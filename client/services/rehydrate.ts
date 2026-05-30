@@ -1,5 +1,14 @@
-import type { SerializedGameState } from '../../shared/session/serialization'
+import type { SerializedGameState, SerializedPlayerState } from '../../shared/session/serialization'
 import type { GameState } from '../../shared/contract/types'
+
+/**
+ * Client-facing game state. Identical to `GameState` except `players` carry the
+ * snapshot-only `specialStables` display projection derived on the server. The
+ * UI reads it directly; it is never written back into the authoritative domain.
+ */
+export type ClientGameState = Omit<GameState, 'players'> & {
+  players: SerializedPlayerState[]
+}
 
 /**
  * Lightweight client-side state rehydrator.
@@ -17,8 +26,8 @@ import type { GameState } from '../../shared/contract/types'
  * reads — including `activeModifiers`, dynamic `PlayerActionCard` action spaces,
  * normalized pastures / fence segments / room tiles, etc.
  */
-export function rehydrateStateForClient(raw: SerializedGameState): GameState {
+export function rehydrateStateForClient(raw: SerializedGameState): ClientGameState {
   // Callbacks on ActionSpace (flow/canBeExecutedByPlayer/execute/resolveChoice)
   // are undefined after the cast. The client never invokes them.
-  return raw as unknown as GameState
+  return raw as unknown as ClientGameState
 }

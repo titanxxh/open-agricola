@@ -341,6 +341,7 @@ type Props = {
   maxRoomSelections: number
   pendingStableTilesLength: number
   maxStableSelections: number
+  pendingFarmHandSelected?: boolean
   pendingSowSelectionsLength?: number
   pendingPositionSelectionsLength: number
   maxPositionSelections: number
@@ -408,6 +409,7 @@ export const InteractionBar = ({
   maxRoomSelections,
   pendingStableTilesLength,
   maxStableSelections,
+  pendingFarmHandSelected = false,
   pendingSowSelectionsLength,
   pendingPositionSelectionsLength,
   maxPositionSelections,
@@ -464,7 +466,8 @@ export const InteractionBar = ({
     pendingRoomTilesLength === 0
   const isStableConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
-    pendingStableTilesLength === 0
+    pendingStableTilesLength === 0 &&
+    !pendingFarmHandSelected
   const isSelectionConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionSelection' &&
     pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
@@ -483,6 +486,10 @@ export const InteractionBar = ({
     pendingChoice?.sourceCard
       ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
       : null
+  const stableSelectedCount = pendingStableTilesLength + (pendingFarmHandSelected ? 1 : 0)
+  const stableMaxLabel = pendingFarmHandSelected
+    ? `${maxStableSelections}+`
+    : maxStableSelections
 
   return (
     <div className="interaction-bar">
@@ -626,9 +633,15 @@ export const InteractionBar = ({
               {pendingChoice.promptKey === 'ui.interactionStableSelect' ? (
                 <div className="interaction-subtitle">
                   {t(locale, 'ui.interactionStableSelectSubtitle', {
-                    selected: pendingStableTilesLength,
-                    max: maxStableSelections,
+                    selected: stableSelectedCount,
+                    max: stableMaxLabel,
                   })}
+                </div>
+              ) : null}
+              {pendingChoice.promptKey === 'ui.interactionStableSelect' &&
+              pendingFarmHandSelected ? (
+                <div className="interaction-subtitle interaction-farmhand-hint">
+                  {t(locale, 'ui.interactionFarmHandHint')}
                 </div>
               ) : null}
               {pendingChoice.promptKey === 'ui.interactionSowSelect' ? (

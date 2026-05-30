@@ -112,11 +112,13 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
+  | 'contributeExtraTurn'
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
+  | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -144,6 +146,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onBeforePlayerTurn',
   'onAllWorkersPlaced',
   'resolveChoice',
+  'contributeExtraTurn',
   'computeBonusScore',
   'computeSharedPostScore',
   'computeCostedBonus',
@@ -153,6 +156,9 @@ export const cardEffectHooks: CardEffectField[] = [
   'onSowExtraField',
   'computeLockedFarmTiles',
   'getInvalidAnimals',
+  'getSpecialStablePositions',
+  'applySpecialStable',
+  'getBuiltSpecialStables',
 ]
 
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
@@ -203,6 +209,18 @@ export type CardEffect = {
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
   resolveChoice?: ResolveChoiceHandler
+  /**
+   * Turn-rotation extra-action hook. Returns an `ActionFlow` (typically an
+   * XOR `[use, forfeit]`) when this card can still grant `player` an extra
+   * placement this round, or `void` when it cannot. Consumed actively by the
+   * round-rotation gating in `shared/session/phases/round.ts` (NOT auto-run
+   * via `runCardEffectHook`): it both decides whether the rotation may stop on
+   * an out-of-workers player (`hasPendingExtraTurn`) and produces the flow
+   * pushed to that player. Single source of truth so gating and flow cannot
+   * drift. First introduced for A92 AdoptiveParents; reusable by any card that
+   * wants to earn a turn-rotation extra action.
+   */
+  contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
@@ -273,6 +291,28 @@ export type CardEffect = {
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
+  /**
+   * Extra "special" stable tiles this card lets the player build during a
+   * Farm-Expansion Build Stables `farm-select` (e.g. B85 FarmHand's 2×2 field
+   * centre). These join the regular stable selection via the `farmHandPositions`
+   * protocol field but are settled by the owning card, not the ordinary
+   * `stableTiles` path. Only consulted at the farm-expansion stables entry.
+   */
+  getSpecialStablePositions?: (state: GameState, player: PlayerState) => FarmTilePosition[]
+  /**
+   * Settle one special stable returned by `getSpecialStablePositions`. Mutates
+   * the player (flags / card state) and returns true on success, false when the
+   * position is not a legal candidate for this card.
+   */
+  applySpecialStable?: (state: GameState, player: PlayerState, position: FarmTilePosition) => boolean
+  /**
+   * Currently-standing special stable tiles this card has built (e.g. B85
+   * FarmHand's 2×2 field centre). Empty until built, and empty again after the
+   * tile is returned (D102 / E76). Drives the generic snapshot `specialStables`
+   * display field so the client can render the built stable without reading any
+   * single card's `cardStates`.
+   */
+  getBuiltSpecialStables?: (player: PlayerState) => FarmTilePosition[]
   /**
    * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
    * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
@@ -479,6 +519,51 @@ export const shouldSkipPlayerTurn = (state: GameState, player: PlayerState): boo
   return skip
 }
 
+/**
+ * Collect the first turn-rotation extra-action flow a player's played cards
+ * can contribute this turn (e.g. A92 AdoptiveParents' `XOR[use, forfeit]`).
+ * Returns the flow plus the owning card id, or `null` when no card contributes.
+ * This is the single source of truth consumed by the round-rotation gating in
+ * `round.ts`: both the "may the rotation stop on this 0-worker player" decision
+ * and the flow pushed to them come from the same `contributeExtraTurn` hook, so
+ * they cannot drift. Errors from custom cards are swallowed (consistent with
+ * the other hook aggregators here).
+ */
+export const collectExtraTurnFlow = (
+  state: GameState,
+  player: PlayerState,
+): { flow: ActionFlow; cardId: string } | null => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.contributeExtraTurn) continue
+    try {
+      const flow = effect.contributeExtraTurn(state, player)
+      if (flow) return { flow, cardId }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return null
+}
+
+/**
+ * Whether any of `player`'s played cards wants to contribute a turn-rotation
+ * extra action this turn. Used by `round.ts` gating to let the rotation stop on
+ * an out-of-workers player (and to avoid ending the round prematurely) when an
+ * extra turn is still pending.
+ */
+export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
+  collectExtraTurnFlow(state, player) !== null
+
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [
     ...player.improvements,
@@ -583,4 +668,115 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
     }
   }
   return lockedKeys
+}
+
+export type SpecialStableCandidate = {
+  position: FarmTilePosition
+  sourceCardId: string
+}
+
+export type BuiltSpecialStable = {
+  position: FarmTilePosition
+  sourceCardId: string
+}
+
+/**
+ * Collect currently-standing special stables (e.g. B85 FarmHand's 2×2 field
+ * centre) from every card the player owns that implements
+ * `getBuiltSpecialStables`. Returns one entry per standing tile tagged with the
+ * owning card id. Empty until built, and empty again after D102 / E76 returns
+ * the tile — the core path carries no per-card knowledge.
+ */
+export const collectBuiltSpecialStables = (
+  player: PlayerState,
+): BuiltSpecialStable[] => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const built: BuiltSpecialStable[] = []
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.getBuiltSpecialStables) continue
+    try {
+      for (const position of effect.getBuiltSpecialStables(player)) {
+        built.push({ position, sourceCardId: cardId })
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} getBuiltSpecialStables threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return built
+}
+
+/**
+ * Collect special-stable candidates (e.g. B85 FarmHand's 2×2 field centre)
+ * from every card the player owns that implements `getSpecialStablePositions`.
+ * Each candidate carries the owning card id so the settlement path can tag the
+ * resulting `farm.stableBuilt` item with `kind:'special'` + `sourceCardId`.
+ */
+export const collectSpecialStablePositions = (
+  state: GameState,
+  player: PlayerState,
+): SpecialStableCandidate[] => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const candidates: SpecialStableCandidate[] = []
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.getSpecialStablePositions) continue
+    try {
+      for (const position of effect.getSpecialStablePositions(state, player)) {
+        candidates.push({ position, sourceCardId: cardId })
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} getSpecialStablePositions threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return candidates
+}
+
+/**
+ * Apply a special stable at `position` by delegating to whichever owned card
+ * accepts it. Returns the owning card id on success, or null when no card
+ * could settle the position.
+ */
+export const applySpecialStableAt = (
+  state: GameState,
+  player: PlayerState,
+  position: FarmTilePosition,
+): { sourceCardId: string } | null => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.applySpecialStable) continue
+    try {
+      if (effect.applySpecialStable(state, player, position)) {
+        return { sourceCardId: cardId }
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} applySpecialStable threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return null
 }

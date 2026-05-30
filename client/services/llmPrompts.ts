@@ -129,6 +129,7 @@ const CARD_IMPL = {
 | onBeforePlayerTurn | 玩家个人回合开始前（non-flow skip-control，只可返回 \`{skipTurn:true}\` 跳过本人回合，不返回 ActionFlow） | 每行动 |
 | onRoundStart | 新一轮格子翻开后 | 每轮 |
 | onAllWorkersPlaced | 所有工人放置完成 | 每轮 |
+| contributeExtraTurn | 轮转额外行动（无普通工人但仍持后代时返回 XOR[用, 放弃]） | 每轮转 |
 | onEndTurn | 每名玩家行动结束后 | 每行动 |
 | onBeforeReturnHome / onStartReturnHome / onReturnHome | 工人回家阶段 | 每轮 |
 | onRoundEnd / onAfterRoundEnd | 该轮结束 | 每轮 |
@@ -153,6 +154,8 @@ const CARD_IMPL = {
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
 | getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
+| getSpecialStablePositions / applySpecialStable | \`(state, player[, position]) => FarmTilePosition[] / boolean\` | Build Stables 特殊 stable（如 B85 的 2×2 中心） |
+| getBuiltSpecialStables | \`(player) => FarmTilePosition[]\` | 当前矗立的特殊 stable（驱动 snapshot specialStables 展示派生） |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
 

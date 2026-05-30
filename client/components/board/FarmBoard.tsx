@@ -20,6 +20,7 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../typ
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
+import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
@@ -239,6 +240,9 @@ export type FarmBoardProps = {
   pendingStableSet: Set<string>
   roomSelectableSet: Set<string>
   stableSelectableSet: Set<string>
+  farmHandSelectableSet: Set<string>
+  pendingFarmHandKey: string | null
+  builtSpecialStableKeys: Set<string>
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
@@ -271,6 +275,7 @@ export type FarmBoardProps = {
   fencePlacementMode?: 'fence' | 'palisade'
   toggleRoomTile: (tile: FarmTilePosition) => void
   toggleStableTile: (tile: FarmTilePosition) => void
+  toggleFarmHand: (tile: FarmTilePosition) => void
   togglePlowTile: (tile: FarmTilePosition) => void
   updateSowSelection: (tile: FarmTilePosition, value: string) => void
   toggleFenceEdge: (edgeId: string) => void
@@ -551,6 +556,9 @@ export const FarmBoard = ({
   pendingStableSet,
   roomSelectableSet,
   stableSelectableSet,
+  farmHandSelectableSet,
+  pendingFarmHandKey,
+  builtSpecialStableKeys,
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
@@ -575,6 +583,7 @@ export const FarmBoard = ({
   fencePlacementMode,
   toggleRoomTile,
   toggleStableTile,
+  toggleFarmHand,
   togglePlowTile,
   updateSowSelection,
   toggleFenceEdge,
@@ -838,6 +847,14 @@ export const FarmBoard = ({
                 }
               }}
             >
+              {isStable ? (
+                <div
+                  className="stable-barn-icon"
+                  data-player-color={displayPlayer.color}
+                >
+                  <span className="res-icon res-icon-barn" />
+                </div>
+              ) : null}
               <span className="farm-tile-text">
                 {isRoom
                   ? displayPlayer.houseType === 'clay'
@@ -848,7 +865,7 @@ export const FarmBoard = ({
                   : isField
                     ? t(locale, 'ui.tileField')
                     : isStable
-                      ? t(locale, 'ui.tileStable')
+                      ? null
                       : t(locale, 'ui.tileEmpty')}
               </span>
               {isSowSelectable ? (
@@ -1043,6 +1060,47 @@ export const FarmBoard = ({
               }}
             />
           )
+        }
+        if (cell.type === 'post') {
+          const centerTopLeft = farmHandTopLeftFromCenterKey(cell.key)
+          const centerKey = centerTopLeft
+            ? `${centerTopLeft.row}-${centerTopLeft.col}`
+            : null
+          if (centerKey && builtSpecialStableKeys.has(centerKey)) {
+            return (
+              <div key={cell.key} className="farm-cell farm-post">
+                <div
+                  className="farmhand-center-overlay farmhand-center-built"
+                  data-farmhand-center-key={centerKey}
+                  data-player-color={displayPlayer.color}
+                  title={t(locale, 'ui.tileStable')}
+                >
+                  <span className="res-icon res-icon-barn farmhand-center-icon" aria-hidden="true" />
+                </div>
+              </div>
+            )
+          }
+          const isFarmHandCenter =
+            isInteractive && !!centerKey && farmHandSelectableSet.has(centerKey)
+          if (isFarmHandCenter && centerTopLeft && centerKey) {
+            const isCenterSelected = pendingFarmHandKey === centerKey
+            return (
+              <div key={cell.key} className="farm-cell farm-post">
+                <button
+                  type="button"
+                  className={`farmhand-center-overlay${
+                    isCenterSelected
+                      ? ' farmhand-center-selected'
+                      : ' farmhand-center-candidate'
+                  }`}
+                  data-farmhand-center-key={centerKey}
+                  aria-pressed={isCenterSelected}
+                  title={t(locale, 'ui.tileStable')}
+                  onClick={() => toggleFarmHand(centerTopLeft)}
+                />
+              </div>
+            )
+          }
         }
         return <div key={cell.key} className={`farm-cell farm-${cell.type}`} />
       })}

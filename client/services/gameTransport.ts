@@ -21,6 +21,7 @@ type CommitSelectionPayload = {
   extraWood?: number
   rooms?: { row: number; col: number }[]
   stables?: { row: number; col: number }[]
+  farmHand?: { row: number; col: number }
   tile?: { row: number; col: number }
   crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
 }

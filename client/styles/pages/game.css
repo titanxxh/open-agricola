@@ -1701,6 +1701,71 @@
   background: #f6ead3;
   box-shadow: inset 0 0 0 2px #b47427;
 }
+/* B85 FarmHand: selection frame and built stable icon rendered at the geometric
+ * center of the 2x2 field (the central `post` cell). The post cell itself is
+ * only fence×fence, so the overlay overflows into a 0.7×tile rounded-square hit
+ * area centered on the post; it does not steal clicks from the outer
+ * empty/pasture tiles (ordinary stable candidates). */
+.farm-post {
+  position: relative;
+  overflow: visible;
+}
+.farmhand-center-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--tile, 60px) * 0.7);
+  height: calc(var(--tile, 60px) * 0.7);
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 18%;
+  background: transparent;
+  cursor: pointer;
+  /* Above tiles, below an active fence so fence placement stays clickable. */
+  z-index: 3;
+}
+.farmhand-center-icon {
+  width: calc(var(--tile, 60px) * 0.5);
+  height: calc(var(--tile, 60px) * 0.5);
+  pointer-events: none;
+}
+.farmhand-center-overlay[data-player-color="red"] .farmhand-center-icon { background-position-x: 0%; }
+.farmhand-center-overlay[data-player-color="yellow"] .farmhand-center-icon { background-position-x: 25%; }
+.farmhand-center-overlay[data-player-color="blue"] .farmhand-center-icon { background-position-x: 50%; }
+.farmhand-center-overlay[data-player-color="black"] .farmhand-center-icon { background-position-x: 75%; }
+.farmhand-center-candidate {
+  background: rgba(124, 58, 173, 0.12);
+  box-shadow: inset 0 0 0 2px #7c3aad;
+  animation: farmhand-center-pulse 1.4s ease-in-out infinite;
+}
+.farmhand-center-selected {
+  background: rgba(124, 58, 173, 0.22);
+  box-shadow: inset 0 0 0 3px #7c3aad;
+}
+.farmhand-center-built {
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+}
+.farmhand-center-built .farmhand-center-icon {
+  opacity: 1;
+}
+@keyframes farmhand-center-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 2px rgba(124, 58, 173, 0.45);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: inset 0 0 0 3px rgba(124, 58, 173, 0.95);
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
 .farm-tile.room {
   background: #d9c2a3;
 }
@@ -1712,6 +1777,21 @@
   background: #f0d8a8;
   color: #6a4a1f;
 }
+.stable-barn-icon {
+  position: absolute;
+  top: calc(var(--tile, 60px) * 0.06);
+  left: calc(var(--tile, 60px) * 0.06);
+  pointer-events: none;
+  z-index: 1;
+}
+.stable-barn-icon .res-icon-barn {
+  font-size: calc(var(--tile, 60px) * 0.42);
+}
+.stable-barn-icon[data-player-color="red"] .res-icon-barn { background-position-x: 0%; }
+.stable-barn-icon[data-player-color="yellow"] .res-icon-barn { background-position-x: 25%; }
+.stable-barn-icon[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
+.stable-barn-icon[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+.stable-barn-icon[data-player-color="green"] .res-icon-barn { background-position-x: 100%; }
 .farm-tile.locked {
   position: relative;
 }
@@ -1988,9 +2068,8 @@
   cursor: not-allowed;
 }
 .farm-post {
-  background: #7b5b32;
+  background: transparent;
   border-radius: 2px;
-  opacity: 0;
 }
 .farm-item {
   background: #fff6da;

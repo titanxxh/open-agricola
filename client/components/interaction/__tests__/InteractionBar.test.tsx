@@ -150,6 +150,172 @@ describe('InteractionBar', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
   })
 
+  it('enables stable-select confirm when only a B85 farmHand is selected', () => {
+    const stableSelectChoice: PendingChoice = {
+      promptKey: 'ui.interactionStableSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'stable-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={stableSelectChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={1}
+        pendingFarmHandSelected={true}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={true}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).not.toBeDisabled()
+  })
+
+  it('shows a Farm Hand hint when a B85 farmHand candidate is selected', () => {
+    const stableSelectChoice: PendingChoice = {
+      promptKey: 'ui.interactionStableSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'stable-space',
+    }
+
+    const { container } = render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={stableSelectChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={1}
+        maxStableSelections={4}
+        pendingFarmHandSelected={true}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={true}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(container.textContent).toContain('Selected 2 / Max 4+')
+    expect(container.textContent).toContain('Farm Hand stable selected')
+  })
+
+  it('keeps stable-select confirm disabled when nothing is selected', () => {
+    const stableSelectChoice: PendingChoice = {
+      promptKey: 'ui.interactionStableSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'stable-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={stableSelectChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={1}
+        pendingFarmHandSelected={false}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={true}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
   it('renders animal reorg pending summary and confirm action in the bottom bar', () => {
     const html = renderToStaticMarkup(
       <InteractionBar

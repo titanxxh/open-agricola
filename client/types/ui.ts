@@ -55,6 +55,7 @@ export type HistorySnapshot = {
   pendingRoomTiles: FarmTilePosition[]
   roomError: string | null
   pendingStableTiles: FarmTilePosition[]
+  pendingFarmHand: FarmTilePosition | null
   stableError: string | null
   pendingPlowTile: FarmTilePosition | null
   plowError: string | null

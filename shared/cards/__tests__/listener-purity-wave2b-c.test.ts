@@ -312,59 +312,55 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('A92 AdoptiveParents promote-newborn activation returns mutation leaves without mutating state', () => {
+  // A92 was migrated to the BGA pull model: a single anytime grow-only listener
+  // (capability A) plus a `contributeExtraTurn` effect hook (capability B). The
+  // old before/after/immediatelyAfter push listeners are gone.
+  it('A92 AdoptiveParents anytime grow-only returns a pay+promote seq without mutating state', () => {
     const p = player('A92_AdoptiveParents', {
       workers: [
         { id: '1', isActive: true, isNewborn: false },
         { id: '2', isActive: true, isNewborn: true },
       ],
+      resources: resource({ food: 3 }),
     })
-    const harvest = space('family-growth', { takenBy: [{ playerId: p.id, workerId: '2' }] })
-    const game = state([p], { actionSpaces: [harvest] })
-    const before = stateSnapshot(game)
-
-    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-before-gain-activation')
-      .handler(context(p, { state: game, actionId: 'gain', phase: 'immediatelyAfter', sourceCard: 'A92_AdoptiveParents' }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A92_AdoptiveParents', params: { kind: 'promote-first-newborn' } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A92_AdoptiveParents', params: { kind: 'set-flag', flag: true } },
-      ],
-    })
-  })
-
-  it('A92 AdoptiveParents does not arm the place-farmer flag without a newborn', () => {
-    const p = player('A92_AdoptiveParents')
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-before-gain-activation')
-      .handler(context(p, { state: game, actionId: 'gain', phase: 'immediatelyAfter', sourceCard: 'A92_AdoptiveParents' }))
+    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
+      .handler(context(p, { state: game, actionId: 'anytime', phase: 'anytime' }))
+
+    expectUnchanged(before, game)
+    expect(result?.flow?.type).toBe('seq')
+    expect(firstLeaf(result?.flow)).toBeDefined()
+  })
+
+  it('A92 AdoptiveParents anytime grow-only returns void without a newborn', () => {
+    const p = player('A92_AdoptiveParents', { resources: resource({ food: 3 }) })
+    const game = state([p])
+    const before = stateSnapshot(game)
+
+    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
+      .handler(context(p, { state: game, actionId: 'anytime', phase: 'anytime' }))
 
     expectUnchanged(before, game)
     expect(result).toBeUndefined()
   })
 
-  it('A92 AdoptiveParents before-place-farmer clears flag by flow only', () => {
+  it('A92 AdoptiveParents contributeExtraTurn returns an XOR without mutating state', () => {
     const p = player('A92_AdoptiveParents', {
-      cardStates: { A92_AdoptiveParents: { flagged: true } },
+      workers: [
+        { id: '1', isActive: true, isNewborn: false },
+        { id: '2', isActive: true, isNewborn: true },
+      ],
+      resources: resource({ food: 3 }),
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-before-place-farmer')
-      .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'before' }))
+    const flow = A92_AdoptiveParents_impl.effect!.contributeExtraTurn!(game, p)
 
     expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'A92_AdoptiveParents',
-      params: { kind: 'set-flag', flag: false },
-    })
+    expect(flow?.type).toBe('xor')
   })
 
   it('B18 GrasslandHarrow queues target round and future meeple lazily', () => {

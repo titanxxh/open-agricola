@@ -65,6 +65,9 @@ const createFarmBoardProps = (
   pendingStableSet: new Set(),
   roomSelectableSet: new Set(),
   stableSelectableSet: new Set(),
+  farmHandSelectableSet: new Set(),
+  pendingFarmHandKey: null,
+  builtSpecialStableKeys: new Set(),
   maxStableSelections: 0,
   plowSelectableSet: new Set(),
   pendingPlowTile: null,
@@ -89,6 +92,7 @@ const createFarmBoardProps = (
   fenceSelectableSet: new Set(),
   toggleRoomTile: () => {},
   toggleStableTile: () => {},
+  toggleFarmHand: () => {},
   togglePlowTile: () => {},
   updateSowSelection: () => {},
   toggleFenceEdge: () => {},
@@ -122,6 +126,114 @@ describe('FarmBoard', () => {
     )
 
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
+  })
+
+  it('renders a B85 farmHand candidate as a clickable frame at the 2x2 center post', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 },
+            { key: '4-4', type: 'post' },
+          ],
+          farmHandSelectableSet: new Set(['1-1']),
+        })}
+      />,
+    )
+
+    // Center overlay sits on the geometric-center post (grid key 4-4 for top-left 1-1).
+    expect(html).toMatch(/farmhand-center-overlay[^"]*\bfarmhand-center-candidate\b/)
+    expect(html).toContain('data-farmhand-center-key="1-1"')
+    // The 2x2 top-left tile itself is no longer the farmHand click target.
+    expect(html).not.toMatch(/farm-tile[^"]*\bfarmhand-selectable\b/)
+  })
+
+  it('marks the selected B85 farmHand candidate overlay as selected', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 },
+            { key: '4-4', type: 'post' },
+          ],
+          farmHandSelectableSet: new Set(['1-1']),
+          pendingFarmHandKey: '1-1',
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farmhand-center-overlay[^"]*\bfarmhand-center-selected\b/)
+    expect(html).not.toMatch(/farm-tile[^"]*\bfarmhand-selected\b/)
+  })
+
+  it('renders a top-left barn icon on a built stable tile instead of the stable label', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('res-icon-barn')
+    expect(html).not.toContain('Stable')
+  })
+
+  it('colors the built stable barn icon by the display player color', () => {
+    const player = createPlayer('p1', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/stable-barn-icon[^>]*data-player-color="blue"/)
+  })
+
+  it('keeps the animal badge on a built stable tile alongside the barn icon', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+          stableDisplayMap: new Map([['0-0', { animalType: 'sheep', animalCount: 1 }]]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('pasture-info')
+  })
+
+  it('does not render a barn icon on a buildable stable candidate tile', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stableSelectableSet: new Set(['0-0']),
+          maxStableSelections: 1,
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-tile[^"]*\bstable-selectable\b/)
+    expect(html).not.toContain('stable-barn-icon')
   })
 
   it('marks highlighted fence edges', () => {
@@ -161,6 +273,9 @@ describe('FarmBoard', () => {
         pendingStableSet={new Set()}
         roomSelectableSet={new Set()}
         stableSelectableSet={new Set()}
+        farmHandSelectableSet={new Set()}
+        pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -184,6 +299,7 @@ describe('FarmBoard', () => {
         fenceSelectableSet={new Set()}
         toggleRoomTile={() => {}}
         toggleStableTile={() => {}}
+        toggleFarmHand={() => {}}
         togglePlowTile={() => {}}
         updateSowSelection={() => {}}
         toggleFenceEdge={() => {}}
@@ -245,6 +361,9 @@ describe('FarmBoard', () => {
       pendingStableSet: new Set<string>(),
       roomSelectableSet: new Set<string>(),
       stableSelectableSet: new Set<string>(),
+      farmHandSelectableSet: new Set<string>(),
+      pendingFarmHandKey: null,
+      builtSpecialStableKeys: new Set<string>(),
       maxStableSelections: 0,
       plowSelectableSet: new Set<string>(),
       pendingPlowTile: null,
@@ -268,6 +387,7 @@ describe('FarmBoard', () => {
       fenceSelectableSet: new Set<string>(),
       toggleRoomTile: () => {},
       toggleStableTile: () => {},
+      toggleFarmHand: () => {},
       togglePlowTile: () => {},
       updateSowSelection: () => {},
       toggleFenceEdge: () => {},
@@ -332,6 +452,9 @@ describe('FarmBoard', () => {
         pendingStableSet={new Set()}
         roomSelectableSet={new Set()}
         stableSelectableSet={new Set()}
+        farmHandSelectableSet={new Set()}
+        pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -356,6 +479,7 @@ describe('FarmBoard', () => {
         fenceSelectableSet={new Set([edgeId])}
         toggleRoomTile={() => {}}
         toggleStableTile={() => {}}
+        toggleFarmHand={() => {}}
         togglePlowTile={() => {}}
         updateSowSelection={() => {}}
         toggleFenceEdge={() => {}}
@@ -407,6 +531,9 @@ describe('FarmBoard', () => {
         pendingStableSet={new Set()}
         roomSelectableSet={new Set()}
         stableSelectableSet={new Set()}
+        farmHandSelectableSet={new Set()}
+        pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -430,6 +557,7 @@ describe('FarmBoard', () => {
         fenceSelectableSet={new Set()}
         toggleRoomTile={() => {}}
         toggleStableTile={() => {}}
+        toggleFarmHand={() => {}}
         togglePlowTile={() => {}}
         updateSowSelection={() => {}}
         toggleFenceEdge={() => {}}
@@ -507,6 +635,9 @@ describe('FarmBoard', () => {
         pendingStableSet={new Set()}
         roomSelectableSet={new Set()}
         stableSelectableSet={new Set()}
+        farmHandSelectableSet={new Set()}
+        pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -530,6 +661,7 @@ describe('FarmBoard', () => {
         fenceSelectableSet={new Set()}
         toggleRoomTile={() => {}}
         toggleStableTile={() => {}}
+        toggleFarmHand={() => {}}
         togglePlowTile={() => {}}
         updateSowSelection={() => {}}
         toggleFenceEdge={() => {}}
@@ -641,6 +773,9 @@ const renderWithOccSelection = (
       pendingStableSet={new Set()}
       roomSelectableSet={new Set()}
       stableSelectableSet={new Set()}
+      farmHandSelectableSet={new Set()}
+      pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
       maxStableSelections={0}
       plowSelectableSet={new Set()}
       pendingPlowTile={null}
@@ -664,6 +799,7 @@ const renderWithOccSelection = (
       fenceSelectableSet={new Set()}
       toggleRoomTile={() => {}}
       toggleStableTile={() => {}}
+      toggleFarmHand={() => {}}
       togglePlowTile={() => {}}
       updateSowSelection={() => {}}
       toggleFenceEdge={() => {}}

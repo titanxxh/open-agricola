@@ -456,6 +456,16 @@ WS 广播、HTTP 查询、单测断言同一结构。`pending` 字段已不是�
 
 ---
 
+### round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
+
+A92_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），发生在玩家普通工人耗尽**之后**，与 `onBeforePlayerTurn` 的 `skipTurn` 在回合开始前的负向跳过相反。
+
+- `contributeExtraTurn?: (state, player) => ActionFlow | void`：`CardEffect` 上的 hook，可还款时返回 XOR `[use, forfeit]` flow，否则 `void`。它**不**经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 的轮转 gating **主动消费**：`hasPendingExtraTurn(state, player)` 决定轮转是否可停在一个 0-worker 玩家身上，`collectExtraTurnFlow(state, player)` 产生推送给该玩家的 flow（单一真相源，gating 与 flow 不会漂移）。OR-aggregate、order-independent。
+- round.ts 三处 gating：选下一活跃玩家（`workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`，`nextSeatedPlayerIdx`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`，`roundWorkComplete`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮以便注入 flow）。都把"有 pending extra turn"的玩家视为仍有资格、不提前跳过。
+- 玩家获得一次额外放工机会，表现为 XOR[use, forfeit]；选 Forfeit（放弃）即退出本轮后续。A92 触发条件：普通工人耗尽但仍持未激活后代（newborn），对齐 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项（pull model）。
+
+**与 `onBeforePlayerTurn` / `skipTurn` 的区别**：`skipTurn`（如 D134_OysterEater，返回 `{ skipTurn: true }`，镜像 BGA `Globals::setSkipNext`）在玩家回合**开始前**让轮转 `continue` 跳过该玩家整个回合（负向）；`contributeExtraTurn` 在玩家工人**耗尽后**让轮转**不提前跳过**、追加一次额外放工（正向）。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
+
 ## 7. shared/actions/ — 行动定义与 Hook 系统
 
 ### 7.1 目录
@@ -916,6 +926,10 @@ shared/domain/
 `AnimalZone.houseAnimalZone?: boolean` 标记“视作 house 动物区”的非 house zone。`computeAnimalZones` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，会统一移除普通 `zoneType === 'house'` 和 `houseAnimalZone === true` 的 zone。House-zone 规则统计必须使用 `isHouseAnimalZone()` / `countHouseAnimals()`，不要再直接读取 `player.houseAnimalCount` 后漏掉 D148_DomesticianExpert 这类 tagged zone。
 
 `onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B86_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。pasture capacity replacement/additive 不再放在这里，改走 `computePastureCapacityModifiers`。
+
+**Special-stable card-effect 扩展点**：`getSpecialStablePositions?(state, player) => FarmTilePosition[]` + `applySpecialStable?(state, player, position) => boolean` + `getBuiltSpecialStables?(player) => FarmTilePosition[]`。在 Farm-Expansion 的 Build Stables `farm-select` 里，核心 `shared/actions/effects/stables.ts` 通过 `card-effects.ts` 的 `collectSpecialStablePositions(state, player)`（聚合所有卡的候选，每项带 `sourceCardId`）和 `applySpecialStableAt(state, player, position)`（委派给接受该格的卡，返回 `sourceCardId`）发现并结算这些“非 `stableTiles` 普通格”的特殊 stable。候选注入协议字段 `farmHandPositions`（字段名为前端兼容保留），结算时填 `farm.stableBuilt` item 的 `kind:'special'` + `sourceCardId`。门控为通用的 `actionContext.farmHand === true`——仅 Farm-Expansion stables leaf wrapper 设置，E148 / A089 / C94 等其他“建 stable”入口不提供特殊 stable。当前唯一实现者是 B85_FarmHand（2×2 田地中心），核心 stables 文件不再 import 任何具体卡牌。
+
+第三个并列方法 `getBuiltSpecialStables?(player)`（#200）返回该卡**当前矗立**的特殊 stable 位置（建造前空，D102 / E76 回收后再次为空）。聚合 `collectBuiltSpecialStables(player) => { position, sourceCardId }[]` 遍历所有卡。`serializeState`（`shared/session/serialization.ts`）据此给每个序列化玩家派生**展示派生字段** `SerializedPlayerState.specialStables: { position, sourceCardId }[]`——领域真相仍在 `cardStates`，该字段只进 snapshot，不进 `PlayerState`/`GameState` 领域顶层，`rehydrateState` 反序列化时显式剥离避免泄漏回权威态。前端 `GameContainerApi` 从 `displayPlayer.specialStables` 派生「已建特殊 stable top-left 集合」传给 FarmBoard，渲染 `.farmhand-center-built` 实心常驻 overlay，无需读任何单卡 `cardStates`。
 
 ---
 

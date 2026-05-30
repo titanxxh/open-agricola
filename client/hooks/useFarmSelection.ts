@@ -30,6 +30,8 @@ export const useFarmSelection = () => {
   const [pendingStableTiles, setPendingStableTiles] = useState<FarmTilePosition[]>(
     [],
   )
+  const [pendingFarmHand, setPendingFarmHand] =
+    useState<FarmTilePosition | null>(null)
   const [stableError, setStableError] = useState<string | null>(null)
   const [pendingPlowTile, setPendingPlowTile] =
     useState<FarmTilePosition | null>(null)
@@ -91,6 +93,19 @@ export const useFarmSelection = () => {
       }
       if (prev.length >= maxStableSelections) return prev
       return [...prev, tile]
+    })
+    setStableError(null)
+  }
+
+  const toggleFarmHand = (
+    tile: FarmTilePosition,
+    positionKey: (tile: FarmTilePosition) => string,
+  ) => {
+    setPendingFarmHand((prev) => {
+      if (prev && positionKey(prev) === positionKey(tile)) {
+        return null
+      }
+      return tile
     })
     setStableError(null)
   }
@@ -182,6 +197,8 @@ export const useFarmSelection = () => {
     setRoomError,
     pendingStableTiles,
     setPendingStableTiles,
+    pendingFarmHand,
+    setPendingFarmHand,
     stableError,
     setStableError,
     pendingPlowTile,
@@ -195,6 +212,7 @@ export const useFarmSelection = () => {
     toggleFenceEdge,
     toggleRoomTile,
     toggleStableTile,
+    toggleFarmHand,
     togglePlowTile,
     updateSowSelection,
     pendingPositionSelections,
