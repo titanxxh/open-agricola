@@ -1323,6 +1323,13 @@ export const GameContainerApi = () => {
       ),
     [farmInteraction],
   )
+  const builtSpecialStableKeys = useMemo(
+    () =>
+      new Set(
+        (displayPlayer?.specialStables ?? []).map((entry) => positionKey(entry.position)),
+      ),
+    [displayPlayer?.specialStables],
+  )
   const fenceSelectableSet = useMemo(
     () =>
       new Set(
@@ -2053,6 +2060,7 @@ export const GameContainerApi = () => {
               roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
               farmHandSelectableSet={farmHandSelectableSet}
               pendingFarmHandKey={pendingFarmHand ? positionKey(pendingFarmHand) : null}
+              builtSpecialStableKeys={builtSpecialStableKeys}
               maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
               positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}

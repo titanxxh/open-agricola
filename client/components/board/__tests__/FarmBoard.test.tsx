@@ -67,6 +67,7 @@ const createFarmBoardProps = (
   stableSelectableSet: new Set(),
   farmHandSelectableSet: new Set(),
   pendingFarmHandKey: null,
+  builtSpecialStableKeys: new Set(),
   maxStableSelections: 0,
   plowSelectableSet: new Set(),
   pendingPlowTile: null,
@@ -274,6 +275,7 @@ describe('FarmBoard', () => {
         stableSelectableSet={new Set()}
         farmHandSelectableSet={new Set()}
         pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -361,6 +363,7 @@ describe('FarmBoard', () => {
       stableSelectableSet: new Set<string>(),
       farmHandSelectableSet: new Set<string>(),
       pendingFarmHandKey: null,
+      builtSpecialStableKeys: new Set<string>(),
       maxStableSelections: 0,
       plowSelectableSet: new Set<string>(),
       pendingPlowTile: null,
@@ -451,6 +454,7 @@ describe('FarmBoard', () => {
         stableSelectableSet={new Set()}
         farmHandSelectableSet={new Set()}
         pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -529,6 +533,7 @@ describe('FarmBoard', () => {
         stableSelectableSet={new Set()}
         farmHandSelectableSet={new Set()}
         pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -632,6 +637,7 @@ describe('FarmBoard', () => {
         stableSelectableSet={new Set()}
         farmHandSelectableSet={new Set()}
         pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
         maxStableSelections={0}
         plowSelectableSet={new Set()}
         pendingPlowTile={null}
@@ -769,6 +775,7 @@ const renderWithOccSelection = (
       stableSelectableSet={new Set()}
       farmHandSelectableSet={new Set()}
       pendingFarmHandKey={null}
+        builtSpecialStableKeys={new Set()}
       maxStableSelections={0}
       plowSelectableSet={new Set()}
       pendingPlowTile={null}

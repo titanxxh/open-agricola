@@ -72,6 +72,7 @@ const createProps = (
   stableSelectableSet: new Set(),
   farmHandSelectableSet: new Set(),
   pendingFarmHandKey: null,
+  builtSpecialStableKeys: new Set(),
   maxStableSelections: 0,
   plowSelectableSet: new Set(),
   pendingPlowTile: null,
@@ -203,5 +204,64 @@ describe('FarmBoard farmHand center overlay interaction', () => {
 
     const overlay = container.querySelector('[data-farmhand-center-key="0-0"]')
     expect(overlay?.getAttribute('data-player-color')).toBe('blue')
+  })
+})
+
+describe('FarmBoard built special-stable center overlay', () => {
+  it('renders a solid built overlay at the 2x2 center for a built special stable', () => {
+    const player = { ...createPlayer(), color: 'green' as const }
+    const { container } = render(
+      <FarmBoard
+        {...createProps(player, {
+          players: [player],
+          currentPlayer: player,
+          displayPlayer: player,
+          farmCells: [{ key: '2-2', type: 'post' }],
+          builtSpecialStableKeys: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    const overlay = container.querySelector('[data-farmhand-center-key="0-0"]')
+    expect(overlay).not.toBeNull()
+    expect(overlay?.classList.contains('farmhand-center-built')).toBe(true)
+    expect(overlay?.querySelector('.res-icon-barn')).not.toBeNull()
+    expect(overlay?.getAttribute('data-player-color')).toBe('green')
+  })
+
+  it('does not toggle farmHand when a built overlay is clicked (not selectable)', () => {
+    const player = createPlayer()
+    const toggleFarmHand = vi.fn()
+    const { container } = render(
+      <FarmBoard
+        {...createProps(player, {
+          farmCells: [{ key: '2-2', type: 'post' }],
+          builtSpecialStableKeys: new Set(['0-0']),
+          toggleFarmHand,
+        })}
+      />,
+    )
+
+    const overlay = container.querySelector('[data-farmhand-center-key="0-0"]')
+    expect(overlay).not.toBeNull()
+    fireEvent.click(overlay!)
+    expect(toggleFarmHand).not.toHaveBeenCalled()
+    expect(overlay?.classList.contains('farmhand-center-candidate')).toBe(false)
+  })
+
+  it('renders the built overlay even when the board is not interactive', () => {
+    const player = createPlayer()
+    const { container } = render(
+      <FarmBoard
+        {...createProps(player, {
+          isInteractive: false,
+          farmCells: [{ key: '2-2', type: 'post' }],
+          builtSpecialStableKeys: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    const overlay = container.querySelector('[data-farmhand-center-key="0-0"]')
+    expect(overlay?.classList.contains('farmhand-center-built')).toBe(true)
   })
 })
