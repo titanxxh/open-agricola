@@ -7,19 +7,31 @@ import { normalizeState } from '../session/state-bootstrap'
 import { getCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'
+import { collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
   'canBeExecutedByPlayer' | 'execute' | 'resolveChoice' | 'flow'
 >
 
+/**
+ * Player as seen by the client. Adds the generic `specialStables` display field
+ * derived from `collectBuiltSpecialStables` — a snapshot-only projection of
+ * each card's standing special stables (e.g. B85 FarmHand's 2×2 centre). The
+ * domain truth stays in `cardStates`; this never enters `PlayerState`.
+ */
+export type SerializedPlayerState = PlayerState & {
+  specialStables: BuiltSpecialStable[]
+}
+
 export type SerializedGameState = Omit<
   GameState,
-  'actionSpaces' | 'roundStartSnapshot'
+  'actionSpaces' | 'roundStartSnapshot' | 'players'
 > & {
   actionSpaces: SerializedActionSpace[]
   roundStartSnapshot: null
   engineStack: EngineStackCursor
+  players: SerializedPlayerState[]
 }
 
 export type SerializeStateContext = {
@@ -30,10 +42,14 @@ export const serializeState = (
   state: GameState,
   ctx: SerializeStateContext,
 ): SerializedGameState => {
-  const { actionSpaces, ...rest } = state
+  const { actionSpaces, players, ...rest } = state
   return {
     ...rest,
     roundStartSnapshot: null,
+    players: players.map((player) => ({
+      ...player,
+      specialStables: collectBuiltSpecialStables(player),
+    })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...s }) => s,
@@ -552,7 +568,13 @@ export type RehydratedState = {
 
 export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
   const templates = createActionSpaces(raw.players?.length)
-  const { engineStack, ...rawWithoutCursor } = raw
+  const { engineStack, players, ...rest } = raw
+  // Strip the snapshot-only `specialStables` display projection so it never
+  // leaks into the authoritative `PlayerState` domain shape.
+  const rawWithoutCursor = {
+    ...rest,
+    players: players.map(({ specialStables: _specialStables, ...player }) => player),
+  }
   const restored = rebuildActiveModifiers(normalizeState(rawWithoutCursor as unknown as GameState))
   restored.actionSpaces = templates.map((template) => {
     const saved = raw.actionSpaces?.find((s) => s.id === template.id)
