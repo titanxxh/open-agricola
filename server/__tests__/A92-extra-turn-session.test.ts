@@ -33,6 +33,19 @@ const optLabels = (r: SessionResponse): (string | undefined)[] =>
   r.interaction.stateId === 'wait' ? (r.interaction.options ?? []).map((o) => o.labelKey) : []
 
 /**
+ * Resolve the XOR branch value by its `choiceLabelKey`. OA addresses XOR
+ * branches by the underlying node id (e.g. 'seq-4'), not a stable '0'/'1'
+ * index, so tests pick the branch by its label and pass the real value to
+ * `resolveChoice`.
+ */
+const valueByLabel = (r: SessionResponse, labelKey: string): string => {
+  const opts = r.interaction.stateId === 'wait' ? (r.interaction.options ?? []) : []
+  const found = opts.find((o) => o.labelKey === labelKey)
+  if (!found) throw new Error(`no option with labelKey ${labelKey}; got ${JSON.stringify(opts)}`)
+  return found.value
+}
+
+/**
  * Two-player rotation fixture. P0 holds A92 and is OUT of ordinary workers —
  * its only active worker is a parked Newborn occupying an action space (so
  * `workersAvailable === 0`). P1 is the current player with `p1Workers`
@@ -129,8 +142,8 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const r = driveToP0ExtraTurn(session)
     expect(session.getState().state.currentPlayerIndex).toBe(0)
     expect(reqKind(r)).toBe('choice')
-    // XOR branches are addressed by index: '0' = use, '1' = forfeit.
-    expect(optValues(r)).toEqual(['0', '1'])
+    // Two XOR branches (use / forfeit), addressed by their choiceLabelKey.
+    expect(optValues(r)).toHaveLength(2)
     expect(optLabels(r)).toEqual(['ui.interactionUseAbility', 'ui.interactionDecline'])
   })
 
@@ -141,8 +154,8 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const foodBefore = session.getState().state.players[0]!.resources.food
     expect(newbornCount(session.getState().state.players[0]!)).toBe(1)
 
-    // Choose "use" (branch 0): pay + promote → place-farmer farm-select.
-    const used = session.resolveChoice(0, '0')
+    // Choose "use": pay + promote → place-farmer farm-select.
+    const used = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionUseAbility'))
     expect(used.ok).toBe(true)
     expect(reqKind(used)).toBe('farm-select')
     expect(used.state.players[0]!.resources.food).toBe(foodBefore - 1)
@@ -165,7 +178,14 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
 
     // First use → pay/promote, then place the promoted worker on the space the
     // promotion just freed (guaranteed empty + placeable this round).
-    const used = session.resolveChoice(0, '0')
+    const used = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionUseAbility'))
+    {
+      const sUsed = session.getState().state
+      const p0u = sUsed.players[0]!
+      console.error('DBG3 usedKind=', used.interaction.stateId === 'wait' ? used.interaction.request.kind : 'idle',
+        'wAvail=', workersAvailable(sUsed, p0u), 'newborn=', newbornCount(p0u),
+        'forest=', JSON.stringify(sUsed.actionSpaces.find((a) => a.id === 'forest')!.takenBy))
+    }
     expect(reqKind(used)).toBe('farm-select')
     const placed = session.resolveChoice(0, placeableSpaces(session)[0]!)
     expect(placed.ok).toBe(true)
@@ -186,8 +206,8 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
 
-    // Choose "forfeit" (branch 1).
-    const forfeited = session.resolveChoice(0, '1')
+    // Choose "forfeit".
+    const forfeited = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionDecline'))
     expect(forfeited.ok).toBe(true)
 
     const after = session.getState()
@@ -201,7 +221,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const session = setupRotation()
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
-    const forfeited = session.resolveChoice(0, '1')
+    const forfeited = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionDecline'))
     expect(forfeited.ok).toBe(true)
 
     const after = drainConfirms(session, forfeited)

@@ -235,6 +235,7 @@ export const zh = {
     interactionOptionalSkip: '跳过',
     interactionFlowSelect: '请选择要执行的动作',
     interactionUseAbility: '使用能力',
+  interactionUseGrowOffspring: '激活后代（付 1 食物）',
     interactionDecline: '放弃',
     interactionFlowDone: '完成',
     interactionSelectTrigger: '选择要先结算的卡牌效果',

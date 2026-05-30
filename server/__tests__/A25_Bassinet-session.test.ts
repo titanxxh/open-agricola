@@ -159,7 +159,7 @@ describe('A25_Bassinet session', () => {
     expect(resp.ok).toBe(false)
   })
 
-  it('case 6: FG + A92 reclaim = 1 person, allowed', () => {
+  it('case 6: FG + A92 grow-only (capability A) = 1 person, allowed', () => {
     const session = baseSetup()
     const state = session.getState().state
     const p1 = state.players[0]!
@@ -170,52 +170,33 @@ describe('A25_Bassinet session', () => {
     p1.occupationPlayed.push('A92_AdoptiveParents')
     session.loadState(state)
 
-    // P1 does FG
+    // P1 does FG → parent + newborn on wish-children. The action engine stays
+    // alive at FG's optional minor-improvement choice (interactive window keyed
+    // to the wish-children space), which is where A92's anytime grow-only entry
+    // is exposed.
     const fgResp = session.takeAction(0, 'wish-children')
     expect(fgResp.ok).toBe(true)
     expect(fgResp.interaction.stateId).toBe('wait')
 
-    // Depending on the dealt hand, wish-children may first offer its own
-    // optional minor-improvement tail. If so, skip it to reach the A92 offer.
-    const fgInteraction = fgResp.interaction.stateId === 'wait' ? fgResp.interaction : null
-    const showsWishChildrenMinorTail =
-      fgInteraction?.options?.some((o) => o.labelKey === 'actions.improvement.name') ?? false
-    const a92Resp = showsWishChildrenMinorTail
-      ? session.resolveChoice(0, '__skip__')
-      : fgResp
-    expect(a92Resp.ok).toBe(true)
-    expect(a92Resp.interaction.stateId).toBe('wait')
+    // Capability A: anytime grow-only promotes the newborn off the FG space
+    // (pay 1 food, child→adult, no immediate place-farmer). This is what frees
+    // the FG space to a single person so A25 can follow P2 into it.
+    const grown = session.takeAnytimeAction(0, 'A92-adoptive-parents-anytime-grow')
+    expect(grown.ok).toBe(true)
 
-    // Accept A92 offer (pay 1 food, reclaim newborn, extra place-farmer)
-    if (a92Resp.interaction.stateId !== 'wait') throw new Error('expected choice')
-    const acceptOption = a92Resp.interaction.options?.find((o) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-    const afterAccept = session.resolveChoice(0, acceptOption!.value)
-    expect(afterAccept.ok).toBe(true)
+    // FG space now has only 1 ref (the parent).
+    const fgSpaceMid = session.getState().state.actionSpaces.find((s) => s.id === 'wish-children')!
+    expect(fgSpaceMid.takenBy.filter((t) => t.playerId === p1.id)).toHaveLength(1)
 
-    // FG space now has only 1 ref (parent)
-    const fgSpaceMid = afterAccept.state.actionSpaces.find((s) => s.id === 'wish-children')!
-    expect(fgSpaceMid.takenBy).toHaveLength(1)
-
-    if (afterAccept.interaction.stateId === 'wait') {
-      const extraPlacement = session.resolveChoice(0, 'forest')
-      expect(extraPlacement.ok).toBe(true)
-      if (extraPlacement.interaction.stateId === 'wait') {
-        const confirm = session.resolveChoice(0, 'confirm')
-        expect(confirm.ok).toBe(true)
-      }
-    }
-
-    // After attempting to clear pending, switch to P2
+    // Switch to P2.
     const finalState = session.getState().state
     finalState.currentPlayerIndex = 1
     session.loadState(finalState)
 
-    // P2 (A25) tries FG space — should succeed (1 person there)
+    // P2 (A25) tries FG space — should succeed (1 person there).
     const resp = session.takeAction(1, 'wish-children')
     expect(resp.ok).toBe(true)
     const fgSpaceAfter = resp.state.actionSpaces.find((s) => s.id === 'wish-children')!
-    expect(fgSpaceAfter.takenBy.length).toBeGreaterThanOrEqual(2)
     expect(fgSpaceAfter.takenBy.some((t) => t.playerId === 'p2')).toBe(true)
   })
 
