@@ -498,13 +498,15 @@ export const handleConfirmNextPlayerResolved = (
     if (extra) {
       core.setTurnOwner(state.currentPlayerIndex)
       const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
-      // Non-`__subflow:` spaceId so the engine-completion trampoline treats this
-      // as a real turn: when the extra-turn flow finishes it runs
-      // `finishCompletedActionTurn`, advancing the rotation or ending the round.
+      // `__subflow:top-level` spaceId mirrors `takeAnytimeAction`'s
+      // no-active-engine branch so `buildInteraction` surfaces the XOR as a real
+      // pending interaction. `reason: 'top-level'` (not the spaceId) is what makes
+      // the completion trampoline run `finishCompletedActionTurn`, advancing the
+      // rotation or ending the round once the extra-turn flow finishes.
       core.pushEngineFrame({
         ...frame,
         ownerPlayerIndex: state.currentPlayerIndex,
-        spaceId: 'extra-turn',
+        spaceId: '__subflow:top-level',
         stageResume: null,
         deferredPlayerSwitch: null,
         reason: 'top-level',

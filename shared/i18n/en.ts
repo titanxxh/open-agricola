@@ -241,6 +241,7 @@ export const en = {
     interactionOptionalSkip: 'Skip',
     interactionFlowSelect: 'Choose an action',
     interactionUseAbility: 'Use ability',
+  interactionUseGrowOffspring: 'Activate offspring (pay 1 food)',
     interactionDecline: 'Decline',
     interactionFlowDone: 'Done',
     interactionSelectTrigger: 'Choose which card effect to resolve first',

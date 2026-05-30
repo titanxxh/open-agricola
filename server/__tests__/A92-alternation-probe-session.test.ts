@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, newbornCount } from '../../shared/domain/player'
 import { removeWorkerRef } from '../../shared/domain/space'
 import { nextSeatedPlayerIdx } from '../../shared/session/phases/round'
+import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import '../../shared/cards/A/A92_AdoptiveParents'
 
 const A92 = 'A92_AdoptiveParents'
@@ -54,7 +55,12 @@ describe('A92 alternation probe (session)', () => {
   // turn — there is no window in which A92's offspring could be activated.
   // Proves capability B (a turn-rotation hook contributing an option for such a
   // player) is required.
-  it('probe B: the rotation skips a player whose only worker is a parked newborn (with A92)', () => {
+  // Formalized: with the #203 extra-turn rotation gating, a player out of
+  // ordinary workers but holding A92 + a parked newborn (+ affordable food) is
+  // owed an extra turn, so `nextSeatedPlayerIdx` now STOPS on them instead of
+  // skipping. This is the rotation half of capability B (the contributed XOR is
+  // pushed by handleConfirmNextPlayerResolved; see A92-extra-turn-session).
+  it('the rotation stops on a player whose only worker is a parked newborn (with A92)', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -65,12 +71,12 @@ describe('A92 alternation probe (session)', () => {
     const p1 = state.players[1]!
 
     // P0: two active workers, all used up (parked off-home → workersAvailable
-    // 0), one of them a newborn. P0 still holds A92, so under BGA the offspring
-    // would earn an extra turn — but OA's rotation cannot see it.
+    // 0), one of them a newborn. P0 holds A92 and can afford the 1-food cost.
     setActiveWorkerCount(p0, 2)
     setWorkersAtHome(state, p0, 0)
     p0.workers.filter((w) => w.isActive)[0]!.isNewborn = true
     p0.occupationPlayed.push(A92)
+    p0.resources.food = 2
 
     // P1: two active workers, one still available.
     setActiveWorkerCount(p1, 2)
@@ -82,16 +88,16 @@ describe('A92 alternation probe (session)', () => {
     const loaded = session.getState().state
     const lp0 = loaded.players[0]!
 
-    // P0 genuinely holds an offspring + A92 that SHOULD earn a turn under BGA.
+    // P0 genuinely holds an offspring + A92 that earns an extra turn.
     expect(workersAvailable(loaded, lp0)).toBe(0)
     expect(newbornCount(lp0)).toBe(1)
     expect(lp0.occupationPlayed).toContain(A92)
+    expect(hasPendingExtraTurn(loaded, lp0)).toBe(true)
 
-    // Rotation starting from P1 skips P0 (no ordinary worker) and wraps to P1.
-    const fromP1 = nextSeatedPlayerIdx(loaded, loaded.players, 1)
-    expect(fromP1).toBe(1)
-    // Even asking directly "who is next after P0" returns P1, never P0 itself.
-    const fromP0 = nextSeatedPlayerIdx(loaded, loaded.players, 0)
-    expect(fromP0).toBe(1)
+    // From P1's seat the rotation now STOPS on P0 (owed an extra turn) instead
+    // of skipping it — the BGA pull behaviour. From P0's own seat the walk still
+    // advances to P1, who has an ordinary worker available.
+    expect(nextSeatedPlayerIdx(loaded, loaded.players, 1)).toBe(0)
+    expect(nextSeatedPlayerIdx(loaded, loaded.players, 0)).toBe(1)
   })
 })
