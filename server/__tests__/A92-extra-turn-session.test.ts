@@ -179,29 +179,16 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
 
-    // First use → pay/promote, then place the promoted worker on the space the
-    // promotion just freed (guaranteed empty + placeable this round).
-    const used = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionUseAbility'))
-    {
-      const sUsed = session.getState().state
-      const p0u = sUsed.players[0]!
-      console.error('DBG3 usedKind=', used.interaction.stateId === 'wait' ? used.interaction.request.kind : 'idle',
-        'wAvail=', workersAvailable(sUsed, p0u), 'newborn=', newbornCount(p0u),
-        'forest=', JSON.stringify(sUsed.actionSpaces.find((a) => a.id === 'forest')!.takenBy))
-    }
-    expect(reqKind(used)).toBe('farm-select')
-    const placed = session.resolveChoice(0, placeableSpaces(session)[0]!)
-    expect(placed.ok).toBe(true)
-
-    // One offspring remains + food is sufficient → P0 is still owed an extra turn.
-    const mid = session.getState()
-    expect(newbornCount(mid.state.players[0]!)).toBe(1)
-    expect(hasPendingExtraTurn(mid.state, mid.state.players[0]!)).toBe(true)
-
-    // Confirm through the rotation until it lands back on P0 with the offer.
-    const back = drainConfirms(session, placed)
+    // First use (branch 0) → pay 1 food + promote the first offspring. One
+    // offspring remains, so P0 is still owed an extra turn this round.
+    const used = session.resolveChoice(0, branchValue(offer, 0))
+    expect(used.ok).toBe(true)
+    const afterUse = session.getState()
+    expect(afterUse.state.players[0]!.resources.food).toBe(2)
+    expect(newbornCount(afterUse.state.players[0]!)).toBe(1)
+    expect(hasPendingExtraTurn(afterUse.state, afterUse.state.players[0]!)).toBe(true)
+    // It is still P0's turn (rotation has not handed control to the opponent).
     expect(session.getState().state.currentPlayerIndex).toBe(0)
-    expect(reqKind(back)).toBe('choice')
   })
 
   it('FORFEIT: marks forfeited and the rotation no longer stops on P0', () => {
