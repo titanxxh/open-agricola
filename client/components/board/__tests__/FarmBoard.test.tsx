@@ -160,6 +160,23 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bselected\b/)
   })
 
+  it('renders a top-left barn icon on a built stable tile instead of the stable label', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('res-icon-barn')
+    expect(html).not.toContain('Stable')
+  })
+
   it('marks highlighted fence edges', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

@@ -1720,6 +1720,21 @@
   background: #f0d8a8;
   color: #6a4a1f;
 }
+.stable-barn-icon {
+  position: absolute;
+  top: calc(var(--tile, 60px) * 0.06);
+  left: calc(var(--tile, 60px) * 0.06);
+  pointer-events: none;
+  z-index: 1;
+}
+.stable-barn-icon .res-icon-barn {
+  font-size: calc(var(--tile, 60px) * 0.42);
+}
+.stable-barn-icon[data-player-color="red"] .res-icon-barn { background-position-x: 0%; }
+.stable-barn-icon[data-player-color="yellow"] .res-icon-barn { background-position-x: 25%; }
+.stable-barn-icon[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
+.stable-barn-icon[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+.stable-barn-icon[data-player-color="green"] .res-icon-barn { background-position-x: 100%; }
 .farm-tile.locked {
   position: relative;
 }

@@ -854,6 +854,14 @@ export const FarmBoard = ({
                 }
               }}
             >
+              {isStable ? (
+                <div
+                  className="stable-barn-icon"
+                  data-player-color={displayPlayer.color}
+                >
+                  <span className="res-icon res-icon-barn" />
+                </div>
+              ) : null}
               <span className="farm-tile-text">
                 {isRoom
                   ? displayPlayer.houseType === 'clay'
@@ -864,7 +872,7 @@ export const FarmBoard = ({
                   : isField
                     ? t(locale, 'ui.tileField')
                     : isStable
-                      ? t(locale, 'ui.tileStable')
+                      ? null
                       : t(locale, 'ui.tileEmpty')}
               </span>
               {isSowSelectable ? (
