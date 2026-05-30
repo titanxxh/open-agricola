@@ -22,7 +22,7 @@ import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners.ts'
-import { shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
+import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
@@ -42,10 +42,21 @@ export const nextSeatedPlayerIdx = (
   for (let off = 1; off <= players.length; off++) {
     const idx = (current + off) % players.length
     const candidate = players[idx]
-    if (candidate && workersAvailable(state, candidate) > 0) return idx
+    if (candidate && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate))) return idx
   }
   return current
 }
+
+/**
+ * Round-work completion predicate. The round's work phase is done only when
+ * every player has spent all ordinary workers AND has no pending extra turn
+ * (e.g. A92 AdoptiveParents' offspring activation). Replaces the bare
+ * `every(p => workersAvailable<=0)` round-end checks so a player owed an extra
+ * turn keeps the round open instead of ending it prematurely. Mirrors the
+ * extra-turn gating applied to `nextSeatedPlayerIdx` and the rotation skip loop.
+ */
+const roundWorkComplete = (state: GameState): boolean =>
+  state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
 
 /**
  * Resolve the starting-player seat index. Returns 0 when no player owns
@@ -262,8 +273,7 @@ export const continueAfterReorganizeRoundEnd = (
   }
   const player = core.state.players[playerIndex]!
   core.invokeFinalizeActionLog(player)
-  const allUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
-  if (!allUsed) {
+  if (!roundWorkComplete(core.state)) {
     const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
     startConfirmNextPlayer(core, playerIndex, next)
   }
@@ -292,8 +302,7 @@ export const finalizeActionLog = (core: GameCore, player: PlayerState): void => 
  */
 export const performRoundEnd = (core: GameCore): SessionResponse => {
   const state = core.state
-  const allUsed = state.players.every((p) => workersAvailable(state, p) <= 0)
-  if (!allUsed) return core.emitResponse(false, 'not all workers used')
+  if (!roundWorkComplete(state)) return core.emitResponse(false, 'not all workers used')
   if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'pending action exists')
 
   const pendingAnimal = state.players.findIndex((p) => core.hasPendingAnimalsCheck(p))
@@ -338,8 +347,7 @@ export const finishCompletedActionTurn = (
   finalizeActionLog(core, player)
   core.setTurnOwner(null)
   core.clearEngineStack()
-  const allWorkersUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
-  if (!allWorkersUsed) {
+  if (!roundWorkComplete(core.state)) {
     const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
     startConfirmNextPlayer(core, playerIndex, next)
   } else {
@@ -455,11 +463,13 @@ export const handleConfirmNextPlayerResolved = (
   // guarantee termination if every player is asked to skip.
   let safety = state.players.length
   while (safety-- > 0) {
-    const allWorkersUsedNow = state.players.every((p) => workersAvailable(state, p) <= 0)
-    if (allWorkersUsedNow) break
+    if (roundWorkComplete(state)) break
     const current = state.players[state.currentPlayerIndex]
     if (!current) break
-    if (workersAvailable(state, current) <= 0) {
+    // A 0-worker player is normally skipped — unless a card owes them an extra
+    // turn (e.g. A92 AdoptiveParents), in which case the rotation stops on them
+    // so the contributed flow can be offered below.
+    if (workersAvailable(state, current) <= 0 && !hasPendingExtraTurn(state, current)) {
       const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
       if (next === state.currentPlayerIndex) break
       state.currentPlayerIndex = next
@@ -476,9 +486,38 @@ export const handleConfirmNextPlayerResolved = (
     state.currentPlayerIndex = next
   }
 
-  // Check if all workers are used (round end condition)
-  const allWorkersUsed = state.players.every((p) => workersAvailable(state, p) <= 0)
-  if (allWorkersUsed) {
+  // Extra-turn injection: the rotation stopped on a player who has no ordinary
+  // workers left but is owed a turn-rotation extra action (A92 AdoptiveParents).
+  // Push the contributed flow (XOR[use, forfeit]) as a top-level frame for that
+  // player and drive it — mirrors `takeAnytimeAction`'s no-active-engine branch.
+  // place-farmer inside the flow runs in the player's own turn, so alternation
+  // is preserved. Ordered before the round-end check so the round stays open.
+  const currentForExtra = state.players[state.currentPlayerIndex]
+  if (currentForExtra && workersAvailable(state, currentForExtra) <= 0) {
+    const extra = collectExtraTurnFlow(state, currentForExtra)
+    if (extra) {
+      core.setTurnOwner(state.currentPlayerIndex)
+      const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
+      // `__subflow:top-level` spaceId mirrors `takeAnytimeAction`'s
+      // no-active-engine branch so `buildInteraction` surfaces the XOR as a real
+      // pending interaction. `reason: 'top-level'` (not the spaceId) is what makes
+      // the completion trampoline run `finishCompletedActionTurn`, advancing the
+      // rotation or ending the round once the extra-turn flow finishes.
+      core.pushEngineFrame({
+        ...frame,
+        ownerPlayerIndex: state.currentPlayerIndex,
+        spaceId: '__subflow:top-level',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      })
+      core.driveEngineSteps()
+      return core.emitResponse()
+    }
+  }
+
+  // Check if the round's work phase is done (round end condition).
+  if (roundWorkComplete(state)) {
     return core.invokeAllWorkersPlacedHooks()
   }
 

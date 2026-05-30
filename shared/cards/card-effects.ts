@@ -112,6 +112,7 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
+  | 'contributeExtraTurn'
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
@@ -145,6 +146,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'onBeforePlayerTurn',
   'onAllWorkersPlaced',
   'resolveChoice',
+  'contributeExtraTurn',
   'computeBonusScore',
   'computeSharedPostScore',
   'computeCostedBonus',
@@ -207,6 +209,18 @@ export type CardEffect = {
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
   resolveChoice?: ResolveChoiceHandler
+  /**
+   * Turn-rotation extra-action hook. Returns an `ActionFlow` (typically an
+   * XOR `[use, forfeit]`) when this card can still grant `player` an extra
+   * placement this round, or `void` when it cannot. Consumed actively by the
+   * round-rotation gating in `shared/session/phases/round.ts` (NOT auto-run
+   * via `runCardEffectHook`): it both decides whether the rotation may stop on
+   * an out-of-workers player (`hasPendingExtraTurn`) and produces the flow
+   * pushed to that player. Single source of truth so gating and flow cannot
+   * drift. First introduced for A92 AdoptiveParents; reusable by any card that
+   * wants to earn a turn-rotation extra action.
+   */
+  contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
@@ -504,6 +518,51 @@ export const shouldSkipPlayerTurn = (state: GameState, player: PlayerState): boo
   }
   return skip
 }
+
+/**
+ * Collect the first turn-rotation extra-action flow a player's played cards
+ * can contribute this turn (e.g. A92 AdoptiveParents' `XOR[use, forfeit]`).
+ * Returns the flow plus the owning card id, or `null` when no card contributes.
+ * This is the single source of truth consumed by the round-rotation gating in
+ * `round.ts`: both the "may the rotation stop on this 0-worker player" decision
+ * and the flow pushed to them come from the same `contributeExtraTurn` hook, so
+ * they cannot drift. Errors from custom cards are swallowed (consistent with
+ * the other hook aggregators here).
+ */
+export const collectExtraTurnFlow = (
+  state: GameState,
+  player: PlayerState,
+): { flow: ActionFlow; cardId: string } | null => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.contributeExtraTurn) continue
+    try {
+      const flow = effect.contributeExtraTurn(state, player)
+      if (flow) return { flow, cardId }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return null
+}
+
+/**
+ * Whether any of `player`'s played cards wants to contribute a turn-rotation
+ * extra action this turn. Used by `round.ts` gating to let the rotation stop on
+ * an out-of-workers player (and to avoid ending the round prematurely) when an
+ * extra turn is still pending.
+ */
+export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
+  collectExtraTurnFlow(state, player) !== null
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

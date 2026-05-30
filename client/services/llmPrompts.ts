@@ -129,6 +129,7 @@ const CARD_IMPL = {
 | onBeforePlayerTurn | 玩家个人回合开始前（non-flow skip-control，只可返回 \`{skipTurn:true}\` 跳过本人回合，不返回 ActionFlow） | 每行动 |
 | onRoundStart | 新一轮格子翻开后 | 每轮 |
 | onAllWorkersPlaced | 所有工人放置完成 | 每轮 |
+| contributeExtraTurn | 轮转额外行动（无普通工人但仍持后代时返回 XOR[用, 放弃]） | 每轮转 |
 | onEndTurn | 每名玩家行动结束后 | 每行动 |
 | onBeforeReturnHome / onStartReturnHome / onReturnHome | 工人回家阶段 | 每轮 |
 | onRoundEnd / onAfterRoundEnd | 该轮结束 | 每轮 |
