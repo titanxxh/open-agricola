@@ -130,6 +130,13 @@ export const B85_FarmHand_impl = {
      */
     computeExtraRoomCapacity: (player: PlayerState) =>
       readFarmHandPosition(player) ? 1 : 0,
+    /**
+     * Offer the FarmHand 2×2 centre as a special stable inside a Build Stables
+     * `farm-select`. Plugs into the generic special-stable card-effect
+     * aggregation so the core stables action carries no B85 knowledge.
+     */
+    getSpecialStablePositions: getFarmHandStablePositions,
+    applySpecialStable: applyFarmHandStable,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
