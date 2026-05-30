@@ -45,7 +45,7 @@ const setupA92Player = (over: {
     .sort((a, b) => Number(a.id) - Number(b.id))
   for (let i = 0; i < newborns && i < active.length; i++) active[i]!.isNewborn = true
   if (over.played ?? true) p0.occupationPlayed.push(A92)
-  p0.food = over.food ?? 2
+  p0.resources.food = over.food ?? 2
   if (over.forfeited) {
     p0.cardStates = {
       ...(p0.cardStates ?? {}),
@@ -92,10 +92,15 @@ describe('extra-turn extension point (isolation)', () => {
     expect(hasPendingExtraTurn(state, player)).toBe(false)
   })
 
-  it('XOR exposes exactly the use + forfeit options', () => {
+  it('XOR exposes exactly two branches (use, forfeit) addressed by index', () => {
     const { state, player } = setupA92Player()
-    const collected = collectExtraTurnFlow(state, player)
-    const values = (collected?.flow.options ?? []).map((o) => o.value)
-    expect(values).toEqual(['use', 'forfeit'])
+    const flow = collectExtraTurnFlow(state, player)?.flow
+    expect(flow?.type).toBe('xor')
+    const branches = (flow && flow.type === 'xor' ? flow.children : []) as Array<{
+      choiceLabelKey?: string
+    }>
+    expect(branches).toHaveLength(2)
+    expect(branches[0]?.choiceLabelKey).toBe('ui.interactionUseAbility')
+    expect(branches[1]?.choiceLabelKey).toBe('ui.interactionDecline')
   })
 })
