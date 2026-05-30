@@ -1753,6 +1753,15 @@
 .farmhand-center-selected .farmhand-center-icon {
   opacity: 0.85;
 }
+.farmhand-center-built {
+  background: rgba(124, 58, 173, 0.18);
+  box-shadow: inset 0 0 0 2px #7c3aad;
+  cursor: default;
+  pointer-events: none;
+}
+.farmhand-center-built .farmhand-center-icon {
+  opacity: 1;
+}
 @keyframes farmhand-center-pulse {
   0%,
   100% {
