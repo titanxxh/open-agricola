@@ -40,6 +40,7 @@ import {
   buildBakeBulkChoice,
   hasSelectedBakeGrain,
 } from './bake-exchange-ui'
+import { buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
@@ -428,11 +429,13 @@ export const GameContainerApi = () => {
     fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
+    pendingFarmHand, setPendingFarmHand,
     pendingPlowTile, setPendingPlowTile, plowError, setPlowError,
     pendingSowSelections, setPendingSowSelections, sowError, setSowError,
     toggleFenceEdge,
     toggleRoomTile: toggleRoomTileInternal,
     toggleStableTile: toggleStableTileInternal,
+    toggleFarmHand: toggleFarmHandInternal,
     togglePlowTile: togglePlowTileInternal,
     updateSowSelection: updateSowSelectionInternal,
     pendingPositionSelections, setPendingPositionSelections,
@@ -464,6 +467,7 @@ export const GameContainerApi = () => {
       setPendingRoomTiles([])
       setRoomError(null)
       setPendingStableTiles([])
+      setPendingFarmHand(null)
       setStableError(null)
       setPendingPlowTile(null)
       setPlowError(null)
@@ -471,7 +475,7 @@ export const GameContainerApi = () => {
       setSowError(null)
       setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return
@@ -633,11 +637,12 @@ export const GameContainerApi = () => {
         return
       }
       if (farm.farmType === 'stable') {
-        if (pendingStableTiles.length === 0) {
+        const stablePayload = buildStableCommitPayload(pendingStableTiles, pendingFarmHand)
+        if (!stablePayload) {
           setStableError('NO_SELECTION')
           return
         }
-        void transport.commitSelection(pendingPlayerIndex, { stables: pendingStableTiles })
+        void transport.commitSelection(pendingPlayerIndex, stablePayload)
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('stable', resp.error)
           })
@@ -704,7 +709,7 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -1309,6 +1314,15 @@ export const GameContainerApi = () => {
       ),
     [farmInteraction],
   )
+  const farmHandSelectableSet = useMemo(
+    () =>
+      new Set(
+        farmInteraction?.farmType === 'stable'
+          ? (farmInteraction.farmHandPositions ?? []).map((tile) => positionKey(tile))
+          : [],
+      ),
+    [farmInteraction],
+  )
   const fenceSelectableSet = useMemo(
     () =>
       new Set(
@@ -1362,6 +1376,8 @@ export const GameContainerApi = () => {
     toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
   const wrappedToggleStable = (tile: FarmTilePosition) =>
     toggleStableTileInternal(tile, maxStableSelections, positionKey)
+  const wrappedToggleFarmHand = (tile: FarmTilePosition) =>
+    toggleFarmHandInternal(tile, positionKey)
   const wrappedTogglePlow = (tile: FarmTilePosition) =>
     togglePlowTileInternal(tile, positionKey)
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
@@ -2035,6 +2051,8 @@ export const GameContainerApi = () => {
               pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
               pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
               roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
+              farmHandSelectableSet={farmHandSelectableSet}
+              pendingFarmHandKey={pendingFarmHand ? positionKey(pendingFarmHand) : null}
               maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
               positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
@@ -2044,6 +2062,7 @@ export const GameContainerApi = () => {
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
               fencePlacementMode={fencePlacementMode}
               toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
+              toggleFarmHand={wrappedToggleFarmHand}
               togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
               toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
               confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
@@ -2119,6 +2138,7 @@ export const GameContainerApi = () => {
         playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
+        pendingFarmHandSelected={pendingFarmHand !== null}
         pendingSowSelectionsLength={sowSelectedCount}
         hasPendingPlowSelection={pendingPlowTile !== null}
         pendingPositionSelectionsLength={pendingPositionSelections.size} maxPositionSelections={maxPositionSelections}
