@@ -240,6 +240,8 @@ export const en = {
     interactionTriggeredByCard: 'Triggered by {card}',
     interactionOptionalSkip: 'Skip',
     interactionFlowSelect: 'Choose an action',
+    interactionUseAbility: 'Use ability',
+    interactionDecline: 'Decline',
     interactionFlowDone: 'Done',
     interactionSelectTrigger: 'Choose which card effect to resolve first',
     interactionSelectTriggerPass: 'Pass (skip remaining)',
