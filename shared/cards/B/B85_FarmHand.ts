@@ -137,6 +137,15 @@ export const B85_FarmHand_impl = {
      */
     getSpecialStablePositions: getFarmHandStablePositions,
     applySpecialStable: applyFarmHandStable,
+    /**
+     * Report the standing FarmHand stable so the snapshot's generic
+     * `specialStables` display field can render it. Empty until built, empty
+     * again after D102/E76 clears the position.
+     */
+    getBuiltSpecialStables: (player: PlayerState) => {
+      const position = readFarmHandPosition(player)
+      return position ? [position] : []
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

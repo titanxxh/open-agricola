@@ -117,7 +117,7 @@ export type CardEffectField = CardEffectHook
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
-  | 'getSpecialStablePositions' | 'applySpecialStable'
+  | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -156,6 +156,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'getInvalidAnimals',
   'getSpecialStablePositions',
   'applySpecialStable',
+  'getBuiltSpecialStables',
 ]
 
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
@@ -290,6 +291,14 @@ export type CardEffect = {
    * position is not a legal candidate for this card.
    */
   applySpecialStable?: (state: GameState, player: PlayerState, position: FarmTilePosition) => boolean
+  /**
+   * Currently-standing special stable tiles this card has built (e.g. B85
+   * FarmHand's 2×2 field centre). Empty until built, and empty again after the
+   * tile is returned (D102 / E76). Drives the generic snapshot `specialStables`
+   * display field so the client can render the built stable without reading any
+   * single card's `cardStates`.
+   */
+  getBuiltSpecialStables?: (player: PlayerState) => FarmTilePosition[]
   /**
    * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
    * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
@@ -605,6 +614,45 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
 export type SpecialStableCandidate = {
   position: FarmTilePosition
   sourceCardId: string
+}
+
+export type BuiltSpecialStable = {
+  position: FarmTilePosition
+  sourceCardId: string
+}
+
+/**
+ * Collect currently-standing special stables (e.g. B85 FarmHand's 2×2 field
+ * centre) from every card the player owns that implements
+ * `getBuiltSpecialStables`. Returns one entry per standing tile tagged with the
+ * owning card id. Empty until built, and empty again after D102 / E76 returns
+ * the tile — the core path carries no per-card knowledge.
+ */
+export const collectBuiltSpecialStables = (
+  player: PlayerState,
+): BuiltSpecialStable[] => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const built: BuiltSpecialStable[] = []
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.getBuiltSpecialStables) continue
+    try {
+      for (const position of effect.getBuiltSpecialStables(player)) {
+        built.push({ position, sourceCardId: cardId })
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} getBuiltSpecialStables threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return built
 }
 
 /**
