@@ -234,6 +234,8 @@ export const zh = {
     interactionTriggeredByCard: '由 {card} 触发',
     interactionOptionalSkip: '跳过',
     interactionFlowSelect: '请选择要执行的动作',
+    interactionUseAbility: '使用能力',
+    interactionDecline: '放弃',
     interactionFlowDone: '完成',
     interactionSelectTrigger: '选择要先结算的卡牌效果',
     interactionSelectTriggerPass: '跳过剩余',
