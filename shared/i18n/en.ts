@@ -234,6 +234,7 @@ export const en = {
     interactionStableConfirm: 'Confirm stables',
     interactionStableCancel: 'Cancel',
     interactionStableSelectSubtitle: 'Selected {selected} / Max {max}',
+    interactionFarmHandHint: 'Farm Hand stable selected',
     interactionSowSelectSubtitle: 'Selected {selected} fields',
     interactionOptionalAction: 'Optional action',
     interactionTriggeredByCard: 'Triggered by {card}',
