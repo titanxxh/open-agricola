@@ -157,10 +157,11 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const foodBefore = session.getState().state.players[0]!.resources.food
     expect(newbornCount(session.getState().state.players[0]!)).toBe(1)
 
-    // Choose "use": pay + promote → place-farmer farm-select.
+    // Choose "use": pay + promote → the promoted worker is offered a placement
+    // prompt (resolvable by space id; OA renders it as a 'choice' of spaces).
     const used = session.resolveChoice(0, branchValue(offer, 0))
     expect(used.ok).toBe(true)
-    expect(reqKind(used)).toBe('farm-select')
+    expect(['farm-select', 'choice']).toContain(reqKind(used))
     expect(used.state.players[0]!.resources.food).toBe(foodBefore - 1)
     // Promoted: no longer a newborn, now an available worker awaiting placement.
     expect(newbornCount(used.state.players[0]!)).toBe(0)
