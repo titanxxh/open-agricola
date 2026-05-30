@@ -20,6 +20,7 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../typ
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
+import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
@@ -747,10 +748,6 @@ export const FarmBoard = ({
             isInteractive &&
             stableSelectableSet.has(tileKey) &&
             (!maxStableReached || isStableSelected)
-          const isFarmHandSelectable =
-            isInteractive && farmHandSelectableSet.has(tileKey)
-          const isFarmHandSelected =
-            isInteractive && pendingFarmHandKey === tileKey
           const isPlowSelectable =
             isInteractive && plowSelectableSet.has(tileKey)
           const isPlowSelected =
@@ -760,9 +757,9 @@ export const FarmBoard = ({
           const isFieldSelectable = isInteractive && positionSelectableSet.has(tileKey)
           const isFieldSelected = isInteractive && pendingPositionSelections.has(tileKey)
           const isTileSelectable =
-            isRoomSelectable || isPlowSelectable || isStableSelectable || isFarmHandSelectable || isFieldSelectable
+            isRoomSelectable || isPlowSelectable || isStableSelectable || isFieldSelectable
           const isTileSelected =
-            isRoomSelected || isPlowSelected || isStableSelected || isFarmHandSelected || isFieldSelected
+            isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
           const isTileLocked = lockedTileKeys.has(tileKey)
           const fieldInfo = fieldMap.get(tileKey)
           const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
@@ -829,9 +826,7 @@ export const FarmBoard = ({
                       : ''
               }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
-              }${isStableSelected ? ' stable-selected' : ''}${
-                isFarmHandSelectable ? ' farmhand-selectable' : ''
-              }${isFarmHandSelected ? ' farmhand-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
+              }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
               onClick={() => {
                 if (isRoomSelectable) {
                   toggleRoomTile({ row: tileRow, col: tileCol })
@@ -839,10 +834,6 @@ export const FarmBoard = ({
                 }
                 if (isStableSelectable) {
                   toggleStableTile({ row: tileRow, col: tileCol })
-                  return
-                }
-                if (isFarmHandSelectable) {
-                  toggleFarmHand({ row: tileRow, col: tileCol })
                   return
                 }
                 if (isFieldSelectable) {
@@ -1067,6 +1058,36 @@ export const FarmBoard = ({
               }}
             />
           )
+        }
+        if (cell.type === 'post') {
+          const centerTopLeft = farmHandTopLeftFromCenterKey(cell.key)
+          const centerKey = centerTopLeft
+            ? `${centerTopLeft.row}-${centerTopLeft.col}`
+            : null
+          const isFarmHandCenter =
+            isInteractive && !!centerKey && farmHandSelectableSet.has(centerKey)
+          if (isFarmHandCenter && centerTopLeft && centerKey) {
+            const isCenterSelected = pendingFarmHandKey === centerKey
+            return (
+              <div key={cell.key} className="farm-cell farm-post">
+                <button
+                  type="button"
+                  className={`farmhand-center-overlay${
+                    isCenterSelected
+                      ? ' farmhand-center-selected'
+                      : ' farmhand-center-candidate'
+                  }`}
+                  data-farmhand-center-key={centerKey}
+                  data-player-color={displayPlayer.color}
+                  aria-pressed={isCenterSelected}
+                  title={t(locale, 'ui.tileStable')}
+                  onClick={() => toggleFarmHand(centerTopLeft)}
+                >
+                  <span className="res-icon res-icon-barn farmhand-center-icon" aria-hidden="true" />
+                </button>
+              </div>
+            )
+          }
         }
         return <div key={cell.key} className={`farm-cell farm-${cell.type}`} />
       })}

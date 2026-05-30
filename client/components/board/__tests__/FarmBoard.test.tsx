@@ -127,37 +127,46 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
   })
 
-  it('marks B85 farmHand candidate tiles as selectable', () => {
+  it('renders a B85 farmHand candidate as a clickable ghost overlay at the 2x2 center post', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 }],
+          farmCells: [
+            { key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 },
+            { key: '4-4', type: 'post' },
+          ],
           farmHandSelectableSet: new Set(['1-1']),
         })}
       />,
     )
 
-    expect(html).toMatch(/farm-tile[^"]*\bfarmhand-selectable\b/)
-    expect(html).toMatch(/farm-tile[^"]*\bselectable\b/)
+    // Center overlay sits on the geometric-center post (grid key 4-4 for top-left 1-1).
+    expect(html).toMatch(/farmhand-center-overlay[^"]*\bfarmhand-center-candidate\b/)
+    expect(html).toContain('data-farmhand-center-key="1-1"')
+    // The 2x2 top-left tile itself is no longer the farmHand click target.
+    expect(html).not.toMatch(/farm-tile[^"]*\bfarmhand-selectable\b/)
   })
 
-  it('marks the selected B85 farmHand tile as selected', () => {
+  it('marks the selected B85 farmHand candidate overlay as selected', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 }],
+          farmCells: [
+            { key: 'tile-1-1', type: 'tile', tileRow: 1, tileCol: 1 },
+            { key: '4-4', type: 'post' },
+          ],
           farmHandSelectableSet: new Set(['1-1']),
           pendingFarmHandKey: '1-1',
         })}
       />,
     )
 
-    expect(html).toMatch(/farm-tile[^"]*\bfarmhand-selected\b/)
-    expect(html).toMatch(/farm-tile[^"]*\bselected\b/)
+    expect(html).toMatch(/farmhand-center-overlay[^"]*\bfarmhand-center-selected\b/)
+    expect(html).not.toMatch(/farm-tile[^"]*\bfarmhand-selected\b/)
   })
 
   it('renders a top-left barn icon on a built stable tile instead of the stable label', () => {
