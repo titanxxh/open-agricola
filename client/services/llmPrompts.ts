@@ -153,6 +153,7 @@ const CARD_IMPL = {
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
 | getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
+| getSpecialStablePositions / applySpecialStable | \`(state, player[, position]) => FarmTilePosition[] / boolean\` | Build Stables 特殊 stable（如 B85 的 2×2 中心） |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
 
