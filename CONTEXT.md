@@ -220,6 +220,26 @@ _Avoid_: 线上多人主链路
 后端边界测试，直接实例化 `GameSession` 并断言 `state`、`pending`、`interaction`、`log`、`scores`。
 _Avoid_: 用 DOM 断言规则正确性
 
+**Newborn（后代）**:
+family growth 当轮新增的工人。当轮不计入可放置工人，要到下一轮才回家可用；喂食阶段只需 1 食物（成人需 2）。
+_Avoid_: 把 newborn 当普通可用工人
+
+**Adoptive Available（后代可激活）**:
+A92 Adoptive Parents 的触发条件：持有 A92、有未激活的后代、且本轮未放弃该效果。anytime grow 与轮转额外行动共用此单一判定。
+_Avoid_: 每轮一次的标记
+
+**Promote（提升后代）**:
+把一个 newborn 转成普通可用工人；提升后该工人不再算 newborn（喂食按成人计、相关计分不再计入）。A92 让后代当轮行动的领域动作。
+_Avoid_: 单纯增加工人计数
+
+**Extra Turn（额外行动）**:
+玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。对应 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
+_Avoid_: 连续放工（破坏交替）
+
+**Forfeit（放弃额外行动）**:
+玩家在额外行动选择窗口里选“不用”，退出本轮后续行动，避免轮转死循环；标记在每轮开始清空。
+_Avoid_: 永久放弃、全局出局名单
+
 ## Relationships
 
 - 一个 **Room** 持有一个 **GameSession**；一个 **GameSession** 持有并写入一个 **GameState**。
@@ -244,6 +264,7 @@ _Avoid_: 用 DOM 断言规则正确性
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
+- **Promote** 一个 **Newborn** 使其成为可放置工人，是 **Adoptive Available** 玩家把后代换成一次 **Extra Turn** 的前提；**Forfeit** 则让该玩家放弃 **Extra Turn** 并退出本轮后续行动。
 
 ## Example dialogue
 
