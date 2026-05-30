@@ -33,15 +33,15 @@ const optLabels = (r: SessionResponse): (string | undefined)[] =>
   r.interaction.stateId === 'wait' ? (r.interaction.options ?? []).map((o) => o.labelKey) : []
 
 /**
- * Resolve the XOR branch value by its `choiceLabelKey`. OA addresses XOR
- * branches by the underlying node id (e.g. 'seq-4'), not a stable '0'/'1'
- * index, so tests pick the branch by its label and pass the real value to
- * `resolveChoice`.
+ * XOR branch value by position: branch 0 = use, branch 1 = forfeit. OA
+ * addresses XOR branches by the underlying node id (e.g. 'seq-4'), not a stable
+ * '0'/'1' index, and emits them in child (flow) order, so position is the stable
+ * handle a test should use.
  */
-const valueByLabel = (r: SessionResponse, labelKey: string): string => {
+const branchValue = (r: SessionResponse, index: number): string => {
   const opts = r.interaction.stateId === 'wait' ? (r.interaction.options ?? []) : []
-  const found = opts.find((o) => o.labelKey === labelKey)
-  if (!found) throw new Error(`no option with labelKey ${labelKey}; got ${JSON.stringify(opts)}`)
+  const found = opts[index]
+  if (!found) throw new Error(`no XOR branch at index ${index}; got ${JSON.stringify(opts)}`)
   return found.value
 }
 
@@ -142,9 +142,12 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const r = driveToP0ExtraTurn(session)
     expect(session.getState().state.currentPlayerIndex).toBe(0)
     expect(reqKind(r)).toBe('choice')
-    // Two XOR branches (use / forfeit), addressed by their choiceLabelKey.
+    // Two XOR branches in flow order: branch 0 = use (its first leaf is the food
+    // payment), branch 1 = forfeit (its leaf is the set-extra-data effect). OA
+    // labels a composite branch by its first leaf's action and addresses
+    // branches by node-id value, so tests select by position, not by '0'/'1'.
     expect(optValues(r)).toHaveLength(2)
-    expect(optLabels(r)).toEqual(['ui.interactionUseAbility', 'ui.interactionDecline'])
+    expect(optLabels(r)).toEqual(['actions.pay.name', 'actions.special-effect.name'])
   })
 
   it('USE: pay 1 food, promote offspring, place it; then proceed normally', () => {
@@ -155,7 +158,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(newbornCount(session.getState().state.players[0]!)).toBe(1)
 
     // Choose "use": pay + promote → place-farmer farm-select.
-    const used = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionUseAbility'))
+    const used = session.resolveChoice(0, branchValue(offer, 0))
     expect(used.ok).toBe(true)
     expect(reqKind(used)).toBe('farm-select')
     expect(used.state.players[0]!.resources.food).toBe(foodBefore - 1)
@@ -206,8 +209,8 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
 
-    // Choose "forfeit".
-    const forfeited = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionDecline'))
+    // Choose "forfeit" (branch 1).
+    const forfeited = session.resolveChoice(0, branchValue(offer, 1))
     expect(forfeited.ok).toBe(true)
 
     const after = session.getState()
@@ -221,7 +224,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const session = setupRotation()
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
-    const forfeited = session.resolveChoice(0, valueByLabel(offer, 'ui.interactionDecline'))
+    const forfeited = session.resolveChoice(0, branchValue(offer, 1))
     expect(forfeited.ok).toBe(true)
 
     const after = drainConfirms(session, forfeited)
