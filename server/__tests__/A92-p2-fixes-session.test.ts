@@ -156,6 +156,38 @@ const addFailingActionSpace = (session: GameSession, id = '__test-failing-extra-
   return id
 }
 
+const addAutoResolveFailingActionSpace = (
+  session: GameSession,
+  id = '__test-auto-resolve-failing-extra-turn-space__',
+) => {
+  const action: ActionDefinition = {
+    id,
+    nameKey: 'actions.forest.name',
+    descriptionKey: 'actions.forest.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: () => ({
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options: [{ value: 'auto-fail', labelKey: 'ui.interactionConfirm' }],
+      },
+    }),
+    resolveChoice: () => ({ type: 'fail', errorKey: 'log.action' }),
+  }
+  const testSession = session as unknown as {
+    registry: { register(action: ActionDefinition): void }
+  }
+  testSession.registry.register(action)
+  session.getState().state.actionSpaces.push({
+    ...action,
+    resources: {},
+    takenBy: [],
+  } satisfies ActionSpace)
+  return id
+}
+
 describe('A92 P2 fixes', () => {
   describe('T1: suppress A92 anytime inside its own extra-turn prompt', () => {
     it('A92 anytime grow is NOT offered while the A92 extra-turn XOR is pending', () => {
@@ -267,6 +299,18 @@ describe('A92 P2 fixes', () => {
       expect(used.ok).toBe(true)
       expect(['farm-select', 'choice']).toContain(reqKind(used))
     })
+
+    it('stacked D134 skips consume stacked A92 extra-turn opportunities before offering XOR', () => {
+      const session = setupRotation({ food: 3, newborns: 2, holdD134: true, d134Skip: 2 })
+      const p1Space = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const taken = session.takeAction(1, p1Space)
+      expect(taken.ok).toBe(true)
+      const afterSkips = drainConfirms(session, taken)
+
+      expect(reqKind(afterSkips)).not.toBe('choice')
+      expect(d134Skip(afterSkips)).toBeUndefined()
+      expect(afterSkips.state.round).toBe(2)
+    })
   })
 
   describe('T4: initialize action snapshot for extra-turn placements', () => {
@@ -358,6 +402,23 @@ describe('A92 P2 fixes', () => {
       } finally {
         unregisterActionHook('test-a92-allow-occupied-failing-space')
       }
+    })
+
+    it('auto-resolved target failure removes the promoted worker from the selected action space', () => {
+      const session = setupRotation({ food: 3, newborns: 2 })
+      const failingSpaceId = addAutoResolveFailingActionSpace(session)
+
+      const offer = driveToP0ExtraTurn(session)
+      const used = session.resolveChoice(0, branchValue(offer, 0))
+      expect(used.ok).toBe(true)
+      expect(['farm-select', 'choice']).toContain(reqKind(used))
+
+      const failed = session.resolveChoice(0, failingSpaceId)
+      expect(failed.ok).toBe(true)
+
+      const p0 = session.getState().state.players[0]!
+      const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
+      expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
     })
   })
 
