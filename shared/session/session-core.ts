@@ -1387,16 +1387,19 @@ export class GameCore {
     player: PlayerState,
     activeActionContext?: Record<string, unknown>,
   ): void {
+    const pendingActionContext = this.getActionContextFromTopFrame()
     const targetSpaceId =
       activeActionContext?.targetSpaceId ??
-      this.getActionContextFromTopFrame()?.targetSpaceId
+      pendingActionContext?.targetSpaceId
     const targetSpace = typeof targetSpaceId === 'string'
       ? this.getSpaceById(targetSpaceId)
       : null
     const placedWorkerId =
       typeof activeActionContext?.placedWorkerId === 'string'
         ? activeActionContext.placedWorkerId
-        : undefined
+        : typeof pendingActionContext?.placedWorkerId === 'string'
+          ? pendingActionContext.placedWorkerId
+          : undefined
     removeWorkerRef(targetSpace ?? frameSpace, player.id, placedWorkerId)
   }
 
