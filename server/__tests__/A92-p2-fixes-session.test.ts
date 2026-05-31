@@ -420,6 +420,50 @@ describe('A92 P2 fixes', () => {
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
     })
+
+    it('pending-context rollback removes the placed worker id when active context is unavailable', () => {
+      const session = setupRotation({ food: 3, newborns: 2 })
+      const failingSpaceId = addFailingActionSpace(session)
+      const state = session.getState().state
+      const p0 = state.players[0]!
+      const oldWorker = p0.workers.find((w) => w.id === '1')!
+      const promotedWorker = p0.workers.find((w) => w.id === '2')!
+      oldWorker.isNewborn = false
+      state.actionSpaces.forEach((space) => {
+        space.takenBy = space.takenBy.filter(
+          (ref) => !(ref.playerId === p0.id && ref.workerId === oldWorker.id),
+        )
+      })
+      const failingSpace = state.actionSpaces.find((space) => space.id === failingSpaceId)!
+      failingSpace.takenBy = [
+        { playerId: p0.id, workerId: oldWorker.id },
+        { playerId: p0.id, workerId: promotedWorker.id },
+      ]
+      session.pushSyntheticPendingFrame({
+        hostNodeId: '__test-pending-context__',
+        request: {
+          kind: 'choice',
+          options: [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
+        },
+        choices: [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
+        ownerNodeId: null,
+        contextSnapshot: {
+          actionContext: {
+            targetSpaceId: failingSpaceId,
+            placedWorkerId: promotedWorker.id,
+          },
+        },
+        effectiveOwnerPlayerId: p0.id,
+      }, 0, 'top-level')
+      ;(session as unknown as {
+        cleanupFailedWorkerPlacement(space: ActionSpace, player: typeof p0): void
+      }).cleanupFailedWorkerPlacement(state.actionSpaces[0]!, p0)
+
+      expect(failingSpace.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }])
+      expect(failingSpace.takenBy).not.toEqual(
+        expect.arrayContaining([{ playerId: p0.id, workerId: promotedWorker.id }]),
+      )
+    })
   })
 
   describe('forfeit log', () => {
