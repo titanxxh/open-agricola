@@ -549,6 +549,7 @@ export const en = {
       'set-flag': { name: 'Mark card effect' },
       'set-infobox': { name: 'Update card note' },
       'clear-pending-fence-bonus': { name: 'Clear fence bonus' },
+      'consume-pending-extra-turns': { name: 'Consume pending extra turns' },
       'remove-future-meeples': { name: 'Remove future workers' },
       'promote-first-newborn': { name: 'Ready newborn for action' },
       'remove-field-crop': { name: 'Remove crop from field' },

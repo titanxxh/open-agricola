@@ -530,6 +530,7 @@ export const zh = {
       'set-flag': { name: '标记卡牌效果' },
       'set-infobox': { name: '更新卡牌提示' },
       'clear-pending-fence-bonus': { name: '清除围栏优惠' },
+      'consume-pending-extra-turns': { name: '消耗待处理额外回合' },
       'remove-future-meeples': { name: '移除未来工人' },
       'promote-first-newborn': { name: '让新生家庭成员可行动' },
       'remove-field-crop': { name: '移除田地作物' },

@@ -580,6 +580,7 @@ const specialEffectDescriptionLabelKey = (node: ActionNode): string | null | und
     case 'swap-improvement-with-board':
     case 'return-card-to-board':
     case 'clear-pending-fence-bonus':
+    case 'consume-pending-extra-turns':
     case 'remove-future-meeples':
     case 'promote-first-newborn':
     case 'remove-field-crop':

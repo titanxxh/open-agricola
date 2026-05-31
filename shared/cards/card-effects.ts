@@ -540,7 +540,7 @@ export const collectExtraTurnFlow = (
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
-  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0)
+  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.contributeExtraTurn) continue
@@ -569,6 +569,59 @@ export const collectExtraTurnFlow = (
     }
   }
   return null
+}
+
+const countExtraTurnOpportunities = (
+  state: GameState,
+  player: PlayerState,
+  effect: CardEffect,
+  skipped: number,
+): number => {
+  if (effect.countExtraTurns) {
+    const rawCount = effect.countExtraTurns(state, player)
+    const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
+    if (count === 0 || skipped >= count) return count
+    return effect.contributeExtraTurn?.(state, player) ? count : 0
+  }
+  return effect.contributeExtraTurn?.(state, player) ? 1 : 0
+}
+
+export const countPendingExtraTurns = (state: GameState, player: PlayerState): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
+  let pending = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.contributeExtraTurn) continue
+    try {
+      const count = countExtraTurnOpportunities(state, player, effect, skipped)
+      if (count === 0) continue
+      if (skipped >= count) {
+        skipped -= count
+        continue
+      }
+      pending += count - skipped
+      skipped = 0
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return pending
+}
+
+export const consumePendingExtraTurns = (state: GameState, player: PlayerState): number => {
+  const pending = countPendingExtraTurns(state, player)
+  if (pending <= 0) return 0
+  player._extraTurnConsumedCount = Math.max(0, player._extraTurnConsumedCount ?? 0) + pending
+  return pending
 }
 
 /**
