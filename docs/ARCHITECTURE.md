@@ -460,7 +460,7 @@ WS 广播、HTTP 查询、单测断言同一结构。`pending` 字段已不是�
 
 A92_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），发生在玩家普通工人耗尽**之后**，与 `onBeforePlayerTurn` 的 `skipTurn` 在回合开始前的负向跳过相反。
 
-- `contributeExtraTurn?: (state, player) => ActionFlow | void`：`CardEffect` 上的 hook，可还款时返回 XOR `[use, forfeit]` flow，否则 `void`。它**不**经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 的轮转 gating **主动消费**：`hasPendingExtraTurn(state, player)` 决定轮转是否可停在一个 0-worker 玩家身上，`collectExtraTurnFlow(state, player)` 产生推送给该玩家的 flow（单一真相源，gating 与 flow 不会漂移）。OR-aggregate、order-independent。
+- `contributeExtraTurn?: (state, player) => ActionFlow | void`：`CardEffect` 上的 hook，可还款时返回 XOR `[use, forfeit]` flow，否则 `void`。它**不**经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 的轮转 gating **主动消费**：`hasPendingExtraTurn(state, player)` 决定轮转是否可停在一个 0-worker 玩家身上，`collectExtraTurnFlow(state, player)` 产生推送给该玩家的 flow（单一真相源，gating 与 flow 不会漂移）。OR-aggregate、order-independent。多次机会卡可配内部 adjunct `countExtraTurns`，让 mandatory skip-turn 只消费一个 extra-turn opportunity；该字段不暴露给 custom-card sandbox。
 - round.ts 三处 gating：选下一活跃玩家（`workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`，`nextSeatedPlayerIdx`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`，`roundWorkComplete`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮以便注入 flow）。都把"有 pending extra turn"的玩家视为仍有资格、不提前跳过。
 - 玩家获得一次额外放工机会，表现为 XOR[use, forfeit]；选 Forfeit（放弃）即退出本轮后续。A92 触发条件：普通工人耗尽但仍持未激活后代（newborn），对齐 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项（pull model）。
 

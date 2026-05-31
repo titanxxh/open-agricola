@@ -1393,7 +1393,11 @@ export class GameCore {
     const targetSpace = typeof targetSpaceId === 'string'
       ? this.getSpaceById(targetSpaceId)
       : null
-    removeWorkerRef(targetSpace ?? frameSpace, player.id)
+    const placedWorkerId =
+      typeof activeActionContext?.placedWorkerId === 'string'
+        ? activeActionContext.placedWorkerId
+        : undefined
+    removeWorkerRef(targetSpace ?? frameSpace, player.id, placedWorkerId)
   }
 
   /**
@@ -2719,7 +2723,10 @@ export class GameCore {
     if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((player) => resetRoundPlacements(player))
+    this.state.players.forEach((player) => {
+      resetRoundPlacements(player)
+      delete player._extraTurnSkipCount
+    })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.state.futureMeeples
       .filter((entry) =>

@@ -108,7 +108,8 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
  * non-standard signatures (scoring, animal zones, sowing, etc.) that cannot be
  * invoked via the generic `runCardEffectHook()` path.
  *
- * `handHooks` (meta-field) is deliberately excluded.
+ * `handHooks` (meta-field) and engine-internal adjuncts such as
+ * `countExtraTurns` are deliberately excluded.
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
@@ -221,6 +222,7 @@ export type CardEffect = {
    * wants to earn a turn-rotation extra action.
    */
   contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
+  countExtraTurns?: (state: GameState, player: PlayerState) => number
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
@@ -538,11 +540,25 @@ export const collectExtraTurnFlow = (
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
+  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0)
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.contributeExtraTurn) continue
     try {
+      if (effect.countExtraTurns) {
+        const rawCount = effect.countExtraTurns(state, player)
+        const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
+        if (count === 0) continue
+        if (skipped >= count) {
+          skipped -= count
+          continue
+        }
+      }
       const flow = effect.contributeExtraTurn(state, player)
+      if (!effect.countExtraTurns && flow && skipped > 0) {
+        skipped -= 1
+        continue
+      }
       if (flow) return { flow, cardId }
     } catch (err) {
       if (isCustomCard(cardId)) {
@@ -562,7 +578,7 @@ export const collectExtraTurnFlow = (
  * extra turn is still pending.
  */
 export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
-  !player._extraTurnForfeited && collectExtraTurnFlow(state, player) !== null
+  collectExtraTurnFlow(state, player) !== null
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [
