@@ -44,6 +44,7 @@ import { buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
+  buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
@@ -542,10 +543,25 @@ export const GameContainerApi = () => {
     return () => observer.disconnect()
   }, [hasGameView])
 
+  const placeFarmerChoiceBySpaceId = useMemo(
+    () =>
+      interaction.stateId === 'wait'
+        ? buildPlaceFarmerChoiceMap(interaction.promptKey, interaction.options)
+        : new Map(),
+    [interaction],
+  )
+
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
+    if (interaction.stateId === 'wait') {
+      const option = placeFarmerChoiceBySpaceId.get(space.id)
+      if (!option || option.disabled) return
+      void transport.resolveChoice(interaction.playerIndex, option.value).catch((e) => console.error(e))
+      return
+    }
+    if (interaction.stateId !== 'idle') return
     void transport.takeAction(state.currentPlayerIndex, space.id).catch((e) => console.error('takeAction error', e))
-  }, [state, transport, isInteractive])
+  }, [state, transport, isInteractive, interaction, placeFarmerChoiceBySpaceId])
 
   const undoStep = useCallback(() => {
     if (!isInteractive) return
@@ -814,9 +830,13 @@ export const GameContainerApi = () => {
   )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
+    if (interaction.stateId === 'wait') {
+      const option = placeFarmerChoiceBySpaceId.get(space.id)
+      return !!option && !option.disabled
+    }
     if (interaction.stateId !== 'idle') return false
     return actionAvailability[space.id] === true
-  }, [state, currentPlayer, interaction.stateId, isInteractive, actionAvailability])
+  }, [state, currentPlayer, interaction.stateId, isInteractive, actionAvailability, placeFarmerChoiceBySpaceId])
 
   const actionSpaces = state?.actionSpaces
   const roundActionOrder = state?.roundActionOrder
@@ -2030,7 +2050,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
           </section>
         </div>
         <div className="game-layout__center">

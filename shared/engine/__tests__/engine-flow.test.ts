@@ -10,6 +10,7 @@ import { payAction } from '../../actions/effects/pay'
 import { gainAction } from '../../actions/effects/gain'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { plowAction } from '../../actions/effects/plow'
+import { specialEffectAction } from '../../actions/effects/special-effect'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
@@ -1833,6 +1834,57 @@ describe('Engine flow nodes', () => {
       'actions.pay.name',
       'actions.bonus-vp.name',
     ])
+  })
+
+  it('renders special-effect steps with semantic descriptions', () => {
+    const placeFarmerAction: ActionDefinition = {
+      id: 'place-farmer',
+      nameKey: 'actions.place-farmer.name',
+      descriptionKey: 'actions.place-farmer.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const useBranch = new SequenceNode('use-offspring', [
+      new ActionNode('pay-food', 'pay', 'A92_AdoptiveParents', { food: 1 }),
+      new ActionNode('promote-newborn', 'special-effect', 'A92_AdoptiveParents', { kind: 'promote-first-newborn' }),
+      new ActionNode('place-newborn', 'place-farmer', 'A92_AdoptiveParents'),
+    ])
+    useBranch.choiceLabelKey = 'ui.interactionUseAbility'
+    const declineBranch = new SequenceNode('decline-offspring', [
+      new ActionNode('emit-decline', 'special-effect', 'A92_AdoptiveParents', { kind: 'emit-card-triggered', accepted: false, optional: true }),
+      new ActionNode('mark-decline', 'special-effect', 'A92_AdoptiveParents', { kind: 'set-extra-data', key: 'forfeitedThisRound', value: true }),
+    ])
+    declineBranch.choiceLabelKey = 'ui.interactionDecline'
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    registry.register(specialEffectAction)
+    registry.register(placeFarmerAction)
+    const root = new XorNode('a92-choice', [useBranch, declineBranch])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.food = 1
+    const first = engine.proceed({ state, player, space: createSpace(payAction) })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    const byValue = Object.fromEntries(first.choice.options.map((o) => [o.value, o]))
+    expect(collectDescriptionLabelKeys(byValue['use-offspring']!.descriptionPreview)).toEqual([
+      'actions.pay.name',
+      'actions.special-effect.promote-first-newborn.name',
+      'actions.place-farmer.name',
+    ])
+    expect(collectDescriptionLabelKeys(byValue['decline-offspring']!.descriptionPreview)).toEqual([
+      'actions.special-effect.emit-card-triggered.declined.name',
+      'actions.special-effect.set-extra-data.name',
+    ])
+    expect(byValue['decline-offspring']!.labelKey).toBe('ui.interactionDecline')
   })
 
   it('marks selected OR leaf action mandatory', () => {
