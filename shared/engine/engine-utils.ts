@@ -555,9 +555,47 @@ export function getNodeEffectPreview(node: EngineNode): ChoiceEffectPreview | un
   return undefined
 }
 
-const isHiddenDescriptionAction = (node: ActionNode): boolean =>
-  node.actionId === 'special-effect' &&
-  (node.params as { kind?: unknown } | undefined)?.kind === 'set-infobox'
+type SpecialEffectDescriptionParams = {
+  kind?: unknown
+  accepted?: unknown
+}
+
+const specialEffectDescriptionLabelKey = (node: ActionNode): string | null | undefined => {
+  if (node.actionId !== 'special-effect') return undefined
+  const params = node.params as SpecialEffectDescriptionParams | undefined
+  if (!params || typeof params.kind !== 'string') return 'actions.special-effect.apply.name'
+  if (params.kind === 'emit-card-triggered' && params.accepted === false) {
+    return 'actions.special-effect.emit-card-triggered.declined.name'
+  }
+  switch (params.kind) {
+    case 'set-infobox':
+      return null
+    case 'increment-extra-data':
+    case 'set-extra-data':
+    case 'increment-counter':
+    case 'set-counter':
+    case 'set-flag':
+      return `actions.special-effect.${params.kind}.name`
+    case 'pop-card-stack-top':
+    case 'swap-improvement-with-board':
+    case 'return-card-to-board':
+    case 'clear-pending-fence-bonus':
+    case 'consume-pending-extra-turns':
+    case 'remove-future-meeples':
+    case 'promote-first-newborn':
+    case 'remove-field-crop':
+    case 'remove-field-crops':
+    case 'consume-fence':
+    case 'add-resource-to-space':
+    case 'build-stable-on-first-empty-tile':
+    case 'move-resource-between-spaces':
+    case 'plant-additional-good':
+    case 'emit-card-triggered':
+      return `actions.special-effect.${params.kind}.name`
+    default:
+      return 'actions.special-effect.apply.name'
+  }
+}
 
 const descriptionSeparatorForNode = (node: EngineNode): string => {
   if (node instanceof SequenceNode) return ', '
@@ -572,12 +610,13 @@ export function getNodeDescriptionPreview(
   registry: ActionRegistry,
 ): ChoiceDescriptionPreview | undefined {
   if (node instanceof ActionNode) {
-    if (isHiddenDescriptionAction(node)) return undefined
     const action = registry.get(node.actionId)
     if (!action) return undefined
+    const specialEffectLabelKey = specialEffectDescriptionLabelKey(node)
+    if (!node.choiceLabelKey && specialEffectLabelKey === null) return undefined
     return {
       kind: 'action',
-      labelKey: node.choiceLabelKey ?? action.nameKey,
+      labelKey: node.choiceLabelKey ?? specialEffectLabelKey ?? action.nameKey,
       labelParams: node.choiceLabelParams,
       effectPreview: getActionEffectPreview(node),
     }

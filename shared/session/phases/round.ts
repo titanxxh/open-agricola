@@ -455,7 +455,6 @@ export const handleConfirmNextPlayerResolved = (
   core.setActionStartIndex(null)
   core.clearHistory() // Clear undo history when switching players
   core.setTurnOwner(null)
-
   const state = core.state
   // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
   // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
@@ -475,14 +474,30 @@ export const handleConfirmNextPlayerResolved = (
       state.currentPlayerIndex = next
       continue
     }
+    // Skip-turn effects take priority over an extra turn: consume the skip
+    // (single call, so D134-style decrements happen exactly once) and advance.
+    // When the skipped player is out of ordinary workers but owed extra turns,
+    // consume exactly one extra-turn opportunity.
+    const skippedExtraTurn =
+      workersAvailable(state, current) <= 0 &&
+      collectExtraTurnFlow(state, current) !== null
     if (!shouldSkipPlayerTurn(state, current)) break
+    if (skippedExtraTurn) {
+      current._extraTurnSkipCount = (current._extraTurnSkipCount ?? 0) + 1
+    }
     appendImmediateEvents(state, [{
       type: 'turn.skipped',
       playerId: current.id,
       reason: 'cardEffect',
     }], { actorPlayerId: current.id })
     const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
-    if (next === state.currentPlayerIndex) break
+    if (next === state.currentPlayerIndex) {
+      if (skippedExtraTurn) {
+        safety = Math.max(safety, 1)
+        continue
+      }
+      break
+    }
     state.currentPlayerIndex = next
   }
 
@@ -496,7 +511,17 @@ export const handleConfirmNextPlayerResolved = (
   if (currentForExtra && workersAvailable(state, currentForExtra) <= 0) {
     const extra = collectExtraTurnFlow(state, currentForExtra)
     if (extra) {
+      // Mirror takeAction's per-action setup so the promoted worker's placement
+      // sees a fresh action snapshot/token: cards that read
+      // getRoomsBuiltThisAction / getStableTilesBuiltThisAction /
+      // getFencesBuiltThisAction during build/fence (e.g. A23 Toolbox) would
+      // otherwise compare against a stale/missing snapshot and over-trigger.
+      core.appendHistory(true)
       core.setTurnOwner(state.currentPlayerIndex)
+      currentForExtra._activeActionBonusSources = []
+      core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(currentForExtra))
+      core.resetActionResultDetails()
+      recordActionSnapshot(currentForExtra, core.allocActionToken())
       const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
       // `__subflow:top-level` spaceId mirrors `takeAnytimeAction`'s
       // no-active-engine branch so `buildInteraction` surfaces the XOR as a real
@@ -516,7 +541,10 @@ export const handleConfirmNextPlayerResolved = (
     }
   }
 
-  // Check if the round's work phase is done (round end condition).
+  // Check if the round's work phase is done (round end condition). A player
+  // whose extra turn was consumed by a mandatory skip above no longer reports
+  // that consumed opportunity as pending, so `roundWorkComplete` (here and the
+  // re-check in performRoundEnd) can complete the round.
   if (roundWorkComplete(state)) {
     return core.invokeAllWorkersPlacedHooks()
   }

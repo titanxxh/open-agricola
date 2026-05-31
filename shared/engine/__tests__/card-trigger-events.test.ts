@@ -8,12 +8,14 @@ import { emitCardTriggered } from '../card-trigger-events'
 const context = (
   actionId: string,
   actionContext: Record<string, unknown> = {},
+  params: Record<string, unknown> = {},
 ): ActionExecutionContext => ({
   state: { players: [] } as unknown as ActionExecutionContext['state'],
   player: { id: 'p1' } as unknown as ActionExecutionContext['player'],
   space: { id: actionId } as unknown as ActionExecutionContext['space'],
   sourceCard: 'A1_TestCard',
   actionContext,
+  params,
 })
 
 const internals = (): EngineInternals => {
@@ -43,6 +45,16 @@ describe('emitCardTriggered', () => {
 
     emitCardTriggered(internals(), sink, context('activate-card-effect'), 'activate-card-effect')
     emitCardTriggered(internals(), sink, context('pay', { costType: 'minor-improvement' }), 'pay')
+
+    expect(emitted).toEqual([])
+  })
+
+  it('skips special-effect leaves that emit card-triggered events themselves', () => {
+    const emitted: DraftGameEvent[] = []
+    const sink = { emit: (event: DraftGameEvent) => emitted.push(event) }
+
+    emitCardTriggered(internals(), sink, context('special-effect', {}, { kind: 'emit-card-triggered' }), 'special-effect')
+    emitCardTriggered(internals(), sink, context('special-effect', {}, { kind: 'consume-pending-extra-turns' }), 'special-effect')
 
     expect(emitted).toEqual([])
   })

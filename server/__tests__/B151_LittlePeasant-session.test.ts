@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
+import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/B/B151_LittlePeasant'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -75,6 +76,43 @@ describe('B151_LittlePeasant session', () => {
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBeGreaterThan(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
+  })
+
+  it('does not offer occupied urgent-wish-children when the player has no inactive worker to grow', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 12
+
+    const player = state.players[0]!
+    const opponent = state.players[1]!
+    setActiveWorkerCount(player, 5)
+    player.houseType = 'wood'
+    player.rooms = 2
+    player.occupationPlayed.push('B151_LittlePeasant')
+
+    for (const space of state.actionSpaces) {
+      space.takenBy = space.takenBy.filter((ref) => ref.playerId !== player.id)
+    }
+    state.actionSpaces.find((space) => space.id === 'forest')!.takenBy = [
+      { playerId: opponent.id, workerId: '1' },
+    ]
+    state.actionSpaces.find((space) => space.id === 'urgent-wish-children')!.takenBy = [
+      { playerId: player.id, workerId: '1' },
+      { playerId: player.id, workerId: '2' },
+      { playerId: player.id, workerId: '3' },
+      { playerId: player.id, workerId: '4' },
+    ]
+
+    session.loadState(state)
+    const loaded = session.getState().state
+    const allowed = computeAllowedPlacementSpaces(loaded, loaded.players[0]!)
+
+    expect(allowed).toEqual(
+      expect.arrayContaining([{ spaceId: 'forest', allowOccupied: true, option: expect.any(Object) }]),
+    )
+    expect(allowed.some((entry) => entry.spaceId === 'urgent-wish-children')).toBe(false)
   })
 
   it('gives 1 stone when the occupation is played', () => {

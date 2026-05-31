@@ -4,6 +4,7 @@ import type { GameEvent } from '../../../shared/contract/events'
 
 import {
   applyPublicEventCancellationSnapshot,
+  buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
   farmCommitErrorMessageKey,
@@ -119,6 +120,21 @@ describe('GameContainerApi WS player identity', () => {
       farmTiles: [],
       fenceEdges: [],
     }, feedback.highlights).actionIds).toEqual(['forest'])
+  })
+
+  it('maps extra place-farmer choices back to board action space ids', () => {
+    const choiceMap = buildPlaceFarmerChoiceMap('ui.interactionPlaceFarmerExtra', [
+      { value: 'forest', labelKey: 'actions.forest.name' },
+      { value: 'allow-occupied:lessons', labelKey: 'actions.lessons.name' },
+      { value: 'clay-pit', labelKey: 'actions.clay-pit.name', disabled: true },
+    ])
+
+    expect(choiceMap.get('forest')?.value).toBe('forest')
+    expect(choiceMap.get('lessons')?.value).toBe('allow-occupied:lessons')
+    expect(choiceMap.get('clay-pit')?.disabled).toBe(true)
+    expect(buildPlaceFarmerChoiceMap('ui.interactionChooseOne', [
+      { value: 'forest', labelKey: 'actions.forest.name' },
+    ])).toEqual(new Map())
   })
 
   it('removes only one counted resource animation batch occurrence', () => {

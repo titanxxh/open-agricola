@@ -58,6 +58,11 @@ const anytimeGrowListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    // Suppress this anytime grow while the player is inside A92's own
+    // extra-turn decision (the XOR[use, forfeit] frame). Otherwise the player
+    // could promote+park an offspring via the anytime grow AND then forfeit the
+    // extra turn, double-dipping a placement and bypassing the use/forfeit XOR.
+    if (context.pendingSourceCard === CARD_ID) return
     if (!adoptiveAvailable(context.player)) return
     return {
       sourceCard: CARD_ID,
@@ -112,6 +117,12 @@ const buildExtraTurnFlow = (): ActionFlow => ({
           type: 'leaf',
           actionId: 'special-effect',
           sourceCard: CARD_ID,
+          params: { kind: 'emit-card-triggered', accepted: false, optional: true },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
           params: { kind: 'set-extra-data', key: FORFEITED_KEY, value: true },
         },
       ],
@@ -126,6 +137,10 @@ export const A92_AdoptiveParents_impl = {
     contributeExtraTurn: (_state: GameState, player: PlayerState): ActionFlow | void => {
       if (!adoptiveAvailable(player)) return
       return buildExtraTurnFlow()
+    },
+    countExtraTurns: (_state: GameState, player: PlayerState): number => {
+      if (!adoptiveAvailable(player)) return 0
+      return Math.min(newbornCount(player), player.resources.food)
     },
     onRoundStart: (_state: GameState, player: PlayerState): void => {
       if (isForfeited(player)) {

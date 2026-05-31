@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
+import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A92_AdoptiveParents'
@@ -253,5 +254,51 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     // Legacy fields: newbornCount still 1, no food spent.
     expect(newbornCount(p1)).toBe(1)
     expect(p1.resources.food).toBe(5)
+  })
+
+  it('A92 capability A: two newborns can be promoted by separate anytime uses', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 4)
+    player.resources.food = 5
+    const newbornWorkers = player.workers.filter((w) => w.isActive).slice(2, 4)
+    for (const [index, worker] of newbornWorkers.entries()) {
+      worker.isNewborn = true
+      const space = state.actionSpaces.find((s) => s.id === (index === 0 ? 'forest' : 'clay-pit'))!
+      space.takenBy = [{ playerId: player.id, workerId: worker.id }] as typeof space.takenBy
+    }
+    session.loadState(state)
+
+    const plow = session.takeAction(0, 'farmland')
+    expect(plow.ok).toBe(true)
+    expect(newbornCount(plow.state.players[0]!)).toBe(2)
+
+    const first = session.takeAnytimeAction(0, A92_ANYTIME)
+    expect(first.ok).toBe(true)
+    expect(newbornCount(session.getState().state.players[0]!)).toBe(1)
+
+    const second = session.takeAnytimeAction(0, A92_ANYTIME)
+    expect(second.ok).toBe(true)
+    const after = session.getState().state.players[0]!
+    expect(newbornCount(after)).toBe(0)
+    expect(after.resources.food).toBe(3)
+  })
+
+  it('A92 capability A: promoted newborn feeds as an adult', () => {
+    const session = setup()
+    const fgResp = session.takeAction(0, 'wish-children')
+    expect(fgResp.ok).toBe(true)
+    drainFgPrompts(session, fgResp)
+
+    const before = session.getState().state
+    expect(computeHarvestFeedingRequirement(before, before.players[0]!)).toBe(5)
+
+    const grown = session.takeAnytimeAction(0, A92_ANYTIME)
+    expect(grown.ok).toBe(true)
+
+    const after = session.getState().state
+    expect(newbornCount(after.players[0]!)).toBe(0)
+    expect(computeHarvestFeedingRequirement(after, after.players[0]!)).toBe(6)
   })
 })

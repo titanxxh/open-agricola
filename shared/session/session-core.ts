@@ -1382,6 +1382,27 @@ export class GameCore {
     return this.peekHostContextSnapshot()?.actionContext
   }
 
+  private cleanupFailedWorkerPlacement(
+    frameSpace: ActionSpace,
+    player: PlayerState,
+    activeActionContext?: Record<string, unknown>,
+  ): void {
+    const pendingActionContext = this.getActionContextFromTopFrame()
+    const targetSpaceId =
+      activeActionContext?.targetSpaceId ??
+      pendingActionContext?.targetSpaceId
+    const targetSpace = typeof targetSpaceId === 'string'
+      ? this.getSpaceById(targetSpaceId)
+      : null
+    const placedWorkerId =
+      typeof activeActionContext?.placedWorkerId === 'string'
+        ? activeActionContext.placedWorkerId
+        : typeof pendingActionContext?.placedWorkerId === 'string'
+          ? pendingActionContext.placedWorkerId
+          : undefined
+    removeWorkerRef(targetSpace ?? frameSpace, player.id, placedWorkerId)
+  }
+
   /**
    * Task 2 — read pending context through PendingEnvelope. The envelope
    * adapter owns pending host lookup.
@@ -2705,7 +2726,11 @@ export class GameCore {
     if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
       return this.respond()
     }
-    this.state.players.forEach((player) => resetRoundPlacements(player))
+    this.state.players.forEach((player) => {
+      resetRoundPlacements(player)
+      delete player._extraTurnSkipCount
+      delete player._extraTurnConsumedCount
+    })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.state.futureMeeples
       .filter((entry) =>
@@ -2967,6 +2992,10 @@ export class GameCore {
 
     while (true) {
       const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
+      const nextNode = nextNodeId
+        ? frame.engine._internals().tree.findNodeById(nextNodeId)
+        : null
+      const activeActionContext = nextNode instanceof ActionNode ? nextNode.actionContext : undefined
       const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
@@ -3154,8 +3183,14 @@ export class GameCore {
               return
             }
             if (result.type === 'fail') {
+              if (!frame.stageResume) {
+                this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
+              }
               this.engineStack.pop()
               this.actionStartIndex = null
+              this.actionStartPlayerSnapshot = null
+              delete player._activeActionBonusSources
+              this.turnOwnerPlayerIndex = null
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
@@ -3182,7 +3217,7 @@ export class GameCore {
 
       if (step.type === 'ok' && step.result.type === 'fail') {
         if (!frame.stageResume) {
-          removeWorkerRef(space, player.id)
+          this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
         }
         this.engineStack.pop()
         this.actionStartIndex = null

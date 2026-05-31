@@ -108,7 +108,8 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
  * non-standard signatures (scoring, animal zones, sowing, etc.) that cannot be
  * invoked via the generic `runCardEffectHook()` path.
  *
- * `handHooks` (meta-field) is deliberately excluded.
+ * `handHooks` (meta-field) and engine-internal adjuncts such as
+ * `countExtraTurns` are deliberately excluded.
  */
 export type CardEffectField = CardEffectHook
   | 'resolveChoice'
@@ -221,6 +222,7 @@ export type CardEffect = {
    * wants to earn a turn-rotation extra action.
    */
   contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
+  countExtraTurns?: (state: GameState, player: PlayerState) => number
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
@@ -538,11 +540,25 @@ export const collectExtraTurnFlow = (
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
+  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.contributeExtraTurn) continue
     try {
+      if (effect.countExtraTurns) {
+        const rawCount = effect.countExtraTurns(state, player)
+        const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
+        if (count === 0) continue
+        if (skipped >= count) {
+          skipped -= count
+          continue
+        }
+      }
       const flow = effect.contributeExtraTurn(state, player)
+      if (!effect.countExtraTurns && flow && skipped > 0) {
+        skipped -= 1
+        continue
+      }
       if (flow) return { flow, cardId }
     } catch (err) {
       if (isCustomCard(cardId)) {
@@ -553,6 +569,59 @@ export const collectExtraTurnFlow = (
     }
   }
   return null
+}
+
+const countExtraTurnOpportunities = (
+  state: GameState,
+  player: PlayerState,
+  effect: CardEffect,
+  skipped: number,
+): number => {
+  if (effect.countExtraTurns) {
+    const rawCount = effect.countExtraTurns(state, player)
+    const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
+    if (count === 0 || skipped >= count) return count
+    return effect.contributeExtraTurn?.(state, player) ? count : 0
+  }
+  return effect.contributeExtraTurn?.(state, player) ? 1 : 0
+}
+
+export const countPendingExtraTurns = (state: GameState, player: PlayerState): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
+  let pending = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.contributeExtraTurn) continue
+    try {
+      const count = countExtraTurnOpportunities(state, player, effect, skipped)
+      if (count === 0) continue
+      if (skipped >= count) {
+        skipped -= count
+        continue
+      }
+      pending += count - skipped
+      skipped = 0
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return pending
+}
+
+export const consumePendingExtraTurns = (state: GameState, player: PlayerState): number => {
+  const pending = countPendingExtraTurns(state, player)
+  if (pending <= 0) return 0
+  player._extraTurnConsumedCount = Math.max(0, player._extraTurnConsumedCount ?? 0) + pending
+  return pending
 }
 
 /**

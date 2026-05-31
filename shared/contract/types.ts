@@ -233,6 +233,13 @@ export type PlayerState = {
    * attributing the `log.actionDetail` entry to the triggering card.
    */
   _activeActionBonusSources?: string[]
+  /**
+   * Session-transient count: mandatory skip-turn effects (e.g. D134
+   * OysterEater) consume this many turn-rotation extra-action opportunities
+   * before the remaining contributed extra turns are offered.
+   */
+  _extraTurnSkipCount?: number
+  _extraTurnConsumedCount?: number
 }
 
 export type FarmTilePosition = {

@@ -12,6 +12,9 @@ import { addWorkerRef } from '../../domain/space'
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
 
+const hasInactiveWorker = (player: PlayerState) =>
+  (player.workers ?? []).some((worker) => !worker.isActive)
+
 const growFamilyCore = (
   state: GameState,
   player: PlayerState,
@@ -46,11 +49,11 @@ export const familyGrowthAction: ActionDefinition = {
   descriptionKey: 'actions.family-growth.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => {
-    // Doable check at action-registry level cannot inspect actionContext, so
-    // err on the side of true; engine's per-flow availability check (which
-    // runs with full actionContext) is the authoritative gate.
-    return true
+  canBeExecutedByPlayer: (_state, player, context) => {
+    if (!hasInactiveWorker(player)) return false
+    const skipRoom =
+      (context?.actionContext as { skipRoomCheck?: boolean } | undefined)?.skipRoomCheck === true
+    return skipRoom || effectiveRooms(player) > familySize(player)
   },
   execute: ({ state, player, space, actionContext, eventSink }) => {
     const skipRoom =

@@ -30,6 +30,7 @@ import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import { consumePendingExtraTurns } from '../../cards/card-effects'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -43,6 +44,7 @@ type ResourceAccumulationTarget =
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'emit-card-triggered'; accepted?: boolean; optional?: boolean; triggerActionId?: string }
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
   | { kind: 'pop-card-stack-top' }
@@ -51,6 +53,7 @@ export type SpecialEffectParams =
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'clear-pending-fence-bonus' }
+  | { kind: 'consume-pending-extra-turns' }
   | { kind: 'remove-future-meeples'; rounds?: number[] }
   | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
@@ -201,6 +204,16 @@ export const specialEffectAction: ActionDefinition = {
           emitCardStateChanged(eventSink, sourceCard, target, p.key, p.value)
         }
         return { type: 'ok' }
+      case 'emit-card-triggered':
+        eventSink?.emit<'card.triggered'>({
+          type: 'card.triggered',
+          cardId: sourceCard,
+          sourceCardId: sourceCard,
+          ...(p.triggerActionId ? { triggerActionId: p.triggerActionId } : {}),
+          ...(typeof p.accepted === 'boolean' ? { accepted: p.accepted } : {}),
+          ...(typeof p.optional === 'boolean' ? { optional: p.optional } : {}),
+        })
+        return { type: 'ok' }
       case 'increment-counter': {
         incCounter(target, sourceCard, p.key, p.amount)
         const next = target.cardStates?.[sourceCard]?.counters?.[p.key] ?? 0
@@ -277,6 +290,18 @@ export const specialEffectAction: ActionDefinition = {
         clearPendingFenceBonus(target)
         emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus', null)
         return { type: 'ok' }
+      case 'consume-pending-extra-turns': {
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        const consumed = consumePendingExtraTurns(state, target)
+        if (consumed > 0) {
+          eventSink?.emit<'card.triggered'>({
+            type: 'card.triggered',
+            cardId: sourceCard,
+            sourceCardId: sourceCard,
+          })
+        }
+        return { type: 'ok' }
+      }
       case 'remove-future-meeples': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const futureBefore = state.futureMeeples.length
