@@ -58,6 +58,11 @@ const anytimeGrowListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    // Suppress this anytime grow while the player is inside A92's own
+    // extra-turn decision (the XOR[use, forfeit] frame). Otherwise the player
+    // could promote+park an offspring via the anytime grow AND then forfeit the
+    // extra turn, double-dipping a placement and bypassing the use/forfeit XOR.
+    if (context.pendingSourceCard === CARD_ID) return
     if (!adoptiveAvailable(context.player)) return
     return {
       sourceCard: CARD_ID,
