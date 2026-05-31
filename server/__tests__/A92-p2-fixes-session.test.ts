@@ -183,19 +183,27 @@ describe('A92 P2 fixes', () => {
       expect(hasPendingExtraTurn(pre.state, pre.state.players[0]!)).toBe(true)
       expect(d134Skip(pre)).toBe(1)
 
-      const after = driveToP0ExtraTurn(session)
-      // Skip must win over the extra turn: no XOR offered to P0.
+      // P1 places on a fixed non-`fishing` space: D134 OysterEater's
+      // scope:'any' after-fishing listener would otherwise bump P0's
+      // skipNextPlacement 1→2, masking the "consumed exactly once" assertion.
+      const p1Space = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const taken = session.takeAction(1, p1Space)
+      expect(taken.ok).toBe(true)
+      const after = drainConfirms(session, taken)
+
+      // Skip must win over the extra turn: P0 is never offered the XOR. If the
+      // T3 gate regressed, the rotation would inject P0's extra-turn XOR here
+      // (reqKind === 'choice') instead of skipping past them.
       expect(reqKind(after)).not.toBe('choice')
+      // P0 went through the skip path, not the extra-turn path.
+      expect(
+        after.state.events.some(
+          (e) => e.type === 'turn.skipped' && e.playerId === after.state.players[0]!.id,
+        ),
+      ).toBe(true)
       // D134 skip flag is consumed exactly once (deleted → undefined).
       expect(d134Skip(after)).toBeUndefined()
-      // The round completed instead of stalling on P0's (now-forfeited) extra
-      // turn. The offspring was never promoted — its worker is still parked on
-      // its action space (the round-end aging clears `isNewborn`, so we check the
-      // parked worker, not newbornCount).
-      const parked = after.state.actionSpaces.some((sp) =>
-        (sp.takenBy ?? []).some((t) => t.playerId === after.state.players[0]!.id),
-      )
-      expect(parked).toBe(true)
+      // Round advanced instead of stalling on P0's (now-forfeited) extra turn.
       expect(after.state.round).toBe(2)
     })
   })
