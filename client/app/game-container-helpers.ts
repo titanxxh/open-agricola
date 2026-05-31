@@ -1,5 +1,6 @@
 import { resourceKeyList } from '../../shared/contract/state-constants'
-import type { FarmTilePosition, Resource } from '../../shared/contract/types'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
+import type { ActionChoiceOption, FarmTilePosition, Resource } from '../../shared/contract/types'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import type { Locale } from '../../shared/i18n'
@@ -145,6 +146,20 @@ export const getCurrentlySelectableRoomKeys = (
       .map((tile) => positionKey(tile))
       .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
   )
+}
+
+export const buildPlaceFarmerChoiceMap = (
+  promptKey: string | undefined,
+  options: readonly ActionChoiceOption[] | undefined,
+): Map<string, ActionChoiceOption> => {
+  if (promptKey !== 'ui.interactionPlaceFarmerExtra') return new Map()
+  const entries = (options ?? []).map((option) => {
+    const spaceId = option.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)
+      ? option.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
+      : option.value
+    return [spaceId, option] as const
+  })
+  return new Map(entries)
 }
 
 export const hasPublicEventHighlights = (targets: PublicEventHighlightTargets): boolean =>

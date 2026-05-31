@@ -891,6 +891,18 @@
 .action-card-holder.occupied-available .action-card {
   filter: none;
 }
+.action-card-holder.choice-available .action-card,
+.player-action-card-wrapper.choice-available .player-card {
+  filter: none;
+  box-shadow:
+    0 0 0 3px rgba(234, 179, 8, 0.72),
+    0 0 18px rgba(234, 179, 8, 0.42);
+}
+.action-card-holder.choice-unavailable .action-card,
+.player-action-card-wrapper.choice-unavailable .player-card {
+  filter: grayscale(70%) brightness(0.72);
+  opacity: 0.66;
+}
 .action-card-holder.exclusive-locked .action-card {
   filter: saturate(70%) brightness(0.92);
 }

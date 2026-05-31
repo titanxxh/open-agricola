@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
 import { ActionBoard } from '../ActionBoard'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 const resources = (): Resource => ({
   wood: 0,
@@ -315,5 +322,131 @@ describe('ActionBoard', () => {
     expect(html).toContain('Alice')
     expect(html).toContain('actions.round14.name')
     expect(html).toContain('disabled')
+  })
+
+  it('lets the board caller decide selectable action-space choices', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    const forest = createAction('forest', 'actions.forest.name')
+    const clayPit = createAction('clay-pit', 'actions.clay-pit.name')
+    const selected: string[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+
+    render(
+      <ActionBoard
+        locale="en"
+        baseActions={[forest, clayPit]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={(space) => space.id === 'forest'}
+        takeAction={(space) => selected.push(space.id)}
+        currentRound={1}
+        devMode={false}
+        actionSpaceSelectionActive={true}
+      />,
+    )
+
+    const forestButton = screen.getByRole('button', { name: /Forest/i })
+    const clayPitButton = screen.getByRole('button', { name: /Clay Pit/i })
+    expect(forestButton).not.toBeDisabled()
+    expect(clayPitButton).toBeDisabled()
+    expect(forestButton.closest('.action-card-holder')?.className).toContain('choice-available')
+    expect(clayPitButton.closest('.action-card-holder')?.className).toContain('choice-unavailable')
+    fireEvent.click(forestButton)
+    fireEvent.click(clayPitButton)
+    expect(selected).toEqual(['forest'])
+  })
+
+  it('removes the family-growth child marker when the newborn leaves the space', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    playerA.workers = [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '3', isActive: true, isNewborn: true },
+    ]
+    const wishChildren = createAction('wish-children', 'actions.wish-children.name')
+    wishChildren.takenBy = [
+      { playerId: 'p1', workerId: '1' },
+      { playerId: 'p1', workerId: '3' },
+    ]
+
+    const withNewborn = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 1, action: wishChildren }]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+    expect(withNewborn.match(/action-farmer-red child/g) ?? []).toHaveLength(1)
+    expect(withNewborn.match(/action-farmer-red"/g) ?? []).toHaveLength(1)
+
+    playerA.workers[1]!.isNewborn = false
+    wishChildren.takenBy = [{ playerId: 'p1', workerId: '1' }]
+    const afterPromotion = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 1, action: wishChildren }]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+    expect(afterPromotion).not.toContain('action-farmer-red child')
+    expect(afterPromotion.match(/action-farmer-red"/g) ?? []).toHaveLength(1)
+  })
+
+  it('shows only the current newborn once when a family-growth space is reused', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    playerA.workers = [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '3', isActive: true, isNewborn: false },
+      { id: '4', isActive: true, isNewborn: true },
+    ]
+    const urgentWishChildren = createAction('urgent-wish-children', 'actions.urgent-wish-children.name')
+    urgentWishChildren.takenBy = [
+      { playerId: 'p1', workerId: '1' },
+      { playerId: 'p1', workerId: '3' },
+      { playerId: 'p1', workerId: '4' },
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 1, action: urgentWishChildren }]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html.match(/action-farmer-red child/g) ?? []).toHaveLength(1)
+    expect(html.match(/action-farmer-red"/g) ?? []).toHaveLength(2)
+    expect(html).not.toContain('has-offspring')
+    expect(html).toMatch(
+      /action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red"><\/div><\/div>[\s\S]*action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red"><\/div><\/div>[\s\S]*action-farmer-stack"[^>]*><div class="action-farmer action-farmer-red child"><\/div><\/div>/,
+    )
   })
 })

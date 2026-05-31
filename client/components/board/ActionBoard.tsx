@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/contract/types'
-import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
 import { RESERVED_ACTION_SPACES_KEY } from '../../../shared/cards/helpers/card-state'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
@@ -243,6 +242,7 @@ type Props = {
   currentRound: number
   devMode: boolean
   highlightedActionIds?: ReadonlySet<string>
+  actionSpaceSelectionActive?: boolean
 }
 
 type TooltipInfo = {
@@ -260,11 +260,8 @@ type TooltipInfo = {
 type SpaceFarmerMarker = {
   player: PlayerState
   key: string
-  hasOffspring?: boolean
+  isNewbornOnly?: boolean
 }
-
-const isFamilyGrowthAction = (spaceId: string) =>
-  spaceId.startsWith('wish-children') || spaceId.startsWith('urgent-wish-children')
 
 const getBoardPlayerCount = (players: PlayerState[]): 2 | 3 | 4 => {
   const count = players.length
@@ -341,6 +338,7 @@ export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
   highlightedActionIds = new Set<string>(),
+  actionSpaceSelectionActive = false,
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -372,27 +370,6 @@ export const ActionBoard = ({
     () => new Map(players.map((p) => [p.id, p])),
     [players],
   )
-
-  const farmerMarkersBySpace = useMemo(() => {
-    const markers = new Map<string, SpaceFarmerMarker[]>()
-    const push = (spaceId: string, marker: SpaceFarmerMarker) => {
-      const current = markers.get(spaceId) ?? []
-      current.push(marker)
-      markers.set(spaceId, current)
-    }
-
-    players.forEach((player) => {
-      getRoundPlacementOrder(player).forEach((spaceId, index) => {
-        push(spaceId, {
-          player,
-          key: `${player.id}-${spaceId}-${index}`,
-          hasOffspring: isFamilyGrowthAction(spaceId),
-        })
-      })
-    })
-
-    return markers
-  }, [players])
 
   const buildStackItems = (action: ActionSpace) => {
     const items: { resource: keyof Resource; amount: number; player?: PlayerState }[] = []
@@ -497,35 +474,29 @@ export const ActionBoard = ({
   }
 
   const renderFarmerHolder = (space: ActionSpace) => {
-    const markers = farmerMarkersBySpace.get(space.id)
-    // Fallback: if there are no custom markers for this space, synthesize one
-    // per occupant from `takenBy` (one marker per placed worker).
-    const fallbackEntries = space.takenBy
+    const entries = space.takenBy
       .map((ref) => {
-        const player = players.find((pl) => pl.id === ref.playerId)
+        const player = playerById.get(ref.playerId)
+        const worker = player?.workers?.find((candidate) => candidate.id === ref.workerId)
         return player
           ? {
               player,
-              key: `${player.id}-${space.id}-${ref.workerId}-fallback`,
-              hasOffspring: false,
+              key: `${player.id}-${space.id}-${ref.workerId}`,
+              isNewbornOnly: !!worker?.isNewborn,
             }
           : null
       })
-      .filter((entry): entry is { player: PlayerState; key: string; hasOffspring: boolean } => entry !== null)
-    const entries = markers && markers.length > 0 ? markers : fallbackEntries
+      .filter((entry): entry is SpaceFarmerMarker => entry !== null)
     if (entries.length === 0) return null
     return (
       <div className="farmer-holder" data-n={entries.length}>
         {entries.map((entry) => (
           <div
             key={entry.key}
-            className={`action-farmer-stack${entry.hasOffspring ? ' has-offspring' : ''}`}
+            className="action-farmer-stack"
             title={entry.player.name}
           >
-            {entry.hasOffspring && (
-              <div className={`action-farmer action-farmer-${entry.player.color} child`} />
-            )}
-            <div className={`action-farmer action-farmer-${entry.player.color}`} />
+            <div className={`action-farmer action-farmer-${entry.player.color}${entry.isNewbornOnly ? ' child' : ''}`} />
           </div>
         ))}
       </div>
@@ -580,7 +551,7 @@ export const ActionBoard = ({
             if (!pos) return null
             const accDir = ACCUMULATE_DIR[space.id]
             const canTake = canTakeAction(space, currentPlayer)
-            const hasFarmer = (farmerMarkersBySpace.get(space.id)?.length ?? 0) > 0 || space.takenBy.length > 0
+            const hasFarmer = space.takenBy.length > 0
             return (
               <div
                 key={space.id}
@@ -589,6 +560,8 @@ export const ActionBoard = ({
                   accDir && `accumulate-${accDir}`,
                   hasFarmer && !canTake && 'taken',
                   hasFarmer && canTake && 'occupied-available',
+                  actionSpaceSelectionActive && canTake && 'choice-available',
+                  actionSpaceSelectionActive && !canTake && 'choice-unavailable',
                   highlightedActionIds.has(space.id) && 'event-highlight',
                 ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
@@ -627,9 +600,7 @@ export const ActionBoard = ({
             const isExclusiveVisible = !!action?.exclusiveUse && currentRound < slot.round
             const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
             const canTake = action ? canTakeAction(action, currentPlayer) : false
-            const hasFarmer = action
-              ? (farmerMarkersBySpace.get(action.id)?.length ?? 0) > 0 || action.takenBy.length > 0
-              : false
+            const hasFarmer = action ? action.takenBy.length > 0 : false
             return (
               <div
                 key={`r-${slot.round}`}
@@ -644,6 +615,8 @@ export const ActionBoard = ({
                       accDir && `accumulate-${accDir}`,
                       hasFarmer && !canTake && 'taken',
                       hasFarmer && canTake && 'occupied-available',
+                      actionSpaceSelectionActive && canTake && 'choice-available',
+                      actionSpaceSelectionActive && !canTake && 'choice-unavailable',
                       highlightedActionIds.has(action.id) && 'event-highlight',
                     ].filter(Boolean).join(' ')}
                     data-action-id={action.id}
@@ -719,7 +692,14 @@ export const ActionBoard = ({
                 p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
               )
               return (
-                <div key={space.id} className="player-action-card-wrapper">
+                <div
+                  key={space.id}
+                  className={[
+                    'player-action-card-wrapper',
+                    actionSpaceSelectionActive && canTake && 'choice-available',
+                    actionSpaceSelectionActive && !canTake && 'choice-unavailable',
+                  ].filter(Boolean).join(' ')}
+                >
                   <PlayerCard
                     locale={locale}
                     cardId={space.id}
