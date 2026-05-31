@@ -7,6 +7,8 @@ import {
   newbornCount,
 } from '../../shared/domain/player'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
+import { executeCardListener, getListenerById } from '../../shared/cards/card-listeners'
+import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import type { SessionResponse } from '../../shared/session/session-core'
 import '../../shared/cards/A/A92_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
@@ -141,14 +143,35 @@ describe('A92 P2 fixes', () => {
       expect(a92AnytimeIds(session)).toEqual([])
     })
 
-    it('regression: A92 anytime grow IS available in an unrelated interactive window', () => {
+    it('regression: A92 anytime grow IS available outside its own pending frame', () => {
+      // The suppression is scoped to A92's own pending frame, not a blanket
+      // disable. Exercise the listener directly: with no A92 pending frame it
+      // must still contribute its grow flow (P0 has a newborn + food). This
+      // avoids `listAnytimeEntries`, which only lists the active interaction
+      // owner's entries (P1 here), so it cannot observe P0's anytime.
       const session = setupRotation({ food: 3 })
-      // No extra-turn frame active; P1 still to act. P0 has newborn + food, so
-      // the anytime grow should remain available (the suppression is scoped to
-      // A92's own pending frame, not a blanket disable).
-      const before = session.getState()
-      expect(newbornCount(before.state.players[0]!)).toBe(1)
-      expect(a92AnytimeIds(session)).not.toEqual([])
+      const state = session.getState().state
+      const p0 = state.players[0]!
+      expect(newbornCount(p0)).toBe(1)
+      const reg = getListenerById('A92-adoptive-parents-anytime-grow')!
+      const noFrame = executeCardListener(reg, {
+        state,
+        player: p0,
+        space: state.actionSpaces[0]!,
+        actionId: 'anytime',
+        phase: 'anytime',
+      })
+      expect(noFrame?.flow).toBeTruthy()
+      // Inside A92's own pending frame it is suppressed.
+      const inFrame = executeCardListener(reg, {
+        state,
+        player: p0,
+        space: state.actionSpaces[0]!,
+        actionId: 'anytime',
+        phase: 'anytime',
+        pendingSourceCard: A92,
+      })
+      expect(inFrame).toBeUndefined()
     })
   })
 
@@ -165,8 +188,14 @@ describe('A92 P2 fixes', () => {
       expect(reqKind(after)).not.toBe('choice')
       // D134 skip flag is consumed exactly once (deleted → undefined).
       expect(d134Skip(after)).toBeUndefined()
-      // The offspring stays parked; control did not stay stuck on P0 offering it.
-      expect(newbornCount(after.state.players[0]!)).toBe(1)
+      // The round completed instead of stalling on P0's (now-forfeited) extra
+      // turn. The offspring was never promoted — its worker is still parked on
+      // its action space (the round-end aging clears `isNewborn`, so we check the
+      // parked worker, not newbornCount).
+      const parked = after.state.actionSpaces.some((sp) =>
+        (sp.takenBy ?? []).some((t) => t.playerId === after.state.players[0]!.id),
+      )
+      expect(parked).toBe(true)
       expect(after.state.round).toBe(2)
     })
   })
@@ -182,10 +211,10 @@ describe('A92 P2 fixes', () => {
       // The injected extra-turn frame must initialize per-action state the way
       // takeAction does (recordActionSnapshot). Without it, build/stable/fence
       // stat deltas (getRoomsBuiltThisAction etc.) fall back to absolute counts
-      // and over-trigger cards like A23 Toolbox. RED: snapshot is null.
-      const snap = (used.state.players[0] as { _actionSnapshot?: unknown })._actionSnapshot
-      expect(snap).not.toBeNull()
-      expect(snap).not.toBeUndefined()
+      // and over-trigger cards like A23 Toolbox. The snapshot lives in
+      // cardStates['__actionSnapshot__'] (readActionSnapshotToken). RED: token
+      // is undefined because no recordActionSnapshot ran for the extra turn.
+      expect(readActionSnapshotToken(used.state.players[0]!)).not.toBeUndefined()
 
       // Resolve the placement onto a real space (use the prompt's own options).
       const placeVal = used.interaction.stateId === 'wait' ? used.interaction.options![0]!.value : ''
