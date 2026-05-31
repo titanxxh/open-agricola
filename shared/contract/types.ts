@@ -239,6 +239,7 @@ export type PlayerState = {
    * before the remaining contributed extra turns are offered.
    */
   _extraTurnSkipCount?: number
+  _extraTurnConsumedCount?: number
 }
 
 export type FarmTilePosition = {

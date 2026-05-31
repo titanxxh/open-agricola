@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../domain/player'
-import { hasPendingExtraTurn, collectExtraTurnFlow } from '../card-effects'
+import {
+  hasPendingExtraTurn,
+  collectExtraTurnFlow,
+  countPendingExtraTurns,
+  consumePendingExtraTurns,
+} from '../card-effects'
 import { A92_AdoptiveParents } from '../../cards-display/A/A92_AdoptiveParents'
 import '../A/A92_AdoptiveParents'
 
@@ -102,5 +107,46 @@ describe('extra-turn extension point (isolation)', () => {
     expect(branches).toHaveLength(2)
     expect(branches[0]?.choiceLabelKey).toBe('ui.interactionUseAbility')
     expect(branches[1]?.choiceLabelKey).toBe('ui.interactionDecline')
+  })
+
+  it('counts remaining opportunities after skipped and forced consumed counters', () => {
+    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+
+    expect(countPendingExtraTurns(state, player)).toBe(2)
+    player._extraTurnSkipCount = 1
+    expect(countPendingExtraTurns(state, player)).toBe(1)
+    player._extraTurnConsumedCount = 1
+    expect(countPendingExtraTurns(state, player)).toBe(0)
+    expect(hasPendingExtraTurn(state, player)).toBe(false)
+  })
+
+  it('consumePendingExtraTurns records all remaining forced consumption', () => {
+    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+
+    const consumed = consumePendingExtraTurns(state, player)
+
+    expect(consumed).toBe(2)
+    expect(player._extraTurnConsumedCount).toBe(2)
+    expect(countPendingExtraTurns(state, player)).toBe(0)
+    expect(collectExtraTurnFlow(state, player)).toBeNull()
+  })
+
+  it('consumePendingExtraTurns respects already skipped opportunities', () => {
+    const { state, player } = setupA92Player({ newborns: 2, food: 2 })
+    player._extraTurnSkipCount = 1
+
+    const consumed = consumePendingExtraTurns(state, player)
+
+    expect(consumed).toBe(1)
+    expect(player._extraTurnConsumedCount).toBe(1)
+    expect(countPendingExtraTurns(state, player)).toBe(0)
+    expect(collectExtraTurnFlow(state, player)).toBeNull()
+  })
+
+  it('consumePendingExtraTurns silently no-ops when nothing is pending', () => {
+    const { state, player } = setupA92Player({ food: 0 })
+
+    expect(consumePendingExtraTurns(state, player)).toBe(0)
+    expect(player._extraTurnConsumedCount).toBeUndefined()
   })
 })
