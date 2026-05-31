@@ -260,7 +260,7 @@ type TooltipInfo = {
 type SpaceFarmerMarker = {
   player: PlayerState
   key: string
-  isNewbornOnly?: boolean
+  isNewbornOnly: boolean
 }
 
 const getBoardPlayerCount = (players: PlayerState[]): 2 | 3 | 4 => {
