@@ -562,7 +562,7 @@ export const collectExtraTurnFlow = (
  * extra turn is still pending.
  */
 export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
-  collectExtraTurnFlow(state, player) !== null
+  !player._extraTurnForfeited && collectExtraTurnFlow(state, player) !== null
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

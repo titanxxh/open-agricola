@@ -455,13 +455,20 @@ export const handleConfirmNextPlayerResolved = (
   core.setActionStartIndex(null)
   core.clearHistory() // Clear undo history when switching players
   core.setTurnOwner(null)
+  // Fresh rotation resolution: drop any transient extra-turn forfeit from a
+  // prior pass so it cannot leak across rounds.
+  for (const p of core.state.players) delete p._extraTurnForfeited
 
   const state = core.state
   // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
   // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
   // skip, advance to the next eligible player. Cap at `players.length` to
   // guarantee termination if every player is asked to skip.
+  // `skippedCurrent` records that the player the loop stopped on was
+  // skip-consumed this pass (e.g. D134) but had nowhere to advance to — in that
+  // case skip must win over any extra-turn injection below.
   let safety = state.players.length
+  let skippedCurrent = false
   while (safety-- > 0) {
     if (roundWorkComplete(state)) break
     const current = state.players[state.currentPlayerIndex]
@@ -475,6 +482,10 @@ export const handleConfirmNextPlayerResolved = (
       state.currentPlayerIndex = next
       continue
     }
+    // Skip-turn effects take priority over an extra turn: consume the skip
+    // (single call, so D134-style decrements happen exactly once) and advance.
+    // If there is nowhere to advance, remember the skip so the extra-turn
+    // injection below does not resurrect this player's turn.
     if (!shouldSkipPlayerTurn(state, current)) break
     appendImmediateEvents(state, [{
       type: 'turn.skipped',
@@ -482,7 +493,15 @@ export const handleConfirmNextPlayerResolved = (
       reason: 'cardEffect',
     }], { actorPlayerId: current.id })
     const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
-    if (next === state.currentPlayerIndex) break
+    if (next === state.currentPlayerIndex) {
+      // Skip consumed this player's step but there is nowhere to advance: a
+      // mandatory skip overrides any extra turn they were owed, so forfeit it
+      // for this round so the round-end check (here and in performRoundEnd) does
+      // not keep the round open on a player who has just been skipped.
+      current._extraTurnForfeited = true
+      skippedCurrent = true
+      break
+    }
     state.currentPlayerIndex = next
   }
 
@@ -493,10 +512,20 @@ export const handleConfirmNextPlayerResolved = (
   // place-farmer inside the flow runs in the player's own turn, so alternation
   // is preserved. Ordered before the round-end check so the round stays open.
   const currentForExtra = state.players[state.currentPlayerIndex]
-  if (currentForExtra && workersAvailable(state, currentForExtra) <= 0) {
+  if (!skippedCurrent && currentForExtra && workersAvailable(state, currentForExtra) <= 0) {
     const extra = collectExtraTurnFlow(state, currentForExtra)
     if (extra) {
+      // Mirror takeAction's per-action setup so the promoted worker's placement
+      // sees a fresh action snapshot/token: cards that read
+      // getRoomsBuiltThisAction / getStableTilesBuiltThisAction /
+      // getFencesBuiltThisAction during build/fence (e.g. A23 Toolbox) would
+      // otherwise compare against a stale/missing snapshot and over-trigger.
+      core.appendHistory(true)
       core.setTurnOwner(state.currentPlayerIndex)
+      currentForExtra._activeActionBonusSources = []
+      core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(currentForExtra))
+      core.resetActionResultDetails()
+      recordActionSnapshot(currentForExtra, core.allocActionToken())
       const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
       // `__subflow:top-level` spaceId mirrors `takeAnytimeAction`'s
       // no-active-engine branch so `buildInteraction` surfaces the XOR as a real
@@ -516,7 +545,10 @@ export const handleConfirmNextPlayerResolved = (
     }
   }
 
-  // Check if the round's work phase is done (round end condition).
+  // Check if the round's work phase is done (round end condition). A player
+  // whose extra turn was forfeited by a mandatory skip above no longer reports
+  // `hasPendingExtraTurn`, so `roundWorkComplete` (here and the re-check in
+  // performRoundEnd) can complete the round.
   if (roundWorkComplete(state)) {
     return core.invokeAllWorkersPlacedHooks()
   }
