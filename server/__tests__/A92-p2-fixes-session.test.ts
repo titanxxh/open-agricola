@@ -311,6 +311,18 @@ describe('A92 P2 fixes', () => {
       expect(d134Skip(afterSkips)).toBeUndefined()
       expect(afterSkips.state.round).toBe(2)
     })
+
+    it('stacked D134 skips can consume more A92 opportunities than player count', () => {
+      const session = setupRotation({ food: 3, newborns: 3, holdD134: true, d134Skip: 3 })
+      const p1Space = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const taken = session.takeAction(1, p1Space)
+      expect(taken.ok).toBe(true)
+      const afterSkips = drainConfirms(session, taken)
+
+      expect(reqKind(afterSkips)).not.toBe('choice')
+      expect(d134Skip(afterSkips)).toBeUndefined()
+      expect(afterSkips.state.round).toBe(2)
+    })
   })
 
   describe('T4: initialize action snapshot for extra-turn placements', () => {
