@@ -9,6 +9,7 @@ import {
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import { executeCardListener, getListenerById } from '../../shared/cards/card-listeners'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
+import type { ActionDefinition, ActionSpace } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import '../../shared/cards/A/A92_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
@@ -131,6 +132,28 @@ const d134Skip = (r: SessionResponse): number | undefined =>
   (r.state.players[0]!.cardStates?.[D134]?.extraData as { skipNextPlacement?: number } | undefined)
     ?.skipNextPlacement
 
+const addFailingActionSpace = (session: GameSession, id = '__test-failing-extra-turn-space__') => {
+  const action: ActionDefinition = {
+    id,
+    nameKey: 'actions.forest.name',
+    descriptionKey: 'actions.forest.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: () => ({ type: 'fail', errorKey: 'log.action' }),
+  }
+  const testSession = session as unknown as {
+    registry: { register(action: ActionDefinition): void }
+  }
+  testSession.registry.register(action)
+  session.getState().state.actionSpaces.push({
+    ...action,
+    resources: {},
+    takenBy: [],
+  } satisfies ActionSpace)
+  return id
+}
+
 describe('A92 P2 fixes', () => {
   describe('T1: suppress A92 anytime inside its own extra-turn prompt', () => {
     it('A92 anytime grow is NOT offered while the A92 extra-turn XOR is pending', () => {
@@ -228,6 +251,72 @@ describe('A92 P2 fixes', () => {
       const placeVal = used.interaction.stateId === 'wait' ? used.interaction.options![0]!.value : ''
       const placed = session.resolveChoice(0, placeVal)
       expect(placed.ok).toBe(true)
+    })
+  })
+
+  describe('T2: rollback failed extra-turn target action', () => {
+    it('failed target action removes the promoted worker from the selected action space', () => {
+      const session = setupRotation({ food: 3, newborns: 2 })
+      const failingSpaceId = addFailingActionSpace(session)
+
+      const offer = driveToP0ExtraTurn(session)
+      expect(reqKind(offer)).toBe('choice')
+      const used = session.resolveChoice(0, branchValue(offer, 0))
+      expect(used.ok).toBe(true)
+      expect(['farm-select', 'choice']).toContain(reqKind(used))
+
+      const failed = session.resolveChoice(0, failingSpaceId)
+      expect(failed.ok).toBe(true)
+      const p0 = session.getState().state.players[0]!
+      const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
+      expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
+    })
+  })
+
+  describe('forfeit log', () => {
+    it('forfeiting A92 writes a visible declined card log entry', () => {
+      const session = setupRotation()
+      const offer = driveToP0ExtraTurn(session)
+
+      const forfeited = session.resolveChoice(0, branchValue(offer, 1))
+      expect(forfeited.ok).toBe(true)
+
+      const log = session.getState().state.log
+      expect(log).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: 'log.cardTriggered',
+            params: expect.objectContaining({
+              cardId: A92,
+              declined: true,
+              optional: true,
+            }),
+          }),
+        ]),
+      )
+      expect(log).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: 'log.cardTriggered',
+            params: expect.objectContaining({
+              cardId: A92,
+              triggerAction: 'actions.special-effect.name',
+            }),
+          }),
+        ]),
+      )
+    })
+
+    it('forfeitedThisRound clears through the real next-round start path', () => {
+      const session = setupRotation()
+      const offer = driveToP0ExtraTurn(session)
+      const forfeited = session.resolveChoice(0, branchValue(offer, 1))
+      expect(forfeited.ok).toBe(true)
+      expect(forfeited.state.players[0]!.cardStates?.[A92]?.extraData?.forfeitedThisRound).toBe(true)
+
+      const nextRound = drainConfirms(session, forfeited)
+      expect(nextRound.state.round).toBe(2)
+      expect(nextRound.state.players[0]!.cardStates?.[A92]?.extraData?.forfeitedThisRound).toBe(false)
     })
   })
 })

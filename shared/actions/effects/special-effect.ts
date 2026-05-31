@@ -43,6 +43,7 @@ type ResourceAccumulationTarget =
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
+  | { kind: 'emit-card-triggered'; accepted?: boolean; optional?: boolean; triggerActionId?: string }
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
   | { kind: 'pop-card-stack-top' }
@@ -200,6 +201,16 @@ export const specialEffectAction: ActionDefinition = {
         if (p.value !== undefined && isPublicCardStateEventValue(p.value)) {
           emitCardStateChanged(eventSink, sourceCard, target, p.key, p.value)
         }
+        return { type: 'ok' }
+      case 'emit-card-triggered':
+        eventSink?.emit<'card.triggered'>({
+          type: 'card.triggered',
+          cardId: sourceCard,
+          sourceCardId: sourceCard,
+          ...(p.triggerActionId ? { triggerActionId: p.triggerActionId } : {}),
+          ...(typeof p.accepted === 'boolean' ? { accepted: p.accepted } : {}),
+          ...(typeof p.optional === 'boolean' ? { optional: p.optional } : {}),
+        })
         return { type: 'ok' }
       case 'increment-counter': {
         incCounter(target, sourceCard, p.key, p.amount)

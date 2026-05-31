@@ -107,7 +107,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
-本轮新增已完成基础设施：Extra-turn 轮转扩展点（A92_AdoptiveParents，#203+#204）。`CardEffect` 新增 `contributeExtraTurn?: (state, player) => ActionFlow | void` hook（返回 XOR `[use, forfeit]` flow）；`shared/cards/card-effects.ts` 提供聚合谓词 `hasPendingExtraTurn(state, player)` 与 flow 收集器 `collectExtraTurnFlow(state, player)`——该 hook 不经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 主动消费（单一真相源，gating 与 flow 不会漂移）。round.ts 三处 gating 据此判定：选下一活跃玩家（`workersAvailable > 0 || hasPendingExtraTurn`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮）——普通工人耗尽但被卡牌欠一次额外回合的玩家不再被提前跳过，而是收到 `collectExtraTurnFlow` 推送的 XOR[用, 放弃]（Forfeit=放弃该额外放工）。A92 是首个使用者（BGA pull model，对齐 BGA `stLabor` 的 adoptive supply-placement）；任何想换取轮转额外行动的卡可复用。
+本轮新增已完成基础设施：Extra-turn 轮转扩展点（A92_AdoptiveParents，#203+#204）。`CardEffect` 新增 `contributeExtraTurn?: (state, player) => ActionFlow | void` hook（返回 XOR `[use, forfeit]` flow）；`shared/cards/card-effects.ts` 提供聚合谓词 `hasPendingExtraTurn(state, player)` 与 flow 收集器 `collectExtraTurnFlow(state, player)`——该 hook 不经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 主动消费（单一真相源，gating 与 flow 不会漂移）。round.ts 三处 gating 据此判定：选下一活跃玩家（`workersAvailable > 0 || hasPendingExtraTurn`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮）——普通工人耗尽但被卡牌欠一次额外回合的玩家不再被提前跳过，而是收到 `collectExtraTurnFlow` 推送的 XOR[用, 放弃]（Forfeit=放弃该额外放工）。A92 是首个使用者（BGA pull model，对齐 BGA `stLabor` 的 adoptive supply-placement）；任何想换取轮转额外行动的卡可复用。后续 hardening 已补齐：A92 自身 extra-turn prompt 内不再暴露 A92 anytime grow；mandatory skip-turn 优先于 extra-turn offer；失败的 extra-turn 目标行动会回滚真实 target space；forfeit 写入可见 declined-card log；多 newborn 与 promoted adult feeding 均有 session 覆盖。
 
 本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
 
@@ -350,6 +350,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | specialKind | `choice` | `B146_Illusionist`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit` |
 | specialKind | `clear-pending-fence-bonus` | `E74_AshTrees` |
 | specialKind | `consume-fence` | `C1_Overhaul` |
+| specialKind | `emit-card-triggered` | `A92_AdoptiveParents` |
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
 | specialKind | `increment-counter` | `B132_EstateMaster`, `C132_TimberShingleMaker` |
@@ -365,8 +366,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | specialKind | `resourceExchange` | `E5_NightLoot` |
 | specialKind | `return-card-to-board` | `C60_SmallPottersOven` |
 | specialKind | `set-counter` | `A144_Sequestrator`, `B48_ForestStone`, `C148_MudWallower`, `D158_BeanCounter` |
-| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `A89_StablePlanner`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B93_Confidant`, `C150_ParrotBreeder`, `C16_FieldFences`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
-| specialKind | `set-flag` | `A130_MummysBoy`, `A153_PigOwner`, `A17_ReclamationPlow`, `A18_WheelPlow`, `A45_FireProtectionPond`, `A92_AdoptiveParents`, `A97_Freshman`, `B124_Trimmer`, `B140_FarmyardWorker`, `B154_SheepKeeper`, `B163_Pastor`, `B24_Lasso`, `B34_SpecialFood`, `B35_HookKnife`, `B76_Ceilings`, `B85_FarmHand`, `C101_StallHolder`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C42_RavenousHunger`, `C46_Mandoline`, `C51_FishingNet`, `C64_CornSchnappsDistillery`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C94_StableCleaner`, `D122_ClayCarrier`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D27_Retraining`, `D46_PelletPress`, `D53_TeaHouse`, `D87_MasterBuilder`, `D93_SheepInspector`, `E13_StoneHouseReconstruction`, `E146_Reseller`, `E151_DeliveryNurse`, `E22_GuestRoom`, `E27_PiggyBank`, `E62_SourDough`, `E91_PlowBuilder`, `E92_FieldDoctor` |
+| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `A89_StablePlanner`, `A92_AdoptiveParents`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B93_Confidant`, `C150_ParrotBreeder`, `C16_FieldFences`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
+| specialKind | `set-flag` | `A130_MummysBoy`, `A153_PigOwner`, `A17_ReclamationPlow`, `A18_WheelPlow`, `A45_FireProtectionPond`, `A97_Freshman`, `B124_Trimmer`, `B140_FarmyardWorker`, `B154_SheepKeeper`, `B163_Pastor`, `B24_Lasso`, `B34_SpecialFood`, `B35_HookKnife`, `B76_Ceilings`, `B85_FarmHand`, `C101_StallHolder`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C42_RavenousHunger`, `C46_Mandoline`, `C51_FishingNet`, `C64_CornSchnappsDistillery`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C94_StableCleaner`, `D122_ClayCarrier`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D27_Retraining`, `D46_PelletPress`, `D53_TeaHouse`, `D87_MasterBuilder`, `D93_SheepInspector`, `E13_StoneHouseReconstruction`, `E146_Reseller`, `E151_DeliveryNurse`, `E22_GuestRoom`, `E27_PiggyBank`, `E62_SourDough`, `E91_PlowBuilder`, `E92_FieldDoctor` |
 | specialKind | `set-infobox` | `A17_ReclamationPlow`, `B21_HayloftBarn`, `B48_ForestStone`, `B55_MaintenancePremium`, `C115_Sower`, `C148_MudWallower`, `D126_FieldCultivator`, `D36_BreedRegistry`, `E110_Dentist`, `E22_GuestRoom`, `E27_PiggyBank`, `E51_WhaleOil`, `E74_AshTrees` |
 | specialKind | `stone` | `C6_StoneClearing` |
 | specialKind | `swap-improvement-with-board` | `D27_Retraining` |
@@ -481,7 +482,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A89_StablePlanner` | 已对齐 |  |
 | `A90_PlowDriver` | 已对齐 |  |
 | `A91_ShiftingCultivator` | 已对齐 |  |
-| `A92_AdoptiveParents` | 已对齐 | BGA pull model：玩家普通工人耗尽但仍持未激活后代时 `contributeExtraTurn` 贡献一次额外放工 XOR[use, forfeit]（#203+#204） |
+| `A92_AdoptiveParents` | 已对齐 | BGA pull model：玩家普通工人耗尽但仍持未激活后代时 `contributeExtraTurn` 贡献一次额外放工 XOR[use, forfeit]（#203+#204）；A92 own-prompt anytime suppression、skip-turn precedence、failed target rollback、forfeit visible log、多 newborn / adult-feeding 覆盖已补齐 |
 | `A93_BedMaker` | 已对齐 |  |
 | `A94_LazySowman` | 已对齐 |  |
 | `A95_Angler` | 已对齐 |  |
