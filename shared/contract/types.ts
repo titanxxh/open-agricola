@@ -234,14 +234,11 @@ export type PlayerState = {
    */
   _activeActionBonusSources?: string[]
   /**
-   * Session-transient flag: set when a mandatory skip-turn effect (e.g. D134
-   * OysterEater) consumes this player's rotation step in the same pass that they
-   * were owed a turn-rotation extra action. It overrides `hasPendingExtraTurn`
-   * for the rest of that round-end resolution so skip wins over the extra turn
-   * and the round can still complete. Reset at the start of each rotation
-   * resolution.
+   * Session-transient count: mandatory skip-turn effects (e.g. D134
+   * OysterEater) consume this many turn-rotation extra-action opportunities
+   * before the remaining contributed extra turns are offered.
    */
-  _extraTurnForfeited?: boolean
+  _extraTurnSkipCount?: number
 }
 
 export type FarmTilePosition = {

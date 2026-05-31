@@ -236,8 +236,15 @@ export const placeFarmerAction: ActionDefinition = {
     ) {
       writeCardExtraData(player, sourceCard, 'markedSpaceId', targetSpaceId)
     }
-    const targetActionContext = { ...(actionContext ?? {}), targetSpaceId }
-    if (actionContext) actionContext.targetSpaceId = targetSpaceId
+    const actionContextWrite = {
+      targetSpaceId,
+      placedWorkerId: placeResult.workerId,
+    }
+    const targetActionContext = { ...(actionContext ?? {}), ...actionContextWrite }
+    if (actionContext) {
+      actionContext.targetSpaceId = targetSpaceId
+      actionContext.placedWorkerId = placeResult.workerId
+    }
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpaceId,
@@ -248,7 +255,7 @@ export const placeFarmerAction: ActionDefinition = {
     return {
       type: 'flow',
       flow: targetLeaf,
-      extraData: { actionContextWrite: { targetSpaceId } },
+      extraData: { actionContextWrite },
     }
   },
 }

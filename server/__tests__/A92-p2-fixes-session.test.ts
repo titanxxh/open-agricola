@@ -11,6 +11,8 @@ import { executeCardListener, getListenerById } from '../../shared/cards/card-li
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import type { ActionDefinition, ActionSpace } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import '../../shared/cards/A/A92_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
 
@@ -229,6 +231,42 @@ describe('A92 P2 fixes', () => {
       // Round advanced instead of stalling on P0's (now-forfeited) extra turn.
       expect(after.state.round).toBe(2)
     })
+
+    it('D134 skip keeps suppressing the skipped A92 extra turn after rotating to another player', () => {
+      const session = setupRotation({ food: 3, holdD134: true, d134Skip: 1, p1Workers: 2 })
+      const firstSpace = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const first = session.takeAction(1, firstSpace)
+      expect(first.ok).toBe(true)
+      const afterSkip = drainConfirms(session, first)
+
+      expect(reqKind(afterSkip)).not.toBe('choice')
+      expect(afterSkip.state.currentPlayerIndex).toBe(1)
+      expect(d134Skip(afterSkip)).toBeUndefined()
+
+      const secondSpace = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const second = session.takeAction(1, secondSpace)
+      expect(second.ok).toBe(true)
+      const afterSecond = drainConfirms(session, second)
+
+      expect(reqKind(afterSecond)).not.toBe('choice')
+      expect(afterSecond.state.round).toBe(2)
+    })
+
+    it('D134 skip consumes only one A92 extra-turn opportunity when multiple newborns remain', () => {
+      const session = setupRotation({ food: 3, newborns: 2, holdD134: true, d134Skip: 1 })
+      const p1Space = placeableSpaces(session).find((id) => id !== 'fishing')!
+      const taken = session.takeAction(1, p1Space)
+      expect(taken.ok).toBe(true)
+      const afterSkip = drainConfirms(session, taken)
+
+      expect(reqKind(afterSkip)).toBe('choice')
+      expect(d134Skip(afterSkip)).toBeUndefined()
+      expect(newbornCount(afterSkip.state.players[0]!)).toBe(2)
+
+      const used = session.resolveChoice(0, branchValue(afterSkip, 0))
+      expect(used.ok).toBe(true)
+      expect(['farm-select', 'choice']).toContain(reqKind(used))
+    })
   })
 
   describe('T4: initialize action snapshot for extra-turn placements', () => {
@@ -270,6 +308,56 @@ describe('A92 P2 fixes', () => {
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
+    })
+
+    it('failed allow-occupied target action removes the newly placed worker, not an older worker', () => {
+      const session = setupRotation({ food: 3, newborns: 2 })
+      const failingSpaceId = addFailingActionSpace(session)
+      const state = session.getState().state
+      const p0 = state.players[0]!
+      const oldWorker = p0.workers.find((w) => w.id === '1')!
+      const promotedWorker = p0.workers.find((w) => w.id === '2')!
+      oldWorker.isNewborn = false
+      state.actionSpaces.forEach((space) => {
+        space.takenBy = space.takenBy.filter(
+          (ref) => !(ref.playerId === p0.id && ref.workerId === oldWorker.id),
+        )
+      })
+      const failingSpace = state.actionSpaces.find((space) => space.id === failingSpaceId)!
+      failingSpace.takenBy = [{ playerId: p0.id, workerId: oldWorker.id }]
+      session.loadState(state)
+
+      registerActionHook({
+        id: 'test-a92-allow-occupied-failing-space',
+        actions: ['place-farmer'],
+        phases: ['computeArgs'],
+        handler: () => ({
+          extraOptions: [{
+            value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`,
+            labelKey: 'actions.forest.name',
+          }],
+        }),
+      })
+      try {
+        const offer = driveToP0ExtraTurn(session)
+        const used = session.resolveChoice(0, branchValue(offer, 0))
+        expect(used.ok).toBe(true)
+        expect(used.interaction.stateId).toBe('wait')
+        expect(used.interaction.options?.map((option) => option.value)).toContain(
+          `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`,
+        )
+
+        const failed = session.resolveChoice(0, `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`)
+        expect(failed.ok).toBe(true)
+
+        const after = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
+        expect(after.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }])
+        expect(after.takenBy).not.toEqual(
+          expect.arrayContaining([{ playerId: p0.id, workerId: promotedWorker.id }]),
+        )
+      } finally {
+        unregisterActionHook('test-a92-allow-occupied-failing-space')
+      }
     })
   })
 
