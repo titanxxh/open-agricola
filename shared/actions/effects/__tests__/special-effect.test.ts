@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { specialEffectAction } from '../special-effect'
+import { GameSession } from '../../../../server/game/authoritative-session'
 import {
   readCardExtraData,
   readCardInfobox,
   isCardFlagged,
 } from '../../../cards/helpers/card-state'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
+import { hasPendingExtraTurn } from '../../../cards/card-effects'
+import { A92_AdoptiveParents } from '../../../cards-display/A/A92_AdoptiveParents'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../../domain/player'
 import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
+import '../../../cards/A/A92_AdoptiveParents'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -39,6 +44,7 @@ const makeCtx = (
 })
 
 const CARD_ID = 'TEST_CARD'
+const A92 = A92_AdoptiveParents.id
 
 const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
   emit: (event) => {
@@ -48,6 +54,46 @@ const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
     events.push(...nextEvents)
   },
 })
+
+const placeholderHands = (state: {
+  players: { minorHand: string[]; occupationHand: string[] }[]
+}) => {
+  for (const p of state.players) {
+    p.minorHand = ['__test_placeholder__']
+    p.occupationHand = ['__test_placeholder__']
+  }
+}
+
+const setupExtraTurnPlayer = (over: {
+  newborns?: number
+  food?: number
+} = {}) => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.round = 1
+  state.roundPhase = 'work'
+
+  const p0 = state.players[0]!
+  setActiveWorkerCount(p0, 2)
+  setWorkersAtHome(state, p0, 0)
+  const newborns = over.newborns ?? 1
+  const active = p0.workers
+    .filter((w) => w.isActive)
+    .sort((a, b) => Number(a.id) - Number(b.id))
+  for (let i = 0; i < newborns && i < active.length; i++) active[i]!.isNewborn = true
+  p0.occupationPlayed.push(A92)
+  p0.resources.food = over.food ?? 2
+
+  const p1 = state.players[1]!
+  setActiveWorkerCount(p1, 1)
+  setWorkersAtHome(state, p1, 1)
+
+  placeholderHands(state)
+  session.loadState(state)
+  const loaded = session.getState().state
+  return { state: loaded, player: loaded.players[0]! }
+}
 
 describe('specialEffectAction — mutation dispatcher', () => {
   it('increment-extra-data: adds to existing counter, init from 0', () => {
@@ -194,6 +240,57 @@ describe('specialEffectAction — mutation dispatcher', () => {
         value: null,
       }),
     ])
+  })
+
+  it('consume-pending-extra-turns: no-ops silently when no opportunity is pending', () => {
+    const { state, player } = setupExtraTurnPlayer({ food: 0 })
+    const events: DraftGameEvent[] = []
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player._extraTurnConsumedCount).toBeUndefined()
+    expect(events).toEqual([])
+  })
+
+  it('consume-pending-extra-turns: consumes all pending opportunities and emits the source card trigger once', () => {
+    const { state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
+    const events: DraftGameEvent[] = []
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player._extraTurnConsumedCount).toBe(2)
+    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.triggered',
+        cardId: CARD_ID,
+        sourceCardId: CARD_ID,
+      }),
+    ])
+  })
+
+  it('consume-pending-extra-turns: consumes only opportunities not already skipped', () => {
+    const { state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
+    const events: DraftGameEvent[] = []
+    player._extraTurnSkipCount = 1
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player._extraTurnConsumedCount).toBe(1)
+    expect(hasPendingExtraTurn(state, player)).toBe(false)
+    expect(events).toHaveLength(1)
   })
 
   it('set-counter: writes counter exactly to the provided non-negative value', () => {

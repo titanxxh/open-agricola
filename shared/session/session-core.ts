@@ -2729,6 +2729,7 @@ export class GameCore {
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
       delete player._extraTurnSkipCount
+      delete player._extraTurnConsumedCount
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.state.futureMeeples
