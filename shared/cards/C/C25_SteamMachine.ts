@@ -17,6 +17,10 @@ const steamMachineListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, space, state } = context
 
+    if (context.sourceCard) {
+      return
+    }
+
     // Check if player has this card
     if (!player.minorPlayed.includes(CARD_ID)) {
       return
@@ -32,10 +36,21 @@ const steamMachineListener: CardListenerRegistration = {
 
     return {
       flow: {
-        type: 'leaf',
-        actionId: 'bake-bread',
-        optional: true,
-        sourceCard: CARD_ID,
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'bake-bread',
+            optional: true,
+            sourceCard: CARD_ID,
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'consume-pending-extra-turns' },
+          },
+        ],
       },
       sourceCard: CARD_ID,
     }

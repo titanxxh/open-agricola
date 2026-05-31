@@ -28,7 +28,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
-| `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | A92 extra-turn 已落地（#203+#204）；C25 adoptive forceSkip/end-turn 联动待 A92 模型落地后另行评估，非阻塞。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
 
 ## 3. 已接受差异
@@ -780,7 +779,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C22_BasketChair` | 已对齐 | 回收 Day Laborer 工人后按 linked-occupancy metadata 清理同 linked worker 的 synthetic occupancy，并保留真实 / 不匹配 lessons 占格 |
 | `C23_JobContract` | 已对齐 | lessons fake occupancy 写入 `WorkerRef.synthetic.kind='linked-occupancy'`，source card 与 linked worker id 都在 action-space state 上表达 |
 | `C24_BedintheGrainField` | 已对齐 | 下一次 harvest 有空房时提供 optional `family-growth`，skip/accept 后都清理一次性 marker；无空房也消费 marker |
-| `C25_SteamMachine` | 待评估 | A92 extra-turn 已落地（#203+#204）；adoptive worker 场景的 forceSkip/end-turn 联动待另行评估，非阻塞 |
+| `C25_SteamMachine` | 已对齐 | 最后一个普通工人使用 accumulation space 后返回 `SEQ[optional bake-bread, special-effect.consume-pending-extra-turns]`；消费步骤走通用 pending extra-turn 聚合，不引用 A92。无 pending/不可支付时 silent no-op；有多个 pending opportunity 时全部写入 `_extraTurnConsumedCount`，并只在实际消费时由 C25 发 `card.triggered`。Card-sourced follow-up leaf 通过 `sourceCard` 守卫避免 immediatelyAfter 自触发循环，也不把卡牌额外放人当作“普通工人最后行动”。 |
 | `C26_Flail` | 已对齐 |  |
 | `C27_Blueprint` | 已对齐 | 三张 workshop major 保留原支付 trade，并追加 Blueprint 折扣 trade；minor-improvement 入口维持 listener 模式 |
 | `C28_TeachersDesk` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
