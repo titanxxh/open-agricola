@@ -26,7 +26,7 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { buildPhaseTrailingNodes } from '../engine-utils'
+import { buildPhaseTrailingNodes, getNodeDescriptionPreview } from '../engine-utils'
 import type { CardListenerContext, MatchedCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
@@ -1885,6 +1885,20 @@ describe('Engine flow nodes', () => {
       'actions.special-effect.set-extra-data.name',
     ])
     expect(byValue['decline-offspring']!.labelKey).toBe('ui.interactionDecline')
+  })
+
+  it('omits card infobox sync from special-effect descriptions', () => {
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    registry.register(specialEffectAction)
+    const branch = new SequenceNode('sync-note', [
+      new ActionNode('pay-food', 'pay', 'C115_Sower', { food: 1 }),
+      new ActionNode('clear-note', 'special-effect', 'C115_Sower', { kind: 'set-infobox', text: '' }),
+    ])
+
+    expect(collectDescriptionLabelKeys(getNodeDescriptionPreview(branch, registry))).toEqual([
+      'actions.pay.name',
+    ])
   })
 
   it('marks selected OR leaf action mandatory', () => {
