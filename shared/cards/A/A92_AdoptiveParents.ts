@@ -138,6 +138,10 @@ export const A92_AdoptiveParents_impl = {
       if (!adoptiveAvailable(player)) return
       return buildExtraTurnFlow()
     },
+    countExtraTurns: (_state: GameState, player: PlayerState): number => {
+      if (!adoptiveAvailable(player)) return 0
+      return Math.min(newbornCount(player), player.resources.food)
+    },
     onRoundStart: (_state: GameState, player: PlayerState): void => {
       if (isForfeited(player)) {
         writeCardExtraData(player, CARD_ID, FORFEITED_KEY, false)
