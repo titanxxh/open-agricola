@@ -514,12 +514,12 @@ return {
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
-| `special-effect`           | **唯一的 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1。 |
+| `special-effect`           | **沙盒 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1；未列出的仓库内部 kind 不属于 Workshop 合约。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
 
 > Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
-### 6.1 `special-effect` `params.kind` 完整列表
+### 6.1 `special-effect` `params.kind` 沙盒可用子集
 
 ```ts
 // 设/清除 player.cardStates[sourceCard].flagged
@@ -536,6 +536,8 @@ return {
 // player.cardStates[sourceCard].extraData[key] += amount
 { kind: 'increment-extra-data', key: 'used', amount: 1 }
 ```
+
+仓库内部还可能使用非沙盒 kind（例如 `emit-card-triggered` 用于写入可见卡牌触发事件日志）。这些 kind 不属于 Workshop 合约，LLM prompt 也不会推荐。
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 

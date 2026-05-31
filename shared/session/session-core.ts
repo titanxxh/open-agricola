@@ -1382,6 +1382,20 @@ export class GameCore {
     return this.peekHostContextSnapshot()?.actionContext
   }
 
+  private cleanupFailedWorkerPlacement(
+    frameSpace: ActionSpace,
+    player: PlayerState,
+    activeActionContext?: Record<string, unknown>,
+  ): void {
+    const targetSpaceId =
+      activeActionContext?.targetSpaceId ??
+      this.getActionContextFromTopFrame()?.targetSpaceId
+    const targetSpace = typeof targetSpaceId === 'string'
+      ? this.getSpaceById(targetSpaceId)
+      : null
+    removeWorkerRef(targetSpace ?? frameSpace, player.id)
+  }
+
   /**
    * Task 2 — read pending context through PendingEnvelope. The envelope
    * adapter owns pending host lookup.
@@ -2967,6 +2981,10 @@ export class GameCore {
 
     while (true) {
       const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
+      const nextNode = nextNodeId
+        ? frame.engine._internals().tree.findNodeById(nextNodeId)
+        : null
+      const activeActionContext = nextNode instanceof ActionNode ? nextNode.actionContext : undefined
       const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
@@ -3182,7 +3200,7 @@ export class GameCore {
 
       if (step.type === 'ok' && step.result.type === 'fail') {
         if (!frame.stageResume) {
-          removeWorkerRef(space, player.id)
+          this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
         }
         this.engineStack.pop()
         this.actionStartIndex = null

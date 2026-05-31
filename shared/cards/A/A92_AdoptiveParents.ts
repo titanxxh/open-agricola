@@ -117,6 +117,12 @@ const buildExtraTurnFlow = (): ActionFlow => ({
           type: 'leaf',
           actionId: 'special-effect',
           sourceCard: CARD_ID,
+          params: { kind: 'emit-card-triggered', accepted: false, optional: true },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
           params: { kind: 'set-extra-data', key: FORFEITED_KEY, value: true },
         },
       ],
