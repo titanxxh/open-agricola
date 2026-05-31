@@ -492,6 +492,7 @@ export const handleConfirmNextPlayerResolved = (
     }], { actorPlayerId: current.id })
     const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
     if (next === state.currentPlayerIndex) {
+      if (skippedExtraTurn) continue
       break
     }
     state.currentPlayerIndex = next

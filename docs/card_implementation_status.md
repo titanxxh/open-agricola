@@ -107,7 +107,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
-本轮新增已完成基础设施：Extra-turn 轮转扩展点（A92_AdoptiveParents，#203+#204）。`CardEffect` 新增 `contributeExtraTurn?: (state, player) => ActionFlow | void` hook（返回 XOR `[use, forfeit]` flow）；`shared/cards/card-effects.ts` 提供聚合谓词 `hasPendingExtraTurn(state, player)` 与 flow 收集器 `collectExtraTurnFlow(state, player)`——该 hook 不经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 主动消费（单一真相源，gating 与 flow 不会漂移）。round.ts 三处 gating 据此判定：选下一活跃玩家（`workersAvailable > 0 || hasPendingExtraTurn`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮）——普通工人耗尽但被卡牌欠一次额外回合的玩家不再被提前跳过，而是收到 `collectExtraTurnFlow` 推送的 XOR[用, 放弃]（Forfeit=放弃该额外放工）。A92 是首个使用者（BGA pull model，对齐 BGA `stLabor` 的 adoptive supply-placement）；任何想换取轮转额外行动的卡可复用。后续 hardening 已补齐：A92 自身 extra-turn prompt 内不再暴露 A92 anytime grow；mandatory skip-turn 通过内部 `_extraTurnSkipCount` / `countExtraTurns` 只消费一个 extra-turn opportunity；失败的 extra-turn 目标行动会按 `placedWorkerId` 回滚真实 target space；forfeit 写入可见 declined-card log；多 newborn 与 promoted adult feeding 均有 session 覆盖。
+本轮新增已完成基础设施：Extra-turn 轮转扩展点（A92_AdoptiveParents，#203+#204）。`CardEffect` 新增 `contributeExtraTurn?: (state, player) => ActionFlow | void` hook（返回 XOR `[use, forfeit]` flow）；`shared/cards/card-effects.ts` 提供聚合谓词 `hasPendingExtraTurn(state, player)` 与 flow 收集器 `collectExtraTurnFlow(state, player)`——该 hook 不经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 主动消费（单一真相源，gating 与 flow 不会漂移）。round.ts 三处 gating 据此判定：选下一活跃玩家（`workersAvailable > 0 || hasPendingExtraTurn`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮）——普通工人耗尽但被卡牌欠一次额外回合的玩家不再被提前跳过，而是收到 `collectExtraTurnFlow` 推送的 XOR[用, 放弃]（Forfeit=放弃该额外放工）。A92 是首个使用者（BGA pull model，对齐 BGA `stLabor` 的 adoptive supply-placement）；任何想换取轮转额外行动的卡可复用。后续 hardening 已补齐：A92 自身 extra-turn prompt 内不再暴露 A92 anytime grow；mandatory skip-turn 通过内部 `_extraTurnSkipCount` / `countExtraTurns` 逐个消费 extra-turn opportunity（含 stacked skip）；失败的 extra-turn 目标行动会按 `placedWorkerId` 回滚真实 target space（含 auto-resolved target failure）；forfeit 写入可见 declined-card log；多 newborn 与 promoted adult feeding 均有 session 覆盖。
 
 本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
 
@@ -482,7 +482,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A89_StablePlanner` | 已对齐 |  |
 | `A90_PlowDriver` | 已对齐 |  |
 | `A91_ShiftingCultivator` | 已对齐 |  |
-| `A92_AdoptiveParents` | 已对齐 | BGA pull model：玩家普通工人耗尽但仍持未激活后代时 `contributeExtraTurn` 贡献一次额外放工 XOR[use, forfeit]（#203+#204）；A92 own-prompt anytime suppression、skip-turn per-opportunity consumption、failed target rollback by placedWorkerId、forfeit visible log、多 newborn / adult-feeding 覆盖已补齐 |
+| `A92_AdoptiveParents` | 已对齐 | BGA pull model：玩家普通工人耗尽但仍持未激活后代时 `contributeExtraTurn` 贡献一次额外放工 XOR[use, forfeit]（#203+#204）；A92 own-prompt anytime suppression、stacked skip per-opportunity consumption、failed/auto-resolved target rollback by placedWorkerId、forfeit visible log、多 newborn / adult-feeding 覆盖已补齐 |
 | `A93_BedMaker` | 已对齐 |  |
 | `A94_LazySowman` | 已对齐 |  |
 | `A95_Angler` | 已对齐 |  |

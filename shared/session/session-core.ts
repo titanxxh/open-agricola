@@ -3179,8 +3179,14 @@ export class GameCore {
               return
             }
             if (result.type === 'fail') {
+              if (!frame.stageResume) {
+                this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
+              }
               this.engineStack.pop()
               this.actionStartIndex = null
+              this.actionStartPlayerSnapshot = null
+              delete player._activeActionBonusSources
+              this.turnOwnerPlayerIndex = null
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
