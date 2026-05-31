@@ -111,6 +111,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 本轮新增已完成基础设施：Family-growth availability 与执行条件对齐。`family-growth.canBeExecutedByPlayer` 现在先检查玩家是否仍有 inactive worker；普通 `wish-children` 继续检查房间容量，`urgent-wish-children` / 卡牌注入的 `skipRoomCheck` 路径只跳过房间要求，不跳过 worker supply 要求。B151_LittlePeasant 这类允许进入已占用行动格的 computeArgs 路径因此不会在玩家已经没有可激活 worker 时继续暴露 occupied `urgent-wish-children`，避免 place-farmer 选择进入必失败的 family-growth flow。
 
+本轮新增已完成基础设施：Special-effect description preview 仅展示玩家语义动作。`special-effect` 继续按 `params.kind` 为 `promote-first-newborn`、`pop-card-stack-top`、`set-extra-data` 等可理解步骤提供描述；纯卡面提示同步 `set-infobox` 不进入 `descriptionPreview`，避免 C115_Sower 这类选项把内部状态刷新显示成额外行动。
+
 本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
 
 本轮新增已完成基础设施：Pasture capacity modifier。`computeAnimalZones()` 在构造 pasture zone 时收集已打出卡的 `computePastureCapacityModifiers()`，先应用 replacement，再应用 additive，同类按打出顺序。A12_DrinkingTrough、D11_LawnFertilizer、B72_LoveforAgriculture 已迁入该机制；size-one pasture replacement 不再通过 D11 直接读取 A12，也不再用 `lawnFertilized` scratch marker 避免 double-add。

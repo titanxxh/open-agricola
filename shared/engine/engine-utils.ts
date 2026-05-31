@@ -560,7 +560,7 @@ type SpecialEffectDescriptionParams = {
   accepted?: unknown
 }
 
-const specialEffectDescriptionLabelKey = (node: ActionNode): string | undefined => {
+const specialEffectDescriptionLabelKey = (node: ActionNode): string | null | undefined => {
   if (node.actionId !== 'special-effect') return undefined
   const params = node.params as SpecialEffectDescriptionParams | undefined
   if (!params || typeof params.kind !== 'string') return 'actions.special-effect.apply.name'
@@ -568,12 +568,13 @@ const specialEffectDescriptionLabelKey = (node: ActionNode): string | undefined 
     return 'actions.special-effect.emit-card-triggered.declined.name'
   }
   switch (params.kind) {
+    case 'set-infobox':
+      return null
     case 'increment-extra-data':
     case 'set-extra-data':
     case 'increment-counter':
     case 'set-counter':
     case 'set-flag':
-    case 'set-infobox':
       return `actions.special-effect.${params.kind}.name`
     case 'pop-card-stack-top':
     case 'swap-improvement-with-board':
@@ -610,9 +611,11 @@ export function getNodeDescriptionPreview(
   if (node instanceof ActionNode) {
     const action = registry.get(node.actionId)
     if (!action) return undefined
+    const specialEffectLabelKey = specialEffectDescriptionLabelKey(node)
+    if (!node.choiceLabelKey && specialEffectLabelKey === null) return undefined
     return {
       kind: 'action',
-      labelKey: node.choiceLabelKey ?? specialEffectDescriptionLabelKey(node) ?? action.nameKey,
+      labelKey: node.choiceLabelKey ?? specialEffectLabelKey ?? action.nameKey,
       labelParams: node.choiceLabelParams,
       effectPreview: getActionEffectPreview(node),
     }
