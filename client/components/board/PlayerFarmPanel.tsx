@@ -1,4 +1,5 @@
 import type { GameState, PlayerState } from '../../../shared/contract/types'
+import { getPlayerPanelSupplySummary } from '../../../shared/domain/player-panel-summary'
 import { FarmBoard, type FarmBoardProps } from './FarmBoard'
 
 /**
@@ -36,6 +37,7 @@ export function PlayerFarmPanel({
         players={state.players}
         currentPlayer={currentPlayer}
         displayPlayer={displayPlayer}
+        playerPanelSummary={getPlayerPanelSupplySummary(state, displayPlayer)}
       />
       {/* occupations CardCarousel — added in Task 6 */}
       {/* minor improvements CardCarousel — added in Task 6 */}

@@ -109,6 +109,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 本轮新增已完成基础设施：Family-growth availability 与执行条件对齐。`family-growth.canBeExecutedByPlayer` 现在先检查玩家是否仍有 inactive worker；普通 `wish-children` 继续检查房间容量，`urgent-wish-children` / 卡牌注入的 `skipRoomCheck` 路径只跳过房间要求，不跳过 worker supply 要求。B151_LittlePeasant 这类允许进入已占用行动格的 computeArgs 路径因此不会在玩家已经没有可激活 worker 时继续暴露 occupied `urgent-wish-children`，避免 place-farmer 选择进入必失败的 family-growth flow。
 
+本轮新增已完成基础设施：Family token supply helper。`Worker.removedFromSupply` 表达被卡牌移出玩家个人供给的家庭成员标记；`getFamilyTokenLimit(player)` 是面板 denominator 与 family-growth supply gate 的统一来源，`activateSmallestInactive` / `place-farmer` 的 from-supply 选择都会跳过 removed worker。B22_WalkingBoots 归还阶段移除被标记的临时家庭成员时写该字段，使面板显示和后续生人可用性保持一致。
+
 本轮新增已完成基础设施：Special-effect description preview 仅展示玩家语义动作。`special-effect` 继续按 `params.kind` 为 `promote-first-newborn`、`pop-card-stack-top`、`set-extra-data` 等可理解步骤提供描述；纯卡面提示同步 `set-infobox` 不进入 `descriptionPreview`，避免 C115_Sower 这类选项把内部状态刷新显示成额外行动。
 
 本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
@@ -595,7 +597,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B19_MoldboardPlow` | 已对齐 | optional extra plow 先执行 `plow`，成功后再 `pop-card-stack`；optional 跳过走 `__skip__`，接受后 `plow` confirm-only 且 direct `cancel` 被通用 guard 拒绝 |
 | `B20_ChainFloat` | 已对齐 |  |
 | `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
-| `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留；临时 from-supply worker 归还时标记 `removedFromSupply`，后续 family-growth supply 与玩家面板家庭成员上限都不再计入该 token |
 | `B23_FinalScenario` | 已对齐 | 第 14 轮行动 reveal / exclusive gate / clear event 已由后端权威建模 |
 | `B24_Lasso` | 已对齐 | 任意首次放人后先用 placement availability 计算合法 second-placement target；非动物市场首放仅在有合法动物市场时触发，动物市场首放仅在有任意合法 target 时触发，并经通用 target action flow 执行目标行动 |
 | `B25_BreadPaddle` | 已对齐 |  |

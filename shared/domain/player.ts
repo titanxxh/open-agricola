@@ -12,6 +12,9 @@ export const getPlayedCardKeys = (
 export const familySize = (p: PlayerState): number =>
   (p.workers ?? []).filter(w => w.isActive).length
 
+export const getFamilyTokenLimit = (p: PlayerState): number =>
+  (p.workers ?? []).filter(w => !w.removedFromSupply).length
+
 export const newbornCount = (p: PlayerState): number =>
   (p.workers ?? []).filter(w => w.isActive && w.isNewborn).length
 
@@ -50,7 +53,7 @@ export const findFirstNewborn = (p: PlayerState): Worker | null =>
   p.workers.find(w => w.isActive && w.isNewborn) ?? null
 
 export const activateSmallestInactive = (p: PlayerState): Worker | null => {
-  const next = (p.workers ?? []).find(w => !w.isActive)
+  const next = (p.workers ?? []).find(w => !w.isActive && !w.removedFromSupply)
   if (!next) return null
   next.isActive = true
   next.isNewborn = true

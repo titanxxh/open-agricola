@@ -163,7 +163,7 @@ export const placeFarmerAction: ActionDefinition = {
     }
 
     if (actionContext?.fromSupply) {
-      const supply = (player.workers ?? []).find((w) => !w.isActive)
+      const supply = (player.workers ?? []).find((w) => !w.isActive && !w.removedFromSupply)
       if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }

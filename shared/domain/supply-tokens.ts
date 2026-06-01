@@ -45,11 +45,13 @@ export const getReservedFutureStableCount = (_state: GameState, player: PlayerSt
 export const getReservedActionSpaceStableCount = (player: PlayerState): number =>
   readStringArray(player.cardStates?.E148_Lazybones?.extraData?.reservedActionSpaces).length
 
+export const getStableSupplyLimit = (player: PlayerState): number =>
+  Math.max(0, MAX_STABLE_PIECES - readConsumedSupplyTokenCount(player, 'stable'))
+
 export const getAvailableStableSupplyCount = (state: GameState, player: PlayerState): number =>
   Math.max(
     0,
-    MAX_STABLE_PIECES
-      - readConsumedSupplyTokenCount(player, 'stable')
+    getStableSupplyLimit(player)
       - getOrdinaryStableCount(player)
       - getReservedFutureStableCount(state, player)
       - getReservedActionSpaceStableCount(player)
