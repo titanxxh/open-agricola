@@ -40,7 +40,7 @@ import {
   buildBakeBulkChoice,
   hasSelectedBakeGrain,
 } from './bake-exchange-ui'
-import { buildStableCommitPayload } from './farm-commit-ui'
+import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
@@ -427,6 +427,8 @@ export const GameContainerApi = () => {
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
+    pendingFenceSources, setPendingFenceSources,
+    selectedFenceSourcePlayerId, setSelectedFenceSourcePlayerId,
     fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
@@ -464,6 +466,8 @@ export const GameContainerApi = () => {
     }
     if (payload.ok) {
       setPendingFenceEdges([])
+      setPendingFenceSources({})
+      setSelectedFenceSourcePlayerId(null)
       setFenceError(null)
       setPendingRoomTiles([])
       setRoomError(null)
@@ -476,7 +480,7 @@ export const GameContainerApi = () => {
       setSowError(null)
       setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return
@@ -627,11 +631,27 @@ export const GameContainerApi = () => {
         return
       }
       if (farm.farmType === 'fence') {
-        void transport.commitSelection(pendingPlayerIndex, {
-          edges: pendingFenceEdges,
-          palisadeEdges: pendingPalisadeEdges,
-          extraWood: farm.extraWood ?? 0,
-        })
+        if (
+          farm.fenceSource?.kind === 'borrowed' &&
+          pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId])
+        ) {
+          setFenceError({
+            code: 'BORROWED_FENCE_SOURCE_REQUIRED',
+            edges: pendingFenceEdges,
+            newEdges: pendingFenceEdges,
+          })
+          return
+        }
+        void transport.commitSelection(
+          pendingPlayerIndex,
+          buildFenceCommitPayload(
+            pendingFenceEdges,
+            pendingPalisadeEdges,
+            farm.extraWood ?? 0,
+            farm.fenceSource,
+            pendingFenceSources,
+          ),
+        )
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('fence', resp.error)
           })
@@ -725,7 +745,7 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setFenceError, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -1170,6 +1190,41 @@ export const GameContainerApi = () => {
     interaction.stateId === 'wait' ? interaction.farm ?? null : null
   const selectionInteraction =
     interaction.stateId === 'wait' ? interaction.selection ?? null : null
+  const borrowedFenceSource =
+    farmInteraction?.farmType === 'fence' ? farmInteraction.fenceSource : undefined
+  const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'
+  const borrowedFenceSourceControls = useMemo(() => {
+    if (!isBorrowedFenceSelection || !borrowedFenceSource || !state) return undefined
+    return {
+      donors: Object.entries(borrowedFenceSource.donorCaps).map(([playerId, cap]) => {
+        const donor = state.players.find((player) => player.id === playerId)
+        return {
+          playerId,
+          name: donor?.name ?? playerId,
+          color: donor?.color ?? 'black',
+          cap,
+          allocated: Object.values(pendingFenceSources).filter((id) => id === playerId).length,
+        }
+      }),
+      selectedPlayerId: selectedFenceSourcePlayerId,
+      onSelect: setSelectedFenceSourcePlayerId,
+      hasMissingSources: pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId]),
+    }
+  }, [
+    borrowedFenceSource,
+    isBorrowedFenceSelection,
+    pendingFenceEdges,
+    pendingFenceSources,
+    selectedFenceSourcePlayerId,
+    setSelectedFenceSourcePlayerId,
+    state,
+  ])
+
+  useEffect(() => {
+    if (isBorrowedFenceSelection && fencePlacementMode === 'palisade') {
+      setFencePlacementMode('fence')
+    }
+  }, [fencePlacementMode, isBorrowedFenceSelection, setFencePlacementMode])
 
   const occupationHandInteraction = useMemo(
     () =>
@@ -1411,6 +1466,13 @@ export const GameContainerApi = () => {
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) =>
     togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
+  const wrappedToggleFenceEdge = (edgeId: string) =>
+    toggleFenceEdge(
+      edgeId,
+      isBorrowedFenceSelection && borrowedFenceSource
+        ? { donorCaps: borrowedFenceSource.donorCaps }
+        : undefined,
+    )
   const setViewPlayerIdSafe = useCallback((value: string) => {
     setViewPlayerId(value)
   }, [])
@@ -2086,13 +2148,13 @@ export const GameContainerApi = () => {
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
               stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
+              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-              fencePlacementMode={fencePlacementMode}
+              fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}
               toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
               toggleFarmHand={wrappedToggleFarmHand}
               togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-              toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+              toggleFenceEdge={wrappedToggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
               confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
               setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
               isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
@@ -2187,6 +2249,7 @@ export const GameContainerApi = () => {
         canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}
         setFencePlacementMode={setFencePlacementMode}
+        borrowedFenceSources={borrowedFenceSourceControls}
         animalReorg={animalReorg}
         reorgRemaining={reorgRemaining}
         hasReorgOverflow={hasReorgOverflow}

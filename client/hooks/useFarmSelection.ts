@@ -17,6 +17,8 @@ const computeEffectiveCount = (
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])
   const [pendingPalisadeEdges, setPendingPalisadeEdges] = useState<string[]>([])
+  const [pendingFenceSources, setPendingFenceSources] = useState<Record<string, string>>({})
+  const [selectedFenceSourcePlayerId, setSelectedFenceSourcePlayerId] = useState<string | null>(null)
   const [fencePlacementMode, setFencePlacementMode] = useState<'fence' | 'palisade'>('fence')
   const [fenceError, setFenceError] = useState<{
     code: string
@@ -42,22 +44,67 @@ export const useFarmSelection = () => {
   const [sowError, setSowError] = useState<string | null>(null)
   const [pendingPositionSelections, setPendingPositionSelections] = useState<Set<string>>(new Set())
 
-  const toggleFenceEdge = (edgeId: string) => {
+  const toggleFenceEdge = (
+    edgeId: string,
+    sourceOptions: { donorCaps?: Record<string, number> } = {},
+  ) => {
     const inFence = pendingFenceEdges.includes(edgeId)
     const inPalisade = pendingPalisadeEdges.includes(edgeId)
+    const selectedDonor =
+      selectedFenceSourcePlayerId &&
+      sourceOptions.donorCaps &&
+      Object.prototype.hasOwnProperty.call(sourceOptions.donorCaps, selectedFenceSourcePlayerId)
+        ? selectedFenceSourcePlayerId
+        : null
+    const donorCap =
+      selectedDonor && sourceOptions.donorCaps
+        ? sourceOptions.donorCaps[selectedDonor]
+        : undefined
+    const donorAllocated =
+      selectedDonor
+        ? Object.values(pendingFenceSources).filter((id) => id === selectedDonor).length
+        : 0
 
     if (fencePlacementMode === 'fence') {
-      if (inFence) setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))
+      if (
+        !inFence &&
+        selectedDonor &&
+        donorCap !== undefined &&
+        donorAllocated >= donorCap
+      ) {
+        return
+      }
+      if (inFence) {
+        setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))
+        setPendingFenceSources((prev) => {
+          if (!Object.prototype.hasOwnProperty.call(prev, edgeId)) return prev
+          const next = { ...prev }
+          delete next[edgeId]
+          return next
+        })
+      }
       else if (inPalisade) {
         setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
         setPendingFenceEdges((prev) => [...prev, edgeId])
+        if (selectedDonor) {
+          setPendingFenceSources((prev) => ({ ...prev, [edgeId]: selectedDonor }))
+        }
       } else setPendingFenceEdges((prev) => [...prev, edgeId])
+      if (!inFence && !inPalisade && selectedDonor) {
+        if (donorCap !== undefined && donorAllocated >= donorCap) return
+        setPendingFenceSources((prev) => ({ ...prev, [edgeId]: selectedDonor }))
+      }
     } else {
-      // palisade can only be placed on the farm border
       if (!isBorderEdge(edgeId)) return
       if (inPalisade) setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
       else if (inFence) {
         setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))
+        setPendingFenceSources((prev) => {
+          if (!Object.prototype.hasOwnProperty.call(prev, edgeId)) return prev
+          const next = { ...prev }
+          delete next[edgeId]
+          return next
+        })
         setPendingPalisadeEdges((prev) => [...prev, edgeId])
       } else setPendingPalisadeEdges((prev) => [...prev, edgeId])
     }
@@ -187,6 +234,10 @@ export const useFarmSelection = () => {
     setPendingFenceEdges,
     pendingPalisadeEdges,
     setPendingPalisadeEdges,
+    pendingFenceSources,
+    setPendingFenceSources,
+    selectedFenceSourcePlayerId,
+    setSelectedFenceSourcePlayerId,
     fencePlacementMode,
     setFencePlacementMode,
     fenceError,
