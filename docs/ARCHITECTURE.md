@@ -734,16 +734,18 @@ OA 对齐规则：
 
 - **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
-- **fence** (`fencing.ts`)：校验选边/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
+- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
 
-farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
+farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
 
 ### 7.8.1 Fence segment / policy 不变量
 
-`FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；未来 E149 borrowed fence 应是 ordinary boundary with borrowed source，而不是新 segment type。
+`FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；borrowed fence 是 `type='fence'` 且 `source.kind='borrowed'` 的普通边界，不是新 segment type。
 
 fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+
+`sourcePolicy: { kind: 'borrowed', donorCaps }` 表示本次 ordinary fence 的 token source、build limit 和 segment source 都由 donor caps 提供。提交 payload 必须用 `fenceSources: Record<edgeId, donorPlayerId>` 为每条新增普通 fence 指定 donor；后端按当前 donor reserve 重新截断 cap，再校验 source key 精确覆盖新增 ordinary edges、donor 不超 cap、不能指向行动玩家自己。成功后新 segment 写入 borrowed source，并通过 `supplyTokensConsumed.fence` 消耗 donor supply；donor 后续 `getOwnOrdinaryFenceReserveCount()` / own ordinary fencing max 会自然下降。`farm.fenceBuilt.fences` 必须带完整新 `FenceSegment[]`，包括 source owner。
 
 `segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 先做通用 policy 资源 / supply 可行性估算；在真实 state 中还会用 `validateFenceSelection()` 预检至少一个 legal fence commit，避免 confirm-only pending 无法完成。最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
 

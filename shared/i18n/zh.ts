@@ -1353,6 +1353,9 @@ export const zh = {
       EDGE_TYPE_CONFLICT: '同一段不能同时选为围栏和木桩',
       SEGMENT_TYPE_NOT_ALLOWED: '此行动不能建造该类型的围栏',
       PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
+      BORROWED_FENCE_SOURCE_REQUIRED: '需要为每段借来的围栏选择来源玩家',
+      BORROWED_FENCE_SOURCE_INVALID: '借来围栏的来源必须和已选择围栏段一致',
+      BORROWED_FENCE_DONOR_LIMIT_EXCEEDED: '借来的围栏超过来源玩家可提供上限',
     },
   },
   'salter-pick': {

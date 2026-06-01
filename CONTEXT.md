@@ -116,6 +116,14 @@ _Avoid_: 每张卡手写支付分支
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限
 
+**Borrowed Fence**:
+建在当前玩家农场、但来源属于其他玩家的普通 fence；仍参与当前农场的几何、牧场和动物规则，但不计入当前玩家 own ordinary fence supply。
+_Avoid_: bonus VP、特殊 fence 类型
+
+**Donor / Source Owner**:
+提供 borrowed fence 组件的玩家；组件被借走后，donor 的 own ordinary fence reserve / build max 会减少。
+_Avoid_: 当前行动执行玩家、农场 owner
+
 **卡牌口径 Stable**:
 卡牌文本中“你拥有的 stable”“本次建造的 stable”“unfenced stable”使用的畜栏口径；包含普通畜栏和 Farm Hand stable 这类只参与卡牌统计的特殊畜栏。
 _Avoid_: 动物容量、牧场容量、可安置动物的 stable
