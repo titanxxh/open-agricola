@@ -1,37 +1,59 @@
 import { readCardExtraData } from '../helpers/card-state'
-import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
+import { canStartFencing } from '../../actions/effects/fencing'
+import type { ActionFlow, PlayerState } from '../../contract/types'
+import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 import { E149_MidnightFencer } from '../../cards-display/E/E149_MidnightFencer'
 
 const CARD_ID = E149_MidnightFencer.id
 
-const KEY_OWED = 'owedFences'
-
 const KEY_OFFERED = 'offered'
-
-const readOwed = (player: PlayerState): number =>
-  readCardExtraData<number>(player, CARD_ID, KEY_OWED) ?? 0
 
 const readOffered = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, KEY_OFFERED) ?? false
 
-const buildOfferChoice = (max: number): ActionFlow => {
-  const options: ActionChoiceOption[] = [
-    { value: '0', labelKey: 'ui.interactionE149Skip', sourceCard: CARD_ID },
-    ...Array.from({ length: max }, (_, i) => ({
-      value: String(i + 1),
-      labelKey: `ui.interactionE149Take${i + 1}`,
-      sourceCard: CARD_ID,
-    })),
-  ]
+const donorCapsFor = (state: { players: PlayerState[] }, player: PlayerState): Record<string, number> => {
+  const caps: Record<string, number> = {}
+  for (const opponent of state.players) {
+    if (opponent.id === player.id) continue
+    caps[opponent.id] = Math.min(2, getOwnOrdinaryFenceReserveCount(opponent))
+  }
+  return caps
+}
+
+const totalCap = (donorCaps: Record<string, number>): number =>
+  Object.values(donorCaps).reduce((sum, cap) => sum + cap, 0)
+
+const actionContextFor = (donorCaps: Record<string, number>, max: number) => ({
+  trueAction: false,
+  fencePolicy: {
+    allowedSegmentTypes: ['fence'],
+    sourcePolicy: { kind: 'borrowed', donorCaps },
+    segmentBounds: { fence: { min: 1, max }, total: { min: 1, max } },
+    costPolicy: { fence: { wood: 0 } },
+    cancelPolicy: 'forbidCancel',
+  },
+})
+
+const buildFenceOffer = (donorCaps: Record<string, number>, max: number): ActionFlow => {
   return {
-    type: 'leaf',
-    actionId: 'emit-choice',
+    type: 'seq',
     sourceCard: CARD_ID,
-    params: {
-      promptKey: 'ui.interactionE149Prompt',
-      options,
-    },
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: KEY_OFFERED, value: true },
+      },
+      {
+        type: 'leaf',
+        actionId: 'fence',
+        sourceCard: CARD_ID,
+        optional: true,
+        actionContext: actionContextFor(donorCaps, max),
+      },
+    ],
   }
 }
 
@@ -41,33 +63,12 @@ export const E149_MidnightFencer_impl = {
     onStartHarvest: (state, player) => {
       if (state.round !== 14) return
       if (readOffered(player)) return
-      const numOpponents = state.players.length - 1
-      if (numOpponents <= 0) return
-      const max = 2 * numOpponents
-      return {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: KEY_OFFERED, value: true },
-          },
-          buildOfferChoice(max),
-        ],
-      }
+      const donorCaps = donorCapsFor(state, player)
+      const max = totalCap(donorCaps)
+      if (max <= 0) return
+      if (!canStartFencing(state, player, undefined, actionContextFor(donorCaps, max))) return
+      return buildFenceOffer(donorCaps, max)
     },
-    resolveChoice: (_state, _player, choice) => {
-      const k = parseInt(choice, 10)
-      if (Number.isNaN(k) || k <= 0) return
-      return {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'increment-extra-data', key: KEY_OWED, amount: k },
-      }
-    },
-    computeBonusScore: (_state, player) => readOwed(player),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
