@@ -1,8 +1,47 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+  type CardsManifestPayload,
+} from '../../../services/card-meta'
+
+const manifestEntry = (
+  id: string,
+  name: string,
+  type: 'occupation' | 'minor',
+): CardsManifestPayload[string] => ({
+  meta: { id, name, deck: id[0] ?? 'A', number: Number(id.slice(1, 4)) || 0, type },
+  module: '',
+  reaches: [],
+})
+
+beforeAll(async () => {
+  const manifest: CardsManifestPayload = {
+    A102_Grocer: manifestEntry('A102_Grocer', 'Grocer', 'occupation'),
+    A105_BarrowPusher: manifestEntry('A105_BarrowPusher', 'Barrow Pusher', 'occupation'),
+    A106_SlurrySpreader: manifestEntry('A106_SlurrySpreader', 'Slurry Spreader', 'occupation'),
+    A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
+    B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
+    C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
+    C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
+    D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
+  }
+  __resetCardsManifestCache()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => manifest,
+  }))
+  await loadCardsManifest()
+})
+
+afterAll(() => {
+  __resetCardsManifestCache()
+  vi.unstubAllGlobals()
+})
 
 const resources = (): Resource => ({
   wood: 0,
@@ -249,6 +288,52 @@ describe('FarmBoard', () => {
     )
 
     expect(html).toMatch(/farm-fence-h[^"]*\bevent-highlight\b/)
+  })
+
+  it('colors own fence segments by the displayed farm owner and borrowed segments by source owner', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      fenceSegments: [
+        { edge: 'H-0-0', type: 'fence' as const },
+        { edge: 'V-0-0', type: 'fence' as const, source: { kind: 'borrowed' as const, ownerPlayerId: 'p2' } },
+      ],
+    }
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [
+            { key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: 'fence-v-0-0', type: 'fence-v', fenceId: 'V-0-0' },
+          ],
+          existingFenceSet: new Set(['H-0-0', 'V-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^>]*data-player-color="red"/)
+    expect(html).toMatch(/farm-fence-v[^>]*data-player-color="blue"/)
+  })
+
+  it('previews pending borrowed fence edges with the selected donor color', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [{ key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' }],
+          pendingFenceSet: new Set(['H-0-0']),
+          pendingFenceSourceMap: { 'H-0-0': 'p2' },
+          fenceSelectableSet: new Set(['H-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^>]*selected[^>]*data-player-color="blue"/)
   })
 
   it('renders off-board sow targets in a tray below the farm grid', () => {

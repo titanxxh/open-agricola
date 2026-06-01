@@ -1564,4 +1564,137 @@ describe('InteractionBar', () => {
     expect(html).toContain('Fence (1 wood)')
     expect(html).toContain('Palisade (2 wood, +1 VP)')
   })
+
+  it('shows borrowed fence donor controls with cap and allocation counts', () => {
+    const selectBorrowedFenceSource = vi.fn()
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'fence-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        canBuildPalisades={true}
+        fencePlacementMode="fence"
+        setFencePlacementMode={noop}
+        borrowedFenceSources={{
+          donors: [
+            { playerId: 'p2', name: 'Player B', color: 'blue', cap: 2, allocated: 1 },
+            { playerId: 'p3', name: 'Player C', color: 'black', cap: 1, allocated: 0 },
+          ],
+          selectedPlayerId: 'p3',
+          onSelect: selectBorrowedFenceSource,
+          hasMissingSources: false,
+        }}
+      />,
+    )
+
+    expect(screen.getByText('Borrowed fence source')).toBeInTheDocument()
+    const donorButton = screen.getByRole('button', { name: /Player B.*1\/2/ })
+    expect(donorButton).toHaveAttribute('data-player-color', 'blue')
+    fireEvent.click(donorButton)
+    expect(selectBorrowedFenceSource).toHaveBeenCalledWith('p2')
+    expect(screen.queryByText('Palisade (2 wood, +1 VP)')).not.toBeInTheDocument()
+  })
+
+  it('disables borrowed fence confirm while selected ordinary edges lack donor sources', () => {
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'fence-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        borrowedFenceSources={{
+          donors: [{ playerId: 'p2', name: 'Player B', color: 'blue', cap: 2, allocated: 0 }],
+          selectedPlayerId: null,
+          onSelect: noop,
+          hasMissingSources: true,
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+    expect(screen.getByText('Choose a source for every selected fence.')).toBeInTheDocument()
+  })
 })

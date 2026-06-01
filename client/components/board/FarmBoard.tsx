@@ -269,6 +269,7 @@ export type FarmBoardProps = {
   hasReorgOverflow: boolean
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
+  pendingFenceSourceMap?: Record<string, string>
   pendingPalisadeSet?: Set<string>
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
@@ -577,6 +578,7 @@ export const FarmBoard = ({
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
+  pendingFenceSourceMap,
   pendingPalisadeSet,
   existingFenceSet,
   fenceSelectableSet,
@@ -1047,12 +1049,25 @@ export const FarmBoard = ({
               : isPendingFence
                 ? 'fence'
                 : null
+          const sourcePlayerId = builtSegment
+            ? builtSegment.source?.kind === 'borrowed'
+              ? builtSegment.source.ownerPlayerId
+              : displayPlayer.id
+            : isPendingFence && edgeId && pendingFenceSourceMap?.[edgeId]
+              ? pendingFenceSourceMap[edgeId]
+              : isPending
+                ? displayPlayer.id
+                : null
+          const sourcePlayerColor = sourcePlayerId
+            ? players.find((player) => player.id === sourcePlayerId)?.color ?? displayPlayer.color
+            : undefined
           return (
             <div
               key={cell.key}
               className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
+              data-player-color={sourcePlayerColor}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

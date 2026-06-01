@@ -55,3 +55,76 @@ describe('useFarmSelection — B85 farmHand selection', () => {
     expect(result.current.pendingFarmHand).toEqual({ row: 1, col: 1 })
   })
 })
+
+describe('useFarmSelection — borrowed fence sources', () => {
+  it('stores a donor source per pending ordinary fence edge', () => {
+    const { result } = renderHook(() => useFarmSelection())
+
+    act(() => {
+      result.current.setSelectedFenceSourcePlayerId('p2')
+    })
+    act(() => {
+      result.current.toggleFenceEdge('H-0-0', { donorCaps: { p2: 2, p3: 2 } })
+    })
+    act(() => {
+      result.current.setSelectedFenceSourcePlayerId('p3')
+    })
+    act(() => {
+      result.current.toggleFenceEdge('V-0-0', { donorCaps: { p2: 2, p3: 2 } })
+    })
+
+    expect(result.current.pendingFenceEdges).toEqual(['H-0-0', 'V-0-0'])
+    expect(result.current.pendingFenceSources).toEqual({
+      'H-0-0': 'p2',
+      'V-0-0': 'p3',
+    })
+  })
+
+  it('removes a pending edge source when that edge is deselected', () => {
+    const { result } = renderHook(() => useFarmSelection())
+
+    act(() => {
+      result.current.setSelectedFenceSourcePlayerId('p2')
+    })
+    act(() => {
+      result.current.toggleFenceEdge('H-0-0', { donorCaps: { p2: 1 } })
+    })
+    act(() => {
+      result.current.toggleFenceEdge('H-0-0', { donorCaps: { p2: 1 } })
+    })
+
+    expect(result.current.pendingFenceEdges).toEqual([])
+    expect(result.current.pendingFenceSources).toEqual({})
+  })
+
+  it('prevents assigning more pending edges than the selected donor cap', () => {
+    const { result } = renderHook(() => useFarmSelection())
+
+    act(() => {
+      result.current.setSelectedFenceSourcePlayerId('p2')
+    })
+    act(() => {
+      result.current.toggleFenceEdge('H-0-0', { donorCaps: { p2: 1 } })
+    })
+    act(() => {
+      result.current.toggleFenceEdge('V-0-0', { donorCaps: { p2: 1 } })
+    })
+
+    expect(result.current.pendingFenceEdges).toEqual(['H-0-0'])
+    expect(result.current.pendingFenceSources).toEqual({ 'H-0-0': 'p2' })
+  })
+
+  it('does not assign a stale selected donor when the current fence action has no borrowed source caps', () => {
+    const { result } = renderHook(() => useFarmSelection())
+
+    act(() => {
+      result.current.setSelectedFenceSourcePlayerId('p2')
+    })
+    act(() => {
+      result.current.toggleFenceEdge('H-0-0')
+    })
+
+    expect(result.current.pendingFenceEdges).toEqual(['H-0-0'])
+    expect(result.current.pendingFenceSources).toEqual({})
+  })
+})
