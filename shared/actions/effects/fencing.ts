@@ -3,6 +3,7 @@ import type {
   ActionExecutionResult,
   ActionMutationContext,
   ActionSpace,
+  FenceSegment,
   FenceSegmentType,
   GameState,
   PlayerState,
@@ -24,7 +25,12 @@ import type {
   FenceCostPolicy,
   FencePastureBounds,
   FenceSegmentBounds,
+  FenceSourcePolicy,
   FenceValidationOptions,
+} from '../../domain/farmyard'
+import {
+  borrowedFenceDonorCapTotal,
+  isBorrowedFenceSourcePolicy,
 } from '../../domain/farmyard'
 import {
   MAX_ORDINARY_FENCE_PIECES,
@@ -33,6 +39,7 @@ import {
 import {
   getOwnOrdinaryFenceBuildLimit,
   getOwnOrdinaryFenceReserveCount,
+  addConsumedSupplyTokenCount,
 } from '../../domain/supply-tokens'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
@@ -49,7 +56,7 @@ export const minimumFenceSegments = 4
 
 export type FenceActionPolicy = {
   allowedSegmentTypes?: FenceSegmentType[]
-  sourcePolicy?: 'ownOnly'
+  sourcePolicy?: FenceSourcePolicy
   segmentBounds?: FenceSegmentBounds
   newPastureBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
@@ -63,6 +70,24 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isFenceSegmentType = (value: unknown): value is FenceSegmentType =>
   value === 'fence' || value === 'palisade'
+
+const readBorrowedDonorCaps = (value: unknown): Record<string, number> | undefined => {
+  if (!isRecord(value)) return undefined
+  const result: Record<string, number> = {}
+  for (const [donorId, cap] of Object.entries(value)) {
+    if (typeof cap !== 'number' || !Number.isInteger(cap) || cap < 0) continue
+    result[donorId] = cap
+  }
+  return result
+}
+
+const readFenceSourcePolicy = (value: unknown): FenceSourcePolicy | undefined => {
+  if (value === 'ownOnly') return 'ownOnly'
+  if (!isRecord(value) || value.kind !== 'borrowed') return undefined
+  const donorCaps = readBorrowedDonorCaps(value.donorCaps)
+  if (!donorCaps) return undefined
+  return { kind: 'borrowed', donorCaps }
+}
 
 export function readFenceActionPolicy(
   actionContext: Record<string, unknown> | undefined,
@@ -78,8 +103,7 @@ export function readFenceActionPolicy(
       allowedSegmentTypes && allowedSegmentTypes.length > 0
         ? allowedSegmentTypes
         : undefined,
-    sourcePolicy:
-      source.sourcePolicy === 'ownOnly' ? 'ownOnly' : undefined,
+    sourcePolicy: readFenceSourcePolicy(source.sourcePolicy),
     segmentBounds: isRecord(source.segmentBounds)
       ? (source.segmentBounds as FenceSegmentBounds)
       : undefined,
@@ -120,6 +144,58 @@ const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.newPastureBounds !== undefined ||
   policy.costPolicy !== undefined ||
   policy.pastureBounds !== undefined
+
+const borrowedPolicyWithCurrentCaps = (
+  state: GameState,
+  activePlayer: PlayerState,
+  policy: FenceActionPolicy,
+): FenceActionPolicy => {
+  if (!isBorrowedFenceSourcePolicy(policy.sourcePolicy)) return policy
+  const donorCaps: Record<string, number> = {}
+  for (const [donorId, cap] of Object.entries(policy.sourcePolicy.donorCaps)) {
+    const donor = state.players.find((candidate) => candidate.id === donorId)
+    donorCaps[donorId] = donor && donor.id !== activePlayer.id
+      ? Math.min(cap, getOwnOrdinaryFenceReserveCount(donor))
+      : 0
+  }
+  return { ...policy, sourcePolicy: { kind: 'borrowed', donorCaps } }
+}
+
+const sourceOrdinaryCapacity = (
+  player: PlayerState,
+  policy: FenceActionPolicy,
+  selectedFreeFences: number,
+): number => {
+  if (isBorrowedFenceSourcePolicy(policy.sourcePolicy)) {
+    return borrowedFenceDonorCapTotal(policy.sourcePolicy)
+  }
+  const remainingBuildCapacity = Math.max(
+    0,
+    getOwnOrdinaryFenceBuildLimit(player) - getOwnOrdinaryFenceCount(player),
+  )
+  const availableOrdinaryFenceTokens =
+    getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences
+  return Math.min(remainingBuildCapacity, availableOrdinaryFenceTokens)
+}
+
+const buildBorrowedFenceSourcesForEdges = (
+  policy: FenceActionPolicy,
+  edges: string[],
+): Record<string, string> | undefined => {
+  if (!isBorrowedFenceSourcePolicy(policy.sourcePolicy)) return undefined
+  const result: Record<string, string> = {}
+  let donorIndex = 0
+  const donors = Object.entries(policy.sourcePolicy.donorCaps)
+    .filter(([, cap]) => cap > 0)
+    .flatMap(([donorId, cap]) => Array.from({ length: cap }, () => donorId))
+  for (const edge of edges) {
+    const donorId = donors[donorIndex]
+    if (!donorId) return undefined
+    result[edge] = donorId
+    donorIndex += 1
+  }
+  return result
+}
 
 const minPerimeterForFarmCells = (cellCount: number): number => {
   if (cellCount <= 0) return 0
@@ -380,8 +456,11 @@ const hasPossibleFenceCommit = (
       const perimeter = perimeterEdges(tiles).filter((edge) => allEdgeIds.has(edge))
       if (perimeter.every((edge) => existing.has(edge))) continue
       for (const spec of candidateFenceSpecs(perimeter, player, policy)) {
+        const newFenceEdges = spec.edges.filter((edge) => !existing.has(edge))
+        const fenceSources = buildBorrowedFenceSourcesForEdges(policy, newFenceEdges)
         const result = board.farmyard.canBuildFence({
           ...spec,
+          fenceSources,
           extraWood: 0,
           freeFences,
           options,
@@ -398,8 +477,12 @@ const fenceValidationOptions = (
   player: PlayerState,
   allowPalisades: boolean,
   policy: FenceActionPolicy,
+  fenceSources?: Record<string, string>,
 ): FenceValidationOptions => {
   const selectedFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
+  const borrowedCapacity = isBorrowedFenceSourcePolicy(policy.sourcePolicy)
+    ? borrowedFenceDonorCapTotal(policy.sourcePolicy)
+    : undefined
   return {
     skipPayment: true,
     allowPalisades,
@@ -410,9 +493,10 @@ const fenceValidationOptions = (
     costPolicy: policy.costPolicy,
     pastureBounds: policy.pastureBounds,
     preserveAnimalTotals: policy.preserveAnimalTotals,
-    ordinaryFenceBuildLimit: getOwnOrdinaryFenceBuildLimit(player),
+    ordinaryFenceBuildLimit: borrowedCapacity ?? getOwnOrdinaryFenceBuildLimit(player),
     availableOrdinaryFenceTokens:
-      getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences,
+      borrowedCapacity ?? getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences,
+    fenceSources,
   }
 }
 
@@ -440,18 +524,13 @@ export const canStartFencing = (
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
 ) => {
-  const policy = readFenceActionPolicy(actionContext)
-  const remainingBuildCapacity = Math.max(
-    0,
-    getOwnOrdinaryFenceBuildLimit(player) - getOwnOrdinaryFenceCount(player),
+  const policy = borrowedPolicyWithCurrentCaps(
+    state,
+    player,
+    readFenceActionPolicy(actionContext),
   )
   const selectedFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
-  const availableOrdinaryFenceTokens =
-    getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences
-  const ordinaryCapacity = Math.min(
-    remainingBuildCapacity,
-    availableOrdinaryFenceTokens,
-  )
+  const ordinaryCapacity = sourceOrdinaryCapacity(player, policy, selectedFreeFences)
   const canCheckLayout = Array.isArray(state.players) && state.players.length > 0
   if (hasCanStartPolicy(policy)) {
     if (!canStartWithFencePolicy(
@@ -469,14 +548,15 @@ export const canStartFencing = (
     return false
   }
   if (getTotalPastureCells(player) >= maxPastureCells) return false
-  const free = selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
+  const free = selectedFreeFences + Math.max(0, -(costOverride?.wood ?? 0))
   if (free > 0) {
     const woodCount = player.resources.wood ?? 0
     if (woodCount + free >= minimumFenceSegments) {
       return !canCheckLayout || hasPossibleFenceCommit(state, player, policy)
     }
   }
-  if (!canAffordTypedFlatCost(player, { wood: minimumFenceSegments }, 'fencing')) {
+  const minimumWoodCost = applyWoodCostOverride(minimumFenceSegments, costOverride)
+  if (!canAffordTypedFlatCost(player, { wood: minimumWoodCost }, 'fencing')) {
     return false
   }
   return !canCheckLayout || hasPossibleFenceCommit(state, player, policy)
@@ -486,6 +566,7 @@ type FencePayload = {
   edges?: string[]
   palisadeEdges?: string[]
   extraWood?: number
+  fenceSources?: Record<string, string>
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
@@ -506,13 +587,13 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
-const computeFreeFenceTotal = (
+const computeFenceCostAdjustment = (
   state: GameState,
   player: PlayerState,
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
-): number => {
+): { freeFences: number; extraWood: number } => {
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
   const fenceOverride = collectComputeCostsForFarmChoice(
     state,
@@ -521,8 +602,26 @@ const computeFreeFenceTotal = (
     { newFenceEdges, newPalisadeEdges },
     space,
   )
-  const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
-  return pendingFreeFences + hookFreeFences
+  const hookWood = fenceOverride.wood ?? 0
+  return {
+    freeFences: pendingFreeFences + Math.max(0, -hookWood),
+    extraWood: Math.max(0, hookWood),
+  }
+}
+
+const countBorrowedFenceSources = (
+  policy: FenceActionPolicy,
+  newFenceEdges: string[],
+  fenceSources: Record<string, string> | undefined,
+): Map<string, number> => {
+  const counts = new Map<string, number>()
+  if (!isBorrowedFenceSourcePolicy(policy.sourcePolicy) || !fenceSources) return counts
+  for (const edge of newFenceEdges) {
+    const donorId = fenceSources[edge]
+    if (!donorId) continue
+    counts.set(donorId, (counts.get(donorId) ?? 0) + 1)
+  }
+  return counts
 }
 
 const finalizeFence = (
@@ -530,9 +629,11 @@ const finalizeFence = (
   edges: string[],
   palisadeEdges: string[],
   extraWood: number,
+  fenceSources: Record<string, string> | undefined,
   paymentChoice: string | undefined,
   policy: FenceActionPolicy,
 ): ActionExecutionResult => {
+  const currentPolicy = borrowedPolicyWithCurrentCaps(ctx.state, ctx.player, policy)
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const normalized = normalizePlayerFarm(ctx.player)
   const existingEdgeIds = new Set(
@@ -542,7 +643,7 @@ const finalizeFence = (
   const newPalisadeEdgesPreview = palisadeEdges.filter(
     (e) => !existingEdgeIds.has(e),
   )
-  const freeFences = computeFreeFenceTotal(
+  const costAdjustment = computeFenceCostAdjustment(
     ctx.state,
     normalized,
     newFenceEdgesPreview,
@@ -553,17 +654,18 @@ const finalizeFence = (
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
     edges,
     palisadeEdges,
-    extraWood,
-    freeFences,
+    extraWood: extraWood + costAdjustment.extraWood,
+    freeFences: costAdjustment.freeFences,
     options: fenceValidationOptions(
       normalized,
       playerCanBuildPalisades(normalized),
-      policy,
+      currentPolicy,
+      fenceSources,
     ),
     lockedKeys,
   })
   if (!validated.ok) {
-    return fenceFail(validated.error?.code ?? 'log.fencingFail', policy)
+    return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
   }
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
@@ -578,13 +680,33 @@ const finalizeFence = (
     return { type: 'fail', errorKey: 'log.fencingFail' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  const consumed = consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
+  const consumed = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy)
+    ? undefined
+    : consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
+  for (const [donorId, count] of countBorrowedFenceSources(
+    currentPolicy,
+    validated.newFenceEdges,
+    fenceSources,
+  )) {
+    const donor = ctx.state.players.find((candidate) => candidate.id === donorId)
+    if (donor) addConsumedSupplyTokenCount(donor, 'fence', count)
+  }
   const paidResources = positiveResources(payment.solution.resourcesPaid)
+  const newSegmentByEdge = new Map(
+    nextPlayer.fenceSegments
+      .filter((segment) =>
+        validated.newFenceEdges.includes(segment.edge) ||
+        validated.newPalisadeEdges.includes(segment.edge),
+      )
+      .map((segment) => [segment.edge, segment]),
+  )
   const builtFences = [
-    ...validated.newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
-    ...validated.newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' })),
+    ...validated.newFenceEdges,
+    ...validated.newPalisadeEdges,
   ]
+    .map((edge) => newSegmentByEdge.get(edge))
+    .filter((segment): segment is FenceSegment => segment !== undefined)
   if (builtFences.length > 0) {
     ctx.eventSink?.emit<'farm.fenceBuilt'>({
       type: 'farm.fenceBuilt',
@@ -677,7 +799,12 @@ export const fenceAction: ActionDefinition = {
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:fence:')) {
       const farmPayload = ctx.actionContext?.farmPayload as
-        | { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
+        | {
+            edges?: string[]
+            palisadeEdges?: string[]
+            extraWood?: number
+            fenceSources?: Record<string, string>
+          }
         | undefined
       if (!farmPayload) return { type: 'fail', errorKey: 'log.fencingFail' }
       const edges = Array.isArray(farmPayload.edges) ? farmPayload.edges : []
@@ -685,7 +812,15 @@ export const fenceAction: ActionDefinition = {
         ? farmPayload.palisadeEdges
         : []
       const extraWood = farmPayload.extraWood ?? 0
-      return finalizeFence(ctx, edges, palisadeEdges, extraWood, choice, policy)
+      return finalizeFence(
+        ctx,
+        edges,
+        palisadeEdges,
+        extraWood,
+        farmPayload.fenceSources,
+        choice,
+        policy,
+      )
     }
 
     // First call: client submitted fence geometry alongside `confirm`.
@@ -694,6 +829,14 @@ export const fenceAction: ActionDefinition = {
       const edges = Array.isArray(fp.edges) ? fp.edges : []
       const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
       const extraWood = fp.extraWood ?? 0
+      const fenceSources = isRecord(fp.fenceSources)
+        ? Object.fromEntries(
+            Object.entries(fp.fenceSources).filter(
+              (entry): entry is [string, string] => typeof entry[1] === 'string',
+            ),
+          )
+        : undefined
+      const currentPolicy = borrowedPolicyWithCurrentCaps(ctx.state, ctx.player, policy)
 
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
       const normalized = normalizePlayerFarm(ctx.player)
@@ -704,7 +847,7 @@ export const fenceAction: ActionDefinition = {
       const newPalisadeEdgesPreview = palisadeEdges.filter(
         (e) => !existingEdgeIds.has(e),
       )
-      const freeFences = computeFreeFenceTotal(
+      const costAdjustment = computeFenceCostAdjustment(
         ctx.state,
         normalized,
         newFenceEdgesPreview,
@@ -715,17 +858,18 @@ export const fenceAction: ActionDefinition = {
       const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
         edges,
         palisadeEdges,
-        extraWood,
-        freeFences,
+        extraWood: extraWood + costAdjustment.extraWood,
+        freeFences: costAdjustment.freeFences,
         options: fenceValidationOptions(
           normalized,
           playerCanBuildPalisades(normalized),
-          policy,
+          currentPolicy,
+          fenceSources,
         ),
         lockedKeys,
       })
       if (!validated.ok) {
-        return fenceFail(validated.error?.code ?? 'log.fencingFail', policy)
+        return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
       }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
@@ -744,7 +888,7 @@ export const fenceAction: ActionDefinition = {
           promptKey: payment.promptKey,
           extraData: {
             actionContextWrite: {
-              farmPayload: { edges, palisadeEdges, extraWood },
+              farmPayload: { edges, palisadeEdges, extraWood, fenceSources },
             },
           },
         }
@@ -752,7 +896,7 @@ export const fenceAction: ActionDefinition = {
       if (payment.type === 'fail') {
         return { type: 'fail', errorKey: 'log.fencingFail' }
       }
-      return finalizeFence(ctx, edges, palisadeEdges, extraWood, undefined, policy)
+      return finalizeFence(ctx, edges, palisadeEdges, extraWood, fenceSources, undefined, policy)
     }
 
     return { type: 'fail', errorKey: 'log.fencingFail' }
