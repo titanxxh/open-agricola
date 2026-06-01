@@ -24,6 +24,19 @@ type ResourceExchangeLabelParams = {
   bonusVp?: number
 }
 
+type BorrowedFenceSourceControls = {
+  donors: {
+    playerId: string
+    name: string
+    color: 'red' | 'yellow' | 'blue' | 'black'
+    cap: number
+    allocated: number
+  }[]
+  selectedPlayerId: string | null
+  onSelect: (playerId: string) => void
+  hasMissingSources: boolean
+}
+
 const isResourceExchangeLabelParams = (
   value: unknown,
 ): value is ResourceExchangeLabelParams =>
@@ -372,6 +385,7 @@ type Props = {
   canBuildPalisades?: boolean
   fencePlacementMode?: 'fence' | 'palisade'
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
+  borrowedFenceSources?: BorrowedFenceSourceControls
   animalReorg?: AnimalReorgState | null
   reorgRemaining?: { sheep: number; boar: number; cattle: number } | null
   hasReorgOverflow?: boolean
@@ -440,6 +454,7 @@ export const InteractionBar = ({
   canBuildPalisades = false,
   fencePlacementMode = 'fence',
   setFencePlacementMode,
+  borrowedFenceSources,
   animalReorg = null,
   reorgRemaining = null,
   hasReorgOverflow = false,
@@ -659,7 +674,41 @@ export const InteractionBar = ({
                   })}
                 </div>
               ) : null}
-              {isSelectingFences && canBuildPalisades && setFencePlacementMode ? (
+              {isSelectingFences && borrowedFenceSources ? (
+                <div className="borrowed-fence-source-controls">
+                  <div className="borrowed-fence-source-title">
+                    {t(locale, 'ui.borrowedFenceSourceTitle')}
+                  </div>
+                  <div className="borrowed-fence-source-options">
+                    {borrowedFenceSources.donors.map((donor) => {
+                      const isSelected =
+                        borrowedFenceSources.selectedPlayerId === donor.playerId
+                      const isAtCap = donor.allocated >= donor.cap
+                      return (
+                        <button
+                          key={donor.playerId}
+                          type="button"
+                          className={`borrowed-fence-source-option${isSelected ? ' active' : ''}`}
+                          data-player-color={donor.color}
+                          aria-pressed={isSelected}
+                          disabled={!isInteractive || (!isSelected && isAtCap)}
+                          onClick={() => borrowedFenceSources.onSelect(donor.playerId)}
+                        >
+                          <span className="borrowed-fence-source-dot" />
+                          <span className="borrowed-fence-source-name">{donor.name}</span>
+                          <span className="borrowed-fence-source-count">
+                            {t(locale, 'ui.borrowedFenceSourceCount', {
+                              allocated: donor.allocated,
+                              cap: donor.cap,
+                            })}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {isSelectingFences && canBuildPalisades && setFencePlacementMode && !borrowedFenceSources ? (
                 <div
                   className="fence-mode-toggle"
                   role="radiogroup"
@@ -687,6 +736,11 @@ export const InteractionBar = ({
               ) : null}
               {isSelectingFences && fenceErrorText ? (
                 <div className="interaction-error">{fenceErrorText}</div>
+              ) : null}
+              {isSelectingFences && borrowedFenceSources?.hasMissingSources ? (
+                <div className="interaction-error">
+                  {t(locale, 'ui.borrowedFenceSourceMissing')}
+                </div>
               ) : null}
               {isSelectingRooms && roomErrorText ? (
                 <div className="interaction-error">{roomErrorText}</div>
@@ -717,6 +771,9 @@ export const InteractionBar = ({
                       (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
                         option.value === 'confirm' &&
                         isRoomConfirmDisabled) ||
+                      (pendingChoice.promptKey === 'ui.interactionFenceSelect' &&
+                        option.value === 'confirm' &&
+                        !!borrowedFenceSources?.hasMissingSources) ||
                       (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
                         option.value === 'confirm' &&
                         isStableConfirmDisabled) ||
