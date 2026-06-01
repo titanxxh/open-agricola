@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-29。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-01。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 4 |
+| 需要实现复核的卡牌 | 3 |
 | 已接受 / 产品策略差异 | 41 |
 | 排除的 BGA legacy 或未实现行为目标 | 51 |
-| 本轮审计视为已对齐 | 792 |
+| 本轮审计视为已对齐 | 793 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -27,7 +27,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
-| `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
 
 ## 3. 已接受差异
@@ -214,7 +213,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
-| effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E149_MidnightFencer`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
+| effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
 | effect | `computeCostedBonus` | `A136_DrudgeryReeve`, `C133_Soldier`, `C99_GardenDesigner`, `E132_VeggieLover` |
 | effect | `computeExtraRoomCapacity` | `A10_WoodenShed`, `A127_Lodger`, `A85_Homekeeper`, `B10_Caravan`, `B85_FarmHand`, `C10_BunkBeds`, `D85_Reader`, `E85_MasterTanner` |
 | effect | `computeLockedFarmTiles` | `B38_FutureBuildingSite` |
@@ -249,7 +248,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onStartHarvestFeedingPhase` | `C107_Baker`, `E52_Cubbyhole` |
 | effect | `onStartHarvestFieldPhase` | `A112_ScytheWorker`, `B165_GameProvider`, `B61_ThreeFieldRotation`, `C57_Crudite`, `D70_StrawManure`, `D72_StableManure`, `E112_GrainThief`, `E73_Scythe` |
 | effect | `onStartReturnHome` | `A100_Curator`, `A127_Lodger`, `A141_TurnipFarmer`, `A151_Minstrel`, `A152_NightSchoolStudent`, `A157_Bohemian`, `A35_SwimmingClass`, `A58_AsparagusKnife`, `C155_FoodDistributor`, `C97_SeedResearcher`, `D102_SampleStableMaker`, `D107_Bellfounder`, `D10_StorksNest`, `D18_SteamPlow`, `E20_IronHoe`, `E87_MasterRenovator` |
-| effect | `resolveChoice` | `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones`, `E149_MidnightFencer` |
+| effect | `resolveChoice` | `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones` |
 | exchange | `anytime` | `A60_OrientalFireplace`, `B104_SheepWalker`, `B32_Kettle`, `B80_HardPorcelain`, `C139_BasketmakersWife`, `C50_StableYard`, `D162_ClayFirer`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D60_LargePottery`, `E109_BraidMaker` |
 | exchange | `bake-bread` | `A60_OrientalFireplace`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D64_BakingCourse`, `E63_IronOven`, `E64_SimpleOven` |
 | exchange | `harvest` | `C105_BasketCarrier`, `C109_SchnappsDistiller`, `C59_SchnappsDistillery`, `D108_StoneCarver`, `D155_Ebonist`, `D62_BeerTap`, `E153_StoneSculptor` |
@@ -358,7 +357,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
 | specialKind | `increment-counter` | `B132_EstateMaster`, `C132_TimberShingleMaker` |
-| specialKind | `increment-extra-data` | `C104_Collector`, `D134_OysterEater`, `D92_ChildOmbudsman`, `E149_MidnightFencer`, `E38_RodCollection` |
+| specialKind | `increment-extra-data` | `C104_Collector`, `D134_OysterEater`, `D92_ChildOmbudsman`, `E38_RodCollection` |
 | specialKind | `move-resource-between-spaces` | `E166_Roastmaster` |
 | specialKind | `plant-additional-good` | `C8_PlantFertilizer` |
 | specialKind | `pop-card-stack-top` | `E103_Wolf` |
@@ -1263,7 +1262,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
 | `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
-| `E149_MidnightFencer` | 需复核 | BGA 最后 harvest 执行免费 `FENCING`；OA 只按选择数记 VP，不改 farm |
+| `E149_MidnightFencer` | 已对齐 | 第 14 轮 harvest start 提供 optional real borrowed `fence` leaf；donor cap 按其他玩家 own ordinary reserve 各最多 2，跳过或建造均不再产生 owed-fence bonus VP |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |
