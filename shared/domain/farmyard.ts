@@ -91,6 +91,9 @@ export type FenceValidationError = {
     | 'TOO_MANY_FENCES'
     | 'PASTURE_BOUNDS_NOT_MET'
     | 'ANIMAL_CAPACITY_INSUFFICIENT'
+    | 'BORROWED_FENCE_SOURCE_REQUIRED'
+    | 'BORROWED_FENCE_SOURCE_INVALID'
+    | 'BORROWED_FENCE_DONOR_LIMIT_EXCEEDED'
   edges: string[]
   palisadeEdges: string[]
   newFenceEdges: string[]
@@ -108,7 +111,11 @@ export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
     }
   | { ok: false; error: FenceValidationError }
 
-export type FenceSourcePolicy = 'ownOnly'
+export type BorrowedFenceSourcePolicy = {
+  kind: 'borrowed'
+  donorCaps: Record<string, number>
+}
+export type FenceSourcePolicy = 'ownOnly' | BorrowedFenceSourcePolicy
 export type FenceCostPolicy = {
   fence?: { wood?: number }
   palisade?: { wood?: number }
@@ -135,6 +142,7 @@ export type FenceValidationOptions = {
   preserveAnimalTotals?: boolean
   ordinaryFenceBuildLimit?: number
   availableOrdinaryFenceTokens?: number
+  fenceSources?: Record<string, string>
   pastureBounds?: {
     newPastures?: Bounds
     changedPastures?: Bounds
@@ -192,6 +200,24 @@ type SowValidationOptions = {
 
 const DEFAULT_NORMAL_FIELD_CROPS = ['grain', 'vegetable'] as const satisfies readonly SowSelection['crop'][]
 const ALL_CROPS = ['grain', 'vegetable', 'wood', 'stone'] as const satisfies readonly SowSelection['crop'][]
+
+export const isBorrowedFenceSourcePolicy = (
+  policy: FenceSourcePolicy | undefined,
+): policy is BorrowedFenceSourcePolicy =>
+  typeof policy === 'object' &&
+  policy !== null &&
+  policy.kind === 'borrowed' &&
+  typeof (policy as { donorCaps?: unknown }).donorCaps === 'object' &&
+  (policy as { donorCaps?: unknown }).donorCaps !== null &&
+  !Array.isArray((policy as { donorCaps?: unknown }).donorCaps)
+
+export const borrowedFenceDonorCapTotal = (
+  policy: BorrowedFenceSourcePolicy,
+): number =>
+  Object.values(policy.donorCaps).reduce(
+    (sum, cap) => sum + (Number.isInteger(cap) && cap > 0 ? cap : 0),
+    0,
+  )
 
 export type RoomSelectionResult =
   | { ok: true; selectedKeys: Set<string> }
@@ -845,11 +871,26 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   )
 
   const allowedSegmentTypes = options.allowedSegmentTypes
+  const borrowedSourcePolicy = isBorrowedFenceSourcePolicy(options.sourcePolicy)
+    ? options.sourcePolicy
+    : undefined
   if (
     allowedSegmentTypes &&
     ((newFenceEdges.length > 0 && !allowedSegmentTypes.includes('fence')) ||
       (newPalisadeEdges.length > 0 && !allowedSegmentTypes.includes('palisade')))
   ) {
+    return {
+      ok: false,
+      error: {
+        code: 'SEGMENT_TYPE_NOT_ALLOWED',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  if (borrowedSourcePolicy && newPalisadeEdges.length > 0) {
     return {
       ok: false,
       error: {
@@ -901,6 +942,75 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
+  const borrowedFenceSources = borrowedSourcePolicy ? options.fenceSources : undefined
+  const borrowedDonorCounts = new Map<string, number>()
+  if (borrowedSourcePolicy) {
+    if (!borrowedFenceSources || typeof borrowedFenceSources !== 'object') {
+      return {
+        ok: false,
+        error: {
+          code: 'BORROWED_FENCE_SOURCE_REQUIRED',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
+    }
+    const expectedEdges = new Set(newFenceEdges)
+    const sourceEdges = Object.keys(borrowedFenceSources)
+    const sourceEdgesMatch =
+      sourceEdges.length === expectedEdges.size &&
+      sourceEdges.every((edge) => expectedEdges.has(edge))
+    if (!sourceEdgesMatch) {
+      return {
+        ok: false,
+        error: {
+          code: 'BORROWED_FENCE_SOURCE_INVALID',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
+    }
+    for (const edge of newFenceEdges) {
+      const donorId = borrowedFenceSources[edge]
+      if (
+        typeof donorId !== 'string' ||
+        donorId === normalized.id ||
+        borrowedSourcePolicy.donorCaps[donorId] === undefined
+      ) {
+        return {
+          ok: false,
+          error: {
+            code: 'BORROWED_FENCE_SOURCE_INVALID',
+            edges,
+            palisadeEdges,
+            newFenceEdges,
+            newPalisadeEdges,
+          },
+        }
+      }
+      borrowedDonorCounts.set(donorId, (borrowedDonorCounts.get(donorId) ?? 0) + 1)
+    }
+    for (const [donorId, count] of borrowedDonorCounts) {
+      const cap = borrowedSourcePolicy.donorCaps[donorId] ?? 0
+      if (count > cap) {
+        return {
+          ok: false,
+          error: {
+            code: 'BORROWED_FENCE_DONOR_LIMIT_EXCEEDED',
+            edges,
+            palisadeEdges,
+            newFenceEdges,
+            newPalisadeEdges,
+          },
+        }
+      }
+    }
+  }
+
   const invalidPalisade = newPalisadeEdges.find((e) => !isBorderEdge(e))
   if (invalidPalisade) {
     return {
@@ -929,12 +1039,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const payableWoodCost =
     payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost + fixedWoodCost
 
-  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
-    options.sourcePolicy === 'ownOnly'
-      ? isOwnOrdinaryFenceSegment(s, normalized.id)
-      : s.type === 'fence',
-  ).length
-  const ordinaryBuildLimit = options.ordinaryFenceBuildLimit ?? MAX_FENCES
+  const existingFenceCount = borrowedSourcePolicy
+    ? 0
+    : (normalized.fenceSegments ?? []).filter((s) =>
+        isOwnOrdinaryFenceSegment(s, normalized.id),
+      ).length
+  const ordinaryBuildLimit =
+    options.ordinaryFenceBuildLimit ??
+    (borrowedSourcePolicy ? borrowedFenceDonorCapTotal(borrowedSourcePolicy) : MAX_FENCES)
   if (existingFenceCount + newFenceEdges.length > ordinaryBuildLimit) {
     return {
       ok: false,
@@ -1149,7 +1261,9 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     ...newFenceEdges.map((edge) => ({
       edge,
       type: 'fence' as const,
-      source: { kind: 'own' as const, ownerPlayerId: normalized.id },
+      source: borrowedSourcePolicy
+        ? { kind: 'borrowed' as const, ownerPlayerId: borrowedFenceSources![edge]! }
+        : { kind: 'own' as const, ownerPlayerId: normalized.id },
     })),
     ...newPalisadeEdges.map((edge) => ({
       edge,
@@ -1557,6 +1671,7 @@ export const buildFarmPositionSelectionInteraction = (
 export const buildFenceFarmInteraction = (
   player: PlayerState,
   spaceId: string,
+  actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const existing = new Set((normalized.fenceSegments ?? []).map((s) => s.edge))
@@ -1564,10 +1679,19 @@ export const buildFenceFarmInteraction = (
     (edgeId) => !existing.has(edgeId),
   )
   const extraWood = spaceId === 'farm-redevelopment' ? 1 : 0
+  const fencePolicy =
+    typeof actionContext?.fencePolicy === 'object' && actionContext.fencePolicy !== null
+      ? actionContext.fencePolicy as { sourcePolicy?: unknown }
+      : undefined
+  const sourcePolicy = fencePolicy?.sourcePolicy as FenceSourcePolicy | undefined
+  const fenceSource = isBorrowedFenceSourcePolicy(sourcePolicy)
+    ? { kind: 'borrowed' as const, donorCaps: sourcePolicy.donorCaps }
+    : undefined
   return {
     farmType: 'fence',
     selectableEdges,
     extraWood,
+    ...(fenceSource ? { fenceSource } : {}),
   }
 }
 
@@ -1588,6 +1712,7 @@ export type FenceSpec = {
   palisadeEdges?: string[]
   extraWood?: number
   freeFences?: number
+  fenceSources?: Record<string, string>
   options?: FenceValidationOptions
   lockedKeys?: Set<string>
 }
@@ -1648,7 +1773,9 @@ export class Farmyard {
       spec.palisadeEdges ?? [],
       spec.extraWood ?? 0,
       spec.freeFences ?? 0,
-      spec.options ?? {},
+      spec.fenceSources === undefined
+        ? (spec.options ?? {})
+        : { ...(spec.options ?? {}), fenceSources: spec.fenceSources },
       spec.lockedKeys,
     )
   }
@@ -1716,7 +1843,7 @@ export class Farmyard {
       case 'sow':
         return buildSowFarmInteraction(this.player, ctx)
       case 'fence':
-        return buildFenceFarmInteraction(this.player, opts?.spaceId ?? '')
+        return buildFenceFarmInteraction(this.player, opts?.spaceId ?? '', ctx)
       case 'room':
         return buildRoomFarmInteraction(
           this.player,

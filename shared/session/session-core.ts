@@ -278,6 +278,7 @@ type SelectionCommitPayload = {
   edges?: string[]
   palisadeEdges?: string[]
   extraWood?: number
+  fenceSources?: Record<string, string>
   rooms?: FarmTilePosition[]
   stables?: FarmTilePosition[]
   farmHand?: FarmTilePosition
@@ -4097,6 +4098,7 @@ export class GameCore {
           edges: payload.edges ?? [],
           palisadeEdges: payload.palisadeEdges ?? [],
           extraWood: payload.extraWood ?? 0,
+          fenceSources: payload.fenceSources ?? undefined,
         }
         break
       case 'room':

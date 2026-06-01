@@ -1343,6 +1343,9 @@ export const en = {
       EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
       SEGMENT_TYPE_NOT_ALLOWED: 'This fence type is not allowed for this action',
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
+      BORROWED_FENCE_SOURCE_REQUIRED: 'Choose a source player for each borrowed fence',
+      BORROWED_FENCE_SOURCE_INVALID: 'Borrowed fence sources must match selected fence segments',
+      BORROWED_FENCE_DONOR_LIMIT_EXCEEDED: 'Selected borrowed fences exceed the source player limit',
     },
   },
   'salter-pick': {
