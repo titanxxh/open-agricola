@@ -175,6 +175,33 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('res-compact-label')
   })
 
+  it('keeps compact panel icon values grouped with accessible labels and the animation anchor', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playerPanelSummary: {
+            family: { used: 2, limit: 5 },
+            rooms: { count: 2 },
+            housingCapacity: { value: 2 },
+            fence: { used: 17, limit: 17 },
+            stable: { used: 3, limit: 4 },
+          },
+        })}
+      />,
+    )
+
+    expect(html).toContain('data-player-resource-anchor="p1"')
+    expect(html).toContain('aria-label="Family capacity: 2/5"')
+    expect(html).toContain('aria-label="Rooms: 2"')
+    expect(html).toContain('aria-label="Housing capacity: 2"')
+    expect(html).toContain('aria-label="Fence capacity: 17/17"')
+    expect(html).toContain('aria-label="Stable supply: 3/4"')
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-fence-icon[\s\S]*>17\/17</)
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-barn[\s\S]*>3\/4</)
+  })
+
   it('marks highlighted farm tiles', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -246,7 +273,7 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('stable-barn-icon')
     expect(html).toContain('res-icon-barn')
-    expect(html).not.toContain('Stable')
+    expect(html).not.toContain('farm-tile-text">Stable</span>')
   })
 
   it('colors the built stable barn icon by the display player color', () => {

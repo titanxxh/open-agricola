@@ -1582,11 +1582,18 @@
 .res-compact-group {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
 }
 .res-compact-group .res-icon {
   font-size: 18px;
   flex-shrink: 0;
+}
+.res-compact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+  min-width: 0;
 }
 .res-compact-num {
   min-width: 14px;
@@ -1594,10 +1601,6 @@
   font-size: 13px;
   font-weight: 700;
   color: #2a1a00;
-  margin-right: 3px;
-}
-.res-compact-num:last-child {
-  margin-right: 0;
 }
 .res-compact-label {
   font-size: 11px;
