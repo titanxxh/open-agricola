@@ -62,6 +62,13 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   name,
   color,
   resources: { ...resources(), wood: 2 },
+  workers: [
+    { id: '1', isActive: true },
+    { id: '2', isActive: true },
+    { id: '3', isActive: false },
+    { id: '4', isActive: false },
+    { id: '5', isActive: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -152,6 +159,22 @@ const createFarmBoardProps = (
 })
 
 describe('FarmBoard', () => {
+  it('renders supply capacities with icons in the compact resource panel', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('res-icon-child')
+    expect(html).toContain('res-icon-room-wood')
+    expect(html).toContain('res-icon-child-free')
+    expect(html).toContain('>2/5<')
+    expect(html).toContain('>0/15<')
+    expect(html).toContain('>0/4<')
+    expect(html).not.toContain('res-compact-label')
+  })
+
   it('marks highlighted farm tiles', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

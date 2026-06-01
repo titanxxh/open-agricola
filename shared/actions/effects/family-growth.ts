@@ -6,14 +6,14 @@ import type {
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
-import { activateSmallestInactive, familySize } from '../../domain/player'
+import { activateSmallestInactive, familySize, getFamilyTokenLimit } from '../../domain/player'
 import { addWorkerRef } from '../../domain/space'
 
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
 
 const hasInactiveWorker = (player: PlayerState) =>
-  (player.workers ?? []).some((worker) => !worker.isActive)
+  getFamilyTokenLimit(player) > familySize(player)
 
 const growFamilyCore = (
   state: GameState,

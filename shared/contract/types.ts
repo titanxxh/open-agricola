@@ -178,6 +178,7 @@ export type Worker = {
   id: string
   isActive: boolean
   isNewborn: boolean
+  removedFromSupply?: boolean
 }
 
 export type WorkerRef = {

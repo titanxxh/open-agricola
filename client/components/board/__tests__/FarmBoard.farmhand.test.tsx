@@ -27,6 +27,13 @@ const createPlayer = (): PlayerState => ({
   name: 'Player A',
   color: 'red',
   resources: resources(),
+  workers: [
+    { id: '1', isActive: true },
+    { id: '2', isActive: true },
+    { id: '3', isActive: false },
+    { id: '4', isActive: false },
+    { id: '5', isActive: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],

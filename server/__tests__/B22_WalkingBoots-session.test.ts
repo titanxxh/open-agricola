@@ -79,6 +79,7 @@ describe('B22_WalkingBoots session', () => {
     // Worker '6' should be deactivated and removed from forest
     const worker6 = (player.workers ?? []).find((w) => w.id === '6')!
     expect(worker6.isActive).toBe(false)
+    expect(worker6.removedFromSupply).toBe(true)
     const forestAfter = state.actionSpaces.find((s) => s.id === 'forest')!
     expect(forestAfter.takenBy.some((t) => t.workerId === '6')).toBe(false)
     // Flag cleared
