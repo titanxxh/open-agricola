@@ -171,6 +171,45 @@ describe('B21_HayloftBarn session', () => {
     ]))
   })
 
+  it('does not include family growth in listener flow when only removed supply tokens remain', () => {
+    const session = setup({ foodCount: 1 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.workers = [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false, removedFromSupply: true },
+      { id: '4', isActive: false, isNewborn: false, removedFromSupply: true },
+      { id: '5', isActive: false, isNewborn: false, removedFromSupply: true },
+    ]
+    const grainEvent: DraftGameEvent<'resource.moved'> = {
+      type: 'resource.moved',
+      resources: { grain: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'gain',
+    }
+    const listener = B21_HayloftBarn_impl.listeners?.find((entry) =>
+      entry.id === 'B21-hayloft-barn-after-grain-gain'
+    )
+
+    const result = listener?.handler({
+      state,
+      player,
+      space: state.actionSpaces[0]!,
+      actionId: 'gain',
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [grainEvent],
+      actionEvents: [grainEvent],
+      eventQuery: createEventQuery([grainEvent]),
+    } as CardListenerContext)
+
+    expect(result?.flow?.type).toBe('seq')
+    if (result?.flow?.type !== 'seq') throw new Error('expected B21 release flow')
+    expect(JSON.stringify(result.flow)).not.toContain('family-growth')
+  })
+
   it('does not release food when card is empty', () => {
     const session = setup({ foodCount: 0 })
     const state = session.getState().state
@@ -252,6 +291,30 @@ describe('B21_HayloftBarn session', () => {
     // Family grew without room (now 3 active workers despite 2 rooms)
     const familyAfter = updated.workers.filter((w) => w.isActive).length
     expect(familyAfter).toBe(familyBefore + 1)
+  })
+
+  it('does not trigger family growth when only removed supply tokens remain', () => {
+    const session = setup({ foodCount: 1 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.workers = [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+      { id: '3', isActive: false, isNewborn: false, removedFromSupply: true },
+      { id: '4', isActive: false, isNewborn: false, removedFromSupply: true },
+      { id: '5', isActive: false, isNewborn: false, removedFromSupply: true },
+    ]
+    const foodBefore = player.resources.food
+    const familyBefore = player.workers.filter((w) => w.isActive).length
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+
+    const updated = resp.state.players[0]!
+    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(0)
+    expect(updated.resources.food).toBe(foodBefore + 1)
+    expect(updated.workers.filter((w) => w.isActive).length).toBe(familyBefore)
   })
 
   it('does not trigger family growth when card is not empty after gain', () => {

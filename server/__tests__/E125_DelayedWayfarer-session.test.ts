@@ -144,6 +144,24 @@ describe('E125_DelayedWayfarer card effect', () => {
       expect(flow).toBeUndefined()
     })
 
+    it('does nothing when inactive supply farmers were removed from supply', () => {
+      const player = createPlayer('p1', {
+        workers: [
+          { id: '1', isActive: true, isNewborn: false },
+          { id: '2', isActive: true, isNewborn: false },
+          { id: '3', isActive: false, isNewborn: false, removedFromSupply: true },
+          { id: '4', isActive: false, isNewborn: false, removedFromSupply: true },
+          { id: '5', isActive: false, isNewborn: false, removedFromSupply: true },
+        ] as any,
+      })
+      const state = createState(5, [player])
+      player.cardStates[CARD_ID] = { extraData: { playedRound: 5 } }
+      const effect = getCardEffect(CARD_ID)
+      const flow = effect!.onAllWorkersPlaced!(state, player)
+      expect(flow).toBeUndefined()
+      expect(readCardExtraData<number>(player, CARD_ID, 'playedRound')).toBe(5)
+    })
+
 
     it('does not trigger twice in the same round (flag cleared to -1)', () => {
       const player = createPlayer('p1')
