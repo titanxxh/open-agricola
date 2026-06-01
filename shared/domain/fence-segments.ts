@@ -28,3 +28,10 @@ export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
 export const getPalisadeCount = <T extends { fenceSegments: FenceSegment[] }>(
   p: T,
 ): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'palisade' ? 1 : 0), 0)
+
+export const getBorrowedFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
+  p: T,
+): number => p.fenceSegments.reduce(
+  (n, s) => n + (s.type === 'fence' && s.source?.kind === 'borrowed' ? 1 : 0),
+  0,
+)

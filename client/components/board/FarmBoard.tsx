@@ -5,16 +5,19 @@ import type {
   CardResourceStats,
   CropStack,
   FarmTilePosition,
+  GameState,
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
-import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
-import { getFenceCount } from '../../../shared/domain/fence-segments'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
+import {
+  getPlayerPanelSupplySummary,
+  type PlayerPanelSupplySummary,
+} from '../../../shared/domain/player-panel-summary'
 import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
@@ -227,6 +230,7 @@ export type FarmBoardProps = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  playerPanelSummary?: PlayerPanelSupplySummary
   devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
@@ -545,6 +549,7 @@ export const FarmBoard = ({
   players,
   currentPlayer,
   displayPlayer,
+  playerPanelSummary,
   currentStartPlayerId,
   nextStartPlayerId,
   playedCards,
@@ -607,6 +612,8 @@ export const FarmBoard = ({
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+  const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
+  const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
 
   // Multi-select state for occupation-hand selection interaction
   const isMultiOccupationSelect = !!occupationHandSelection
@@ -672,11 +679,15 @@ export const FarmBoard = ({
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
-            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{familySize(displayPlayer)}</span>
-            <span className="res-compact-label">{locale === 'zh' ? '屋' : 'R'}</span><span className="res-compact-num">{displayPlayer.rooms}</span>
+            <span className="res-icon res-icon-child" title="Family" aria-label="Family" />
+            <span className="res-compact-num">{summary.family.used}/{summary.family.limit}</span>
+            <span className={`res-icon ${roomIconClass}`} title="Rooms" aria-label="Rooms" />
+            <span className="res-compact-num">{summary.rooms.count}</span>
+            <span className="res-icon res-icon-child-free" title="Housing capacity" aria-label="Housing capacity" />
+            <span className="res-compact-num">{summary.housingCapacity.value}</span>
             <span className="res-icon res-icon-field" /><span className="res-compact-num">{displayPlayer.fields.length}</span>
-            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{getFenceCount(displayPlayer)}</span>
-            <span className="res-icon res-icon-barn" /><span className="res-compact-num">{displayPlayer.stableTiles?.length ?? 0}</span>
+            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{summary.fence.used}/{summary.fence.limit}</span>
+            <span className="res-icon res-icon-barn" /><span className="res-compact-num">{summary.stable.used}/{summary.stable.limit}</span>
           </span>
         </div>
       </div>
