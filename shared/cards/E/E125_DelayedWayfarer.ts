@@ -4,6 +4,7 @@ import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E125_DelayedWayfarer } from '../../cards-display/E/E125_DelayedWayfarer'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
 
 const CARD_ID = E125_DelayedWayfarer.id
 
@@ -44,8 +45,7 @@ export const E125_DelayedWayfarer_impl = {
   actions: ['place-farmer'],
   handler: (context) => {
     if (!context.actionContext?.fromSupply) return
-    const hasSupply = (context.player.workers ?? []).some((w) => !w.isActive)
-    if (hasSupply) return { doable: true }
+    if (hasInactiveWorkerInSupply(context.player)) return { doable: true }
   },
 }],
   effect: {
@@ -57,7 +57,7 @@ export const E125_DelayedWayfarer_impl = {
   onAllWorkersPlaced: (state, player) => {
     const playedRound = readCardExtraData<number>(player, CARD_ID, PLAYED_ROUND_KEY)
     if (playedRound !== state.round) return
-    if (!(player.workers ?? []).some((w) => !w.isActive)) return
+    if (!hasInactiveWorkerInSupply(player)) return
     // Clear flag so card cannot trigger again this round
     writeCardExtraData(player, CARD_ID, PLAYED_ROUND_KEY, -1)
     return {

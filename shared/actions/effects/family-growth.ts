@@ -6,14 +6,11 @@ import type {
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
-import { activateSmallestInactive, familySize, getFamilyTokenLimit } from '../../domain/player'
+import { activateSmallestInactive, familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import { addWorkerRef } from '../../domain/space'
 
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
-
-const hasInactiveWorker = (player: PlayerState) =>
-  getFamilyTokenLimit(player) > familySize(player)
 
 const growFamilyCore = (
   state: GameState,
@@ -50,7 +47,7 @@ export const familyGrowthAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player, context) => {
-    if (!hasInactiveWorker(player)) return false
+    if (!hasInactiveWorkerInSupply(player)) return false
     const skipRoom =
       (context?.actionContext as { skipRoomCheck?: boolean } | undefined)?.skipRoomCheck === true
     return skipRoom || effectiveRooms(player) > familySize(player)
