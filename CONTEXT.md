@@ -112,6 +112,10 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**Scoring Reserve**:
+终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
+_Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
+
 **Supply Token**:
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限
