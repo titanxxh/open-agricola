@@ -135,6 +135,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         kind: 'record-scoring-reserve-bonus',
         reserved: { wood: 2, clay: 1 },
         score: 3,
+        cardType: 'occupation',
       }, CARD_ID, state),
       actionContext: { targetPlayerId: target.id },
     })
@@ -143,6 +144,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(readCardExtraData(target, CARD_ID, 'scoringReserveBonus')).toEqual({
       reserved: { wood: 2, clay: 1 },
       score: 3,
+      cardType: 'occupation',
     })
     expect(target.resources.wood).toBe(3)
     expect(target.resources.clay).toBe(1)
@@ -211,6 +213,23 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
     expect(negative.type).toBe('fail')
     expect(fractional.type).toBe('fail')
+    expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
+  })
+
+  it('record-scoring-reserve-bonus: rejects invalid card type attribution', () => {
+    const player = makePlayer()
+    player.resources.wood = 3
+
+    const result = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: 1 },
+        score: 1,
+        cardType: 'event',
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(result.type).toBe('fail')
     expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
   })
 

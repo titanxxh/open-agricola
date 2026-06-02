@@ -6,6 +6,7 @@ export const SCORING_RESERVE_BONUS_KEY = 'scoringReserveBonus'
 export type ScoringReserveBonus = {
   reserved: Partial<Resource>
   score: number
+  cardType?: 'major' | 'minor' | 'occupation'
 }
 
 export type SelectedScoringReserveBonus = {
@@ -40,13 +41,30 @@ export const readScoringReserveBonus = (
   value: unknown,
 ): ScoringReserveBonus | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const record = value as { reserved?: unknown; score?: unknown }
+  const record = value as {
+    reserved?: unknown
+    score?: unknown
+    cardType?: unknown
+  }
   if (typeof record.score !== 'number' || !Number.isFinite(record.score)) {
     return undefined
   }
   const reserved = normalizeScoringReserveResources(record.reserved)
   if (!reserved) return undefined
-  return { reserved, score: record.score }
+  const cardType = record.cardType
+  if (
+    cardType !== undefined &&
+    cardType !== 'major' &&
+    cardType !== 'minor' &&
+    cardType !== 'occupation'
+  ) {
+    return undefined
+  }
+  return {
+    reserved,
+    score: record.score,
+    ...(cardType ? { cardType } : {}),
+  }
 }
 
 export const getSelectedScoringReserveBonuses = (

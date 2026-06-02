@@ -26,7 +26,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 | 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
 |---|---|---|---|---|---|
-| `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | Scoring Reserve / score-entry attribution 基础设施已具备；仍需 before-end player dispatch 与 A136 choice 接入。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | Scoring Reserve 基础设施已具备；若要严格对齐，仍需 before-end choice。 |
 
 ## 3. 已接受差异
@@ -142,8 +141,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 本轮新增已完成基础设施：Harvest field stage hook parallel。`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` 进入阶段时先收集全部可触发 card flows；mandatory non-interactive flow 走普通 `parallel` 自动执行，optional / OR / XOR / choice-bearing flow 仍走 `trigger-select` 交互。`immediatelyAfter.reap` 反应 flow 在普通收获和私有田收获汇总前都按 reacting owner 写入 target，避免多人 harvest 中跨玩家写 `cardStates`。
 
-本轮新增已完成基础设施：before-endgame hook flow。`onBeforeEndGame` 作为 `FlowEffectHandler` 在 round 14 后、gameover 前运行，允许卡牌生成终局前 pending 并通过 `stageResume` 恢复；D132 的 optional prompt 是 stage hook chain 中唯一放开 anytime 的 before-endgame choice prompt，后续数量选择不放开，避免 stale max。
-
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
 本轮新增已完成基础设施：Stable count semantics helper。`shared/domain/stables.ts` 集中畜栏计数口径：`getOrdinaryStableCount`（普通 stable tile，用于动物容量 / placement / supply）、`getStableCountForCards`、`getUnfencedStableCountForCards`、`getEmptyUnfencedStableCountForCards`（card-facing 口径在 helper 内部封装 B85 FarmHand position 读取，B85 永远算 1 个 unfenced / empty-unfenced stable）。`getFarmHandStableInUseCount` 从 `supply-tokens.ts` 移入本 helper，`getAvailableStableSupplyCount` 改用 `getOrdinaryStableCount`。业务代码不再直接读 `player.stableTiles.length`，由 `shared/domain/__tests__/stable-count-guardrail.test.ts` 静态扫描 `shared/cards/**` 与 `shared/domain/**` 阻断（白名单仅 `shared/domain/stables.ts` 与测试/fixture）。#184：C88 折扣口径已校准为 card-facing（`getStableCountForCards`，含 B85），混合普通 + B85 stable 建造经 `stables.ts` 的 `applyStableBuildDiscount`（`collectComputeCostsForFarmChoice` 按真实 `params.stableCount` 重算总额折扣）统一结算，详见 §C88 appendix。#186：完成其余 card-facing 口径校准——`B54`/`E43`/`D168`/`E114`/`C56` 改用 `getStableCountForCards`（“你拥有畜栏 / 第 N 座畜栏”序数定位含 B85），`C101`/`D72` 改用 `getUnfencedStableCountForCards`，`C49` 改用 `getEmptyUnfencedStableCountForCards`（B85 永远算 1 个 empty unfenced）；动物容量 / placement / supply / `getStableTilesBuiltThisAction`（after-stables 本次建造数，归 #185）继续用 `getOrdinaryStableCount`，B85 不获得动物容量。
@@ -221,7 +218,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
 | effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
-| effect | `computeCostedBonus` | `A136_DrudgeryReeve`, `C133_Soldier`, `C99_GardenDesigner`, `E132_VeggieLover` |
+| effect | `computeCostedBonus` | `C133_Soldier`, `C99_GardenDesigner`, `E132_VeggieLover` |
 | effect | `computeExtraRoomCapacity` | `A10_WoodenShed`, `A127_Lodger`, `A85_Homekeeper`, `B10_Caravan`, `B85_FarmHand`, `C10_BunkBeds`, `D85_Reader`, `E85_MasterTanner` |
 | effect | `computeLockedFarmTiles` | `B38_FutureBuildingSite` |
 | effect | `computeSharedPostScore` | `A135_AnimalReeve`, `B136_HouseSteward`, `C136_RanchProvost` |
@@ -230,7 +227,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onAfterReap` | `A106_SlurrySpreader`, `A59_PotatoRidger`, `A64_BarleyMill`, `B21_HayloftBarn`, `B58_CrackWeeder`, `C106_PotatoHarvester`, `C120_AgriculturalLabourer`, `D113_FoodMerchant`, `D126_FieldCultivator`, `D63_Lynchet`, `D65_GrainSieve` |
 | effect | `onAfterRoundEnd` | `A165_PigBreeder`, `A54_Credit`, `B53_SculptureCourse`, `D167_PureBreeder`, `D64_BakingCourse`, `D79_CarrotMuseum`, `E87_MasterRenovator` |
 | effect | `onAllWorkersPlaced` | `E125_DelayedWayfarer` |
-| effect | `onBeforeEndGame` | `B133_VillagePeasant`, `D132_HideFarmer` |
+| effect | `onBeforeEndGame` | `A136_DrudgeryReeve`, `B133_VillagePeasant`, `D132_HideFarmer` |
 | effect | `onBeforeHarvest` | `A166_Haydryer`, `C92_AutumnMother`, `D32_WoodRake`, `D98_Transactor` |
 | effect | `onBeforePlayerTurn` | `D134_OysterEater`（non-flow skip-control，labor turn 入口同步消费 `{ skipTurn?: true }`） |
 | effect | `contributeExtraTurn` | `A92_AdoptiveParents`（轮转额外行动：玩家普通工人耗尽但仍持未激活后代时返回 XOR[use, forfeit] flow；被 round.ts 主动消费、order-independent；轮转据此不提前跳过该玩家；内部 `countExtraTurns` 让 skip-turn / forced consume 逐个 opportunity 消费） |
@@ -536,7 +533,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A133_Braggart` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `A134_FullFarmer` | 已对齐 |  |
 | `A135_AnimalReeve` | 已对齐 |  |
-| `A136_DrudgeryReeve` | 需复核 | BGA sharedScoring 每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分 |
+| `A136_DrudgeryReeve` | 已对齐 | BGA sharedScoring 通过 all-player before-end select dispatch 对每位 target player 提供 0..max sets 选择，选择后用 Scoring Reserve 记录 wood/clay/stone/reed 占用和 1/3/5 额外分；真实资源不扣除，Joinery / Pottery / Basketmaker / C133 读取剩余计分资源 |
 | `A137_RiverineShepherd` | 已对齐 | optional extra good 使用另一个累积格的 partial collect，会扣除来源格并保留 action-space provenance |
 | `A138_Harpooner` | 已对齐 |  |
 | `A139_HollowWarden` | 已对齐 |  |
