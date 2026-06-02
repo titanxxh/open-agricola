@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
@@ -307,6 +307,7 @@ export const GameContainerApi = () => {
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
+  const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
@@ -567,15 +568,32 @@ export const GameContainerApi = () => {
     void transport.takeAction(state.currentPlayerIndex, space.id).catch((e) => console.error('takeAction error', e))
   }, [state, transport, isInteractive, interaction, placeFarmerChoiceBySpaceId])
 
+  const allowedCommands = interaction.allowedCommands as readonly InteractionCommand[]
+  const canUndoStep = allowedCommands.includes('undoStep')
+  const canUndoAction = allowedCommands.includes('undoAction')
+  const gameOverScoringKey = state?.gameOver
+    ? `${state.gameSeed}:${state.round}:${state.nextEventSeq}`
+    : null
+  const shouldShowScoringPad =
+    showScoringPad || (gameOverScoringKey !== null && dismissedGameOverScoringKey !== gameOverScoringKey)
+  const showScoring = useCallback(() => {
+    setDismissedGameOverScoringKey(null)
+    setShowScoringPad(true)
+  }, [])
+  const closeScoring = useCallback(() => {
+    if (gameOverScoringKey !== null) setDismissedGameOverScoringKey(gameOverScoringKey)
+    setShowScoringPad(false)
+  }, [gameOverScoringKey])
+
   const undoStep = useCallback(() => {
-    if (!isInteractive) return
+    if (!isInteractive || !canUndoStep) return
     void transport.undoStep().catch((e) => console.error('undo error', e))
-  }, [transport, isInteractive])
+  }, [transport, isInteractive, canUndoStep])
 
   const undoAction = useCallback(() => {
-    if (!isInteractive) return
+    if (!isInteractive || !canUndoAction) return
     void transport.undoAction().catch((e) => console.error('undoAction error', e))
-  }, [transport, isInteractive])
+  }, [transport, isInteractive, canUndoAction])
 
   const takeAnytimeAction = useCallback((actionId: string) => {
     if (!state || !isInteractive) return
@@ -2075,7 +2093,7 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
-      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={() => setShowScoringPad(false)} showDraftHistory={state.gameOver} /> : null}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
       {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}
@@ -2241,7 +2259,9 @@ export const GameContainerApi = () => {
         isInteractive={isInteractive}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onShowScoring={() => setShowScoringPad(true)}
+        canUndoStep={canUndoStep}
+        canUndoAction={canUndoAction}
+        onShowScoring={showScoring}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
         anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}

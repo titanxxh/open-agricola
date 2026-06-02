@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
+import { confirmPlayerSwitch } from '../../../../server/__tests__/_helpers/pending-confirms'
 import { registerStubCards, clearStubCards } from '../index'
 import { requireActiveCardRegistry } from '../../active-registry'
 import type { ActionFlow } from '../../../contract/types'
@@ -190,6 +191,13 @@ describe('New hook stubs - Harvest sub-phases', () => {
 
     let p1Resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
     p1Resp = resolveSourceCardChoice(session, p1Resp, cardIds[0]!)
+    expect(p1Resp.interaction.stateId).toBe('wait')
+    if (p1Resp.interaction.stateId !== 'wait') return
+    expect(p1Resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(p1Resp.interaction.fromPlayerIndex).toBe(0)
+    expect(p1Resp.interaction.toPlayerIndex).toBe(1)
+
+    p1Resp = confirmPlayerSwitch(session)
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.playerIndex).toBe(1)

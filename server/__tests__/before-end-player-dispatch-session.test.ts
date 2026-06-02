@@ -4,6 +4,7 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const SHARED_CARD = 'TEST_BeforeEndShared'
 const PREVIEW_CARD = 'TEST_BeforeEndPreviewMutation'
@@ -85,7 +86,19 @@ describe('Before-End Player Dispatch session', () => {
 
     resp = session.resolveChoice(0, SHARED_CARD)
     expect(resp.state.players[0]!.resources.food).toBe(1)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expectSharedTrigger(resp, 1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
+    expect(resp.interaction.allowedCommands).not.toContain('undoAction')
 
     resp = session.resolveChoice(1, SHARED_CARD)
     expect(resp.state.players[1]!.resources.food).toBe(1)
