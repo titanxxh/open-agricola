@@ -12,6 +12,7 @@ import type {
 } from '../../../shared/contract/types'
 import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
+import { LogCardLink, resolveLogCardRef } from './log-rendering'
 
 type Props = {
   locale: Locale
@@ -173,13 +174,29 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               ))}
             </div>
             {rows.map((row) => {
+              const cardBonusRef = row.type === 'cardBonus'
+                ? resolveLogCardRef(locale, row.cardId)
+                : null
               const rowLabel =
                 row.type === 'category'
                   ? t(locale, categoryLabelKey[row.key])
                   : row.type === 'card'
                     ? `· ${getCardLabel(locale, row.cardType, row.cardId)}`
                     : row.type === 'cardBonus'
-                      ? `· ${row.cardType ? getCardDisplayName(locale, row.cardType, row.cardId) : getAnyCardDisplayName(locale, row.cardId)}`
+                      ? (
+                          <>
+                            {'· '}
+                            {cardBonusRef ? (
+                              <LogCardLink locale={locale} cardRef={cardBonusRef}>
+                                {cardBonusRef.name}
+                              </LogCardLink>
+                            ) : row.cardType ? (
+                              getCardDisplayName(locale, row.cardType, row.cardId)
+                            ) : (
+                              getAnyCardDisplayName(locale, row.cardId)
+                            )}
+                          </>
+                        )
                       : t(locale, 'ui.scoringTotal')
               return (
                 <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
@@ -232,7 +249,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                     )
                     const score = category?.entries.reduce(
                       (sum, item) =>
-                        item.type === 'bonus' && item.cardId === row.cardId
+                        item.type === 'bonus' && item.cardId === row.cardId && item.score > 0
                           ? sum + item.score
                           : sum,
                       0,
