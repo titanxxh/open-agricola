@@ -6,7 +6,7 @@ export interface PlayerScoreRow {
   breakdown: {
     fields: number
     animals: number
-    food: number
+    cardBonusVp: number
     family: number
     cards: number
   }
@@ -35,8 +35,8 @@ export function ScorePanel({ rows }: Props) {
               <span className="score-chip" title="animals">
                 🐑 animals {row.breakdown.animals}
               </span>
-              <span className="score-chip" title="food">
-                🍞 food {row.breakdown.food}
+              <span className="score-chip" title="card bonus VP">
+                ⭐ card bonus VP {row.breakdown.cardBonusVp}
               </span>
               <span className="score-chip" title="family">
                 👶 family {row.breakdown.family}

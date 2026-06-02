@@ -926,7 +926,9 @@ shared/domain/
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
 
-`Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score, cardType? }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver，之后 resource-based major scoring 也读取该 clone 的剩余资源。`ScoreEntry.type='bonus'` 仍支持旧裸 `{ score }` 形态，也可以携带 `cardId` / `cardType` / `reserved` attribution；当 target player 没有打出 source card 时，`cardType` 由 Scoring Reserve 记录显式提供。
+`Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score, cardType? }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver，之后 resource-based major scoring 也读取该 clone 的剩余资源。`ScoreEntry.type='bonus'` 必须携带 `cardId`，并可以携带 `cardType` / `reserved` attribution；当 target player 没有打出 source card 时，`cardType` 由 Scoring Reserve 记录显式提供。
+
+`Card Bonus VP` 的统一 score category 是 `cardBonusVp`：所有由卡牌产生的非印刷 bonus VP 都进入该 category，并尽量在 `ScoreEntry.type='bonus'` 上保留 `cardId` / `cardType` attribution。它不同于 printed Cards VP；卡牌本身印刷分仍进入 `cards` category，compact/live score 也必须保持 `cards` 与 `cardBonusVp` 分离。旧 `cardsBonus`、`cardStateBonusVp`、`cardBonus` score shapes 不保留，客户端和文档都不应读取、合并或兼容这些旧 key。
 
 `computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D11_LawnFertilizer 这类 size-one pasture replacement 总是在 A12_DrinkingTrough / B72_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
 

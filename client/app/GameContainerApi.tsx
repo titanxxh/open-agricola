@@ -23,7 +23,7 @@ import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
-import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
+import { ScorePanel } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
@@ -44,6 +44,7 @@ import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
+  buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   farmCommitErrorMessageKey,
@@ -1592,38 +1593,10 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
-  const scoreRows = useMemo<PlayerScoreRow[]>(() => {
-    if (!state) return []
-    const summaryById = new Map((scores ?? []).map((s) => [s.playerId, s]))
-    const myId = selfPlayer?.id ?? null
-    return state.players.map((p) => {
-      const summary = summaryById.get(p.id)
-      const catTotal = (key: string): number =>
-        summary?.categories.find((c) => c.key === key)?.total ?? 0
-      const breakdown = {
-        fields:
-          catTotal('fields') +
-          catTotal('grains') +
-          catTotal('vegetables') +
-          catTotal('pastures'),
-        animals:
-          catTotal('sheeps') +
-          catTotal('boars') +
-          catTotal('cattles') +
-          catTotal('stables'),
-        food: catTotal('cardBonusVp'),
-        family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
-        cards: catTotal('cards'),
-      }
-      return {
-        id: p.id,
-        name: p.name,
-        isYou: myId !== null && p.id === myId,
-        total: summary?.total ?? 0,
-        breakdown,
-      }
-    })
-  }, [state, scores, selfPlayer?.id])
+  const scoreRows = useMemo(
+    () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null),
+    [state, scores, selfPlayer?.id],
+  )
 
   const resourceKeys = resourceKeyList
 
