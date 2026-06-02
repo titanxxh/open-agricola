@@ -12,7 +12,7 @@ import type {
 } from '../../../shared/contract/types'
 import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
-import { LogCardLink, resolveLogCardRef } from './log-rendering'
+import { LogCardLink } from './log-rendering'
 
 type Props = {
   locale: Locale
@@ -174,8 +174,12 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               ))}
             </div>
             {rows.map((row) => {
-              const cardBonusRef = row.type === 'cardBonus'
-                ? resolveLogCardRef(locale, row.cardId)
+              const cardBonusRef = row.type === 'cardBonus' && row.cardType
+                ? {
+                    id: row.cardId,
+                    type: row.cardType,
+                    name: getCardDisplayName(locale, row.cardType, row.cardId),
+                  }
                 : null
               const rowLabel =
                 row.type === 'category'
