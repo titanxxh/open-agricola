@@ -116,6 +116,10 @@ _Avoid_: 每张卡手写支付分支
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
 _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
 
+**Card Bonus VP**:
+由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
+_Avoid_: Improvement bonus、card state bonus、printed VP
+
 **Supply Token**:
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限
