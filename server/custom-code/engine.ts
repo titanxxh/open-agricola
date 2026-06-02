@@ -7,6 +7,7 @@ import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import type {
+  CustomCodeEffectMetadata,
   CustomCodeEffectInvocation,
   CustomCodeEffectResult,
   CustomCodeListenerInvocation,
@@ -113,6 +114,7 @@ function runInIsolate(
  */
 function runManifestExtraction(compiledCode: string, cardId: string): {
   effectHooks: CardEffectField[]
+  effectMetadata?: CustomCodeEffectMetadata
   listeners: CustomCodeListenerManifest[]
 } {
   const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB })
@@ -134,6 +136,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
         };
       })();
       var __effectKeys = [];
+      var __effectMetadata = {};
       var __listeners = [];
       if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
         var eff = __captured.CARD_IMPL.effect;
@@ -141,6 +144,15 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
           if (Object.prototype.hasOwnProperty.call(eff, k) && typeof eff[k] === 'function') {
             __effectKeys.push(k);
           }
+        }
+        if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
+          __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
+        }
+        if (eff.beforeEndGameDispatchMode === 'serial' || eff.beforeEndGameDispatchMode === 'select') {
+          __effectMetadata.beforeEndGameDispatchMode = eff.beforeEndGameDispatchMode;
+        }
+        if (typeof eff.beforeEndGameMandatory === 'boolean') {
+          __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
         }
       }
       if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
@@ -159,6 +171,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       }
       JSON.stringify({
         effectKeys: __effectKeys,
+        effectMetadata: __effectMetadata,
         listeners: __listeners,
       });
     `
@@ -167,8 +180,9 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     const resultJson = script.runSync(context, { timeout: EXECUTION_TIMEOUT_MS })
     const parsed = resultJson ? JSON.parse(resultJson as string) as {
       effectKeys: string[]
+      effectMetadata?: CustomCodeEffectMetadata
       listeners: CustomCodeListenerManifest[]
-    } : { effectKeys: [], listeners: [] }
+    } : { effectKeys: [], effectMetadata: {}, listeners: [] }
 
     const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
       cardEffectHooks.includes(hook as CardEffectField),
@@ -179,7 +193,11 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       scope: isCardListenerScope(l.scope) ? l.scope : undefined,
     }))
 
-    return { effectHooks, listeners }
+    const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
+      ? parsed.effectMetadata
+      : undefined
+
+    return { effectHooks, effectMetadata, listeners }
   } finally {
     isolate.dispose()
   }
@@ -278,4 +296,3 @@ __result = __listener && typeof __listener.handler === 'function'
     }
   }
 }
-
