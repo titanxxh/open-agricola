@@ -470,6 +470,7 @@ export class GameCore {
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
+  private pendingStageSwitchFromPlayerIndex: number | null = null
   private actionResultDetailsSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
     gains: {},
     costs: {},
@@ -2320,13 +2321,18 @@ export class GameCore {
     nextCardIndex: number,
     resumePlayerIndex = playerIndex,
   ) {
+    const stageSwitchFromPlayerIndex = this.pendingStageSwitchFromPlayerIndex
+    this.pendingStageSwitchFromPlayerIndex = null
+    const deferredPlayerSwitch = stageSwitchFromPlayerIndex !== null && stageSwitchFromPlayerIndex !== playerIndex
+      ? { fromPlayerIndex: stageSwitchFromPlayerIndex, toPlayerIndex: playerIndex }
+      : null
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
       stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex },
-      deferredPlayerSwitch: null,
+      deferredPlayerSwitch,
       reason: 'stage-hook',
     })
     this.runEngineSteps()
@@ -3147,7 +3153,12 @@ export class GameCore {
         const ownerIdx = frame.ownerPlayerIndex
         if (stageResume) {
           this.engineStack.pop()
-          this.resumeStageFlow(stageResume)
+          this.pendingStageSwitchFromPlayerIndex = ownerIdx
+          try {
+            this.resumeStageFlow(stageResume)
+          } finally {
+            this.pendingStageSwitchFromPlayerIndex = null
+          }
           return
         }
         if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
@@ -4640,6 +4651,7 @@ export class GameCore {
   }
 
   undoStep(): SessionResponse {
+    if (this.state.gameOver) return this.respond(false, 'game is over')
     const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
     // Farm-select kind carries the same promptKey shape as the previous
@@ -4714,6 +4726,7 @@ export class GameCore {
   }
 
   undoAction(): SessionResponse {
+    if (this.state.gameOver) return this.respond(false, 'game is over')
     if (!this.canUndoActionNow()) {
       if (
         this.state.pendingUndoBoundary === true ||

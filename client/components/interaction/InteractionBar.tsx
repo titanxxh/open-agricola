@@ -377,6 +377,8 @@ type Props = {
   confirmHarvestFeed: () => void
   onUndo: () => void
   onUndoAction: () => void
+  canUndoStep: boolean
+  canUndoAction: boolean
   onShowScoring: () => void
   historyLength: number
   hasActionStartSnapshot: boolean
@@ -446,6 +448,8 @@ export const InteractionBar = ({
   confirmHarvestFeed,
   onUndo,
   onUndoAction,
+  canUndoStep,
+  canUndoAction,
   onShowScoring,
   historyLength,
   hasActionStartSnapshot,
@@ -510,10 +514,10 @@ export const InteractionBar = ({
     <div className="interaction-bar">
       <div className="interaction-bar__top">
         <div className="interaction-bar__controls">
-          <button onClick={onUndo} disabled={!isInteractive || historyLength === 0}>
+          <button onClick={onUndo} disabled={!isInteractive || historyLength === 0 || !canUndoStep}>
             {t(locale, 'ui.undoStep')}
           </button>
-          <button onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot}>
+          <button onClick={onUndoAction} disabled={!isInteractive || !hasActionStartSnapshot || !canUndoAction}>
             {t(locale, 'ui.undoAction')}
           </button>
           <button onClick={onShowScoring}>

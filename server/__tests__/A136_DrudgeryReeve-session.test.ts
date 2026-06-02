@@ -5,6 +5,7 @@ import type { CardEffect } from '../../shared/cards/card-effects'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'A136_DrudgeryReeve'
 const RESERVE_FIRST_CARD = 'TEST_A136ReserveFirst'
@@ -109,6 +110,13 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
       score: 3,
       cardType: 'occupation',
     })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expectA136Trigger(resp, 1)
 
     resp = session.resolveChoice(1, CARD_ID)
@@ -127,6 +135,18 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
       cardType: 'occupation',
     })
     expect(resp.state.gameOver).toBe(true)
+    expect(resp.interaction.stateId).toBe('gameover')
+    expect(resp.interaction.allowedCommands).toEqual([])
+
+    const undoStep = session.undoStep()
+    expect(undoStep.ok).toBe(false)
+    expect(undoStep.ok ? '' : undoStep.error).toBe('game is over')
+    expect(undoStep.state.gameOver).toBe(true)
+
+    const undoAction = session.undoAction()
+    expect(undoAction.ok).toBe(false)
+    expect(undoAction.ok ? '' : undoAction.error).toBe('game is over')
+    expect(undoAction.state.gameOver).toBe(true)
 
     const scores = computeScores(resp.state)
     const p2Bonus = scores[1]!.categories.find((category) => category.key === 'cardStateBonusVp')
