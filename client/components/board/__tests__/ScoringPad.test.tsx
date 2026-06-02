@@ -263,4 +263,18 @@ describe('ScoringPad', () => {
     fireEvent.blur(drudgeryLink)
     expect(container.querySelector('.log-card-tooltip')).toBeNull()
   })
+
+  it('uses resilient card names for card bonus child labels', () => {
+    render(
+      <ScoringPad
+        locale="zh"
+        scores={scoreRowsWithCardBonuses}
+        players={mockPlayers}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('苦役监工')).toBeInTheDocument()
+    expect(screen.queryByText('Drudgery Reeve')).toBeNull()
+  })
 })
