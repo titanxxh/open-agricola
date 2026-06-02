@@ -19,7 +19,7 @@ const humanizeCardId = (id: string): string =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .trim()
 
-export const resolveLogCardRef = (locale: Locale, id: string): CardRef | null => {
+const resolveLogCardRef = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
     const name = t(locale, `${prefix}.${id}.name`)
     if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
