@@ -155,6 +155,31 @@ describe('E149 Midnight Fencer', () => {
     expect(getOwnOrdinaryFenceBuildLimit(resp.state.players[1]!)).toBe(13)
   })
 
+  it('does not let undoStep cross the round-end boundary from the borrowed fence prompt', () => {
+    const session = setupHarvest({ donorConsumed: [0, 0, 13, 15] })
+
+    let resp = session.performRoundEnd()
+    resp = acceptOptional(session, resp)
+    const fencePrompt = expectWait(resp)
+    expect(fencePrompt.request.kind).toBe('farm-select')
+
+    resp = session.undoStep()
+    expect(resp.ok).toBe(true)
+    const offerPrompt = expectWait(resp)
+    expect(offerPrompt.sourceCard).toBe(CARD_ID)
+    expect(offerPrompt.request.kind).toBe('choice')
+    expect(offerPrompt.allowedCommands).not.toContain('undoStep')
+    expect(resp.state.roundPhase).toBe('harvest')
+
+    const blocked = session.undoStep()
+    expect(blocked.ok).toBe(false)
+    expect(blocked.error).toBe('cannot undo past boundary')
+    expect(blocked.state.roundPhase).toBe('harvest')
+    const stillOfferPrompt = expectWait(blocked)
+    expect(stillOfferPrompt.sourceCard).toBe(CARD_ID)
+    expect(stillOfferPrompt.request.kind).toBe('choice')
+  })
+
   it('skip marks the harvest offer and does not create owed fences', () => {
     const session = setupHarvest({ donorConsumed: [0, 0, 13, 15] })
 
