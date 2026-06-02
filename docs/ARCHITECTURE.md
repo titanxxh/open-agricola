@@ -708,7 +708,7 @@ OA 对齐规则：
 
 **2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
 
-- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`clear-pending-fence-bonus`、`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`。
+- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`clear-pending-fence-bonus`、`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`、`record-scoring-reserve-bonus`。`record-scoring-reserve-bonus` 只记录终局 Scoring Reserve 与 bonus VP，不扣真实资源；target 由 server-side `actionContext.targetPlayerId` 解析，reserved 只校验非负整数 real resource 与不超过 `target.resources - 已选 Scoring Reserve`。
 - B18 这类 future-meeple 写入走 lazy flow；after-pay listener 不再立即 queue。
 - C93 / C130 对 action space 的资源写入返回 `special-effect.add-resource-to-space`，额外放人仍保持 optional。
 - E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。
@@ -915,6 +915,7 @@ shared/domain/
 ├── animal-zones.ts    动物分区容量（getTotalAnimalCapacity / getPastureCapacity）
 ├── animals.ts         动物模型
 ├── scoring.ts         计分 / PlayerScoreSummary
+├── scoring-reserve.ts 终局 Scoring Reserve 读取 / 汇总 / 扣 scoring clone
 ├── farm.ts、field.ts、space.ts
 └── index.ts
 ```
@@ -922,6 +923,8 @@ shared/domain/
 `PlayerBoard(player, state)` 暴露：`countAnimals` / `pasturesWithCapacity` / `emptyFences` / `hasRoomFor` / `canPlow` / `canBuildFence` / `scoringBreakdown`，私有 `invariant_animalsInPastureOrStable`。
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+
+`Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver，之后 resource-based major scoring 也读取该 clone 的剩余资源。`ScoreEntry.type='bonus'` 仍支持旧裸 `{ score }` 形态，也可以携带 `cardId` / `cardType` / `reserved` attribution。
 
 `computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D11_LawnFertilizer 这类 size-one pasture replacement 总是在 A12_DrinkingTrough / B72_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
 
