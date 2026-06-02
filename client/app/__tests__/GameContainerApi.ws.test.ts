@@ -4,6 +4,7 @@ import type { GameEvent } from '../../../shared/contract/events'
 
 import {
   applyPublicEventCancellationSnapshot,
+  buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
@@ -19,6 +20,7 @@ import {
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
 } from '../game-container-helpers'
+import type { PlayerScoreSummary } from '../../../shared/domain/scoring'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
 import type { ReplayTimelineEntry } from '../replay-timeline'
@@ -49,6 +51,43 @@ describe('GameContainerApi WS player identity', () => {
     expect(farmCommitErrorMessageKey('stable', 'LIMIT_REACHED')).toBe('ui.stableErrorLimit')
     expect(farmCommitErrorMessageKey('plow', 'FENCED')).toBe('ui.plowErrorFenced')
     expect(farmCommitErrorMessageKey('sow', 'NO_SELECTION')).toBe('ui.sowErrorNoSelection')
+  })
+
+  it('maps compact score card bonus VP from the unified category only', () => {
+    const rows = buildCompactScoreRows(
+      { players: [{ id: 'p1', name: 'Alice' }] },
+      [
+        {
+          playerId: 'p1',
+          playerName: 'Alice',
+          total: 42,
+          categories: [
+            { key: 'cards', total: 2, entries: [] },
+            { key: 'cardBonusVp', total: 3, entries: [] },
+            { key: 'cardsBonus', total: 50, entries: [] },
+            { key: 'cardStateBonusVp', total: 60, entries: [] },
+            { key: 'cardBonus', total: 70, entries: [] },
+          ],
+        } as unknown as PlayerScoreSummary,
+      ],
+      'p1',
+    )
+
+    expect(rows).toEqual([
+      {
+        id: 'p1',
+        name: 'Alice',
+        isYou: true,
+        total: 42,
+        breakdown: {
+          fields: 0,
+          animals: 0,
+          cardBonusVp: 3,
+          family: 0,
+          cards: 2,
+        },
+      },
+    ])
   })
 
   it('keeps only currently connected room tiles selectable', () => {

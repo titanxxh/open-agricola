@@ -118,6 +118,7 @@ _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
 
 **Card Bonus VP**:
 由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
+统一 score category 是 `cardBonusVp`，不保留旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` shape。
 _Avoid_: Improvement bonus、card state bonus、printed VP
 
 **Supply Token**:

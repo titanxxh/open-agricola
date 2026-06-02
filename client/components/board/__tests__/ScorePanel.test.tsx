@@ -9,13 +9,13 @@ const ROWS: PlayerScoreRow[] = [
     name: 'You',
     isYou: true,
     total: 12,
-    breakdown: { fields: 3, animals: 5, food: 4, family: 3, cards: 2 },
+    breakdown: { fields: 3, animals: 5, cardBonusVp: 4, family: 3, cards: 2 },
   },
   {
     id: 'p2',
     name: 'AI',
     total: 9,
-    breakdown: { fields: 2, animals: 3, food: 2, family: 2, cards: 0 },
+    breakdown: { fields: 2, animals: 3, cardBonusVp: 2, family: 2, cards: 0 },
   },
 ]
 
@@ -37,5 +37,12 @@ describe('ScorePanel', () => {
   it('shows breakdown chips', () => {
     render(<ScorePanel rows={ROWS} />)
     expect(screen.getAllByText(/fields/i).length).toBeGreaterThan(0)
+  })
+
+  it('labels card bonus VP separately from printed cards', () => {
+    render(<ScorePanel rows={ROWS} />)
+    expect(screen.getByText(/bonus VP 4/i)).toBeInTheDocument()
+    expect(screen.getByText(/cards 2/i)).toBeInTheDocument()
+    expect(screen.queryByText(/food 4/i)).toBeNull()
   })
 })
