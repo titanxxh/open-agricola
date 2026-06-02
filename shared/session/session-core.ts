@@ -94,7 +94,7 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
-import type { FlowCardEffectHook } from '../cards/card-effects.ts'
+import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
@@ -2419,6 +2419,107 @@ export class GameCore {
     return false
   }
 
+  private buildBeforeEndGameActivationFlow(
+    cardId: string,
+    ownerPlayerId: string,
+    targetPlayerId: string,
+    scope: BeforeEndGameScope,
+    dispatchMode: BeforeEndGameDispatchMode,
+    mandatory: boolean,
+  ): ActionFlow {
+    const actionContext = {
+      ownerPlayerId,
+      targetPlayerId,
+      beforeEndGameScope: scope,
+      beforeEndGameDispatchMode: dispatchMode,
+      beforeEndGameMandatory: mandatory,
+    }
+    return {
+      type: 'leaf',
+      actionId: 'activate-card-effect',
+      params: {
+        cardId,
+        hook: 'onBeforeEndGame',
+        ...actionContext,
+      },
+      actionContext,
+      sourceCard: cardId,
+      targetPlayerId,
+      optional: dispatchMode === 'select' && !mandatory ? true : undefined,
+    }
+  }
+
+  private collectBeforeEndGameActivationFlows(targetPlayerIndex: number) {
+    const targetPlayer = this.state.players[targetPlayerIndex]
+    const serialChildren: ActionFlow[] = []
+    const promptedChildren: ActionFlow[] = []
+    if (!targetPlayer) return { serialChildren, promptedChildren }
+
+    for (const ownerPlayer of this.state.players) {
+      const playedCards = this.getPlayerEffectCardIds(ownerPlayer)
+      for (const cardId of playedCards) {
+        const effect = getCardEffect(cardId)
+        if (!effect?.onBeforeEndGame) continue
+        const scope = effect.beforeEndGameScope ?? 'owner'
+        if (scope === 'owner' && ownerPlayer.id !== targetPlayer.id) continue
+        const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
+        const flow = this.buildBeforeEndGameActivationFlow(
+          cardId,
+          ownerPlayer.id,
+          targetPlayer.id,
+          scope,
+          dispatchMode,
+          effect.beforeEndGameMandatory === true,
+        )
+        if (dispatchMode === 'select') promptedChildren.push(flow)
+        else serialChildren.push(flow)
+      }
+    }
+
+    const handCards = this.getPlayerHandEffectCardIds(targetPlayer, 'onBeforeEndGame')
+    for (const cardId of handCards) {
+      const effect = getCardEffect(cardId)
+      if (!effect?.onBeforeEndGame) continue
+      const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
+      const flow = this.buildBeforeEndGameActivationFlow(
+        cardId,
+        targetPlayer.id,
+        targetPlayer.id,
+        'owner',
+        dispatchMode,
+        effect.beforeEndGameMandatory === true,
+      )
+      if (dispatchMode === 'select') promptedChildren.push(flow)
+      else serialChildren.push(flow)
+    }
+
+    return { serialChildren, promptedChildren }
+  }
+
+  private continueBeforeEndGamePlayerDispatch(playerIndex = 0) {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      const { serialChildren, promptedChildren } =
+        this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
+      if (serialChildren.length === 0 && promptedChildren.length === 0) continue
+      const children: ActionFlow[] = []
+      if (serialChildren.length > 0) {
+        children.push({ type: 'parallel', children: serialChildren })
+      }
+      if (promptedChildren.length > 0) {
+        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
+      }
+      this.startStageFlow(
+        children.length === 1 ? children[0]! : { type: 'seq', children },
+        'onBeforeEndGame',
+        currentPlayerIndex,
+        0,
+        currentPlayerIndex + 1,
+      )
+      return true
+    }
+    return false
+  }
+
   private continueSinglePlayerStageHook(
     hook: StageCardEffectHook,
     playerIndex: number,
@@ -3980,7 +4081,7 @@ export class GameCore {
   }
 
   private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onBeforeEndGame', playerIndex, cardIndex)) {
+    if (cardIndex === 0 && this.continueBeforeEndGamePlayerDispatch(playerIndex)) {
       return this.respond()
     }
     if (!this.state.gameOver) {

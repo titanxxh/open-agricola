@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards, registerCustomCard, type CustomCardData } from '../../shared/cards/custom-registry.ts'
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'
-import { runCardEffectHook } from '../../shared/cards/card-effects.ts'
+import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
@@ -51,6 +51,42 @@ const CARD_IMPL = {
     expect(result.manifest.effectHooks).toContain('onReturnHome')
     expect(result.manifest.listeners).toHaveLength(1)
     expect(result.manifest.listeners[0]?.actions).toEqual(['meeting-place'])
+  })
+
+  it('extracts before-end dispatch metadata for executor-backed custom cards', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    beforeEndGameScope: 'allPlayers',
+    beforeEndGameDispatchMode: 'select',
+    beforeEndGameMandatory: true,
+    onBeforeEndGame: (_state: any, _player: any) => {
+      return { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID }
+    },
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    expect((result.manifest as any).effectMetadata).toEqual({
+      beforeEndGameScope: 'allPlayers',
+      beforeEndGameDispatchMode: 'select',
+      beforeEndGameMandatory: true,
+    })
+
+    const cardData = makeCardData(result.compiledCode, result.manifest)
+    registerCustomCard(cardData, { allowGlobal: true })
+    registerExecutorBackedCustomCard(cardData)
+
+    expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({
+      beforeEndGameScope: 'allPlayers',
+      beforeEndGameDispatchMode: 'select',
+      beforeEndGameMandatory: true,
+    })
   })
 
   it('rejects forbidden globals during validation', () => {

@@ -168,6 +168,10 @@ _Avoid_: 前端规则补丁、核心路径单卡 if-else
 卡牌在阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。
 _Avoid_: listener phase
 
+**Before-End Player Dispatch**:
+终局计分前按 target player 座次触发 `onBeforeEndGame` card-effect activation 的阶段机制；owner-scope 卡只在自己 target step 触发，allPlayers 卡可在每个 target step 触发，同一 target step 内的 select trigger 复用 `ParallelNode(mode='trigger-select')`。
+_Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
+
 **Card Listener**:
 监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。
 _Avoid_: dispatch 阶段直接 mutate state

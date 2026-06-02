@@ -10,7 +10,9 @@ import {
   type CardListenerContext,
   type CardListenerContextInput,
 } from '../cards/card-listeners'
+import { previewActivateCardEffect } from '../actions/effects/internal/activate-card-effect'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
+import { ActionNode } from './nodes/action-node'
 import type { ParallelNode } from './nodes'
 import type { EngineNode } from './types'
 
@@ -38,14 +40,51 @@ export type TriggerSelectEvaluationOptions = {
 
 export const TRIGGER_DISABLED_REASON = 'ui.interactionTriggerUnavailable'
 
+const cloneJson = <T>(value: T): T =>
+  JSON.parse(JSON.stringify(value)) as T
+
 const clonePlayerForPreview = (player: PlayerState): PlayerState => ({
   ...player,
   resources: { ...player.resources },
-  cardStates: JSON.parse(JSON.stringify(player.cardStates ?? {})) as PlayerState['cardStates'],
+  workers: cloneJson(player.workers ?? []),
+  fields: cloneJson(player.fields ?? []),
+  roomTiles: cloneJson(player.roomTiles ?? []),
+  stableTiles: cloneJson(player.stableTiles ?? []),
+  improvements: [...(player.improvements ?? [])],
+  minorHand: [...(player.minorHand ?? [])],
+  minorPlayed: [...(player.minorPlayed ?? [])],
+  occupationHand: [...(player.occupationHand ?? [])],
+  occupationPlayed: [...(player.occupationPlayed ?? [])],
+  extraOccupationsFromCards: [...(player.extraOccupationsFromCards ?? [])],
+  playedCards: [...(player.playedCards ?? [])],
+  stableAnimals: cloneJson(player.stableAnimals ?? {}),
+  pastures: cloneJson(player.pastures ?? []),
+  fenceSegments: cloneJson(player.fenceSegments ?? []),
+  majorEffects: cloneJson(player.majorEffects ?? {}),
+  activeModifiers: cloneJson(player.activeModifiers ?? []),
+  cardStates: cloneJson(player.cardStates ?? {}) as PlayerState['cardStates'],
+  stats: cloneJson(player.stats ?? {}) as PlayerState['stats'],
 })
 
 type TriggerSelectContext = ActionExecutionContext &
   Partial<Pick<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
+
+const isActivateCardEffectNode = (node: EngineNode): node is ActionNode =>
+  node instanceof ActionNode && node.actionId === 'activate-card-effect'
+
+const cloneStateForPreview = (
+  state: ActionExecutionContext['state'],
+  playerClones: Map<string, PlayerState>,
+) => ({
+  ...state,
+  players: (state.players ?? []).map((player) => playerClones.get(player.id) ?? player),
+  actionSpaces: (state.actionSpaces ?? []).map((space) => ({
+    ...space,
+    resources: { ...space.resources },
+    gainPerRound: { ...space.gainPerRound },
+    takenBy: [...(space.takenBy ?? [])],
+  })),
+})
 
 const previewContextForChild = (
   child: ActivateCardActionNode,
@@ -69,14 +108,7 @@ const previewContextForChild = (
     (ownerPlayerId ? playerClones.get(ownerPlayerId) : undefined)
     ?? triggerPlayer
   const previewState = {
-    ...context.state,
-    players: (context.state.players ?? []).map((player) => playerClones.get(player.id) ?? player),
-    actionSpaces: (context.state.actionSpaces ?? []).map((space) => ({
-      ...space,
-      resources: { ...space.resources },
-      gainPerRound: { ...space.gainPerRound },
-      takenBy: [...(space.takenBy ?? [])],
-    })),
+    ...cloneStateForPreview(context.state, playerClones),
   }
   const event: Record<string, unknown> = {
     ...params.event,
@@ -106,6 +138,27 @@ const previewContextForChild = (
       ...event,
     },
   }
+}
+
+const previewActivateCardEffectChild = (
+  child: ActionNode,
+  context: TriggerSelectContext,
+): ActionHookResult | undefined => {
+  const targetPlayerId = child.params?.targetPlayerId
+  const playerClones = new Map(
+    (context.state.players ?? []).map((player) => [player.id, clonePlayerForPreview(player)]),
+  )
+  const previewState = cloneStateForPreview(context.state, playerClones)
+  const previewPlayer =
+    (typeof targetPlayerId === 'string' ? playerClones.get(targetPlayerId) : undefined)
+    ?? playerClones.get(context.player.id)
+    ?? clonePlayerForPreview(context.player)
+  return previewActivateCardEffect(
+    previewState,
+    previewPlayer,
+    child.params,
+    child.actionContext,
+  )
 }
 
 const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boolean => {
@@ -238,11 +291,15 @@ export const evaluateTriggerSelect = (
         ownerCardId: entry.cardId,
         ownerCardZone: preview.ownerCardZone,
       })
+      : isActivateCardEffectNode(child)
+        ? previewActivateCardEffectChild(child, context)
       : undefined
-    const applicable = isActivateCardActionNode(child)
-      ? child.params.phase !== 'isDoable' && resultHasApplicabilitySignal(result)
+    const previewable = isActivateCardActionNode(child) || isActivateCardEffectNode(child)
+    const applicable = previewable
+      ? (!isActivateCardActionNode(child) || child.params.phase !== 'isDoable') &&
+        resultHasApplicabilitySignal(result)
       : true
-    const doable = isActivateCardActionNode(child)
+    const doable = previewable
       ? (applicable ? evaluateChildDoable(result, context) : false)
       : true
     const resourcesAfter = doable ? previewResourcesAfterChild(result, context) : undefined
@@ -253,8 +310,12 @@ export const evaluateTriggerSelect = (
       mandatory: entry.mandatory,
       applicable,
       doable,
-      actionId: isActivateCardActionNode(child) ? child.params.actionId : 'stage-hook',
-      phase: isActivateCardActionNode(child) ? child.params.phase : 'stage',
+      actionId: isActivateCardActionNode(child)
+        ? child.params.actionId
+        : isActivateCardEffectNode(child) ? child.actionId : 'stage-hook',
+      phase: isActivateCardActionNode(child)
+        ? child.params.phase
+        : isActivateCardEffectNode(child) ? String(child.params?.hook ?? 'stage') : 'stage',
       resourcesAfter,
     }
     optionStates.push(state)
