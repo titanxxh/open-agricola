@@ -49,7 +49,12 @@ type ResourceAccumulationTarget =
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
-  | { kind: 'record-scoring-reserve-bonus'; reserved: Partial<Resource>; score: number }
+  | {
+      kind: 'record-scoring-reserve-bonus'
+      reserved: Partial<Resource>
+      score: number
+      cardType?: 'major' | 'minor' | 'occupation'
+    }
   | { kind: 'emit-card-triggered'; accepted?: boolean; optional?: boolean; triggerActionId?: string }
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
@@ -214,6 +219,14 @@ export const specialEffectAction: ActionDefinition = {
         if (typeof p.score !== 'number' || !Number.isFinite(p.score)) {
           return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
+        if (
+          p.cardType !== undefined &&
+          p.cardType !== 'major' &&
+          p.cardType !== 'minor' &&
+          p.cardType !== 'occupation'
+        ) {
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        }
         {
           const reserved = normalizeScoringReserveResources(p.reserved)
           if (!reserved) return { type: 'fail', errorKey: 'log.specialEffectFail' }
@@ -224,6 +237,7 @@ export const specialEffectAction: ActionDefinition = {
           writeCardExtraData(target, sourceCard, SCORING_RESERVE_BONUS_KEY, {
             reserved,
             score: p.score,
+            ...(p.cardType ? { cardType: p.cardType } : {}),
           })
         }
         return { type: 'ok' }

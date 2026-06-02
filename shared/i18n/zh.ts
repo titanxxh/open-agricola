@@ -77,6 +77,10 @@ export const zh = {
       bonusVp: '额外得分',
     },
     cards: {
+      A136_DrudgeryReeve: {
+        prompt: '选择要计分的建材套数',
+        scoreSets: '计分 {sets} 套（{score} 额外分）',
+      },
       D132_HideFarmer: {
         optional: '隐藏未使用农场格？',
         markSpaces: {

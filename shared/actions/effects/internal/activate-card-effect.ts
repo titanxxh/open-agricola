@@ -46,6 +46,7 @@ export const previewActivateCardEffect = (
   if (!flow) return undefined
   return {
     flow,
+    doable: true,
     sourceCard: cardId,
     extraData: {
       ownerPlayerId: params?.ownerPlayerId,
