@@ -33,6 +33,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
       return response.result ?? undefined
     }
   }
+  if (codeManifest.effectMetadata) {
+    Object.assign(effect, codeManifest.effectMetadata)
+  }
 
   // Register into session context when one is active; otherwise write
   // directly to the active CardRegistry (test-only path).
