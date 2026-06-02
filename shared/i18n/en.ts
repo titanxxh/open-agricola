@@ -77,6 +77,10 @@ export const en = {
       bonusVp: 'Bonus VP',
     },
     cards: {
+      A136_DrudgeryReeve: {
+        prompt: 'Choose how many sets of building resources to score',
+        scoreSets: 'Score {sets} sets ({score} bonus VP)',
+      },
       D132_HideFarmer: {
         optional: 'Hide unused farmyard spaces?',
         markSpaces: {

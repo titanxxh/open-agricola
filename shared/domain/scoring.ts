@@ -619,7 +619,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
         score: bonus.score,
         reserved: bonus.reserved,
       }
-      const cardType = playedCardType(player, cardId)
+      const cardType = bonus.cardType ?? playedCardType(player, cardId)
       if (cardType) {
         entry.cardId = cardId
         entry.cardType = cardType
