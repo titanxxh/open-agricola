@@ -1592,20 +1592,6 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
-  // ── Right-column data mappings (Batch 3 Task 7) ───────────────────────────
-  //
-  // Map shared/domain/scoring.ts `PlayerScoreSummary` (one entry per player)
-  // into the 5-bucket breakdown that ScorePanel expects. These are *estimates*
-  // — spec explicitly says "估算分数" is OK for the live chip — so we collapse
-  // related categories pragmatically:
-  //
-  //   fields  ← fields + grains + vegetables + pastures (everything farm-plot)
-  //   animals ← sheeps + boars + cattles + stables
-  //   food    ← cardsBonus (major-improvement food bonuses, e.g. Fireplace) + bonus VP
-  //   family  ← farmers (rooms + family count VP)
-  //   cards   ← cards (occupations + minors + majors printed VP)
-  //
-  // `scores` comes from useGameSync; falls back to empty map if absent.
   const scoreRows = useMemo<PlayerScoreRow[]>(() => {
     if (!state) return []
     const summaryById = new Map((scores ?? []).map((s) => [s.playerId, s]))
@@ -1625,7 +1611,7 @@ export const GameContainerApi = () => {
           catTotal('boars') +
           catTotal('cattles') +
           catTotal('stables'),
-        food: catTotal('cardsBonus') + catTotal('cardStateBonusVp'),
+        food: catTotal('cardBonusVp'),
         family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
         cards: catTotal('cards'),
       }

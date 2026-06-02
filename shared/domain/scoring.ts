@@ -40,8 +40,7 @@ type ScoreCategoryKey =
   | 'stoneRooms'
   | 'farmers'
   | 'cards'
-  | 'cardsBonus'
-  | 'cardStateBonusVp'
+  | 'cardBonusVp'
   | 'beggings'
 
 export type ScoreEntry =
@@ -55,17 +54,9 @@ export type ScoreEntry =
   | {
       type: 'bonus'
       score: number
-      cardId?: string
+      cardId: string
       cardType?: 'major' | 'minor' | 'occupation'
       reserved?: Partial<Resource>
-    }
-  | {
-      type: 'cardBonus'
-      cardId: string
-      cardType: 'major'
-      score: number
-      quantity: number
-      resource: keyof Resource
     }
 
 export type ScoreCategoryResult = {
@@ -179,6 +170,7 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
     })
 
   let bestScore = -Infinity
+  let bestCostedScore = -Infinity
   let bestCombo: { cardId: string; level: BonusScoreLevel }[] = []
   let bestCost: Partial<Resource> = {}
 
@@ -214,8 +206,9 @@ export function solveBonusScoring(input: SolverInput): SolverResult {
         }
       }
       const total = costedScore + freeScore
-      if (total > bestScore) {
+      if (total > bestScore || (total === bestScore && costedScore > bestCostedScore)) {
         bestScore = total
+        bestCostedScore = costedScore
         bestCombo = [...accCombo]
         bestCost = { ...accCost }
       }
@@ -303,17 +296,6 @@ const scoreByRanges = (quantity: number, ranges: string[]) => {
   return 0
 }
 
-const scoreByMap = (quantity: number, map: Record<string, number>) => {
-  let score = 0
-  Object.entries(map).forEach(([range, value]) => {
-    const { min, max } = parseQuantityRange(range)
-    if (quantity >= min && quantity <= max) {
-      score = value
-    }
-  })
-  return score
-}
-
 const totalTiles = FARM_ROWS * FARM_COLS
 
 const playedCardType = (
@@ -330,20 +312,28 @@ const playedCardType = (
 const applyPostScoreAdjustment = (
   categories: ScoreCategoryResult[],
   score: number,
+  cardId: string,
+  cardType?: 'major' | 'minor' | 'occupation',
 ) => {
   if (score === 0) return
 
-  const bonusCategory = categories.find((c) => c.key === 'cardStateBonusVp')
+  const bonusCategory = categories.find((c) => c.key === 'cardBonusVp')
+  const entry: Extract<ScoreEntry, { type: 'bonus' }> = {
+    type: 'bonus',
+    score,
+    cardId,
+    ...(cardType ? { cardType } : {}),
+  }
   if (bonusCategory) {
     bonusCategory.total += score
-    bonusCategory.entries.push({ type: 'bonus', score })
+    bonusCategory.entries.push(entry)
     return
   }
 
   categories.push({
-    key: 'cardStateBonusVp',
+    key: 'cardBonusVp',
     total: score,
-    entries: [{ type: 'bonus', score }],
+    entries: [entry],
   })
 }
 
@@ -552,7 +542,6 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     })
 
     const cardEntries: ScoreEntry[] = []
-    const cardBonusEntries: ScoreEntry[] = []
     player.improvements.forEach((cardId) => {
       if (!isMajorCardId(cardId)) return
       const card = getMajorCard(cardId)
@@ -563,22 +552,6 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
         cardType: 'major',
         score: card.vp ?? 0,
       })
-      if (card.scoring) {
-        const scoringResource = card.scoring.resource as keyof Resource
-        const resourceCount = Math.max(
-          0,
-          playerForBonus.resources[scoringResource] ?? 0,
-        )
-        const bonusScore = scoreByMap(resourceCount, card.scoring.map)
-        cardBonusEntries.push({
-          type: 'cardBonus',
-          cardId,
-          cardType: 'major',
-          score: bonusScore,
-          quantity: resourceCount,
-          resource: scoringResource,
-        })
-      }
     })
     player.minorPlayed.forEach((cardId) => {
       const vp = getRegisteredMinorImprovement(cardId)?.vp ?? 0
@@ -594,63 +567,65 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       })
     })
     const cardsTotal = cardEntries.reduce((sum, entry) => sum + entry.score, 0)
-    const cardsBonusTotal = cardBonusEntries.reduce(
-      (sum, entry) => sum + entry.score,
-      0,
-    )
     categories.push({
       key: 'cards',
       total: cardsTotal,
       entries: cardEntries,
     })
-    categories.push({
-      key: 'cardsBonus',
-      total: cardsBonusTotal,
-      entries: cardBonusEntries,
-    })
 
-    let cardStateBonusVp = 0
-    const cardStateBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []
+    let cardBonusVp = 0
+    const cardBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []
     const selectedReserveEntries = getSelectedScoringReserveBonuses(player)
     for (const { cardId, bonus } of selectedReserveEntries) {
-      cardStateBonusVp += bonus.score
       const entry: Extract<ScoreEntry, { type: 'bonus' }> = {
         type: 'bonus',
         score: bonus.score,
+        cardId,
         reserved: bonus.reserved,
       }
       const cardType = bonus.cardType ?? playedCardType(player, cardId)
       if (cardType) {
-        entry.cardId = cardId
         entry.cardType = cardType
       }
-      cardStateBonusEntries.push(entry)
+      if (bonus.score !== 0) {
+        cardBonusVp += bonus.score
+        cardBonusEntries.push(entry)
+      }
     }
-    let bareBonusVp = 0
     if (player.cardStates) {
       Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
         if (cardId === '__pendingChoice__') return
         const vp = cardState.counters?.bonusVp ?? 0
         if (vp > 0) {
-          bareBonusVp += vp
+          const cardType = playedCardType(player, cardId)
+          cardBonusVp += vp
+          cardBonusEntries.push({
+            type: 'bonus',
+            score: vp,
+            cardId,
+            ...(cardType ? { cardType } : {}),
+          })
         }
       })
     }
 
     for (const entry of bonusScoreResult.entries) {
-      bareBonusVp += entry.score
+      if (entry.score === 0) continue
+      const cardType = playedCardType(player, entry.cardId)
+      cardBonusVp += entry.score
+      cardBonusEntries.push({
+        type: 'bonus',
+        score: entry.score,
+        cardId: entry.cardId,
+        ...(cardType ? { cardType } : {}),
+      })
     }
 
-    if (bareBonusVp !== 0) {
-      cardStateBonusEntries.push({ type: 'bonus', score: bareBonusVp })
-    }
-    cardStateBonusVp += bareBonusVp
-
-    if (cardStateBonusVp !== 0 || cardStateBonusEntries.length > 0) {
+    if (cardBonusVp !== 0 || cardBonusEntries.length > 0) {
       categories.push({
-        key: 'cardStateBonusVp',
-        total: cardStateBonusVp,
-        entries: cardStateBonusEntries,
+        key: 'cardBonusVp',
+        total: cardBonusVp,
+        entries: cardBonusEntries,
       })
     }
 
@@ -692,7 +667,12 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       adjustments.forEach(({ playerId, score }) => {
         const summary = summariesByPlayerId.get(playerId)
         if (!summary) return
-        applyPostScoreAdjustment(summary.categories, score)
+        applyPostScoreAdjustment(
+          summary.categories,
+          score,
+          cardId,
+          playedCardType(owner, cardId),
+        )
         summary.total += score
       })
     })

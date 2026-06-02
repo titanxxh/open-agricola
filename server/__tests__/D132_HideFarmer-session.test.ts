@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { Scoring } from '../../shared/domain'
 import type { InteractionRequest, InteractionState, PlayerState } from '../../shared/contract/types'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C135_Constable'
 import '../../shared/cards/D/D132_HideFarmer'
@@ -211,7 +212,7 @@ describe('D132_HideFarmer session', () => {
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(2)
     expect(getCategory(resp, 0, 'empty')?.quantity).toBe(1)
     expect(getCategory(resp, 0, 'empty')?.total).toBe(-1)
-    expect(getCategory(resp, 0, 'cardStateBonusVp')).toBeUndefined()
+    expect(getCategory(resp, 0, 'cardBonusVp')).toBeUndefined()
   })
 
   it('distinguishes optional skip from accepting and choosing zero', () => {
@@ -345,6 +346,12 @@ describe('D132_HideFarmer session', () => {
     resp = commitHiddenFood(session, 0, 1)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.hiddenSpaces).toBe(1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.ok).toBe(true)
 
     const p1Optional = expectD132Optional(resp, 1)
     expect(p1Optional.anytimeActions.map((a) => a.id)).toContain('exchange')
@@ -379,6 +386,6 @@ describe('D132_HideFarmer session', () => {
     resp = commitHiddenFood(session, 0, 2)
     expect(resp.ok).toBe(true)
     expect(getCategory(resp, 0, 'empty')?.total).toBe(0)
-    expect(getCategory(resp, 0, 'cardStateBonusVp')?.total).toBe(3)
+    expect(getCategory(resp, 0, 'cardBonusVp')?.total).toBe(3)
   })
 })

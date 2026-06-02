@@ -41,7 +41,7 @@ describe('ScoringPad', () => {
       <ScoringPad locale="zh" scores={mockScores} players={mockPlayers} onClose={() => {}} />,
     )
 
-    expect(html).toContain('· Adoptive Parents')
+    expect(html).toContain('Adoptive Parents')
     expect(html).not.toContain('occupations.A92_AdoptiveParents.name')
   })
 

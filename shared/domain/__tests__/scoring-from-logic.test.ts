@@ -77,22 +77,33 @@ describe('computeScores', () => {
     expect(byKey.get('empty')?.quantity).toBe(13)
   })
 
-  it('applies major scoring bonus ranges', () => {
+  it('scores Joinery resource bonus as attributed Card Bonus VP', () => {
     const player = createPlayer()
     player.improvements = ['Major_Joinery']
     player.resources.wood = 5
 
     const [result] = computeScores(createState(player))
-    const cardsBonus = result.categories.find((item) => item.key === 'cardsBonus')
-    expect(cardsBonus?.total).toBe(2)
-    expect(cardsBonus?.entries).toEqual(
+    const byKey = new Map(result.categories.map((item) => [item.key, item]))
+    const cardBonusVp = byKey.get('cardBonusVp')
+
+    expect(byKey.has('cardsBonus')).toBe(false)
+    expect(byKey.has('cardStateBonusVp')).toBe(false)
+    expect(cardBonusVp?.total).toBe(2)
+    expect(cardBonusVp?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: 'cardBonus',
+          type: 'bonus',
           cardId: 'Major_Joinery',
+          cardType: 'major',
           score: 2,
-          quantity: 5,
         }),
+      ]),
+    )
+    expect(cardBonusVp?.entries).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'cardBonus' }),
+        expect.objectContaining({ quantity: expect.any(Number) }),
+        expect.objectContaining({ resource: expect.any(String) }),
       ]),
     )
   })
@@ -104,12 +115,17 @@ describe('computeScores', () => {
     player.resources.stone = 2
 
     const [result] = computeScores(createState(player))
-    const bonusCategory = result.categories.find((item) => item.key === 'cardStateBonusVp')
+    const bonusCategory = result.categories.find((item) => item.key === 'cardBonusVp')
 
     expect(bonusCategory?.total).toBe(2)
     expect(bonusCategory?.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'bonus', score: 2 }),
+        expect.objectContaining({
+          type: 'bonus',
+          cardId: 'C133_Soldier',
+          cardType: 'occupation',
+          score: 2,
+        }),
       ]),
     )
   })

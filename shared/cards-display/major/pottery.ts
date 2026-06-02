@@ -16,12 +16,4 @@ export const pottery: MajorCardDisplay = {
     '[Scoring]',
     '3/5/7<CLAY> <ARROW-1X> 1/2/3<SCORE>',
   ],
-  scoring: {
-    resource: 'clay',
-    map: {
-      '3-4': 1,
-      '5-6': 2,
-      '7+': 3,
-    },
-  },
 }

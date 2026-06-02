@@ -175,8 +175,16 @@ describe('Stub_PayGainVp mechanism', () => {
     const state = createState(player)
     const scores = computeScores(state)
     const p1Score = scores[0]
-    const bonusCategory = p1Score.categories.find(c => c.key === 'cardStateBonusVp')
+    const bonusCategory = p1Score.categories.find(c => c.key === 'cardBonusVp')
     expect(bonusCategory).toBeDefined()
     expect(bonusCategory!.total).toBe(3)
+    expect(bonusCategory!.entries).toEqual([
+      expect.objectContaining({
+        type: 'bonus',
+        cardId: CARD_ID,
+        cardType: 'minor',
+        score: 3,
+      }),
+    ])
   })
 })
