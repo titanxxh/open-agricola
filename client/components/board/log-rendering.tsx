@@ -19,7 +19,7 @@ const humanizeCardId = (id: string): string =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .trim()
 
-const resolveCardName = (locale: Locale, id: string): CardRef | null => {
+export const resolveLogCardRef = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
     const name = t(locale, `${prefix}.${id}.name`)
     if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
@@ -49,7 +49,7 @@ const resolveCardName = (locale: Locale, id: string): CardRef | null => {
 }
 
 const resolveCardDisplayName = (locale: Locale, id: string) =>
-  resolveCardName(locale, id)?.name ?? humanizeCardId(id)
+  resolveLogCardRef(locale, id)?.name ?? humanizeCardId(id)
 
 const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   const translated = t(locale, value)
@@ -143,7 +143,7 @@ const renderRichTemplate = (
     })
 }
 
-const LogCardLink = ({
+export const LogCardLink = ({
   locale,
   cardRef,
   children,
@@ -438,7 +438,7 @@ export const prepareLogEntry = (
       : []
     if (bonusSourceIds.length > 0) {
       const refs = bonusSourceIds
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveLogCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       if (refs.length > 0) {
         richParams.via = (
@@ -604,7 +604,7 @@ export const prepareLogEntry = (
     }
     if (effectData.improvements && effectData.improvements.length > 0) {
       const refs = effectData.improvements
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveLogCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       effects.push(
         <>
@@ -619,7 +619,7 @@ export const prepareLogEntry = (
     }
     if (effectData.minorImprovements && effectData.minorImprovements.length > 0) {
       const refs = effectData.minorImprovements
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveLogCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       effects.push(
         <>
@@ -644,7 +644,7 @@ export const prepareLogEntry = (
       )
     }
     const bonusSourceRefs = (detailParts.bonusSources ?? [])
-      .map((id) => resolveCardName(locale, id))
+      .map((id) => resolveLogCardRef(locale, id))
       .filter((ref): ref is CardRef => ref !== null)
     const segments: ReactNode[] = []
     if (
@@ -721,7 +721,7 @@ export const prepareLogEntry = (
   }
 
   const cardRefs = cardIds
-    .map((id) => resolveCardName(locale, id))
+    .map((id) => resolveLogCardRef(locale, id))
     .filter((ref): ref is CardRef => ref !== null)
   const textParams = params
     ? (Object.fromEntries(

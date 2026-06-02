@@ -35,6 +35,93 @@ const mockPlayers = [
   { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },
 ] as unknown as PlayerState[]
 
+const scoreRowsWithCardBonuses = [
+  {
+    playerId: 'p1',
+    playerName: 'Player 1',
+    total: 12,
+    categories: [
+      {
+        key: 'cards',
+        total: 2,
+        entries: [
+          { type: 'card', cardId: 'Major_Pottery', cardType: 'major', score: 2 },
+        ],
+      },
+      {
+        key: 'cardBonusVp',
+        total: 7,
+        entries: [
+          {
+            type: 'bonus',
+            cardId: 'A136_DrudgeryReeve',
+            cardType: 'occupation',
+            score: 3,
+            reserved: { wood: 3, clay: 3, reed: 3, stone: 3 },
+          },
+          {
+            type: 'bonus',
+            cardId: 'A136_DrudgeryReeve',
+            cardType: 'occupation',
+            score: 2,
+          },
+          {
+            type: 'bonus',
+            cardId: 'Major_Pottery',
+            cardType: 'major',
+            score: 2,
+            reserved: { clay: 2 },
+          },
+          {
+            type: 'bonus',
+            cardId: 'A37_Bucksaw',
+            cardType: 'minor',
+            score: 0,
+          },
+        ],
+      },
+      {
+        key: 'cardsBonus',
+        total: 4,
+        entries: [
+          { type: 'bonus', cardId: 'A37_Bucksaw', cardType: 'minor', score: 4 },
+        ],
+      },
+      {
+        key: 'cardStateBonusVp',
+        total: 1,
+        entries: [
+          { type: 'bonus', cardId: 'B48_ForestStone', cardType: 'minor', score: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    playerId: 'p2',
+    playerName: 'Player 2',
+    total: 0,
+    categories: [
+      {
+        key: 'cardBonusVp',
+        total: 0,
+        entries: [
+          {
+            type: 'bonus',
+            cardId: 'A136_DrudgeryReeve',
+            cardType: 'occupation',
+            score: 0,
+          },
+        ],
+      },
+    ],
+  },
+] as unknown as PlayerScoreSummary[]
+
+const scoringRowContaining = (container: HTMLElement, text: string) =>
+  Array.from(container.querySelectorAll('.scoring-row')).find((row) =>
+    row.textContent?.includes(text),
+  )
+
 describe('ScoringPad', () => {
   it('falls back to a readable card name when card translation is missing', () => {
     const html = renderToStaticMarkup(
@@ -125,5 +212,55 @@ describe('ScoringPad', () => {
     expect(screen.getByText('Resources from board')).toBeTruthy()
     // numeric value 14 should appear at least once
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
+  })
+
+  it('renders one card bonus category with merged positive attributed child rows', () => {
+    const { container } = render(
+      <ScoringPad
+        locale="en"
+        scores={scoreRowsWithCardBonuses}
+        players={mockPlayers}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(screen.getAllByText('Card bonus')).toHaveLength(1)
+    expect(screen.getByText('Cards')).toBeTruthy()
+    expect(screen.queryByText('Improvements')).toBeNull()
+    expect(screen.queryByText('Bucksaw')).toBeNull()
+    expect(screen.queryByText('Forest Stone')).toBeNull()
+
+    expect(screen.getAllByText('Drudgery Reeve')).toHaveLength(1)
+    const drudgeryRow = scoringRowContaining(container, 'Drudgery Reeve')
+    expect(drudgeryRow?.textContent).toContain('+5')
+    expect(drudgeryRow?.textContent).toContain('0')
+    expect(drudgeryRow?.textContent).not.toContain('wood')
+    expect(drudgeryRow?.textContent).not.toContain('clay')
+    expect(drudgeryRow?.querySelector('.scoring-cell-detail')).toBeNull()
+
+    const potteryRows = Array.from(container.querySelectorAll('.scoring-row')).filter((row) =>
+      row.textContent?.includes('Pottery'),
+    )
+    expect(potteryRows).toHaveLength(2)
+  })
+
+  it('uses the action log card reference affordance for card bonus child labels', () => {
+    const { container } = render(
+      <ScoringPad
+        locale="en"
+        scores={scoreRowsWithCardBonuses}
+        players={mockPlayers}
+        onClose={() => {}}
+      />,
+    )
+
+    const drudgeryLink = screen.getByText('Drudgery Reeve')
+    expect(drudgeryLink.classList.contains('log-card-link')).toBe(true)
+    expect(drudgeryLink.getAttribute('tabindex')).toBe('0')
+
+    fireEvent.focus(drudgeryLink)
+    expect(container.querySelector('.log-card-tooltip')).not.toBeNull()
+    fireEvent.blur(drudgeryLink)
+    expect(container.querySelector('.log-card-tooltip')).toBeNull()
   })
 })
