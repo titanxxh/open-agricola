@@ -149,7 +149,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
     expect(undoAction.state.gameOver).toBe(true)
 
     const scores = computeScores(resp.state)
-    const p2Bonus = scores[1]!.categories.find((category) => category.key === 'cardStateBonusVp')
+    const p2Bonus = scores[1]!.categories.find((category) => category.key === 'cardBonusVp')
     expect(p2Bonus).toEqual(expect.objectContaining({
       total: 5,
       entries: [

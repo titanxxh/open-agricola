@@ -106,7 +106,7 @@ describe('E132_VeggieLover session', () => {
     player.resources.vegetable = 2
 
     const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
     expect(bonusCat).toBeDefined()
     expect(bonusCat!.total).toBe(4)
   })
@@ -118,7 +118,7 @@ describe('E132_VeggieLover session', () => {
     player.resources.vegetable = 3
 
     const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
     expect(bonusCat).toBeDefined()
     expect(bonusCat!.total).toBe(2)
   })
@@ -130,7 +130,7 @@ describe('E132_VeggieLover session', () => {
     player.resources.vegetable = 5
 
     const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
     expect(bonusCat).toBeDefined()
     expect(bonusCat!.total).toBe(6)
   })
@@ -141,7 +141,7 @@ describe('E132_VeggieLover session', () => {
     player.resources.vegetable = 5
 
     const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
     expect(bonusCat).toBeUndefined()
   })
 })

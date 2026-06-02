@@ -15,12 +15,4 @@ export const basketmaker: MajorCardDisplay = {
     '[Scoring]',
     '2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>',
   ],
-  scoring: {
-    resource: 'reed',
-    map: {
-      '2-3': 1,
-      '4': 2,
-      '5+': 3,
-    },
-  },
 }

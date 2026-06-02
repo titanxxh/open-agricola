@@ -14,7 +14,7 @@ const bonusVp = (
   playerId: string,
 ): number => {
   const entry = scores.find((s) => s.playerId === playerId)
-  return entry?.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0
+  return entry?.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0
 }
 
 const setupThreePlayers = () => {

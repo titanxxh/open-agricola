@@ -88,11 +88,6 @@ export type CardDefinition = {
   mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
-  /** Majors-only: scoring tier table read by major-improvements scoring. */
-  scoring?: {
-    resource: keyof Resource
-    map: Record<string, number>
-  }
   /**
    * BGA `$this->field = true` + `getFieldDetails()`. Declarative card-field config.
    * When set, `shared/cards/helpers/card-field.ts` derives sow / harvest / isDoable

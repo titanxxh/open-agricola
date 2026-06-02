@@ -24,7 +24,10 @@ export type MajorCardDisplay = CardDefinition & {
 /**
  * Major hooks layer. Map-keyed by major id in `cards/major/effects.ts`.
  */
-export type MajorHooks = Pick<CardEffect, MajorEffectHook>
+export type MajorHooks = Pick<
+  CardEffect,
+  MajorEffectHook | 'computeBonusScore' | 'computeCostedBonus'
+>
 
 /**
  * Composite type used by callers (improvement / exchange / round / catalog).

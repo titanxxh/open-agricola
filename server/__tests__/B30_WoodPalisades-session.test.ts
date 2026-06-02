@@ -33,7 +33,7 @@ const bonusVpFor = (session: GameSession) => {
   const state = session.getState().state
   const scores = computeScores(state)
   const summary = scores.find((s) => s.playerId === state.players[0]!.id)!
-  return summary.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0
+  return summary.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0
 }
 
 describe('B30 Wood Palisades — session', () => {
