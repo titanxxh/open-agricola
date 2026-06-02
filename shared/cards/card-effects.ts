@@ -186,7 +186,7 @@ export type BonusScoreLevel = {
 }
 
 /** Read-only context passed to bonus-scoring handlers.
- *  Standard categories (fields/pastures/.../cards/cardsBonus) are already computed. */
+ *  Standard categories (fields/pastures/.../cards) are already computed. */
 export type BonusScoringContext = {
   categories: readonly ScoreCategoryResult[]
 }

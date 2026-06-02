@@ -61,13 +61,13 @@ describe('B136_HouseSteward session', () => {
     const byPlayerId = new Map(scores.map((entry) => [entry.playerId, entry]))
 
     expect(
-      byPlayerId.get(state.players[0]!.id)?.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0,
+      byPlayerId.get(state.players[0]!.id)?.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0,
     ).toBe(0)
     expect(
-      byPlayerId.get(state.players[1]!.id)?.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0,
+      byPlayerId.get(state.players[1]!.id)?.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0,
     ).toBe(3)
     expect(
-      byPlayerId.get(state.players[2]!.id)?.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0,
+      byPlayerId.get(state.players[2]!.id)?.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0,
     ).toBe(3)
   })
 
@@ -82,7 +82,7 @@ describe('B136_HouseSteward session', () => {
 
     expect(
       scores.some((entry) =>
-        (entry.categories.find((c) => c.key === 'cardStateBonusVp')?.total ?? 0) > 0),
+        (entry.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0) > 0),
     ).toBe(false)
   })
 })

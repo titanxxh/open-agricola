@@ -15,12 +15,4 @@ export const joinery: MajorCardDisplay = {
     '[Scoring]',
     '3/5/7<WOOD> <ARROW-1X> 1/2/3<SCORE>',
   ],
-  scoring: {
-    resource: 'wood',
-    map: {
-      '3-4': 1,
-      '5-6': 2,
-      '7+': 3,
-    },
-  },
 }
