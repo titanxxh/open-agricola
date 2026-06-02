@@ -45,6 +45,90 @@ const createState = (...players: PlayerState[]): GameState => ({
 const getCategory = (result: ReturnType<typeof computeScores>[0], key: string) =>
   result.categories.find((c) => c.key === key)
 
+describe('selected Scoring Reserve bonus scoring', () => {
+  it('scores selected reserve bonuses with card attribution before major resource scoring', () => {
+    const player = createPlayer()
+    const sourceCard = 'TEST_ScoringReserveCard'
+    player.occupationPlayed = [sourceCard]
+    player.improvements = ['Major_Joinery']
+    player.resources.wood = 5
+    player.cardStates = {
+      [sourceCard]: {
+        extraData: {
+          scoringReserveBonus: {
+            reserved: { wood: 2 },
+            score: 3,
+          },
+        },
+      },
+    }
+
+    const [result] = computeScores(createState(player))
+
+    expect(player.resources.wood).toBe(5)
+    expect(getCategory(result, 'cardStateBonusVp')).toEqual(
+      expect.objectContaining({
+        total: 3,
+        entries: [
+          {
+            type: 'bonus',
+            score: 3,
+            cardId: sourceCard,
+            cardType: 'occupation',
+            reserved: { wood: 2 },
+          },
+        ],
+      }),
+    )
+    expect(getCategory(result, 'cardsBonus')?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'cardBonus',
+          cardId: 'Major_Joinery',
+          quantity: 3,
+          score: 1,
+        }),
+      ]),
+    )
+  })
+
+  it('applies selected scoring reserve before automatic costed-bonus solver work', () => {
+    const player = createPlayer()
+    const sourceCard = 'TEST_ScoringReserveCard'
+    player.occupationPlayed = [sourceCard, 'C133_Soldier']
+    player.resources.wood = 3
+    player.resources.stone = 3
+    player.cardStates = {
+      [sourceCard]: {
+        extraData: {
+          scoringReserveBonus: {
+            reserved: { wood: 2 },
+            score: 5,
+          },
+        },
+      },
+    }
+
+    const [result] = computeScores(createState(player))
+
+    expect(getCategory(result, 'cardStateBonusVp')).toEqual(
+      expect.objectContaining({
+        total: 6,
+        entries: expect.arrayContaining([
+          {
+            type: 'bonus',
+            score: 5,
+            cardId: sourceCard,
+            cardType: 'occupation',
+            reserved: { wood: 2 },
+          },
+          { type: 'bonus', score: 1 },
+        ]),
+      }),
+    )
+  })
+})
+
 // ─── C133_Soldier standalone ────────────────────────────────────────
 
 describe('C133_Soldier scoring', () => {

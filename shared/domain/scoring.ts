@@ -16,6 +16,11 @@ import type {
   CostedBonusHandler,
 } from '../cards/card-effects.ts'
 import { familySize } from '../domain/player.ts'
+import {
+  getSelectedScoringReserveBonuses,
+  subtractScoringReserve,
+  sumSelectedScoringReserve,
+} from './scoring-reserve.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -47,7 +52,13 @@ export type ScoreEntry =
       cardType: 'major' | 'minor' | 'occupation'
       score: number
     }
-  | { type: 'bonus'; score: number }
+  | {
+      type: 'bonus'
+      score: number
+      cardId?: string
+      cardType?: 'major' | 'minor' | 'occupation'
+      reserved?: Partial<Resource>
+    }
   | {
       type: 'cardBonus'
       cardId: string
@@ -305,6 +316,17 @@ const scoreByMap = (quantity: number, map: Record<string, number>) => {
 
 const totalTiles = FARM_ROWS * FARM_COLS
 
+const playedCardType = (
+  player: PlayerState,
+  cardId: string,
+): 'major' | 'minor' | 'occupation' | undefined => {
+  if (player.improvements.includes(cardId)) {
+    return isMajorCardId(cardId) ? 'major' : 'minor'
+  }
+  if (player.minorPlayed.includes(cardId)) return 'minor'
+  if (player.occupationPlayed.includes(cardId)) return 'occupation'
+}
+
 const applyPostScoreAdjustment = (
   categories: ScoreCategoryResult[],
   score: number,
@@ -516,7 +538,11 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
         cardId,
         handler: effect.computeCostedBonus!,
       }))
-    const playerForBonus = { ...player, resources: { ...player.resources } }
+    const selectedReserve = sumSelectedScoringReserve(player)
+    const playerForBonus = {
+      ...player,
+      resources: subtractScoringReserve(player.resources, selectedReserve),
+    }
     const bonusScoreResult = solveBonusScoring({
       state,
       player: playerForBonus,
@@ -584,25 +610,47 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     })
 
     let cardStateBonusVp = 0
+    const cardStateBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []
+    const selectedReserveEntries = getSelectedScoringReserveBonuses(player)
+    for (const { cardId, bonus } of selectedReserveEntries) {
+      cardStateBonusVp += bonus.score
+      const entry: Extract<ScoreEntry, { type: 'bonus' }> = {
+        type: 'bonus',
+        score: bonus.score,
+        reserved: bonus.reserved,
+      }
+      const cardType = playedCardType(player, cardId)
+      if (cardType) {
+        entry.cardId = cardId
+        entry.cardType = cardType
+      }
+      cardStateBonusEntries.push(entry)
+    }
+    let bareBonusVp = 0
     if (player.cardStates) {
       Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
         if (cardId === '__pendingChoice__') return
         const vp = cardState.counters?.bonusVp ?? 0
         if (vp > 0) {
-          cardStateBonusVp += vp
+          bareBonusVp += vp
         }
       })
     }
 
     for (const entry of bonusScoreResult.entries) {
-      cardStateBonusVp += entry.score
+      bareBonusVp += entry.score
     }
 
-    if (cardStateBonusVp !== 0) {
+    if (bareBonusVp !== 0) {
+      cardStateBonusEntries.push({ type: 'bonus', score: bareBonusVp })
+    }
+    cardStateBonusVp += bareBonusVp
+
+    if (cardStateBonusVp !== 0 || cardStateBonusEntries.length > 0) {
       categories.push({
         key: 'cardStateBonusVp',
         total: cardStateBonusVp,
-        entries: [{ type: 'bonus' as const, score: cardStateBonusVp }],
+        entries: cardStateBonusEntries,
       })
     }
 
