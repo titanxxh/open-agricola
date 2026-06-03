@@ -81,6 +81,10 @@ export const zh = {
         prompt: '选择要计分的建材套数',
         scoreSets: '计分 {sets} 套（{score} 额外分）',
       },
+      C133_Soldier: {
+        prompt: '选择要计分的木头+石头对数',
+        scorePairs: '计分 {pairs} 对（{score} 额外分）',
+      },
       D132_HideFarmer: {
         optional: '隐藏未使用农场格？',
         markSpaces: {

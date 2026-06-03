@@ -113,6 +113,17 @@ describe('computeScores', () => {
     player.occupationPlayed = ['C133_Soldier']
     player.resources.wood = 4
     player.resources.stone = 2
+    player.cardStates = {
+      C133_Soldier: {
+        extraData: {
+          scoringReserveBonus: {
+            reserved: { wood: 2, stone: 2 },
+            score: 2,
+            cardType: 'occupation',
+          },
+        },
+      },
+    }
 
     const [result] = computeScores(createState(player))
     const bonusCategory = result.categories.find((item) => item.key === 'cardBonusVp')

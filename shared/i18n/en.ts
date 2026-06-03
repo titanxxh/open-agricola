@@ -81,6 +81,10 @@ export const en = {
         prompt: 'Choose how many sets of building resources to score',
         scoreSets: 'Score {sets} sets ({score} bonus VP)',
       },
+      C133_Soldier: {
+        prompt: 'Choose how many wood and stone pairs to score',
+        scorePairs: 'Score {pairs} pairs ({score} bonus VP)',
+      },
       D132_HideFarmer: {
         optional: 'Hide unused farmyard spaces?',
         markSpaces: {

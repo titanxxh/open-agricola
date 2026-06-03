@@ -6,6 +6,7 @@ import { getCardEffect } from '../../cards/card-effects'
 // Register card effects for scoring
 import '../../cards/C/C133_Soldier'
 import '../../cards/A/A136_DrudgeryReeve'
+import '../../cards/E/E132_VeggieLover'
 
 const emptyResources = (): Resource => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -61,6 +62,21 @@ const setA136Reserve = (player: PlayerState, sets: number) => {
   }
 }
 
+const setC133Reserve = (player: PlayerState, pairs: number) => {
+  player.cardStates = {
+    ...(player.cardStates ?? {}),
+    C133_Soldier: {
+      extraData: {
+        scoringReserveBonus: {
+          reserved: { wood: pairs, stone: pairs },
+          score: pairs,
+          cardType: 'occupation',
+        },
+      },
+    },
+  }
+}
+
 describe('selected Scoring Reserve bonus scoring', () => {
   it('scores selected reserve bonuses with card attribution before major resource scoring', () => {
     const player = createPlayer()
@@ -109,14 +125,14 @@ describe('selected Scoring Reserve bonus scoring', () => {
   it('applies selected scoring reserve before automatic costed-bonus solver work', () => {
     const player = createPlayer()
     const sourceCard = 'TEST_ScoringReserveCard'
-    player.occupationPlayed = [sourceCard, 'C133_Soldier']
-    player.resources.wood = 3
-    player.resources.stone = 3
+    player.occupationPlayed = [sourceCard, 'E132_VeggieLover']
+    player.resources.grain = 3
+    player.resources.vegetable = 3
     player.cardStates = {
       [sourceCard]: {
         extraData: {
           scoringReserveBonus: {
-            reserved: { wood: 2 },
+            reserved: { grain: 2 },
             score: 5,
           },
         },
@@ -127,20 +143,20 @@ describe('selected Scoring Reserve bonus scoring', () => {
 
     expect(getCategory(result, 'cardBonusVp')).toEqual(
       expect.objectContaining({
-        total: 6,
+        total: 7,
         entries: expect.arrayContaining([
           {
             type: 'bonus',
             score: 5,
             cardId: sourceCard,
             cardType: 'occupation',
-            reserved: { wood: 2 },
+            reserved: { grain: 2 },
           },
           {
             type: 'bonus',
-            cardId: 'C133_Soldier',
+            cardId: 'E132_VeggieLover',
             cardType: 'occupation',
-            score: 1,
+            score: 2,
           },
         ]),
       }),
@@ -151,20 +167,31 @@ describe('selected Scoring Reserve bonus scoring', () => {
 // ─── C133_Soldier standalone ────────────────────────────────────────
 
 describe('C133_Soldier scoring', () => {
-  it('scores min(wood, stone) as bonus VP', () => {
+  it('scores selected Soldier Scoring Reserve bonus VP', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
+    setC133Reserve(player, 2)
     player.resources.wood = 4
     player.resources.stone = 2
 
     const [result] = computeScores(createState(player))
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(2)
+    expect(getCategory(result, 'cardBonusVp')?.entries).toEqual([
+      {
+        type: 'bonus',
+        score: 2,
+        cardId: 'C133_Soldier',
+        cardType: 'occupation',
+        reserved: { wood: 2, stone: 2 },
+      },
+    ])
   })
 
-  it('scores 0 when no wood', () => {
+  it('does not score automatically before a player chooses pairs', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
-    player.resources.stone = 5
+    player.resources.wood = 4
+    player.resources.stone = 2
 
     const [result] = computeScores(createState(player))
     expect(getCategory(result, 'cardBonusVp')).toBeUndefined()
@@ -183,13 +210,12 @@ describe('C133_Soldier scoring', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
     player.improvements = ['Major_Joinery']
+    setC133Reserve(player, 3)
     player.resources.wood = 5
     player.resources.stone = 3
 
     const [result] = computeScores(createState(player))
-    // Soldier: min(5, 3) = 3 pairs → 3 bonus VP, reserves 3 wood + 3 stone
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(3)
-    // Joinery: 5 wood - 3 reserved = 2 effective wood → 0 score (needs 3+)
     expect(getCategory(result, 'cardsBonus')).toBeUndefined()
   })
 
@@ -197,13 +223,12 @@ describe('C133_Soldier scoring', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
     player.improvements = ['Major_Joinery']
+    setC133Reserve(player, 2)
     player.resources.wood = 7
     player.resources.stone = 2
 
     const [result] = computeScores(createState(player))
-    // Soldier: min(7, 2) = 2 pairs → 2 bonus VP, reserves 2 wood
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(4)
-    // Joinery: 7 wood - 2 reserved = 5 effective wood → 2 score
     expect(getCategory(result, 'cardBonusVp')?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ cardId: 'C133_Soldier', score: 2 }),
@@ -296,14 +321,13 @@ describe('DrudgeryReeve + Soldier resource conflict', () => {
     const player = createPlayer()
     player.occupationPlayed = ['A136_DrudgeryReeve', 'C133_Soldier']
     setA136Reserve(player, 2)
+    setC133Reserve(player, 2)
     player.resources.wood = 5
     player.resources.clay = 2
     player.resources.stone = 4
     player.resources.reed = 2
 
     const [result] = computeScores(createState(player))
-    // DrudgeryReeve: min(5,2,4,2,3) = 2 sets → 3 VP, reserves 2 wood/clay/stone/reed
-    // Soldier: min(5-2, 4-2) = min(3, 2) = 2 pairs → 2 VP, reserves 2 more wood+stone
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(5) // 3 + 2
   })
 
@@ -312,17 +336,14 @@ describe('DrudgeryReeve + Soldier resource conflict', () => {
     player.occupationPlayed = ['A136_DrudgeryReeve', 'C133_Soldier']
     player.improvements = ['Major_Joinery']
     setA136Reserve(player, 1)
+    setC133Reserve(player, 2)
     player.resources.wood = 7
     player.resources.clay = 1
     player.resources.stone = 3
     player.resources.reed = 1
 
     const [result] = computeScores(createState(player))
-    // DrudgeryReeve: min(7,1,3,1,3) = 1 set → 1 VP, reserves 1 wood/clay/stone/reed
-    // Soldier: min(7-1, 3-1) = min(6, 2) = 2 pairs → 2 VP, reserves 2 more wood+stone
-    // Total bonus: 3
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(4)
-    // Joinery: 7 wood - 1 (DR) - 2 (Soldier) = 4 effective wood → 1 score (3-4 range)
     expect(getCategory(result, 'cardBonusVp')?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ cardId: 'A136_DrudgeryReeve', score: 1 }),
@@ -336,16 +357,14 @@ describe('DrudgeryReeve + Soldier resource conflict', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
     player.improvements = ['Major_Pottery', 'Major_Basket']
+    setC133Reserve(player, 3)
     player.resources.wood = 3
     player.resources.stone = 3
     player.resources.clay = 5
     player.resources.reed = 4
 
     const [result] = computeScores(createState(player))
-    // Soldier: min(3, 3) = 3 pairs → 3 VP, reserves 3 wood + 3 stone
     expect(getCategory(result, 'cardBonusVp')?.total).toBe(7)
-    // Pottery: 5 clay - 0 reserved = 5 → 2 score
-    // Basketmaker: 4 reed - 0 reserved = 4 → 2 score
     expect(getCategory(result, 'cardBonusVp')?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ cardId: 'C133_Soldier', score: 3 }),
