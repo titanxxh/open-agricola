@@ -99,7 +99,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     })
     const bonusCategory = player.categories.find((item) => item.key === 'cardBonusVp')
     bonusCategory?.entries.forEach((entry) => {
-      if (entry.type === 'bonus' && entry.score > 0) {
+      if (entry.type === 'bonus' && entry.score !== 0) {
         cardBonusMap.set(entry.cardId, entry.cardType)
       }
     })
@@ -250,7 +250,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                     )
                     const score = category?.entries.reduce(
                       (sum, item) =>
-                        item.type === 'bonus' && item.cardId === row.cardId && item.score > 0
+                        item.type === 'bonus' && item.cardId === row.cardId && item.score !== 0
                           ? sum + item.score
                           : sum,
                       0,
