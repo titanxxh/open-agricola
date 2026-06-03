@@ -74,6 +74,12 @@ const scoreRowsWithCardBonuses = [
           },
           {
             type: 'bonus',
+            cardId: 'E159_OldMiser',
+            cardType: 'occupation',
+            score: -3,
+          },
+          {
+            type: 'bonus',
             cardId: 'A37_Bucksaw',
             cardType: 'minor',
             score: 0,
@@ -214,7 +220,7 @@ describe('ScoringPad', () => {
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
   })
 
-  it('renders one card bonus category with merged positive attributed child rows', () => {
+  it('renders one card bonus category with merged non-zero attributed child rows', () => {
     const { container } = render(
       <ScoringPad
         locale="en"
@@ -242,6 +248,21 @@ describe('ScoringPad', () => {
       row.textContent?.includes('Pottery'),
     )
     expect(potteryRows).toHaveLength(2)
+  })
+
+  it('renders negative attributed card bonus child rows', () => {
+    const { container } = render(
+      <ScoringPad
+        locale="en"
+        scores={scoreRowsWithCardBonuses}
+        players={mockPlayers}
+        onClose={() => {}}
+      />,
+    )
+
+    const oldMiserRow = scoringRowContaining(container, 'Old Miser')
+    expect(oldMiserRow?.textContent).toContain('-3')
+    expect(oldMiserRow?.textContent).toContain('0')
   })
 
   it('uses the action log card reference affordance for card bonus child labels', () => {
