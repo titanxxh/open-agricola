@@ -46,6 +46,7 @@ const scoreRowsWithCardBonuses = [
         total: 2,
         entries: [
           { type: 'card', cardId: 'Major_Pottery', cardType: 'major', score: 2 },
+          { type: 'card', cardId: 'A37_Bucksaw', cardType: 'minor', score: 0 },
         ],
       },
       {
@@ -283,6 +284,39 @@ describe('ScoringPad', () => {
     expect(container.querySelector('.log-card-tooltip')).not.toBeNull()
     fireEvent.blur(drudgeryLink)
     expect(container.querySelector('.log-card-tooltip')).toBeNull()
+  })
+
+  it('uses the action log card reference affordance for printed card child labels', () => {
+    const { container } = render(
+      <ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => {}} />,
+    )
+
+    const cardRow = scoringRowContaining(container, 'Adoptive Parents')
+    const cardLink = cardRow?.querySelector('.log-card-link')
+    expect(cardLink).toBeInstanceOf(HTMLElement)
+    if (!(cardLink instanceof HTMLElement)) throw new Error('missing card link')
+    expect(cardLink.getAttribute('tabindex')).toBe('0')
+
+    fireEvent.focus(cardLink)
+    expect(container.querySelector('.log-card-tooltip')).not.toBeNull()
+    fireEvent.blur(cardLink)
+    expect(container.querySelector('.log-card-tooltip')).toBeNull()
+  })
+
+  it('keeps child-row bullets and card names in the same label wrapper', () => {
+    const { container } = render(
+      <ScoringPad
+        locale="en"
+        scores={scoreRowsWithCardBonuses}
+        players={mockPlayers}
+        onClose={() => {}}
+      />,
+    )
+
+    const drudgeryRow = scoringRowContaining(container, 'Drudgery Reeve')
+    const label = drudgeryRow?.querySelector('.scoring-label')
+    expect(label?.childNodes).toHaveLength(1)
+    expect(label?.textContent).toContain('· Drudgery Reeve')
   })
 
   it('uses resilient card names for card bonus child labels', () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -64,18 +64,43 @@ const categoryLabelKey: Record<ScoreCategoryResult['key'], string> = {
 const formatScore = (value: number) =>
   value > 0 ? `+${value}` : value === 0 ? '0' : `${value}`
 
-const getCardLabel = (
-  locale: Locale,
-  cardType: 'major' | 'minor' | 'occupation',
-  cardId: string,
-) =>
-  getCardDisplayName(locale, cardType, cardId)
-
 type ScoringRow =
   | { id: string; type: 'category'; key: ScoreCategoryResult['key'] }
   | { id: string; type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation' }
   | { id: string; type: 'cardBonus'; cardId: string; cardType?: 'major' | 'minor' | 'occupation' }
   | { id: string; type: 'total' }
+
+const renderCardChildLabel = (
+  locale: Locale,
+  cardId: string,
+  cardType?: 'major' | 'minor' | 'occupation',
+  preferResolvedName = false,
+) => {
+  const fallbackName = cardType
+    ? getCardDisplayName(locale, cardType, cardId)
+    : getAnyCardDisplayName(locale, cardId)
+  const typedCardRef = cardType
+    ? { id: cardId, type: cardType, name: fallbackName }
+    : null
+  const resolvedCardRef = resolveCardRef(locale, cardId)
+  const cardRef = preferResolvedName
+    ? resolvedCardRef ?? typedCardRef
+    : typedCardRef ?? resolvedCardRef
+  const label = preferResolvedName ? cardRef?.name ?? fallbackName : fallbackName
+
+  return (
+    <span className="scoring-card-label">
+      {'· '}
+      {cardRef ? (
+        <LogCardLink locale={locale} cardRef={cardRef}>
+          {label}
+        </LogCardLink>
+      ) : (
+        label
+      )}
+    </span>
+  )
+}
 
 export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
@@ -93,7 +118,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   scores.forEach((player) => {
     const cardsCategory = player.categories.find((item) => item.key === 'cards')
     cardsCategory?.entries.forEach((entry) => {
-      if (entry.type === 'card') {
+      if (entry.type === 'card' && entry.score !== 0) {
         cardMap.set(entry.cardId, entry.cardType)
       }
     })
@@ -175,29 +200,13 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               ))}
             </div>
             {rows.map((row) => {
-              const cardBonusRef = row.type === 'cardBonus'
-                ? resolveCardRef(locale, row.cardId)
-                : null
-              const rowLabel =
+              const rowLabel: ReactNode =
                 row.type === 'category'
                   ? t(locale, categoryLabelKey[row.key])
                   : row.type === 'card'
-                    ? `· ${getCardLabel(locale, row.cardType, row.cardId)}`
+                    ? renderCardChildLabel(locale, row.cardId, row.cardType)
                     : row.type === 'cardBonus'
-                      ? (
-                          <>
-                            {'· '}
-                            {cardBonusRef ? (
-                              <LogCardLink locale={locale} cardRef={cardBonusRef}>
-                                {cardBonusRef.name}
-                              </LogCardLink>
-                            ) : row.cardType ? (
-                              getCardDisplayName(locale, row.cardType, row.cardId)
-                            ) : (
-                              getAnyCardDisplayName(locale, row.cardId)
-                            )}
-                          </>
-                        )
+                      ? renderCardChildLabel(locale, row.cardId, row.cardType, true)
                       : t(locale, 'ui.scoringTotal')
               return (
                 <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
