@@ -2,14 +2,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseCardFile, type CardMeta } from './build-cards-manifest'
 
-const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'community', '__stubs__'] as const
+const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'community'] as const
+const RUNTIME_DECKS = [...CATALOG_DECKS, '__stubs__'] as const
 const MAJOR_DECK = 'major'
 
 export type RegisterAllBuildResult = {
   registerAll: string
   catalogGenerated: string
   majorGenerated: string
+  majorRuntimeGenerated: string
   implCount: number
   catalogDefinitionCount: number
   majorDefinitionCount: number
@@ -22,6 +25,7 @@ type BuildOptions = {
 type SourceExport = {
   name: string
   moduleRel: string
+  filePath: string
   hasImpl: boolean
   number?: number
 }
@@ -39,13 +43,14 @@ const listCardFiles = (dir: string): string[] => {
       && f !== 'index.ts'
       && f !== 'types.ts'
       && f !== 'generated.ts'
+      && f !== 'runtime.generated.ts'
       && f !== 'catalog.generated.ts'
       && f !== 'register-all.ts',
     )
     .sort()
 }
 
-const extractCardSourceExports = (source: string, moduleRel: string): SourceExport[] => {
+const extractCardSourceExports = (source: string, moduleRel: string, filePath: string): SourceExport[] => {
   const matches = [...source.matchAll(cardSourceExportRe)]
   return matches.map((match, index) => {
     const start = match.index ?? 0
@@ -53,6 +58,7 @@ const extractCardSourceExports = (source: string, moduleRel: string): SourceExpo
     return {
       name: match[1]!,
       moduleRel,
+      filePath,
       hasImpl: /\bimpl\s*:/.test(source.slice(start, next)),
       number: Number(source.slice(start, next).match(/\bnumber\s*:\s*(\d+)/)?.[1] ?? Number.NaN),
     }
@@ -70,7 +76,7 @@ const collectSources = (
       const filePath = path.join(deckDir, file)
       const source = fs.readFileSync(filePath, 'utf8')
       const moduleRel = `./${deck}/${path.basename(file, '.ts')}`
-      sources.push(...extractCardSourceExports(source, moduleRel))
+      sources.push(...extractCardSourceExports(source, moduleRel, filePath))
     }
   }
   return sources.sort((a, b) => a.name.localeCompare(b.name))
@@ -83,7 +89,7 @@ const collectMajorSources = (cardsRoot: string): SourceExport[] => {
     const filePath = path.join(majorDir, file)
     const source = fs.readFileSync(filePath, 'utf8')
     const moduleRel = `./major/${path.basename(file, '.ts')}`
-    sources.push(...extractCardSourceExports(source, moduleRel))
+    sources.push(...extractCardSourceExports(source, moduleRel, filePath))
   }
   return sources.sort((a, b) => {
     const aNum = Number.isFinite(a.number) ? a.number! : 999
@@ -93,9 +99,6 @@ const collectMajorSources = (cardsRoot: string): SourceExport[] => {
   })
 }
 
-const importBlock = (sources: readonly SourceExport[]) =>
-  sources.map((source) => `import { ${source.name} } from '${source.moduleRel}'`).join('\n')
-
 const majorImportBlock = (sources: readonly SourceExport[]) =>
   sources
     .map((source) => `import { ${source.name} } from '${source.moduleRel.replace('./major/', './')}'`)
@@ -104,12 +107,57 @@ const majorImportBlock = (sources: readonly SourceExport[]) =>
 const sourceArray = (sources: readonly SourceExport[]) =>
   sources.map((source) => `  ${source.name},`).join('\n')
 
+const cardSourceKindFromType = (type: CardMeta['type']) => type
+
+const cardDefinitionLiteral = (meta: CardMeta) => {
+  const { type, ...definition } = meta
+  return JSON.stringify({ ...definition, kind: cardSourceKindFromType(type) }, null, 2)
+}
+
+const parseSourceMetas = (sources: readonly SourceExport[]) => {
+  const metas = new Map<string, CardMeta>()
+  const parsedFiles = new Map<string, CardMeta[]>()
+  for (const source of sources) {
+    if (!parsedFiles.has(source.filePath)) {
+      parsedFiles.set(
+        source.filePath,
+        parseCardFile(source.filePath, {
+          includeLegacyConstructors: false,
+          includeMajorLiterals: false,
+          includeCardSources: true,
+        }).metas,
+      )
+    }
+    const meta = parsedFiles.get(source.filePath)?.find((candidate) => candidate.id === source.name)
+    if (!meta) {
+      throw new Error(`${source.filePath}: missing static metadata for ${source.name}`)
+    }
+    metas.set(source.name, meta)
+  }
+  return metas
+}
+
+const definitionArray = (
+  sources: readonly SourceExport[],
+  metas: ReadonlyMap<string, CardMeta>,
+) =>
+  sources.map((source) => {
+    const meta = metas.get(source.name)
+    if (!meta) {
+      throw new Error(`${source.filePath}: missing static metadata for ${source.name}`)
+    }
+    return cardDefinitionLiteral(meta).split('\n').map((line) => `  ${line}`).join('\n') + ','
+  }).join('\n')
+
 export function buildRegisterAll(options: BuildOptions = {}): RegisterAllBuildResult {
   const repoRoot = options.repoRoot ?? process.cwd()
   const cardsRoot = path.resolve(repoRoot, 'shared', 'cards')
   const catalogSources = collectSources(cardsRoot, CATALOG_DECKS)
+  const runtimeSources = collectSources(cardsRoot, RUNTIME_DECKS)
   const majorSources = collectMajorSources(cardsRoot)
-  const implSources = [...catalogSources, ...majorSources].filter((source) => source.hasImpl)
+  const implSources = [...runtimeSources, ...majorSources].filter((source) => source.hasImpl)
+  const catalogMetas = parseSourceMetas(catalogSources)
+  const majorMetas = parseSourceMetas(majorSources)
 
   const registerImports = implSources.map((source) =>
     `import { ${source.name} } from '${source.moduleRel}'`)
@@ -129,28 +177,29 @@ export type AllCardImpls = typeof ALL_CARD_IMPLS
 `
 
   const catalogGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
-import type { CardSource, CardSourceMeta } from './card-source'
-${importBlock(catalogSources)}
+import type { CardDefinition } from '../contract/cards'
 
-export const catalogCardSources = [
-${sourceArray(catalogSources)}
-] as const satisfies readonly CardSource[]
+type GeneratedCatalogCardDefinition = CardDefinition & {
+  kind: 'minor' | 'occupation' | 'playerAction'
+}
 
-const isMinorLike = (source: CardSource) =>
-  source.meta.kind === 'minor' || source.meta.kind === 'playerAction'
+export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] = [
+${definitionArray(catalogSources, catalogMetas)}
+]
 
-const isOccupation = (source: CardSource) =>
-  source.meta.kind === 'occupation'
+const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
+  card.kind === 'minor' || card.kind === 'playerAction'
 
-const isImplemented = (card: CardSourceMeta) => card.implemented !== false
+const isOccupation = (card: GeneratedCatalogCardDefinition) =>
+  card.kind === 'occupation'
 
-export const minorImprovementCardsList = catalogCardSources
+const isImplemented = (card: GeneratedCatalogCardDefinition) => card.implemented !== false
+
+export const minorImprovementCardsList = catalogCardDefinitions
   .filter(isMinorLike)
-  .map((source) => source.meta)
 
-export const occupationCardsList = catalogCardSources
+export const occupationCardsList = catalogCardDefinitions
   .filter(isOccupation)
-  .map((source) => source.meta)
 
 export const implementedMinorImprovementCardsList =
   minorImprovementCardsList.filter(isImplemented)
@@ -166,21 +215,30 @@ export const occupationIdsList =
 `
 
   const majorGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
+import type { MajorCardDisplay } from './types'
+
+export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'major' })[] = [
+${definitionArray(majorSources, majorMetas)}
+]
+
+export const majorImprovementIdsList =
+  majorCardDefinitionsList.map((card) => card.id)
+`
+
+  const majorRuntimeGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
 import type { CardSource } from '../card-source'
 ${majorImportBlock(majorSources)}
 
 export const majorCardSources = [
 ${sourceArray(majorSources)}
 ] as const satisfies readonly CardSource<'major'>[]
-
-export const majorImprovementIdsList =
-  majorCardSources.map((source) => source.meta.id)
 `
 
   return {
     registerAll,
     catalogGenerated,
     majorGenerated,
+    majorRuntimeGenerated,
     implCount: implSources.length,
     catalogDefinitionCount: catalogSources.length,
     majorDefinitionCount: majorSources.length,
@@ -203,6 +261,10 @@ export function writeRegisterAll(options: BuildOptions = {}): void {
   const majorGeneratedPath = path.join(cardsRoot, 'major', 'generated.ts')
   fs.writeFileSync(majorGeneratedPath, result.majorGenerated, 'utf8')
   console.log(`[generate-register-all] wrote ${result.majorDefinitionCount} major defs to ${majorGeneratedPath}`)
+
+  const majorRuntimeGeneratedPath = path.join(cardsRoot, 'major', 'runtime.generated.ts')
+  fs.writeFileSync(majorRuntimeGeneratedPath, result.majorRuntimeGenerated, 'utf8')
+  console.log(`[generate-register-all] wrote ${result.majorDefinitionCount} major runtime entries to ${majorRuntimeGeneratedPath}`)
 }
 
 const isCli = process.argv[1] === fileURLToPath(import.meta.url)

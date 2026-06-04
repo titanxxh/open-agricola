@@ -33,13 +33,34 @@ export type CardMeta = {
   }>
   players?: string
   prerequisite?: unknown
+  maxRound?: number
   vp?: number
   isCookery?: boolean
   isBaking?: boolean
   passing?: boolean
   returnCards?: string[]
+  occupationPrerequisites?: unknown
+  improvementPrerequisites?: unknown
+  implemented?: boolean
+  evenMoreSet?: boolean
+  extraVp?: boolean
+  providesField?: boolean
+  providesOccupation?: boolean
+  isField?: boolean
+  fireplaceIdentity?: boolean
+  cookingHearthIdentity?: boolean
+  ovenIdentity?: boolean
+  potteryIdentity?: boolean
+  preventsHandDiscard?: boolean
+  animalHolder?: boolean
+  blocksHouseAnimalZones?: boolean
+  waresSalesmanGains?: unknown
+  mustBePlayedViaMinorAction?: boolean
+  mustBePlayedViaMajorImprovementAction?: boolean
   alsoCountsAs?: string[]
+  cardField?: unknown
   enablesPalisades?: boolean
+  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
 export type CardManifestEntry = {
@@ -53,7 +74,14 @@ export type CardsManifest = Record<string, CardManifestEntry>
 const META_FIELDS = new Set([
   'id', 'name', 'deck', 'number', 'category', 'desc',
   'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
-  'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs', 'enablesPalisades',
+  'maxRound', 'isCookery', 'isBaking', 'passing', 'returnCards',
+  'occupationPrerequisites', 'improvementPrerequisites', 'implemented',
+  'evenMoreSet', 'extraVp', 'providesField', 'providesOccupation', 'isField',
+  'fireplaceIdentity', 'cookingHearthIdentity', 'ovenIdentity', 'potteryIdentity',
+  'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
+  'waresSalesmanGains', 'mustBePlayedViaMinorAction',
+  'mustBePlayedViaMajorImprovementAction', 'alsoCountsAs', 'cardField',
+  'enablesPalisades', 'locales',
 ])
 
 const CARD_CLASSES = new Set([

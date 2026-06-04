@@ -1,12 +1,16 @@
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { MajorCardData, MajorEffectHook } from './types'
-import { majorCardSources } from './generated'
+import { majorCardDefinitionsList } from './generated'
+import { majorCardSources } from './runtime.generated'
 
 export const majorCardDefinitions: readonly MajorCardData[] =
-  majorCardSources.map((source) => ({
-    ...source.meta,
-    ...(source.impl?.effect ?? {}),
-  }) as MajorCardData)
+  majorCardDefinitionsList.map((card) => {
+    const source = majorCardSources.find((candidate) => candidate.meta.id === card.id)
+    return {
+      ...card,
+      ...(source?.impl?.effect ?? {}),
+    } as MajorCardData
+  })
 
 export const majorImprovementIds = majorCardDefinitions.map((card) => card.id)
 

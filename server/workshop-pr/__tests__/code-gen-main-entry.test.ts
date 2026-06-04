@@ -25,7 +25,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
 export type AllCardImpls = typeof ALL_CARD_IMPLS
 `
   const upstreamMd = `# CC\n<!-- community-card-entries:begin -->\n| ID |\n<!-- community-card-entries:end -->\n`
-  it('returns 4 files when no art', async () => {
+  it('returns 5 files when no art', async () => {
     const files = await generatePrFiles({
       wcard,
       github_login: 'alice-gh',
@@ -34,16 +34,17 @@ export type AllCardImpls = typeof ALL_CARD_IMPLS
       pr_number: 0,
       art_data: null,
     })
-    expect(files).toHaveLength(4)
+    expect(files).toHaveLength(5)
     expect(files.map((f) => f.path)).toEqual([
       'shared/cards/community/CUSTOM_Foo.ts',
       'shared/cards/community/__tests__/CUSTOM_Foo.test.ts',
       'shared/cards/register-all.ts',
+      'shared/cards/catalog.generated.ts',
       'docs/community_cards.md',
     ])
   })
 
-  it('returns 5 files when art_data provided', async () => {
+  it('returns 6 files when art_data provided', async () => {
     const files = await generatePrFiles({
       wcard,
       github_login: 'alice-gh',
@@ -52,9 +53,9 @@ export type AllCardImpls = typeof ALL_CARD_IMPLS
       pr_number: 0,
       art_data: { ext: 'webp', buffer: Buffer.from('fakepng') },
     })
-    expect(files).toHaveLength(5)
-    expect(files[4]!.path).toBe('public/card-art/community/CUSTOM_Foo.webp')
-    expect(files[4]!.encoding).toBe('base64')
+    expect(files).toHaveLength(6)
+    expect(files[5]!.path).toBe('public/card-art/community/CUSTOM_Foo.webp')
+    expect(files[5]!.encoding).toBe('base64')
   })
 
   it('uses card name from card_json in community_cards.md patch', async () => {
@@ -84,5 +85,19 @@ export type AllCardImpls = typeof ALL_CARD_IMPLS
     const registerFile = files.find((f) => f.path === 'shared/cards/register-all.ts')!
     expect(registerFile.content).toContain(`import { CUSTOM_Foo } from './community/CUSTOM_Foo'`)
     expect(registerFile.content).toContain(`'CUSTOM_Foo': CUSTOM_Foo.impl,`)
+  })
+
+  it('regenerates catalog.generated with the new card metadata', async () => {
+    const files = await generatePrFiles({
+      wcard,
+      github_login: 'alice-gh',
+      upstream_register_all: upstreamRegisterAll,
+      upstream_community_md: upstreamMd,
+      pr_number: 7,
+      art_data: null,
+    })
+    const catalogFile = files.find((f) => f.path === 'shared/cards/catalog.generated.ts')!
+    expect(catalogFile.content).toContain(`"id": "CUSTOM_Foo"`)
+    expect(catalogFile.content).toContain(`"kind": "minor"`)
   })
 })

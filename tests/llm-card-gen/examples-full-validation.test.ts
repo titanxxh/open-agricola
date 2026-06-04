@@ -3,7 +3,7 @@
  *
  * For each example, three checks:
  *   1. Sandbox compile + execute (validateAndCompileCustomCode)
- *   2. PR file generation (generatePrFiles produces 4 syntactically valid TS files)
+ *   2. PR file generation (generatePrFiles produces 5 syntactically valid TS files)
  *   3. Card Source file exports both UI metadata and implementation
  *
  * NOTE: We deliberately stop at "syntax + cross-ref" rather than full GameSession
@@ -48,7 +48,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
         expect(result.valid).toBe(true)
       })
 
-      it('PR generation produces 4 syntactically valid TS files', async () => {
+      it('PR generation produces 5 syntactically valid TS files', async () => {
         const ex = get()
         const wcard = {
           id: `example-${idx}`,
@@ -71,7 +71,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
           ),
           pr_number: 1000 + idx,
         })
-        expect(files.length).toBe(4)
+        expect(files.length).toBe(5)
         expect(files.some((f) => f.path.includes('cards-display'))).toBe(false)
         // Parse generated TS files — ensures no syntax errors
         for (const f of files) {

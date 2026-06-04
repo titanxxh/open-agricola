@@ -27,7 +27,7 @@ describe('checkGeneratedCardsSync', () => {
       path.join(majorRoot, 'well.ts'),
       `import { defineMajorCard } from '../card-source'\n` +
       `export const Well = defineMajorCard({\n` +
-      `  meta: { id: 'well', name: 'Well', kind: 'major', deck: 'major', number: 1, desc: [], cost: {} },\n` +
+      `  meta: { id: 'Well', name: 'Well', deck: 'major', number: 1, desc: [], cost: {}, vp: 0, extraVp: false },\n` +
       `})\n`,
     )
 
@@ -35,6 +35,7 @@ describe('checkGeneratedCardsSync', () => {
     writeSource(path.join(cardsRoot, 'register-all.ts'), `${generated.registerAll}// stale\n`)
     writeSource(path.join(cardsRoot, 'catalog.generated.ts'), generated.catalogGenerated)
     writeSource(path.join(majorRoot, 'generated.ts'), generated.majorGenerated)
+    writeSource(path.join(majorRoot, 'runtime.generated.ts'), generated.majorRuntimeGenerated)
 
     const result = checkGeneratedCardsSync(tmp)
 

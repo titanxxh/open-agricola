@@ -79,6 +79,16 @@ describe('buildHarvestFeedOptions', () => {
     expect(sheepWalker.length).toBeGreaterThan(0)
   })
 
+  it('lists major improvement exchanges from card metadata', () => {
+    const player = mkPlayer({
+      resources: { ...emptyResources, sheep: 1 },
+      improvements: ['Major_Fireplace1'],
+    })
+    const options = buildHarvestFeedOptions(player, 'en', cardLabel)
+    const fireplace = options.filter((o) => o.sourceId === 'Major_Fireplace1')
+    expect(fireplace.length).toBeGreaterThan(0)
+  })
+
   it('skips exchanges whose from resources player cannot afford', () => {
     const player = mkPlayer({
       resources: { ...emptyResources, sheep: 0 },
