@@ -65,6 +65,10 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
             resolve(REPO_ROOT, 'shared/cards/register-all.ts'),
             'utf-8',
           ),
+          upstream_catalog_generated: readFileSync(
+            resolve(REPO_ROOT, 'shared/cards/catalog.generated.ts'),
+            'utf-8',
+          ),
           upstream_community_md: readFileSync(
             resolve(REPO_ROOT, 'docs/community_cards.md'),
             'utf-8',
@@ -108,6 +112,10 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
           github_login: 'examples',
           upstream_register_all: readFileSync(
             resolve(REPO_ROOT, 'shared/cards/register-all.ts'),
+            'utf-8',
+          ),
+          upstream_catalog_generated: readFileSync(
+            resolve(REPO_ROOT, 'shared/cards/catalog.generated.ts'),
             'utf-8',
           ),
           upstream_community_md: readFileSync(

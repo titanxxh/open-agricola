@@ -47,6 +47,10 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         join(REPO_ROOT, 'shared/cards/register-all.ts'),
         'utf-8',
       )
+      const upstream_catalog_generated = readFileSync(
+        join(REPO_ROOT, 'shared/cards/catalog.generated.ts'),
+        'utf-8',
+      )
       const upstream_community_md = readFileSync(
         join(REPO_ROOT, 'docs/community_cards.md'),
         'utf-8',
@@ -57,6 +61,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         wcard,
         github_login: 'snapshot',
         upstream_register_all,
+        upstream_catalog_generated,
         upstream_community_md,
         pr_number: 999,
       })
