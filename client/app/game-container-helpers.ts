@@ -2,8 +2,10 @@ import { resourceKeyList } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import type { ActionChoiceOption, FarmTilePosition, Resource } from '../../shared/contract/types'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import type { PlayerScoreSummary } from '../../shared/domain/scoring'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import type { Locale } from '../../shared/i18n'
+import type { PlayerScoreRow } from '../components/board/ScorePanel'
 import type {
   PublicEventFenceEdgeHighlightTarget,
   PublicEventFarmTileHighlightTarget,
@@ -122,6 +124,47 @@ export const farmCommitErrorMessageKey = (
   return (error && error in typeMap)
     ? typeMap[error as keyof typeof typeMap]
     : `ui.${farmType}ErrorUnknown`
+}
+
+type CompactScorePlayer = {
+  id: string
+  name: string
+}
+
+export const buildCompactScoreRows = (
+  state: { players: readonly CompactScorePlayer[] } | null | undefined,
+  scores: readonly PlayerScoreSummary[] | null | undefined,
+  selfPlayerId: string | null | undefined,
+): PlayerScoreRow[] => {
+  if (!state) return []
+  const summaryById = new Map((scores ?? []).map((score) => [score.playerId, score]))
+  const myId = selfPlayerId ?? null
+  return state.players.map((player) => {
+    const summary = summaryById.get(player.id)
+    const catTotal = (key: string): number =>
+      summary?.categories.find((category) => category.key === key)?.total ?? 0
+    return {
+      id: player.id,
+      name: player.name,
+      isYou: myId !== null && player.id === myId,
+      total: summary?.total ?? 0,
+      breakdown: {
+        fields:
+          catTotal('fields') +
+          catTotal('grains') +
+          catTotal('vegetables') +
+          catTotal('pastures'),
+        animals:
+          catTotal('sheeps') +
+          catTotal('boars') +
+          catTotal('cattles') +
+          catTotal('stables'),
+        cardBonusVp: catTotal('cardBonusVp'),
+        family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
+        cards: catTotal('cards'),
+      },
+    }
+  })
 }
 
 const roomNeighborKeys = (key: string) => {

@@ -312,7 +312,7 @@ export const performRoundEnd = (core: GameCore): SessionResponse => {
     return core.emitResponse()
   }
 
-  core.appendHistory()
+  core.appendHistory(false, true)
   state.roundPhase = 'returning-home'
   appendImmediateEvents(state, [{ type: 'returnHome.started' }])
   return core.invokeBeforeReturnHomeHooks()

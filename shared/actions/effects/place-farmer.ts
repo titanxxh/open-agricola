@@ -8,7 +8,7 @@ import type {
 } from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../domain/space'
-import { smallestAvailableWorker } from '../../domain/player'
+import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/player'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
@@ -163,7 +163,7 @@ export const placeFarmerAction: ActionDefinition = {
     }
 
     if (actionContext?.fromSupply) {
-      const supply = (player.workers ?? []).find((w) => !w.isActive)
+      const supply = inactiveWorkersInSupply(player)[0]
       if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }

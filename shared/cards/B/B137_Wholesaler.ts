@@ -15,6 +15,13 @@ type WholesalerData = {
   cattleTaken: boolean
 }
 
+type WholesalerReward = {
+  listenerId: string
+  spaceId: string
+  takenKey: keyof WholesalerData
+  reward: Parameters<typeof gainLeaf>[1]
+}
+
 const INITIAL_DATA: WholesalerData = {
   vegetableTaken: false,
   boarTaken: false,
@@ -40,89 +47,39 @@ const takeRewardFlow = (value: WholesalerData, reward: Parameters<typeof gainLea
   ],
 })
 
-/**
- * After using VegetableSeeds, gain 1 vegetable from card.
- */
-const afterVegetableSeedsListener: CardListenerRegistration = {
-  id: 'B137-wholesaler-after-vegetable-seeds',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'vegetable-seeds') return
-    const data = getData(context)
-    if (data.vegetableTaken) return
-    return {
-      flow: takeRewardFlow({ ...data, vegetableTaken: true }, { vegetable: 1 }),
-      sourceCard: CARD_ID,
-    }
-  },
-}
+export const SPACE_REWARDS = [
+  { listenerId: 'B137-wholesaler-after-vegetable-seeds', spaceId: 'vegetable-seeds', takenKey: 'vegetableTaken', reward: { vegetable: 1 } },
+  { listenerId: 'B137-wholesaler-after-pig-market', spaceId: 'pig-market', takenKey: 'boarTaken', reward: { boar: 1 } },
+  { listenerId: 'B137-wholesaler-after-eastern-quarry', spaceId: 'eastern-quarry', takenKey: 'stoneTaken', reward: { stone: 1 } },
+  { listenerId: 'B137-wholesaler-after-cattle-market', spaceId: 'cattle-market', takenKey: 'cattleTaken', reward: { cattle: 1 } },
+] as const satisfies readonly WholesalerReward[]
 
-/**
- * After using PigMarket, gain 1 boar from card.
- */
-const afterPigMarketListener: CardListenerRegistration = {
-  id: 'B137-wholesaler-after-pig-market',
+const createSpaceRewardListener = (
+  { listenerId, spaceId, takenKey, reward }: WholesalerReward,
+): CardListenerRegistration => ({
+  id: listenerId,
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'pig-market') return
+    if (context.space?.id !== spaceId) return
     const data = getData(context)
-    if (data.boarTaken) return
+    if (data[takenKey]) return
+    const nextData: WholesalerData = { ...data, [takenKey]: true }
     return {
-      flow: takeRewardFlow({ ...data, boarTaken: true }, { boar: 1 }),
+      flow: takeRewardFlow(nextData, reward),
       sourceCard: CARD_ID,
     }
   },
-}
-
-/**
- * After using EasternQuarry, gain 1 stone from card.
- */
-const afterEasternQuarryListener: CardListenerRegistration = {
-  id: 'B137-wholesaler-after-eastern-quarry',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'eastern-quarry') return
-    const data = getData(context)
-    if (data.stoneTaken) return
-    return {
-      flow: takeRewardFlow({ ...data, stoneTaken: true }, { stone: 1 }),
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-/**
- * After using CattleMarket, gain 1 cattle from card.
- */
-const afterCattleMarketListener: CardListenerRegistration = {
-  id: 'B137-wholesaler-after-cattle-market',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'cattle-market') return
-    const data = getData(context)
-    if (data.cattleTaken) return
-    return {
-      flow: takeRewardFlow({ ...data, cattleTaken: true }, { cattle: 1 }),
-      sourceCard: CARD_ID,
-    }
-  },
-}
+})
 
 export const B137_Wholesaler_impl = {
-  listeners: [afterVegetableSeedsListener, afterPigMarketListener, afterEasternQuarryListener, afterCattleMarketListener],
+  listeners: SPACE_REWARDS.map(createSpaceRewardListener),
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'wholesaler', { ...INITIAL_DATA })
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      writeCardExtraData(player, CARD_ID, 'wholesaler', { ...INITIAL_DATA })
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

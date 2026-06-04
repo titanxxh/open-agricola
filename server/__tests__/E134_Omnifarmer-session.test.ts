@@ -116,7 +116,7 @@ describe('E134_Omnifarmer session', () => {
       setStored(player, stored)
 
       const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+      const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
       expect(bonusCat?.total ?? 0).toBe(expected)
     })
   })

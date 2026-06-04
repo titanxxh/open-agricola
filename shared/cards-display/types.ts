@@ -79,10 +79,6 @@ export class CardBase {
   mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
-  scoring?: {
-    resource: keyof Resource
-    map: Record<string, number>
-  }
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 
   constructor(data: CardDefinition) {

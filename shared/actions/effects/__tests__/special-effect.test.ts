@@ -123,6 +123,135 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ nested: 1 })
   })
 
+  it('record-scoring-reserve-bonus: records selected scoring reserve on the target player without spending resources', () => {
+    const actor = makePlayer()
+    const target = { ...makePlayer(), id: 'p2', name: 'P2', cardStates: {} }
+    target.resources.wood = 3
+    target.resources.clay = 1
+    const state = { players: [actor, target] } as GameState
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(actor, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: 2, clay: 1 },
+        score: 3,
+        cardType: 'occupation',
+      }, CARD_ID, state),
+      actionContext: { targetPlayerId: target.id },
+    })
+
+    expect(result.type).toBe('ok')
+    expect(readCardExtraData(target, CARD_ID, 'scoringReserveBonus')).toEqual({
+      reserved: { wood: 2, clay: 1 },
+      score: 3,
+      cardType: 'occupation',
+    })
+    expect(target.resources.wood).toBe(3)
+    expect(target.resources.clay).toBe(1)
+    expect(actor.cardStates).toEqual({})
+  })
+
+  it('record-scoring-reserve-bonus: rejects reserve above remaining resources after existing scoring reserve', () => {
+    const player = makePlayer()
+    player.resources.wood = 3
+    player.cardStates = {
+      OTHER_CARD: {
+        extraData: {
+          scoringReserveBonus: {
+            reserved: { wood: 2 },
+            score: 1,
+          },
+        },
+      },
+    }
+
+    const result = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: 2 },
+        score: 3,
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(result.type).toBe('fail')
+    expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
+  })
+
+  it('record-scoring-reserve-bonus: writes no scoring state for empty reserve with zero score', () => {
+    const player = makePlayer()
+
+    const result = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: {},
+        score: 0,
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(player.cardStates).toEqual({})
+  })
+
+  it('record-scoring-reserve-bonus: rejects negative or fractional reserve amounts', () => {
+    const player = makePlayer()
+    player.resources.wood = 3
+
+    const negative = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: -1 },
+        score: 1,
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+    const fractional = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: 1.5 },
+        score: 1,
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(negative.type).toBe('fail')
+    expect(fractional.type).toBe('fail')
+    expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
+  })
+
+  it('record-scoring-reserve-bonus: rejects invalid card type attribution', () => {
+    const player = makePlayer()
+    player.resources.wood = 3
+
+    const result = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { wood: 1 },
+        score: 1,
+        cardType: 'event',
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(result.type).toBe('fail')
+    expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toBeUndefined()
+  })
+
+  it('record-scoring-reserve-bonus: accepts real resource kinds chosen by the source card flow', () => {
+    const player = makePlayer()
+    player.resources.sheep = 2
+
+    const result = specialEffectAction.execute(
+      makeCtx(player, {
+        kind: 'record-scoring-reserve-bonus',
+        reserved: { sheep: 1 },
+        score: 1,
+      }, CARD_ID, { players: [player] } as GameState),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardExtraData(player, CARD_ID, 'scoringReserveBonus')).toEqual({
+      reserved: { sheep: 1 },
+      score: 1,
+    })
+  })
+
   it('set-extra-data: emits public literal state changes only', () => {
     const player = makePlayer()
     const events: DraftGameEvent[] = []

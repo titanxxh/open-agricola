@@ -186,6 +186,8 @@ const commitSelectionPayloadValidators: Record<string, (value: unknown) => boole
   edges: isStringArray,
   palisadeEdges: isStringArray,
   extraWood: (value) => typeof value === 'number',
+  fenceSources: (value) =>
+    isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string'),
   rooms: isFarmTilePositionArray,
   stables: isFarmTilePositionArray,
   tile: isFarmTilePositionPayload,
@@ -423,7 +425,12 @@ export const handleGameRoute = async (
     const board = playerBoard(normalizedState, playerIndex)
 
     if (body.type === 'fence') {
-      const fp = body.payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
+      const fp = body.payload as {
+        edges?: string[]
+        palisadeEdges?: string[]
+        extraWood?: number
+        fenceSources?: Record<string, string>
+      }
       const edges = Array.isArray(fp.edges) ? fp.edges : []
       const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
       const extraWood = fp.extraWood ?? 0
@@ -432,6 +439,7 @@ export const handleGameRoute = async (
         edges,
         palisadeEdges,
         extraWood,
+        fenceSources: fp.fenceSources,
         freeFences: 0,
         options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
         lockedKeys,

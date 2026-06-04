@@ -204,7 +204,7 @@ describe('E159_OldMiser session', () => {
       expect(farmerCat!.total).toBe(6) // Base farmer score still 6
 
       // Post-score penalty
-      const postScoreCat = result.categories.find((c) => c.key === 'cardStateBonusVp')
+      const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
       expect(postScoreCat).toBeDefined()
       expect(postScoreCat!.total).toBe(-2) // -1 per person * 2 people
     })
@@ -216,7 +216,7 @@ describe('E159_OldMiser session', () => {
       const state = createState(player)
       const [result] = computeScores(state)
 
-      const postScoreCat = result.categories.find((c) => c.key === 'cardStateBonusVp')
+      const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
       expect(postScoreCat).toBeDefined()
       expect(postScoreCat!.total).toBe(-5)
     })
@@ -228,7 +228,7 @@ describe('E159_OldMiser session', () => {
       const [result] = computeScores(state)
 
       // No post-score card effect should be registered without the card
-      const postScoreCat = result.categories.find((c) => c.key === 'cardStateBonusVp')
+      const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
       expect(postScoreCat).toBeUndefined()
     })
   })

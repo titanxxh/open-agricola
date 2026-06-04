@@ -31,6 +31,11 @@ import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { consumePendingExtraTurns } from '../../cards/card-effects'
+import {
+  SCORING_RESERVE_BONUS_KEY,
+  canAddScoringReserve,
+  normalizeScoringReserveResources,
+} from '../../domain/scoring-reserve'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -44,6 +49,12 @@ type ResourceAccumulationTarget =
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
+  | {
+      kind: 'record-scoring-reserve-bonus'
+      reserved: Partial<Resource>
+      score: number
+      cardType?: 'major' | 'minor' | 'occupation'
+    }
   | { kind: 'emit-card-triggered'; accepted?: boolean; optional?: boolean; triggerActionId?: string }
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
@@ -202,6 +213,32 @@ export const specialEffectAction: ActionDefinition = {
         writeCardExtraData(target, sourceCard, p.key, p.value)
         if (p.value !== undefined && isPublicCardStateEventValue(p.value)) {
           emitCardStateChanged(eventSink, sourceCard, target, p.key, p.value)
+        }
+        return { type: 'ok' }
+      case 'record-scoring-reserve-bonus':
+        if (typeof p.score !== 'number' || !Number.isFinite(p.score)) {
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        }
+        if (
+          p.cardType !== undefined &&
+          p.cardType !== 'major' &&
+          p.cardType !== 'minor' &&
+          p.cardType !== 'occupation'
+        ) {
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        }
+        {
+          const reserved = normalizeScoringReserveResources(p.reserved)
+          if (!reserved) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+          if (!canAddScoringReserve(target, reserved, { excludeCardId: sourceCard })) {
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
+          }
+          if (p.score === 0 && Object.keys(reserved).length === 0) return { type: 'ok' }
+          writeCardExtraData(target, sourceCard, SCORING_RESERVE_BONUS_KEY, {
+            reserved,
+            score: p.score,
+            ...(p.cardType ? { cardType: p.cardType } : {}),
+          })
         }
         return { type: 'ok' }
       case 'emit-card-triggered':

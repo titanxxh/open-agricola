@@ -3,53 +3,13 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PaymentResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
 import type { ActionDetailParts } from '../../../shared/contract/protocol/game'
-import { getCardMeta } from '../../services/card-meta'
-import { PlayerCard, type CardType } from '../common/PlayerCard'
+import { PlayerCard } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
-
-export type CardRef = { id: string; type: CardType; name: string }
+import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
   locale === 'zh' ? names.join('、') : names.join(', ')
-
-const humanizeCardId = (id: string): string =>
-  id
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim()
-
-const resolveCardName = (locale: Locale, id: string): CardRef | null => {
-  const tryKey = (prefix: string, type: CardRef['type']) => {
-    const name = t(locale, `${prefix}.${id}.name`)
-    if (!name.includes('.name')) return { id, type, name: name.replace(/\s*[（(].*$/, '') }
-    return null
-  }
-  const translated =
-    tryKey('improvements', 'major') ??
-    tryKey('minorImprovements', 'minor') ??
-    tryKey('occupations', 'occupation')
-  if (translated) return translated
-
-  const meta = getCardMeta(id)
-  if (!meta) return null
-
-  const type: CardRef['type'] =
-    meta.type === 'major'
-      ? 'major'
-      : meta.type === 'minor'
-        ? 'minor'
-        : meta.type === 'occupation'
-          ? 'occupation'
-          : t(locale, `minorImprovements.${id}.name`) !== `minorImprovements.${id}.name`
-            ? 'minor'
-            : 'occupation'
-
-  return { id, type, name: meta.name.replace(/\s*[（(].*$/, '') }
-}
-
-const resolveCardDisplayName = (locale: Locale, id: string) =>
-  resolveCardName(locale, id)?.name ?? humanizeCardId(id)
 
 const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   const translated = t(locale, value)
@@ -143,7 +103,7 @@ const renderRichTemplate = (
     })
 }
 
-const LogCardLink = ({
+export const LogCardLink = ({
   locale,
   cardRef,
   children,
@@ -438,7 +398,7 @@ export const prepareLogEntry = (
       : []
     if (bonusSourceIds.length > 0) {
       const refs = bonusSourceIds
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       if (refs.length > 0) {
         richParams.via = (
@@ -604,7 +564,7 @@ export const prepareLogEntry = (
     }
     if (effectData.improvements && effectData.improvements.length > 0) {
       const refs = effectData.improvements
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       effects.push(
         <>
@@ -619,7 +579,7 @@ export const prepareLogEntry = (
     }
     if (effectData.minorImprovements && effectData.minorImprovements.length > 0) {
       const refs = effectData.minorImprovements
-        .map((id) => resolveCardName(locale, id))
+        .map((id) => resolveCardRef(locale, id))
         .filter((ref): ref is CardRef => ref !== null)
       effects.push(
         <>
@@ -644,7 +604,7 @@ export const prepareLogEntry = (
       )
     }
     const bonusSourceRefs = (detailParts.bonusSources ?? [])
-      .map((id) => resolveCardName(locale, id))
+      .map((id) => resolveCardRef(locale, id))
       .filter((ref): ref is CardRef => ref !== null)
     const segments: ReactNode[] = []
     if (
@@ -721,7 +681,7 @@ export const prepareLogEntry = (
   }
 
   const cardRefs = cardIds
-    .map((id) => resolveCardName(locale, id))
+    .map((id) => resolveCardRef(locale, id))
     .filter((ref): ref is CardRef => ref !== null)
   const textParams = params
     ? (Object.fromEntries(

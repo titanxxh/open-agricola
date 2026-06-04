@@ -72,6 +72,9 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         effect: {
           id: 'test',
           handHooks: ['onRoundStart'],
+          beforeEndGameScope: 'allPlayers',
+          beforeEndGameDispatchMode: 'select',
+          beforeEndGameMandatory: true,
           onRoundStart: (state, player) => {},
         },
       }

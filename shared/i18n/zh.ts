@@ -77,6 +77,14 @@ export const zh = {
       bonusVp: '额外得分',
     },
     cards: {
+      A136_DrudgeryReeve: {
+        prompt: '选择要计分的建材套数',
+        scoreSets: '计分 {sets} 套（{score} 额外分）',
+      },
+      C133_Soldier: {
+        prompt: '选择要计分的木头+石头对数',
+        scorePairs: '计分 {pairs} 对（{score} 额外分）',
+      },
       D132_HideFarmer: {
         optional: '隐藏未使用农场格？',
         markSpaces: {
@@ -154,8 +162,8 @@ export const zh = {
     scoringClayRooms: '黏土房',
     scoringStoneRooms: '石屋',
     scoringFarmers: '家庭成员',
-    scoringCards: '改良卡',
-    scoringCardsBonus: '改良加分',
+    scoringCards: '卡牌分',
+    scoringCardsBonus: '卡牌加分',
     scoringBeggings: '乞讨卡',
     scoringBonusDetail: '{count}{resource}',
     scoringPadButton: '计分板',
@@ -381,6 +389,9 @@ export const zh = {
     fenceModeToggle: '围栏放置模式',
     fenceModeFence: '围栏（1 木）',
     fenceModePalisade: '木桩（2 木，+1 VP）',
+    borrowedFenceSourceTitle: '借用围栏来源',
+    borrowedFenceSourceCount: '{allocated}/{cap}',
+    borrowedFenceSourceMissing: '请为每段已选择围栏指定来源。',
     interactionFarmRedevelopmentChoice: '改建并可追加围栏',
     interactionRenovateBuildFences: '改建并建造 {count} 段围栏',
     houseWood: '木屋',
@@ -1353,6 +1364,9 @@ export const zh = {
       EDGE_TYPE_CONFLICT: '同一段不能同时选为围栏和木桩',
       SEGMENT_TYPE_NOT_ALLOWED: '此行动不能建造该类型的围栏',
       PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
+      BORROWED_FENCE_SOURCE_REQUIRED: '需要为每段借来的围栏选择来源玩家',
+      BORROWED_FENCE_SOURCE_INVALID: '借来围栏的来源必须和已选择围栏段一致',
+      BORROWED_FENCE_DONOR_LIMIT_EXCEEDED: '借来的围栏超过来源玩家可提供上限',
     },
   },
   'salter-pick': {

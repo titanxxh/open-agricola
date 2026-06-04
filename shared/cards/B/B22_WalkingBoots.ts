@@ -53,6 +53,7 @@ export const B22_WalkingBoots_impl = {
         if (worker) {
           worker.isActive = false
           worker.isNewborn = false
+          worker.removedFromSupply = true
         }
       }
       writeCardExtraData(player, CARD_ID, 'markedSpaceId', undefined)

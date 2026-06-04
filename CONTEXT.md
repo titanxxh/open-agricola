@@ -112,9 +112,50 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**Scoring Reserve**:
+终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
+_Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
+
+**Card Bonus VP**:
+由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
+统一 score category 是 `cardBonusVp`，不保留旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` shape。
+_Avoid_: Improvement bonus、card state bonus、printed VP
+
 **Supply Token**:
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限
+
+**Family Token Limit（家庭成员 token 上限）**:
+玩家可拥有或激活的家庭成员 token 总上限；通常来自玩家的 worker token supply，也可以被卡牌改变。它限制家庭成员总数，但不表示当前住房是否足够。
+_Avoid_: 当前家庭成员数、当前可放工人数、有效住房容量
+
+**Removed Family Token（已移除家庭成员 token）**:
+被卡牌永久移出玩家 family token supply 的 worker token。它不再是可通过 family growth 激活的 inactive worker，也不计入家庭成员 token 上限。
+_Avoid_: newborn、暂时在行动格或卡牌上的 worker、尚未出生的 inactive worker
+
+**Effective Housing Capacity（有效住房容量）**:
+玩家当前住房可以容纳的家庭成员数量，由房间和提供额外居住空间的卡牌共同决定。它用于判断需要住房的家庭增长是否有空间，和房间数量、家庭成员 token 上限都不是同一个概念。
+_Avoid_: 房间数量、家庭成员 token supply
+
+**Farm Fence Segment Count（农场围栏段数）**:
+当前玩家农场边上已经建出的围栏类边段数量，包含 own ordinary fence、borrowed fence 和 palisade。它描述农场版图上的围栏段展示与几何，不代表玩家自己的 ordinary fence supply。
+_Avoid_: own ordinary fence reserve、own ordinary fence build max
+
+**Effective Farm Fence Segment Limit（有效农场围栏段数上限）**:
+玩家当前农场面板可展示的围栏类边段上限。它以玩家 own ordinary fence build max 为基础，并把已经建在该农场上的 borrowed fence、palisade 等非 own ordinary 边段提供的额外上限计入；它服务面板容量展示，不等同于 own ordinary fence supply。
+_Avoid_: own ordinary fence reserve、donor 的 supply 上限
+
+**Borrowed Fence**:
+建在当前玩家农场、但来源属于其他玩家的普通 fence；仍参与当前农场的几何、牧场、动物规则、农场围栏段数和有效农场围栏段数上限，但不计入当前玩家 own ordinary fence supply。
+_Avoid_: bonus VP、特殊 fence 类型
+
+**Donor / Source Owner**:
+提供 borrowed fence 组件的玩家；组件被借走后，donor 的 own ordinary fence reserve / build max 会减少。
+_Avoid_: 当前行动执行玩家、农场 owner
+
+**Stable Supply Usage（畜栏 supply 占用）**:
+玩家 stable supply 中已经离开 reserve、但没有被永久支付或移除的畜栏组件占用。已建普通畜栏、行动或未来轮保留的畜栏、以及卡牌产生的特殊畜栏都属于占用；永久消耗会降低 stable supply 上限，不算占用。
+_Avoid_: 卡牌口径 Stable、动物容量、永久消耗的 supply token
 
 **卡牌口径 Stable**:
 卡牌文本中“你拥有的 stable”“本次建造的 stable”“unfenced stable”使用的畜栏口径；包含普通畜栏和 Farm Hand stable 这类只参与卡牌统计的特殊畜栏。
@@ -131,6 +172,10 @@ _Avoid_: 前端规则补丁、核心路径单卡 if-else
 **Card Effect Hook**:
 卡牌在阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。
 _Avoid_: listener phase
+
+**Before-End Player Dispatch**:
+终局计分前按 target player 座次触发 `onBeforeEndGame` card-effect activation 的阶段机制；owner-scope 卡只在自己 target step 触发，allPlayers 卡可在每个 target step 触发，同一 target step 内的 select trigger 复用 `ParallelNode(mode='trigger-select')`。
+_Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 
 **Card Listener**:
 监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。

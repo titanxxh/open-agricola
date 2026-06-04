@@ -58,6 +58,21 @@ describe('E16_BriarHedge session', () => {
     ]
     expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(true)
   })
+
+  it('animals held on animal-holder cards count', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.stableAnimals = { '0-0': 'boar' }
+    player.cardStates = {
+      Test_AnimalHolder: {
+        extraData: { held: 1, animalType: 'cattle' },
+      },
+    }
+    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(true)
+  })
 })
 
 describe('E16 BriarHedge — border-fence discount', () => {

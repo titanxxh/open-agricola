@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
@@ -23,7 +23,7 @@ import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
-import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
+import { ScorePanel } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
@@ -40,10 +40,11 @@ import {
   buildBakeBulkChoice,
   hasSelectedBakeGrain,
 } from './bake-exchange-ui'
-import { buildStableCommitPayload } from './farm-commit-ui'
+import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
+  buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   farmCommitErrorMessageKey,
@@ -307,6 +308,7 @@ export const GameContainerApi = () => {
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
+  const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
@@ -427,6 +429,8 @@ export const GameContainerApi = () => {
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
+    pendingFenceSources, setPendingFenceSources,
+    selectedFenceSourcePlayerId, setSelectedFenceSourcePlayerId,
     fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
     pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
     pendingStableTiles, setPendingStableTiles, stableError, setStableError,
@@ -464,6 +468,8 @@ export const GameContainerApi = () => {
     }
     if (payload.ok) {
       setPendingFenceEdges([])
+      setPendingFenceSources({})
+      setSelectedFenceSourcePlayerId(null)
       setFenceError(null)
       setPendingRoomTiles([])
       setRoomError(null)
@@ -476,7 +482,7 @@ export const GameContainerApi = () => {
       setSowError(null)
       setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return
@@ -563,15 +569,32 @@ export const GameContainerApi = () => {
     void transport.takeAction(state.currentPlayerIndex, space.id).catch((e) => console.error('takeAction error', e))
   }, [state, transport, isInteractive, interaction, placeFarmerChoiceBySpaceId])
 
+  const allowedCommands = interaction.allowedCommands as readonly InteractionCommand[]
+  const canUndoStep = allowedCommands.includes('undoStep')
+  const canUndoAction = allowedCommands.includes('undoAction')
+  const gameOverScoringKey = state?.gameOver
+    ? `${state.gameSeed}:${state.round}:${state.nextEventSeq}`
+    : null
+  const shouldShowScoringPad =
+    showScoringPad || (gameOverScoringKey !== null && dismissedGameOverScoringKey !== gameOverScoringKey)
+  const showScoring = useCallback(() => {
+    setDismissedGameOverScoringKey(null)
+    setShowScoringPad(true)
+  }, [])
+  const closeScoring = useCallback(() => {
+    if (gameOverScoringKey !== null) setDismissedGameOverScoringKey(gameOverScoringKey)
+    setShowScoringPad(false)
+  }, [gameOverScoringKey])
+
   const undoStep = useCallback(() => {
-    if (!isInteractive) return
+    if (!isInteractive || !canUndoStep) return
     void transport.undoStep().catch((e) => console.error('undo error', e))
-  }, [transport, isInteractive])
+  }, [transport, isInteractive, canUndoStep])
 
   const undoAction = useCallback(() => {
-    if (!isInteractive) return
+    if (!isInteractive || !canUndoAction) return
     void transport.undoAction().catch((e) => console.error('undoAction error', e))
-  }, [transport, isInteractive])
+  }, [transport, isInteractive, canUndoAction])
 
   const takeAnytimeAction = useCallback((actionId: string) => {
     if (!state || !isInteractive) return
@@ -627,11 +650,27 @@ export const GameContainerApi = () => {
         return
       }
       if (farm.farmType === 'fence') {
-        void transport.commitSelection(pendingPlayerIndex, {
-          edges: pendingFenceEdges,
-          palisadeEdges: pendingPalisadeEdges,
-          extraWood: farm.extraWood ?? 0,
-        })
+        if (
+          farm.fenceSource?.kind === 'borrowed' &&
+          pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId])
+        ) {
+          setFenceError({
+            code: 'BORROWED_FENCE_SOURCE_REQUIRED',
+            edges: pendingFenceEdges,
+            newEdges: pendingFenceEdges,
+          })
+          return
+        }
+        void transport.commitSelection(
+          pendingPlayerIndex,
+          buildFenceCommitPayload(
+            pendingFenceEdges,
+            pendingPalisadeEdges,
+            farm.extraWood ?? 0,
+            farm.fenceSource,
+            pendingFenceSources,
+          ),
+        )
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('fence', resp.error)
           })
@@ -725,7 +764,7 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setFenceError, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -1170,6 +1209,41 @@ export const GameContainerApi = () => {
     interaction.stateId === 'wait' ? interaction.farm ?? null : null
   const selectionInteraction =
     interaction.stateId === 'wait' ? interaction.selection ?? null : null
+  const borrowedFenceSource =
+    farmInteraction?.farmType === 'fence' ? farmInteraction.fenceSource : undefined
+  const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'
+  const borrowedFenceSourceControls = useMemo(() => {
+    if (!isBorrowedFenceSelection || !borrowedFenceSource || !state) return undefined
+    return {
+      donors: Object.entries(borrowedFenceSource.donorCaps).map(([playerId, cap]) => {
+        const donor = state.players.find((player) => player.id === playerId)
+        return {
+          playerId,
+          name: donor?.name ?? playerId,
+          color: donor?.color ?? 'black',
+          cap,
+          allocated: Object.values(pendingFenceSources).filter((id) => id === playerId).length,
+        }
+      }),
+      selectedPlayerId: selectedFenceSourcePlayerId,
+      onSelect: setSelectedFenceSourcePlayerId,
+      hasMissingSources: pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId]),
+    }
+  }, [
+    borrowedFenceSource,
+    isBorrowedFenceSelection,
+    pendingFenceEdges,
+    pendingFenceSources,
+    selectedFenceSourcePlayerId,
+    setSelectedFenceSourcePlayerId,
+    state,
+  ])
+
+  useEffect(() => {
+    if (isBorrowedFenceSelection && fencePlacementMode === 'palisade') {
+      setFencePlacementMode('fence')
+    }
+  }, [fencePlacementMode, isBorrowedFenceSelection, setFencePlacementMode])
 
   const occupationHandInteraction = useMemo(
     () =>
@@ -1411,6 +1485,13 @@ export const GameContainerApi = () => {
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) =>
     togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
+  const wrappedToggleFenceEdge = (edgeId: string) =>
+    toggleFenceEdge(
+      edgeId,
+      isBorrowedFenceSelection && borrowedFenceSource
+        ? { donorCaps: borrowedFenceSource.donorCaps }
+        : undefined,
+    )
   const setViewPlayerIdSafe = useCallback((value: string) => {
     setViewPlayerId(value)
   }, [])
@@ -1512,52 +1593,10 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
-  // ── Right-column data mappings (Batch 3 Task 7) ───────────────────────────
-  //
-  // Map shared/domain/scoring.ts `PlayerScoreSummary` (one entry per player)
-  // into the 5-bucket breakdown that ScorePanel expects. These are *estimates*
-  // — spec explicitly says "估算分数" is OK for the live chip — so we collapse
-  // related categories pragmatically:
-  //
-  //   fields  ← fields + grains + vegetables + pastures (everything farm-plot)
-  //   animals ← sheeps + boars + cattles + stables
-  //   food    ← cardsBonus (major-improvement food bonuses, e.g. Fireplace) + bonus VP
-  //   family  ← farmers (rooms + family count VP)
-  //   cards   ← cards (occupations + minors + majors printed VP)
-  //
-  // `scores` comes from useGameSync; falls back to empty map if absent.
-  const scoreRows = useMemo<PlayerScoreRow[]>(() => {
-    if (!state) return []
-    const summaryById = new Map((scores ?? []).map((s) => [s.playerId, s]))
-    const myId = selfPlayer?.id ?? null
-    return state.players.map((p) => {
-      const summary = summaryById.get(p.id)
-      const catTotal = (key: string): number =>
-        summary?.categories.find((c) => c.key === key)?.total ?? 0
-      const breakdown = {
-        fields:
-          catTotal('fields') +
-          catTotal('grains') +
-          catTotal('vegetables') +
-          catTotal('pastures'),
-        animals:
-          catTotal('sheeps') +
-          catTotal('boars') +
-          catTotal('cattles') +
-          catTotal('stables'),
-        food: catTotal('cardsBonus') + catTotal('cardStateBonusVp'),
-        family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
-        cards: catTotal('cards'),
-      }
-      return {
-        id: p.id,
-        name: p.name,
-        isYou: myId !== null && p.id === myId,
-        total: summary?.total ?? 0,
-        breakdown,
-      }
-    })
-  }, [state, scores, selfPlayer?.id])
+  const scoreRows = useMemo(
+    () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null),
+    [state, scores, selfPlayer?.id],
+  )
 
   const resourceKeys = resourceKeyList
 
@@ -2013,7 +2052,7 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
-      {showScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={() => setShowScoringPad(false)} showDraftHistory={state.gameOver} /> : null}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
       {devMode && isInteractive ? (
         <DevPanel
           locale={locale} players={state.players}
@@ -2086,13 +2125,13 @@ export const GameContainerApi = () => {
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
               stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingPalisadeSet={pendingPalisadeSet}
+              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-              fencePlacementMode={fencePlacementMode}
+              fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}
               toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
               toggleFarmHand={wrappedToggleFarmHand}
               togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-              toggleFenceEdge={toggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
+              toggleFenceEdge={wrappedToggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
               confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
               setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
               isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
@@ -2179,7 +2218,9 @@ export const GameContainerApi = () => {
         isInteractive={isInteractive}
         onUndo={undoStep}
         onUndoAction={undoAction}
-        onShowScoring={() => setShowScoringPad(true)}
+        canUndoStep={canUndoStep}
+        canUndoAction={canUndoAction}
+        onShowScoring={showScoring}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
         anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}
@@ -2187,6 +2228,7 @@ export const GameContainerApi = () => {
         canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}
         setFencePlacementMode={setFencePlacementMode}
+        borrowedFenceSources={borrowedFenceSourceControls}
         animalReorg={animalReorg}
         reorgRemaining={reorgRemaining}
         hasReorgOverflow={hasReorgOverflow}

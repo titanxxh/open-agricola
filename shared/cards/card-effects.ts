@@ -164,6 +164,8 @@ export const cardEffectHooks: CardEffectField[] = [
 
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
+export type BeforeEndGameScope = 'owner' | 'allPlayers'
+export type BeforeEndGameDispatchMode = 'serial' | 'select'
 
 export type ResolveChoiceHandler = (
   state: GameState,
@@ -184,7 +186,7 @@ export type BonusScoreLevel = {
 }
 
 /** Read-only context passed to bonus-scoring handlers.
- *  Standard categories (fields/pastures/.../cards/cardsBonus) are already computed. */
+ *  Standard categories (fields/pastures/.../cards) are already computed. */
 export type BonusScoringContext = {
   categories: readonly ScoreCategoryResult[]
 }
@@ -332,6 +334,9 @@ export type CardEffect = {
    * and into the played arrays, and only the normal hook path applies.
    */
   handHooks?: CardEffectHook[]
+  beforeEndGameScope?: BeforeEndGameScope
+  beforeEndGameDispatchMode?: BeforeEndGameDispatchMode
+  beforeEndGameMandatory?: boolean
 }
 
 export const getCardEffect = (id: string): CardEffect | null => {

@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B30_WoodPalisades'
 import { fenceAction } from '../fencing'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
+import { getOwnOrdinaryFenceReserveCount } from '../../../domain/supply-tokens'
+import { SessionCardContext, withSessionContext } from '../../../cards/session-card-context'
+import type { CardListenerRegistration } from '../../../cards/card-listeners'
 import type {
   ActionMutationContext,
   ActionSpace,
+  DraftGameEvent,
   GameState,
   PlayerState,
   Resource,
@@ -45,6 +49,13 @@ const twoCellPastureEdges = [
   'V-0-3',
 ]
 
+const borrowedPolicy = (donorCaps: Record<string, number>) => ({
+  allowedSegmentTypes: ['fence'],
+  sourcePolicy: { kind: 'borrowed', donorCaps },
+  segmentBounds: { fence: { min: 1 }, total: { min: 1 } },
+  costPolicy: { fence: { wood: 0 } },
+})
+
 const openAirPasturePolicy = {
   sourcePolicy: 'ownOnly',
   segmentBounds: { fence: { max: 6 } },
@@ -59,9 +70,11 @@ const openAirPasturePolicy = {
 const makeCtx = (
   opts: {
     player?: Partial<PlayerState>
+    otherPlayers?: Partial<PlayerState>[]
     actionContext?: Record<string, unknown>
     costs?: Partial<Resource>
     events?: string[]
+    rawEvents?: DraftGameEvent[]
   } = {},
 ): ActionMutationContext => {
   const player = {
@@ -94,8 +107,38 @@ const makeCtx = (
     activeModifiers: [],
     ...(opts.player ?? {}),
   } as unknown as PlayerState
+  const otherPlayers = (opts.otherPlayers ?? []).map((other, index) => ({
+    id: `p${index + 2}`,
+    name: `P${index + 2}`,
+    resources: {
+      wood: 4,
+      clay: 0,
+      stone: 0,
+      reed: 0,
+      grain: 0,
+      vegetable: 0,
+      food: 0,
+      sheep: 0,
+      boar: 0,
+      cattle: 0,
+    },
+    fields: [],
+    roomTiles: [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ],
+    stableTiles: [],
+    pastures: [],
+    fenceSegments: [],
+    cardStates: {},
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [],
+    activeModifiers: [],
+    ...other,
+  })) as unknown as PlayerState[]
   const state = {
-    players: [player],
+    players: [player, ...otherPlayers],
     currentPlayerIndex: 0,
   } as unknown as GameState
   return {
@@ -105,9 +148,15 @@ const makeCtx = (
     actionContext: opts.actionContext,
     costs: opts.costs,
     eventSink: {
-      emit: (event: { type: string }) => opts.events?.push(event.type),
-      emitMany: (events: Array<{ type: string }>) =>
-        events.forEach((event) => opts.events?.push(event.type)),
+      emit: (event: DraftGameEvent) => {
+        opts.events?.push(event.type)
+        opts.rawEvents?.push(event)
+      },
+      emitMany: (events: DraftGameEvent[]) =>
+        events.forEach((event) => {
+          opts.events?.push(event.type)
+          opts.rawEvents?.push(event)
+        }),
     },
   } as ActionMutationContext
 }
@@ -361,6 +410,262 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(0)
     expect(ctx.player.fenceSegments).toHaveLength(4)
     expect(events).toContain('farm.fenceBuilt')
+  })
+
+  it('builds borrowed ordinary fences and consumes donor supply', () => {
+    const rawEvents: DraftGameEvent[] = []
+    const donor = { id: 'p2', name: 'P2' } as Partial<PlayerState>
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      otherPlayers: [donor],
+      actionContext: {
+        fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          sourcePolicy: { kind: 'borrowed', donorCaps: { p2: 4 } },
+          segmentBounds: { fence: { min: 1, max: 4 }, total: { min: 1, max: 4 } },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      },
+      rawEvents,
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+      fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
+    })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({})
+    expect(ctx.player.fenceSegments).toEqual(
+      edgesForTile(0, 0).map((edge) => ({
+        edge,
+        type: 'fence',
+        source: { kind: 'borrowed', ownerPlayerId: 'p2' },
+      })),
+    )
+    expect(ctx.state.players[1]?.supplyTokensConsumed?.fence).toBe(4)
+    expect(getOwnOrdinaryFenceReserveCount(ctx.state.players[1]!)).toBe(11)
+    expect(rawEvents).toContainEqual(
+      expect.objectContaining({
+        type: 'farm.fenceBuilt',
+        fences: expect.arrayContaining([
+          expect.objectContaining({
+            edge: 'H-0-0',
+            type: 'fence',
+            source: { kind: 'borrowed', ownerPlayerId: 'p2' },
+          }),
+        ]),
+      }),
+    )
+  })
+
+  it('exposes borrowed donor caps in the farm-select request', () => {
+    const result = fenceAction.execute(
+      makeCtx({
+        actionContext: {
+          fencePolicy: borrowedPolicy({ p2: 2, p3: 1 }),
+        },
+      }),
+    )
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('farm-select')
+    if (result.request.kind !== 'farm-select') return
+    expect(result.request.farm).toMatchObject({
+      farmType: 'fence',
+      fenceSource: { kind: 'borrowed', donorCaps: { p2: 2, p3: 1 } },
+    })
+  })
+
+  it('rejects borrowed ordinary fences without per-edge sources', () => {
+    const ctx = makeCtx({
+      otherPlayers: [{ id: 'p2', name: 'P2' }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 4 }),
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'BORROWED_FENCE_SOURCE_REQUIRED',
+      recoverable: true,
+    })
+  })
+
+  it('rejects borrowed source maps that do not exactly match new ordinary edges', () => {
+    const ctx = makeCtx({
+      otherPlayers: [{ id: 'p2', name: 'P2' }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 4 }),
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+      fenceSources: { ...Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])), 'H-2-2': 'p2' },
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'BORROWED_FENCE_SOURCE_INVALID',
+      recoverable: true,
+    })
+  })
+
+  it('rejects borrowed ordinary fences assigned over donor cap', () => {
+    const ctx = makeCtx({
+      otherPlayers: [{ id: 'p2', name: 'P2' }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 2 }),
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+      fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'BORROWED_FENCE_DONOR_LIMIT_EXCEEDED',
+      recoverable: true,
+    })
+  })
+
+  it('rechecks donor reserve at commit time before consuming borrowed fences', () => {
+    const ctx = makeCtx({
+      otherPlayers: [{ id: 'p2', name: 'P2', supplyTokensConsumed: { fence: 14 } }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 4 }),
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+      fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'BORROWED_FENCE_DONOR_LIMIT_EXCEEDED',
+      recoverable: true,
+    })
+    expect(ctx.state.players[1]?.supplyTokensConsumed?.fence).toBe(14)
+  })
+
+  it('allows borrowed fences beyond the active player own ordinary limit', () => {
+    const existing = [...widePastureEdges, 'H-0-0'].map((edge) => ({
+      edge,
+      type: 'fence' as const,
+      source: { kind: 'own' as const, ownerPlayerId: 'p1' },
+    }))
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [],
+        fenceSegments: existing,
+      },
+      otherPlayers: [{ id: 'p2', name: 'P2' }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 2 }),
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+      fenceSources: { 'H-1-0': 'p2', 'V-0-0': 'p2' },
+    })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(ctx.player.fenceSegments).toHaveLength(17)
+    expect(ctx.state.players[1]?.supplyTokensConsumed?.fence).toBe(2)
+  })
+
+  it('applies positive computeCosts modifiers to zero-cost borrowed fencing', () => {
+    const sessionContext = new SessionCardContext()
+    const listener: CardListenerRegistration = {
+      id: 'test-borrowed-fence-surcharge',
+      phases: ['computeCosts'],
+      actions: ['fence'],
+      handler: () => ({ costs: { wood: 1 } }),
+    }
+    sessionContext.registerListener(listener)
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 1,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      otherPlayers: [{ id: 'p2', name: 'P2' }],
+      actionContext: {
+        fencePolicy: borrowedPolicy({ p2: 4 }),
+      },
+    })
+
+    const result = withSessionContext(sessionContext, () =>
+      fenceAction.resolveChoice!(ctx, 'confirm', {
+        edges: edgesForTile(0, 0),
+        palisadeEdges: [],
+        extraWood: 0,
+        fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
+      }),
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 1 })
   })
 
   it('first call with multi-combo payment returns choice + actionContextWrite', () => {

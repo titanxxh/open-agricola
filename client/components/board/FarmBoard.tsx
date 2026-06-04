@@ -5,16 +5,19 @@ import type {
   CardResourceStats,
   CropStack,
   FarmTilePosition,
+  GameState,
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
-import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
-import { getFenceCount } from '../../../shared/domain/fence-segments'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
+import {
+  getPlayerPanelSupplySummary,
+  type PlayerPanelSupplySummary,
+} from '../../../shared/domain/player-panel-summary'
 import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
@@ -126,6 +129,21 @@ const CardStackItem = ({
   )
 }
 
+const CompactResourceItem = ({
+  iconClass,
+  value,
+  label,
+}: {
+  iconClass: string
+  value: number | string
+  label: string
+}) => (
+  <span className="res-compact-item" title={label} aria-label={label}>
+    <span className={`res-icon ${iconClass}`} aria-hidden="true" />
+    <span className="res-compact-num">{value}</span>
+  </span>
+)
+
 const SowChoiceButtons = ({
   locale,
   tileKey,
@@ -227,6 +245,7 @@ export type FarmBoardProps = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  playerPanelSummary?: PlayerPanelSupplySummary
   devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
@@ -269,6 +288,7 @@ export type FarmBoardProps = {
   hasReorgOverflow: boolean
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
+  pendingFenceSourceMap?: Record<string, string>
   pendingPalisadeSet?: Set<string>
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
@@ -544,6 +564,7 @@ export const FarmBoard = ({
   players,
   currentPlayer,
   displayPlayer,
+  playerPanelSummary,
   currentStartPlayerId,
   nextStartPlayerId,
   playedCards,
@@ -577,6 +598,7 @@ export const FarmBoard = ({
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
+  pendingFenceSourceMap,
   pendingPalisadeSet,
   existingFenceSet,
   fenceSelectableSet,
@@ -605,6 +627,25 @@ export const FarmBoard = ({
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+  const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
+  const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
+  const compactLabels = locale === 'zh'
+    ? {
+        family: '家庭成员容量',
+        rooms: '房间',
+        housing: '住房容量',
+        fields: '田地',
+        fence: '栅栏容量',
+        stable: '畜栏供给',
+      }
+    : {
+        family: 'Family capacity',
+        rooms: 'Rooms',
+        housing: 'Housing capacity',
+        fields: 'Fields',
+        fence: 'Fence capacity',
+        stable: 'Stable supply',
+      }
 
   // Multi-select state for occupation-hand selection interaction
   const isMultiOccupationSelect = !!occupationHandSelection
@@ -651,30 +692,31 @@ export const FarmBoard = ({
         <div className="player-summary">{displayPlayer.name}</div>
         <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">
-            <span className="res-icon res-icon-wood" /><span className="res-compact-num">{displayPlayer.resources.wood}</span>
-            <span className="res-icon res-icon-clay" /><span className="res-compact-num">{displayPlayer.resources.clay}</span>
-            <span className="res-icon res-icon-reed" /><span className="res-compact-num">{displayPlayer.resources.reed}</span>
-            <span className="res-icon res-icon-stone" /><span className="res-compact-num">{displayPlayer.resources.stone}</span>
-            <span className="res-icon res-icon-grain" /><span className="res-compact-num">{displayPlayer.resources.grain}</span>
-            <span className="res-icon res-icon-vegetable" /><span className="res-compact-num">{displayPlayer.resources.vegetable}</span>
+            <CompactResourceItem iconClass="res-icon-wood" value={displayPlayer.resources.wood} label={`${t(locale, 'resources.wood')}: ${displayPlayer.resources.wood}`} />
+            <CompactResourceItem iconClass="res-icon-clay" value={displayPlayer.resources.clay} label={`${t(locale, 'resources.clay')}: ${displayPlayer.resources.clay}`} />
+            <CompactResourceItem iconClass="res-icon-reed" value={displayPlayer.resources.reed} label={`${t(locale, 'resources.reed')}: ${displayPlayer.resources.reed}`} />
+            <CompactResourceItem iconClass="res-icon-stone" value={displayPlayer.resources.stone} label={`${t(locale, 'resources.stone')}: ${displayPlayer.resources.stone}`} />
+            <CompactResourceItem iconClass="res-icon-grain" value={displayPlayer.resources.grain} label={`${t(locale, 'resources.grain')}: ${displayPlayer.resources.grain}`} />
+            <CompactResourceItem iconClass="res-icon-vegetable" value={displayPlayer.resources.vegetable} label={`${t(locale, 'resources.vegetable')}: ${displayPlayer.resources.vegetable}`} />
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
-            <span className="res-icon res-icon-food" /><span className="res-compact-num">{displayPlayer.resources.food}</span>
-            <span className="res-icon res-icon-sheep" /><span className="res-compact-num">{displayPlayer.resources.sheep}</span>
-            <span className="res-icon res-icon-boar" /><span className="res-compact-num">{displayPlayer.resources.boar}</span>
-            <span className="res-icon res-icon-cattle" /><span className="res-compact-num">{displayPlayer.resources.cattle}</span>
+            <CompactResourceItem iconClass="res-icon-food" value={displayPlayer.resources.food} label={`${t(locale, 'resources.food')}: ${displayPlayer.resources.food}`} />
+            <CompactResourceItem iconClass="res-icon-sheep" value={displayPlayer.resources.sheep} label={`${t(locale, 'resources.sheep')}: ${displayPlayer.resources.sheep}`} />
+            <CompactResourceItem iconClass="res-icon-boar" value={displayPlayer.resources.boar} label={`${t(locale, 'resources.boar')}: ${displayPlayer.resources.boar}`} />
+            <CompactResourceItem iconClass="res-icon-cattle" value={displayPlayer.resources.cattle} label={`${t(locale, 'resources.cattle')}: ${displayPlayer.resources.cattle}`} />
             {displayPlayer.resources.begging > 0 && (<>
-              <span className="res-icon res-icon-begging" /><span className="res-compact-num">{displayPlayer.resources.begging}</span>
+              <CompactResourceItem iconClass="res-icon-begging" value={displayPlayer.resources.begging} label={`${t(locale, 'resources.begging')}: ${displayPlayer.resources.begging}`} />
             </>)}
           </span>
           <span className="res-compact-divider" />
           <span className="res-compact-group">
-            <span className="res-compact-label">{locale === 'zh' ? '人' : 'F'}</span><span className="res-compact-num">{familySize(displayPlayer)}</span>
-            <span className="res-compact-label">{locale === 'zh' ? '屋' : 'R'}</span><span className="res-compact-num">{displayPlayer.rooms}</span>
-            <span className="res-icon res-icon-field" /><span className="res-compact-num">{displayPlayer.fields.length}</span>
-            <span className="res-icon res-icon-fence-icon" /><span className="res-compact-num">{getFenceCount(displayPlayer)}</span>
-            <span className="res-icon res-icon-barn" /><span className="res-compact-num">{displayPlayer.stableTiles?.length ?? 0}</span>
+            <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
+            <CompactResourceItem iconClass={roomIconClass} value={summary.rooms.count} label={`${compactLabels.rooms}: ${summary.rooms.count}`} />
+            <CompactResourceItem iconClass="res-icon-child-free" value={summary.housingCapacity.value} label={`${compactLabels.housing}: ${summary.housingCapacity.value}`} />
+            <CompactResourceItem iconClass="res-icon-field" value={displayPlayer.fields.length} label={`${compactLabels.fields}: ${displayPlayer.fields.length}`} />
+            <CompactResourceItem iconClass="res-icon-fence-icon" value={`${summary.fence.used}/${summary.fence.limit}`} label={`${compactLabels.fence}: ${summary.fence.used}/${summary.fence.limit}`} />
+            <CompactResourceItem iconClass="res-icon-barn" value={`${summary.stable.used}/${summary.stable.limit}`} label={`${compactLabels.stable}: ${summary.stable.used}/${summary.stable.limit}`} />
           </span>
         </div>
       </div>
@@ -1047,12 +1089,25 @@ export const FarmBoard = ({
               : isPendingFence
                 ? 'fence'
                 : null
+          const sourcePlayerId = builtSegment
+            ? builtSegment.source?.kind === 'borrowed'
+              ? builtSegment.source.ownerPlayerId
+              : displayPlayer.id
+            : isPendingFence && edgeId && pendingFenceSourceMap?.[edgeId]
+              ? pendingFenceSourceMap[edgeId]
+              : isPending
+                ? displayPlayer.id
+                : null
+          const sourcePlayerColor = sourcePlayerId
+            ? players.find((player) => player.id === sourcePlayerId)?.color ?? displayPlayer.color
+            : undefined
           return (
             <div
               key={cell.key}
               className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
+              data-player-color={sourcePlayerColor}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

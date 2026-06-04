@@ -77,6 +77,14 @@ export const en = {
       bonusVp: 'Bonus VP',
     },
     cards: {
+      A136_DrudgeryReeve: {
+        prompt: 'Choose how many sets of building resources to score',
+        scoreSets: 'Score {sets} sets ({score} bonus VP)',
+      },
+      C133_Soldier: {
+        prompt: 'Choose how many wood and stone pairs to score',
+        scorePairs: 'Score {pairs} pairs ({score} bonus VP)',
+      },
       D132_HideFarmer: {
         optional: 'Hide unused farmyard spaces?',
         markSpaces: {
@@ -159,8 +167,8 @@ export const en = {
     scoringClayRooms: 'Clay rooms',
     scoringStoneRooms: 'Stone rooms',
     scoringFarmers: 'Family members',
-    scoringCards: 'Improvements',
-    scoringCardsBonus: 'Improvement bonus',
+    scoringCards: 'Cards',
+    scoringCardsBonus: 'Card bonus',
     scoringBeggings: 'Begging cards',
     scoringBonusDetail: '{count} {resource}',
     scoringPadButton: 'Scoring Pad',
@@ -394,6 +402,9 @@ export const en = {
     fenceModeToggle: 'Fence placement mode',
     fenceModeFence: 'Fence (1 wood)',
     fenceModePalisade: 'Palisade (2 wood, +1 VP)',
+    borrowedFenceSourceTitle: 'Borrowed fence source',
+    borrowedFenceSourceCount: '{allocated}/{cap}',
+    borrowedFenceSourceMissing: 'Choose a source for every selected fence.',
     interactionFarmRedevelopmentChoice: 'Renovate and optionally build fences',
     interactionRenovateBuildFences: 'Renovate and build {count} fence(s)',
     houseWood: 'Wooden House',
@@ -1343,6 +1354,9 @@ export const en = {
       EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
       SEGMENT_TYPE_NOT_ALLOWED: 'This fence type is not allowed for this action',
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
+      BORROWED_FENCE_SOURCE_REQUIRED: 'Choose a source player for each borrowed fence',
+      BORROWED_FENCE_SOURCE_INVALID: 'Borrowed fence sources must match selected fence segments',
+      BORROWED_FENCE_DONOR_LIMIT_EXCEEDED: 'Selected borrowed fences exceed the source player limit',
     },
   },
   'salter-pick': {

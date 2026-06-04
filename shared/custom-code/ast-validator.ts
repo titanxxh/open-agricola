@@ -44,6 +44,9 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
   ...cardEffectHooks,
   'id',
   'handHooks',
+  'beforeEndGameScope',
+  'beforeEndGameDispatchMode',
+  'beforeEndGameMandatory',
 ])
 
 /** Allowed values inside listener.phases arrays. */

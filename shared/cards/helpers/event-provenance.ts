@@ -1,6 +1,7 @@
 import type { Resource } from '../../contract/types'
 import type { DraftGameEvent, ResourceExchangedEvent, ResourceMovedEvent, ResourcePaidEvent } from '../../contract/events'
 import type { QueryableGameEvent } from '../../events/query'
+import type { CardListenerContext } from '../card-listeners'
 
 type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
 type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
@@ -74,6 +75,25 @@ export const sumResourceMovedFromActionSpace = (
     if (amount <= 0 || event.from.kind !== 'actionSpace' || !predicate(event)) return total
     return total + amount
   }, 0)
+
+export const sumActionSpaceMovedToPlayer = (
+  events: readonly QueryableGameEvent[] | undefined,
+  resource: keyof Resource,
+  playerId: string,
+): number =>
+  sumResourceMovedToPlayer(events, resource, playerId, (event) =>
+    event.from.kind === 'actionSpace',
+  )
+
+export const sumActionSpaceMovedToTriggerPlayer = (
+  context: CardListenerContext,
+  resource: keyof Resource,
+): number =>
+  sumActionSpaceMovedToPlayer(
+    context.actionEvents ?? context.transactionEvents,
+    resource,
+    (context.triggerPlayer ?? context.player).id,
+  )
 
 export const sumResourcePaid = (
   events: readonly QueryableGameEvent[] | undefined,

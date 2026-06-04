@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-29。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-03。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 4 |
+| 需要实现复核的卡牌 | 0 |
 | 已接受 / 产品策略差异 | 41 |
 | 排除的 BGA legacy 或未实现行为目标 | 51 |
-| 本轮审计视为已对齐 | 792 |
+| 本轮审计视为已对齐 | 796 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -24,11 +24,7 @@
 
 BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；OA 路径默认相对本仓库。
 
-| 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
-|---|---|---|---|---|---|
-| `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
-| `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
-| `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
+当前没有开放的问题优先条目。
 
 ## 3. 已接受差异
 
@@ -41,112 +37,95 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
 | BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
-| BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
+| BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
+| BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 
 ## 4. 简洁度审阅
 
-行数只是信号，不是结论。下表列出 OA display+implementation 的非空非注释行数至少为 BGA PHP 2 倍的卡牌。
+行数只是信号，不是结论。下表列出 OA display+implementation 的非空非注释行数至少为 BGA PHP 1.5 倍的卡牌。备注列按 2026-06-03 `origin/main` 复核最近 PR 后填写：先说明变长原因，再判断是否仍是基础设施债。
 
 | 卡牌 | BGA 行数 | OA 行数 | 比例 | 备注 |
 |---|---:|---:|---:|---|
-| `E161_ElderBaker` | 24 | 73 | 3.04 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `A41_VegetableSlicer` | 24 | 63 | 2.62 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `A87_Conservator` | 21 | 54 | 2.57 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `E16_BriarHedge` | 27 | 68 | 2.52 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `C88_CarpentersApprentice` | 41 | 99 | 2.41 | fence 折扣已从 `reserve-fence-bonus` 机制改为单个 `computeCosts.fence` listener；修复「第 13 个起」下界 bug（旧实现 `freeFences = 15 − getFenceCount` 导致第 13 之前的 fence 也免费，新实现用 `min(end,15) − max(start,13) + 1` 只释放第 13–15 fence）；第 13–15 根免费早退也走 `fencePolicy` 布局门禁，避免无 legal commit 的 confirm-only fence prompt。stable 折扣按 **card-facing stable count**（`getStableCountForCards`，含 B85 FarmHand）计：对齐 BGA `countCarpenterDiscounts(before, totalBuilt)`，只有第 3、4 座各 −1 wood。`computeCosts.stables` listener 读 `params.stableCount`（本次建造总数，含 FarmHand）返回**总额**折扣（非 per-unit，因为部分座折扣无法用单价 delta × count 表达）；dispatcher 的 per-unit computeCosts pass 不带 `stableCount` → 不折扣，折扣统一由 `stables.ts` 的 `applyStableBuildDiscount`（经 `collectComputeCostsForFarmChoice`）按真实 `totalUnits` 重算，避免与 per-unit `ctx.costs` 双算；`buildStableFarmSelection` 额外把「下一座」折扣注入 farm-select 的 maxSelections affordability 扫描。混合建造（1 普通 + B85）跨第 3/4 座时总折扣 −2。 |
-| `E118_KindlingGatherer` | 34 | 77 | 2.26 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `D131_CraftsmanshipPromoter` | 25 | 56 | 2.24 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `B18_GrasslandHarrow` | 38 | 82 | 2.16 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `C150_ParrotBreeder` | 74 | 159 | 2.15 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `D1_ZigzagHarrow` | 38 | 80 | 2.11 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `B137_Wholesaler` | 57 | 117 | 2.05 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `D36_BreedRegistry` | 50 | 101 | 2.02 | 已通过 zone-aware hand listener 收敛到本卡局部状态；后续只复核是否还能进一步压缩实现。 |
+| `D36_BreedRegistry` | 50 | 232 | 4.64 | 原因：手牌中也要追踪、打出后要显示 infobox，且 sheep 来源跨 `resource.moved` / `futureMeeple.resolved` / `harvest.feedConverted`。基础设施状态：zone-aware hand listener、future meeple synthetic dispatch、harvest feed conversion event、非 owner 隐私过滤均已在 main；不是开放债，剩余是本卡多来源统计。 |
+| `E161_ElderBaker` | 24 | 73 | 3.04 | 原因：私有 action space 加上 Minor Improvement 行动中额外开放 `Major_StoneOven`。基础设施状态：`player-action-space`、`computeChoiceCandidates.improvement`、`readImprovementTypes()` 已在 main，且与 `D131` 共用；不是开放债。 |
+| `C88_CarpentersApprentice` | 40 | 115 | 2.88 | 原因：同一卡同时覆盖 wood house construct 折扣、stable 第 3/4 座非线性总额折扣、fence 第 13-15 根免费及 entry doability。基础设施状态：近期 stable/FarmHand PR 已补 `getStableCountForCards()`、count-aware `maxSelections`、`fencePolicy` 布局门禁和 supply helper；旧 `reserve-fence-bonus` 分支已移除，不是开放债。 |
+| `A41_VegetableSlicer` | 24 | 63 | 2.63 | 原因：必须同时确认本次 `improvement` 打出的是 Cooking Hearth，且支付事件中确实 returned Fireplace，不能只看最终资源。基础设施状态：`card.played` / `resource.paid.returnedCardId` provenance 已够用；仅缺一个可选的局部 predicate helper（upgrade transition = played major + returned major），不是 umbrella blocker。 |
+| `A87_Conservator` | 21 | 54 | 2.57 | 原因：wood house 直升 stone house 是额外 renovation candidate；当默认 wood-to-clay 不可支付但 direct-stone 可支付时，还要救回 entry doability。基础设施状态：`computeChoiceCandidates.renovate-house`、`buildRenovationPlan()`、`canRenovate()` 已在 main；不是开放债。 |
+| `E16_BriarHedge` | 27 | 68 | 2.52 | 原因：前置条件要数玩家现有三类动物，fence 成本要按新建 border edge 数折扣。基础设施状态：#243 已改用 `getAssignedAnimalsByType()` 统一 house/pasture/stable/animal-holder 口径；剩余复杂度主要来自 fence cost listener。 |
+| `E118_KindlingGatherer` | 34 | 77 | 2.26 | 原因：BGA 只看行动格收 food，OA 需要区分 action-space food、普通 supply gain、卡牌 source gain，避免误触发。基础设施状态：`resource.moved` provenance 与 `sumResourceMovedToPlayer()` 已在 main；不是开放债。 |
+| `D131_CraftsmanshipPromoter` | 25 | 56 | 2.24 | 原因：Minor Improvement 行动中额外注入底排 major candidates，并在购买时给 1 stone。基础设施状态：`computeChoiceCandidates.improvement` 与 `readImprovementTypes()` 已在 main，和 `E161` 同一机制；最多可抽“minor action 可买指定 major”小 helper，不是开放债。 |
+| `D1_ZigzagHarrow` | 38 | 84 | 2.21 | 原因：BGA `PlayerBoard::zigzag()` 的 L 形邻接算法在 OA 需要显式移植，并把 raw candidates 交给 plow 校验。基础设施状态：近期 plow allowlist 已补 `actionContext.allowedTiles`，同时约束 selectable / doability / resolveChoice；不是开放债。 |
+| `B18_GrasslandHarrow` | 38 | 82 | 2.16 | 原因：目标回合取决于打出本卡并支付职业费后的剩余建材数，随后在该 round start 给 optional plow。基础设施状态：`after:pay` listener、`futureMeeplesNode()`、`onRoundStart` 已可表达支付后时序；不是开放债。 |
+| `C150_ParrotBreeder` | 74 | 159 | 2.15 | 原因：四人座次右邻追踪、anytime 付 grain 置 flag、下次 place-farmer 注入 occupied action space、自己/对手放人后清理状态，是完整单卡状态机。基础设施状态：`scope: opponent` listener、card flag/extraData、`computeArgs.place-farmer` occupied-choice 注入均已在 main；缺的是可选的“复制相邻玩家行动格”高阶 helper，但当前只服务少数卡，不是 umbrella blocker。 |
+| `B93_Confidant` | 69 | 146 | 2.12 | 原因：打出时必须保留最低 2 food 给 future schedule，后续每回合领取 food 后可选 sow 或低价 fence，还要 veto lessons 占格后无可付职业的场景。基础设施状态：近期 `reserveResources`、future schedule、lessons doability、nested `fencePolicy.costPolicy` 均已在 main；不是开放债。 |
+| `B137_Wholesaler` | 57 | 117 | 2.05 | 原因：四个固定 action space 各有一次性取物状态，需要在 card state 中分别标记 vegetable/boar/stone/cattle 是否已取。基础设施状态：`after:place-farmer`、`cardStates.extraData`、`gainLeaf()` 已够用；#241 已改为卡内 `SPACE_REWARDS` 表生成 listener。 |
+| `B138_ForestGuardian` | 35 | 69 | 1.97 | 原因：购买奖励和对手拿 5+ wood accumulation 前的 owner-targeted food transfer 分成两条 listener。基础设施状态：opponent scope、targeted gain / payer、action-space resources 已可表达；不是开放债。 |
+| `A14_CarpentersHammer` | 46 | 90 | 1.96 | 原因：BGA banned 但 OA 保留，卡面用 4 条 construct bonus metadata 分别表达 reed + 不同房型资源折扣。基础设施状态：construct modifier metadata 已可表达；不是实现复杂度债。 |
+| `A113_HeresyTeacher` | 21 | 41 | 1.95 | 原因：BGA 未实现，OA 产品扩展为 lessons 后给符合条件 grain field 叠 vegetable，需要 field stack helper。基础设施状态：lessons-space helper 与 field stack API 已可表达；已接受产品差异，不是开放债。 |
+| `C16_FieldFences` | 37 | 72 | 1.95 | 原因：onBuy optional fence 期间临时置 flag，并只对字段邻接的新 fence edge 免 wood。基础设施状态：`computeCosts.fence` 和 `fence` leaf 已够用；可抽 field-edge helper，但不是 umbrella blocker。 |
+| `A111_WallBuilder` | 29 | 56 | 1.93 | 原因：建房后按 action snapshot 只触发一次，并排未来 4 轮 food。基础设施状态：`getRoomsBuiltThisAction()`、snapshot token、future meeple 已在 main；不是开放债。 |
+| `D25_WitchesDanceFloor` | 22 | 42 | 1.91 | 原因：BGA 未实现，OA 重写为 card field + occupation + fireplace/baking identity + exchanges。基础设施状态：card field、identity metadata、exchange metadata 已在 main；已接受产品差异。 |
+| `E148_Lazybones` | 69 | 131 | 1.90 | 原因：购买时选择保留哪些行动格，对手触发后清 reservation 并按第一个空地建 stable。基础设施状态：reserved action-space extraData、stable supply helper、special-effect build stable 已在 main；不是开放债。 |
+| `C94_StableCleaner` | 46 | 85 | 1.85 | 原因：anytime build stables 要按 exact cost `{wood:1, food:1}`，同时 probe `computeCosts.stables` 让 C88 等折扣参与可支付判断。基础设施状态：`stablesAction.costPreview`、`runCardListeners`、stable supply helper 已可表达；不是开放债。 |
+| `C105_BasketCarrier` | 23 | 42 | 1.83 | 原因：主要是 display metadata 的 harvest exchange，比 BGA PHP 短实现还长。基础设施状态：harvest exchange metadata 已可表达；不是实现复杂度债。 |
+| `B157_Salter` | 107 | 194 | 1.81 | 原因：anytime 要选择并移除不同动物数量，再按动物种类生成不同轮数 future food，并验证只从 board animal 取。基础设施状态：`resource-quantity-select`、assigned animal helper、subtract animal、future meeple 已在 main；不是开放债。 |
+| `E156_ClaypitOwner` | 36 | 65 | 1.81 | 原因：对手打 improvement 后要判断打出的 major/minor printed cost 是否含 clay，而不是看实际支付。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`，按 printed/base cost candidates 取目标资源最大值；不是 umbrella blocker。 |
+| `E96_Elder` | 21 | 37 | 1.76 | 原因：手牌区 round 1 before-start optional 免费打本职业，需要 hand hook 和 exact cost。基础设施状态：handHooks、`occupation` allowedCards / exactCost 已在 main；不是开放债。 |
+| `D91_Plowman` | 29 | 51 | 1.76 | 原因：购买时按 +4/+7/+10 轮排多个 future plow opportunity，round start 再可选付 food plow。基础设施状态：future meeple、round-start hook、pay+plow flow 已可表达；不是开放债。 |
+| `A130_MummysBoy` | 57 | 99 | 1.74 | 原因：每轮一次，追踪第 2 个工人的行动格，并在第 3 个及以后放人时注入 occupied choice 和 flag。基础设施状态：round placement helper、occupied choice prefix、card flag 已在 main；不是开放债。 |
+| `A19_Handplow` | 26 | 45 | 1.73 | 原因：购买后排一个未来回合 optional plow，并在触发后清 card state。基础设施状态：future meeple 与 round-start hook 已可表达；不是开放债。 |
+| `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：要从 major/minor/altCosts 读取 printed wood cost，再注入 food→wood trade。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`；D117 当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 由 #239 跟踪。 |
+| `C41_FarmStore` | 47 | 80 | 1.70 | 原因：收获喂食后 7 种 pay 1 food 换资源组合逐一写成 XOR children。基础设施状态：harvest phase hook、pay/gain flow 已可表达；#241 已改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
+| `E155_Visionary` | 28 | 46 | 1.64 | 原因：购买早期奖励加 family-growth isDoable gate，需要比较其他玩家 family size 与 round。基础设施状态：`isDoable.family-growth` 与 `familySize()` 已在 main；不是开放债。 |
+| `C162_ForestOwner` | 44 | 72 | 1.64 | 原因：注册所有人可用的 player action space，owner/非 owner 资源与 owner 分成事件不同。基础设施状态：`player-action-space` 与 `resource.moved` eventSink 已可表达；不是开放债。 |
+| `D132_HideFarmer` | 69 | 112 | 1.62 | 原因：before-end 终局前要按 food/empty spaces 让玩家选择隐藏数量，并扣 food 写 scoring state。基础设施状态：近期 Before-End Player Dispatch、ad-hoc action、resource-quantity-select 已在 main；不是开放债。 |
+| `B34_SpecialFood` | 94 | 152 | 1.62 | 原因：拿动物前后都要记录 board animal count，判断来自 action space 的动物和是否发生容量丢弃歧义。基础设施状态：#243 已改用 `sumActionSpaceMovedToTriggerPlayer()` 与 `getAssignedAnimalsByType()`；不是机制缺口。 |
+| `A138_Harpooner` | 28 | 45 | 1.61 | 原因：Fishing 后 optional pay wood，再按 family size 给 food + reed。基础设施状态：place-farmer listener、`familySize()`、pay/gain flow 已可表达；不是开放债。 |
+| `B111_Rustic` | 32 | 51 | 1.59 | 原因：建房后按本次新增 room 数生成等量 optional food VP flow。基础设施状态：action snapshot room count 和 bonus-vp leaf 已可表达；不是开放债。 |
+| `D80_BrickHammer` | 34 | 54 | 1.59 | 原因：打 major improvement 后要读取 built card 的 printed clay cost 是否 >=2。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`，避免把 `cost.clay` 与 `altCosts[].clay` 相加。 |
+| `E108_BlackberryFarmer` | 36 | 57 | 1.58 | 原因：fence 后从 `farm.fenceBuilt` 事件数新 fence edges，并按数量排 future food。基础设施状态：farm event provenance 与 future meeple 已在 main；不是开放债。 |
+| `A68_AsparagusGift` | 38 | 60 | 1.58 | 原因：fence 前记录数量，fence 后用 delta 判断是否达到当前 round，并检查空 field 前置。基础设施状态：before/after listener、fence count、field helper 已可表达；不是开放债。 |
+| `E160_KelpGatherer` | 32 | 50 | 1.56 | 原因：对手用 Fishing 时同时给触发玩家 food、给 owner vegetable。基础设施状态：opponent scope 与 targeted gain 已可表达；不是开放债。 |
+| `B146_Illusionist` | 89 | 139 | 1.56 | 原因：before collect 要动态列手牌选择弃 1 张，再按 accumulation resource 类型补 1 资源，并处理阻止弃牌 capability。基础设施状态：ad-hoc action、private hand event、capability metadata 已在 main；不是开放债。 |
+| `B156_StorehouseKeeper` | 31 | 48 | 1.55 | 原因：Resource Market 行动后给 clay/grain XOR 选择。基础设施状态：after place-farmer listener 与 XOR gain flow 已可表达；不是开放债。 |
+| `E140_Carter` | 44 | 68 | 1.55 | 原因：购买时记录下一轮并显示 infobox，下一轮从 building-resource accumulation 的实际 moved 数量给 food。基础设施状态：#243 已改用 `sumActionSpaceMovedToTriggerPlayer()` 收敛 action-space provenance；不是开放债。 |
+| `A106_SlurrySpreader` | 22 | 34 | 1.55 | 原因：购买时按当前已种 crop field 给资源奖励，需遍历 field crop state。基础设施状态：field helper 与 gain flow 已可表达；不是开放债。 |
+| `C27_Blueprint` | 41 | 63 | 1.54 | 原因：minor action 中注入指定 major candidates，并给这些 major optional stone discount。基础设施状态：`computeChoiceCandidates.improvement`、payment bonus `preserveOriginal`、`readImprovementTypes()` 已在 main；不是开放债。 |
+| `D112_YoungFarmer` | 49 | 75 | 1.53 | 原因：Major Improvement 行动格可重复占用，during 给 grain，after optional sow。基础设施状态：occupied choice prefix、during/after place-farmer listener、sow flow 已可表达；不是开放债。 |
+| `B107_Manservant` | 36 | 55 | 1.53 | 原因：购买时或 renovation 后若已住 stone house，要给后续所有回合排 3 food。基础设施状态：renovate-house listener 与 future meeple 已在 main；不是开放债。 |
+| `E142_Smuggler` | 55 | 84 | 1.53 | 原因：harvest feeding phase 可选 wood→grain、grain→stone，且支持同类两次或混合 OR。基础设施状态：harvest phase hook、pay/gain flow、OR/XOR 已可表达；#241 已改为卡内 `TRADE_OPTIONS` 表生成同类 2x 选项并保留 mixed optional OR。 |
+| `B134_HousebookMaster` | 38 | 58 | 1.53 | 原因：renovate to stone 后按当前 round 给不同数量 food 与 VP leaves。基础设施状态：renovate-house after listener 和 bonus-vp leaf 已可表达；不是开放债。 |
+| `D139_Chairman` | 40 | 61 | 1.52 | 原因：Meeting Place 对 owner 与 opponent 两种路径发不同 recipient food。基础设施状态：player/opponent scope 与 targeted gain 已可表达；不是开放债。 |
+| `B155_ArtTeacher` | 42 | 64 | 1.52 | 原因：购买奖励 plus occupation payment 可从 Traveling Players 食物支付，需 trade sideEffect drainSpace。基础设施状态：payment trades 与 drainSpace sideEffect 已在 main；不是开放债。 |
+| `E120_ScrapCollector` | 31 | 47 | 1.52 | 原因：购买后按奇偶 offset 分别排 wood/clay future meeples。基础设施状态：future meeple entries 已可表达；不是开放债。 |
+| `A65_SeedPellets` | 35 | 53 | 1.51 | 原因：sow 前补 grain，还要在无 grain 但有空田时通过 isDoable 救回 sow entry。基础设施状态：`isDoable.sow`、`canSow()`、field helper 已在 main；不是开放债。 |
+| `E33_BeaverColony` | 57 | 86 | 1.51 | 原因：拿 action-space reed 得 VP，同时 onBuy 触发容量整理并通过 onComputeAnimalZones 限制带 stable 牧场。基础设施状态：animal-zone hook、capacity enforcement、resource provenance 已在 main；不是开放债。 |
 
 比例不是唯一信号：`E123_ResourceHoarder`（85/136 = 0.62）和 `E78_SleightofHand`（42/73 = 0.57）已远低于 BGA，是已完成的简化案例；表里高比例卡也要先看是否伴随行为风险再决定优先级。
 
 ## 5. 架构审阅
 
-本轮审阅没有发现新的“仅前端裁定规则”路径。主要架构风险来自既有或新暴露的基础设施缺口：
+本轮审阅没有发现新的“仅前端裁定规则”路径，也没有开放的通用基础设施 blocker。下表只保留会继续约束新增卡牌 / 后续改动的架构事项；已完成的一次性基础设施记录不再作为待办保留。
 
-| 风险 | 证据 / 卡牌 | 方向 |
+| 事项 | 当前代码证据 | 后续约束 |
 |---|---|---|
-| Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing` | 新增 BGA metadata 字段时同步加 parser/diff fixture，避免统计口径回退。 |
-| 主路径 prefix namespace 检查 | 旧 bad-smell 文档中的 `CUSTOM_`、`card_` 模式 | 保留为 helper 常量/函数，避免散落的 startsWith 检查。 |
-| Payment provenance 守卫已落地 | construct/renovate bonus choice 已通过 `resource.paid` 携带 selected index；`shared/cards/__tests__/provenance-result-audit.test.ts` 禁止生产卡牌从 `context.result` 读取资源事实 | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result。 |
-| 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
-| Linked action-space occupancy 已进入通用行动格状态 | `WorkerRef.synthetic.kind='linked-occupancy'`、C23_JobContract、C22_BasketChair | 由创建者在 `takenBy` worker ref 上写 source card + linked worker id；后续清理只按同玩家同 linked worker 的 synthetic metadata 删除，不跨读外卡 id，也不删除真实 worker occupancy。 |
-| Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实读取 | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
-| Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
-| Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
-| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`、`reserveResources`；construct / renovation / stables / plow / occupation / fencing policy 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、old `params.cost` path、old `renovation` / `fencing` leaf 表达精确免费/付费单位成本；除已登记 allowlist 的 `E27_PiggyBank` 外，不新增 `-99` 免费成本表达；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达；B93 这类“先付职业费、随后强制 future schedule”的支付后资源保留用 `reserveResources` 过滤 payment solutions；nested `fencePolicy.costPolicy` 仍叠加 `computeCosts.fence` 折扣。 |
-| 额外放人目标行动语义已进入通用基础设施 | `place-farmer` constraints / `targetSpaceId` actionContext、ActionNode `expandFlow`、`move-farmer-to-space` relocation | B24/C42 额外放人不在卡牌内手写目标行动；选择目标格后由通用 flow 执行目标 action，并让 downstream hooks 用真实目标 space。E10/D51 的 worker relocation 也走同一目标行动 flow。 |
-| Plow allowlist 已进入通用行动上下文 | `plow.actionContext.allowedTiles`、D1_ZigzagHarrow | 通用 plow allowlist 同时约束 `selectableTiles`、availability、resolveChoice/payment-stage 校验；D1 raw zigzag candidates 不预过滤越界/占用，最终由 plow validation / `allowedTiles` 交集处理，empty intersection optional leaf auto-skip。 |
-| Extra-crop placement provenance 已进入通用行动上下文 | `actionContext.extraCropPlacement`、B115_TinsmithMaster、E71_CowPatty、C69_LandConsolidation | 额外加作物的 selection leaf 通过语义 marker 表达 provenance；pending / anytime 构造从 `contextSnapshot.actionContext` 传递 marker，C69 不再判断 B115/E71 sourceCard id。 |
-| Action-level cancel policy 已进入通用基础设施 | `shared/engine/engine-resolve.ts`、farm-select actions、`reorganize`、internal `selection` | 非 `exchange` / `bake-bread` 的 protected atomic action 直接 `cancel` 会在 hook / action resolve 前被 recoverable reject，pending 保持；optional 只走 parent node 的 `__skip__`。当前 protected set 是 `plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / `selection`。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` entry guard 还会过滤无 reachable room / 无 legal fence commit 的真实 state，包括 C88 这类 cloned preview player，避免 confirm-only prompt 进入死路；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。 |
-| Pasture capacity modifier 已进入通用动物容量基础设施 | `computePastureCapacityModifiers()`、A12/D11/B72 | pasture zone 创建时先按打出顺序应用 replacement，再按打出顺序应用 additive；D11 不再读取 A12 id，A12/B72 不再依赖 `onComputeAnimalZones` 执行顺序或 scratch marker。 |
-| Breeding threshold modifier 已进入通用动物繁殖基础设施 | `getBreedThreshold()`、`CardImpl.effect.computeBreedThreshold`、E84 | breed 主路径对每种动物统一计算 source-aware threshold，默认 2，同一动物多个 modifier 取最小值；E84 只在 `sourceCard === 'harvest'` 时把 sheep threshold 降为 1，breed phase 直接写 newborn summary，不再写 virtual sheep 状态。 |
-| Private Field Phase 已进入通用收获基础设施 | `private-field-phase` internal action、`reap` trigger metadata、Card Field reaper registry | C72/E25 不再返回未注册 `reap` leaf；普通田和 Card Field 都走 `reason: 'reap'` 事件与同一套 `immediatelyAfter.reap` listener，并用普通 `parallel` flow 承载反应。 |
-| Harvest field stage hook parallel 已进入通用收获基础设施 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`、`stageResume`、stage-level auto / trigger-select split | 三个 field phase hook 进入阶段时先收集全部可触发 card flows；mandatory non-interactive flow 自动执行，optional / OR / XOR / choice-bearing flow 继续走玩家交互；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 后发生，并保留 `immediatelyAfter.reap` 反应 flow 的 owner。 |
-| Harvest feeding requirement modifier 已进入通用收获基础设施 | `computeHarvestFeedingRequirement()`、`registerHarvestFeedingRequirementModifier()`、E30/E159 | E30/E159 对齐 BGA `Player::getHarvestCost()` 公式扩展，不再通过 `onBeforeFeed` / `onAfterFeed` 临时改资源或 worker 标记；喂食主路径只读取通用公式结果。 |
-| Harvest count applications 已进入通用收获基础设施 | `HarvestReapSummary.harvestCountApplications`、`HarvestCountModifierResult.tags`、`computeHarvestSelectionThreshold()` | 普通 reap 记录 field/crop/count/source/tag/scope；Harvest Count 可在 top stack 收空后继续消费同田下一层 stack；E73 full-field 使用 `full-field-reap` tag，E112 supply-style 使用 `supply-instead-of-field` tag；`override`（E73 full-field-reap）生效时 `sources` 只记 override 自身来源，被覆盖的 delta-only modifier（如同田 E112）来源不计入、但 tag 仍保留供下游判断；E112 end field phase 只读本次 applications，不再读取 E73 状态；A112/D72 的额外收获选择门槛走通用 threshold modifier。 |
-| Harvest outcome helper 已进入通用收获基础设施 | `getHarvestOutcome()`、`harvestReapSummary`、`harvestBreedSummary`、E134 | reap/breed summary 保留到 `onAfterHarvest` 完成后再清理；helper 从本次实际 harvested crop 与 newborn animal summary 组合 outcome；E134 只在 after-harvest 读取 outcome，不再读 live resources 或 E84。 |
-| Trailing trigger snapshot 已进入通用 listener 基础设施 | `TriggerSnapshot`、`ActivateCardActionParams.triggerSnapshot`、deferred host cursor、B49/D42/E89/E97 | host action commit 后、trailing listener 执行前冻结每位玩家的已打出 occupation/minor/major/improvement/played 列表与派生 count；activation cursor 持久化 snapshot，按第 N 张职业/改良或平衡数量判断的 listener 读 snapshot helper，不读执行时 live count。 |
-| Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
-| Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
-| Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `potteryIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75/A27 fireplace/hearth/oven identity、B31 pottery identity、E144 wares gain、D86 animal-holder occupation filtering、D12 house animal zone blocking 都已迁到 metadata/helper。 |
-| Card implementation boundary guard 已进入常规验证 | `pnpm run check:card-impl-boundaries`、`.github/workflows/ci.yml` verify job、`scripts/check-card-impl-boundaries.ts` | 生产 `shared/cards/A-E/*.ts` 中的运行时跨非 Major 卡 id 读取默认失败；`Major_*`、`reaches`、`allowedPurchases`、prerequisite candidate list 仍是明确例外。 |
-| House animal zone tag 已进入通用动物分区基础设施 | `AnimalZone.houseAnimalZone`、`isHouseAnimalZone()`、`countHouseAnimals()`、D12/D148/D164 | D148 house-edge card zone 标记为 house animal zone；`computeAnimalZones()` 在所有卡牌 zone 添加后统一用 `blocksHouseAnimalZones` 过滤普通 house zone 和 tagged house zone；D164 统计 house 动物时走 tagged zone helper。 |
-| DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板打出/回收卡牌时先清理所有玩家旧 hand/played/improvements/cardStates/activeModifiers/virtual occupation 状态；major 不允许重复归属，draw 已打出 minor/occupation 回目标手牌，major 回公共供应区，PlayerActionCard 动态行动格随旧 owner 一起移除。 |
-| 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
-| 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
+| Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
+| 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice` | 新增交互必须显式暴露 command / options 并由后端校验；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
+| 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。 |
+| Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/D117/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
+| 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
+| 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
+| 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
+| Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers | fence、linked occupancy、special stable、stable count、token supply 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
+| Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；不要反查外卡 `cardStates` 或临时改 live resources。 |
 
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
 ## 6. 基础设施待办
 
-当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
+当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、card boundary guard、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
 
-本轮新增已完成基础设施：Extra-turn 轮转扩展点（A92_AdoptiveParents，#203+#204）。`CardEffect` 新增 `contributeExtraTurn?: (state, player) => ActionFlow | void` hook（返回 XOR `[use, forfeit]` flow）；`shared/cards/card-effects.ts` 提供聚合谓词 `hasPendingExtraTurn(state, player)` 与 flow 收集器 `collectExtraTurnFlow(state, player)`——该 hook 不经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 主动消费（单一真相源，gating 与 flow 不会漂移）。round.ts 三处 gating 据此判定：选下一活跃玩家（`workersAvailable > 0 || hasPendingExtraTurn`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮）——普通工人耗尽但被卡牌欠一次额外回合的玩家不再被提前跳过，而是收到 `collectExtraTurnFlow` 推送的 XOR[用, 放弃]（Forfeit=放弃该额外放工）。A92 是首个使用者（BGA pull model，对齐 BGA `stLabor` 的 adoptive supply-placement）；任何想换取轮转额外行动的卡可复用。后续 hardening 已补齐：A92 自身 extra-turn prompt 内不再暴露 A92 anytime grow；mandatory skip-turn 通过内部 `_extraTurnSkipCount` / `countExtraTurns` 逐个消费 extra-turn opportunity（含 stacked skip 与超过玩家数的 same-seat skip 链）；`countPendingExtraTurns` / `consumePendingExtraTurns` 通过同一聚合顺序计算并消耗剩余 pending extra-turn，forced consume 记录在 session-transient `_extraTurnConsumedCount`，并由 `special-effect.consume-pending-extra-turns` 暴露给卡牌 flow；失败的 extra-turn 目标行动会按 `placedWorkerId` 回滚真实 target space（含 auto-resolved target failure 与 pending-context fallback）；forfeit 写入可见 declined-card log；多 newborn 与 promoted adult feeding 均有 session 覆盖。
-
-本轮新增已完成基础设施：Family-growth availability 与执行条件对齐。`family-growth.canBeExecutedByPlayer` 现在先检查玩家是否仍有 inactive worker；普通 `wish-children` 继续检查房间容量，`urgent-wish-children` / 卡牌注入的 `skipRoomCheck` 路径只跳过房间要求，不跳过 worker supply 要求。B151_LittlePeasant 这类允许进入已占用行动格的 computeArgs 路径因此不会在玩家已经没有可激活 worker 时继续暴露 occupied `urgent-wish-children`，避免 place-farmer 选择进入必失败的 family-growth flow。
-
-本轮新增已完成基础设施：Special-effect description preview 仅展示玩家语义动作。`special-effect` 继续按 `params.kind` 为 `promote-first-newborn`、`pop-card-stack-top`、`set-extra-data` 等可理解步骤提供描述；纯卡面提示同步 `set-infobox` 不进入 `descriptionPreview`，避免 C115_Sower 这类选项把内部状态刷新显示成额外行动。
-
-本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
-
-本轮新增已完成基础设施：Pasture capacity modifier。`computeAnimalZones()` 在构造 pasture zone 时收集已打出卡的 `computePastureCapacityModifiers()`，先应用 replacement，再应用 additive，同类按打出顺序。A12_DrinkingTrough、D11_LawnFertilizer、B72_LoveforAgriculture 已迁入该机制；size-one pasture replacement 不再通过 D11 直接读取 A12，也不再用 `lawnFertilized` scratch marker 避免 double-add。
-
-本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`；B153、C75/A27、B31、E144、D86、D12 已分别迁到 major identity collection、fireplace/hearth/oven identity、pottery identity、wares gain metadata、animal-holder occupation filtering、house animal zone blocking。
-
-本轮新增已完成基础设施：House animal zone tag。`AnimalZone.houseAnimalZone` 标记“视作 house 动物区”的非 house zone；`computeAnimalZones()` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，就统一移除 `zoneType === 'house'` 或 `houseAnimalZone === true` 的 zone。`countHouseAnimals()` 用同一判定统计 D164 这类 house-zone 规则，避免 D164 读取 D148 id。
-
-本轮新增已完成基础设施：Harvest count applications 与 harvest selection threshold modifier。`reap()` 在本次 `HarvestReapSummary.harvestCountApplications` 中记录 field/crop/count/source/tag/scope；`HarvestCountModifierResult.tags` 表达 full-field reap、supply-instead-of-field 这类语义标签；E112 end field phase 只读取本次 applications 判断是否补 grain，不再读取 E73 状态；A112/D72 的可选田门槛改由 `computeHarvestSelectionThreshold()` 统一计算，E112 通过注册 modifier 把 grain field 门槛降为 1。
-
-本轮新增已完成基础设施：Breeding threshold modifier。`breed()` 对每个 animal type 调 `getBreedThreshold(state, player, animalType, { sourceCard })`；默认 threshold=2，多个已打出卡返回同一动物门槛时取最小值。E84_DollysMother 已迁为 `computeBreedThreshold`，仅 harvest-source sheep breeding 降为 1；card-triggered breed 不受影响，且不再写 `virtualSheepAdded` 或临时改 live 资源。
-
-本轮新增已完成基础设施：Harvest outcome helper。`harvestReapSummary` 不再在 field phase 后清理，而是和 `harvestBreedSummary` 一起保留到 `onAfterHarvest` 完成后清理；`getHarvestOutcome(state, playerId)` 从两份 summary 组合本次实际 harvested crop types 与 newborn animal types。E134_Omnifarmer 已迁到 `onAfterHarvest` 读取 outcome，提交选择时重新校验 outcome、stored goods 和当前可支付资源。
-
-本轮新增已完成基础设施：Trailing trigger snapshot。`activate-card` params 携带 `TriggerSnapshot`，deferred host continuation 在 onBuy / afterHostCommit flow 前冻结 snapshot 并随 cursor 恢复；B49_Scales、D42_EducationBonus、E89_Stallwright 改用 snapshot helper 读取触发时 played-card count，E97_Beneficiary 不再内嵌 E89 stable 分支。
-
-本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
-
-本轮新增已完成基础设施：zone-aware card listener。listener 默认只匹配已打出卡，显式 `zones: ['hand', 'played']` 才能在手牌中监听；匹配结果向 handler 透传 `ownerCardZone`。D36 这类单卡历史需求落在本卡 `cardStates`，不新增全局 sheep stats；手牌卡的局部 `cardStates` / 以该手牌卡为 source 的 public events / 派生 log entry / 过滤后的 event/archive seq cursor / runtime `publicEventCancellations` / 按手牌 id keyed 的 `cardAvailability` 在非 owner snapshot 中隐藏。收获喂食转食物通过通用 `harvest-feed-conversion` synthetic listener dispatch 暴露 `harvest.feedConverted` 事件；future meeple 结算通过通用 `future-meeple-resolved` synthetic listener dispatch 暴露 `futureMeeple.resolved` 事件。两者都不在 session core 写单卡分支。
-
-本轮新增已完成基础设施：Private Field Phase。`private-field-phase` 是内部行动，按来源卡触发只收获玩家自己的普通田和 Card Field，不启动完整 Harvest；事件统一使用 `reason: 'reap'`，并携带 `trigger.phase` 区分 `harvest` / `private-field-phase`。普通田和 Card Field 的 `immediatelyAfter.reap` listener 结果统一收集进普通 `parallel` flow，避免在 dispatch 阶段直接改状态。
-
-本轮新增已完成基础设施：Harvest field stage hook parallel。`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` 进入阶段时先收集全部可触发 card flows；mandatory non-interactive flow 走普通 `parallel` 自动执行，optional / OR / XOR / choice-bearing flow 仍走 `trigger-select` 交互。`immediatelyAfter.reap` 反应 flow 在普通收获和私有田收获汇总前都按 reacting owner 写入 target，避免多人 harvest 中跨玩家写 `cardStates`。
-
-本轮新增已完成基础设施：before-endgame hook flow。`onBeforeEndGame` 作为 `FlowEffectHandler` 在 round 14 后、gameover 前运行，允许卡牌生成终局前 pending 并通过 `stageResume` 恢复；D132 的 optional prompt 是 stage hook chain 中唯一放开 anytime 的 before-endgame choice prompt，后续数量选择不放开，避免 stale max。
-
-保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
-
-本轮新增已完成基础设施：Stable count semantics helper。`shared/domain/stables.ts` 集中畜栏计数口径：`getOrdinaryStableCount`（普通 stable tile，用于动物容量 / placement / supply）、`getStableCountForCards`、`getUnfencedStableCountForCards`、`getEmptyUnfencedStableCountForCards`（card-facing 口径在 helper 内部封装 B85 FarmHand position 读取，B85 永远算 1 个 unfenced / empty-unfenced stable）。`getFarmHandStableInUseCount` 从 `supply-tokens.ts` 移入本 helper，`getAvailableStableSupplyCount` 改用 `getOrdinaryStableCount`。业务代码不再直接读 `player.stableTiles.length`，由 `shared/domain/__tests__/stable-count-guardrail.test.ts` 静态扫描 `shared/cards/**` 与 `shared/domain/**` 阻断（白名单仅 `shared/domain/stables.ts` 与测试/fixture）。#184：C88 折扣口径已校准为 card-facing（`getStableCountForCards`，含 B85），混合普通 + B85 stable 建造经 `stables.ts` 的 `applyStableBuildDiscount`（`collectComputeCostsForFarmChoice` 按真实 `params.stableCount` 重算总额折扣）统一结算，详见 §C88 appendix。#186：完成其余 card-facing 口径校准——`B54`/`E43`/`D168`/`E114`/`C56` 改用 `getStableCountForCards`（“你拥有畜栏 / 第 N 座畜栏”序数定位含 B85），`C101`/`D72` 改用 `getUnfencedStableCountForCards`，`C49` 改用 `getEmptyUnfencedStableCountForCards`（B85 永远算 1 个 empty unfenced）；动物容量 / placement / supply / `getStableTilesBuiltThisAction`（after-stables 本次建造数，归 #185）继续用 `getOrdinaryStableCount`，B85 不获得动物容量。
-
-本轮新增已完成基础设施：After-stables built-count card semantics（#185）。`shared/cards/helpers/action-snapshot.ts` 的 `recordActionSnapshot` / `getStableTilesBuiltThisAction` 改用 `getStableCountForCards`（含 B85），使「本次建造畜栏数」delta = card-facing 座数（对齐 BGA `numStablesBuiltThisTurn`：B85 solo 算 1 座、mixed 普通 + B85 算总数）。「建 ≥1 座」listener（`A43_FarmyardManure` / `A74_StableTree` / `A167_BreederBuyer` / `B27_Toolbox`）与「建 ≥2 座」listener（`D166_StableMilker`）对 B85 solo / mixed 正确触发。「第几座」序号卡 `D168_Stockman` / `E114_ShedBuilder` 与 4th-stable bonus 卡 `C56_FeedFence` 的 `nAfter` 改用 `getStableCountForCards`（对齐 BGA `countStablesForCards()`），B85 占一个建造序号位。B85 不计入 animal / pasture capacity（仍走 `getOrdinaryStableCount` / animal-zone）。after-stables payment ordering（stable-built event → after-stables effects → stables payment）保持不变。
-
-本轮新增已完成基础设施：Special-stable card-effect 扩展点（#189 解耦）。核心 `shared/actions/effects/stables.ts` 不再 import 任何具体卡牌——B85 专属逻辑（`getFarmHandStablePositions` / `applyFarmHandStable` / `FARM_HAND_CARD_ID`）经 card-effect 聚合机制收口到卡牌文件。`CardEffect` 新增可选 `getSpecialStablePositions(state, player) => FarmTilePosition[]` 与 `applySpecialStable(state, player, position) => boolean`；`card-effects.ts` 新增聚合 `collectSpecialStablePositions`（遍历所有卡候选，每项带 `sourceCardId`）与 `applySpecialStableAt`（委派结算，返回 `sourceCardId`）。`stables.ts` 的 `buildStableFarmSelection` 用 `collectSpecialStablePositions` 注入协议字段 `farmHandPositions`（字段名为前端兼容保留不变），`finalizeStables` 用 `applySpecialStableAt` 结算并以其返回的 `sourceCardId` 填 `farm.stableBuilt` 的 `kind:'special'` item。门控通用化为 `isSpecialStableEntry`（`actionContext.farmHand === true`，仅 Farm-Expansion stables leaf 设置；E148 / A089 / C94 不提供）。B85_FarmHand 的 `effect` 实现这两个方法封装原 helper，`sourceCardId = 'B85_FarmHand'`。`check:card-impl-boundaries` 通过，核心 stables 文件 0 单卡 import。
-
-本轮新增已完成基础设施：Built-special-stable snapshot 展示派生（#200）。`CardEffect` 第三个并列方法 `getBuiltSpecialStables?(player) => FarmTilePosition[]` 返回该卡当前矗立的特殊 stable（建造前 / 回收后空）；`card-effects.ts` 聚合 `collectBuiltSpecialStables(player) => { position, sourceCardId }[]`。`serializeState` 据此给每个序列化玩家派生展示字段 `SerializedPlayerState.specialStables`——领域真相仍在 `cardStates`，仅进 snapshot，不进 `PlayerState`/`GameState`；`rehydrateState` 显式剥离避免泄漏回权威态。前端只读该通用字段渲染已建 overlay，后端聚合无 B85-specific 分支，B85 的 effect 实现封装 `readFarmHandPosition`。
+后续若发现需要跨多张卡的新机制，先在本节新增待办；实现完成并有测试或守卫后，从本节移除并同步 §5 / §9 / §10 / §12。
 
 ## 7. Log 系统对比
 
@@ -214,8 +193,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
-| effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E149_MidnightFencer`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
-| effect | `computeCostedBonus` | `A136_DrudgeryReeve`, `C133_Soldier`, `C99_GardenDesigner`, `E132_VeggieLover` |
+| effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
+| effect | `computeCostedBonus` | `C99_GardenDesigner`, `E132_VeggieLover` |
 | effect | `computeExtraRoomCapacity` | `A10_WoodenShed`, `A127_Lodger`, `A85_Homekeeper`, `B10_Caravan`, `B85_FarmHand`, `C10_BunkBeds`, `D85_Reader`, `E85_MasterTanner` |
 | effect | `computeLockedFarmTiles` | `B38_FutureBuildingSite` |
 | effect | `computeSharedPostScore` | `A135_AnimalReeve`, `B136_HouseSteward`, `C136_RanchProvost` |
@@ -224,7 +203,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onAfterReap` | `A106_SlurrySpreader`, `A59_PotatoRidger`, `A64_BarleyMill`, `B21_HayloftBarn`, `B58_CrackWeeder`, `C106_PotatoHarvester`, `C120_AgriculturalLabourer`, `D113_FoodMerchant`, `D126_FieldCultivator`, `D63_Lynchet`, `D65_GrainSieve` |
 | effect | `onAfterRoundEnd` | `A165_PigBreeder`, `A54_Credit`, `B53_SculptureCourse`, `D167_PureBreeder`, `D64_BakingCourse`, `D79_CarrotMuseum`, `E87_MasterRenovator` |
 | effect | `onAllWorkersPlaced` | `E125_DelayedWayfarer` |
-| effect | `onBeforeEndGame` | `B133_VillagePeasant`, `D132_HideFarmer` |
+| effect | `onBeforeEndGame` | `A136_DrudgeryReeve`, `B133_VillagePeasant`, `C133_Soldier`, `D132_HideFarmer` |
 | effect | `onBeforeHarvest` | `A166_Haydryer`, `C92_AutumnMother`, `D32_WoodRake`, `D98_Transactor` |
 | effect | `onBeforePlayerTurn` | `D134_OysterEater`（non-flow skip-control，labor turn 入口同步消费 `{ skipTurn?: true }`） |
 | effect | `contributeExtraTurn` | `A92_AdoptiveParents`（轮转额外行动：玩家普通工人耗尽但仍持未激活后代时返回 XOR[use, forfeit] flow；被 round.ts 主动消费、order-independent；轮转据此不提前跳过该玩家；内部 `countExtraTurns` 让 skip-turn / forced consume 逐个 opportunity 消费） |
@@ -249,7 +228,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onStartHarvestFeedingPhase` | `C107_Baker`, `E52_Cubbyhole` |
 | effect | `onStartHarvestFieldPhase` | `A112_ScytheWorker`, `B165_GameProvider`, `B61_ThreeFieldRotation`, `C57_Crudite`, `D70_StrawManure`, `D72_StableManure`, `E112_GrainThief`, `E73_Scythe` |
 | effect | `onStartReturnHome` | `A100_Curator`, `A127_Lodger`, `A141_TurnipFarmer`, `A151_Minstrel`, `A152_NightSchoolStudent`, `A157_Bohemian`, `A35_SwimmingClass`, `A58_AsparagusKnife`, `C155_FoodDistributor`, `C97_SeedResearcher`, `D102_SampleStableMaker`, `D107_Bellfounder`, `D10_StorksNest`, `D18_SteamPlow`, `E20_IronHoe`, `E87_MasterRenovator` |
-| effect | `resolveChoice` | `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones`, `E149_MidnightFencer` |
+| effect | `resolveChoice` | `A136_DrudgeryReeve`, `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C133_Soldier`, `C146_WorkshopAssistant`, `D132_HideFarmer`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones` |
 | exchange | `anytime` | `A60_OrientalFireplace`, `B104_SheepWalker`, `B32_Kettle`, `B80_HardPorcelain`, `C139_BasketmakersWife`, `C50_StableYard`, `D162_ClayFirer`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D60_LargePottery`, `E109_BraidMaker` |
 | exchange | `bake-bread` | `A60_OrientalFireplace`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D64_BakingCourse`, `E63_IronOven`, `E64_SimpleOven` |
 | exchange | `harvest` | `C105_BasketCarrier`, `C109_SchnappsDistiller`, `C59_SchnappsDistillery`, `D108_StoneCarver`, `D155_Ebonist`, `D62_BeerTap`, `E153_StoneSculptor` |
@@ -358,7 +337,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
 | specialKind | `increment-counter` | `B132_EstateMaster`, `C132_TimberShingleMaker` |
-| specialKind | `increment-extra-data` | `C104_Collector`, `D134_OysterEater`, `D92_ChildOmbudsman`, `E149_MidnightFencer`, `E38_RodCollection` |
+| specialKind | `increment-extra-data` | `C104_Collector`, `D134_OysterEater`, `D92_ChildOmbudsman`, `E38_RodCollection` |
 | specialKind | `move-resource-between-spaces` | `E166_Roastmaster` |
 | specialKind | `plant-additional-good` | `C8_PlantFertilizer` |
 | specialKind | `pop-card-stack-top` | `E103_Wolf` |
@@ -366,6 +345,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | specialKind | `remove-field-crop` | `C63_CraftBrewery` |
 | specialKind | `remove-field-crops` | `C57_Crudite` |
 | specialKind | `remove-future-meeples` | `B76_Ceilings` |
+| specialKind | `record-scoring-reserve-bonus` | `A136_DrudgeryReeve`, `C133_Soldier` |
 | specialKind | `resource-quantity-select` | `B157_Salter` |
 | specialKind | `resourceExchange` | `E5_NightLoot` |
 | specialKind | `return-card-to-board` | `C60_SmallPottersOven` |
@@ -530,7 +510,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A133_Braggart` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `A134_FullFarmer` | 已对齐 |  |
 | `A135_AnimalReeve` | 已对齐 |  |
-| `A136_DrudgeryReeve` | 需复核 | BGA sharedScoring 每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分 |
+| `A136_DrudgeryReeve` | 已对齐 | BGA sharedScoring 通过 all-player before-end select dispatch 对每位 target player 提供 0..max sets 选择，选择后用 Scoring Reserve 记录 wood/clay/stone/reed 占用和 1/3/5 额外分；真实资源不扣除，Joinery / Pottery / Basketmaker / C133 读取剩余计分资源 |
 | `A137_RiverineShepherd` | 已对齐 | optional extra good 使用另一个累积格的 partial collect，会扣除来源格并保留 action-space provenance |
 | `A138_Harpooner` | 已对齐 |  |
 | `A139_HollowWarden` | 已对齐 |  |
@@ -595,8 +575,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B18_GrasslandHarrow` | 已对齐 |  |
 | `B19_MoldboardPlow` | 已对齐 | optional extra plow 先执行 `plow`，成功后再 `pop-card-stack`；optional 跳过走 `__skip__`，接受后 `plow` confirm-only 且 direct `cancel` 被通用 guard 拒绝 |
 | `B20_ChainFloat` | 已对齐 |  |
-| `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
-| `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `B21_HayloftBarn` | 已接受差异 | BGA banned，但 OA 按产品策略保留；通过 resource exchange 获得的 grain 已由 provenance helper 触发；空卡 family-growth 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露生人 flow |
+| `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留；临时 from-supply worker 归还时标记 `removedFromSupply`，后续 family-growth supply 与玩家面板家庭成员上限都不再计入该 token |
 | `B23_FinalScenario` | 已对齐 | 第 14 轮行动 reveal / exclusive gate / clear event 已由后端权威建模 |
 | `B24_Lasso` | 已对齐 | 任意首次放人后先用 placement availability 计算合法 second-placement target；非动物市场首放仅在有合法动物市场时触发，动物市场首放仅在有任意合法 target 时触发，并经通用 target action flow 执行目标行动 |
 | `B25_BreadPaddle` | 已对齐 |  |
@@ -608,7 +588,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B31_PotteryYard` | 已对齐 | prerequisite 改用 `potteryIdentity` played-card capability；D60_LargePottery 通过 dual-type major 身份参与判断。 |
 | `B32_Kettle` | 已对齐 |  |
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
-| `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次并在牌面显示累计值 |
+| `B34_SpecialFood` | 已对齐 | 行动格动物 provenance 已收敛到 `sumActionSpaceMovedToTriggerPlayer()`；保留动物检查改用 assigned animal 口径，bonus VP 只记一次并在牌面显示累计值 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
 | `B37_Grange` | 已对齐 |  |
@@ -711,7 +691,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B134_HousebookMaster` | 已对齐 |  |
 | `B135_NutritionExpert` | 已对齐 |  |
 | `B136_HouseSteward` | 已对齐 |  |
-| `B137_Wholesaler` | 已对齐 |  |
+| `B137_Wholesaler` | 已对齐 | #241 改为卡内 `SPACE_REWARDS` 表生成四个 action-space listener，保留 cardStates 一次性领取语义。 |
 | `B138_ForestGuardian` | 已对齐 |  |
 | `B139_ForestScientist` | 已对齐 |  |
 | `B140_FarmyardWorker` | 已对齐 |  |
@@ -795,7 +775,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C38_Christianity` | 已对齐 |  |
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
-| `C41_FarmStore` | 已对齐 |  |
+| `C41_FarmStore` | 已对齐 | #241 改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `C42_RavenousHunger` | 已对齐 | Vegetable Seeds 后先用 placement availability 过滤实际可进入的累积格；有合法 target 才创建 optional second placement，目标 collect 通过 `after.collect` flag 追加对应累积资源 +1，并在结算后 unflag |
 | `C43_FarmBuilding` | 已对齐 |  |
 | `C44_ChickenCoop` | 已对齐 |  |
@@ -887,7 +867,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C130_OutskirtsDirector` | 已对齐 |  |
 | `C131_PrivateTeacher` | 已对齐 |  |
 | `C132_TimberShingleMaker` | 已对齐 |  |
-| `C133_Soldier` | 需复核 | BGA 终局前玩家选择 0..max 对并 reserve wood/stone；OA scoring solver 自动最优 |
+| `C133_Soldier` | 已对齐 | 终局前 owner before-end select 提供 0..max 对 wood/stone 选择；选择后用 Scoring Reserve 记录占用和额外分，真实资源不扣除，资源计分读取剩余计分资源 |
 | `C134_CowPrince` | 已对齐 |  |
 | `C135_Constable` | 已对齐 |  |
 | `C136_RanchProvost` | 已对齐 |  |
@@ -1014,7 +994,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D77_RecycledBrick` | 已对齐 |  |
 | `D78_ReedPond` | 已对齐 |  |
 | `D79_CarrotMuseum` | 已对齐 |  |
-| `D80_BrickHammer` | 已对齐 |  |
+| `D80_BrickHammer` | 已对齐 | after-improvement 判断改用 `getPrintedImprovementResourceCost(..., 'clay')`；`cost` 与 `altCosts` 是 base cost 候选，取最大 clay，不再把 minor `cost.clay` 与 `altCosts[].clay` 相加。 |
 | `D81_RoofLadder` | 已对齐 |  |
 | `D82_HuntingTrophy` | 已对齐 |  |
 | `D83_Pigswill` | 已对齐 |  |
@@ -1051,7 +1031,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D114_SeedTrader` | 已对齐 |  |
 | `D115_FodderPlanter` | 已对齐 |  |
 | `D116_TreeInspector` | 已对齐 |  |
-| `D117_WoodExpert` | 已对齐 |  |
+| `D117_WoodExpert` | 已对齐 | wood printed/base cost 读取改用 `getPrintedImprovementResourceCost(..., 'wood')`，继续支持 minor `altCosts` 中含 wood 的候选；当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 留给 #239。 |
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
@@ -1130,7 +1110,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E13_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |
 | `E14_WoodSaw` | 已对齐 |  |
 | `E15_NailBasket` | 已对齐 |  |
-| `E16_BriarHedge` | 已对齐 |  |
+| `E16_BriarHedge` | 已对齐 | prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener。 |
 | `E17_SkimmerPlow` | 已对齐 |  |
 | `E18_SeedAlmanac` | 已对齐 |  |
 | `E19_OxGoad` | 已对齐 |  |
@@ -1239,7 +1219,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E122_Cottar` | 已对齐 |  |
 | `E123_ResourceHoarder` | 已对齐 | after-pay 优先读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径 |
 | `E124_MayorCandidate` | 已对齐 |  |
-| `E125_DelayedWayfarer` | 已对齐 |  |
+| `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |
 | `E127_DiligentFarmer` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `E128_Saddler` | 已对齐 |  |
@@ -1254,23 +1234,23 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E137_FlaxFarmer` | 已对齐 |  |
 | `E138_LivestockExpert` | 已对齐 |  |
 | `E139_BunnyBreeder` | 已对齐 |  |
-| `E140_Carter` | 已对齐 |  |
+| `E140_Carter` | 已对齐 | collect building resources from action-space 判定改用 `sumActionSpaceMovedToTriggerPlayer()`；triggerRound gating unchanged。 |
 | `E141_VegetableVendor` | 已对齐 |  |
-| `E142_Smuggler` | 已对齐 |  |
+| `E142_Smuggler` | 已对齐 | #241 改为卡内 `TRADE_OPTIONS` 表生成 2x 同类选项，并保留 mixed optional OR 子树。 |
 | `E143_Hewer` | 已对齐 |  |
 | `E144_WaresSalesman` | 已对齐 | 按 `waresSalesmanGains` metadata 读取 single/multiple gain options，不再维护硬编码 improvement id 分组。 |
 | `E145_Parvenu` | 已对齐 |  |
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
 | `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
-| `E149_MidnightFencer` | 需复核 | BGA 最后 harvest 执行免费 `FENCING`；OA 只按选择数记 VP，不改 farm |
+| `E149_MidnightFencer` | 已对齐 | 第 14 轮 harvest start 提供 optional real borrowed `fence` leaf；donor cap 按其他玩家 own ordinary reserve 各最多 2，跳过或建造均不再产生 owed-fence bonus VP；借围栏选择可 undo 回 E149 optional，但不能继续 undo 穿过 round-end 边界 |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |
 | `E153_StoneSculptor` | 已对齐 |  |
 | `E154_Margrave` | 已对齐 |  |
 | `E155_Visionary` | 已对齐 |  |
-| `E156_ClaypitOwner` | 已对齐 |  |
+| `E156_ClaypitOwner` | 已对齐 | printed clay 判定改用 `getPrintedImprovementResourceCost(..., 'clay')`，可识别 minor `altCosts` 中含 clay 的 base cost 候选，并继续支持 major simple / complex fee cost。 |
 | `E157_Usufructuary` | 已对齐 |  |
 | `E158_StoneCustodian` | 已对齐 |  |
 | `E159_OldMiser` | 已对齐 |  |

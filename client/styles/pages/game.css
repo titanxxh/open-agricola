@@ -294,6 +294,54 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.borrowed-fence-source-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.borrowed-fence-source-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fdf6e3;
+}
+.borrowed-fence-source-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.borrowed-fence-source-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 247, 230, 0.28);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(255, 247, 230, 0.12);
+  color: #fdf6e3;
+  font-weight: 600;
+  cursor: pointer;
+}
+.borrowed-fence-source-option.active {
+  border-color: rgba(255, 210, 123, 0.85);
+  background: rgba(255, 210, 123, 0.18);
+}
+.borrowed-fence-source-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.borrowed-fence-source-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #8b5e34;
+}
+.borrowed-fence-source-option[data-player-color="red"] .borrowed-fence-source-dot { background: var(--color-danger); }
+.borrowed-fence-source-option[data-player-color="yellow"] .borrowed-fence-source-dot { background: #d6b332; }
+.borrowed-fence-source-option[data-player-color="blue"] .borrowed-fence-source-dot { background: #3f6ee8; }
+.borrowed-fence-source-option[data-player-color="black"] .borrowed-fence-source-dot { background: #1f2937; }
+.borrowed-fence-source-count {
+  color: rgba(253, 246, 227, 0.75);
+}
 .collector-multi-select {
   display: flex;
   flex-direction: column;
@@ -1534,11 +1582,18 @@
 .res-compact-group {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
 }
 .res-compact-group .res-icon {
   font-size: 18px;
   flex-shrink: 0;
+}
+.res-compact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+  min-width: 0;
 }
 .res-compact-num {
   min-width: 14px;
@@ -1546,10 +1601,6 @@
   font-size: 13px;
   font-weight: 700;
   color: #2a1a00;
-  margin-right: 3px;
-}
-.res-compact-num:last-child {
-  margin-right: 0;
 }
 .res-compact-label {
   font-size: 11px;
@@ -2064,6 +2115,30 @@
 .farm-fence-h.selected,
 .farm-fence-v.selected {
   background: rgba(255, 255, 255, 0.35);
+}
+.farm-fence-h.active[data-player-color="red"]::before,
+.farm-fence-v.active[data-player-color="red"]::before,
+.farm-fence-h.selected[data-player-color="red"]::before,
+.farm-fence-v.selected[data-player-color="red"]::before {
+  background: var(--color-danger);
+}
+.farm-fence-h.active[data-player-color="yellow"]::before,
+.farm-fence-v.active[data-player-color="yellow"]::before,
+.farm-fence-h.selected[data-player-color="yellow"]::before,
+.farm-fence-v.selected[data-player-color="yellow"]::before {
+  background: #d6b332;
+}
+.farm-fence-h.active[data-player-color="blue"]::before,
+.farm-fence-v.active[data-player-color="blue"]::before,
+.farm-fence-h.selected[data-player-color="blue"]::before,
+.farm-fence-v.selected[data-player-color="blue"]::before {
+  background: #3f6ee8;
+}
+.farm-fence-h.active[data-player-color="black"]::before,
+.farm-fence-v.active[data-player-color="black"]::before,
+.farm-fence-h.selected[data-player-color="black"]::before,
+.farm-fence-v.selected[data-player-color="black"]::before {
+  background: #1f2937;
 }
 /* Wood Palisade visual distinction (B30). */
 .farm-fence-h.active.palisade::before,

@@ -4,6 +4,7 @@ import type { ActionFlow, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
+import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B21_HayloftBarn } from '../../cards-display/B/B21_HayloftBarn'
 import { hasExchangeGained, hasResourceMovedToPlayer } from '../helpers/event-provenance'
@@ -33,14 +34,11 @@ const familyGrowthLeaf = (): ActionFlow => ({
   actionContext: { skipRoomCheck: true },
 })
 
-const hasInactiveWorker = (player: PlayerState) =>
-  player.workers.some((w) => !w.isActive)
-
 const buildFlow = (newCount: number, player: PlayerState): ActionFlow => {
   const food = gainLeaf(CARD_ID, { food: 1 })
   // BGA: when card just emptied AND player has farmer in reserve and family <= 4,
   // grant family-growth-without-room.
-  if (newCount === 0 && hasInactiveWorker(player) && player.workers.filter((w) => w.isActive).length <= 4) {
+  if (newCount === 0 && hasInactiveWorkerInSupply(player) && familySize(player) <= 4) {
     return {
       type: 'seq',
       children: [food, familyGrowthLeaf()],

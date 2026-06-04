@@ -178,6 +178,7 @@ export type Worker = {
   id: string
   isActive: boolean
   isNewborn: boolean
+  removedFromSupply?: boolean
 }
 
 export type WorkerRef = {
@@ -745,7 +746,12 @@ export type InteractionRequest =
             }[]
             maxSelections?: number
           }
-        | { farmType: 'fence'; selectableEdges: string[]; extraWood?: number }
+        | {
+            farmType: 'fence'
+            selectableEdges: string[]
+            extraWood?: number
+            fenceSource?: { kind: 'borrowed'; donorCaps: Record<string, number> }
+          }
         | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
         | {
             farmType: 'stable'
@@ -843,6 +849,7 @@ export type InteractionFarmSelection =
       farmType: 'fence'
       selectableEdges: string[]
       extraWood?: number
+      fenceSource?: { kind: 'borrowed'; donorCaps: Record<string, number> }
     }
   | {
       farmType: 'room'

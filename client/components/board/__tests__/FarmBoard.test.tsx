@@ -1,8 +1,47 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+  type CardsManifestPayload,
+} from '../../../services/card-meta'
+
+const manifestEntry = (
+  id: string,
+  name: string,
+  type: 'occupation' | 'minor',
+): CardsManifestPayload[string] => ({
+  meta: { id, name, deck: id[0] ?? 'A', number: Number(id.slice(1, 4)) || 0, type },
+  module: '',
+  reaches: [],
+})
+
+beforeAll(async () => {
+  const manifest: CardsManifestPayload = {
+    A102_Grocer: manifestEntry('A102_Grocer', 'Grocer', 'occupation'),
+    A105_BarrowPusher: manifestEntry('A105_BarrowPusher', 'Barrow Pusher', 'occupation'),
+    A106_SlurrySpreader: manifestEntry('A106_SlurrySpreader', 'Slurry Spreader', 'occupation'),
+    A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
+    B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
+    C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
+    C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
+    D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
+  }
+  __resetCardsManifestCache()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => manifest,
+  }))
+  await loadCardsManifest()
+})
+
+afterAll(() => {
+  __resetCardsManifestCache()
+  vi.unstubAllGlobals()
+})
 
 const resources = (): Resource => ({
   wood: 0,
@@ -23,6 +62,13 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   name,
   color,
   resources: { ...resources(), wood: 2 },
+  workers: [
+    { id: '1', isActive: true },
+    { id: '2', isActive: true },
+    { id: '3', isActive: false },
+    { id: '4', isActive: false },
+    { id: '5', isActive: false },
+  ],
   rooms: 2,
   houseType: 'wood',
   fields: [],
@@ -113,6 +159,49 @@ const createFarmBoardProps = (
 })
 
 describe('FarmBoard', () => {
+  it('renders supply capacities with icons in the compact resource panel', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('res-icon-child')
+    expect(html).toContain('res-icon-room-wood')
+    expect(html).toContain('res-icon-child-free')
+    expect(html).toContain('>2/5<')
+    expect(html).toContain('>0/15<')
+    expect(html).toContain('>0/4<')
+    expect(html).not.toContain('res-compact-label')
+  })
+
+  it('keeps compact panel icon values grouped with accessible labels and the animation anchor', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playerPanelSummary: {
+            family: { used: 2, limit: 5 },
+            rooms: { count: 2 },
+            housingCapacity: { value: 2 },
+            fence: { used: 17, limit: 17 },
+            stable: { used: 3, limit: 4 },
+          },
+        })}
+      />,
+    )
+
+    expect(html).toContain('data-player-resource-anchor="p1"')
+    expect(html).toContain('aria-label="Family capacity: 2/5"')
+    expect(html).toContain('aria-label="Rooms: 2"')
+    expect(html).toContain('aria-label="Housing capacity: 2"')
+    expect(html).toContain('aria-label="Fence capacity: 17/17"')
+    expect(html).toContain('aria-label="Stable supply: 3/4"')
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-fence-icon[\s\S]*>17\/17</)
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-barn[\s\S]*>3\/4</)
+  })
+
   it('marks highlighted farm tiles', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -184,7 +273,7 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('stable-barn-icon')
     expect(html).toContain('res-icon-barn')
-    expect(html).not.toContain('Stable')
+    expect(html).not.toContain('farm-tile-text">Stable</span>')
   })
 
   it('colors the built stable barn icon by the display player color', () => {
@@ -249,6 +338,52 @@ describe('FarmBoard', () => {
     )
 
     expect(html).toMatch(/farm-fence-h[^"]*\bevent-highlight\b/)
+  })
+
+  it('colors own fence segments by the displayed farm owner and borrowed segments by source owner', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      fenceSegments: [
+        { edge: 'H-0-0', type: 'fence' as const },
+        { edge: 'V-0-0', type: 'fence' as const, source: { kind: 'borrowed' as const, ownerPlayerId: 'p2' } },
+      ],
+    }
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [
+            { key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: 'fence-v-0-0', type: 'fence-v', fenceId: 'V-0-0' },
+          ],
+          existingFenceSet: new Set(['H-0-0', 'V-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^>]*data-player-color="red"/)
+    expect(html).toMatch(/farm-fence-v[^>]*data-player-color="blue"/)
+  })
+
+  it('previews pending borrowed fence edges with the selected donor color', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [{ key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' }],
+          pendingFenceSet: new Set(['H-0-0']),
+          pendingFenceSourceMap: { 'H-0-0': 'p2' },
+          fenceSelectableSet: new Set(['H-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^>]*selected[^>]*data-player-color="blue"/)
   })
 
   it('renders off-board sow targets in a tray below the farm grid', () => {

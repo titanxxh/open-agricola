@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
   PlayerScoreSummary,
   ScoreCategoryResult,
-  ScoreEntry,
 } from '../../../shared/domain'
 import type {
   PlayerState,
@@ -13,6 +12,8 @@ import type {
 } from '../../../shared/contract/types'
 import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
+import { resolveCardRef } from './card-reference'
+import { LogCardLink } from './log-rendering'
 
 type Props = {
   locale: Locale
@@ -38,8 +39,7 @@ const categoryOrder: ScoreCategoryResult['key'][] = [
   'stoneRooms',
   'farmers',
   'cards',
-  'cardsBonus',
-  'cardStateBonusVp',
+  'cardBonusVp',
   'beggings',
 ]
 
@@ -57,36 +57,50 @@ const categoryLabelKey: Record<ScoreCategoryResult['key'], string> = {
   stoneRooms: 'ui.scoringStoneRooms',
   farmers: 'ui.scoringFarmers',
   cards: 'ui.scoringCards',
-  cardsBonus: 'ui.scoringCardsBonus',
-  cardStateBonusVp: 'ui.scoringCardsBonus',
+  cardBonusVp: 'ui.scoringCardsBonus',
   beggings: 'ui.scoringBeggings',
 }
 
 const formatScore = (value: number) =>
   value > 0 ? `+${value}` : value === 0 ? '0' : `${value}`
 
-const getCardLabel = (
-  locale: Locale,
-  cardType: 'major' | 'minor' | 'occupation',
-  cardId: string,
-) =>
-  getCardDisplayName(locale, cardType, cardId)
-
-const renderEntryDetail = (locale: Locale, entry: ScoreEntry) => {
-  if (entry.type === 'cardBonus') {
-    return t(locale, 'ui.scoringBonusDetail', {
-      count: entry.quantity,
-      resource: t(locale, `resources.${entry.resource}`),
-    })
-  }
-  return ''
-}
-
 type ScoringRow =
   | { id: string; type: 'category'; key: ScoreCategoryResult['key'] }
   | { id: string; type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation' }
-  | { id: string; type: 'cardBonus'; cardId: string }
+  | { id: string; type: 'cardBonus'; cardId: string; cardType?: 'major' | 'minor' | 'occupation' }
   | { id: string; type: 'total' }
+
+const renderCardChildLabel = (
+  locale: Locale,
+  cardId: string,
+  cardType?: 'major' | 'minor' | 'occupation',
+  preferResolvedName = false,
+) => {
+  const fallbackName = cardType
+    ? getCardDisplayName(locale, cardType, cardId)
+    : getAnyCardDisplayName(locale, cardId)
+  const typedCardRef = cardType
+    ? { id: cardId, type: cardType, name: fallbackName }
+    : null
+  const resolvedCardRef = resolveCardRef(locale, cardId)
+  const cardRef = preferResolvedName
+    ? resolvedCardRef ?? typedCardRef
+    : typedCardRef ?? resolvedCardRef
+  const label = preferResolvedName ? cardRef?.name ?? fallbackName : fallbackName
+
+  return (
+    <span className="scoring-card-label">
+      {'· '}
+      {cardRef ? (
+        <LogCardLink locale={locale} cardRef={cardRef}>
+          {label}
+        </LogCardLink>
+      ) : (
+        label
+      )}
+    </span>
+  )
+}
 
 export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
@@ -99,19 +113,19 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   const cardRows: ScoringRow[] = []
   const cardBonusRows: ScoringRow[] = []
   const cardMap = new Map<string, 'major' | 'minor' | 'occupation'>()
-  const cardBonusSet = new Set<string>()
+  const cardBonusMap = new Map<string, 'major' | 'minor' | 'occupation' | undefined>()
 
   scores.forEach((player) => {
     const cardsCategory = player.categories.find((item) => item.key === 'cards')
     cardsCategory?.entries.forEach((entry) => {
-      if (entry.type === 'card') {
+      if (entry.type === 'card' && entry.score !== 0) {
         cardMap.set(entry.cardId, entry.cardType)
       }
     })
-    const bonusCategory = player.categories.find((item) => item.key === 'cardsBonus')
+    const bonusCategory = player.categories.find((item) => item.key === 'cardBonusVp')
     bonusCategory?.entries.forEach((entry) => {
-      if (entry.type === 'cardBonus') {
-        cardBonusSet.add(entry.cardId)
+      if (entry.type === 'bonus' && entry.score !== 0) {
+        cardBonusMap.set(entry.cardId, entry.cardType)
       }
     })
   })
@@ -119,8 +133,8 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   Array.from(cardMap.entries()).forEach(([cardId, cardType]) => {
     cardRows.push({ id: `card-${cardId}`, type: 'card', cardId, cardType })
   })
-  Array.from(cardBonusSet.values()).forEach((cardId) => {
-    cardBonusRows.push({ id: `cardBonus-${cardId}`, type: 'cardBonus', cardId })
+  Array.from(cardBonusMap.entries()).forEach(([cardId, cardType]) => {
+    cardBonusRows.push({ id: `cardBonus-${cardId}`, type: 'cardBonus', cardId, cardType })
   })
 
   const rows: ScoringRow[] = [{ id: 'total', type: 'total' }]
@@ -129,7 +143,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     if (row.type === 'category' && row.key === 'cards') {
       rows.push(...cardRows)
     }
-    if (row.type === 'category' && row.key === 'cardsBonus') {
+    if (row.type === 'category' && row.key === 'cardBonusVp') {
       rows.push(...cardBonusRows)
     }
   })
@@ -186,13 +200,13 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               ))}
             </div>
             {rows.map((row) => {
-              const rowLabel =
+              const rowLabel: ReactNode =
                 row.type === 'category'
                   ? t(locale, categoryLabelKey[row.key])
                   : row.type === 'card'
-                    ? `· ${getCardLabel(locale, row.cardType, row.cardId)}`
+                    ? renderCardChildLabel(locale, row.cardId, row.cardType)
                     : row.type === 'cardBonus'
-                      ? `· ${getCardDisplayName(locale, 'major', row.cardId)}`
+                      ? renderCardChildLabel(locale, row.cardId, row.cardType, true)
                       : t(locale, 'ui.scoringTotal')
               return (
                 <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
@@ -241,21 +255,19 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                       )
                     }
                     const category = player.categories.find(
-                      (item) => item.key === 'cardsBonus',
+                      (item) => item.key === 'cardBonusVp',
                     )
-                    const entry = category?.entries.find(
-                      (item) =>
-                        item.type === 'cardBonus' && item.cardId === row.cardId,
+                    const score = category?.entries.reduce(
+                      (sum, item) =>
+                        item.type === 'bonus' && item.cardId === row.cardId && item.score !== 0
+                          ? sum + item.score
+                          : sum,
+                      0,
                     )
-                    const score = entry ? formatScore(entry.score) : '0'
+                    const formattedScore = score ? formatScore(score) : '0'
                     return (
                       <div key={`${row.id}-${player.playerId}`} className="scoring-cell">
-                        <div className="scoring-cell-value">{score}</div>
-                        {entry ? (
-                          <div className="scoring-cell-detail">
-                            {renderEntryDetail(locale, entry)}
-                          </div>
-                        ) : null}
+                        <div className="scoring-cell-value">{formattedScore}</div>
                       </div>
                     )
                   })}
