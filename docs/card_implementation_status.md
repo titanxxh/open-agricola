@@ -51,7 +51,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `C88_CarpentersApprentice` | 40 | 115 | 2.88 | 原因：同一卡同时覆盖 wood house construct 折扣、stable 第 3/4 座非线性总额折扣、fence 第 13-15 根免费及 entry doability。基础设施状态：近期 stable/FarmHand PR 已补 `getStableCountForCards()`、count-aware `maxSelections`、`fencePolicy` 布局门禁和 supply helper；旧 `reserve-fence-bonus` 分支已移除，不是开放债。 |
 | `A41_VegetableSlicer` | 24 | 63 | 2.63 | 原因：必须同时确认本次 `improvement` 打出的是 Cooking Hearth，且支付事件中确实 returned Fireplace，不能只看最终资源。基础设施状态：`card.played` / `resource.paid.returnedCardId` provenance 已够用；仅缺一个可选的局部 predicate helper（upgrade transition = played major + returned major），不是 umbrella blocker。 |
 | `A87_Conservator` | 21 | 54 | 2.57 | 原因：wood house 直升 stone house 是额外 renovation candidate；当默认 wood-to-clay 不可支付但 direct-stone 可支付时，还要救回 entry doability。基础设施状态：`computeChoiceCandidates.renovate-house`、`buildRenovationPlan()`、`canRenovate()` 已在 main；不是开放债。 |
-| `E16_BriarHedge` | 27 | 68 | 2.52 | 原因：前置条件要数玩家现有三类动物，fence 成本要按新建 border edge 数折扣。基础设施状态：`computeCosts.fence`、`isBorderEdge()`、`getAllEdgeIds()` 已可表达；`getAssignedAnimalsByType()` 近期已经存在，当前本卡本地 `countAllAnimalsOfType()` 可后续替换为 helper 以减行，但不是缺机制导致。 |
+| `E16_BriarHedge` | 27 | 68 | 2.52 | 原因：前置条件要数玩家现有三类动物，fence 成本要按新建 border edge 数折扣。基础设施状态：#243 已改用 `getAssignedAnimalsByType()` 统一 house/pasture/stable/animal-holder 口径；剩余复杂度主要来自 fence cost listener。 |
 | `E118_KindlingGatherer` | 34 | 77 | 2.26 | 原因：BGA 只看行动格收 food，OA 需要区分 action-space food、普通 supply gain、卡牌 source gain，避免误触发。基础设施状态：`resource.moved` provenance 与 `sumResourceMovedToPlayer()` 已在 main；不是开放债。 |
 | `D131_CraftsmanshipPromoter` | 25 | 56 | 2.24 | 原因：Minor Improvement 行动中额外注入底排 major candidates，并在购买时给 1 stone。基础设施状态：`computeChoiceCandidates.improvement` 与 `readImprovementTypes()` 已在 main，和 `E161` 同一机制；最多可抽“minor action 可买指定 major”小 helper，不是开放债。 |
 | `D1_ZigzagHarrow` | 38 | 84 | 2.21 | 原因：BGA `PlayerBoard::zigzag()` 的 L 形邻接算法在 OA 需要显式移植，并把 raw candidates 交给 plow 校验。基础设施状态：近期 plow allowlist 已补 `actionContext.allowedTiles`，同时约束 selectable / doability / resolveChoice；不是开放债。 |
@@ -79,7 +79,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `E155_Visionary` | 28 | 46 | 1.64 | 原因：购买早期奖励加 family-growth isDoable gate，需要比较其他玩家 family size 与 round。基础设施状态：`isDoable.family-growth` 与 `familySize()` 已在 main；不是开放债。 |
 | `C162_ForestOwner` | 44 | 72 | 1.64 | 原因：注册所有人可用的 player action space，owner/非 owner 资源与 owner 分成事件不同。基础设施状态：`player-action-space` 与 `resource.moved` eventSink 已可表达；不是开放债。 |
 | `D132_HideFarmer` | 69 | 112 | 1.62 | 原因：before-end 终局前要按 food/empty spaces 让玩家选择隐藏数量，并扣 food 写 scoring state。基础设施状态：近期 Before-End Player Dispatch、ad-hoc action、resource-quantity-select 已在 main；不是开放债。 |
-| `B34_SpecialFood` | 94 | 152 | 1.62 | 原因：拿动物前后都要记录 board animal count，判断来自 action space 的动物和是否发生容量丢弃歧义。基础设施状态：`resource.moved` provenance 已在 main；`getAssignedAnimalsByType()` 可替换本地计数以减行，不是机制缺口。 |
+| `B34_SpecialFood` | 94 | 152 | 1.62 | 原因：拿动物前后都要记录 board animal count，判断来自 action space 的动物和是否发生容量丢弃歧义。基础设施状态：#243 已改用 `sumActionSpaceMovedToTriggerPlayer()` 与 `getAssignedAnimalsByType()`；不是机制缺口。 |
 | `A138_Harpooner` | 28 | 45 | 1.61 | 原因：Fishing 后 optional pay wood，再按 family size 给 food + reed。基础设施状态：place-farmer listener、`familySize()`、pay/gain flow 已可表达；不是开放债。 |
 | `B111_Rustic` | 32 | 51 | 1.59 | 原因：建房后按本次新增 room 数生成等量 optional food VP flow。基础设施状态：action snapshot room count 和 bonus-vp leaf 已可表达；不是开放债。 |
 | `D80_BrickHammer` | 34 | 54 | 1.59 | 原因：打 major improvement 后要读取 built card 的 printed clay cost 是否 >=2。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`，避免把 `cost.clay` 与 `altCosts[].clay` 相加。 |
@@ -88,7 +88,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `E160_KelpGatherer` | 32 | 50 | 1.56 | 原因：对手用 Fishing 时同时给触发玩家 food、给 owner vegetable。基础设施状态：opponent scope 与 targeted gain 已可表达；不是开放债。 |
 | `B146_Illusionist` | 89 | 139 | 1.56 | 原因：before collect 要动态列手牌选择弃 1 张，再按 accumulation resource 类型补 1 资源，并处理阻止弃牌 capability。基础设施状态：ad-hoc action、private hand event、capability metadata 已在 main；不是开放债。 |
 | `B156_StorehouseKeeper` | 31 | 48 | 1.55 | 原因：Resource Market 行动后给 clay/grain XOR 选择。基础设施状态：after place-farmer listener 与 XOR gain flow 已可表达；不是开放债。 |
-| `E140_Carter` | 44 | 68 | 1.55 | 原因：购买时记录下一轮并显示 infobox，下一轮从 building-resource accumulation 的实际 moved 数量给 food。基础设施状态：card extraData/infobox 与 `resource.moved` provenance 已在 main；不是开放债。 |
+| `E140_Carter` | 44 | 68 | 1.55 | 原因：购买时记录下一轮并显示 infobox，下一轮从 building-resource accumulation 的实际 moved 数量给 food。基础设施状态：#243 已改用 `sumActionSpaceMovedToTriggerPlayer()` 收敛 action-space provenance；不是开放债。 |
 | `A106_SlurrySpreader` | 22 | 34 | 1.55 | 原因：购买时按当前已种 crop field 给资源奖励，需遍历 field crop state。基础设施状态：field helper 与 gain flow 已可表达；不是开放债。 |
 | `C27_Blueprint` | 41 | 63 | 1.54 | 原因：minor action 中注入指定 major candidates，并给这些 major optional stone discount。基础设施状态：`computeChoiceCandidates.improvement`、payment bonus `preserveOriginal`、`readImprovementTypes()` 已在 main；不是开放债。 |
 | `D112_YoungFarmer` | 49 | 75 | 1.53 | 原因：Major Improvement 行动格可重复占用，during 给 grain，after optional sow。基础设施状态：occupied choice prefix、during/after place-farmer listener、sow flow 已可表达；不是开放债。 |
@@ -588,7 +588,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B31_PotteryYard` | 已对齐 | prerequisite 改用 `potteryIdentity` played-card capability；D60_LargePottery 通过 dual-type major 身份参与判断。 |
 | `B32_Kettle` | 已对齐 |  |
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
-| `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次并在牌面显示累计值 |
+| `B34_SpecialFood` | 已对齐 | 行动格动物 provenance 已收敛到 `sumActionSpaceMovedToTriggerPlayer()`；保留动物检查改用 assigned animal 口径，bonus VP 只记一次并在牌面显示累计值 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
 | `B37_Grange` | 已对齐 |  |
@@ -1110,7 +1110,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E13_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |
 | `E14_WoodSaw` | 已对齐 |  |
 | `E15_NailBasket` | 已对齐 |  |
-| `E16_BriarHedge` | 已对齐 |  |
+| `E16_BriarHedge` | 已对齐 | prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener。 |
 | `E17_SkimmerPlow` | 已对齐 |  |
 | `E18_SeedAlmanac` | 已对齐 |  |
 | `E19_OxGoad` | 已对齐 |  |
@@ -1234,7 +1234,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E137_FlaxFarmer` | 已对齐 |  |
 | `E138_LivestockExpert` | 已对齐 |  |
 | `E139_BunnyBreeder` | 已对齐 |  |
-| `E140_Carter` | 已对齐 |  |
+| `E140_Carter` | 已对齐 | collect building resources from action-space 判定改用 `sumActionSpaceMovedToTriggerPlayer()`；triggerRound gating unchanged。 |
 | `E141_VegetableVendor` | 已对齐 |  |
 | `E142_Smuggler` | 已对齐 | #241 改为卡内 `TRADE_OPTIONS` 表生成 2x 同类选项，并保留 mixed optional OR 子树。 |
 | `E143_Hewer` | 已对齐 |  |
