@@ -58,7 +58,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `B18_GrasslandHarrow` | 38 | 82 | 2.16 | 原因：目标回合取决于打出本卡并支付职业费后的剩余建材数，随后在该 round start 给 optional plow。基础设施状态：`after:pay` listener、`futureMeeplesNode()`、`onRoundStart` 已可表达支付后时序；不是开放债。 |
 | `C150_ParrotBreeder` | 74 | 159 | 2.15 | 原因：四人座次右邻追踪、anytime 付 grain 置 flag、下次 place-farmer 注入 occupied action space、自己/对手放人后清理状态，是完整单卡状态机。基础设施状态：`scope: opponent` listener、card flag/extraData、`computeArgs.place-farmer` occupied-choice 注入均已在 main；缺的是可选的“复制相邻玩家行动格”高阶 helper，但当前只服务少数卡，不是 umbrella blocker。 |
 | `B93_Confidant` | 69 | 146 | 2.12 | 原因：打出时必须保留最低 2 food 给 future schedule，后续每回合领取 food 后可选 sow 或低价 fence，还要 veto lessons 占格后无可付职业的场景。基础设施状态：近期 `reserveResources`、future schedule、lessons doability、nested `fencePolicy.costPolicy` 均已在 main；不是开放债。 |
-| `B137_Wholesaler` | 57 | 117 | 2.05 | 原因：四个固定 action space 各有一次性取物状态，需要在 card state 中分别标记 vegetable/boar/stone/cattle 是否已取。基础设施状态：`after:place-farmer`、`cardStates.extraData`、`gainLeaf()` 已够用；可改为表驱动生成 listener 以减重复，不是缺引擎机制。 |
+| `B137_Wholesaler` | 57 | 117 | 2.05 | 原因：四个固定 action space 各有一次性取物状态，需要在 card state 中分别标记 vegetable/boar/stone/cattle 是否已取。基础设施状态：`after:place-farmer`、`cardStates.extraData`、`gainLeaf()` 已够用；#241 已改为卡内 `SPACE_REWARDS` 表生成 listener。 |
 | `B138_ForestGuardian` | 35 | 69 | 1.97 | 原因：购买奖励和对手拿 5+ wood accumulation 前的 owner-targeted food transfer 分成两条 listener。基础设施状态：opponent scope、targeted gain / payer、action-space resources 已可表达；不是开放债。 |
 | `A14_CarpentersHammer` | 46 | 90 | 1.96 | 原因：BGA banned 但 OA 保留，卡面用 4 条 construct bonus metadata 分别表达 reed + 不同房型资源折扣。基础设施状态：construct modifier metadata 已可表达；不是实现复杂度债。 |
 | `A113_HeresyTeacher` | 21 | 41 | 1.95 | 原因：BGA 未实现，OA 产品扩展为 lessons 后给符合条件 grain field 叠 vegetable，需要 field stack helper。基础设施状态：lessons-space helper 与 field stack API 已可表达；已接受产品差异，不是开放债。 |
@@ -75,7 +75,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `A130_MummysBoy` | 57 | 99 | 1.74 | 原因：每轮一次，追踪第 2 个工人的行动格，并在第 3 个及以后放人时注入 occupied choice 和 flag。基础设施状态：round placement helper、occupied choice prefix、card flag 已在 main；不是开放债。 |
 | `A19_Handplow` | 26 | 45 | 1.73 | 原因：购买后排一个未来回合 optional plow，并在触发后清 card state。基础设施状态：future meeple 与 round-start hook 已可表达；不是开放债。 |
 | `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：要从 major/minor/altCosts 读取 printed wood cost，再注入 food→wood trade。基础设施状态：improvement cost lookup 与 payment trades 已可表达；可抽 printed-resource-cost helper，不是 umbrella blocker。 |
-| `C41_FarmStore` | 47 | 80 | 1.70 | 原因：收获喂食后 7 种 pay 1 food 换资源组合逐一写成 XOR children。基础设施状态：harvest phase hook、pay/gain flow 已可表达；可改表驱动减重复，不是缺机制。 |
+| `C41_FarmStore` | 47 | 80 | 1.70 | 原因：收获喂食后 7 种 pay 1 food 换资源组合逐一写成 XOR children。基础设施状态：harvest phase hook、pay/gain flow 已可表达；#241 已改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `E155_Visionary` | 28 | 46 | 1.64 | 原因：购买早期奖励加 family-growth isDoable gate，需要比较其他玩家 family size 与 round。基础设施状态：`isDoable.family-growth` 与 `familySize()` 已在 main；不是开放债。 |
 | `C162_ForestOwner` | 44 | 72 | 1.64 | 原因：注册所有人可用的 player action space，owner/非 owner 资源与 owner 分成事件不同。基础设施状态：`player-action-space` 与 `resource.moved` eventSink 已可表达；不是开放债。 |
 | `D132_HideFarmer` | 69 | 112 | 1.62 | 原因：before-end 终局前要按 food/empty spaces 让玩家选择隐藏数量，并扣 food 写 scoring state。基础设施状态：近期 Before-End Player Dispatch、ad-hoc action、resource-quantity-select 已在 main；不是开放债。 |
@@ -93,7 +93,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `C27_Blueprint` | 41 | 63 | 1.54 | 原因：minor action 中注入指定 major candidates，并给这些 major optional stone discount。基础设施状态：`computeChoiceCandidates.improvement`、payment bonus `preserveOriginal`、`readImprovementTypes()` 已在 main；不是开放债。 |
 | `D112_YoungFarmer` | 49 | 75 | 1.53 | 原因：Major Improvement 行动格可重复占用，during 给 grain，after optional sow。基础设施状态：occupied choice prefix、during/after place-farmer listener、sow flow 已可表达；不是开放债。 |
 | `B107_Manservant` | 36 | 55 | 1.53 | 原因：购买时或 renovation 后若已住 stone house，要给后续所有回合排 3 food。基础设施状态：renovate-house listener 与 future meeple 已在 main；不是开放债。 |
-| `E142_Smuggler` | 55 | 84 | 1.53 | 原因：harvest feeding phase 可选 wood→grain、grain→stone，且支持同类两次或混合 OR。基础设施状态：harvest phase hook、pay/gain flow、OR/XOR 已可表达；可表驱动减重复，不是缺机制。 |
+| `E142_Smuggler` | 55 | 84 | 1.53 | 原因：harvest feeding phase 可选 wood→grain、grain→stone，且支持同类两次或混合 OR。基础设施状态：harvest phase hook、pay/gain flow、OR/XOR 已可表达；#241 已改为卡内 `TRADE_OPTIONS` 表生成同类 2x 选项并保留 mixed optional OR。 |
 | `B134_HousebookMaster` | 38 | 58 | 1.53 | 原因：renovate to stone 后按当前 round 给不同数量 food 与 VP leaves。基础设施状态：renovate-house after listener 和 bonus-vp leaf 已可表达；不是开放债。 |
 | `D139_Chairman` | 40 | 61 | 1.52 | 原因：Meeting Place 对 owner 与 opponent 两种路径发不同 recipient food。基础设施状态：player/opponent scope 与 targeted gain 已可表达；不是开放债。 |
 | `B155_ArtTeacher` | 42 | 64 | 1.52 | 原因：购买奖励 plus occupation payment 可从 Traveling Players 食物支付，需 trade sideEffect drainSpace。基础设施状态：payment trades 与 drainSpace sideEffect 已在 main；不是开放债。 |
@@ -690,7 +690,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B134_HousebookMaster` | 已对齐 |  |
 | `B135_NutritionExpert` | 已对齐 |  |
 | `B136_HouseSteward` | 已对齐 |  |
-| `B137_Wholesaler` | 已对齐 |  |
+| `B137_Wholesaler` | 已对齐 | #241 改为卡内 `SPACE_REWARDS` 表生成四个 action-space listener，保留 cardStates 一次性领取语义。 |
 | `B138_ForestGuardian` | 已对齐 |  |
 | `B139_ForestScientist` | 已对齐 |  |
 | `B140_FarmyardWorker` | 已对齐 |  |
@@ -774,7 +774,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C38_Christianity` | 已对齐 |  |
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
-| `C41_FarmStore` | 已对齐 |  |
+| `C41_FarmStore` | 已对齐 | #241 改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `C42_RavenousHunger` | 已对齐 | Vegetable Seeds 后先用 placement availability 过滤实际可进入的累积格；有合法 target 才创建 optional second placement，目标 collect 通过 `after.collect` flag 追加对应累积资源 +1，并在结算后 unflag |
 | `C43_FarmBuilding` | 已对齐 |  |
 | `C44_ChickenCoop` | 已对齐 |  |
@@ -1235,7 +1235,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E139_BunnyBreeder` | 已对齐 |  |
 | `E140_Carter` | 已对齐 |  |
 | `E141_VegetableVendor` | 已对齐 |  |
-| `E142_Smuggler` | 已对齐 |  |
+| `E142_Smuggler` | 已对齐 | #241 改为卡内 `TRADE_OPTIONS` 表生成 2x 同类选项，并保留 mixed optional OR 子树。 |
 | `E143_Hewer` | 已对齐 |  |
 | `E144_WaresSalesman` | 已对齐 | 按 `waresSalesmanGains` metadata 读取 single/multiple gain options，不再维护硬编码 improvement id 分组。 |
 | `E145_Parvenu` | 已对齐 |  |
