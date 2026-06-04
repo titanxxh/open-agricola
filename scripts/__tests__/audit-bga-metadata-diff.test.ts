@@ -350,6 +350,8 @@ const IGNORED_FIELDS = new Set([
   'id', 'deck', 'number',
   // BGA platform / workshop flags — not aligned (see §1 audit rule)
   'implemented', 'bannedLiving', 'bannedWeak',
+  'bannedStrong1or2p', 'bannedStrong3or4p',
+  'bannedWeak1or2p', 'bannedWeak3or4p',
   'isCorbariusOrDulcinaria', 'isArtifexOrBubulcus',
   'isBakingImprovement', 'isCookery',
   // BGA PHP runtime behaviour (flow / hooks / state holders)
