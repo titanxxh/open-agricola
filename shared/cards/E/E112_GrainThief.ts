@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { readCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, FarmTilePosition, Field, GameState, PlayerState } from '../../contract/types'
@@ -74,7 +75,7 @@ registerHarvestSelectionThresholdModifier(CARD_ID, ({ player, field }) => {
   return { threshold: 1, sources: [CARD_ID] }
 })
 
-export const E112_GrainThief_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvestFieldPhase: (_state, player) => {
@@ -100,3 +101,19 @@ export const E112_GrainThief_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E112_GrainThief = defineOccupationCard({
+  meta: {
+    id: "E112_GrainThief",
+    name: "Grain Thief",
+    deck: "E",
+    number: 112,
+    desc: ["Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."],
+    cost: {},
+    players: "1+",
+    category: 'CROPS_-_GRAIN',
+  },
+  impl: cardImpl,
+})
+
+export const E112_GrainThief_impl = E112_GrainThief.impl

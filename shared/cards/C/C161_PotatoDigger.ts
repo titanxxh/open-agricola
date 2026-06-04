@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { C161_PotatoDigger } from '../../cards-display/C/C161_PotatoDigger'
 
-const CARD_ID = C161_PotatoDigger.id
+const CARD_ID = 'C161_PotatoDigger'
 
-export const C161_PotatoDigger_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -24,3 +24,18 @@ export const C161_PotatoDigger_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C161_PotatoDigger = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Potato Digger",
+    deck: "C",
+    number: 161,
+    category: "CROP_PROVIDER",
+    desc: ["When you play this card, if you have at least 2/4/5 unplanted field tiles, you immediately get 1/2/3 <VEGETABLE>."],
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const C161_PotatoDigger_impl = C161_PotatoDigger.impl

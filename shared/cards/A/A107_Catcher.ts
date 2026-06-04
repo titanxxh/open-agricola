@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
-import { A107_Catcher } from '../../cards-display/A/A107_Catcher'
 
-const CARD_ID = A107_Catcher.id
-
+const CARD_ID = 'A107_Catcher'
 const isBuildingResourceSpace = (space: CardListenerContext['space']): boolean =>
   (space.gainPerRound?.wood ?? 0) > 0 ||
   (space.gainPerRound?.clay ?? 0) > 0 ||
@@ -39,7 +38,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A107_Catcher_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A107_Catcher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Catcher',
+    deck: 'A',
+    number: 107,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you place your 1st/2nd/3rd person in a round on a building resource accumulation space with exactly 5/4/3 building resources, you get 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A107_Catcher_impl = A107_Catcher.impl

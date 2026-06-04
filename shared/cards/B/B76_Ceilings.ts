@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { B76_Ceilings } from '../../cards-display/B/B76_Ceilings'
 
-const CARD_ID = B76_Ceilings.id
-
+const CARD_ID = 'B76_Ceilings'
 const listener: CardListenerRegistration = {
   id: 'B76-ceilings-after-renovation',
   cardIds: [CARD_ID],
@@ -37,7 +36,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B76_Ceilings_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -54,3 +53,21 @@ export const B76_Ceilings_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B76_Ceilings = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Ceilings",
+    deck: "B",
+    number: 76,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Place 1 <WOOD> on the next 5 round spaces. At the start of these rounds, you get the <WOOD>. Remove the <WOOD> promised by this card from future round spaces the next time you renovate."],
+    cost: {"clay": 1},
+    prerequisite: "1 Occupation",
+    occupationPrerequisites: {"min": 1},
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const B76_Ceilings_impl = B76_Ceilings.impl

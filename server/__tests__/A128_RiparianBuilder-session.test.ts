@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -142,7 +142,7 @@ describe('A128_RiparianBuilder session', () => {
     owner.resources = { ...owner.resources, wood: 1, stone: 5, reed: 2, clay: 0 }
     owner.occupationPlayed.push('A123_FrameBuilder')
     owner.activeModifiers = [
-      ...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(A123_FrameBuilder.impl.modifiers ?? []),
     ]
     session.loadState(state)
 

@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C107_Baker } from '../../cards-display/C/C107_Baker'
 
-const CARD_ID = C107_Baker.id
+const CARD_ID = 'C107_Baker'
 
-export const C107_Baker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -27,3 +27,21 @@ export const C107_Baker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C107_Baker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Baker',
+    deck: 'C',
+    number: 107,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card and at the start of each feeding phase, you can take a __Bake Bread__ action.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C107_Baker_impl = C107_Baker.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D14_HammerCrusher } from '../../cards-display/D/D14_HammerCrusher'
 
-const CARD_ID = D14_HammerCrusher.id
-
+const CARD_ID = 'D14_HammerCrusher'
 const listener: CardListenerRegistration = {
   id: 'D14-hammer-crusher-before-renovate',
   cardIds: [CARD_ID],
@@ -40,7 +39,22 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const D14_HammerCrusher_impl = {
+const cardImpl = {
   listeners: [listener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D14_HammerCrusher = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Hammer Crusher",
+    deck: "D",
+    number: 14,
+    category: "FARM_PLANNER",
+    desc: ["Immediately before you renovate to stone, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."],
+    cost: {"wood":1},
+  },
+  impl: cardImpl,
+})
+
+export const D14_HammerCrusher_impl = D14_HammerCrusher.impl

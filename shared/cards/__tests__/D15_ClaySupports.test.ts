@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
-import { D15_ClaySupports } from '../../cards-display/D/D15_ClaySupports'
+import { D15_ClaySupports } from '../../cards/D/D15_ClaySupports'
 import type { CostModifier, PlayerState } from '../../contract/types'
-
-// D15_ClaySupports unit test — wired through the static `modifier` field on
-// the cards-display definition. The static field is mirrored into
-// `player.activeModifiers` via `rebuildActiveModifiers` during loadState in
-// session paths; here we inject the modifier directly to keep the unit test
-// fast and independent of GameSession setup.
 
 const makePlayer = (
   houseType: PlayerState['houseType'] = 'clay',
@@ -50,17 +44,15 @@ const makePlayer = (
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
-  activeModifiers: D15_ClaySupports.modifier
-    ? [D15_ClaySupports.modifier as CostModifier]
-    : [],
+  activeModifiers: [...(D15_ClaySupports.impl.modifiers ?? [])] as CostModifier[],
   cardStates: {},
   stats: {} as any,
 })
 
 describe('D15_ClaySupports unit-scope trade migration', () => {
   it('static modifier shape: scope:unit, houseTypeClay condition', () => {
-    expect(D15_ClaySupports.modifier).toBeDefined()
-    expect(D15_ClaySupports.modifier).toMatchObject({
+    expect(D15_ClaySupports.impl.modifiers?.[0]).toBeDefined()
+    expect(D15_ClaySupports.impl.modifiers?.[0]).toMatchObject({
       type: 'trade',
       cardId: 'D15_ClaySupports',
       appliesTo: ['construct'],

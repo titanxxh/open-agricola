@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D138_PetLover } from '../../cards-display/D/D138_PetLover'
 
-const CARD_ID = D138_PetLover.id
-
+const CARD_ID = 'D138_PetLover'
 const ANIMAL_MARKET_SPACES: Record<string, 'sheep' | 'boar' | 'cattle'> = {
   'sheep-market': 'sheep',
   'pig-market': 'boar',
@@ -50,7 +49,23 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-export const D138_PetLover_impl = {
+const cardImpl = {
   listeners: [computeReplaceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D138_PetLover = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pet Lover',
+    deck: 'D',
+    number: 138,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you use an accumulation space providing exactly 1 animal, you can leave it on the space and get one from the general supply instead, as well as 3 <FOOD> and 1 <GRAIN>.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D138_PetLover_impl = D138_PetLover.impl

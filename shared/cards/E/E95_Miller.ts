@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { E95_Miller } from '../../cards-display/E/E95_Miller'
 
-const CARD_ID = E95_Miller.id
-
+const CARD_ID = 'E95_Miller'
 /**
  * List of baking-related improvements that the Miller can purchase onBuy.
  * Matches BGA reference (E95_Miller.php allowedPurchases).
@@ -81,7 +80,25 @@ const opponentGrainSeedsListener: CardListenerRegistration = {
   },
 }
 
-export const E95_Miller_impl = {
+const cardImpl = {
   listeners: [onBuyListener, opponentGrainSeedsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E95_Miller = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Miller',
+    deck: 'E',
+    number: 95,
+    category: 'ACTION_-_MAJOR_IMPROVEMENT',
+    desc: [
+        'You can immediately build a <BAKE>-improvement by paying its cost. Each time another player uses the __Grain Seeds__ action space, you can take a __Bake Bread__ action.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E95_Miller_impl = E95_Miller.impl

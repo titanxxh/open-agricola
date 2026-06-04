@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D97_BeggingStudent } from '../../cards-display/D/D97_BeggingStudent'
 
-const CARD_ID = D97_BeggingStudent.id
+const CARD_ID = 'D97_BeggingStudent'
 
-export const D97_BeggingStudent_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -27,3 +27,21 @@ export const D97_BeggingStudent_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D97_BeggingStudent = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Begging Student',
+    deck: 'D',
+    number: 97,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'When you play this card, you must immediately take 1 <BEGGING> marker. At the start of each harvest, you can play 1 occupation without paying an occupation cost.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D97_BeggingStudent_impl = D97_BeggingStudent.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A137_RiverineShepherd } from '../../cards-display/A/A137_RiverineShepherd'
 
-const CARD_ID = A137_RiverineShepherd.id
-
+const CARD_ID = 'A137_RiverineShepherd'
 /**
  * A137 Riverine Shepherd:
  * Each time you use the Sheep Market or Reed Bank accumulation space,
@@ -67,7 +66,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A137_RiverineShepherd_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A137_RiverineShepherd = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Riverine Shepherd",
+    deck: "A",
+    number: 137,
+    category: "GOODS_PROVIDER",
+    desc: ["Each time you use the __Sheep Market__ or __Reed Bank__ accumulation space, you can also take 1 good from the respective other accumulation space, if possible."],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const A137_RiverineShepherd_impl = A137_RiverineShepherd.impl

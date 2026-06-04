@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { E25_BumperCrop } from '../../cards-display/E/E25_BumperCrop'
 import { hasAnyCardFieldCrops } from '../helpers/card-field'
 
-const CARD_ID = E25_BumperCrop.id
+const CARD_ID = 'E25_BumperCrop'
 
-export const E25_BumperCrop_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -21,3 +21,19 @@ export const E25_BumperCrop_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E25_BumperCrop = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bumper Crop',
+    deck: 'E',
+    number: 25,
+    category: 'ACTION',
+    desc: ['When you play this card, immediately carry out the field phase on your farmyard only. (This is not a harvest.)'],
+    vp: 1,
+    prerequisite: '2 Grain Fields',
+  },
+  impl: cardImpl,
+})
+
+export const E25_BumperCrop_impl = E25_BumperCrop.impl

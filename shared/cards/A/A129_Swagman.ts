@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
-import { A129_Swagman } from '../../cards-display/A/A129_Swagman'
 
-const CARD_ID = A129_Swagman.id
-
+const CARD_ID = 'A129_Swagman'
 const TRIGGER_PAIRS: Record<string, string> = {
   'farm-expansion': 'grain-seeds',
   'grain-seeds': 'farm-expansion',
@@ -49,7 +48,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A129_Swagman_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A129_Swagman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Swagman',
+    deck: 'A',
+    number: 129,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Immediately after each time you use the __Farm Expansion__ or __Grain Seeds__ action space, you can use the respective other space with the same person (even if it is occupied).',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const A129_Swagman_impl = A129_Swagman.impl

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { validateSowSelection } from '../../shared/domain/farmyard'
-import { E68_CherryOrchard } from '../../shared/cards-display/E/E68_CherryOrchard'
+import { E68_CherryOrchard } from '../../shared/cards/E/E68_CherryOrchard'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'

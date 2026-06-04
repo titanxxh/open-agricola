@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B163_Pastor } from '../../cards-display/B/B163_Pastor'
 
-const CARD_ID = B163_Pastor.id
-
+const CARD_ID = 'B163_Pastor'
 /** Shared predicate + flow used by both `effect.onBuy` and the after-construct
  *  listener — mirrors BGA's `onBuy($p) { return $this->onAfterConstruct(...) }`. */
 const evaluatePastorTrigger = (
@@ -52,7 +51,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B163_Pastor_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
@@ -63,3 +62,21 @@ export const B163_Pastor_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B163_Pastor = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pastor',
+    deck: 'B',
+    number: 163,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Once you are the only player to live in a house with only 2 rooms, you immediately get 3 <WOOD>, 2 <CLAY>, 1 <REED>, and 1 <STONE> (only once).',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B163_Pastor_impl = B163_Pastor.impl

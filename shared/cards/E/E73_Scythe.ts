@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
 import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
@@ -43,7 +44,7 @@ registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   }
 })
 
-export const E73_Scythe_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvestFieldPhase: (_state, player) => {
@@ -74,3 +75,18 @@ export const E73_Scythe_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E73_Scythe = defineMinorCard({
+  meta: {
+    id: "E73_Scythe",
+    name: "Scythe",
+    deck: "E",
+    number: 73,
+    desc: ["During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."],
+    cost: {"wood":1},
+    category: 'CROPS_-_GRAIN_AND_VEGETABLE',
+  },
+  impl: cardImpl,
+})
+
+export const E73_Scythe_impl = E73_Scythe.impl

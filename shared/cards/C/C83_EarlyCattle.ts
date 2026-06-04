@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C83_EarlyCattle } from '../../cards-display/C/C83_EarlyCattle'
 
-const CARD_ID = C83_EarlyCattle.id
+const CARD_ID = 'C83_EarlyCattle'
 
-export const C83_EarlyCattle_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => {
@@ -17,3 +17,19 @@ export const C83_EarlyCattle_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C83_EarlyCattle = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Early Cattle",
+    deck: "C",
+    number: 83,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ["When you play this card, you immediately get 2 <CATTLE>."],
+    vp: -3,
+    prerequisite: "1 Pasture",
+  },
+  impl: cardImpl,
+})
+
+export const C83_EarlyCattle_impl = C83_EarlyCattle.impl

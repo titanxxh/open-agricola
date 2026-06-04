@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { E20_IronHoe } from '../../cards-display/E/E20_IronHoe'
 
-const CARD_ID = E20_IronHoe.id
+const CARD_ID = 'E20_IronHoe'
 
-export const E20_IronHoe_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
@@ -23,3 +23,18 @@ export const E20_IronHoe_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E20_IronHoe = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Iron Hoe',
+    deck: 'E',
+    number: 20,
+    category: 'FARMYARD_-_PLOWING',
+    desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E20_IronHoe_impl = E20_IronHoe.impl

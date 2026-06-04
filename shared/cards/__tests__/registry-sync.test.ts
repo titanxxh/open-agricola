@@ -1,33 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { CardRegistry } from '../registry'
-import { allOccupationCards, allMinorImprovementCards } from '../catalog'
+import { A28_ForestSchool } from '../A/A28_ForestSchool'
+import { A123_FrameBuilder } from '../A/A123_FrameBuilder'
 
-describe('CardRegistry.syncModifiersFromCatalog', () => {
-  it('writes minor.modifier (singular) into modifiersByCard', () => {
+describe('CardRegistry modifier loading', () => {
+  it('loads a single modifier from Card Source impl', () => {
     const registry = new CardRegistry()
-    registry.syncModifiersFromCatalog(allOccupationCards, allMinorImprovementCards)
+    registry.loadImpl(A28_ForestSchool.id, A28_ForestSchool.impl)
     const mods = registry.getModifiers('A28_ForestSchool')
     expect(mods).toHaveLength(1)
     expect(mods[0]?.type).toBe('trade')
   })
 
-  it('writes minor.modifiers (plural array) into modifiersByCard', () => {
+  it('loads plural modifiers from Card Source impl', () => {
     const registry = new CardRegistry()
-    registry.syncModifiersFromCatalog(allOccupationCards, allMinorImprovementCards)
+    registry.loadImpl(A123_FrameBuilder.id, A123_FrameBuilder.impl)
     const mods = registry.getModifiers('A123_FrameBuilder')
     expect(mods.length).toBeGreaterThan(0)
   })
 
-  it('skips cards with no modifier and no modifiers field', () => {
+  it('syncModifiersFromCatalog is a compatibility no-op', () => {
     const registry = new CardRegistry()
-    registry.syncModifiersFromCatalog(allOccupationCards, allMinorImprovementCards)
-    expect(registry.getModifiers('A1_Shelter')).toEqual([])
-  })
-
-  it('does not include majors (caller does not pass majors anyway)', () => {
-    const registry = new CardRegistry()
-    registry.syncModifiersFromCatalog(allOccupationCards, allMinorImprovementCards)
-    expect(registry.getModifiers('Major_Fireplace1')).toEqual([])
+    registry.syncModifiersFromCatalog([], [])
+    expect(registry.getModifiers('A28_ForestSchool')).toEqual([])
   })
 })

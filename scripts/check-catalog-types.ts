@@ -1,22 +1,15 @@
 /**
- * CI check: enforce that `minorImprovementCards` contains only MinorImprovement
- * (or PlayerActionCard) instances, and `occupationCards` contains only
- * Occupation instances. Prevents regression of issue #10.
+ * CI check: enforce that catalog arrays contain the expected card kinds.
  */
 // Force module load order so catalog's TDZ resolves.
 import '../server/game/authoritative-session'
 import '../shared/cards/register-all'
 import { minorImprovementCards, occupationCards } from '../shared/cards/catalog'
-import {
-  MinorImprovement,
-  Occupation,
-  PlayerActionCard,
-} from '../shared/cards-display/types'
 
-const misInOcc = occupationCards.filter(
-  (c) => c instanceof MinorImprovement || c instanceof PlayerActionCard,
+const misInOcc = occupationCards.filter((c) => c.kind !== 'occupation')
+const misInMinor = minorImprovementCards.filter(
+  (c) => c.kind !== 'minor' && c.kind !== 'playerAction',
 )
-const misInMinor = minorImprovementCards.filter((c) => c instanceof Occupation)
 
 let failed = false
 

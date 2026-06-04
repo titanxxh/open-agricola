@@ -49,7 +49,7 @@
 7. 服务端：
   - 若授权用户与 upstream owner 相同，跳过 fork，直接使用 upstream repo。
   - 否则确保 fork 存在。
-  - 读取 `shared/cards/register-all.ts`、`shared/cards/community/auto-catalog.ts`、`docs/community_cards.md`。
+  - 读取 `shared/cards/register-all.ts`、`docs/community_cards.md`。
   - 生成 community card 文件、smoke test、注册表、community docs、可选 card art。
   - 先提交占位 PR number 的 V1 commit，打开或更新 PR。
   - 再提交带真实 PR number 的 V2 commit。
@@ -71,7 +71,7 @@ pnpm run build
 | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------- |
 | `deck` 检查失败                         | 工坊卡仍是 `deck: 'CUSTOM'` | `server/workshop-pr/code-gen.ts` 把 deck 规范成 `community`                   |
 | `localeCompare` / listener 排序报错     | listener 缺稳定 `id`      | 生成器给缺 id 的 listener 补 `{cardId}-listener-{n}`                             |
-| `auto-catalog.ts is out of sync`    | 只更新了 `register-all.ts` | 生成器必须同时更新 `shared/cards/community/auto-catalog.ts`                        |
+| `catalog.generated.ts is out of sync` | 生成后未提交 generated catalog | 运行 `pnpm run generate:register-all` 并提交 `catalog.generated.ts` / `major/generated.ts` |
 | TypeScript 报 `phases: string[]` 不兼容 | `CARD_IMPL` 没有上下文类型    | 生成器把 `CARD_IMPL` 标注为 `CardImpl`                                           |
 | TypeScript 报 `prerequisite` 类型不兼容   | 工坊 JSON 用了结构化 prereq   | 生成器把 `{ occupation: N }` 转成 `prerequisite` 文本 + `occupationPrerequisites` |
 
@@ -102,4 +102,3 @@ GitHub 不允许用户 fork 自己的仓库。`GitHubClient.ensureFork()` 必须
 2. 点 "Generate a new client secret"
 3. 更新服务端 env 的 `GITHUB_OAUTH_CLIENT_SECRET`
 4. 重启服务
-

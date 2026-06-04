@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D40_Cesspit } from '../../cards-display/D/D40_Cesspit'
 
-const CARD_ID = D40_Cesspit.id
+const CARD_ID = 'D40_Cesspit'
 
-export const D40_Cesspit_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -41,3 +41,21 @@ export const D40_Cesspit_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D40_Cesspit = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cesspit',
+    deck: 'D',
+    number: 40,
+    category: 'GOODS_PROVIDER',
+    desc: ['Alternate placing 1 <CLAY> and 1 <PIG> on each remaining round space, starting with <CLAY>. At the start of these rounds, you get the respective good.'],
+    cost: {},
+    vp: -1,
+    prerequisite: '2 Fields and 1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D40_Cesspit_impl = D40_Cesspit.impl

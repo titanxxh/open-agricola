@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { E80_RockGarden } from '../../shared/cards-display/E/E80_RockGarden'
+import { E80_RockGarden } from '../../shared/cards/E/E80_RockGarden'
 import {
   getMinorImprovementCard,
   isFieldCard,

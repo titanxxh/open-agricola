@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B167_StableSergeant } from '../../cards-display/B/B167_StableSergeant'
 
-const CARD_ID = B167_StableSergeant.id
+const CARD_ID = 'B167_StableSergeant'
 
-export const B167_StableSergeant_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => ({
@@ -18,3 +18,19 @@ export const B167_StableSergeant_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B167_StableSergeant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stable Sergeant',
+    deck: 'B',
+    number: 167,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['When you play this card, you can pay 2 <FOOD> to get 1 <SHEEP>, 1 <PIG>, and 1 <CATTLE>, but only if you can accommodate all three animals on your farm.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B167_StableSergeant_impl = B167_StableSergeant.impl

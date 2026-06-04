@@ -1,12 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
-import { C75_Firewood } from '../../cards-display/C/C75_Firewood'
 import { getCardDefinitionById } from '../helpers/card-type'
 
-const CARD_ID = C75_Firewood.id
+const CARD_ID = 'C75_Firewood'
 
 const getBuiltImprovementId = (choice: string | undefined) =>
   choice ? choice.replace(/^major:/, '').replace(/^minor:/, '') : undefined
@@ -60,8 +60,23 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   },
 }
 
-export const C75_Firewood_impl = {
+const cardImpl = {
   listeners: [firewoodAfterBuildListener],
   effect: firewoodReturnHomeEffect,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C75_Firewood = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Firewood",
+    deck: "C",
+    number: 75,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["In the returning home phase of each round, place 1 <WOOD> on this card. Each time after you build a Fireplace, Cooking Hearth, or oven, move up to 4 <WOOD> from this card to your supply."],
+    cost: {"food": 2},
+  },
+  impl: cardImpl,
+})
+
+export const C75_Firewood_impl = C75_Firewood.impl

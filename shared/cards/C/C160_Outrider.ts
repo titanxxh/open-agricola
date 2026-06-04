@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C160_Outrider } from '../../cards-display/C/C160_Outrider'
 
-const CARD_ID = C160_Outrider.id
-
+const CARD_ID = 'C160_Outrider'
 /**
  * C160 Outrider (Occupation, 4+ players)
  *
@@ -35,7 +34,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C160_Outrider_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C160_Outrider = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Outrider',
+    deck: 'C',
+    number: 160,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time before you use the action space on the most recently revealed action space card (after it has been placed on the round space), you get 1 <GRAIN>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const C160_Outrider_impl = C160_Outrider.impl

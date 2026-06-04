@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B140_FarmyardWorker } from '../../cards-display/B/B140_FarmyardWorker'
 
-const CARD_ID = B140_FarmyardWorker.id
-
+const CARD_ID = 'B140_FarmyardWorker'
 const farmyardListener: CardListenerRegistration = {
   id: 'B140-farmyard-worker-after-farmyard',
   cardIds: [CARD_ID],
@@ -23,7 +22,7 @@ const farmyardListener: CardListenerRegistration = {
   },
 }
 
-export const B140_FarmyardWorker_impl = {
+const cardImpl = {
   listeners: [farmyardListener],
   effect: {
   id: CARD_ID,
@@ -37,3 +36,19 @@ export const B140_FarmyardWorker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B140_FarmyardWorker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Farmyard Worker',
+    deck: 'B',
+    number: 140,
+    category: 'FOOD_PROVIDER',
+    desc: ['At the end of each work phase in which you placed at least 1 good on 1 of your farmyard spaces, you get 2 <FOOD>.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B140_FarmyardWorker_impl = B140_FarmyardWorker.impl

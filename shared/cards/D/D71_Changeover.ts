@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D71_Changeover } from '../../cards-display/D/D71_Changeover'
 
-const CARD_ID = D71_Changeover.id
-
+const CARD_ID = 'D71_Changeover'
 registerSelectionEffect('discard-single-crop', ({ player, positions }) => {
   for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
@@ -54,7 +53,22 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const D71_Changeover_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D71_Changeover = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Changeover',
+    deck: 'D',
+    number: 71,
+    category: 'CROP_PROVIDER',
+    desc: ['At any time, if a field contains exactly 1 good as a result of a harvest, you can discard that good and immediately take a __Sow__ action limited to that field.'],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const D71_Changeover_impl = D71_Changeover.impl

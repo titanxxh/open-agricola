@@ -12,8 +12,8 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { Occupation } from '../../shared/cards-display/types'
-import { occupations } from '../../shared/cards-display/_lookup'
+import { Occupation } from '../../shared/cards/registry-display'
+import { registerAdHocOccupation } from '../../shared/cards/registry-runtime'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -44,7 +44,7 @@ let occupationRegistered = false
 
 beforeEach(() => {
   if (!occupationRegistered) {
-    occupations.push(testCard)
+    registerAdHocOccupation(testCard)
     occupationRegistered = true
   }
   requireActiveCardRegistry('choice-disabled-option').setEffect({

@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D5_FieldClay } from '../../cards-display/D/D5_FieldClay'
 
-const CARD_ID = D5_FieldClay.id
+const CARD_ID = 'D5_FieldClay'
 
-export const D5_FieldClay_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -17,3 +17,20 @@ export const D5_FieldClay_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D5_FieldClay = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Field Clay",
+    deck: "D",
+    number: 5,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["You immediately get 1 <CLAY> for each planted field you have."],
+    cost: { food: 1 },
+    passing: true,
+    prerequisite: "1 Planted Field",
+  },
+  impl: cardImpl,
+})
+
+export const D5_FieldClay_impl = D5_FieldClay.impl

@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
-import { D115_FodderPlanter } from '../../cards-display/D/D115_FodderPlanter'
 
-const CARD_ID = D115_FodderPlanter.id
+const CARD_ID = 'D115_FodderPlanter'
 
-export const D115_FodderPlanter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
@@ -26,3 +26,19 @@ export const D115_FodderPlanter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D115_FodderPlanter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Fodder Planter",
+    deck: "D",
+    number: 115,
+    category: "CROP_PROVIDER",
+    desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const D115_FodderPlanter_impl = D115_FodderPlanter.impl

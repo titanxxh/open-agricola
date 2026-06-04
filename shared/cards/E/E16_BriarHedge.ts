@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { isBorderEdge } from '../../domain/farm'
 import { getAllEdgeIds } from '../../domain'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { E16_BriarHedge } from '../../cards-display/E/E16_BriarHedge'
 
-const CARD_ID = E16_BriarHedge.id
-
+const CARD_ID = 'E16_BriarHedge'
 const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] }): number => {
   const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
   let count = 0
@@ -36,7 +35,7 @@ const E16FenceListener: CardListenerRegistration = {
   },
 }
 
-export const E16_BriarHedge_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => {
     const totals = getAssignedAnimalsByType(player)
     return totals.sheep >= 1 && totals.boar >= 1 && totals.cattle >= 1
@@ -44,3 +43,19 @@ export const E16_BriarHedge_impl = {
   listeners: [E16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E16_BriarHedge = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Briar Hedge',
+    deck: 'E',
+    number: 16,
+    desc: ['You do not need to pay wood for fences that you build on the edge of your farmyard board.'],
+    cost: {},
+    prerequisite: '1 Animal of Each Type',
+    category: 'FARMYARD_-__FENCING_OR_STABLE_BUILDING',
+  },
+  impl: cardImpl,
+})
+
+export const E16_BriarHedge_impl = E16_BriarHedge.impl

@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
@@ -8,10 +9,8 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { A111_WallBuilder } from '../../cards-display/A/A111_WallBuilder'
 
-const CARD_ID = A111_WallBuilder.id
-
+const CARD_ID = 'A111_WallBuilder'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const queueFoodNextFour = (state: GameState, player: PlayerState) => {
@@ -42,7 +41,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A111_WallBuilder_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A111_WallBuilder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wall Builder',
+    deck: 'A',
+    number: 111,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you build at least 1 room, you can place 1 <FOOD> on each of the next 4 round spaces. At the start of these rounds, you get the <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A111_WallBuilder_impl = A111_WallBuilder.impl

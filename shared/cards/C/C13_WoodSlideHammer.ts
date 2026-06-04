@@ -1,5 +1,6 @@
-import { MinorImprovement } from '../../cards-display/types'
+import { defineMinorCard } from '../card-source'
 import type { BonusModifier } from '../../contract/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C13_WoodSlideHammer'
 
@@ -17,19 +18,26 @@ const CARD_ID = 'C13_WoodSlideHammer'
  * stone (or has fewer than 5 rooms) the modifier is automatically filtered
  * out.
  */
-export const C13_WoodSlideHammer = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Wood Slide Hammer',
-  deck: 'C',
-  number: 13,
-  category: 'FARM_PLANNER',
-  desc: ['On your first renovation, if you have at least 5 wood rooms, you can renovate to stone directly and you get a discount of 2 <STONE> on the renovation cost.'],
-  cost: { wood: 1 },
-  modifier: {
-    type: 'bonus',
-    cardId: CARD_ID,
-    appliesTo: ['renovation'],
-    discount: { stone: 2 },
-    conditions: { houseTypeWood: 1, minNumRooms: 5 },
-  } as BonusModifier,
+
+export const C13_WoodSlideHammer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wood Slide Hammer',
+    deck: 'C',
+    number: 13,
+    category: 'FARM_PLANNER',
+    desc: ['On your first renovation, if you have at least 5 wood rooms, you can renovate to stone directly and you get a discount of 2 <STONE> on the renovation cost.'],
+    cost: { wood: 1 },
+  },
+  impl: {
+  modifiers: [{
+        type: 'bonus',
+        cardId: CARD_ID,
+        appliesTo: ['renovation'],
+        discount: { stone: 2 },
+        conditions: { houseTypeWood: 1, minNumRooms: 5 },
+      } as BonusModifier],
+} satisfies CardImpl,
 })
+
+export const C13_WoodSlideHammer_impl = C13_WoodSlideHammer.impl

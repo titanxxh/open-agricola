@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B74_ThickForest } from '../../cards-display/B/B74_ThickForest'
 
-const CARD_ID = B74_ThickForest.id
+const CARD_ID = 'B74_ThickForest'
 
-export const B74_ThickForest_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => (player.resources.clay ?? 0) >= 5,
   effect: {
   id: CARD_ID,
@@ -20,3 +20,19 @@ export const B74_ThickForest_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B74_ThickForest = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Thick Forest',
+    deck: 'B',
+    number: 74,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Place 1 <WOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <WOOD>.'],
+    cost: {},
+    prerequisite: '5 Clay in Your Supply',
+  },
+  impl: cardImpl,
+})
+
+export const B74_ThickForest_impl = B74_ThickForest.impl

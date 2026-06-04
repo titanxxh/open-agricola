@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -19,7 +20,7 @@ registerSelectionEffect('take-vegetable', ({ player, positions }) => {
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-export const A70_LiftingMachine_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onReturnHome: (state, player) => {
@@ -43,3 +44,19 @@ export const A70_LiftingMachine_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A70_LiftingMachine = defineMinorCard({
+  meta: {
+    id: "A70_LiftingMachine",
+    name: "Lifting Machine",
+    deck: "A",
+    number: 70,
+    category: "CROP_PROVIDER",
+    desc: ["At the end of each round that does not end with a harvest, you can move 1 <VEGETABLE> from one of your fields to your supply. (This is not considered a field phase.)"],
+    cost: {"wood":1},
+    prerequisite: "3 Fields",
+  },
+  impl: cardImpl,
+})
+
+export const A70_LiftingMachine_impl = A70_LiftingMachine.impl

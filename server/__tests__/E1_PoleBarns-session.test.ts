@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { E1_PoleBarns } from '../../shared/cards-display/E/E1_PoleBarns'
+import { E1_PoleBarns } from '../../shared/cards/E/E1_PoleBarns'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { FenceSegment } from '../../shared/contract/types'
 

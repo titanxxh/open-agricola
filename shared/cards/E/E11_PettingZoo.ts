@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E11_PettingZoo } from '../../cards-display/E/E11_PettingZoo'
 
-const CARD_ID = E11_PettingZoo.id
-
+const CARD_ID = 'E11_PettingZoo'
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1
 
-export const E11_PettingZoo_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones, _state) => {
@@ -35,3 +34,19 @@ export const E11_PettingZoo_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E11_PettingZoo = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Petting Zoo',
+    deck: 'E',
+    number: 11,
+    category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+    desc: ['As long as you have a pasture orthogonally adjacent to your house, you can keep animals of any type on this card, up to the number of rooms in your house.'],
+    cost: { wood: 1 },
+    animalHolder: true,
+  },
+  impl: cardImpl,
+})
+
+export const E11_PettingZoo_impl = E11_PettingZoo.impl

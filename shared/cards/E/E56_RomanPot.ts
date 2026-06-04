@@ -1,15 +1,14 @@
+import { defineMinorCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E56_RomanPot } from '../../cards-display/E/E56_RomanPot'
 
-const CARD_ID = E56_RomanPot.id
-
+const CARD_ID = 'E56_RomanPot'
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
 
-export const E56_RomanPot_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -31,3 +30,19 @@ export const E56_RomanPot_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E56_RomanPot = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Roman Pot',
+    deck: 'E',
+    number: 56,
+    category: 'FOOD_-_FUTURE_ROUND_SPACES',
+    desc: ['Place 4 <FOOD> from the general supply on this card. At the start of each work phase, if you are the last player in turn order, move 1 <FOOD> from this card to your supply.'],
+    cost: { clay: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const E56_RomanPot_impl = E56_RomanPot.impl

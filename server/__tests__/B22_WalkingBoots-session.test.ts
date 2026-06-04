@@ -8,7 +8,7 @@ import {
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import { B22_WalkingBoots } from '../../shared/cards-display/B/B22_WalkingBoots'
+import { B22_WalkingBoots } from '../../shared/cards/B/B22_WalkingBoots'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B22_WalkingBoots'

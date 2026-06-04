@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
@@ -7,10 +8,8 @@ import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { returnCardToBoard } from '../helpers/return-card'
 import type { CardImpl } from '../registry'
-import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
 
-const CARD_ID = C60_SmallPottersOven.id
-
+const CARD_ID = 'C60_SmallPottersOven'
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
 type OvenId = (typeof OVEN_IDS)[number]
 
@@ -80,7 +79,7 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const C60_SmallPottersOven_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => getReturnableOvens(player).length > 0,
   listeners: [beforeBakeListener, isDoableListener],
   effect: {
@@ -107,3 +106,23 @@ export const C60_SmallPottersOven_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C60_SmallPottersOven = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Small Potter's Oven",
+    deck: "C",
+    number: 60,
+    category: "FOOD_PROVIDER",
+    desc: [
+        "When you play this card, you immediately get 5 <FOOD>. Each time before you get a __Bake Bread__ action, you can build the __Clay Oven__ or __Stone Oven__ major improvement.",
+      ],
+    vp: 5,
+    cost: { clay: 2 },
+    prerequisite: "Return the Clay / Stone Oven",
+    alsoCountsAs: ['major'],
+  },
+  impl: cardImpl,
+})
+
+export const C60_SmallPottersOven_impl = C60_SmallPottersOven.impl

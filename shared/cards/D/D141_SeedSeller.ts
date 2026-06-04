@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D141_SeedSeller } from '../../cards-display/D/D141_SeedSeller'
 
-const CARD_ID = D141_SeedSeller.id
-
+const CARD_ID = 'D141_SeedSeller'
 const listener: CardListenerRegistration = {
   id: 'D141-seed-seller-after-grain-seeds',
   cardIds: [CARD_ID],
@@ -17,7 +16,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D141_SeedSeller_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -25,3 +24,21 @@ export const D141_SeedSeller_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D141_SeedSeller = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Seed Seller",
+    deck: "D",
+    number: 141,
+    category: "CROP_PROVIDER",
+    desc: [
+        "When you play this card, you immediately get 1 <GRAIN>. Each time you use the __Grain Seeds__ action space, you get 1 additional <GRAIN>.",
+      ],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const D141_SeedSeller_impl = D141_SeedSeller.impl

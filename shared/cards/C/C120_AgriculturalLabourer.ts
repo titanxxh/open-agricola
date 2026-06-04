@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
@@ -5,10 +6,8 @@ import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { fieldHasCrop } from '../../domain/field'
 import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
-import { C120_AgriculturalLabourer } from '../../cards-display/C/C120_AgriculturalLabourer'
 
-const CARD_ID = C120_AgriculturalLabourer.id
-
+const CARD_ID = 'C120_AgriculturalLabourer'
 type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
 
 const isResourceExchangedEvent = (
@@ -70,7 +69,7 @@ const gainListener: CardListenerRegistration = {
   },
 }
 
-export const C120_AgriculturalLabourer_impl = {
+const cardImpl = {
   listeners: [onPlayListener, gainListener],
   effect: {
   id: CARD_ID,
@@ -96,3 +95,19 @@ export const C120_AgriculturalLabourer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C120_AgriculturalLabourer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Agricultural Labourer",
+    deck: "C",
+    number: 120,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Place 8 <CLAY> on this card. For each <GRAIN> you obtain, you also get 1 <CLAY> from this card."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C120_AgriculturalLabourer_impl = C120_AgriculturalLabourer.impl

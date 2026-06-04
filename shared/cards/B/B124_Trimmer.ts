@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
@@ -5,10 +6,8 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
-import { B124_Trimmer } from '../../cards-display/B/B124_Trimmer'
 
-const CARD_ID = B124_Trimmer.id
-
+const CARD_ID = 'B124_Trimmer'
 /**
  * B124 Trimmer:
  * In each work phase, after you enclose at least one farmyard space, you get 2 stone.
@@ -64,7 +63,7 @@ const afterFencingListener: CardListenerRegistration = {
   },
 }
 
-export const B124_Trimmer_impl = {
+const cardImpl = {
   listeners: [afterFencingListener],
   effect: {
   id: CARD_ID,
@@ -87,3 +86,20 @@ export const B124_Trimmer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B124_Trimmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Trimmer',
+    deck: 'B',
+    number: 124,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['In each work phase, after you enclose at least one farmyard space, you get 2 <STONE>. (Subdividing an existing pasture does not count.)'],
+    cost: {},
+    players: '1+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B124_Trimmer_impl = B124_Trimmer.impl

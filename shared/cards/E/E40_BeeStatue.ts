@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E40_BeeStatue } from '../../cards-display/E/E40_BeeStatue'
 
-const CARD_ID = E40_BeeStatue.id
-
+const CARD_ID = 'E40_BeeStatue'
 /**
  * Stack order (bottom to top): vegetable, stone, grain, stone, grain.
  * Each time the owner uses Day Laborer, automatically take the top good.
@@ -28,7 +27,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const E40_BeeStatue_impl = {
+const cardImpl = {
   listeners: [afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
@@ -38,3 +37,19 @@ export const E40_BeeStatue_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E40_BeeStatue = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bee Statue',
+    deck: 'E',
+    number: 40,
+    category: 'GOODS_-_GET',
+    desc: ['Pile (from bottom to top) 1 <VEGETABLE>, 1 <STONE>, 1 <GRAIN>, 1 <STONE>, 1 <GRAIN> on this card. Each time you use the __Day Laborer__ action space, you get the top good.'],
+    cost: { clay: 2 },
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E40_BeeStatue_impl = E40_BeeStatue.impl

@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A23_StoneCompany } from '../../cards-display/A/A23_StoneCompany'
 
-const CARD_ID = A23_StoneCompany.id
-
+const CARD_ID = 'A23_StoneCompany'
 const QUARRY_SPACES = new Set(['eastern-quarry', 'western-quarry'])
 
 const listener: CardListenerRegistration = {
@@ -32,7 +31,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A23_StoneCompany_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A23_StoneCompany = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stone Company",
+    deck: "A",
+    number: 23,
+    category: "ACTIONS_BOOSTER",
+    desc: ["Immediately after each time you use a __Quarry__ accumulation space, you get a __Major or Minor Improvement__ action during which you must spend at least 1 <STONE>."],
+    cost: { clay: 2, reed: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const A23_StoneCompany_impl = A23_StoneCompany.impl

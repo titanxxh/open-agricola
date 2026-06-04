@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import { LESSONS_SPACE_IDS, isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { B63_Tasting } from '../../cards-display/B/B63_Tasting'
 
-const CARD_ID = B63_Tasting.id
-
+const CARD_ID = 'B63_Tasting'
 /**
  * B63 Tasting — Each time you use a Lessons action space, before paying the
  * occupation cost, you can exchange 1 GRAIN for 4 FOOD.
@@ -38,7 +37,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B63_Tasting_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B63_Tasting = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tasting',
+    deck: 'B',
+    number: 63,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you use a __Lessons__ action space, before paying the occupation cost, you can exchange 1 <GRAIN> for 4 <FOOD>.',
+      ],
+    cost: { wood: 2 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const B63_Tasting_impl = B63_Tasting.impl

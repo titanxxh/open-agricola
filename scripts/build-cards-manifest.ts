@@ -2,11 +2,8 @@
 /**
  * Build cards manifest for lazy loading.
  *
- * Scans shared/cards-display/{A,B,C,D,E,major}/*.ts plus dev/test stubs in
- * shared/cards/__stubs__/*.ts and extracts meta fields
- * from each card's constructor call (Occupation / MinorImprovement /
- * MajorImprovement / PlayerActionCard) and from major-literal exports
- * (`export const x: MajorCardData = {...}`).
+ * Scans shared/cards/{A,B,C,D,E,major,community}/*.ts plus dev/test stubs in
+ * shared/cards/__stubs__/*.ts and extracts meta fields from Card Source files.
  *
  * Output: public/cards-manifest.json
  */
@@ -108,6 +105,20 @@ function extractStaticJsonLikeValue(
 ): unknown {
   if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) return expr.text
   if (ts.isNumericLiteral(expr)) return Number(expr.text)
+  if (
+    ts.isPrefixUnaryExpression(expr) &&
+    expr.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(expr.operand)
+  ) {
+    return -Number(expr.operand.text)
+  }
+  if (
+    ts.isPrefixUnaryExpression(expr) &&
+    expr.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(expr.operand)
+  ) {
+    return -Number(expr.operand.text)
+  }
   if (expr.kind === ts.SyntaxKind.TrueKeyword) return true
   if (expr.kind === ts.SyntaxKind.FalseKeyword) return false
   if (expr.kind === ts.SyntaxKind.NullKeyword) return null
@@ -142,6 +153,14 @@ function extractStaticJsonLikeValue(
   if (ts.isObjectLiteralExpression(expr)) {
     const obj: Record<string, unknown> = {}
     for (const prop of expr.properties) {
+      if (ts.isSpreadAssignment(prop)) {
+        const spread = extractStaticJsonLikeValue(prop.expression, constants, `${context}.<spread>`, seen)
+        if (!spread || typeof spread !== 'object' || Array.isArray(spread)) {
+          throw new Error(`${context}: spread must resolve to an object literal`)
+        }
+        Object.assign(obj, spread)
+        continue
+      }
       if (!ts.isPropertyAssignment(prop)) {
         throw new Error(`${context}: only property assignments are statically supported`)
       }
@@ -211,9 +230,7 @@ function parseMajorCardDataVars(
       if (!ts.isIdentifier(decl.name)) continue
       if (!decl.type) continue
       const typeText = decl.type.getText()
-      // Accept both legacy `MajorCardData` (display + hooks) and the
-      // S8 split `MajorCardDisplay` (display-only). cards-display/major
-      // files now use the display-only type after Sprint S8 B1.
+      // Accept legacy major literal shapes for manifest fixtures.
       if (typeText !== 'MajorCardData' && typeText !== 'MajorCardDisplay') continue
       if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
 
@@ -313,22 +330,22 @@ function cardSourceCallToMeta(
     (prop): prop is ts.PropertyAssignment =>
       ts.isPropertyAssignment(prop) && propertyNameText(prop.name) === 'meta',
   )
-  if (!metaProp || !ts.isObjectLiteralExpression(metaProp.initializer)) {
-    throw new Error(`${filePath}: Card Source meta must be an object literal`)
+  if (!metaProp) {
+    throw new Error(`${filePath}: Card Source meta must be present`)
+  }
+
+  const rawMeta = extractStaticJsonLikeValue(
+    metaProp.initializer,
+    constants,
+    `${filePath}: meta`,
+  )
+  if (!rawMeta || typeof rawMeta !== 'object' || Array.isArray(rawMeta)) {
+    throw new Error(`${filePath}: Card Source meta must resolve to an object literal`)
   }
 
   const meta: Record<string, unknown> = {}
-  for (const prop of metaProp.initializer.properties) {
-    if (!ts.isPropertyAssignment(prop)) {
-      throw new Error(`${filePath}: Card Source meta only supports property assignments`)
-    }
-    const keyName = propertyNameText(prop.name)
-    if (!META_FIELDS.has(keyName)) continue
-    meta[keyName] = extractStaticJsonLikeValue(
-      prop.initializer,
-      constants,
-      `${filePath}: meta.${keyName}`,
-    )
+  for (const [keyName, value] of Object.entries(rawMeta)) {
+    if (META_FIELDS.has(keyName)) meta[keyName] = value
   }
   if (typeof meta.id !== 'string') {
     throw new Error(`${filePath}: Card Source meta.id must be a static string`)
@@ -417,7 +434,7 @@ export function parseCardFile(filePath: string, options: ParseCardFileOptions = 
 
 export function buildCardsManifest(cardsRoot: string): CardsManifest {
   const manifest: CardsManifest = {}
-  const decks = ['A', 'B', 'C', 'D', 'E', 'major']
+  const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community']
   const repoRoot = path.resolve(cardsRoot, '..', '..')
   const scanDir = (deckDir: string, parseOptions?: ParseCardFileOptions) => {
     if (!fs.existsSync(deckDir)) return
@@ -453,7 +470,7 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
 }
 
 export function writeCardsManifest(repoRoot: string): string {
-  const cardsRoot = path.join(repoRoot, 'shared', 'cards-display')
+  const cardsRoot = path.join(repoRoot, 'shared', 'cards')
   const outputPath = path.join(repoRoot, 'public', 'cards-manifest.json')
   const manifest = buildCardsManifest(cardsRoot)
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })

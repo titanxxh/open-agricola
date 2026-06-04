@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
-import { D160_Midwife } from '../../cards-display/D/D160_Midwife'
 
-const CARD_ID = D160_Midwife.id
-
+const CARD_ID = 'D160_Midwife'
 /**
  * D160 Midwife (Occupation, D, 160)
  * Each time another player uses the FIRST person they place in a round to
@@ -38,7 +37,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D160_Midwife_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D160_Midwife = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Midwife',
+    deck: 'D',
+    number: 160,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time another player uses the first person they place in a round to take a __Family Growth__ action, you get 1 <GRAIN> from the general supply.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const D160_Midwife_impl = D160_Midwife.impl

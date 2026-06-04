@@ -1,9 +1,8 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
-import { D23_PioneeringSpirit } from '../../cards-display/D/D23_PioneeringSpirit'
 
-const CARD_ID = D23_PioneeringSpirit.id
-
+const CARD_ID = 'D23_PioneeringSpirit'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
@@ -48,7 +47,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const D23_PioneeringSpirit_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -62,3 +61,18 @@ export const D23_PioneeringSpirit_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D23_PioneeringSpirit = definePlayerActionCard({
+  meta: {
+    id: CARD_ID,
+    name: "Pioneering Spirit",
+    deck: "D",
+    number: 23,
+    category: "ACTIONS_BOOSTER",
+    desc: ["This card is an action space for you only. In rounds 3-5, it provides a __Renovation__ action. In rounds 6-8, it provides your choice of 1 <VEGETABLE>, <PIG>, or <CATTLE>."],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const D23_PioneeringSpirit_impl = D23_PioneeringSpirit.impl

@@ -3,9 +3,8 @@
  *
  * **沙盒约束 vs 物理分层**：本 prompt 仅描述沙盒约束（LLM 输出格式：
  * 单文件含 `CARD_DEF + CARD_IMPL` 两个常量）。提交到主仓库 PR 时由
- * `server/workshop-pr/code-gen.ts` 把这两个常量**透明拆分**到
- * `shared/cards-display/community/X.ts` + `shared/cards/community/X.ts`
- * 两个物理文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
+ * `server/workshop-pr/code-gen.ts` 把这两个常量转换成一个 Card Source
+ * 文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
  *
  * **Single source of truth for sandbox constraints**: docs/CUSTOM_CARD_SANDBOX.md
  *
@@ -37,22 +36,25 @@ const PROMPT_BODY = `\
 const CARD_ID = 'CUSTOM_英文驼峰名'
 
 // 卡牌定义（必须）
-const CARD_DEF = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Card Name',                    // 必须英文，与项目内置卡风格一致（如 "Roughcaster"）
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Effect description in English; resource tags like <WOOD> <FOOD> stay unchanged.'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '卡牌中文名',
-      desc: ['中文版效果描述，资源标记 <WOOD> <FOOD> 保持不变。'],
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Card Name',                    // 必须英文，与项目内置卡风格一致（如 "Roughcaster"）
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect description in English; resource tags like <WOOD> <FOOD> stay unchanged.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '卡牌中文名',
+        desc: ['中文版效果描述，资源标记 <WOOD> <FOOD> 保持不变。'],
+      },
     },
   },
-})
+}
 
 // 卡牌实现（无效果卡可省略或写空对象）
 const CARD_IMPL = {
@@ -81,7 +83,7 @@ const CARD_IMPL = {
 **关键规则：**
 - CARD_ID 必须以 "CUSTOM_" 开头，英文驼峰
 - deck 固定 'CUSTOM'，number 固定 0，implemented 固定 true
-- 职业卡用 \`new Occupation({...})\`，小发展卡用 \`new MinorImprovement({...})\`
+- 职业卡用 \`cardType: 'occupation'\`，小发展卡用 \`cardType: 'minor'\`
 - ❌ 禁止 \`import\` / \`export\` / \`require\` / \`registerCardEffect\` / \`registerCardListener\`
 - ❌ 禁止 \`class\`、generator、\`with\`、\`eval\`、\`Function\`、\`fetch\` 等
 - ✅ 引擎自动处理所有权检查——**不需要**手动检查 \`player.minorPlayed.includes(CARD_ID)\`

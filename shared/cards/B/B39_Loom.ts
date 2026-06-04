@@ -1,16 +1,15 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
-import { B39_Loom } from '../../cards-display/B/B39_Loom'
 
-const CARD_ID = B39_Loom.id
-
+const CARD_ID = 'B39_Loom'
 const sheepFoodIncome = (sheep: number): number => {
   const map = [0, 1, 1, 1, 2, 2, 2, 3]
   return map[Math.min(sheep, 7)] ?? 3
 }
 
-export const B39_Loom_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
@@ -26,3 +25,22 @@ export const B39_Loom_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B39_Loom = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Loom",
+    deck: "B",
+    number: 39,
+    category: "POINTS_PROVIDER",
+    desc: ['In the field phase of each harvest, if you have at least 1/4/7 <SHEEP>, you get 1/2/3 <FOOD>. During scoring, you get 1 bonus <SCORE> for every 3 <SHEEP>.'],
+    cost: { wood: 2 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    vp: 1,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B39_Loom_impl = B39_Loom.impl

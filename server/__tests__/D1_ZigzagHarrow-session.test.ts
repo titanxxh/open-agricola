@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { plowAction } from '../../shared/actions/effects/plow'
 import type { ActionFlow, ActionSpace } from '../../shared/contract/types'
 
-import { D1_ZigzagHarrow } from '../../shared/cards-display/D/D1_ZigzagHarrow'
+import { D1_ZigzagHarrow } from '../../shared/cards/D/D1_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('D1_ZigzagHarrow session', () => {

@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B58_CrackWeeder } from '../../cards-display/B/B58_CrackWeeder'
 
-const CARD_ID = B58_CrackWeeder.id
+const CARD_ID = 'B58_CrackWeeder'
 
-export const B58_CrackWeeder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),
@@ -16,3 +16,20 @@ export const B58_CrackWeeder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B58_CrackWeeder = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Crack Weeder',
+    deck: 'B',
+    number: 58,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 1 <FOOD>. For each <VEGETABLE> you take from a field in the field phase of a harvest, you also get 1 <FOOD>.',
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B58_CrackWeeder_impl = B58_CrackWeeder.impl

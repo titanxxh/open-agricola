@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D65_GrainSieve } from '../../cards-display/D/D65_GrainSieve'
 
-const CARD_ID = D65_GrainSieve.id
+const CARD_ID = 'D65_GrainSieve'
 
-export const D65_GrainSieve_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
@@ -19,3 +19,21 @@ export const D65_GrainSieve_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D65_GrainSieve = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Grain Sieve',
+    deck: 'D',
+    number: 65,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'In the field phase of each harvest, if you harvest at least 2 <GRAIN>, you get 1 additional <GRAIN> from the general supply.',
+      ],
+    cost: { wood: 1 },
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const D65_GrainSieve_impl = D65_GrainSieve.impl

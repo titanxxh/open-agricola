@@ -6,12 +6,20 @@
  */
 import { describe, it, expect } from 'vitest'
 import { dealHands } from '../../shared/session/state-bootstrap'
-import { allCommunityCards } from '../../shared/cards/community/auto-catalog'
+import {
+  implementedCommunityMinors,
+  implementedCommunityOccupations,
+} from '../../shared/cards/catalog'
 
 // Ensure the community fixture card is registered before any state is created.
 import '../../shared/cards/community/CUSTOM_FixtureHarvester'
 
 const FIXTURE_CARD = 'CUSTOM_FixtureHarvester'
+
+const allCommunityCards = [
+  ...implementedCommunityMinors,
+  ...implementedCommunityOccupations,
+]
 
 const COMMUNITY_CARD_IDS = new Set(allCommunityCards.map((card) => card.id))
 

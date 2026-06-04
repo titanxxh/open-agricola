@@ -1,7 +1,27 @@
+import { defineMinorCard } from '../card-source'
 import { makeCardFieldImpl } from '../helpers/card-field'
-import { E80_RockGarden } from '../../cards-display/E/E80_RockGarden'
 
-export const E80_RockGarden_impl = makeCardFieldImpl(E80_RockGarden.id, {
+const CARD_ID = 'E80_RockGarden'
+
+const cardImpl = makeCardFieldImpl(CARD_ID, {
   allowedCrops: ['stone'],
   capacity: 3,
 })
+
+export const E80_RockGarden = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Rock Garden',
+    deck: 'E',
+    number: 80,
+    category: 'BUILDING_RESOURCES_-_STONE',
+    desc: [
+        'You can only plant <STONE> on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest <STONE> on this card as you would vegetables.',
+      ],
+    isField: true,
+    cardField: { allowedCrops: ['stone'], capacity: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const E80_RockGarden_impl = E80_RockGarden.impl

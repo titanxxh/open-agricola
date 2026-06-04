@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
-import { D150_GodlySpouse } from '../../cards-display/D/D150_GodlySpouse'
 
-const CARD_ID = D150_GodlySpouse.id
-
+const CARD_ID = 'D150_GodlySpouse'
 const MEETING_PLACE_PREFIX = 'meeting-place'
 
 const afterWishChildrenListener: CardListenerRegistration = {
@@ -44,7 +43,7 @@ const afterWishChildrenListener: CardListenerRegistration = {
   },
 }
 
-export const D150_GodlySpouse_impl = {
+const cardImpl = {
   listeners: [afterWishChildrenListener],
   effect: {
   id: CARD_ID,
@@ -54,3 +53,21 @@ export const D150_GodlySpouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D150_GodlySpouse = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Godly Spouse",
+    deck: "D",
+    number: 150,
+    category: "ACTIONS_BOOSTER",
+    desc: [
+        'Each time you take a __Family Growth__ action with the second person you place in a round, return the first person you placed home, unless it is on the __Meeting Place__ action space.',
+      ],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const D150_GodlySpouse_impl = D150_GodlySpouse.impl

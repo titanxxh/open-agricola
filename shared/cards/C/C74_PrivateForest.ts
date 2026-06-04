@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C74_PrivateForest } from '../../cards-display/C/C74_PrivateForest'
 
-const CARD_ID = C74_PrivateForest.id
+const CARD_ID = 'C74_PrivateForest'
 
-export const C74_PrivateForest_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -20,3 +20,20 @@ export const C74_PrivateForest_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C74_PrivateForest = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Private Forest",
+    deck: "C",
+    number: 74,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Place 1 <WOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <WOOD>."],
+    cost: { food: 2 },
+    prerequisite: "1 Occupation",
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C74_PrivateForest_impl = C74_PrivateForest.impl

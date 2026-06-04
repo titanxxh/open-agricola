@@ -1,9 +1,8 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
-import { E81_AlchemistsLab } from '../../cards-display/E/E81_AlchemistsLab'
 
-const CARD_ID = E81_AlchemistsLab.id
-
+const CARD_ID = 'E81_AlchemistsLab'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
@@ -40,7 +39,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const E81_AlchemistsLab_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -54,3 +53,21 @@ export const E81_AlchemistsLab_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E81_AlchemistsLab = definePlayerActionCard({
+  meta: {
+    id: CARD_ID,
+    name: "Alchemists Lab",
+    deck: "E",
+    number: 81,
+    desc: ["This card is an action space for all. A player who uses it gets 1 building resource of each type they already have. If another player uses it, they must first pay you 1 <FOOD>."],
+    cost: {},
+    prerequisite: "3 Occupations",
+    occupationPrerequisites: {"min":3},
+    vp: 1,
+    category: 'BUILDING_RESOURCES_-_ALL',
+  },
+  impl: cardImpl,
+})
+
+export const E81_AlchemistsLab_impl = E81_AlchemistsLab.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A42_ForestLakeHut } from '../../cards-display/A/A42_ForestLakeHut'
 
-const CARD_ID = A42_ForestLakeHut.id
-
+const CARD_ID = 'A42_ForestLakeHut'
 const listener: CardListenerRegistration = {
   id: 'A42-forest-lake-hut-after-place-farmer',
   cardIds: [CARD_ID],
@@ -22,7 +21,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A42_ForestLakeHut_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A42_ForestLakeHut = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forest Lake Hut',
+    deck: 'A',
+    number: 42,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you use the __Fishing__/__Forest__ accumulation space, you also get 1 <WOOD>/<FOOD>.'],
+    cost: { clay: 2 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const A42_ForestLakeHut_impl = A42_ForestLakeHut.impl

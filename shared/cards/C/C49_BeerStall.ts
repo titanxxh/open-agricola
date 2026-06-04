@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { getEmptyUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { C49_BeerStall } from '../../cards-display/C/C49_BeerStall'
 
-const CARD_ID = C49_BeerStall.id
+const CARD_ID = 'C49_BeerStall'
 
-export const C49_BeerStall_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
@@ -42,3 +42,18 @@ export const C49_BeerStall_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C49_BeerStall = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Beer Stall",
+    deck: "C",
+    number: 49,
+    category: "FOOD_PROVIDER",
+    desc: ['In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C49_BeerStall_impl = C49_BeerStall.impl

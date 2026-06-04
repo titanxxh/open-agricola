@@ -13,20 +13,27 @@
  */
 import type { CardEffect } from './card-effects.ts'
 import type { CardListenerRegistration } from './card-listeners.ts'
-import type { CardBase } from '../cards-display/types'
 import type { CardDefinition } from '../contract/cards'
-import { MinorImprovement, Occupation } from '../cards-display/types'
 import type { CustomCodeManifest } from '../custom-code/types.ts'
+import type { CostModifier } from '../contract/types.ts'
 
 // ── Custom card data type (moved from custom-registry.ts) ───────────────────
 
 export type CustomCardData = {
   cardType: 'minor' | 'occupation'
-  cardJson: CardDefinition
+  cardJson: CardDefinition & {
+    modifier?: CostModifier
+    modifiers?: CostModifier[]
+  }
   effectCode?: string | null
   compiledCode?: string | null
   codeManifest?: CustomCodeManifest | null
   artUrl?: string | null
+}
+
+const displayOnlyCardJson = (cardJson: CustomCardData['cardJson']): CardDefinition => {
+  const { modifier: _modifier, modifiers: _modifiers, ...display } = cardJson
+  return display
 }
 
 // ── Session context class ───────────────────────────────────────────────────
@@ -34,8 +41,8 @@ export type CustomCardData = {
 export class SessionCardContext {
   readonly customEffects = new Map<string, CardEffect>()
   readonly customListeners: CardListenerRegistration[] = []
-  readonly customMinors = new Map<string, CardBase>()
-  readonly customOccupations = new Map<string, CardBase>()
+  readonly customMinors = new Map<string, CardDefinition>()
+  readonly customOccupations = new Map<string, CardDefinition>()
   /** Art URLs for custom cards, keyed by card ID. */
   readonly customArtUrls = new Map<string, string>()
 
@@ -49,9 +56,7 @@ export class SessionCardContext {
 
   registerCard(data: CustomCardData): void {
     const { cardType, cardJson, artUrl } = data
-    const card = cardType === 'minor'
-      ? new MinorImprovement(cardJson)
-      : new Occupation(cardJson)
+    const card = displayOnlyCardJson(cardJson)
 
     if (cardType === 'minor') {
       this.customMinors.set(cardJson.id, card)
@@ -64,11 +69,11 @@ export class SessionCardContext {
     }
   }
 
-  getCustomMinor(id: string): CardBase | null {
+  getCustomMinor(id: string): CardDefinition | null {
     return this.customMinors.get(id) ?? null
   }
 
-  getCustomOccupation(id: string): CardBase | null {
+  getCustomOccupation(id: string): CardDefinition | null {
     return this.customOccupations.get(id) ?? null
   }
 

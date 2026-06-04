@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B148_PetBroker } from '../../cards-display/B/B148_PetBroker'
 
-const CARD_ID = B148_PetBroker.id
+const CARD_ID = 'B148_PetBroker'
 
-export const B148_PetBroker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
@@ -22,3 +22,20 @@ export const B148_PetBroker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B148_PetBroker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pet Broker',
+    deck: 'B',
+    number: 148,
+    desc: ['When you play this card, you immediately get 1 <SHEEP>. You can keep 1 <SHEEP> on this card for each occupation in front of you.'],
+    cost: {},
+    animalHolder: true,
+    players: '4+',
+    category: 'FARM_PLANNER',
+  },
+  impl: cardImpl,
+})
+
+export const B148_PetBroker_impl = B148_PetBroker.impl

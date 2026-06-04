@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -18,7 +19,7 @@ registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => 
   }
 })
 
-export const E4_Thunderbolt_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -41,3 +42,20 @@ export const E4_Thunderbolt_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E4_Thunderbolt = defineMinorCard({
+  meta: {
+    id: "E4_Thunderbolt",
+    name: "Thunderbolt",
+    deck: "E",
+    number: 4,
+    desc: ["Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
+    cost: {},
+    prerequisite: "1 Grain Field",
+    passing: true,
+    category: 'PASSING_-_IMPROVEMENT/OCC_-_WOOD',
+  },
+  impl: cardImpl,
+})
+
+export const E4_Thunderbolt_impl = E4_Thunderbolt.impl

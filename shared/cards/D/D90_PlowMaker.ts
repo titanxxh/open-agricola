@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D90_PlowMaker } from '../../cards-display/D/D90_PlowMaker'
 
-const CARD_ID = D90_PlowMaker.id
-
+const CARD_ID = 'D90_PlowMaker'
 const listener: CardListenerRegistration = {
   id: 'D90-plow-maker-before-place-farmer',
   cardIds: [CARD_ID],
@@ -28,7 +27,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D90_PlowMaker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D90_PlowMaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Plow Maker',
+    deck: 'D',
+    number: 90,
+    category: 'FARM_PLANNER',
+    desc: ['Each time you use the __Farmland__ or __Cultivation__ action space, you can pay 1 <FOOD> to plow 1 additional field.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D90_PlowMaker_impl = D90_PlowMaker.impl

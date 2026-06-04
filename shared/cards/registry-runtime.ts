@@ -1,33 +1,23 @@
-// Runtime registration helpers. Sourced from S6a split of shared/cards/types.ts.
-// Provides registerCardLookups() and registerAdHoc{Minor,Occupation} that
-// install lookup functions into shared/cards-display/types.ts.
-//
-// Read-side metadata getters (getMinorImprovement / getOccupation /
-// getRegisteredMinorImprovement / getRegisteredOccupation /
-// majorImprovementIds / MinorImprovement class) live in
-// `./registry-display.ts` so consumers that only register (e.g. `catalog.ts`
-// at module init) don't pull `cards-display/_lookup` and induce a cycle.
+import type { CardDefinition } from '../contract/cards'
 
-import type { CardBase } from '../cards-display/types'
-import {
-  __setMinorLookup,
-  __setOccupationLookup,
-  __getAdHocMinors,
-  __getAdHocOccupations,
-} from '../cards-display/types'
+const adHocMinors = new Map<string, CardDefinition>()
+const adHocOccupations = new Map<string, CardDefinition>()
 
-export const registerCardLookups = (lookups: {
-  minor: (id: string) => CardBase | undefined
-  occupation: (id: string) => CardBase | undefined
-}): void => {
-  __setMinorLookup(lookups.minor)
-  __setOccupationLookup(lookups.occupation)
+export const registerCardLookups = (_lookups: {
+  minor: (id: string) => CardDefinition | undefined
+  occupation: (id: string) => CardDefinition | undefined
+}): void => {}
+
+export const registerAdHocMinorImprovement = (card: CardDefinition): void => {
+  adHocMinors.set(card.id, card)
 }
 
-export const registerAdHocMinorImprovement = (card: CardBase): void => {
-  __getAdHocMinors().set(card.id, card)
+export const registerAdHocOccupation = (card: CardDefinition): void => {
+  adHocOccupations.set(card.id, card)
 }
 
-export const registerAdHocOccupation = (card: CardBase): void => {
-  __getAdHocOccupations().set(card.id, card)
-}
+export const getAdHocMinorImprovement = (id: string): CardDefinition | undefined =>
+  adHocMinors.get(id)
+
+export const getAdHocOccupation = (id: string): CardDefinition | undefined =>
+  adHocOccupations.get(id)

@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B137_Wholesaler } from '../../cards-display/B/B137_Wholesaler'
 
-const CARD_ID = B137_Wholesaler.id
-
+const CARD_ID = 'B137_Wholesaler'
 type WholesalerData = {
   vegetableTaken: boolean
   boarTaken: boolean
@@ -73,7 +72,7 @@ const createSpaceRewardListener = (
   },
 })
 
-export const B137_Wholesaler_impl = {
+const cardImpl = {
   listeners: SPACE_REWARDS.map(createSpaceRewardListener),
   effect: {
     id: CARD_ID,
@@ -83,3 +82,19 @@ export const B137_Wholesaler_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B137_Wholesaler = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wholesaler',
+    deck: 'B',
+    number: 137,
+    category: 'GOODS_PROVIDER',
+    desc: ['Place 1 <VEGETABLE>, 1 <PIG>, 1 <STONE>, and 1 <CATTLE> on this card. Each time you use an action space card on round spaces 8 to 11, you get the corresponding good from this card.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B137_Wholesaler_impl = B137_Wholesaler.impl

@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { D16_WoodenWheyBucket } from '../../cards-display/D/D16_WoodenWheyBucket'
 
-const CARD_ID = D16_WoodenWheyBucket.id
-
+const CARD_ID = 'D16_WoodenWheyBucket'
 const listener: CardListenerRegistration = {
   id: 'D16-wooden-whey-bucket-before-place-farmer',
   cardIds: [CARD_ID],
@@ -34,7 +33,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D16_WoodenWheyBucket_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D16_WoodenWheyBucket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wooden Whey Bucket',
+    deck: 'D',
+    number: 16,
+    category: 'FARM_PLANNER',
+    desc: ['Each time before you use the __Sheep Market__/__Cattle Market__ accumulation space, you can build exactly 1 stable for 1 <WOOD>/at no cost.'],
+    cost: { wood: 1, food: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D16_WoodenWheyBucket_impl = D16_WoodenWheyBucket.impl

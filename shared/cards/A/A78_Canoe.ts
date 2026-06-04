@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A78_Canoe } from '../../cards-display/A/A78_Canoe'
 
-const CARD_ID = A78_Canoe.id
-
+const CARD_ID = 'A78_Canoe'
 const listener: CardListenerRegistration = {
   id: 'A78-canoe-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,7 +16,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A78_Canoe_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A78_Canoe = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Canoe',
+    deck: 'A',
+    number: 78,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time you use the __Fishing__ accumulation space, you get an additional 1 <FOOD> and 1 <REED>.'],
+    cost: { wood: 2 },
+    vp: 1,
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A78_Canoe_impl = A78_Canoe.impl

@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E12_AnimalBedding } from '../../cards-display/E/E12_AnimalBedding'
 
-const CARD_ID = E12_AnimalBedding.id
+const CARD_ID = 'E12_AnimalBedding'
 
-export const E12_AnimalBedding_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones, _state) => {
@@ -28,3 +28,20 @@ export const E12_AnimalBedding_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E12_AnimalBedding = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Animal Bedding',
+    deck: 'E',
+    number: 12,
+    category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+    desc: ['You can keep 1 additional animal (of the same type) in each of your unfenced stables, and 2 additional animals (of the same type) in each pasture with stable.'],
+    cost: {},
+    vp: 1,
+    prerequisite: '1 Grain Field',
+  },
+  impl: cardImpl,
+})
+
+export const E12_AnimalBedding_impl = E12_AnimalBedding.impl

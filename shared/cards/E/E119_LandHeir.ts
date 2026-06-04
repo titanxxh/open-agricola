@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E119_LandHeir } from '../../cards-display/E/E119_LandHeir'
 
-const CARD_ID = E119_LandHeir.id
+const CARD_ID = 'E119_LandHeir'
 
-export const E119_LandHeir_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -26,3 +26,18 @@ export const E119_LandHeir_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E119_LandHeir = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Land Heir',
+    deck: 'E',
+    number: 119,
+    category: 'BUILDING_RESOURCES_-_WOOD_(AND_CLAY)',
+    desc: ['If you play this card in round 4 or before, place 4 <WOOD> and 4 <CLAY> on the space for round 9. At the start of this round, you get the resources.'],
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E119_LandHeir_impl = E119_LandHeir.impl

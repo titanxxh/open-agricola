@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import { makeCardFieldImpl } from '../helpers/card-field'
-import { E69_MelonPatch } from '../../cards-display/E/E69_MelonPatch'
 
-const CARD_ID = E69_MelonPatch.id
+const CARD_ID = 'E69_MelonPatch'
 
-export const E69_MelonPatch_impl = makeCardFieldImpl(
+const cardImpl = makeCardFieldImpl(
   CARD_ID,
   { allowedCrops: ['vegetable'], capacity: 1 },
   {
@@ -13,3 +13,23 @@ export const E69_MelonPatch_impl = makeCardFieldImpl(
     },
   },
 )
+
+export const E69_MelonPatch = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Melon Patch',
+    deck: 'E',
+    number: 69,
+    category: 'CROPS_-_VEGETABLE',
+    desc: [
+        'This card is a field that can only grow vegetables. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field.',
+      ],
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    isField: true,
+    cardField: { allowedCrops: ['vegetable'], capacity: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E69_MelonPatch_impl = E69_MelonPatch.impl

@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B66_SackCart } from '../../cards-display/B/B66_SackCart'
 
-const CARD_ID = B66_SackCart.id
+const CARD_ID = 'B66_SackCart'
 
-export const B66_SackCart_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -22,3 +22,20 @@ export const B66_SackCart_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B66_SackCart = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sack Cart',
+    deck: 'B',
+    number: 66,
+    category: 'CROP_PROVIDER',
+    desc: ['Place 1 <GRAIN> each on the remaining spaces for rounds 5, 8, 11, and 14. At the start of these rounds, you get the <GRAIN>.'],
+    cost: { wood: 2 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const B66_SackCart_impl = B66_SackCart.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { B95_MasterBricklayer } from '../../cards-display/B/B95_MasterBricklayer'
 
-const CARD_ID = B95_MasterBricklayer.id
-
+const CARD_ID = 'B95_MasterBricklayer'
 /**
  * B95 Master Bricklayer — Each time you build a major improvement, reduce the stone cost
  * by the number of rooms you have built onto your initial house.
@@ -27,7 +26,23 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const B95_MasterBricklayer_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B95_MasterBricklayer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Master Bricklayer',
+    deck: 'B',
+    number: 95,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time you build a major improvement, reduce the <STONE> cost by the number of rooms you have built onto your initial house.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B95_MasterBricklayer_impl = B95_MasterBricklayer.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A160_Lutenist } from '../../cards-display/A/A160_Lutenist'
 
-const CARD_ID = A160_Lutenist.id
-
+const CARD_ID = 'A160_Lutenist'
 /**
  * A160 Lutenist:
  * Each time another player uses the Traveling Players accumulation space,
@@ -41,7 +40,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A160_Lutenist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A160_Lutenist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lutenist',
+    deck: 'A',
+    number: 160,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time another player uses the __Traveling Players__ accumulation space, you get 1 <FOOD> and 1 <WOOD>. Immediately after, you can buy exactly 1 <VEGETABLE> for 2 <FOOD>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A160_Lutenist_impl = A160_Lutenist.impl

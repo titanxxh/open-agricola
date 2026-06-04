@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionDefinition, ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C67_MineralFeeder } from '../../cards-display/C/C67_MineralFeeder'
 
-const CARD_ID = C67_MineralFeeder.id
+const CARD_ID = 'C67_MineralFeeder'
 const POST_REORG_CHECK_ACTION_ID = 'card_C67_MineralFeeder_checkAndGain'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -45,7 +45,7 @@ const postReorgCheckAction: ActionDefinition = {
 
 registerAdHocAction(postReorgCheckAction)
 
-export const C67_MineralFeeder_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBeforeStartOfTurn: (state, player): ActionFlow | undefined => {
@@ -73,3 +73,19 @@ export const C67_MineralFeeder_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C67_MineralFeeder = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mineral Feeder',
+    deck: 'C',
+    number: 67,
+    category: 'CROP_PROVIDER',
+    desc: ['At the start of each round that does not end with a harvest, if you have at least 1 <SHEEP> in a pasture, you get 1 <GRAIN>.'],
+    cost: { reed: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const C67_MineralFeeder_impl = C67_MineralFeeder.impl

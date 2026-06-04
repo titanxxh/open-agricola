@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { D165_PigStalker } from '../../cards-display/D/D165_PigStalker'
 
-const CARD_ID = D165_PigStalker.id
-
+const CARD_ID = 'D165_PigStalker'
 const ANIMAL_MARKETS = ['sheep-market', 'pig-market', 'cattle-market']
 
 const ADJACENCY_MAP: Record<number, number[]> = {
@@ -52,7 +51,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D165_PigStalker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D165_PigStalker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pig Stalker',
+    deck: 'D',
+    number: 165,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['Each time you use an animal accumulation space, you get an additional 1 <PIG> if you occupy a Round 1-14 action space which is immediately to the left or right of that accumulation space.'],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D165_PigStalker_impl = D165_PigStalker.impl

@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C159_FishermansFriend } from '../../cards-display/C/C159_FishermansFriend'
 
-const CARD_ID = C159_FishermansFriend.id
+const CARD_ID = 'C159_FishermansFriend'
 
-export const C159_FishermansFriend_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (state, _player) => {
@@ -19,3 +19,19 @@ export const C159_FishermansFriend_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C159_FishermansFriend = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Fisherman's Friend",
+    deck: 'C',
+    number: 159,
+    category: 'FOOD_PROVIDER',
+    desc: ['At the start of each round, if there is more <FOOD> on the __Traveling Players__ than on the __Fishing__ accumulation space, you get the difference from the general supply.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const C159_FishermansFriend_impl = C159_FishermansFriend.impl

@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Bonus } from '../../contract/types'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
-import { D82_HuntingTrophy } from '../../cards-display/D/D82_HuntingTrophy'
 
-const CARD_ID = D82_HuntingTrophy.id
-
+const CARD_ID = 'D82_HuntingTrophy'
 const FARM_REDEV = 'farm-redevelopment'
 
 const HOUSE_REDEV = 'house-redevelopment'
@@ -77,7 +76,7 @@ const improvementCostListener: CardListenerRegistration = {
   },
 }
 
-export const D82_HuntingTrophy_impl = {
+const cardImpl = {
   listeners: [
     farmRedevFenceCostListener,
     farmRedevFenceIsDoableListener,
@@ -85,3 +84,20 @@ export const D82_HuntingTrophy_impl = {
   ],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D82_HuntingTrophy = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hunting Trophy',
+    deck: 'D',
+    number: 82,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. Fences built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
+      ],
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const D82_HuntingTrophy_impl = D82_HuntingTrophy.impl

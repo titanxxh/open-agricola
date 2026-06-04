@@ -1,3 +1,4 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { readCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
@@ -78,7 +79,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const C104_Collector_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -92,3 +93,19 @@ export const C104_Collector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C104_Collector = definePlayerActionCard({
+  meta: {
+    id: "C104_Collector",
+    name: "Collector",
+    deck: "C",
+    number: 104,
+    category: "GOODS_PROVIDER",
+    desc: ["This card is an action space for you only. When you use it for the 1st/2nd/3rd/4th time, you get 1 <BEGGING> marker and 6/7/8/9 different goods of your choice."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C104_Collector_impl = C104_Collector.impl

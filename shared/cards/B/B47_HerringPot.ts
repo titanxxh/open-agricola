@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B47_HerringPot } from '../../cards-display/B/B47_HerringPot'
 
-const CARD_ID = B47_HerringPot.id
-
+const CARD_ID = 'B47_HerringPot'
 const listener: CardListenerRegistration = {
   id: 'B47-herring-pot-after-place-farmer',
   cardIds: [CARD_ID],
@@ -24,7 +23,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B47_HerringPot_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B47_HerringPot = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Herring Pot',
+    deck: 'B',
+    number: 47,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Fishing__ accumulation space, place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: { clay: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B47_HerringPot_impl = B47_HerringPot.impl

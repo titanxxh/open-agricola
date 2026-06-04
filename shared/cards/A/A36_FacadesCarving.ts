@@ -1,8 +1,7 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A36_FacadesCarving } from '../../cards-display/A/A36_FacadesCarving'
 
-const CARD_ID = A36_FacadesCarving.id
-
+const CARD_ID = 'A36_FacadesCarving'
 const HARVEST_MAP: Record<number, number> = {
   1: 0, 2: 0, 3: 0, 4: 0,
   5: 1, 6: 1, 7: 1,
@@ -12,7 +11,7 @@ const HARVEST_MAP: Record<number, number> = {
   14: 5,
 }
 
-export const A36_FacadesCarving_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -52,3 +51,20 @@ export const A36_FacadesCarving_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A36_FacadesCarving = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Facades Carving',
+    deck: 'A',
+    number: 36,
+    category: 'POINTS_PROVIDER',
+    desc: ['When you play this card, you can exchange any number of <FOOD> for 1 bonus <SCORE> each, up to the number of completed harvests.'],
+    cost: { clay: 2 },
+    prerequisite: 'Wood in Your Supply >= Current Round',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A36_FacadesCarving_impl = A36_FacadesCarving.impl

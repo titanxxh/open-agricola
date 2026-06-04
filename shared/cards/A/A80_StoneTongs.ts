@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A80_StoneTongs } from '../../cards-display/A/A80_StoneTongs'
 
-const CARD_ID = A80_StoneTongs.id
-
+const CARD_ID = 'A80_StoneTongs'
 /**
  * A80 Stone Tongs — Each time you use a stone accumulation space
  * (eastern-quarry or western-quarry), you get 1 additional stone.
@@ -25,7 +24,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A80_StoneTongs_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A80_StoneTongs = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stone Tongs",
+    deck: "A",
+    number: 80,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: [
+        "Each time you use a stone accumulation space, you get 1 additional <STONE>.",
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A80_StoneTongs_impl = A80_StoneTongs.impl

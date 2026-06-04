@@ -27,10 +27,10 @@ export const getCustomCardDefs = (
   const defs: CustomCardDef[] = []
   const artUrls = sessionCardContext.customArtUrls
   for (const [id, card] of sessionCardContext.customMinors) {
-    defs.push({ cardType: 'minor', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
+    defs.push({ cardType: 'minor', cardJson: card, artUrl: artUrls.get(id) ?? null })
   }
   for (const [id, card] of sessionCardContext.customOccupations) {
-    defs.push({ cardType: 'occupation', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
+    defs.push({ cardType: 'occupation', cardJson: card, artUrl: artUrls.get(id) ?? null })
   }
   return defs
 }

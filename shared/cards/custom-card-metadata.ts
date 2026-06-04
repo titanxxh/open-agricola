@@ -2,8 +2,13 @@ import type { CardDefinition } from '../contract/cards'
 
 export type CustomCardMetadata = {
   cardType: 'minor' | 'occupation'
-  cardJson: Omit<CardDefinition, 'modifier' | 'modifiers'>
+  cardJson: CardDefinition
   artUrl?: string | null
+}
+
+type LegacyCardJson = CardDefinition & {
+  modifier?: unknown
+  modifiers?: unknown
 }
 
 const customMetadata = new Map<string, CustomCardMetadata>()
@@ -13,7 +18,7 @@ let nextMinorNumber = 1
 let nextOccupationNumber = 500
 
 const displayOnlyCardJson = (
-  cardJson: CardDefinition,
+  cardJson: LegacyCardJson,
 ): CustomCardMetadata['cardJson'] => {
   const { modifier: _modifier, modifiers: _modifiers, ...display } = cardJson
   return display
@@ -21,7 +26,7 @@ const displayOnlyCardJson = (
 
 export function registerCustomCardMetadata(data: {
   cardType: 'minor' | 'occupation'
-  cardJson: CardDefinition
+  cardJson: LegacyCardJson
   artUrl?: string | null
 }): void {
   const { cardType, cardJson, artUrl } = data

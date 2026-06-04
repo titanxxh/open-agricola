@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { ActionChoiceOption, ActionFlow, PlayerState, Resource } from '../../contract/types'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
-import { C133_Soldier } from '../../cards-display/C/C133_Soldier'
 
-const CARD_ID = C133_Soldier.id
+const CARD_ID = 'C133_Soldier'
 const CHOICE_PREFIX = `${CARD_ID}:pairs:`
 
 const maxSoldierPairs = (player: PlayerState) => {
@@ -35,7 +35,7 @@ const reserveForPairs = (pairs: number): Partial<Resource> => ({
   stone: pairs,
 })
 
-export const C133_Soldier_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     beforeEndGameDispatchMode: 'select',
@@ -76,3 +76,20 @@ export const C133_Soldier_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C133_Soldier = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Soldier",
+    deck: "C",
+    number: 133,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each <STONE> + <WOOD> pair in your supply. You cannot score additional points for the resources scored with this card."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C133_Soldier_impl = C133_Soldier.impl

@@ -1,9 +1,8 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
-import { A38_WoolBlankets } from '../../cards-display/A/A38_WoolBlankets'
 
-const CARD_ID = A38_WoolBlankets.id
-
+const CARD_ID = 'A38_WoolBlankets'
 const countSheepOnBoard = (player: PlayerState): number => {
   let total = 0
   for (const pasture of player.pastures) {
@@ -16,7 +15,7 @@ const countSheepOnBoard = (player: PlayerState): number => {
   return total
 }
 
-export const A38_WoolBlankets_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -28,3 +27,20 @@ export const A38_WoolBlankets_impl = {
   prerequisiteCheck: (player) => countSheepOnBoard(player) >= 5,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A38_WoolBlankets = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wool Blankets",
+    deck: "A",
+    number: 38,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."],
+    cost: {},
+    prerequisite: "5 Sheep",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A38_WoolBlankets_impl = A38_WoolBlankets.impl

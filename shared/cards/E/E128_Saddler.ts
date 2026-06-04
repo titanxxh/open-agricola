@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E128_Saddler } from '../../cards-display/E/E128_Saddler'
 
-const CARD_ID = E128_Saddler.id
-
+const CARD_ID = 'E128_Saddler'
 const listener: CardListenerRegistration = {
   id: 'E128-saddler-after-pay',
   cardIds: [CARD_ID],
@@ -26,7 +25,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E128_Saddler_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E128_Saddler = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Saddler",
+    deck: "E",
+    number: 128,
+    category: "FARMYARD",
+    desc: ["Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 field."],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const E128_Saddler_impl = E128_Saddler.impl

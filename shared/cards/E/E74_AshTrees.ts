@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
@@ -9,10 +10,8 @@ import {
   getOwnOrdinaryFenceReserveCount,
 } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
-import { E74_AshTrees } from '../../cards-display/E/E74_AshTrees'
 
-const CARD_ID = E74_AshTrees.id
-
+const CARD_ID = 'E74_AshTrees'
 const MAX_FREE_FENCES = 5
 
 const isDoableListener: CardListenerRegistration = {
@@ -99,7 +98,7 @@ const afterFenceListener: CardListenerRegistration = {
   },
 }
 
-export const E74_AshTrees_impl = {
+const cardImpl = {
   listeners: [isDoableListener, beforeFenceListener, afterFenceListener],
   effect: {
   id: CARD_ID,
@@ -112,3 +111,19 @@ export const E74_AshTrees_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E74_AshTrees = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Ash Trees",
+    deck: "E",
+    number: 74,
+    desc: ["When you play this card, immediately place (up to) 5 fences from your supply on it. When you build fences, fences taken from this card cost you nothing."],
+    cost: {},
+    prerequisite: "2 Planted Fields",
+    category: 'BUILDING_RESOURCES_-_WOOD',
+  },
+  impl: cardImpl,
+})
+
+export const E74_AshTrees_impl = E74_AshTrees.impl

@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C110_HomeBrewer } from '../../cards-display/C/C110_HomeBrewer'
 
-const CARD_ID = C110_HomeBrewer.id
+const CARD_ID = 'C110_HomeBrewer'
 
-export const C110_HomeBrewer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
@@ -36,3 +36,20 @@ export const C110_HomeBrewer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C110_HomeBrewer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Home Brewer",
+    deck: "C",
+    number: 110,
+    category: "FOOD_PROVIDER",
+    desc: ["After the field phase of each harvest, you can use this card to turn exactly 1 <GRAIN> into your choice of 3 <FOOD> or 1 bonus <SCORE>."],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C110_HomeBrewer_impl = C110_HomeBrewer.impl

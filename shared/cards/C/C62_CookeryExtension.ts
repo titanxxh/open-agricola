@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardExchange } from '../../contract/cards'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { getPlayerCookeryCards } from '../helpers/cookery'
-import { C62_CookeryExtension } from '../../cards-display/C/C62_CookeryExtension'
 
-const CARD_ID = C62_CookeryExtension.id
-
+const CARD_ID = 'C62_CookeryExtension'
 const VALID_FROM_RESOURCES: readonly string[] = ['vegetable', 'sheep', 'boar', 'cattle']
 
 const computeExchangesListener: CardListenerRegistration = {
@@ -52,7 +51,7 @@ const computeExchangesListener: CardListenerRegistration = {
   },
 }
 
-export const C62_CookeryExtension_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvest: (_state, player) => {
@@ -65,3 +64,21 @@ export const C62_CookeryExtension_impl = {
   },
   listeners: [computeExchangesListener],
 } satisfies CardImpl
+
+export const C62_CookeryExtension = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cookery Extension',
+    deck: 'C',
+    number: 62,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each harvest, you can use each of your cooking improvements once to get double the amount of <FOOD> for 1 animal or <VEGETABLE>.',
+      ],
+    cost: { clay: 2 },
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const C62_CookeryExtension_impl = C62_CookeryExtension.impl

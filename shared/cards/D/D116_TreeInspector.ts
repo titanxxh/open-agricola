@@ -1,3 +1,4 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { getStoredResource, setStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
@@ -32,7 +33,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const D116_TreeInspector_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -58,3 +59,19 @@ export const D116_TreeInspector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D116_TreeInspector = definePlayerActionCard({
+  meta: {
+    id: "D116_TreeInspector",
+    name: "Tree Inspector",
+    deck: "D",
+    number: 116,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["This card is a __1 <WOOD>__ accumulation space for you only. Each time the newly revealed action space card is a __Quarry__ accumulation space, you must discard all <WOOD> from this card."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const D116_TreeInspector_impl = D116_TreeInspector.impl

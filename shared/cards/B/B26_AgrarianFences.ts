@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import { collectComputeCostsForFarmChoice } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
-import { B26_AgrarianFences } from '../../cards-display/B/B26_AgrarianFences'
 
-const CARD_ID = B26_AgrarianFences.id
-
+const CARD_ID = 'B26_AgrarianFences'
 /**
  * B26 Agrarian Fences — Minor Improvement
  *
@@ -131,7 +130,23 @@ const isDoableBakeListener: CardListenerRegistration = {
   },
 }
 
-export const B26_AgrarianFences_impl = {
+const cardImpl = {
   listeners: [computeReplaceListener, computeReplaceBakeListener, isDoableListener, isDoableBakeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B26_AgrarianFences = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Agrarian Fences',
+    deck: 'B',
+    number: 26,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time you use the __Grain Utilization__ action space, you can take a __Build Fences__ action instead of one of the two actions provide by the action space.',
+      ],
+  },
+  impl: cardImpl,
+})
+
+export const B26_AgrarianFences_impl = B26_AgrarianFences.impl

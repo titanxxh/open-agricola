@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 import '../../shared/cards/C/C32_AbortOriel'
-import { C32_AbortOriel } from '../../shared/cards-display/C/C32_AbortOriel'
+import { C32_AbortOriel } from '../../shared/cards/C/C32_AbortOriel'
 
 describe('C32_AbortOriel session', () => {
   const setup = () => {

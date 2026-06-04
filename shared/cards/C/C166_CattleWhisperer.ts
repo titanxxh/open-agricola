@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C166_CattleWhisperer } from '../../cards-display/C/C166_CattleWhisperer'
 
-const CARD_ID = C166_CattleWhisperer.id
+const CARD_ID = 'C166_CattleWhisperer'
 
-export const C166_CattleWhisperer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -23,3 +23,18 @@ export const C166_CattleWhisperer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C166_CattleWhisperer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Cattle Whisperer",
+    deck: "C",
+    number: 166,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ["Add 5 and 8 to the current round and place 1 <CATTLE> on each corresponding round space. At the start of these rounds, you get the <CATTLE>."],
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const C166_CattleWhisperer_impl = C166_CattleWhisperer.impl

@@ -13,7 +13,7 @@ import {
 } from '../domain/farm'
 import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import { createActionSpaces } from '../actions'
-import { majorImprovementIds } from '../cards/registry-display'
+import { majorImprovementIds } from '../cards/major'
 import {
   implementedMinorImprovementCards,
   implementedOccupationCards,

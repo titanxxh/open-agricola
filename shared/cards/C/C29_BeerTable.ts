@@ -1,9 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C29_BeerTable'
 
-export const C29_BeerTable_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvestFieldPhase: (_state, player) => {
@@ -22,3 +23,20 @@ export const C29_BeerTable_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C29_BeerTable = defineMinorCard({
+  meta: {
+    id: "C29_BeerTable",
+    name: "Beer Table",
+    deck: "C",
+    number: 29,
+    category: "POINTS_PROVIDER",
+    desc: ["At the end of the field phase of each harvest, you can pay 1 <GRAIN> from your supply to get 2 bonus <SCORE>. If you do, all other players get 1 <FOOD> each."],
+    cost: {"wood":2},
+    prerequisite: "No Grain in Your Supply",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C29_BeerTable_impl = C29_BeerTable.impl

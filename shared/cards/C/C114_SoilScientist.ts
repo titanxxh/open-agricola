@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C114_SoilScientist } from '../../cards-display/C/C114_SoilScientist'
 
-const CARD_ID = C114_SoilScientist.id
-
+const CARD_ID = 'C114_SoilScientist'
 const listener: CardListenerRegistration = {
   id: 'C114-soil-scientist-after-collect',
   cardIds: [CARD_ID],
@@ -33,7 +32,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C114_SoilScientist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C114_SoilScientist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Soil Scientist',
+    deck: 'C',
+    number: 114,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time after you use a clay/stone accumulation space, you can place 1 <STONE>/2 <CLAY> from your supply on the space to get 2 <GRAIN>/1 <VEGETABLE>, respectively.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C114_SoilScientist_impl = C114_SoilScientist.impl

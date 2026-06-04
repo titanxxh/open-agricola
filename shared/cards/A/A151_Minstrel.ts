@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import { isSpaceOccupied } from '../../domain/space'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
-import { A151_Minstrel } from '../../cards-display/A/A151_Minstrel'
 
-const CARD_ID = A151_Minstrel.id
-
+const CARD_ID = 'A151_Minstrel'
 /**
  * A151 Minstrel:
  * At the start of each returning home phase, if only one stage-1 action space
@@ -26,7 +25,7 @@ const STAGE_1_ACTIONS = [
   'major-improvement',
 ] as const
 
-export const A151_Minstrel_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartReturnHome: (state, _player) => {
@@ -60,3 +59,19 @@ export const A151_Minstrel_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A151_Minstrel = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Minstrel',
+    deck: 'A',
+    number: 151,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['At the start of each returning home phase, if only one action space card on round space 1 to 4 is unoccupied, you can use that action space.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A151_Minstrel_impl = A151_Minstrel.impl

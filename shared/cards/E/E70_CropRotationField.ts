@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { makeCardFieldImpl } from '../helpers/card-field'
 import { writeCardExtraData } from '../helpers/card-state'
-import { E70_CropRotationField } from '../../cards-display/E/E70_CropRotationField'
 
-const CARD_ID = E70_CropRotationField.id
+const CARD_ID = 'E70_CropRotationField'
 const VIRTUAL_KEY = '-1-5070'
 
-export const E70_CropRotationField_impl = makeCardFieldImpl(
+const cardImpl = makeCardFieldImpl(
   CARD_ID,
   { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
   {
@@ -24,3 +24,24 @@ export const E70_CropRotationField_impl = makeCardFieldImpl(
     },
   },
 )
+
+export const E70_CropRotationField = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Crop Rotation Field',
+    deck: 'E',
+    number: 70,
+    category: 'CROPS_-_VEGETABLE',
+    desc: [
+        'This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
+      ],
+    cost: {},
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+    isField: true,
+    cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E70_CropRotationField_impl = E70_CropRotationField.impl

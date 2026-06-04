@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D133_BeerTentOperator } from '../../cards-display/D/D133_BeerTentOperator'
 
-const CARD_ID = D133_BeerTentOperator.id
+const CARD_ID = 'D133_BeerTentOperator'
 
-export const D133_BeerTentOperator_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, player) => {
@@ -22,3 +22,21 @@ export const D133_BeerTentOperator_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D133_BeerTentOperator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Beer Tent Operator",
+    deck: "D",
+    number: 133,
+    category: "POINTS_PROVIDER",
+    desc: ["In the feeding phase of each harvest, you can use this card to turn 1 <WOOD> plus 1 <GRAIN> into 1 bonus <SCORE> and 2 <FOOD>."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+    waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const D133_BeerTentOperator_impl = D133_BeerTentOperator.impl

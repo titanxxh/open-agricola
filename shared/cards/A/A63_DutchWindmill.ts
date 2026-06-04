@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A63_DutchWindmill } from '../../cards-display/A/A63_DutchWindmill'
 
-const CARD_ID = A63_DutchWindmill.id
-
+const CARD_ID = 'A63_DutchWindmill'
 const POST_HARVEST_ROUNDS = new Set([5, 8, 10, 12, 14])
 
 const listener: CardListenerRegistration = {
@@ -19,7 +18,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A63_DutchWindmill_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A63_DutchWindmill = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Dutch Windmill',
+    deck: 'A',
+    number: 63,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you take a __Bake Bread__ action in a round immediately following a harvest, you get 3 additional <FOOD>.'],
+    cost: { wood: 2, stone: 2 },
+    vp: 2,
+  },
+  impl: cardImpl,
+})
+
+export const A63_DutchWindmill_impl = A63_DutchWindmill.impl

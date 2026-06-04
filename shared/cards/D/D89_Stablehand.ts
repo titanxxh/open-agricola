@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, FarmFenceBuiltEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
-import { D89_Stablehand } from '../../cards-display/D/D89_Stablehand'
 
-const CARD_ID = D89_Stablehand.id
-
+const CARD_ID = 'D89_Stablehand'
 type QueryableFarmFenceBuiltEvent = FarmFenceBuiltEvent | DraftGameEvent<'farm.fenceBuilt'>
 
 const isFarmFenceBuiltEvent = (
@@ -40,7 +39,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D89_Stablehand_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D89_Stablehand = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stablehand',
+    deck: 'D',
+    number: 89,
+    category: 'FARM_PLANNER',
+    desc: ['Each time you build at least 1 fence, you can also build a stable without paying <WOOD> for the stable.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D89_Stablehand_impl = D89_Stablehand.impl

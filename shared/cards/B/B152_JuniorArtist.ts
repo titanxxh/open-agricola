@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
@@ -5,10 +6,8 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
-import { B152_JuniorArtist } from '../../cards-display/B/B152_JuniorArtist'
 
-const CARD_ID = B152_JuniorArtist.id
-
+const CARD_ID = 'B152_JuniorArtist'
 const CANDIDATE_TARGETS = ['lessons-4', 'lessons', 'traveling-players'] as const
 
 const listener: CardListenerRegistration = {
@@ -56,7 +55,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B152_JuniorArtist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B152_JuniorArtist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Junior Artist',
+    deck: 'B',
+    number: 152,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time after you use the __Day Laborer__ action space, you can pay 1 <FOOD> to use an unoccupied __Traveling Players__ or __Lessons__ action space with the same person.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B152_JuniorArtist_impl = B152_JuniorArtist.impl

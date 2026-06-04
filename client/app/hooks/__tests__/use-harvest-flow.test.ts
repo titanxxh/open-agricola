@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../../shared/cards-display/types', () => ({
+vi.mock('../../../../shared/cards/registry-display', () => ({
+  getMinorImprovement: () => undefined,
+  getOccupation: () => undefined,
   getRegisteredMinorImprovement: () => undefined,
   getRegisteredOccupation: () => undefined,
+  majorImprovementIds: [],
 }))
 
 import { buildHarvestFeedOptions } from '../use-harvest-flow'

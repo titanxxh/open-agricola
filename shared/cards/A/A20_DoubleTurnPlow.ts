@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A20_DoubleTurnPlow } from '../../cards-display/A/A20_DoubleTurnPlow'
 
-const CARD_ID = A20_DoubleTurnPlow.id
-
+const CARD_ID = 'A20_DoubleTurnPlow'
 const computeCostsListener: CardListenerRegistration = {
   id: 'A20-double-turn-plow-compute-costs',
   cardIds: [CARD_ID],
@@ -17,7 +16,7 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const A20_DoubleTurnPlow_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   effect: {
   id: CARD_ID,
@@ -36,3 +35,21 @@ export const A20_DoubleTurnPlow_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A20_DoubleTurnPlow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Double-Turn Plow',
+    deck: 'A',
+    number: 20,
+    category: 'FARM_PLANNER',
+    desc: ['When you play this card, you can immediately plow up to 2 fields.'],
+    cost: { grain: 1 },
+    maxRound: 5,
+    prerequisite: 'Play in Round 3 (5) or Before',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const A20_DoubleTurnPlow_impl = A20_DoubleTurnPlow.impl

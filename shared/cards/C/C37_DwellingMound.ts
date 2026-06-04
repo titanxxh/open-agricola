@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C37_DwellingMound } from '../../cards-display/C/C37_DwellingMound'
 
-const CARD_ID = C37_DwellingMound.id
-
+const CARD_ID = 'C37_DwellingMound'
 const computeCostsListener: CardListenerRegistration = {
   id: 'C37-dwelling-mound-costs-plow',
   cardIds: [CARD_ID],
@@ -15,7 +14,25 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const C37_DwellingMound_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C37_DwellingMound = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Dwelling Mound",
+    deck: "C",
+    number: 37,
+    category: "POINTS_PROVIDER",
+    desc: ["From now on, you must pay 1 <FOOD> for each new field tile that you place in your farmyard."],
+    cost: { food: 1 },
+    prerequisite: "Play in Round 3 or Before",
+    maxRound: 3,
+    vp: 3,
+  },
+  impl: cardImpl,
+})
+
+export const C37_DwellingMound_impl = C37_DwellingMound.impl

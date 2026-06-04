@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C28_TeachersDesk } from '../../cards-display/C/C28_TeachersDesk'
 
-const CARD_ID = C28_TeachersDesk.id
-
+const CARD_ID = 'C28_TeachersDesk'
 /**
  * C28 Teacher's Desk (Minor Improvement)
  *
@@ -44,7 +43,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C28_TeachersDesk_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C28_TeachersDesk = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Teacher's Desk",
+    deck: 'C',
+    number: 28,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time you use the __Major Improvement__ or __House Redevelopment__ action space, you can also play 1 occupation at an occupation cost of 1 <FOOD>.',
+      ],
+    cost: { wood: 1 },
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C28_TeachersDesk_impl = C28_TeachersDesk.impl

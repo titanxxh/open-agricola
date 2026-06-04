@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E165_MasterHuntsman } from '../../cards-display/E/E165_MasterHuntsman'
 
-const CARD_ID = E165_MasterHuntsman.id
-
+const CARD_ID = 'E165_MasterHuntsman'
 /**
  * E165 Master Huntsman:
  * When you play this card and each time you build a major improvement, you get 1 pig.
@@ -40,7 +39,25 @@ const majorImprovementListener: CardListenerRegistration = {
   },
 }
 
-export const E165_MasterHuntsman_impl = {
+const cardImpl = {
   listeners: [onBuyListener, majorImprovementListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E165_MasterHuntsman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Master Huntsman',
+    deck: 'E',
+    number: 165,
+    category: 'ANIMALS_-_WILD_BOAR',
+    desc: [
+        'When you play this card and each time you build a major improvement, you get 1 <PIG>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const E165_MasterHuntsman_impl = E165_MasterHuntsman.impl

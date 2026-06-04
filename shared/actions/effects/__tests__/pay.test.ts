@@ -29,10 +29,10 @@ import type {
   TradeModifier,
 } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
-import { A28_ForestSchool } from '../../../cards-display/A/A28_ForestSchool'
-import { A88_HedgeKeeper } from '../../../cards-display/A/A88_HedgeKeeper'
+import { A28_ForestSchool } from '../../../cards/A/A28_ForestSchool'
+import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
 
-const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
+const hedgeKeeperModifier = A88_HedgeKeeper.impl.modifiers![0] as TradeModifier
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -1031,7 +1031,7 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
 
   it('typed-flat Partial<Resource> with reserve applies selected multi-solution payment', () => {
     const player = createMockPlayer({ food: 3, wood: 1 })
-    player.activeModifiers = [A28_ForestSchool.modifier as TradeModifier]
+    player.activeModifiers = [A28_ForestSchool.impl.modifiers![0] as TradeModifier]
     const params = {
       cost: { food: 1 },
       costType: 'occupation',

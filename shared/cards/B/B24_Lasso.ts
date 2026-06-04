@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
@@ -5,10 +6,8 @@ import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-a
 import { isCardFlagged } from '../helpers/card-state'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { B24_Lasso } from '../../cards-display/B/B24_Lasso'
 
-const CARD_ID = B24_Lasso.id
-
+const CARD_ID = 'B24_Lasso'
 const MARKET_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
 
 const listener: CardListenerRegistration = {
@@ -48,7 +47,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B24_Lasso_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B24_Lasso = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lasso',
+    deck: 'B',
+    number: 24,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['You can place exactly two people immediately after one another if at least one of them uses the __Sheep Market__, __Pig Market__, or __Cattle Market__ accumulation space.'],
+    cost: { reed: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B24_Lasso_impl = B24_Lasso.impl

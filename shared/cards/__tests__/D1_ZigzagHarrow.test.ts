@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeZigzagCandidates } from '../D/D1_ZigzagHarrow'
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../registry-display'
 import { requireActiveCardRegistry } from '../active-registry'
 import '../D/D1_ZigzagHarrow'
 import type { Field, PlayerState } from '../../contract/types'

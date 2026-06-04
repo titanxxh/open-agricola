@@ -4,19 +4,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { buildRegisterAll } from '../generate-register-all'
 
-describe('generate-register-all Card Source coexistence', () => {
-  it('includes legacy _impl exports and Card Source impl exports in ALL_CARD_IMPLS', () => {
+describe('generate-register-all Card Source', () => {
+  it('includes only Card Source impl exports in ALL_CARD_IMPLS', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'card-source-register-all-'))
     const cardsRoot = path.join(tmp, 'shared', 'cards')
     fs.mkdirSync(path.join(cardsRoot, 'A'), { recursive: true })
     fs.mkdirSync(path.join(cardsRoot, 'B'), { recursive: true })
-    fs.mkdirSync(path.join(tmp, 'shared', 'cards-display', 'community'), { recursive: true })
+    fs.mkdirSync(path.join(tmp, 'shared', 'cards', 'community'), { recursive: true })
 
-    fs.writeFileSync(
-      path.join(cardsRoot, 'A', 'A1_Legacy.ts'),
-      `export const A1_Legacy_impl = { effect: { id: 'A1_Legacy' } }\n`,
-      'utf8',
-    )
     fs.writeFileSync(
       path.join(cardsRoot, 'B', 'B1_Source.ts'),
       `import { defineOccupationCard } from '../card-source'\n` +
@@ -37,12 +32,11 @@ describe('generate-register-all Card Source coexistence', () => {
 
     const result = buildRegisterAll({ repoRoot: tmp })
 
-    expect(result.registerAll).toContain(`import { A1_Legacy_impl } from './A/A1_Legacy'`)
     expect(result.registerAll).toContain(`import { B1_Source } from './B/B1_Source'`)
-    expect(result.registerAll).toContain(`'A1_Legacy': A1_Legacy_impl`)
     expect(result.registerAll).toContain(`'B1_Source': B1_Source.impl`)
     expect(result.registerAll).not.toContain('B2_MetaOnly')
-    expect(result.autoCatalog).toContain('export const allCommunityCards')
+    expect(result.catalogGenerated).toContain('export const catalogCardSources')
+    expect(result.catalogGenerated).toContain('B2_MetaOnly')
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })

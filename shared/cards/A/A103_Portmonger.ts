@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A103_Portmonger } from '../../cards-display/A/A103_Portmonger'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
-const CARD_ID = A103_Portmonger.id
+const CARD_ID = 'A103_Portmonger'
 
 const isFoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.food ?? 0) > 0
@@ -40,7 +40,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A103_Portmonger_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A103_Portmonger = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Portmonger',
+    deck: 'A',
+    number: 103,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you take 1/2/3+ <FOOD> from a food accumulation space, you also get 1 <VEGETABLE>/<GRAIN>/<REED>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A103_Portmonger_impl = A103_Portmonger.impl

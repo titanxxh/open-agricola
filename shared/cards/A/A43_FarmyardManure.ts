@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
@@ -10,10 +11,8 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { A43_FarmyardManure } from '../../cards-display/A/A43_FarmyardManure'
 
-const CARD_ID = A43_FarmyardManure.id
-
+const CARD_ID = 'A43_FarmyardManure'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const queueFoodNextThree = (state: GameState, player: PlayerState) => {
@@ -45,7 +44,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A43_FarmyardManure_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -64,3 +63,22 @@ export const A43_FarmyardManure_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A43_FarmyardManure = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Farmyard Manure',
+    deck: 'A',
+    number: 43,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you build 1 or more stables in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.',
+      ],
+    cost: {},
+    prerequisite: '1 Animal',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const A43_FarmyardManure_impl = A43_FarmyardManure.impl

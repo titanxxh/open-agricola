@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { E117_PipeSmoker } from '../../cards-display/E/E117_PipeSmoker'
 
-const CARD_ID = E117_PipeSmoker.id
+const CARD_ID = 'E117_PipeSmoker'
 
-export const E117_PipeSmoker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
@@ -20,3 +20,19 @@ export const E117_PipeSmoker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E117_PipeSmoker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Pipe Smoker",
+    deck: "E",
+    number: 117,
+    category: "BUILDING_RESOURCES_-_WOOD",
+    desc: ['At the start of each harvest, if you have at least 1 grain field, you get 2\u00a0<WOOD>.'],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const E117_PipeSmoker_impl = E117_PipeSmoker.impl

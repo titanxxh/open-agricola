@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D31_Storeroom } from '../../cards-display/D/D31_Storeroom'
 
-const CARD_ID = D31_Storeroom.id
+const CARD_ID = 'D31_Storeroom'
 
-export const D31_Storeroom_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -20,3 +20,22 @@ export const D31_Storeroom_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D31_Storeroom = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Storeroom",
+    deck: "D",
+    number: 31,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and fields), rounded up.',
+      ],
+    cost: { wood: 1, stone: 2 },
+    vp: 1,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D31_Storeroom_impl = D31_Storeroom.impl

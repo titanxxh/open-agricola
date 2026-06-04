@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type {
   ActionChoiceOption,
   ActionDefinition,
@@ -15,10 +16,8 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { C146_WorkshopAssistant } from '../../cards-display/C/C146_WorkshopAssistant'
 
-const CARD_ID = C146_WorkshopAssistant.id
-
+const CARD_ID = 'C146_WorkshopAssistant'
 const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
 const TAKE_PAIR_ACTION_ID = 'card_C146_WorkshopAssistant_takePair'
 const COMMIT_TAKE_PAIR_ACTION_ID = 'card_C146_WorkshopAssistant_commitTakePair'
@@ -239,7 +238,7 @@ const opponentRenovationListener: CardListenerRegistration = {
   },
 }
 
-export const C146_WorkshopAssistant_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (_state, player) => {
@@ -256,3 +255,21 @@ export const C146_WorkshopAssistant_impl = {
   listeners: [opponentRenovationListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C146_WorkshopAssistant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Workshop Assistant",
+    deck: "C",
+    number: 146,
+    category: "GOODS_PROVIDER",
+    desc: [
+        'Place unique pairs of different building resources on this card, one for each improvement you have built. Each time another player renovates, you may move one such pair to your supply.',
+      ],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const C146_WorkshopAssistant_impl = C146_WorkshopAssistant.impl

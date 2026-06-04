@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D8_FernSeeds } from '../../cards-display/D/D8_FernSeeds'
 
-const CARD_ID = D8_FernSeeds.id
+const CARD_ID = 'D8_FernSeeds'
 
-export const D8_FernSeeds_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => {
     const empty = player.fields.filter(fieldIsEmpty).length
     const planted = player.fields.filter(
@@ -32,3 +32,19 @@ export const D8_FernSeeds_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D8_FernSeeds = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Fern Seeds",
+    deck: "D",
+    number: 8,
+    category: "CROP_PROVIDER",
+    desc: ["You get 2 <FOOD> and 1 <GRAIN>, which you must sow immediately."],
+    passing: true,
+    prerequisite: "1 Empty and 2 Planted Fields",
+  },
+  impl: cardImpl,
+})
+
+export const D8_FernSeeds_impl = D8_FernSeeds.impl

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types.ts'
 import { buildRoomFarmInteraction } from '../../shared/domain/farmyard'
-import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
 
@@ -66,7 +66,7 @@ describe('farm choice', () => {
     player.resources.wood = 1
     player.resources.clay = 3
     player.resources.reed = 2
-    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+    player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
     expect(interaction.farmType).toBe('room')
@@ -100,7 +100,7 @@ describe('farm choice', () => {
     player.resources.wood = 1
     player.resources.stone = 5
     player.resources.reed = 2
-    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+    player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
     expect(interaction.farmType).toBe('room')
@@ -122,7 +122,7 @@ describe('farm choice', () => {
     player.resources.wood = 8
     player.resources.reed = 2
     player.activeModifiers = [
-      ...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(A14_CarpentersHammer.impl.modifiers ?? []),
     ]
 
     const interaction = buildRoomFarmInteraction(player)

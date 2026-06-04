@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D70_StrawManure } from '../../cards-display/D/D70_StrawManure'
 
-const CARD_ID = D70_StrawManure.id
-
+const CARD_ID = 'D70_StrawManure'
 registerSelectionEffect('add-vegetable', ({ player, positions }) => {
   for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
@@ -17,7 +16,7 @@ registerSelectionEffect('add-vegetable', ({ player, positions }) => {
   }
 })
 
-export const D70_StrawManure_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
@@ -55,3 +54,19 @@ export const D70_StrawManure_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D70_StrawManure = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Straw Manure",
+    deck: "D",
+    number: 70,
+    category: "CROP_PROVIDER",
+    desc: ["Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 vegetable fields."],
+    cost: {},
+    prerequisite: "2 Fields",
+  },
+  impl: cardImpl,
+})
+
+export const D70_StrawManure_impl = D70_StrawManure.impl

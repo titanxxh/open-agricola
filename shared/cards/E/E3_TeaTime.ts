@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { recallWorkerById } from '../helpers/recall-worker'
 import type { CardImpl } from '../registry'
-import { E3_TeaTime } from '../../cards-display/E/E3_TeaTime'
 
-const CARD_ID = E3_TeaTime.id
+const CARD_ID = 'E3_TeaTime'
 
-export const E3_TeaTime_impl = {
+const cardImpl = {
   prerequisiteCheck: (player, state) => {
     if (!state) return true
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
@@ -25,3 +25,20 @@ export const E3_TeaTime_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E3_TeaTime = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tea Time',
+    deck: 'E',
+    number: 3,
+    category: 'PASSING_-_ACTION_-_FARMYARD',
+    desc: ['Immediately return your person on the __Grain Utilization__ action space home; you can place it again later this round.'],
+    cost: { food: 1 },
+    passing: true,
+    prerequisite: 'Own Person on Grain Utilization',
+  },
+  impl: cardImpl,
+})
+
+export const E3_TeaTime_impl = E3_TeaTime.impl

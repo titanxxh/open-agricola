@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { E109_BraidMaker } from '../../cards-display/E/E109_BraidMaker'
 
-const CARD_ID = E109_BraidMaker.id
-
+const CARD_ID = 'E109_BraidMaker'
 /**
  * E109 Braid Maker (Occupation, 1+ players).
  *
@@ -38,7 +37,29 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const E109_BraidMaker_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E109_BraidMaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Braid Maker',
+    deck: 'E',
+    number: 109,
+    category: 'FOOD',
+    desc: [
+        "Each harvest, you can use this card to exchange 1 <REED> for 2 <FOOD>. You can build the  __Basketmaker's Workshop__ for 1 <REED> and 1 <STONE> even when taking a __Minor Improvement__ action. ",
+      ],
+    cost: {},
+    players: '1+',
+    waresSalesmanGains: [{ reed: 2 }],
+    exchanges: [
+        { from: { reed: 1 }, to: { food: 2 }, max: 1, triggers: ['anytime'] },
+      ],
+  },
+  impl: cardImpl,
+})
+
+export const E109_BraidMaker_impl = E109_BraidMaker.impl

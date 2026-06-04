@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
@@ -43,7 +44,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E82_Profiteering_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -51,3 +52,18 @@ export const E82_Profiteering_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E82_Profiteering = defineMinorCard({
+  meta: {
+    id: "E82_Profiteering",
+    name: "Profiteering",
+    deck: "E",
+    number: 82,
+    desc: ["When you play this card, you immediately get 1 <FOOD>. Each time you use the __Day Laborer__ action space, you can exchange 1 building resource for another building resource."],
+    cost: {},
+    category: 'BUILDING_RESOURCES_-_ALL',
+  },
+  impl: cardImpl,
+})
+
+export const E82_Profiteering_impl = E82_Profiteering.impl

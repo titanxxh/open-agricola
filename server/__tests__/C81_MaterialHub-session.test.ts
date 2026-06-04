@@ -5,7 +5,7 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
-import { C81_MaterialHub } from '../../shared/cards-display/C/C81_MaterialHub'
+import { C81_MaterialHub } from '../../shared/cards/C/C81_MaterialHub'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
 import { setWorkersAtHome } from '../../shared/domain/player'

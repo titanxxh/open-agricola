@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C41_FarmStore } from '../../cards-display/C/C41_FarmStore'
 
-const CARD_ID = C41_FarmStore.id
-
+const CARD_ID = 'C41_FarmStore'
 type ResourceMap = Partial<Resource>
 
 export const REWARD_OPTIONS = [
@@ -25,7 +24,7 @@ const payGainFlow = (reward: ResourceMap): ActionFlow => ({
   ],
 })
 
-export const C41_FarmStore_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onEndHarvestFeedingPhase: (_state, player) => {
@@ -40,3 +39,18 @@ export const C41_FarmStore_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C41_FarmStore = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Farm Store",
+    deck: "C",
+    number: 41,
+    category: "GOODS_PROVIDER",
+    desc: ["After the feeding phase of each harvest, you can exchange exactly 1 <FOOD> for 2 different building resources of your choice or 1 <VEGETABLE>."],
+    cost: { wood: 2, clay: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const C41_FarmStore_impl = C41_FarmStore.impl

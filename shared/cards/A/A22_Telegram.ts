@@ -1,12 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
 import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { A22_Telegram } from '../../cards-display/A/A22_Telegram'
 
-const CARD_ID = A22_Telegram.id
+const CARD_ID = 'A22_Telegram'
 
-export const A22_Telegram_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -44,3 +44,21 @@ export const A22_Telegram_impl = {
   prerequisiteCheck: (player) => getOwnOrdinaryFenceReserveCount(player) >= 1,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A22_Telegram = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Telegram',
+    deck: 'A',
+    number: 22,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply.'],
+    cost: { food: 2 },
+    prerequisite: 'At Least 1 Fence in Supply',
+    vp: 1,
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const A22_Telegram_impl = A22_Telegram.impl

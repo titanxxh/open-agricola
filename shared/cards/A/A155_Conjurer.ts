@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A155_Conjurer } from '../../cards-display/A/A155_Conjurer'
 
-const CARD_ID = A155_Conjurer.id
-
+const CARD_ID = 'A155_Conjurer'
 const listener: CardListenerRegistration = {
   id: 'A155-conjurer-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,7 +16,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A155_Conjurer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A155_Conjurer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Conjurer',
+    deck: 'A',
+    number: 155,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you use the __Traveling Players__ accumulation space, you get an additional 1 <WOOD> and 1 <GRAIN>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A155_Conjurer_impl = A155_Conjurer.impl

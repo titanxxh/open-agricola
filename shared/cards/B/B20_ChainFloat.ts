@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B20_ChainFloat } from '../../cards-display/B/B20_ChainFloat'
 
-const CARD_ID = B20_ChainFloat.id
+const CARD_ID = 'B20_ChainFloat'
 
-export const B20_ChainFloat_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -22,3 +22,18 @@ export const B20_ChainFloat_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B20_ChainFloat = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Chain Float',
+    deck: 'B',
+    number: 20,
+    category: 'FARM_PLANNER',
+    desc: ['Add 7, 8, and 9 to the current round and place 1 field on each corresponding round space. At the start of these rounds, you can plow the field.'],
+    cost: { wood: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const B20_ChainFloat_impl = B20_ChainFloat.impl

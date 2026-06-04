@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C10_BunkBeds } from '../../cards-display/C/C10_BunkBeds'
 
-const CARD_ID = C10_BunkBeds.id
+const CARD_ID = 'C10_BunkBeds'
 
-export const C10_BunkBeds_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
@@ -12,3 +12,20 @@ export const C10_BunkBeds_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C10_BunkBeds = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bunk Beds',
+    deck: 'C',
+    number: 10,
+    category: 'FARM_PLANNER',
+    desc: ['Once you have 4 rooms, your house can hold 5 people.'],
+    cost: { wood: 1 },
+    prerequisite: '2 Major Improvements',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C10_BunkBeds_impl = C10_BunkBeds.impl

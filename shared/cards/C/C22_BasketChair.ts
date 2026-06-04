@@ -1,12 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { workersAvailable } from '../../domain/player'
 import { removeSyntheticLinkedOccupancyRefs } from '../../domain/space'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionDefinition } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C22_BasketChair } from '../../cards-display/C/C22_BasketChair'
 
-const CARD_ID = C22_BasketChair.id
+const CARD_ID = 'C22_BasketChair'
 const CLEANUP_JOB_CONTRACT_FAKE_ACTION_ID = 'card_C22_BasketChair_cleanupJobContractFake'
 
 const cleanupJobContractFakeAction: ActionDefinition = {
@@ -28,7 +28,7 @@ const cleanupJobContractFakeAction: ActionDefinition = {
 
 registerAdHocAction(cleanupJobContractFakeAction)
 
-export const C22_BasketChair_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -77,3 +77,22 @@ export const C22_BasketChair_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C22_BasketChair = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Basket Chair',
+    deck: 'C',
+    number: 22,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'When you play this card, you can immediately move the first person you placed this work phase to this card (unless it is on __Meeting Place__). If you do, immediately afterward, you can place another person.',
+      ],
+    cost: { reed: 1 },
+    vp: 1,
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C22_BasketChair_impl = C22_BasketChair.impl

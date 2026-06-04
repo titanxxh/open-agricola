@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
 import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A73_AgriculturalFertilizers } from '../../cards-display/A/A73_AgriculturalFertilizers'
 
-const CARD_ID = A73_AgriculturalFertilizers.id
-
+const CARD_ID = 'A73_AgriculturalFertilizers'
 const countUsedSpaces = (player: PlayerState): number => {
   const occupied = new Set<string>()
   player.roomTiles.forEach((t) => occupied.add(positionKey(t)))
@@ -55,7 +54,25 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-export const A73_AgriculturalFertilizers_impl = {
+const cardImpl = {
   listeners: [beforeListener, afterListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A73_AgriculturalFertilizers = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Agricultural Fertilizers',
+    deck: 'A',
+    number: 73,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time after you turn at least 2 unused spaces into used spaces in one action, you get an additional __Sow__ action.',
+      ],
+    cost: {},
+    prerequisite: '1 Pasture',
+  },
+  impl: cardImpl,
+})
+
+export const A73_AgriculturalFertilizers_impl = A73_AgriculturalFertilizers.impl

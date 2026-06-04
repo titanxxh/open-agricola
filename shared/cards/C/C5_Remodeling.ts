@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { C5_Remodeling } from '../../cards-display/C/C5_Remodeling'
 
-const CARD_ID = C5_Remodeling.id
+const CARD_ID = 'C5_Remodeling'
 
-export const C5_Remodeling_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -22,3 +22,19 @@ export const C5_Remodeling_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C5_Remodeling = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Remodeling",
+    deck: "C",
+    number: 5,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["You immediately get 1 <CLAY> for each clay room and for each major improvement you have."],
+    cost: { food: 1 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const C5_Remodeling_impl = C5_Remodeling.impl

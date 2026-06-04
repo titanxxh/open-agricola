@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C64_CornSchnappsDistillery } from '../../cards-display/C/C64_CornSchnappsDistillery'
 
-const CARD_ID = C64_CornSchnappsDistillery.id
-
+const CARD_ID = 'C64_CornSchnappsDistillery'
 const anytimeListener: CardListenerRegistration = {
   id: 'C64-corn-schnapps-distillery-anytime',
   cardIds: [CARD_ID],
@@ -37,7 +36,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C64_CornSchnappsDistillery_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -47,3 +46,19 @@ export const C64_CornSchnappsDistillery_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C64_CornSchnappsDistillery = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Corn Schnapps Distillery',
+    deck: 'C',
+    number: 64,
+    category: 'FOOD_PROVIDER',
+    desc: ['Once per round, you can pay 1 <GRAIN> to place 1 <FOOD> on each of the next 4 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: { wood: 1, clay: 2 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const C64_CornSchnappsDistillery_impl = C64_CornSchnappsDistillery.impl

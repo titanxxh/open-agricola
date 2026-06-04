@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D98_Transactor } from '../../cards-display/D/D98_Transactor'
 
-const CARD_ID = D98_Transactor.id
-
+const CARD_ID = 'D98_Transactor'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
-export const D98_Transactor_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeHarvest: (state, _player) => {
@@ -37,3 +36,19 @@ export const D98_Transactor_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D98_Transactor = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Transactor",
+    deck: "D",
+    number: 98,
+    category: "POINTS_PROVIDER",
+    desc: ["Immediately before the final harvest at the end of round 14, you can take all the building resources that are left on the entire game board."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const D98_Transactor_impl = D98_Transactor.impl

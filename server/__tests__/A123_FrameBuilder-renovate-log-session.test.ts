@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards-display/A/A123_FrameBuilder'
+import '../../shared/cards/A/A123_FrameBuilder'
 
 const CARD_ID = 'A123_FrameBuilder'
 

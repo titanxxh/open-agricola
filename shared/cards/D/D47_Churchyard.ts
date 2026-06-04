@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D47_Churchyard } from '../../cards-display/D/D47_Churchyard'
 
-const CARD_ID = D47_Churchyard.id
+const CARD_ID = 'D47_Churchyard'
 
-export const D47_Churchyard_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => {
     const total =
       player.occupationPlayed.length
@@ -29,3 +29,20 @@ export const D47_Churchyard_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D47_Churchyard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Churchyard',
+    deck: 'D',
+    number: 47,
+    category: 'FOOD_PROVIDER',
+    desc: ['Place 2 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>. (*Occupations and Improvements)'],
+    cost: { stone: 1, reed: 1 },
+    vp: 1,
+    prerequisite: '10 Cards* in Front of You',
+  },
+  impl: cardImpl,
+})
+
+export const D47_Churchyard_impl = D47_Churchyard.impl

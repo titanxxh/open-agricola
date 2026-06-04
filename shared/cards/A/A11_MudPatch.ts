@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { A11_MudPatch } from '../../cards-display/A/A11_MudPatch'
 
-const CARD_ID = A11_MudPatch.id
+const CARD_ID = 'A11_MudPatch'
 
-export const A11_MudPatch_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { boar: 1 }),
@@ -23,3 +23,17 @@ export const A11_MudPatch_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A11_MudPatch = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mud Patch',
+    deck: 'A',
+    number: 11,
+    category: 'FARM_PLANNER',
+    desc: ['When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted field tiles.'],
+  },
+  impl: cardImpl,
+})
+
+export const A11_MudPatch_impl = A11_MudPatch.impl

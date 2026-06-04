@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { generatePrFiles } from '../code-gen'
 
-describe('generatePrFiles — output file list (S9 dual-file split)', () => {
-  const upstreamRegisterAll = `// generated\nimport { CUSTOM_FixtureHarvester_impl } from './community/CUSTOM_FixtureHarvester'\n\nexport const ALL_CARD_IMPLS = {\n  'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester_impl,\n}\n\nexport type AllCardImpls = typeof ALL_CARD_IMPLS\n`
-  const upstreamAutoCatalog = `// GENERATED\nimport type { MinorImprovement, Occupation } from '../../cards-display/types'\n\nimport { CUSTOM_FixtureHarvester } from '../../cards-display/community/CUSTOM_FixtureHarvester'\n\nexport const allCommunityCards: Array<MinorImprovement | Occupation> = [\n  CUSTOM_FixtureHarvester,\n]\n`
+describe('generatePrFiles — output file list', () => {
+  const upstreamRegisterAll = `// generated\nimport { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'\n\nexport const ALL_CARD_IMPLS = {\n  'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,\n}\n\nexport type AllCardImpls = typeof ALL_CARD_IMPLS\n`
   const upstreamCommunityMd = `# Community Cards\n\n<!-- community-card-entries:begin -->\n<!-- community-card-entries:end -->\n`
 
-  it('emits 6 files (display + impl + smoke test + register-all + auto-catalog + community.md)', async () => {
+  it('emits 4 files (card source + smoke test + register-all + community.md)', async () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_NewCard',
@@ -19,22 +18,19 @@ describe('generatePrFiles — output file list (S9 dual-file split)', () => {
       wcard,
       github_login: 'alicegh',
       upstream_register_all: upstreamRegisterAll,
-      upstream_auto_catalog: upstreamAutoCatalog,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 1,
     })
     const paths = files.map((f) => f.path).sort()
     expect(paths).toEqual([
       'docs/community_cards.md',
-      'shared/cards-display/community/CUSTOM_NewCard.ts',
       'shared/cards/community/CUSTOM_NewCard.ts',
       'shared/cards/community/__tests__/CUSTOM_NewCard.test.ts',
-      'shared/cards/community/auto-catalog.ts',
       'shared/cards/register-all.ts',
     ])
   })
 
-  it('display file contains CARD_DEF only; impl file contains CARD_IMPL only', async () => {
+  it('card source file contains meta and impl together', async () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_X',
@@ -45,16 +41,14 @@ describe('generatePrFiles — output file list (S9 dual-file split)', () => {
       wcard,
       github_login: 'gh',
       upstream_register_all: upstreamRegisterAll,
-      upstream_auto_catalog: upstreamAutoCatalog,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 2,
     })
-    const display = files.find((f) => f.path === 'shared/cards-display/community/CUSTOM_X.ts')!
-    const impl = files.find((f) => f.path === 'shared/cards/community/CUSTOM_X.ts')!
-    expect(display.content).toContain('CARD_DEF = new MinorImprovement(')
-    expect(display.content).not.toContain('CARD_IMPL')
-    expect(impl.content).toMatch(/const CARD_IMPL\b/)
-    expect(impl.content).not.toContain('new MinorImprovement(')
-    expect(impl.content).toContain(`from '../../cards-display/community/CUSTOM_X'`)
+    const source = files.find((f) => f.path === 'shared/cards/community/CUSTOM_X.ts')!
+    expect(source.content).toContain(`import { defineMinorCard } from '../card-source'`)
+    expect(source.content).toMatch(/const CARD_IMPL\b/)
+    expect(source.content).toContain(`export const CUSTOM_X = defineMinorCard({`)
+    expect(source.content).toContain(`impl: cardImpl`)
+    expect(source.content).not.toContain('new MinorImprovement(')
   })
 })

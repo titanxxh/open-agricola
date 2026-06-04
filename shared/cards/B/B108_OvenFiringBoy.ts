@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B108_OvenFiringBoy } from '../../cards-display/B/B108_OvenFiringBoy'
 
-const CARD_ID = B108_OvenFiringBoy.id
-
+const CARD_ID = 'B108_OvenFiringBoy'
 /**
  * B108 Oven Firing Boy
  * Each time you use a wood accumulation space, you get an additional
@@ -35,7 +34,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B108_OvenFiringBoy_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B108_OvenFiringBoy = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Oven Firing Boy',
+    deck: 'B',
+    number: 108,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you use a wood accumulation space, you get an additional __Bake Bread__ action.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B108_OvenFiringBoy_impl = B108_OvenFiringBoy.impl

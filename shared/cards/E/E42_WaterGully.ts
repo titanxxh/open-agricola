@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E42_WaterGully } from '../../cards-display/E/E42_WaterGully'
 
-const CARD_ID = E42_WaterGully.id
+const CARD_ID = 'E42_WaterGully'
 
-export const E42_WaterGully_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => player.improvements.includes('Major_Well'),
   effect: {
   id: CARD_ID,
@@ -42,3 +42,19 @@ export const E42_WaterGully_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E42_WaterGully = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Water Gully',
+    deck: 'E',
+    number: 42,
+    category: 'GOODS_-_GET',
+    desc: ['Place 1 <CATTLE>, 1 <GRAIN>, and 1 <CATTLE> on the next 3 round spaces (in that order). At the start of these rounds, you get the respective good.'],
+    cost: { stone: 1 },
+    prerequisite: 'Major Well',
+  },
+  impl: cardImpl,
+})
+
+export const E42_WaterGully_impl = E42_WaterGully.impl
