@@ -1,7 +1,6 @@
 import type { PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/session/harvest-summary'
-import { getMajorCardDisplay } from '../../../shared/cards/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   basicConversionExchanges,
@@ -83,8 +82,8 @@ export const buildHarvestFeedOptions = (
 
   // 2. Improvements (includes majors)
   for (const cardId of player.improvements) {
-    const major = getMajorCardDisplay(cardId)
-    pushFromExchanges(cardId, cardLabel(cardId), major?.exchanges)
+    const card = getCardMeta(cardId)
+    pushFromExchanges(cardId, cardLabel(cardId), card?.exchanges)
   }
 
   // 3. Minors

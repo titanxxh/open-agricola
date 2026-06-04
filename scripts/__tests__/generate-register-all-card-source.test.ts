@@ -11,6 +11,7 @@ describe('generate-register-all Card Source', () => {
     fs.mkdirSync(path.join(cardsRoot, 'A'), { recursive: true })
     fs.mkdirSync(path.join(cardsRoot, 'B'), { recursive: true })
     fs.mkdirSync(path.join(tmp, 'shared', 'cards', 'community'), { recursive: true })
+    fs.mkdirSync(path.join(cardsRoot, '__stubs__'), { recursive: true })
 
     fs.writeFileSync(
       path.join(cardsRoot, 'B', 'B1_Source.ts'),
@@ -29,14 +30,26 @@ describe('generate-register-all Card Source', () => {
       `})\n`,
       'utf8',
     )
+    fs.writeFileSync(
+      path.join(cardsRoot, '__stubs__', 'STUB_Source.ts'),
+      `import { defineMinorCard } from '../card-source'\n` +
+      `export const STUB_Source = defineMinorCard({\n` +
+      `  meta: { id: 'STUB_Source', name: 'Stub', deck: '__stubs__', number: 1, desc: [], cost: {} },\n` +
+      `  impl: { effect: { id: 'STUB_Source' }, reaches: ['test'] },\n` +
+      `})\n`,
+      'utf8',
+    )
 
     const result = buildRegisterAll({ repoRoot: tmp })
 
     expect(result.registerAll).toContain(`import { B1_Source } from './B/B1_Source'`)
     expect(result.registerAll).toContain(`'B1_Source': B1_Source.impl`)
+    expect(result.registerAll).toContain(`import { STUB_Source } from './__stubs__/STUB_Source'`)
+    expect(result.registerAll).toContain(`'STUB_Source': STUB_Source.impl`)
     expect(result.registerAll).not.toContain('B2_MetaOnly')
-    expect(result.catalogGenerated).toContain('export const catalogCardSources')
-    expect(result.catalogGenerated).toContain('B2_MetaOnly')
+    expect(result.catalogGenerated).toContain('export const catalogCardDefinitions')
+    expect(result.catalogGenerated).toContain('"id": "B2_MetaOnly"')
+    expect(result.catalogGenerated).not.toContain('STUB_Source')
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })

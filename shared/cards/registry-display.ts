@@ -7,7 +7,7 @@ import {
   getMinorImprovementCard,
   getOccupationCard,
 } from './catalog'
-import { majorImprovementIds as majorIds } from './major'
+import { majorImprovementIdsList as majorIds } from './major/generated'
 
 export type CardBase = CardDefinition
 
