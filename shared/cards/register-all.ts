@@ -791,13 +791,13 @@ import { E57_CheeseFondue_impl } from './E/E57_CheeseFondue'
 import { E58_LunchtimeBeer_impl } from './E/E58_LunchtimeBeer'
 import { E59_CombandCutter_impl } from './E/E59_CombandCutter'
 import { E5_NightLoot_impl } from './E/E5_NightLoot'
-import { E60_WorkingGloves_impl } from './E/E60_WorkingGloves'
+import { E60_WorkingGloves } from './E/E60_WorkingGloves'
 import { E61_RaisedBed_impl } from './E/E61_RaisedBed'
 import { E62_SourDough_impl } from './E/E62_SourDough'
 import { E63_IronOven_impl } from './E/E63_IronOven'
 import { E64_SimpleOven_impl } from './E/E64_SimpleOven'
 import { E65_Almsbag_impl } from './E/E65_Almsbag'
-import { E66_BarnShed_impl } from './E/E66_BarnShed'
+import { E66_BarnShed } from './E/E66_BarnShed'
 import { E67_GrainBag_impl } from './E/E67_GrainBag'
 import { E68_CherryOrchard_impl } from './E/E68_CherryOrchard'
 import { E69_MelonPatch_impl } from './E/E69_MelonPatch'
@@ -835,6 +835,7 @@ import { E97_Beneficiary_impl } from './E/E97_Beneficiary'
 import { E98_Prodigy_impl } from './E/E98_Prodigy'
 import { E99_UncaringParents_impl } from './E/E99_UncaringParents'
 import { E9_BarteringHut_impl } from './E/E9_BarteringHut'
+import { Major_Well } from './major/well'
 import { CUSTOM_FixtureHarvester_impl } from './community/CUSTOM_FixtureHarvester'
 import { STUB_BeforeBakeGainClay_impl } from './__stubs__/STUB_BeforeBakeGainClay'
 
@@ -1620,13 +1621,13 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E58_LunchtimeBeer': E58_LunchtimeBeer_impl,
   'E59_CombandCutter': E59_CombandCutter_impl,
   'E5_NightLoot': E5_NightLoot_impl,
-  'E60_WorkingGloves': E60_WorkingGloves_impl,
+  'E60_WorkingGloves': E60_WorkingGloves.impl,
   'E61_RaisedBed': E61_RaisedBed_impl,
   'E62_SourDough': E62_SourDough_impl,
   'E63_IronOven': E63_IronOven_impl,
   'E64_SimpleOven': E64_SimpleOven_impl,
   'E65_Almsbag': E65_Almsbag_impl,
-  'E66_BarnShed': E66_BarnShed_impl,
+  'E66_BarnShed': E66_BarnShed.impl,
   'E67_GrainBag': E67_GrainBag_impl,
   'E68_CherryOrchard': E68_CherryOrchard_impl,
   'E69_MelonPatch': E69_MelonPatch_impl,
@@ -1664,6 +1665,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E98_Prodigy': E98_Prodigy_impl,
   'E99_UncaringParents': E99_UncaringParents_impl,
   'E9_BarteringHut': E9_BarteringHut_impl,
+  'Major_Well': Major_Well.impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester_impl,
   'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay_impl,
 }

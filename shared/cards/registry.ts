@@ -141,6 +141,7 @@ export class CardRegistry {
    */
   registerEffects(effects: readonly CardEffect[]): void {
     for (const effect of effects) {
+      if (this.effectsByCard.has(effect.id)) continue
       this.effectsByCard.set(effect.id, effect)
     }
   }
