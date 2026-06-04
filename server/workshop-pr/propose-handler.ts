@@ -124,8 +124,10 @@ export async function handleProposeRequest(
     const fork = await client.ensureFork()
     const githubLogin = fork.owner
 
-    const upstreamRegisterAll = await client.getUpstreamFile('shared/cards/register-all.ts')
-    const upstreamCommunityMd = await client.getUpstreamFile('docs/community_cards.md')
+    const upstreamBaseSha = await client.getUpstreamMainSha()
+    const upstreamRegisterAll = await client.getUpstreamFile('shared/cards/register-all.ts', upstreamBaseSha)
+    const upstreamCatalogGenerated = await client.getUpstreamFile('shared/cards/catalog.generated.ts', upstreamBaseSha)
+    const upstreamCommunityMd = await client.getUpstreamFile('docs/community_cards.md', upstreamBaseSha)
 
     const artData = loadArtIfAny(wcard.art_url)
 
@@ -153,6 +155,7 @@ export async function handleProposeRequest(
       wcard: wcardForGen,
       github_login: githubLogin,
       upstream_register_all: upstreamRegisterAll,
+      upstream_catalog_generated: upstreamCatalogGenerated,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 0,
       art_data: artData,
@@ -165,6 +168,7 @@ export async function handleProposeRequest(
         name: wcard.author_name ?? githubLogin,
         email: `${githubLogin}@users.noreply.github.com`,
       },
+      upstreamBaseSha,
     })
     await client.upsertBranch({
       forkOwner: githubLogin,
@@ -193,6 +197,7 @@ export async function handleProposeRequest(
       wcard: wcardForGen,
       github_login: githubLogin,
       upstream_register_all: upstreamRegisterAll,
+      upstream_catalog_generated: upstreamCatalogGenerated,
       upstream_community_md: upstreamCommunityMd,
       pr_number: pr.number,
       art_data: artData,
@@ -205,6 +210,7 @@ export async function handleProposeRequest(
         name: wcard.author_name ?? githubLogin,
         email: `${githubLogin}@users.noreply.github.com`,
       },
+      upstreamBaseSha,
     })
     await client.upsertBranch({
       forkOwner: githubLogin,

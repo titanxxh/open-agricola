@@ -157,6 +157,19 @@ const FAKE_COMMUNITY_MD = `# Community cards
 <!-- community-card-entries:end -->
 `
 
+const FAKE_CATALOG_GENERATED = `// generated
+export const catalogCardDefinitions = [
+  {
+    "id": "C99_Source",
+    "name": "Source",
+    "deck": "C",
+    "number": 99,
+    "desc": [],
+    "kind": "minor"
+  },
+]
+`
+
 // ── GitHub API stub factory ────────────────────────────────────────────────
 
 type StubOpts = {
@@ -218,12 +231,23 @@ function createGitHubApiStub(opts: StubOpts): {
       )
     }
 
-    // Upstream contents (register-all.ts, community_cards.md)
+    // Upstream contents (generated catalogs, community_cards.md)
     if (url.includes('/contents/shared/cards/register-all.ts')) {
       return Promise.resolve(
         new Response(
           JSON.stringify({
             content: Buffer.from(FAKE_REGISTER_ALL).toString('base64'),
+            encoding: 'base64',
+          }),
+          { status: 200 },
+        ),
+      )
+    }
+    if (url.includes('/contents/shared/cards/catalog.generated.ts')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            content: Buffer.from(FAKE_CATALOG_GENERATED).toString('base64'),
             encoding: 'base64',
           }),
           { status: 200 },

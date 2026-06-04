@@ -79,17 +79,12 @@ export class GitHubClient {
     files: CommitFile[]
     message: string
     author: { name: string; email: string }
+    upstreamBaseSha?: string
   }): Promise<{ commitSha: string; upstreamBaseSha: string }> {
     const { forkOwner, files, message, author } = opts
     const repo = this.opts.upstreamRepo
 
-    const upstreamRef = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${repo}/git/ref/heads/main`,
-    )
-    if (!upstreamRef.ok) {
-      throw new GitHubApiError('upstream ref failed', 'upstream_ref_failed', upstreamRef.status)
-    }
-    const upstreamBaseSha = ((await upstreamRef.json()) as { object: { sha: string } }).object.sha
+    const upstreamBaseSha = opts.upstreamBaseSha ?? await this.getUpstreamMainSha()
 
     const blobs: Array<{ path: string; sha: string }> = []
     for (const f of files) {
@@ -130,6 +125,17 @@ export class GitHubClient {
     const { sha: commitSha } = (await commitResp.json()) as { sha: string }
 
     return { commitSha, upstreamBaseSha }
+  }
+
+  async getUpstreamMainSha(): Promise<string> {
+    const repo = this.opts.upstreamRepo
+    const upstreamRef = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${repo}/git/ref/heads/main`,
+    )
+    if (!upstreamRef.ok) {
+      throw new GitHubApiError('upstream ref failed', 'upstream_ref_failed', upstreamRef.status)
+    }
+    return ((await upstreamRef.json()) as { object: { sha: string } }).object.sha
   }
 
   async upsertBranch(opts: {
@@ -220,9 +226,9 @@ export class GitHubClient {
     }
   }
 
-  async getUpstreamFile(path: string): Promise<string> {
+  async getUpstreamFile(path: string, ref = 'main'): Promise<string> {
     const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${path}?ref=main`,
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
     )
     if (!r.ok) throw new GitHubApiError(`contents failed: ${path}`, 'contents_failed', r.status)
     const data = (await r.json()) as { content: string; encoding: string }
