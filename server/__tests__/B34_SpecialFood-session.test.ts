@@ -56,10 +56,12 @@ const runListener = (
   events: readonly DraftGameEvent<'resource.moved'>[],
   resourcesGained?: Partial<Resource>,
   actionEvents: readonly DraftGameEvent<'resource.moved'>[] = events,
+  configurePlayer?: (player: ReturnType<typeof setup>['player']) => void,
 ): ActionFlow | undefined => {
   const listener = findListener()
   expect(listener).toBeDefined()
   const { state, player, space } = setup()
+  configurePlayer?.(player)
   return executeCardListener(listener!, {
     state,
     player,
@@ -108,6 +110,30 @@ describe('B34_SpecialFood action-space provenance', () => {
 
     expect(runListener([moved({ sheep: 1 }, player.id, { kind: 'supply' })], { sheep: 1 })).toBeUndefined()
     expect(runListener([moved({ sheep: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })], { sheep: 1 })).toBeUndefined()
+  })
+
+  it('counts animal-holder animals when checking whether gained animals were retained', () => {
+    const { player } = setup()
+    const events = [moved({ sheep: 1 }, player.id)]
+
+    const flow = runListener(events, { sheep: 1 }, events, (configured) => {
+      configured.pastures = []
+      configured.cardStates = {
+        ...configured.cardStates,
+        Test_AnimalHolder: {
+          extraData: { held: 2, animalType: 'sheep' },
+        },
+        [CARD_ID]: {
+          extraData: {
+            animalsBeforeCollecting: { sheep: 1, boar: 0, cattle: 0 },
+          },
+        },
+      }
+    })
+
+    expect(flow?.type).toBe('seq')
+    if (flow?.type !== 'seq') throw new Error('expected sequence flow')
+    expect(flow.children.filter((child) => child.type === 'leaf' && child.actionId === 'bonus-vp')).toHaveLength(1)
   })
 
   it('ignores stale earlier transaction animal events when current actionEvents has no animal move', () => {

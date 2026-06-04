@@ -1,11 +1,12 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow, Pasture, PlayerState } from '../../contract/types'
+import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import {
   isCardFlagged,
   readCardExtraData,
 } from '../helpers/card-state'
-import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
+import { sumActionSpaceMovedToTriggerPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
 
@@ -14,50 +15,19 @@ const CARD_ID = B34_SpecialFood.id
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
+const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 
 const actionSpaceAnimalMovedToTriggerPlayer = (
   context: CardListenerContext,
   animalType: AnimalType,
 ) =>
-  sumResourceMovedToPlayer(
-    context.actionEvents ?? context.transactionEvents,
-    animalType,
-    (context.triggerPlayer ?? context.player).id,
-    (event) => event.from.kind === 'actionSpace',
-  )
+  sumActionSpaceMovedToTriggerPlayer(context, animalType)
 
 const isAnimalAccumulationSpace = (context: CardListenerContext) => {
-  return actionSpaceAnimalMovedToTriggerPlayer(context, 'sheep') > 0 ||
-    actionSpaceAnimalMovedToTriggerPlayer(context, 'boar') > 0 ||
-    actionSpaceAnimalMovedToTriggerPlayer(context, 'cattle') > 0
+  return ANIMAL_TYPES.some((animalType) =>
+    actionSpaceAnimalMovedToTriggerPlayer(context, animalType) > 0,
+  )
 }
-
-const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> => ({
-  sheep:
-    (player.houseAnimalType === 'sheep' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'sheep').length +
-    (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) =>
-        sum + (pasture.animalType === 'sheep' ? pasture.animalCount : 0),
-      0,
-    ),
-  boar:
-    (player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'boar').length +
-    (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) =>
-        sum + (pasture.animalType === 'boar' ? pasture.animalCount : 0),
-      0,
-    ),
-  cattle:
-    (player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'cattle').length +
-    (player.pastures ?? []).reduce(
-      (sum: number, pasture: Pasture) =>
-        sum + (pasture.animalType === 'cattle' ? pasture.animalCount : 0),
-      0,
-    ),
-})
 
 const buildBonusVpFlow = (count: number) => ({
   type: 'seq' as const,
@@ -97,7 +67,7 @@ const beforeListener: CardListenerRegistration = {
         params: {
           kind: 'set-extra-data',
           key: ANIMALS_BEFORE_KEY,
-          value: getAnimalCountByType(context.player),
+          value: getAssignedAnimalsByType(context.player),
         },
       },
       sourceCard: CARD_ID,
@@ -131,9 +101,9 @@ const afterListener: CardListenerRegistration = {
       obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return
 
-    const animalsAfterCollecting = getAnimalCountByType(context.player)
+    const animalsAfterCollecting = getAssignedAnimalsByType(context.player)
     let ambiguous = false
-    for (const animalType of ['sheep', 'boar', 'cattle'] as AnimalType[]) {
+    for (const animalType of ANIMAL_TYPES) {
       const after = animalsAfterCollecting[animalType]
       const obtained = obtainedAnimals[animalType]
       if (after < obtained) {

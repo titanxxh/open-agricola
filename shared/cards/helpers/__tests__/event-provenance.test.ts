@@ -4,10 +4,12 @@ import {
   hasExchangeGained,
   hasResourceMovedFromActionSpace,
   hasResourceMovedToPlayer,
+  sumActionSpaceMovedToTriggerPlayer,
   sumResourceMovedFromActionSpace,
   sumResourceMovedToPlayer,
   sumResourcePaid,
 } from '../event-provenance'
+import type { CardListenerContext } from '../../card-listeners'
 
 const moved = (overrides: Partial<Extract<QueryableGameEvent, { type: 'resource.moved' }>> = {}) => ({
   type: 'resource.moved',
@@ -87,5 +89,26 @@ describe('event provenance helpers', () => {
     expect(sumResourceMovedFromActionSpace(undefined, 'clay')).toBe(0)
     expect(sumResourcePaid(undefined, 'food')).toBe(0)
     expect(JSON.stringify(events)).toBe(snapshot)
+  })
+
+  it('sums action-space resources moved to the trigger player from listener context', () => {
+    const ctx = {
+      player: { id: 'owner' },
+      triggerPlayer: { id: 'trigger' },
+      transactionEvents: [
+        moved({ resources: { wood: 5 }, to: { kind: 'player', playerId: 'trigger' } }),
+      ],
+      actionEvents: [
+        moved({ resources: { wood: 2 }, to: { kind: 'player', playerId: 'trigger' } }),
+        moved({ resources: { wood: 3 }, to: { kind: 'player', playerId: 'owner' } }),
+        moved({
+          resources: { wood: 4 },
+          from: { kind: 'card', cardId: 'Test_Source' },
+          to: { kind: 'player', playerId: 'trigger' },
+        }),
+      ],
+    } as unknown as CardListenerContext
+
+    expect(sumActionSpaceMovedToTriggerPlayer(ctx, 'wood')).toBe(2)
   })
 })
