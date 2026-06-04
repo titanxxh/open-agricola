@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { C108_Layabout } from '../../cards-display/C/C108_Layabout'
 
-const CARD_ID = C108_Layabout.id
+const CARD_ID = 'C108_Layabout'
 
-export const C108_Layabout_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -13,3 +13,18 @@ export const C108_Layabout_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C108_Layabout = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Layabout",
+    deck: "C",
+    number: 108,
+    category: "FOOD_PROVIDER",
+    desc: ["When you play this card, you must skip the next harvest. (You also do not have to feed your family that harvest.)"],
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C108_Layabout_impl = C108_Layabout.impl

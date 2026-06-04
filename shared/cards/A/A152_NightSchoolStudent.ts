@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { isSpaceOccupied } from '../../domain/space'
 import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { A152_NightSchoolStudent } from '../../cards-display/A/A152_NightSchoolStudent'
 
-const CARD_ID = A152_NightSchoolStudent.id
+const CARD_ID = 'A152_NightSchoolStudent'
 
-export const A152_NightSchoolStudent_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
@@ -27,3 +27,19 @@ export const A152_NightSchoolStudent_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A152_NightSchoolStudent = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Night-School Student',
+    deck: 'A',
+    number: 152,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each returning home phase in which no player returns a person from a __Lessons__ action space, you can play an occupation for an occupation cost of 1 <FOOD>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A152_NightSchoolStudent_impl = A152_NightSchoolStudent.impl

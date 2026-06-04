@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { B99_Tutor } from '../../cards-display/B/B99_Tutor'
 
-const CARD_ID = B99_Tutor.id
+const CARD_ID = 'B99_Tutor'
 
-export const B99_Tutor_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -17,3 +17,20 @@ export const B99_Tutor_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B99_Tutor = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Tutor",
+    deck: "B",
+    number: 99,
+    category: "POINTS_PROVIDER",
+    desc: ['During scoring, you get 1 bonus <SCORE> for each occupation played after this one.'],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B99_Tutor_impl = B99_Tutor.impl

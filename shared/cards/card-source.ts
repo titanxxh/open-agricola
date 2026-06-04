@@ -13,12 +13,12 @@ export type CardSourceMeta<K extends CardSourceKind = CardSourceKind> =
 export type CardSourceWithImpl<K extends CardSourceKind = CardSourceKind> = {
   meta: CardSourceMeta<K>
   impl: CardImpl
-}
+} & CardSourceMeta<K>
 
 export type CardSourceWithoutImpl<K extends CardSourceKind = CardSourceKind> = {
   meta: CardSourceMeta<K>
   impl?: undefined
-}
+} & CardSourceMeta<K>
 
 export type CardSource<K extends CardSourceKind = CardSourceKind> =
   | CardSourceWithImpl<K>
@@ -39,13 +39,17 @@ type CardSourceInput = CardSourceWithImplInput | CardSourceWithoutImplInput
 const defineCardSource = <K extends CardSourceKind>(
   kind: K,
   input: CardSourceInput,
-): CardSource<K> => ({
-  ...input,
-  meta: {
+): CardSource<K> => {
+  const meta = {
     ...input.meta,
     kind,
-  },
-} as CardSource<K>)
+  }
+  return {
+    ...meta,
+    meta,
+    impl: input.impl,
+  } as CardSource<K>
+}
 
 export function defineMinorCard(input: CardSourceWithImplInput): CardSourceWithImpl<'minor'>
 export function defineMinorCard(input: CardSourceWithoutImplInput): CardSourceWithoutImpl<'minor'>

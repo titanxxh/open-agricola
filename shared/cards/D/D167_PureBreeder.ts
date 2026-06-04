@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { ActionFlow } from '../../contract/types'
@@ -9,7 +10,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const BREEDABLE = ['sheep', 'boar', 'cattle'] as const
 
-export const D167_PureBreeder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
@@ -35,3 +36,19 @@ export const D167_PureBreeder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D167_PureBreeder = defineOccupationCard({
+  meta: {
+    id: "D167_PureBreeder",
+    name: "Pure Breeder",
+    deck: "D",
+    number: 167,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ["You immediately get 1 <WOOD>. After each round that does not end with a harvest, you can breed exactly one type of animal. (This is not considered a breeding phase.)"],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const D167_PureBreeder_impl = D167_PureBreeder.impl

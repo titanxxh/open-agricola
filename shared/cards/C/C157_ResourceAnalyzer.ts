@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C157_ResourceAnalyzer } from '../../cards-display/C/C157_ResourceAnalyzer'
 
-const CARD_ID = C157_ResourceAnalyzer.id
-
+const CARD_ID = 'C157_ResourceAnalyzer'
 const BUILD_RESOURCES = ['stone', 'clay', 'reed', 'wood'] as const
 
-export const C157_ResourceAnalyzer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
@@ -26,3 +25,20 @@ export const C157_ResourceAnalyzer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C157_ResourceAnalyzer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Resource Analyzer',
+    deck: 'C',
+    number: 157,
+    category: 'FOOD_PROVIDER',
+    desc: ['Before the start of each round, if you have more building resources than all other players of at least two types, you get 1 <FOOD>.'],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C157_ResourceAnalyzer_impl = C157_ResourceAnalyzer.impl

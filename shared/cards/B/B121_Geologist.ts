@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B121_Geologist } from '../../cards-display/B/B121_Geologist'
 
-const CARD_ID = B121_Geologist.id
-
+const CARD_ID = 'B121_Geologist'
 /**
  * B121 Geologist — Each time you use the Forest or Reed Bank accumulation space,
  * you also get 1 CLAY. In games with 3 or more players, this also applies to
@@ -31,7 +30,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B121_Geologist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B121_Geologist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Geologist',
+    deck: 'B',
+    number: 121,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time you use the __Forest__ or __Reed Bank__ accumulation space, you also get 1 <CLAY>. In games with 3 or more players, this also applies to the __Clay Pit__.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B121_Geologist_impl = B121_Geologist.impl

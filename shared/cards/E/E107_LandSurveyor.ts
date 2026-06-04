@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E107_LandSurveyor } from '../../cards-display/E/E107_LandSurveyor'
 
-const CARD_ID = E107_LandSurveyor.id
+const CARD_ID = 'E107_LandSurveyor'
 
-export const E107_LandSurveyor_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
@@ -22,3 +22,19 @@ export const E107_LandSurveyor_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E107_LandSurveyor = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Land Surveyor",
+    deck: "E",
+    number: 107,
+    category: "FOOD",
+    desc: ["In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 <FOOD>."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const E107_LandSurveyor_impl = E107_LandSurveyor.impl

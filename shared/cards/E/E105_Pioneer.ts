@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E105_Pioneer } from '../../cards-display/E/E105_Pioneer'
 
-const CARD_ID = E105_Pioneer.id
-
+const CARD_ID = 'E105_Pioneer'
 /**
  * E105 Pioneer (Occupation):
  * On purchase: XOR choice of 1 building resource (wood/clay/reed/stone) + 1 food.
@@ -27,7 +26,7 @@ const buildPioneerChoiceFlow = (): ActionFlow => ({
 })
 
 /** Get the action space ID most recently revealed this round */
-const getMostRecentlyRevealedSpaceId = (state: { round: number; roundActionOrder: (string | null)[] }): string | null => {
+export const getMostRecentlyRevealedSpaceId = (state: { round: number; roundActionOrder: (string | null)[] }): string | null => {
   if (state.round < 1 || state.round > 14) return null
   return state.roundActionOrder[state.round - 1] ?? null
 }
@@ -48,9 +47,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-export { getMostRecentlyRevealedSpaceId }
-
-export const E105_Pioneer_impl = {
+const cardImpl = {
   listeners: [afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
@@ -60,3 +57,21 @@ export const E105_Pioneer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E105_Pioneer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pioneer',
+    deck: 'E',
+    number: 105,
+    category: 'GOODS_-_GET',
+    desc: [
+        'When you play this card and each time before you use the most recent action space card, you get 1 building resource of your choice and 1 <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E105_Pioneer_impl = E105_Pioneer.impl

@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C92_AutumnMother } from '../../cards-display/C/C92_AutumnMother'
 
-const CARD_ID = C92_AutumnMother.id
+const CARD_ID = 'C92_AutumnMother'
 
-export const C92_AutumnMother_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeHarvest: (_state, player) => {
@@ -24,3 +24,19 @@ export const C92_AutumnMother_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C92_AutumnMother = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Autumn Mother",
+    deck: "C",
+    number: 92,
+    category: "ACTIONS_BOOSTER",
+    desc: ["Immediately before each harvest, if you have room in your house, you can take a __Family Growth__ action for 3 <FOOD>."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C92_AutumnMother_impl = C92_AutumnMother.impl

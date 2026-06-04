@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B28_ForestryStudies } from '../../cards-display/B/B28_ForestryStudies'
 
-const CARD_ID = B28_ForestryStudies.id
-
+const CARD_ID = 'B28_ForestryStudies'
 const listener: CardListenerRegistration = {
   id: 'B28-forestry-studies-after-place-farmer',
   cardIds: [CARD_ID],
@@ -36,7 +35,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B28_ForestryStudies_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B28_ForestryStudies = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forestry Studies',
+    deck: 'B',
+    number: 28,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time after you use the __Forest__ accumulation space, you can return 2 <WOOD> to that space to play 1 occupation without paying an occupation costs.'],
+    cost: { food: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const B28_ForestryStudies_impl = B28_ForestryStudies.impl

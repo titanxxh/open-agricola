@@ -1,20 +1,10 @@
-import { MinorImprovement } from '../../cards-display/types'
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 
 const CARD_ID = 'STUB_BeforeBakeGainClay'
-
-export const STUB_BeforeBakeGainClay = new MinorImprovement({
-  id: CARD_ID,
-  name: 'STUB Before Bake Gain Clay',
-  deck: 'STUB',
-  number: 1,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Test stub: before you bake bread, gain 1 clay.'],
-  cost: {},
-})
 
 const beforeBakeListener: CardListenerRegistration = {
   id: 'STUB-before-bake-gain-clay',
@@ -41,7 +31,22 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const STUB_BeforeBakeGainClay_impl = {
+const cardImpl = {
   listeners: [beforeBakeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const STUB_BeforeBakeGainClay = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'STUB Before Bake Gain Clay',
+    deck: 'STUB',
+    number: 1,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Test stub: before you bake bread, gain 1 clay.'],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const STUB_BeforeBakeGainClay_impl = cardImpl

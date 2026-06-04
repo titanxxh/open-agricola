@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B116_Shoreforester } from '../../cards-display/B/B116_Shoreforester'
 
-const CARD_ID = B116_Shoreforester.id
+const CARD_ID = 'B116_Shoreforester'
 
-export const B116_Shoreforester_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { wood: 1 }),
@@ -17,3 +17,21 @@ export const B116_Shoreforester_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B116_Shoreforester = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Shoreforester',
+    deck: 'B',
+    number: 116,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'When you play this card and each time 1 <REED> is placed on an empty __Reed Bank__ accumulation space in the preparation phase, you get 1 <WOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B116_Shoreforester_impl = B116_Shoreforester.impl

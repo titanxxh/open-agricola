@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { A31_DebtSecurity } from '../../cards-display/A/A31_DebtSecurity'
 
-const CARD_ID = A31_DebtSecurity.id
+const CARD_ID = 'A31_DebtSecurity'
 
-export const A31_DebtSecurity_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -19,3 +19,19 @@ export const A31_DebtSecurity_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A31_DebtSecurity = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Debt Security",
+    deck: "A",
+    number: 31,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each major improvement you have, up to the number of your unused farmyard spaces."],
+    cost: { food: 2 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A31_DebtSecurity_impl = A31_DebtSecurity.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { A138_Harpooner } from '../../cards-display/A/A138_Harpooner'
 
-const CARD_ID = A138_Harpooner.id
-
+const CARD_ID = 'A138_Harpooner'
 const listener: CardListenerRegistration = {
   id: 'A138-harpooner-after-place-farmer',
   cardIds: [CARD_ID],
@@ -29,7 +28,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A138_Harpooner_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A138_Harpooner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Harpooner',
+    deck: 'A',
+    number: 138,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you use the __Fishing__ space you can also pay 1 <WOOD> to get 1 <FOOD> for each person you have, and 1 <REED>'],
+    cost: {},
+    players: '3+',
+    waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const A138_Harpooner_impl = A138_Harpooner.impl

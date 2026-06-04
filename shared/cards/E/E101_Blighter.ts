@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { E101_Blighter } from '../../cards-display/E/E101_Blighter'
 
-const CARD_ID = E101_Blighter.id
-
+const CARD_ID = 'E101_Blighter'
 const SCORE_MAP = [0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
 
 const isDoableListener: CardListenerRegistration = {
@@ -41,7 +40,24 @@ const onPlayListener: CardListenerRegistration = {
   },
 }
 
-export const E101_Blighter_impl = {
+const cardImpl = {
   listeners: [isDoableListener, onPlayListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E101_Blighter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Blighter",
+    deck: "E",
+    number: 101,
+    category: "BONUS_POINTS_-_GET",
+    desc: ['When you play this card, you get 1 bonus <SCORE> for each complete stage left to play. You may not play any more occupations.'],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E101_Blighter_impl = E101_Blighter.impl

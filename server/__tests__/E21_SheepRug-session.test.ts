@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/domain/player'
-import { E21_SheepRug } from '../../shared/cards-display/E/E21_SheepRug'
+import { E21_SheepRug } from '../../shared/cards/E/E21_SheepRug'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`

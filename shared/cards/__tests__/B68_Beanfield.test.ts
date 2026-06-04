@@ -4,7 +4,7 @@ import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../B/B68_Beanfield'
-import { B68_Beanfield as B68Card } from '../../cards-display/B/B68_Beanfield'
+import { B68_Beanfield as B68Card } from '../../cards/B/B68_Beanfield'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'B68_Beanfield'

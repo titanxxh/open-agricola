@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D35_FodderChamber } from '../../cards-display/D/D35_FodderChamber'
 
-const CARD_ID = D35_FodderChamber.id
+const CARD_ID = 'D35_FodderChamber'
 
-export const D35_FodderChamber_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (state, player) => {
@@ -15,3 +15,20 @@ export const D35_FodderChamber_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D35_FodderChamber = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Fodder Chamber",
+    deck: "D",
+    number: 35,
+    category: "POINTS_PROVIDER",
+    desc: ['During scoring in a game with 1/2/3/4+ players, you get 1 bonus <SCORE> for every 7th/5th/4th/3rd animal on your farm.'],
+    cost: { stone: 3, grain: 3 },
+    vp: 2,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D35_FodderChamber_impl = D35_FodderChamber.impl

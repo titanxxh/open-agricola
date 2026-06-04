@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E58_LunchtimeBeer } from '../../cards-display/E/E58_LunchtimeBeer'
 
-const CARD_ID = E58_LunchtimeBeer.id
+const CARD_ID = 'E58_LunchtimeBeer'
 
-export const E58_LunchtimeBeer_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvest: (state, _player) => ({
@@ -27,3 +27,18 @@ export const E58_LunchtimeBeer_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E58_LunchtimeBeer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lunchtime Beer',
+    deck: 'E',
+    number: 58,
+    category: 'FOOD',
+    desc: ['At the start of each harvest, you can choose to skip the field and breeding phase of that harvest and get exactly 1 <FOOD> instead.'],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const E58_LunchtimeBeer_impl = E58_LunchtimeBeer.impl

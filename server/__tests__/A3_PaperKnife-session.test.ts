@@ -38,7 +38,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A3_PaperKnife'
-import { A3_PaperKnife } from '../../shared/cards-display/A/A3_PaperKnife'
+import { A3_PaperKnife } from '../../shared/cards/A/A3_PaperKnife'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'

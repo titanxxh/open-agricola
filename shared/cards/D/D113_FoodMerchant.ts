@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D113_FoodMerchant } from '../../cards-display/D/D113_FoodMerchant'
 
-const CARD_ID = D113_FoodMerchant.id
+const CARD_ID = 'D113_FoodMerchant'
 
-export const D113_FoodMerchant_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
@@ -38,3 +38,21 @@ export const D113_FoodMerchant_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D113_FoodMerchant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Food Merchant',
+    deck: 'D',
+    number: 113,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'For each <GRAIN> you harvest from a field, you can buy 1 <VEGETABLE> for 3 <FOOD>. If you harvest the last <GRAIN> from a field, the <VEGETABLE> costs you only 2 <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D113_FoodMerchant_impl = D113_FoodMerchant.impl

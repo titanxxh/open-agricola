@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C12_CattleFarm } from '../../cards-display/C/C12_CattleFarm'
 
-const CARD_ID = C12_CattleFarm.id
+const CARD_ID = 'C12_CattleFarm'
 
-export const C12_CattleFarm_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, _state) => {
@@ -33,3 +33,19 @@ export const C12_CattleFarm_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C12_CattleFarm = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cattle Farm',
+    deck: 'C',
+    number: 12,
+    category: 'FARM_PLANNER',
+    desc: ['For each pasture you have, you can keep 1 <CATTLE> on this card.'],
+    cost: { wood: 1 },
+    animalHolder: true,
+  },
+  impl: cardImpl,
+})
+
+export const C12_CattleFarm_impl = C12_CattleFarm.impl

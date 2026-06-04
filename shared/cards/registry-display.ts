@@ -1,27 +1,65 @@
-// Forwarding layer between cards-display (display layer) and
-// session/engine/actions (impl layer). Per S6c Rule 8, impl files cannot
-// import `shared/cards-display/**` directly — they go through this module.
-//
-// Kept separate from `./registry-runtime` so that `cards/catalog.ts`
-// (which depends on `registerCardLookups` and feeds back into cards-display)
-// does not pull `cards-display/_lookup` at module init and cause a cycle.
-
+import type { CardDefinition } from '../contract/cards'
 import {
-  MinorImprovement as MinorImprovementClass,
-  getRegisteredMinorImprovement as getRegisteredMinorImprovementImpl,
-  getRegisteredOccupation as getRegisteredOccupationImpl,
-} from '../cards-display/types'
+  getAdHocMinorImprovement,
+  getAdHocOccupation,
+} from './registry-runtime'
 import {
-  getMinorImprovement as getMinorImprovementImpl,
-  getOccupation as getOccupationImpl,
-  majorImprovementIds as majorImprovementIdsImpl,
-} from '../cards-display/_lookup'
-import type { CardBase } from '../cards-display/types'
+  getMinorImprovementCard,
+  getOccupationCard,
+} from './catalog'
+import { majorImprovementIds as majorIds } from './major'
 
-export const getMinorImprovement = getMinorImprovementImpl
-export const getOccupation = getOccupationImpl
-export const getRegisteredMinorImprovement = getRegisteredMinorImprovementImpl
-export const getRegisteredOccupation = getRegisteredOccupationImpl
-export const majorImprovementIds = majorImprovementIdsImpl
-export const MinorImprovement = MinorImprovementClass
-export type { CardBase }
+export type CardBase = CardDefinition
+
+class CardDefinitionWrapper {
+  constructor(input: CardDefinition) {
+    Object.assign(this, input)
+  }
+
+  toJSON(): CardDefinition {
+    const { toJSON: _toJSON, ...json } = this as unknown as CardDefinitionWrapper & CardDefinition
+    return json
+  }
+}
+
+export class MinorImprovement extends CardDefinitionWrapper implements CardDefinition {
+  declare id: string
+  declare name: string
+  declare deck: string
+  declare number: number
+  declare desc: string[]
+
+  constructor(input: CardDefinition) {
+    super(input)
+  }
+}
+
+export class Occupation extends CardDefinitionWrapper implements CardDefinition {
+  declare id: string
+  declare name: string
+  declare deck: string
+  declare number: number
+  declare desc: string[]
+
+  constructor(input: CardDefinition) {
+    super(input)
+  }
+}
+
+export class PlayerActionCard extends MinorImprovement {}
+
+export function getMinorImprovement(id: string): CardDefinition | undefined {
+  return getMinorImprovementCard(id) ?? getAdHocMinorImprovement(id)
+}
+
+export function getOccupation(id: string): CardDefinition | undefined {
+  return getOccupationCard(id) ?? getAdHocOccupation(id)
+}
+
+export const getRegisteredMinorImprovement = (id: string): CardDefinition | undefined =>
+  getMinorImprovement(id)
+
+export const getRegisteredOccupation = (id: string): CardDefinition | undefined =>
+  getOccupation(id)
+
+export const majorImprovementIds = majorIds

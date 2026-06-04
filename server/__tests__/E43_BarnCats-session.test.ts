@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { E43_BarnCats } from '../../shared/cards-display/E/E43_BarnCats'
+import { E43_BarnCats } from '../../shared/cards/E/E43_BarnCats'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('E43_BarnCats prerequisite', () => {

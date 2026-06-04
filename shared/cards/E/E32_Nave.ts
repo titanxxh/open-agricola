@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E32_Nave } from '../../cards-display/E/E32_Nave'
 
-const CARD_ID = E32_Nave.id
+const CARD_ID = 'E32_Nave'
 
-export const E32_Nave_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -13,3 +13,20 @@ export const E32_Nave_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E32_Nave = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Nave",
+    deck: "E",
+    number: 32,
+    category: "BONUS_POINTS_-_GET",
+    desc: ['During scoring, you get 1 bonus <SCORE> for each of the 5 columns of your farmyard board containing at least one room.'],
+    cost: { stone: 2, reed: 1 },
+    vp: 0,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E32_Nave_impl = E32_Nave.impl

@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { D121_ClayPlasterer } from '../../cards-display/D/D121_ClayPlasterer'
 
-const CARD_ID = D121_ClayPlasterer.id
-
+const CARD_ID = 'D121_ClayPlasterer'
 /**
  * D121 Clay Plasterer — Renovating to clay only costs you exactly 1 <CLAY> and 1 <REED>.
  * Each clay room only costs you 3 <CLAY> and 2 <REED> to build.
@@ -46,7 +45,25 @@ const renovationCostListener: CardListenerRegistration = {
   },
 }
 
-export const D121_ClayPlasterer_impl = {
+const cardImpl = {
   listeners: [constructCostListener, renovationCostListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D121_ClayPlasterer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Clay Plasterer',
+    deck: 'D',
+    number: 121,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Renovating to clay only costs you exactly 1 <CLAY> and 1 <REED>. Each clay room only costs you 3 <CLAY> and 2 <REED> to build.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D121_ClayPlasterer_impl = D121_ClayPlasterer.impl

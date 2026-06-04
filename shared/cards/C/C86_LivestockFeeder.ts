@@ -1,9 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C86_LivestockFeeder'
 
-export const C86_LivestockFeeder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
@@ -28,3 +29,21 @@ export const C86_LivestockFeeder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C86_LivestockFeeder = defineOccupationCard({
+  meta: {
+    id: "C86_LivestockFeeder",
+    name: "Livestock Feeder",
+    deck: "C",
+    number: 86,
+    category: "FARM_PLANNER",
+    desc: ["When you play this card, you immediately get 1 <GRAIN>. This card can hold 1 animal of any type for each <GRAIN> in your supply."],
+    cost: {},
+    animalHolder: true,
+    occupationPrerequisites: {"min":2},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C86_LivestockFeeder_impl = C86_LivestockFeeder.impl

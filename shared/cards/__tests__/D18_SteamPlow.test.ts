@@ -3,7 +3,7 @@ import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState , ActionFlow } from '../../contract/types'
 
 import '../D/D18_SteamPlow'
-import { D18_SteamPlow as D18Card } from '../../cards-display/D/D18_SteamPlow'
+import { D18_SteamPlow as D18Card } from '../../cards/D/D18_SteamPlow'
 
 const CARD_ID = 'D18_SteamPlow'
 

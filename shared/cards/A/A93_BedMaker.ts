@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
-import { A93_BedMaker } from '../../cards-display/A/A93_BedMaker'
 
-const CARD_ID = A93_BedMaker.id
-
+const CARD_ID = 'A93_BedMaker'
 const listener: CardListenerRegistration = {
   id: 'A93-bed-maker-after-construct',
   cardIds: [CARD_ID],
@@ -38,7 +37,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A93_BedMaker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A93_BedMaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bed Maker',
+    deck: 'A',
+    number: 93,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time you add rooms to your house, you can also pay 1 <WOOD> and 1 <GRAIN> to immediately get a __Family Growth with Room Only__ action.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A93_BedMaker_impl = A93_BedMaker.impl

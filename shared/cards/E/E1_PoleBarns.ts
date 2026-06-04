@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E1_PoleBarns } from '../../cards-display/E/E1_PoleBarns'
 
-const CARD_ID = E1_PoleBarns.id
+const CARD_ID = 'E1_PoleBarns'
 
-export const E1_PoleBarns_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => player.fenceSegments.length >= 15,
   effect: {
   id: CARD_ID,
@@ -17,3 +17,20 @@ export const E1_PoleBarns_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E1_PoleBarns = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pole Barns',
+    deck: 'E',
+    number: 1,
+    category: 'PASSING_-_FARMYARD',
+    desc: ['You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)'],
+    cost: { wood: 2 },
+    passing: true,
+    prerequisite: '15 Fences Built',
+  },
+  impl: cardImpl,
+})
+
+export const E1_PoleBarns_impl = E1_PoleBarns.impl

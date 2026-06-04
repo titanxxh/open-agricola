@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { E43_BarnCats } from '../../cards-display/E/E43_BarnCats'
 
-const CARD_ID = E43_BarnCats.id
+const CARD_ID = 'E43_BarnCats'
 
-export const E43_BarnCats_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => getStableCountForCards(player) >= 1,
   effect: {
   id: CARD_ID,
@@ -28,3 +28,19 @@ export const E43_BarnCats_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E43_BarnCats = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Barn Cats',
+    deck: 'E',
+    number: 43,
+    category: 'FOOD_-_FUTURE_ROUND_SPACES',
+    desc: ['If you have 1/2/3/4 stables, place 1 <FOOD> on each of the next 2/3/4/5 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    vp: 1,
+    prerequisite: '1 Stable',
+  },
+  impl: cardImpl,
+})
+
+export const E43_BarnCats_impl = E43_BarnCats.impl

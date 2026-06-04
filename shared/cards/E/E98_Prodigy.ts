@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E98_Prodigy } from '../../cards-display/E/E98_Prodigy'
 
-const CARD_ID = E98_Prodigy.id
+const CARD_ID = 'E98_Prodigy'
 
-export const E98_Prodigy_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -28,3 +28,19 @@ export const E98_Prodigy_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E98_Prodigy = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Prodigy',
+    deck: 'E',
+    number: 98,
+    category: 'BONUS_POINTS_-_GET',
+    desc: ['If this is your 1st occupation, you immediately get 1 <SCORE> for each improvement you have. (This will not apply to improvements played after this card.)'],
+    players: '1+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E98_Prodigy_impl = E98_Prodigy.impl

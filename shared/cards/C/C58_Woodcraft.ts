@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C58_Woodcraft } from '../../cards-display/C/C58_Woodcraft'
 
-const CARD_ID = C58_Woodcraft.id
-
+const CARD_ID = 'C58_Woodcraft'
 const listener: CardListenerRegistration = {
   id: 'C58-woodcraft-immediately-after-collect',
   cardIds: [CARD_ID],
@@ -19,7 +18,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C58_Woodcraft_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C58_Woodcraft = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Woodcraft',
+    deck: 'C',
+    number: 58,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you use a wood accumulation space, if immediately afterward you have at most 5 <WOOD> in your supply, you get 1 <FOOD>.',
+      ],
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C58_Woodcraft_impl = C58_Woodcraft.impl

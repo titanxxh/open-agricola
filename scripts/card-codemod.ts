@@ -151,7 +151,7 @@ export function transformCardFile(source: string, filePath: string): TransformRe
 
   if (!cardId) {
     throw new Error(
-      `cannot determine cardId for ${path.basename(filePath)} (no CARD_ID const and no string id in new Occupation/MinorImprovement/MajorImprovement)`,
+      `cannot determine cardId for ${path.basename(filePath)} (no CARD_ID const and no static card id)`,
     )
   }
 

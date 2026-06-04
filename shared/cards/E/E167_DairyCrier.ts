@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E167_DairyCrier } from '../../cards-display/E/E167_DairyCrier'
 
-const CARD_ID = E167_DairyCrier.id
+const CARD_ID = 'E167_DairyCrier'
 
-export const E167_DairyCrier_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -40,3 +40,21 @@ export const E167_DairyCrier_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E167_DairyCrier = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Dairy Crier',
+    deck: 'E',
+    number: 167,
+    desc: [
+        'When you play this card, each player (including you) can choose to get 2 <SHEEP> or 2 <FOOD>; you also get 1 <CATTLE>.',
+      ],
+    cost: {},
+    players: '4+',
+    category: 'ANIMALS_-_ALL',
+  },
+  impl: cardImpl,
+})
+
+export const E167_DairyCrier_impl = E167_DairyCrier.impl

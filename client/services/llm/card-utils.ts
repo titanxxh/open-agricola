@@ -8,8 +8,7 @@ import { streamChat } from './index'
 /**
  * Extract card metadata from a TypeScript code block in LLM response.
  * TS-only — the LLM system prompt requires a ```typescript fenced block that
- * calls `registerCardEffect` / `registerCardListener` and instantiates either
- * `new Occupation({...})` or `new MinorImprovement({...})`.
+ * defines `CARD_DEF` and `CARD_IMPL` constants.
  */
 export function extractCardFromResponse(text: string): {
   card: Record<string, unknown>
@@ -88,26 +87,30 @@ function parseCardFromTs(code: string): {
   card: Record<string, unknown>
   sourceCode: string
 } | null {
-  // Extract card_type from class constructor
-  const isOccupation = /new\s+Occupation\s*\(/.test(code)
-  const isMinor = /new\s+MinorImprovement\s*\(/.test(code)
-  if (!isOccupation && !isMinor) return null
-
-  const cardType = isOccupation ? 'occupation' : 'minor'
-
-  // Extract CARD_ID
   const idMatch = code.match(/const\s+CARD_ID\s*=\s*['"]([^'"]+)['"]/)
   const cardId = idMatch?.[1] ?? 'CUSTOM_Unknown'
 
-  // Extract the card definition object — find the constructor argument
-  const constructorPattern = /new\s+(?:MinorImprovement|Occupation)\s*\(\s*\{([\s\S]*)\}\s*\)\s*$/m
-  const ctorMatch = code.match(constructorPattern)
-  if (!ctorMatch) return null
+  const defMatch = /CARD_DEF\s*=\s*\{/g.exec(code)
+  if (!defMatch) return null
+  const defStart = defMatch.index + defMatch[0].length
+  const defEnd = findMatchingBrace(code, defStart)
+  if (defEnd < 0) return null
 
-  const objStr = ctorMatch[1]!
+  const defBody = code.slice(defStart, defEnd)
+  const cardType = extractStringField(defBody, 'cardType') ?? extractStringField(defBody, 'card_type')
+  if (cardType !== 'occupation' && cardType !== 'minor') return null
 
-  // Parse fields from the object literal
-  const name = extractStringField(objStr, 'name') ?? cardId
+  const metaMatch = /meta\s*:\s*\{/g.exec(defBody)
+  const objStr = metaMatch
+    ? (() => {
+        const metaStart = metaMatch.index + metaMatch[0].length
+        const metaEnd = findMatchingBrace(defBody, metaStart)
+        return metaEnd >= 0 ? defBody.slice(metaStart, metaEnd) : defBody
+      })()
+    : defBody
+
+  const id = extractStringField(objStr, 'id') ?? cardId
+  const name = extractStringField(objStr, 'name') ?? id
   const descRaw = extractArrayField(objStr, 'desc') ?? []
   const desc = descRaw.filter(line => {
     const trimmed = line.trim()
@@ -119,18 +122,16 @@ function parseCardFromTs(code: string): {
   })
   const vp = extractNumberField(objStr, 'vp') ?? 0
   const cost = extractObjectField(objStr, 'cost') ?? {}
-  const modifiers = extractModifiers(objStr)
   const locales = extractLocales(objStr)
 
   const card: Record<string, unknown> = {
-    id: cardId,
+    id,
     name,
     card_type: cardType,
     cost,
     vp,
     desc,
   }
-  if (modifiers.length > 0) card.modifiers = modifiers
   if (locales) card.locales = locales
 
   return {
@@ -228,29 +229,6 @@ function extractObjectField(objStr: string, field: string): Record<string, numbe
     result[k!] = Number(v!)
   }
   return result
-}
-
-function extractModifiers(objStr: string): unknown[] {
-  // Simple check: does it have modifiers: [...]?
-  if (!objStr.includes('modifiers')) return []
-  // Extract the modifiers array content
-  const re = /modifiers\s*:\s*\[([\s\S]*?)\]\s*,?\s*(?:implemented|$)/
-  const m = objStr.match(re)
-  if (!m) return []
-  // Try to parse each object in the array
-  const results: unknown[] = []
-  const objMatches = m[1]!.matchAll(/\{([^}]+)\}/g)
-  for (const om of objMatches) {
-    try {
-      // Convert JS object literal to JSON
-      const jsonStr = '{' + om[1]!
-        .replace(/(\w+)\s*:/g, '"$1":')
-        .replace(/'/g, '"')
-        + '}'
-      results.push(JSON.parse(jsonStr))
-    } catch { /* skip malformed */ }
-  }
-  return results
 }
 
 // ── Image generation ──────────────────────────────────────────────────────────

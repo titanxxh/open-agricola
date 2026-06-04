@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C84_PerennialRye } from '../../cards-display/C/C84_PerennialRye'
 
-const CARD_ID = C84_PerennialRye.id
-
+const CARD_ID = 'C84_PerennialRye'
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
 
 const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
@@ -41,7 +40,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C84_PerennialRye_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -51,3 +50,20 @@ export const C84_PerennialRye_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C84_PerennialRye = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Perennial Rye',
+    deck: 'C',
+    number: 84,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['Each round that does not end with a harvest, you can pay 1 <GRAIN> to breed exactly 1 type of animal. (This is not considered a breeding phase.)'],
+    cost: { food: 1 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const C84_PerennialRye_impl = C84_PerennialRye.impl

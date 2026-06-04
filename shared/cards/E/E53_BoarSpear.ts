@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
@@ -6,10 +7,8 @@ import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
-import { E53_BoarSpear } from '../../cards-display/E/E53_BoarSpear'
 
-const CARD_ID = E53_BoarSpear.id
-
+const CARD_ID = 'E53_BoarSpear'
 const TRACKED_ACTIONS = ['gain', 'collect', 'receive', 'exchange'] as const
 
 const USED_TOKEN_KEY = 'E53UsedActionToken'
@@ -83,7 +82,30 @@ const obtainListener: CardListenerRegistration = {
   },
 }
 
-export const E53_BoarSpear_impl = {
+const cardImpl = {
   listeners: [obtainListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E53_BoarSpear = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Boar Spear',
+    deck: 'E',
+    number: 53,
+    category: 'FOOD',
+    desc: ['Each time you get at least 1 <PIG> outside of the breeding phase of a harvest, you can immediately turn them into 4 <FOOD> each.'],
+    vp: 1,
+    cost: { wood: 1, stone: 1 },
+    exchanges: [
+        // Sprint 6b: Aligned to BGA — listener-only. The trade is invocable only
+        // via the `obtainListener` SEQ above (which dispatches `exchange` with
+        // `tradeIds: ['E53_BoarSpear']`); it is intentionally NOT surfaced in the
+        // anytime cookery window (`triggers: []`).
+        { from: { boar: 1 }, to: { food: 4 }, sourceId: CARD_ID, triggers: [] },
+      ],
+  },
+  impl: cardImpl,
+})
+
+export const E53_BoarSpear_impl = E53_BoarSpear.impl

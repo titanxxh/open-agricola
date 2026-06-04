@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionSpace, Resource } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B161_Weakling } from '../../cards-display/B/B161_Weakling'
 
-const CARD_ID = B161_Weakling.id
-
+const CARD_ID = 'B161_Weakling'
 /**
  * B161 Weakling — Each time it is your turn in the work phase, if there are
  * one or more accumulation spaces with 5+ goods on them and you do not use
@@ -62,7 +61,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B161_Weakling_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B161_Weakling = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Weakling',
+    deck: 'B',
+    number: 161,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time it is your turn in the work phase, if there are one or more accumulation spaces with 5+ goods on them and you do not use any of them, you get 1 <VEGETABLE>.',
+      ],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B161_Weakling_impl = B161_Weakling.impl

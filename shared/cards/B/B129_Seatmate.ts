@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { B129_Seatmate } from '../../cards-display/B/B129_Seatmate'
 
-const CARD_ID = B129_Seatmate.id
-
+const CARD_ID = 'B129_Seatmate'
 /**
  * B129 Seatmate — "You can use the action space on round space 13 even if it
  * is occupied by one or more people of the players to your immediate left and
@@ -86,7 +85,23 @@ const buildExtraOptions = (round13Space: { id: string; nameKey: string }): Actio
   },
 ]
 
-export const B129_Seatmate_impl = {
+const cardImpl = {
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B129_Seatmate = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Seatmate',
+    deck: 'B',
+    number: 129,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['You can use the action space on round space 13 even if it is occupied by one or more people of the players to your immediate left and right.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B129_Seatmate_impl = B129_Seatmate.impl

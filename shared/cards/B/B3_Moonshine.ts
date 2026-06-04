@@ -1,16 +1,16 @@
+import { defineMinorCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B3_Moonshine } from '../../cards-display/B/B3_Moonshine'
 import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 
-const CARD_ID = B3_Moonshine.id
+const CARD_ID = 'B3_Moonshine'
 
 const KEY_OCC = 'occ'
 
-export const B3_Moonshine_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
 
@@ -87,3 +87,21 @@ export const B3_Moonshine_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B3_Moonshine = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Moonshine',
+    deck: 'B',
+    number: 3,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Randomly select an occupation in your hand. Either play it for an occupation cost of 2 <FOOD>, or give it to the next player.',
+      ],
+    cost: {},
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const B3_Moonshine_impl = B3_Moonshine.impl

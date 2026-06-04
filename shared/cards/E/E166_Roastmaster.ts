@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E166_Roastmaster } from '../../cards-display/E/E166_Roastmaster'
 
-const CARD_ID = E166_Roastmaster.id
-
+const CARD_ID = 'E166_Roastmaster'
 const PAIR: Record<string, string> = {
   fishing: 'traveling-players',
   'traveling-players': 'fishing',
@@ -50,7 +49,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E166_Roastmaster_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E166_Roastmaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Roastmaster',
+    deck: 'E',
+    number: 166,
+    category: 'ANIMALS_-_CATTLE',
+    desc: ['Each time you use the __Traveling Players__ or __Fishing__ accumulation spaces, you can move exactly 1 <FOOD> from that space to the other to get 1 <CATTLE>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const E166_Roastmaster_impl = E166_Roastmaster.impl

@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
-import { B69_PottersMarket } from '../../cards-display/B/B69_PottersMarket'
 
-const CARD_ID = B69_PottersMarket.id
-
+const CARD_ID = 'B69_PottersMarket'
 const anytimeListener: CardListenerRegistration = {
   id: 'B69-potters-market-anytime',
   cardIds: [CARD_ID],
@@ -35,7 +34,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const B69_PottersMarket_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -49,3 +48,19 @@ export const B69_PottersMarket_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B69_PottersMarket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Potter's Market",
+    deck: 'B',
+    number: 69,
+    category: 'CROP_PROVIDER',
+    desc: ['At any time, you can pay 3 <CLAY> and 2 <FOOD>. If you do, place 1 <VEGETABLE> on each of the next 2 round spaces. At the start of these rounds, you get the <VEGETABLE>.'],
+    cost: { wood: 2 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const B69_PottersMarket_impl = B69_PottersMarket.impl

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
-import { C54_MarketBooth } from '../../cards-display/C/C54_MarketBooth'
+import { C54_MarketBooth } from '../../cards/C/C54_MarketBooth'
 
 import '../C/C54_MarketBooth'
 

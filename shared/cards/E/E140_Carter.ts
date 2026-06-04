@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { sumActionSpaceMovedToTriggerPlayer } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E140_Carter } from '../../cards-display/E/E140_Carter'
 
-const CARD_ID = E140_Carter.id
-
+const CARD_ID = 'E140_Carter'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
 const isBuildingResourceSpace = (space: CardListenerContext['space']): boolean =>
@@ -39,7 +38,7 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-export const E140_Carter_impl = {
+const cardImpl = {
   listeners: [afterCollectListener],
   effect: {
   id: CARD_ID,
@@ -51,3 +50,19 @@ export const E140_Carter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E140_Carter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Carter',
+    deck: 'E',
+    number: 140,
+    desc: ['Next round, each time you use a building resource accumulation space, you also get 1 <FOOD> for each building resource that you take from the space.'],
+    cost: {},
+    players: '3+',
+    category: 'FOOD',
+  },
+  impl: cardImpl,
+})
+
+export const E140_Carter_impl = E140_Carter.impl

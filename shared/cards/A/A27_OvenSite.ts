@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerHasCardCapability } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { A27_OvenSite } from '../../cards-display/A/A27_OvenSite'
 
-const CARD_ID = A27_OvenSite.id
-
+const CARD_ID = 'A27_OvenSite'
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
 
 const computeCostsListener: CardListenerRegistration = {
@@ -33,7 +32,7 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const A27_OvenSite_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   effect: {
   id: CARD_ID,
@@ -61,3 +60,21 @@ export const A27_OvenSite_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A27_OvenSite = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Oven Site',
+    deck: 'A',
+    number: 27,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'When you play this card, you get 2 <WOOD> and you can immediately build the __Clay Oven__ or __Stone Oven__ major improvement. Either way, it only costs you 1 <CLAY> and 1 <STONE>.',
+      ],
+    prerequisite: 'Both Fireplace and Cooking Hearth',
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const A27_OvenSite_impl = A27_OvenSite.impl

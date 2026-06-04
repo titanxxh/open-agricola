@@ -1,8 +1,7 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C124_StoneImporter } from '../../cards-display/C/C124_StoneImporter'
 
-const CARD_ID = C124_StoneImporter.id
-
+const CARD_ID = 'C124_StoneImporter'
 const harvestFoodCosts: Record<number, number> = {
   4: 2,
   7: 2,
@@ -12,7 +11,7 @@ const harvestFoodCosts: Record<number, number> = {
   14: 1,
 }
 
-export const C124_StoneImporter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
@@ -32,3 +31,19 @@ export const C124_StoneImporter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C124_StoneImporter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stone Importer",
+    deck: "C",
+    number: 124,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["In the breeding phase of the 1st/2nd/3rd/4th/5th/6th harvest, you can use this card to buy exactly 2 <STONE> for 2/2/3/3/4/1 <FOOD>."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C124_StoneImporter_impl = C124_StoneImporter.impl

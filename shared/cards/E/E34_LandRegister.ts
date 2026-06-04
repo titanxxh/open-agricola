@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E34_LandRegister } from '../../cards-display/E/E34_LandRegister'
 
-const CARD_ID = E34_LandRegister.id
+const CARD_ID = 'E34_LandRegister'
 
-export const E34_LandRegister_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -17,3 +17,20 @@ export const E34_LandRegister_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E34_LandRegister = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Land Register",
+    deck: "E",
+    number: 34,
+    category: "BONUS_POINTS_-_GET",
+    desc: ['During scoring, if your farm has no unused spaces, you get 2 bonus <SCORE>.'],
+    cost: { wood: 1 },
+    vp: 0,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E34_LandRegister_impl = E34_LandRegister.impl

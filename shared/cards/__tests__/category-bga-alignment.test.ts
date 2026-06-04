@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { allMinorImprovementCards, allOccupationCards } from '../catalog'
-import { C39_StudioBoat } from '../../cards-display/C/C39_StudioBoat'
+import { C39_StudioBoat } from '../../cards/C/C39_StudioBoat'
 
 const expectedCategories: Record<string, string> = {
   'A11_MudPatch': 'FARM_PLANNER',

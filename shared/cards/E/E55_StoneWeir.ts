@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E55_StoneWeir } from '../../cards-display/E/E55_StoneWeir'
 
-const CARD_ID = E55_StoneWeir.id
-
+const CARD_ID = 'E55_StoneWeir'
 const listener: CardListenerRegistration = {
   id: 'E55-stone-weir-before-place-farmer',
   cardIds: [CARD_ID],
@@ -20,7 +19,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E55_StoneWeir_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E55_StoneWeir = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stone Weir',
+    deck: 'E',
+    number: 55,
+    category: 'FOOD',
+    desc: ['Each time you use the __Fishing__ accumulation space, if there are 0/1/2/3 <FOOD> on the space, you get an additional 4/3/2/1 <FOOD> from the general supply.'],
+    cost: { stone: 1 },
+    vp: 1,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const E55_StoneWeir_impl = E55_StoneWeir.impl

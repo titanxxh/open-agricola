@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { E62_SourDough } from '../../cards-display/E/E62_SourDough'
 
-const CARD_ID = E62_SourDough.id
-
+const CARD_ID = 'E62_SourDough'
 const anytimeListener: CardListenerRegistration = {
   id: 'E62-sour-dough-anytime',
   cardIds: [CARD_ID],
@@ -32,7 +31,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const E62_SourDough_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -42,3 +41,21 @@ export const E62_SourDough_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E62_SourDough = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sour Dough',
+    deck: 'E',
+    number: 62,
+    desc: ['Once per round, if all players have at least 1 person left to place, you can skip placing a person and take a __Bake Bread__ action instead.'],
+    cost: {},
+    vp: 1,
+    prerequisite: '3 Occupations and 1 Baking Improvement',
+    occupationPrerequisites: { min: 3 },
+    category: 'FOOD_-_GRAIN',
+  },
+  impl: cardImpl,
+})
+
+export const E62_SourDough_impl = E62_SourDough.impl

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A30_BakingSheet } from '../../shared/cards-display/A/A30_BakingSheet'
+import { A30_BakingSheet } from '../../shared/cards/A/A30_BakingSheet'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('A30_BakingSheet prerequisite', () => {

@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
@@ -6,10 +7,8 @@ import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, ActionSpace, Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
 
-const CARD_ID = C42_RavenousHunger.id
-
+const CARD_ID = 'C42_RavenousHunger'
 const accumulationSpaceIds = (context: CardListenerContext) =>
   computeAllowedPlacementSpaces(context.state, context.player, { sourceCard: CARD_ID })
     .map((placement) => context.state.actionSpaces.find((space) => space.id === placement.spaceId))
@@ -98,7 +97,25 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-export const C42_RavenousHunger_impl = {
+const cardImpl = {
   listeners: [afterPlaceFarmerListener, afterCollectListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C42_RavenousHunger = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Ravenous Hunger',
+    deck: 'C',
+    number: 42,
+    category: 'GOODS_PROVIDER',
+    desc: [
+        'Immediately after each time you use the __Vegetable Seeds__ action space, you can place another person on an accumulation space and get 1 additional good of the accumulating type.',
+      ],
+    cost: { grain: 1 },
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C42_RavenousHunger_impl = C42_RavenousHunger.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A89_StablePlanner } from '../../cards-display/A/A89_StablePlanner'
 
-const CARD_ID = A89_StablePlanner.id
-
+const CARD_ID = 'A89_StablePlanner'
 const TARGET_ROUNDS_KEY = 'targetRounds'
 
 const targetPrefixes = (round: number, reserve: number): number[][] => {
@@ -35,7 +34,7 @@ const selectTargetsFlow = (playerId: string, targets: number[]): ActionFlow => (
   ],
 })
 
-export const A89_StablePlanner_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
@@ -67,3 +66,19 @@ export const A89_StablePlanner_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A89_StablePlanner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stable Planner',
+    deck: 'A',
+    number: 89,
+    category: 'FARM_PLANNER',
+    desc: ['Add 3, 6, and 9 to the current round. You can place 1 stable on each corresponding round space. At the start of these rounds (not earlier), you can build the stable at no cost.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A89_StablePlanner_impl = A89_StablePlanner.impl

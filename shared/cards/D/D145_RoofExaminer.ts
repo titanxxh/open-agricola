@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { D145_RoofExaminer } from '../../cards-display/D/D145_RoofExaminer'
 
-const CARD_ID = D145_RoofExaminer.id
+const CARD_ID = 'D145_RoofExaminer'
 
-export const D145_RoofExaminer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -18,3 +18,19 @@ export const D145_RoofExaminer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D145_RoofExaminer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Roof Examiner',
+    deck: 'D',
+    number: 145,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['When you play this card, if you have 1/2/3/4 major improvements, you immediately get 2/3/4/5 <REED>.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D145_RoofExaminer_impl = D145_RoofExaminer.impl

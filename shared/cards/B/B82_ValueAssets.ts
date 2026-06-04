@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B82_ValueAssets } from '../../cards-display/B/B82_ValueAssets'
 
-const CARD_ID = B82_ValueAssets.id
+const CARD_ID = 'B82_ValueAssets'
 
-export const B82_ValueAssets_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterHarvest: (_state, _player) => {
@@ -49,3 +49,18 @@ export const B82_ValueAssets_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B82_ValueAssets = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Value Assets",
+    deck: "B",
+    number: 82,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["After each harvest, you can buy exactly one of the following goods: 1 <FOOD> <ARROW> 1 <WOOD>; 1 <FOOD> <ARROW> 1 <CLAY>; 2 <FOOD> <ARROW> 1 <REED>; 2 <FOOD> <ARROW> 1 <STONE>"],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const B82_ValueAssets_impl = B82_ValueAssets.impl

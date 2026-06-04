@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A24_ThreshingBoard } from '../../cards-display/A/A24_ThreshingBoard'
 
-const CARD_ID = A24_ThreshingBoard.id
-
+const CARD_ID = 'A24_ThreshingBoard'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
@@ -26,7 +25,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A24_ThreshingBoard_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A24_ThreshingBoard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Threshing Board',
+    deck: 'A',
+    number: 24,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time you use the __Farmland__ or __Cultivation__ action space, you get an additional __Bake Bread__ action.'],
+    cost: { wood: 1 },
+    vp: 1,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const A24_ThreshingBoard_impl = A24_ThreshingBoard.impl

@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
@@ -9,10 +10,8 @@ import {
 } from '../helpers/action-snapshot'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
-import { B27_Toolbox } from '../../cards-display/B/B27_Toolbox'
 
-const CARD_ID = B27_Toolbox.id
-
+const CARD_ID = 'B27_Toolbox'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
 
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
@@ -42,7 +41,7 @@ const makeToolboxFlow = (): ActionFlow => ({
   actionContext: { trueAction: false },
 })
 
-export const B27_Toolbox_impl = {
+const cardImpl = {
   listeners: setFlagListeners,
   effect: {
     id: CARD_ID,
@@ -58,3 +57,20 @@ export const B27_Toolbox_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B27_Toolbox = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Toolbox',
+    deck: 'B',
+    number: 27,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        "In the work phase, after each turn in which you build at least 1 room, stable, or fence, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement.",
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B27_Toolbox_impl = B27_Toolbox.impl

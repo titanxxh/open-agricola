@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, FarmFenceBuiltEvent } from '../../contract/events'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E108_BlackberryFarmer } from '../../cards-display/E/E108_BlackberryFarmer'
 
-const CARD_ID = E108_BlackberryFarmer.id
-
+const CARD_ID = 'E108_BlackberryFarmer'
 type QueryableFarmFenceBuiltEvent = FarmFenceBuiltEvent | DraftGameEvent<'farm.fenceBuilt'>
 
 const isFarmFenceBuiltEvent = (
@@ -43,7 +42,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E108_BlackberryFarmer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E108_BlackberryFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Blackberry Farmer',
+    deck: 'E',
+    number: 108,
+    category: 'FOOD',
+    desc: [
+        'Each time you build fences, place 1 <FOOD> on each remaining round space, up to the number of fences just built. At the start of these rounds, you get the <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E108_BlackberryFarmer_impl = E108_BlackberryFarmer.impl

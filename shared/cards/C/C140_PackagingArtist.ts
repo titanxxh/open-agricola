@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C140_PackagingArtist } from '../../cards-display/C/C140_PackagingArtist'
 
-const CARD_ID = C140_PackagingArtist.id
-
+const CARD_ID = 'C140_PackagingArtist'
 /**
  * C140 Packaging Artist — Each time you get a Minor Improvement action, you
  * can take a Bake Bread action instead.
@@ -69,7 +68,7 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const C140_PackagingArtist_impl = {
+const cardImpl = {
   listeners: [computeReplaceListener, isDoableListener],
   effect: {
     id: CARD_ID,
@@ -77,3 +76,22 @@ export const C140_PackagingArtist_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C140_PackagingArtist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Packaging Artist',
+    deck: 'C',
+    number: 140,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 1 <GRAIN>. Each time you get a __Minor Improvement__ action, you can take a __Bake Bread__ action instead.',
+      ],
+    cost: {},
+    players: '3+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C140_PackagingArtist_impl = C140_PackagingArtist.impl

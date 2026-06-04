@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A133_Braggart } from '../../cards-display/A/A133_Braggart'
 
-const CARD_ID = A133_Braggart.id
+const CARD_ID = 'A133_Braggart'
 
-export const A133_Braggart_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -19,3 +19,20 @@ export const A133_Braggart_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A133_Braggart = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Braggart",
+    deck: "A",
+    number: 133,
+    category: "POINTS_PROVIDER",
+    desc: ["During the scoring, you get 2/3/4/5/7/9 bonus <SCORE> for having at least 5/6/7/8/9/10 improvements in front of you."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A133_Braggart_impl = A133_Braggart.impl

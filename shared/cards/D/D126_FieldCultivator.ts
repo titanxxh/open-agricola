@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D126_FieldCultivator } from '../../cards-display/D/D126_FieldCultivator'
 
-const CARD_ID = D126_FieldCultivator.id
-
+const CARD_ID = 'D126_FieldCultivator'
 /**
  * Stack order (bottom to top): wood, clay, reed, stone, reed, clay, wood.
  * First popped will be 'wood' (top).
@@ -18,7 +17,7 @@ const updateInfobox = (player: PlayerState) => {
   }
 }
 
-export const D126_FieldCultivator_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -56,3 +55,19 @@ export const D126_FieldCultivator_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D126_FieldCultivator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Field Cultivator',
+    deck: 'D',
+    number: 126,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Pile 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <REED>, 1 <CLAY>, and 1 <WOOD> on this card. Each time you harvest a field tile, you can also take the top good from the pile.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D126_FieldCultivator_impl = D126_FieldCultivator.impl

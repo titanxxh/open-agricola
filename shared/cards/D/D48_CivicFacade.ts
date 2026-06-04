@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D48_CivicFacade } from '../../cards-display/D/D48_CivicFacade'
 
-const CARD_ID = D48_CivicFacade.id
+const CARD_ID = 'D48_CivicFacade'
 
-export const D48_CivicFacade_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => player.rooms >= 3,
   effect: {
   id: CARD_ID,
@@ -17,3 +17,19 @@ export const D48_CivicFacade_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D48_CivicFacade = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Civic Facade',
+    deck: 'D',
+    number: 48,
+    category: 'FOOD_PROVIDER',
+    desc: ['Before the start of each round, if you have more occupations than improvements in your hand, you get 1 <FOOD>.'],
+    cost: { clay: 1 },
+    prerequisite: '3 Rooms',
+  },
+  impl: cardImpl,
+})
+
+export const D48_CivicFacade_impl = D48_CivicFacade.impl

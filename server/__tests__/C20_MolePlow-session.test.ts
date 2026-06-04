@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { C20_MolePlow } from '../../shared/cards-display/C/C20_MolePlow'
+import { C20_MolePlow } from '../../shared/cards/C/C20_MolePlow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('C20_MolePlow prerequisite', () => {

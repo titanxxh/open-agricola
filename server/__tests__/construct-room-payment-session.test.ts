@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'
@@ -22,7 +22,7 @@ describe('construct room payment session', () => {
     player.occupationPlayed.push('A123_FrameBuilder')
     player.occupationPlayed.push('A110_Roughcaster')
     player.activeModifiers = [
-      ...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(A123_FrameBuilder.impl.modifiers ?? []),
     ]
 
     session.loadState(state)
@@ -157,7 +157,7 @@ describe('construct room payment session', () => {
     }
     player.minorPlayed.push('A14_CarpentersHammer')
     player.activeModifiers = [
-      ...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(A14_CarpentersHammer.impl.modifiers ?? []),
     ]
 
     session.loadState(state)

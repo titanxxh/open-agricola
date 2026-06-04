@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
-import { A82_WorkCertificate } from '../../cards-display/A/A82_WorkCertificate'
 
-const CARD_ID = A82_WorkCertificate.id
-
+const CARD_ID = 'A82_WorkCertificate'
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 /**
@@ -66,7 +65,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A82_WorkCertificate_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A82_WorkCertificate = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Work Certificate',
+    deck: 'A',
+    number: 82,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time after you use an action space, you can take 1 building resource from a building resource accumulation space with at least 4 building resources on it.'],
+    cost: { food: 1 },
+    prerequisite: '3 Occupations',
+    occupationPrerequisites: { min: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const A82_WorkCertificate_impl = A82_WorkCertificate.impl

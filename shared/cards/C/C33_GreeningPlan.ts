@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { C33_GreeningPlan } from '../../cards-display/C/C33_GreeningPlan'
 
-const CARD_ID = C33_GreeningPlan.id
+const CARD_ID = 'C33_GreeningPlan'
 
-export const C33_GreeningPlan_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -18,3 +18,19 @@ export const C33_GreeningPlan_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C33_GreeningPlan = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Greening Plan",
+    deck: "C",
+    number: 33,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, if you then have at least 2/4/5/6 unplanted fields, you get 1/2/3/5 bonus <SCORE>."],
+    cost: { food: 3 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C33_GreeningPlan_impl = C33_GreeningPlan.impl

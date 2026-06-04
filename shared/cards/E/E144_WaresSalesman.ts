@@ -1,12 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E144_WaresSalesman } from '../../cards-display/E/E144_WaresSalesman'
 import { getCardDefinitionById } from '../helpers/card-type'
 
-const CARD_ID = E144_WaresSalesman.id
+const CARD_ID = 'E144_WaresSalesman'
 
 /**
  * E144 Wares Salesman:
@@ -55,10 +55,28 @@ const makeListener = (
   },
 })
 
-export const E144_WaresSalesman_impl = {
+const cardImpl = {
   listeners: [makeListener(
     ['improvement'],
     'E144-wares-salesman-after-improvement',
   ), makeListener(['occupation'], 'E144-wares-salesman-after-occupation')],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E144_WaresSalesman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wares Salesman',
+    deck: 'E',
+    number: 144,
+    category: 'BUILDING_RESOURCES_-_REED',
+    desc: [
+        'Each time any player (including you) plays or builds a card that lets them turn building resources into <FOOD>, you get exactly 1 corresponding building resource and 1 <REED>.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const E144_WaresSalesman_impl = E144_WaresSalesman.impl

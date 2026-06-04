@@ -8,8 +8,8 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../../shared/domain/farmyard'
-import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
@@ -120,7 +120,7 @@ describe('farm interaction builders', () => {
     player.resources.wood = 2
     player.resources.clay = 6
     player.resources.reed = 4
-    player.activeModifiers = [...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+    player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
 
@@ -133,7 +133,7 @@ describe('farm interaction builders', () => {
     const player = createPlayer()
     player.resources.wood = 8
     player.resources.reed = 2
-    player.activeModifiers = [...((A14_CarpentersHammer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? [])]
+    player.activeModifiers = [...(A14_CarpentersHammer.impl.modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
 

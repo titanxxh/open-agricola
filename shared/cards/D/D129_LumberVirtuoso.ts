@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D129_LumberVirtuoso } from '../../cards-display/D/D129_LumberVirtuoso'
 
-const CARD_ID = D129_LumberVirtuoso.id
+const CARD_ID = 'D129_LumberVirtuoso'
 
-export const D129_LumberVirtuoso_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
@@ -51,3 +51,21 @@ export const D129_LumberVirtuoso_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D129_LumberVirtuoso = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lumber Virtuoso',
+    deck: 'D',
+    number: 129,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each harvest in which you have at least 5 <WOOD> in your supply, you can discard down to 5 <WOOD> to take a __Build Stables__ or __Build Wood Rooms__ action by paying the usual costs.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D129_LumberVirtuoso_impl = D129_LumberVirtuoso.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B134_HousebookMaster } from '../../cards-display/B/B134_HousebookMaster'
 
-const CARD_ID = B134_HousebookMaster.id
-
+const CARD_ID = 'B134_HousebookMaster'
 const listener: CardListenerRegistration = {
   id: 'B134-housebook-master-after-renovation',
   cardIds: [CARD_ID],
@@ -43,7 +42,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B134_HousebookMaster_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B134_HousebookMaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Housebook Master',
+    deck: 'B',
+    number: 134,
+    category: 'POINTS_PROVIDER',
+    desc: ['After playing this card, if you renovate to stone in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>.'],
+    cost: {},
+    players: '3+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B134_HousebookMaster_impl = B134_HousebookMaster.impl

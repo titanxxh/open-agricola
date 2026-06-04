@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B106_MoralCrusader } from '../../cards-display/B/B106_MoralCrusader'
 
-const CARD_ID = B106_MoralCrusader.id
+const CARD_ID = 'B106_MoralCrusader'
 
-export const B106_MoralCrusader_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
@@ -21,3 +21,19 @@ export const B106_MoralCrusader_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B106_MoralCrusader = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Moral Crusader',
+    deck: 'B',
+    number: 106,
+    category: 'FOOD_PROVIDER',
+    desc: ['Immediately before the start of each round, if there are goods on the remaining round spaces that are promised to you, you get 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B106_MoralCrusader_impl = B106_MoralCrusader.impl

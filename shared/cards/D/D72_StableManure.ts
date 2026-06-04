@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import { positionKey } from '../../domain/farm'
 import type { GameState, PlayerState } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
@@ -8,10 +9,8 @@ import {
 import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
 
-const CARD_ID = D72_StableManure.id
-
+const CARD_ID = 'D72_StableManure'
 registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
   if (!selected.includes(positionKey(field))) return
@@ -30,7 +29,7 @@ const eligibleFields = (state: GameState, player: PlayerState) =>
     return fieldTotalRemaining(field) >= min
   })
 
-export const D72_StableManure_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (state, player) => {
@@ -61,3 +60,20 @@ export const D72_StableManure_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D72_StableManure = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stable Manure",
+    deck: "D",
+    number: 72,
+    category: "CROP_PROVIDER",
+    desc: ["In the field phase of each harvest, you can harvest 1 additional good from a number of fields equal to the number of unfenced stables you have."],
+    cost: {},
+    prerequisite: "At Most 1 Occupation",
+    occupationPrerequisites: {"max":1},
+  },
+  impl: cardImpl,
+})
+
+export const D72_StableManure_impl = D72_StableManure.impl

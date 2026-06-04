@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E78_SleightofHand } from '../../cards-display/E/E78_SleightofHand'
 
-const CARD_ID = E78_SleightofHand.id
-
+const CARD_ID = 'E78_SleightofHand'
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-export const E78_SleightofHand_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -31,3 +30,19 @@ export const E78_SleightofHand_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E78_SleightofHand = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sleight of Hand',
+    deck: 'E',
+    number: 78,
+    category: 'BUILDING_RESOURCES_-_REED',
+    desc: ['When you play this card, you can immediately exchange up to 4 building resources for an equal number of other building resources.'],
+    prerequisite: '3 Occupations',
+    occupationPrerequisites: { min: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const E78_SleightofHand_impl = E78_SleightofHand.impl

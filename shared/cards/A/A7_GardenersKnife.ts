@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { A7_GardenersKnife } from '../../cards-display/A/A7_GardenersKnife'
 
-const CARD_ID = A7_GardenersKnife.id
+const CARD_ID = 'A7_GardenersKnife'
 
-export const A7_GardenersKnife_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -24,3 +24,19 @@ export const A7_GardenersKnife_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A7_GardenersKnife = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Gardener's Knife",
+    deck: 'A',
+    number: 7,
+    category: 'FOOD_PROVIDER',
+    desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
+    cost: { wood: 1 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const A7_GardenersKnife_impl = A7_GardenersKnife.impl

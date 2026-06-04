@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B53_SculptureCourse } from '../../cards-display/B/B53_SculptureCourse'
 
-const CARD_ID = B53_SculptureCourse.id
-
+const CARD_ID = 'B53_SculptureCourse'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-export const B53_SculptureCourse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterRoundEnd: (state, _player) => {
@@ -38,3 +37,19 @@ export const B53_SculptureCourse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B53_SculptureCourse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Sculpture Course",
+    deck: "B",
+    number: 53,
+    category: "FOOD_PROVIDER",
+    desc: ["At the end of each round that does not end with a harvest, you can use this card to exchange your choice of 1 <WOOD> for 2 <FOOD>, or 1 <STONE> for 4 <FOOD>."],
+    cost: { grain: 1 },
+    waresSalesmanGains: [{ wood: 1, reed: 1 }, { stone: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const B53_SculptureCourse_impl = B53_SculptureCourse.impl

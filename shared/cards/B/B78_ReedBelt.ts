@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B78_ReedBelt } from '../../cards-display/B/B78_ReedBelt'
 
-const CARD_ID = B78_ReedBelt.id
+const CARD_ID = 'B78_ReedBelt'
 
-export const B78_ReedBelt_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -19,3 +19,18 @@ export const B78_ReedBelt_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B78_ReedBelt = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Reed Belt',
+    deck: 'B',
+    number: 78,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Place 1 <REED> on each of the remaining space for rounds 5, 8, 10, and 12. At the start of these rounds, you get the <REED>.'],
+    cost: { food: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const B78_ReedBelt_impl = B78_ReedBelt.impl

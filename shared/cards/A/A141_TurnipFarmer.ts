@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { A141_TurnipFarmer } from '../../cards-display/A/A141_TurnipFarmer'
 
-const CARD_ID = A141_TurnipFarmer.id
+const CARD_ID = 'A141_TurnipFarmer'
 
-export const A141_TurnipFarmer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, _player) => {
@@ -18,3 +18,19 @@ export const A141_TurnipFarmer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A141_TurnipFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Turnip Farmer',
+    deck: 'A',
+    number: 141,
+    category: 'CROP_PROVIDER',
+    desc: ['At the start of the returning home phase of each round, if both the __Day Laborer__ and __Grain Seeds__ action spaces are occupied, you get 1 <VEGETABLE>.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const A141_TurnipFarmer_impl = A141_TurnipFarmer.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { readCardExtraData } from '../helpers/card-state'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
-import { E149_MidnightFencer } from '../../cards-display/E/E149_MidnightFencer'
 
-const CARD_ID = E149_MidnightFencer.id
-
+const CARD_ID = 'E149_MidnightFencer'
 const KEY_OFFERED = 'offered'
 
 const readOffered = (player: PlayerState): boolean =>
@@ -57,7 +56,7 @@ const buildFenceOffer = (donorCaps: Record<string, number>, max: number): Action
   }
 }
 
-export const E149_MidnightFencer_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvest: (state, player) => {
@@ -72,3 +71,19 @@ export const E149_MidnightFencer_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E149_MidnightFencer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Midnight Fencer',
+    deck: 'E',
+    number: 149,
+    desc: ["At the start of the last harvest, you can take up to 2 of each other player's unbuilt fences and build them on your farm at no cost. (Your farm can then have over 15 fences.)"],
+    cost: {},
+    players: '4+',
+    category: 'FARMYARD',
+  },
+  impl: cardImpl,
+})
+
+export const E149_MidnightFencer_impl = E149_MidnightFencer.impl

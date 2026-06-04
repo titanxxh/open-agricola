@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { FarmTilePosition, GameState, PlayerState } from '../../contract/types'
 import { FARM_ROWS, FARM_COLS, positionKey } from '../../domain/farm'
 import {
@@ -7,10 +8,9 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { B85_FarmHand } from '../../cards-display/B/B85_FarmHand'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
-const CARD_ID = B85_FarmHand.id
+const CARD_ID = 'B85_FarmHand'
 
 const POSITION_KEY = 'position'
 
@@ -120,7 +120,7 @@ export const applyFarmHandStable = (
   return true
 }
 
-export const B85_FarmHand_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     /**
@@ -149,3 +149,21 @@ export const B85_FarmHand_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B85_FarmHand = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Farm Hand',
+    deck: 'B',
+    number: 85,
+    category: 'FARM_PLANNER',
+    desc: [
+        'Once this game, if you have 4 field tiles in a 2x2, you can build a stable in the center of the 2x2 during a __Build Stables__ action. This stable provides room for a person but not animals.',
+      ],
+    players: '1+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const B85_FarmHand_impl = B85_FarmHand.impl

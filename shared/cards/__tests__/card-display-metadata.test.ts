@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MinorImprovement } from '../../cards-display/types'
+import { MinorImprovement } from '../registry-display'
 
 describe('card display metadata serialization', () => {
   it('preserves card capability metadata in CardBase.toJSON', () => {

@@ -43,3 +43,5 @@ export const E66_BarnShed = defineMinorCard({
     reaches: [] as readonly string[],
   },
 })
+
+export const E66_BarnShed_impl = E66_BarnShed.impl

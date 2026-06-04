@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A132_Publican } from '../../cards-display/A/A132_Publican'
 
-const CARD_ID = A132_Publican.id
-
+const CARD_ID = 'A132_Publican'
 /**
  * BGA `wrapSowWithDeferredCheck` defers the offer so that the offer is not
  * shown when the only legal way for the sowing player to sow is to receive
@@ -55,7 +54,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A132_Publican_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A132_Publican = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Publican',
+    deck: 'A',
+    number: 132,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'Each time before another player takes an unconditional __Sow__ action, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: '3+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A132_Publican_impl = A132_Publican.impl

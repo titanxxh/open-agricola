@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B86_TruffleSearcher } from '../../cards-display/B/B86_TruffleSearcher'
 
-const CARD_ID = B86_TruffleSearcher.id
+const CARD_ID = 'B86_TruffleSearcher'
 
-export const B86_TruffleSearcher_impl = {
+const cardImpl = {
   listeners: [],
   effect: {
     id: CARD_ID,
@@ -22,3 +22,20 @@ export const B86_TruffleSearcher_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B86_TruffleSearcher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Truffle Searcher',
+    deck: 'B',
+    number: 86,
+    category: 'FARM_PLANNER',
+    desc: ['This card can hold a number of <PIG> equal to the number of completed feeding phases.'],
+    cost: {},
+    animalHolder: true,
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B86_TruffleSearcher_impl = B86_TruffleSearcher.impl

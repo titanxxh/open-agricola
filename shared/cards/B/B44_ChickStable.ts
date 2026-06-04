@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B44_ChickStable } from '../../cards-display/B/B44_ChickStable'
 
-const CARD_ID = B44_ChickStable.id
+const CARD_ID = 'B44_ChickStable'
 
-export const B44_ChickStable_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -21,3 +21,19 @@ export const B44_ChickStable_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B44_ChickStable = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Chick Stable',
+    deck: 'B',
+    number: 44,
+    category: 'FOOD_PROVIDER',
+    desc: ['Add 3 and 4 to the current round and place 2 <FOOD> on each corresponding round space. At the start of these rounds, you get the <FOOD>.'],
+    cost: {},
+    altCosts: [{ wood: 1 }, { clay: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const B44_ChickStable_impl = B44_ChickStable.impl

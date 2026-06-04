@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C90_FieldWatchman } from '../../cards-display/C/C90_FieldWatchman'
 
-const CARD_ID = C90_FieldWatchman.id
-
+const CARD_ID = 'C90_FieldWatchman'
 const listener: CardListenerRegistration = {
   id: 'C90-field-watchman-after-place-farmer',
   cardIds: [CARD_ID],
@@ -24,7 +23,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C90_FieldWatchman_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C90_FieldWatchman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Field Watchman',
+    deck: 'C',
+    number: 90,
+    category: 'FARM_PLANNER',
+    desc: ['Each time you use the __Grain Seeds__ action space, you can also plow 1 field.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C90_FieldWatchman_impl = C90_FieldWatchman.impl

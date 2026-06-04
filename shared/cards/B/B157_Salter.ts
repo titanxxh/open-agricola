@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type {
   ActionDefinition,
   ActionExecutionContext,
@@ -13,10 +14,8 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { CardImpl } from '../registry'
-import { B157_Salter } from '../../cards-display/B/B157_Salter'
 
-const CARD_ID = B157_Salter.id
-
+const CARD_ID = 'B157_Salter'
 const PICK_ACTION_ID = 'card_B157_Salter_salt-pick'
 
 const TURNS = { sheep: 3, boar: 5, cattle: 7 } as const
@@ -188,8 +187,24 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const B157_Salter_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: { id: CARD_ID },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B157_Salter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Salter',
+    deck: 'B',
+    number: 157,
+    category: 'FOOD_PROVIDER',
+    desc: ['At any time, you can pay 1 <SHEEP>/<PIG>/<CATTLE> from your farm. If you do, place 1 <FOOD> on each of the next 3/5/7 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B157_Salter_impl = B157_Salter.impl

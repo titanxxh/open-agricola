@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { B36_Bottles } from '../../cards-display/B/B36_Bottles'
 
-const CARD_ID = B36_Bottles.id
-
+const CARD_ID = 'B36_Bottles'
 /**
  * B36 Bottles (Minor Improvement):
  * Worth 4 VP. Dynamic cost: for each person you have, pay 1 clay + 1 food.
@@ -29,7 +28,23 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const B36_Bottles_impl = {
+const cardImpl = {
   listeners: [computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B36_Bottles = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bottles',
+    deck: 'B',
+    number: 36,
+    category: 'POINTS_PROVIDER',
+    desc: ['For each person you have, you must pay an additional 1 <CLAY> and 1 <FOOD> to play this card.'],
+    cost: {},
+    vp: 4,
+  },
+  impl: cardImpl,
+})
+
+export const B36_Bottles_impl = B36_Bottles.impl

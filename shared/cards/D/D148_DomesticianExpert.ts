@@ -1,9 +1,8 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
-import { D148_DomesticianExpert } from '../../cards-display/D/D148_DomesticianExpert'
 
-const CARD_ID = D148_DomesticianExpert.id
-
+const CARD_ID = 'D148_DomesticianExpert'
 const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): number => {
   let pairs = 0
   const tileSet = new Set(roomTiles.map(t => `${t.row}-${t.col}`))
@@ -22,7 +21,7 @@ const countHeldSheep = (player: PlayerState): number => {
   return Math.max(0, Math.floor(extra.held))
 }
 
-export const D148_DomesticianExpert_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones, _state) => {
@@ -42,3 +41,19 @@ export const D148_DomesticianExpert_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D148_DomesticianExpert = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Domestician Expert',
+    deck: 'D',
+    number: 148,
+    desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
+    cost: {},
+    players: '4+',
+    category: 'FARM_PLANNER',
+  },
+  impl: cardImpl,
+})
+
+export const D148_DomesticianExpert_impl = D148_DomesticianExpert.impl

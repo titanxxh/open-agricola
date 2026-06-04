@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C121_ClayKneader } from '../../cards-display/C/C121_ClayKneader'
 
-const CARD_ID = C121_ClayKneader.id
-
+const CARD_ID = 'C121_ClayKneader'
 const listener: CardListenerRegistration = {
   id: 'C121-clay-kneader-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,7 +16,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C121_ClayKneader_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -25,3 +24,22 @@ export const C121_ClayKneader_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C121_ClayKneader = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Clay Kneader',
+    deck: 'C',
+    number: 121,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 1 <WOOD> and 2 <CLAY>. Each time after you use __Grain Seeds__ or __Vegetable Seeds__ action space, you get 1 <CLAY>.',
+      ],
+    cost: {},
+    players: '1+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const C121_ClayKneader_impl = C121_ClayKneader.impl

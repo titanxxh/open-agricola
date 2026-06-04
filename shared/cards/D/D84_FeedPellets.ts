@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D84_FeedPellets } from '../../cards-display/D/D84_FeedPellets'
 
-const CARD_ID = D84_FeedPellets.id
-
+const CARD_ID = 'D84_FeedPellets'
 const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 
-export const D84_FeedPellets_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
@@ -37,3 +36,18 @@ export const D84_FeedPellets_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D84_FeedPellets = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Feed Pellets",
+    deck: "D",
+    number: 84,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ['When you play this card, you immediately get 1 <SHEEP>. In the feeding phase of each harvest, you can exchange exactly 1 <VEGETABLE> for 1 animal of a type you already have.'],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const D84_FeedPellets_impl = D84_FeedPellets.impl

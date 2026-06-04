@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D27_Retraining } from '../../cards-display/D/D27_Retraining'
 
-const CARD_ID = D27_Retraining.id
-
+const CARD_ID = 'D27_Retraining'
 /**
  * D27 Retraining (Minor, D, 27):
  * - At the end of each turn in which the player renovates, they may exchange
@@ -107,7 +106,28 @@ const placeFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const D27_Retraining_impl = {
+const cardImpl = {
   listeners: [renovationListener, placeFarmerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D27_Retraining = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Retraining',
+    deck: 'D',
+    number: 27,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        "At the end of each turn in which you renovate, you can exchange your __Joinery__ for the __Pottery__ or your __Pottery__ for the __Basketmaker's Workshop__.",
+      ],
+    vp: 1,
+    cost: { food: 1 },
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D27_Retraining_impl = D27_Retraining.impl

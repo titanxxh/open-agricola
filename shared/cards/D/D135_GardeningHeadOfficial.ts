@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D135_GardeningHeadOfficial } from '../../cards-display/D/D135_GardeningHeadOfficial'
 
-const CARD_ID = D135_GardeningHeadOfficial.id
-
+const CARD_ID = 'D135_GardeningHeadOfficial'
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
   if (remaining >= 9) return 4
@@ -13,7 +12,7 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   return 0
 }
 
-export const D135_GardeningHeadOfficial_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -33,3 +32,22 @@ export const D135_GardeningHeadOfficial_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D135_GardeningHeadOfficial = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Gardening Head Official",
+    deck: "D",
+    number: 135,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most vegetables in their fields gets 2 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D135_GardeningHeadOfficial_impl = D135_GardeningHeadOfficial.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
-import { D94_HenpeckedHusband } from '../../cards-display/D/D94_HenpeckedHusband'
 
-const CARD_ID = D94_HenpeckedHusband.id
-
+const CARD_ID = 'D94_HenpeckedHusband'
 const MEETING_PLACE_PREFIX = 'meeting-place'
 
 const listener: CardListenerRegistration = {
@@ -40,7 +39,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D94_HenpeckedHusband_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D94_HenpeckedHusband = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Henpecked Husband",
+    deck: "D",
+    number: 94,
+    category: "ACTIONS_BOOSTER",
+    desc: ["Each time you take a __Build Rooms__ action with the second person you place, return the first person you placed home, unless it is on the __Meeting Place__ action space."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const D94_HenpeckedHusband_impl = D94_HenpeckedHusband.impl

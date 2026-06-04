@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C112_Thresher } from '../../cards-display/C/C112_Thresher'
 
-const CARD_ID = C112_Thresher.id
-
+const CARD_ID = 'C112_Thresher'
 /**
  * C112 Thresher — Occupation
  *
@@ -61,7 +60,25 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const C112_Thresher_impl = {
+const cardImpl = {
   listeners: [beforeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C112_Thresher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Thresher',
+    deck: 'C',
+    number: 112,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Immediately before each time you use the __Grain Utilization__, __Farmland__, or __Cultivation__ action space, you can buy 1 <GRAIN> for 1 <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C112_Thresher_impl = C112_Thresher.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D39_TruffleSlicer } from '../../cards-display/D/D39_TruffleSlicer'
 
-const CARD_ID = D39_TruffleSlicer.id
-
+const CARD_ID = 'D39_TruffleSlicer'
 /**
  * D39 Truffle Slicer (Minor Improvement):
  * When player uses a wood accumulation space (forest, copse, grove),
@@ -37,7 +36,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D39_TruffleSlicer_impl = {
+const cardImpl = {
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
     return state.round >= 8
@@ -45,3 +44,20 @@ export const D39_TruffleSlicer_impl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D39_TruffleSlicer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Truffle Slicer',
+    deck: 'D',
+    number: 39,
+    category: 'POINTS_PROVIDER',
+    desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
+    cost: { wood: 1 },
+    prerequisite: 'Play in Round 8 or Later',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D39_TruffleSlicer_impl = D39_TruffleSlicer.impl

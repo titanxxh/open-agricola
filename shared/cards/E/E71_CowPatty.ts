@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../domain/farm'
@@ -119,8 +120,26 @@ const afterSowListener: CardListenerRegistration = {
   },
 }
 
-export const E71_CowPatty_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => countCattleOnBoard(player) >= 1,
   listeners: [afterSowListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E71_CowPatty = defineMinorCard({
+  meta: {
+    id: 'E71_CowPatty',
+    name: 'Cow Patty',
+    deck: 'E',
+    number: 71,
+    desc: ['Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it.'],
+    cost: {},
+    vp: 1,
+    prerequisite: '1 Cattle',
+    implemented: true,
+    category: 'CROPS_-_GRAIN_AND_VEGETABLE',
+  },
+  impl: cardImpl,
+})
+
+export const E71_CowPatty_impl = E71_CowPatty.impl

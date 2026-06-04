@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
-import { B130_FullPeasant } from '../../cards-display/B/B130_FullPeasant'
 
-const CARD_ID = B130_FullPeasant.id
-
+const CARD_ID = 'B130_FullPeasant'
 const TRIGGER_PAIRS: Record<string, string> = {
   'grain-utilization': 'fencing',
   fencing: 'grain-utilization',
@@ -53,7 +52,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B130_FullPeasant_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B130_FullPeasant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Full Peasant',
+    deck: 'B',
+    number: 130,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time after you use the __Grain Utilization__ or __Fencing__ action space while the other is unoccupied, you can pay 1 <FOOD> to use the other space with the same person.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B130_FullPeasant_impl = B130_FullPeasant.impl

@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardListenerRegistration } from '../card-listeners'
 import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D131_CraftsmanshipPromoter } from '../../cards-display/D/D131_CraftsmanshipPromoter'
 
-const CARD_ID = D131_CraftsmanshipPromoter.id
-
+const CARD_ID = 'D131_CraftsmanshipPromoter'
 /**
  * BGA bottom-row major candidates injected by D131 into the
  * Minor Improvement action. Source: bga-agricola
@@ -43,7 +42,7 @@ const choiceCandidateListener: CardListenerRegistration = {
   },
 }
 
-export const D131_CraftsmanshipPromoter_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { stone: 1 }),
@@ -51,3 +50,19 @@ export const D131_CraftsmanshipPromoter_impl = {
   listeners: [choiceCandidateListener],
   reaches: [...D131_BOTTOM_ROW_MAJORS] as readonly string[],
 } satisfies CardImpl
+
+export const D131_CraftsmanshipPromoter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Craftsmanship Promoter',
+    deck: 'D',
+    number: 131,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['When you play this card, you immediately get 1 <STONE>. You can build any of the major improvements in the bottom row of the supply board even when taking a __Minor Improvement__ action.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D131_CraftsmanshipPromoter_impl = D131_CraftsmanshipPromoter.impl

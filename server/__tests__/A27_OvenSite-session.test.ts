@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { A27_OvenSite } from '../../shared/cards-display/A/A27_OvenSite'
-import { minorImprovements } from '../../shared/cards-display/_lookup'
+import { A27_OvenSite } from '../../shared/cards/A/A27_OvenSite'
+import { minorImprovements } from '../../shared/cards/_lookup'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'A27_OvenSite'

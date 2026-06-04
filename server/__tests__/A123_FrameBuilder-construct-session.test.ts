@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { getMaxBuildableRooms } from '../../shared/actions/payment/internal/room-payment'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
 import type { PlayerState } from '../../shared/contract/types'

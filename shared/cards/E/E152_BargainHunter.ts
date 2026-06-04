@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E152_BargainHunter } from '../../cards-display/E/E152_BargainHunter'
 
-const CARD_ID = E152_BargainHunter.id
+const CARD_ID = 'E152_BargainHunter'
 
-export const E152_BargainHunter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -27,3 +27,19 @@ export const E152_BargainHunter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E152_BargainHunter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bargain Hunter',
+    deck: 'E',
+    number: 152,
+    category: 'ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS',
+    desc: ['At the start of each round, you can place 1 <FOOD> from your supply on the __Traveling Players__ accumulation space to play a minor improvement by paying its cost.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const E152_BargainHunter_impl = E152_BargainHunter.impl

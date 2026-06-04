@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D61_BaleofStraw } from '../../cards-display/D/D61_BaleofStraw'
 
-const CARD_ID = D61_BaleofStraw.id
+const CARD_ID = 'D61_BaleofStraw'
 
-export const D61_BaleofStraw_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
@@ -21,3 +21,18 @@ export const D61_BaleofStraw_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D61_BaleofStraw = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Bale of Straw",
+    deck: "D",
+    number: 61,
+    category: "FOOD_PROVIDER",
+    desc: ["At the start of each harvest, if you have at least 3 grain fields (including field cards with planted grain), you get 2 <FOOD>."],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const D61_BaleofStraw_impl = D61_BaleofStraw.impl

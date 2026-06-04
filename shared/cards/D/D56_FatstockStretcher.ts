@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D56_FatstockStretcher } from '../../cards-display/D/D56_FatstockStretcher'
 
-const CARD_ID = D56_FatstockStretcher.id
-
+const CARD_ID = 'D56_FatstockStretcher'
 const beforeExchangeListener: CardListenerRegistration = {
   id: 'D56-fatstock-stretcher-before-exchange',
   cardIds: [CARD_ID],
@@ -55,7 +54,22 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-export const D56_FatstockStretcher_impl = {
+const cardImpl = {
   listeners: [beforeExchangeListener, afterExchangeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D56_FatstockStretcher = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Fatstock Stretcher',
+    deck: 'D',
+    number: 56,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you turn a <SHEEP> or <PIG> into <FOOD> using a cooking improvement, you get 1 additional <FOOD>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D56_FatstockStretcher_impl = D56_FatstockStretcher.impl

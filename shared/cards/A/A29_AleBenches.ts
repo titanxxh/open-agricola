@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A29_AleBenches } from '../../cards-display/A/A29_AleBenches'
 
-const CARD_ID = A29_AleBenches.id
+const CARD_ID = 'A29_AleBenches'
 
-export const A29_AleBenches_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onReturnHome: (_state, player) => {
@@ -22,3 +22,21 @@ export const A29_AleBenches_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A29_AleBenches = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Ale-Benches",
+    deck: "A",
+    number: 29,
+    category: "POINTS_PROVIDER",
+    desc: ["In the returning home phase of each round, you can pay exactly 1 <GRAIN> from your supply to get 1 bonus <SCORE>. If you do, each other player gets 1 <FOOD>."],
+    cost: {"wood":1},
+    prerequisite: "2 Occupations",
+    occupationPrerequisites: {"min":2},
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A29_AleBenches_impl = A29_AleBenches.impl

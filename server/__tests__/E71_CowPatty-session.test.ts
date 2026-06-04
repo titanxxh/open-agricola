@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
-import { E71_CowPatty } from '../../shared/cards-display/E/E71_CowPatty'
+import { E71_CowPatty } from '../../shared/cards/E/E71_CowPatty'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'E71_CowPatty'

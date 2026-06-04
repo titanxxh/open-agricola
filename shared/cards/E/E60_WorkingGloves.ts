@@ -38,3 +38,5 @@ export const E60_WorkingGloves = defineMinorCard({
     reaches: [] as readonly string[],
   },
 })
+
+export const E60_WorkingGloves_impl = E60_WorkingGloves.impl

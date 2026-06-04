@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -5,10 +6,8 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { D53_TeaHouse } from '../../cards-display/D/D53_TeaHouse'
 
-const CARD_ID = D53_TeaHouse.id
-
+const CARD_ID = 'D53_TeaHouse'
 const anytimeListener: CardListenerRegistration = {
   id: 'D53-tea-house-anytime',
   cardIds: [CARD_ID],
@@ -34,7 +33,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const D53_TeaHouse_impl = {
+const cardImpl = {
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
     return state.round >= 6
@@ -48,3 +47,20 @@ export const D53_TeaHouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D53_TeaHouse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tea House',
+    deck: 'D',
+    number: 53,
+    category: 'FOOD_PROVIDER',
+    desc: ['Once per round, you can skip placing your second person and get 1 <FOOD> instead. (You can place the person later that round.)'],
+    cost: { wood: 1, stone: 1 },
+    vp: 2,
+    prerequisite: 'Play in Round 6 or Later',
+  },
+  impl: cardImpl,
+})
+
+export const D53_TeaHouse_impl = D53_TeaHouse.impl

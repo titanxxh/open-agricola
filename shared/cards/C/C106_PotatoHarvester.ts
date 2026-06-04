@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C106_PotatoHarvester } from '../../cards-display/C/C106_PotatoHarvester'
 
-const CARD_ID = C106_PotatoHarvester.id
+const CARD_ID = 'C106_PotatoHarvester'
 
-export const C106_PotatoHarvester_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { food: 3 }),
@@ -20,3 +20,22 @@ export const C106_PotatoHarvester_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C106_PotatoHarvester = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Potato Harvester',
+    deck: 'C',
+    number: 106,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 3 <FOOD>. For each <VEGETABLE> you get from your fields during the field phase of the harvest, you get 1 additional <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const C106_PotatoHarvester_impl = C106_PotatoHarvester.impl

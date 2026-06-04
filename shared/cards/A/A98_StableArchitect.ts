@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A98_StableArchitect } from '../../cards-display/A/A98_StableArchitect'
 
-const CARD_ID = A98_StableArchitect.id
+const CARD_ID = 'A98_StableArchitect'
 
-export const A98_StableArchitect_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -15,3 +15,20 @@ export const A98_StableArchitect_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A98_StableArchitect = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stable Architect",
+    deck: "A",
+    number: 98,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each unfenced stable in your farmyard."],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A98_StableArchitect_impl = A98_StableArchitect.impl

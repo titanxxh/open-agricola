@@ -1,7 +1,29 @@
+import { defineMinorCard } from '../card-source'
 import { makeCardFieldImpl } from '../helpers/card-field'
-import { B68_Beanfield } from '../../cards-display/B/B68_Beanfield'
 
-export const B68_Beanfield_impl = makeCardFieldImpl(B68_Beanfield.id, {
+const CARD_ID = 'B68_Beanfield'
+
+const cardImpl = makeCardFieldImpl(CARD_ID, {
   allowedCrops: ['vegetable'],
   capacity: 1,
 })
+
+export const B68_Beanfield = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Beanfield',
+    deck: 'B',
+    number: 68,
+    category: 'CROP_PROVIDER',
+    desc: ['This card is a field that can only grow vegetables.'],
+    cost: { food: 1 },
+    vp: 1,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    isField: true,
+    cardField: { allowedCrops: ['vegetable'], capacity: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B68_Beanfield_impl = B68_Beanfield.impl

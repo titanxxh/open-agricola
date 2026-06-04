@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import { buildRenovationPlan, canRenovate } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
-import { A87_Conservator } from '../../cards-display/A/A87_Conservator'
 
-const CARD_ID = A87_Conservator.id
-
+const CARD_ID = 'A87_Conservator'
 /**
  * A87 Conservator — Occupation.
  *
@@ -62,7 +61,25 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const A87_Conservator_impl = {
+const cardImpl = {
   listeners: [choiceCandidateListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A87_Conservator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Conservator',
+    deck: 'A',
+    number: 87,
+    category: 'FARM_PLANNER',
+    desc: [
+        'When you renovate your home, you can renovate from wood directly into stone.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A87_Conservator_impl = A87_Conservator.impl

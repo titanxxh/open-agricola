@@ -1,14 +1,13 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A19_Handplow } from '../../cards-display/A/A19_Handplow'
 
-const CARD_ID = A19_Handplow.id
-
+const CARD_ID = 'A19_Handplow'
 const TARGET_ROUND_KEY = 'targetRound'
 
-export const A19_Handplow_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -35,3 +34,18 @@ export const A19_Handplow_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A19_Handplow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Handplow',
+    deck: 'A',
+    number: 19,
+    category: 'FARM_PLANNER',
+    desc: ['Add 5 to the current round and place 1 field tile on the corresponding round space. At the start of that round, you can plow the field.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A19_Handplow_impl = A19_Handplow.impl

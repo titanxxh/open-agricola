@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A95_Angler } from '../../cards-display/A/A95_Angler'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
-const CARD_ID = A95_Angler.id
+const CARD_ID = 'A95_Angler'
 
 const listener: CardListenerRegistration = {
   id: 'A95-angler-after-collect',
@@ -36,7 +36,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A95_Angler_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A95_Angler = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Angler',
+    deck: 'A',
+    number: 95,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time after you use the __Fishing__ Accumulation space while there are at most 2 <FOOD> on that space, you get a __Major or Minor Improvement__ action.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A95_Angler_impl = A95_Angler.impl

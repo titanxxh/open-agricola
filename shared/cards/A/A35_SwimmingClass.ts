@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { spaceHasPlayer } from '../../domain/space'
 import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { A35_SwimmingClass } from '../../cards-display/A/A35_SwimmingClass'
 
-const CARD_ID = A35_SwimmingClass.id
+const CARD_ID = 'A35_SwimmingClass'
 
-export const A35_SwimmingClass_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
@@ -24,3 +24,21 @@ export const A35_SwimmingClass_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A35_SwimmingClass = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Swimming Class',
+    deck: 'A',
+    number: 35,
+    category: 'POINTS_PROVIDER',
+    desc: ['In the returning home phase of each round, if you return a person from the __Fishing__ accumulation space, you get 2 bonus <SCORE> for each newborn that you return home.'],
+    cost: { food: 1 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A35_SwimmingClass_impl = A35_SwimmingClass.impl

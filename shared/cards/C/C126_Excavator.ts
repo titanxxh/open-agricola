@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C126_Excavator } from '../../cards-display/C/C126_Excavator'
 
-const CARD_ID = C126_Excavator.id
-
+const CARD_ID = 'C126_Excavator'
 const listener: CardListenerRegistration = {
   id: 'C126-excavator-after-place-farmer',
   cardIds: [CARD_ID],
@@ -39,7 +38,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C126_Excavator_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C126_Excavator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Excavator',
+    deck: 'C',
+    number: 126,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time after you use the __Day Laborer__ action space, you get 1 additional <WOOD> and <CLAY>, and you can buy 1 <STONE> for 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C126_Excavator_impl = C126_Excavator.impl

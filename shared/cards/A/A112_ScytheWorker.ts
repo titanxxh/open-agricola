@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
 import { positionKey } from '../../domain/farm'
@@ -8,10 +9,8 @@ import {
 } from '../../actions/helpers/harvest-count-registry'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A112_ScytheWorker } from '../../cards-display/A/A112_ScytheWorker'
 
-const CARD_ID = A112_ScytheWorker.id
-
+const CARD_ID = 'A112_ScytheWorker'
 registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
   if (!selected.includes(positionKey(field))) return
@@ -31,7 +30,7 @@ const eligibleFields = (state: GameState, player: PlayerState) => {
   })
 }
 
-export const A112_ScytheWorker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => {
@@ -61,3 +60,19 @@ export const A112_ScytheWorker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A112_ScytheWorker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Scythe Worker",
+    deck: "A",
+    number: 112,
+    category: "CROP_PROVIDER",
+    desc: ["When you play this card, you immediately get 1 <GRAIN>. In the field phase of each harvest, you can harvest 1 additional <GRAIN> from each of your grain fields."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const A112_ScytheWorker_impl = A112_ScytheWorker.impl

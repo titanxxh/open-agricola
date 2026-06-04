@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C73_SeaweedFertilizer } from '../../cards-display/C/C73_SeaweedFertilizer'
 
-const CARD_ID = C73_SeaweedFertilizer.id
-
+const CARD_ID = 'C73_SeaweedFertilizer'
 const isUnconditionalSow = (context: CardListenerContext): boolean => {
   const actionContext = context.actionContext ?? {}
   if (actionContext.checkedReplaceAction === true) return false
@@ -36,7 +35,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C73_SeaweedFertilizer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C73_SeaweedFertilizer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Seaweed Fertilizer',
+    deck: 'C',
+    number: 73,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time after you take an unconditional __Sow__ action, you get 1 <GRAIN> from the general supply. From round 11 on, you can get 1 <VEGETABLE> instead.',
+      ],
+    cost: { food: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const C73_SeaweedFertilizer_impl = C73_SeaweedFertilizer.impl

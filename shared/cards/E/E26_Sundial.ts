@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E26_Sundial } from '../../cards-display/E/E26_Sundial'
 
-const CARD_ID = E26_Sundial.id
-
+const CARD_ID = 'E26_Sundial'
 const TRIGGER_ROUNDS = new Set([7, 9])
 
-export const E26_Sundial_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
@@ -22,3 +21,18 @@ export const E26_Sundial_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E26_Sundial = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sundial',
+    deck: 'E',
+    number: 26,
+    category: 'ACTION',
+    desc: ['At the end of the work phases of rounds 7 and 9, you can take a __Sow__ action without placing a person.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E26_Sundial_impl = E26_Sundial.impl

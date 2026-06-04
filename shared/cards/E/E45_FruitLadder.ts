@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E45_FruitLadder } from '../../cards-display/E/E45_FruitLadder'
 
-const CARD_ID = E45_FruitLadder.id
+const CARD_ID = 'E45_FruitLadder'
 
-export const E45_FruitLadder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -21,3 +21,19 @@ export const E45_FruitLadder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E45_FruitLadder = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Fruit Ladder',
+    deck: 'E',
+    number: 45,
+    category: 'FOOD',
+    desc: ['Place 1 <FOOD> on each remaining even-numbered round space. At the start of these rounds, you get the <FOOD>.'],
+    vp: 1,
+    cost: { wood: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const E45_FruitLadder_impl = E45_FruitLadder.impl

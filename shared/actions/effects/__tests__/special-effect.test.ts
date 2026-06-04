@@ -8,7 +8,7 @@ import {
 } from '../../../cards/helpers/card-state'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import { hasPendingExtraTurn } from '../../../cards/card-effects'
-import { A92_AdoptiveParents } from '../../../cards-display/A/A92_AdoptiveParents'
+import { A92_AdoptiveParents } from '../../../cards/A/A92_AdoptiveParents'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../../domain/player'
 import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'

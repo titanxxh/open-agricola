@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Bonus } from '../../contract/types'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E123_ResourceHoarder } from '../../cards-display/E/E123_ResourceHoarder'
 
-const CARD_ID = E123_ResourceHoarder.id
-
+const CARD_ID = 'E123_ResourceHoarder'
 /**
  * E123 Resource Hoarder (Occupation, E, 123)
  * On purchase: pile resources on card from bottom to top:
@@ -109,7 +108,7 @@ const afterPayListener: CardListenerRegistration = {
   },
 }
 
-export const E123_ResourceHoarder_impl = {
+const cardImpl = {
   listeners: [computeCostsListener, afterPayListener],
   effect: {
   id: CARD_ID,
@@ -123,3 +122,19 @@ export const E123_ResourceHoarder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E123_ResourceHoarder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Resource Hoarder',
+    deck: 'E',
+    number: 123,
+    desc: ['Pile resources as depicted on this card. You can use the top item(s) when building a room, playing/building an improvement, or renovating. (From bottom to top: <STONE>, <CLAY>, <STONE>, <REED>, <WOOD>, <CLAY>)'],
+    cost: {},
+    players: '1+',
+    category: 'BUILDING_RESOURCES_-_CLAY_AND/OR_STONE',
+  },
+  impl: cardImpl,
+})
+
+export const E123_ResourceHoarder_impl = E123_ResourceHoarder.impl

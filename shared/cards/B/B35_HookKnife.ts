@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { B35_HookKnife } from '../../cards-display/B/B35_HookKnife'
 
-const CARD_ID = B35_HookKnife.id
-
+const CARD_ID = 'B35_HookKnife'
 const SHEEP_THRESHOLDS = [9, 8, 7, 6, 5, 5]
 
 const anytimeListener: CardListenerRegistration = {
@@ -31,7 +30,23 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const B35_HookKnife_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B35_HookKnife = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hook Knife',
+    deck: 'B',
+    number: 35,
+    category: 'POINTS_PROVIDER',
+    desc: ['Once this game, when you have 9/8/7/6/5/5 <SHEEP> on your farm in a 1-/2-/3-/4-/5-/6- player game, you immediately get 2 bonus <SCORE>.'],
+    cost: { wood: 1 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B35_HookKnife_impl = B35_HookKnife.impl

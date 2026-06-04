@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A131_CraftTeacher } from '../../cards-display/A/A131_CraftTeacher'
 
-const CARD_ID = A131_CraftTeacher.id
-
+const CARD_ID = 'A131_CraftTeacher'
 const TRIGGER_MAJORS = new Set(['Major_Joinery', 'Major_Pottery', 'Major_Basket'])
 
 const getBuiltCardId = (choice: string | undefined): string | undefined => {
@@ -56,7 +55,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A131_CraftTeacher_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A131_CraftTeacher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Craft Teacher',
+    deck: 'A',
+    number: 131,
+    category: 'ACTIONS_BOOSTER',
+    desc: ["Each time after you build the major improvement __Joinery__, __Pottery__, and __Basketmaker's Workshop__, you can play up to 2 occupations without paying an occupation cost."],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const A131_CraftTeacher_impl = A131_CraftTeacher.impl

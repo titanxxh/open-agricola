@@ -490,33 +490,73 @@ export function extractCardImplSource(source: string): string {
   return printStatements(sf, stmts)
 }
 
-export function generateDisplayFile(
-  wcard: WorkshopCardForGen & { card_json?: string },
-  ctx: { githubLogin: string; iso: string },
-): string {
-  const classImport =
-    wcard.card_type === 'occupation'
-      ? `import { Occupation } from '../types'`
-      : `import { MinorImprovement } from '../types'`
-
-  const locales = readLocalesFromCardJson(wcard.card_json)
-  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
-  const cardDefSource = extractCardDefSource(normalised)
-
-  return `// Generated from Open Agricola workshop. Do not hand-edit.
-// Workshop card: ${wcard.card_id}
-// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
-// Submitted: ${ctx.iso}
-
-${classImport}
-
-${cardDefSource}
-
-export const ${wcard.card_id} = CARD_DEF
-`
+function expressionToSource(sf: ts.SourceFile, expr: ts.Expression): string {
+  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+  return printer
+    .printNode(ts.EmitHint.Expression, expr, sf)
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
 }
 
-export function generateImplFile(
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  if (
+    ts.isParenthesizedExpression(expr) ||
+    ts.isAsExpression(expr) ||
+    ts.isTypeAssertionExpression(expr) ||
+    ts.isSatisfiesExpression(expr)
+  ) {
+    return unwrapExpression(expr.expression)
+  }
+  return expr
+}
+
+export function extractCardMetaSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardDef = findTopLevelConst(sf, 'CARD_DEF')
+  if (!cardDef) {
+    throw new Error('CARD_DEF top-level const not found in workshop code')
+  }
+  const decl = cardDef.declarationList.declarations[0]
+  if (!decl?.initializer) {
+    throw new Error('CARD_DEF initializer not found in workshop code')
+  }
+  const initializer = unwrapExpression(decl.initializer)
+  if (ts.isNewExpression(initializer)) {
+    const arg = initializer.arguments?.[0]
+    if (arg && ts.isObjectLiteralExpression(arg)) return expressionToSource(sf, arg)
+  }
+  if (ts.isObjectLiteralExpression(initializer)) {
+    const metaProp = initializer.properties.find(
+      (prop): prop is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(prop) && propertyNameMatches(prop.name, 'meta'),
+    )
+    if (metaProp) {
+      const meta = unwrapExpression(metaProp.initializer)
+      if (ts.isObjectLiteralExpression(meta)) return expressionToSource(sf, meta)
+    }
+    return expressionToSource(sf, initializer)
+  }
+  throw new Error('CARD_DEF must be an object literal')
+}
+
+function cardSourceImport(cardType: string): string {
+  return cardType === 'occupation'
+    ? `import { defineOccupationCard } from '../card-source'`
+    : `import { defineMinorCard } from '../card-source'`
+}
+
+function cardSourceFactory(cardType: string): string {
+  return cardType === 'occupation' ? 'defineOccupationCard' : 'defineMinorCard'
+}
+
+export function generateCardSourceFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
 ): string {
@@ -529,23 +569,37 @@ export function generateImplFile(
 
   const locales = readLocalesFromCardJson(wcard.card_json)
   const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const cardMetaSource = extractCardMetaSource(normalised)
   const cardImplSource = extractCardImplSource(normalised)
+  const cardImplWithId = cardImplSource.includes('const CARD_ID')
+    ? cardImplSource
+    : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
+  const factory = cardSourceFactory(wcard.card_type)
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
 // Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
 // Submitted: ${ctx.iso}
 
+${cardSourceImport(wcard.card_type)}
 import type { CardImpl } from '../registry'
-import { ${wcard.card_id} } from '../../cards-display/community/${wcard.card_id}'
-export { ${wcard.card_id} }
 ${helperImports ? '\n' + helperImports : ''}
 
-${cardImplSource}
+${cardImplWithId}
 
-export const ${wcard.card_id}_impl = CARD_IMPL satisfies CardImpl
+const cardImpl = CARD_IMPL satisfies CardImpl
+
+export const ${wcard.card_id} = ${factory}({
+  meta: ${cardMetaSource},
+  impl: cardImpl,
+})
+
+export const ${wcard.card_id}_impl = ${wcard.card_id}.impl
 `
 }
+
+export const generateDisplayFile = generateCardSourceFile
+export const generateImplFile = generateCardSourceFile
 
 // ---------------------------------------------------------------------------
 // C-14: Smoke test generator
@@ -591,13 +645,13 @@ export function patchRegisterAll(
   args: { card_id: string },
 ): string {
   const id = args.card_id
-  const newImport = `import { ${id}_impl } from './community/${id}'`
-  const newEntry = `  '${id}': ${id}_impl,`
+  const newImport = `import { ${id} } from './community/${id}'`
+  const newEntry = `  '${id}': ${id}.impl,`
 
   if (source.includes(newImport)) return source
 
   // === Insert import ===
-  const customImportRe = /^(import \{ (CUSTOM_\w+)_impl[^\n]*)\n/gm
+  const customImportRe = /^(import \{ (CUSTOM_\w+) \} from '\.\/community\/CUSTOM_\w+')\n/gm
   const customImports: Array<{
     full: string
     id: string
@@ -723,61 +777,6 @@ export function patchCommunityCardsMarkdown(
   return source.slice(0, idx) + row + '\n' + source.slice(idx)
 }
 
-export function patchCommunityAutoCatalog(
-  source: string,
-  args: { card_id: string },
-): string {
-  const id = args.card_id
-  const newImport = `import { ${id} } from '../../cards-display/community/${id}'`
-  const newEntry = `  ${id},`
-  if (source.includes(newImport)) return source
-
-  const customImportRe =
-    /^(import \{ (CUSTOM_\w+) \} from '\.\.\/\.\.\/cards-display\/community\/CUSTOM_\w+')\n/gm
-  const customImports: Array<{ id: string; start: number; end: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = customImportRe.exec(source)) !== null) {
-    customImports.push({ id: m[2]!, start: m.index, end: m.index + m[0]!.length })
-  }
-
-  let withImport: string
-  if (customImports.length === 0) {
-    const anchor = '\nexport const allCommunityCards'
-    const idx = source.indexOf(anchor)
-    if (idx === -1) throw new Error('auto-catalog.ts structure not recognized')
-    withImport = source.slice(0, idx) + '\n' + newImport + '\n' + source.slice(idx)
-  } else {
-    const before = customImports.find((existing) => existing.id.localeCompare(id) > 0)
-    if (before) {
-      withImport = source.slice(0, before.start) + newImport + '\n' + source.slice(before.start)
-    } else {
-      const last = customImports[customImports.length - 1]!
-      withImport = source.slice(0, last.end) + newImport + '\n' + source.slice(last.end)
-    }
-  }
-
-  const customEntryRe = /^ {2}(CUSTOM_\w+),\n/gm
-  const customEntries: Array<{ id: string; start: number; end: number }> = []
-  let em: RegExpExecArray | null
-  while ((em = customEntryRe.exec(withImport)) !== null) {
-    customEntries.push({ id: em[1]!, start: em.index, end: em.index + em[0]!.length })
-  }
-
-  if (customEntries.length === 0) {
-    const anchor = '\n]'
-    const idx = withImport.indexOf(anchor)
-    if (idx === -1) throw new Error('auto-catalog.ts structure not recognized')
-    return withImport.slice(0, idx) + '\n' + newEntry + withImport.slice(idx)
-  }
-
-  const before = customEntries.find((existing) => existing.id.localeCompare(id) > 0)
-  if (before) {
-    return withImport.slice(0, before.start) + newEntry + '\n' + withImport.slice(before.start)
-  }
-  const last = customEntries[customEntries.length - 1]!
-  return withImport.slice(0, last.end) + newEntry + '\n' + withImport.slice(last.end)
-}
-
 // ---------------------------------------------------------------------------
 // C-17: generatePrFiles main entry
 // ---------------------------------------------------------------------------
@@ -792,7 +791,6 @@ export type GenArgs = {
   wcard: WorkshopCardForGen & { card_json?: string; art_url?: string | null }
   github_login: string
   upstream_register_all: string
-  upstream_auto_catalog: string
   upstream_community_md: string
   pr_number: number
   art_data?: { ext: string; buffer: Buffer } | null
@@ -803,26 +801,18 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     wcard,
     github_login,
     upstream_register_all,
-    upstream_auto_catalog,
     upstream_community_md,
     pr_number,
     art_data,
   } = args
   const iso = new Date().toISOString()
 
-  const displayContent = generateDisplayFile(wcard, {
-    githubLogin: github_login,
-    iso,
-  })
-  const implContent = generateImplFile(wcard, {
+  const cardContent = generateCardSourceFile(wcard, {
     githubLogin: github_login,
     iso,
   })
   const testContent = generateSmokeTest({ card_id: wcard.card_id })
   const newRegisterAll = patchRegisterAll(upstream_register_all, {
-    card_id: wcard.card_id,
-  })
-  const newAutoCatalog = patchCommunityAutoCatalog(upstream_auto_catalog, {
     card_id: wcard.card_id,
   })
 
@@ -846,13 +836,8 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
 
   const files: PrFile[] = [
     {
-      path: `shared/cards-display/community/${wcard.card_id}.ts`,
-      content: displayContent,
-      encoding: 'utf-8',
-    },
-    {
       path: `shared/cards/community/${wcard.card_id}.ts`,
-      content: implContent,
+      content: cardContent,
       encoding: 'utf-8',
     },
     {
@@ -863,11 +848,6 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     {
       path: 'shared/cards/register-all.ts',
       content: newRegisterAll,
-      encoding: 'utf-8',
-    },
-    {
-      path: 'shared/cards/community/auto-catalog.ts',
-      content: newAutoCatalog,
       encoding: 'utf-8',
     },
     {

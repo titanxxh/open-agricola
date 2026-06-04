@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C48_Farmstead } from '../../cards-display/C/C48_Farmstead'
 
-const CARD_ID = C48_Farmstead.id
-
+const CARD_ID = 'C48_Farmstead'
 const countUsedTiles = (player: PlayerState): number => {
   const used = new Set<string>()
   for (const tile of player.roomTiles) used.add(`${tile.row},${tile.col}`)
@@ -78,7 +77,26 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-export const C48_Farmstead_impl = {
+const cardImpl = {
   listeners: [beforeListener, afterListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C48_Farmstead = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Farmstead',
+    deck: 'C',
+    number: 48,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'After each turn in which you make at least one unused farmyard space used, you get 1 <FOOD>.',
+      ],
+    cost: {},
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C48_Farmstead_impl = C48_Farmstead.impl

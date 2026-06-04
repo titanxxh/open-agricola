@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C164_GermanHeathKeeper } from '../../cards-display/C/C164_GermanHeathKeeper'
 
-const CARD_ID = C164_GermanHeathKeeper.id
-
+const CARD_ID = 'C164_GermanHeathKeeper'
 const listener: CardListenerRegistration = {
   id: 'C164-german-heath-keeper-any-pig-market',
   cardIds: [CARD_ID],
@@ -18,7 +17,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C164_GermanHeathKeeper_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C164_GermanHeathKeeper = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'German Heath Keeper',
+    deck: 'C',
+    number: 164,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: [
+        'Each time any player (including you) uses the __Pig Market__ accumulation space, you get 1 <SHEEP> from the general supply.',
+      ],
+    cost: {},
+    players: '4+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const C164_GermanHeathKeeper_impl = C164_GermanHeathKeeper.impl

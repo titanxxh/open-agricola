@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { C145_ForestReviewer } from '../../cards-display/C/C145_ForestReviewer'
 
-const CARD_ID = C145_ForestReviewer.id
-
+const CARD_ID = 'C145_ForestReviewer'
 /**
  * C145 Forest Reviewer:
  * When any player uses an unoccupied Grove or Forest while the other
@@ -36,7 +35,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C145_ForestReviewer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C145_ForestReviewer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forest Reviewer',
+    deck: 'C',
+    number: 145,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time after any player (including you) uses the unoccupied __Grove__ or __Forest__ accumulation space while the other of the two is occupied, you get 1 <REED>.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const C145_ForestReviewer_impl = C145_ForestReviewer.impl

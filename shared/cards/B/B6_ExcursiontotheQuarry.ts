@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { B6_ExcursiontotheQuarry } from '../../cards-display/B/B6_ExcursiontotheQuarry'
 
-const CARD_ID = B6_ExcursiontotheQuarry.id
+const CARD_ID = 'B6_ExcursiontotheQuarry'
 
-export const B6_ExcursiontotheQuarry_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -16,3 +16,21 @@ export const B6_ExcursiontotheQuarry_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B6_ExcursiontotheQuarry = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Excursion to the Quarry",
+    deck: "B",
+    number: 6,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["You immediately get a number of <STONE> equal to the number of people you have."],
+    cost: { food: 2 },
+    passing: true,
+    prerequisite: "1 Occupation",
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B6_ExcursiontotheQuarry_impl = B6_ExcursiontotheQuarry.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { E131_MarketMaster } from '../../cards-display/E/E131_MarketMaster'
 
-const CARD_ID = E131_MarketMaster.id
-
+const CARD_ID = 'E131_MarketMaster'
 const listener: CardListenerRegistration = {
   id: 'E131-market-master-after-place-farmer',
   cardIds: [CARD_ID],
@@ -28,7 +27,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E131_MarketMaster_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E131_MarketMaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Market Master',
+    deck: 'E',
+    number: 131,
+    category: 'ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS',
+    desc: ['Immediately after each time you place your last person in a round on the __Traveling Players__ accumulation space, you can play 1 occupation for an occupation cost of 1 <FOOD>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const E131_MarketMaster_impl = E131_MarketMaster.impl

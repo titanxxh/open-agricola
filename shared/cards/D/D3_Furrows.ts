@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D3_Furrows } from '../../cards-display/D/D3_Furrows'
 
-const CARD_ID = D3_Furrows.id
+const CARD_ID = 'D3_Furrows'
 
-export const D3_Furrows_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => ({
@@ -16,3 +16,19 @@ export const D3_Furrows_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D3_Furrows = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Furrows',
+    deck: 'D',
+    number: 3,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['You can immediately sow in exactly 1 field.'],
+    cost: {},
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const D3_Furrows_impl = D3_Furrows.impl

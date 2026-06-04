@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C55_Studio } from '../../cards-display/C/C55_Studio'
 
-const CARD_ID = C55_Studio.id
+const CARD_ID = 'C55_Studio'
 
-export const C55_Studio_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, _player) => {
@@ -42,3 +42,20 @@ export const C55_Studio_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C55_Studio = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Studio",
+    deck: "C",
+    number: 55,
+    category: "FOOD_PROVIDER",
+    desc: ["In the feeding phase of each harvest, you can use this card to turn exactly 1 <WOOD>/<CLAY>/<STONE> into 2/2/3 <FOOD>."],
+    vp: 1,
+    cost: { clay: 1, reed: 1 },
+    waresSalesmanGains: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { stone: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const C55_Studio_impl = C55_Studio.impl

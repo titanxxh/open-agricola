@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A28_ForestSchool as A28Card } from '../../shared/cards-display/A/A28_ForestSchool'
+import { A28_ForestSchool as A28Card } from '../../shared/cards/A/A28_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/A/A28_ForestSchool'
-import '../../shared/cards-display/A/A123_FrameBuilder'
+import '../../shared/cards/A/A123_FrameBuilder'
 
 const setup = (withForestSchool: boolean, options?: { playerCount?: number; spaceId?: string }) => {
   const playerCount = options?.playerCount ?? 2
@@ -26,7 +26,7 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
 
   if (withForestSchool) {
     player.minorPlayed.push('A28_ForestSchool')
-    player.activeModifiers.push({ ...((A28Card as any).modifier ?? {}) })
+    player.activeModifiers.push({ ...(A28Card.impl.modifiers![0] ?? {}) })
   }
 
   const lessons = state.actionSpaces.find((space) => space.id === spaceId)

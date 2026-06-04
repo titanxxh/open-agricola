@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
@@ -5,10 +6,8 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { D112_YoungFarmer } from '../../cards-display/D/D112_YoungFarmer'
 
-const CARD_ID = D112_YoungFarmer.id
-
+const CARD_ID = 'D112_YoungFarmer'
 const duringListener: CardListenerRegistration = {
   id: 'D112-young-farmer-during-place-farmer',
   cardIds: [CARD_ID],
@@ -61,7 +60,25 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const D112_YoungFarmer_impl = {
+const cardImpl = {
   listeners: [duringListener, afterListener, computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D112_YoungFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Young Farmer',
+    deck: 'D',
+    number: 112,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time you use the __Major Improvement__ action space, you also get 1 <GRAIN> and, afterward, you can take a __Sow__ action.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D112_YoungFarmer_impl = D112_YoungFarmer.impl
