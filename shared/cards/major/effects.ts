@@ -1,5 +1,4 @@
 import type { MajorHooks } from './types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
 const scoreByResourceTiers = (
@@ -23,17 +22,6 @@ const scoreByResourceTiers = (
  * deliberately do not appear here; the composition spreads `{}` for them.
  */
 export const majorEffects: Record<string, MajorHooks> = {
-  Major_Well: {
-    onBuy: (state, player) => {
-      return queueFutureMeeplesFlow(state, {
-        cardId: 'Major_Well',
-        playerId: player.id,
-        startRound: state.round + 1,
-        count: 5,
-        resources: { food: 1 },
-      })
-    },
-  },
   Major_Joinery: {
     onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: 'Major_Joinery' }),
     computeBonusScore: (_state, player) =>
