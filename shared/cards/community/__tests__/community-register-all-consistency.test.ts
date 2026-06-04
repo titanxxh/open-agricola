@@ -8,6 +8,7 @@ describe('register-all.ts is in sync with generator', () => {
       'shared/cards/register-all.ts',
       'shared/cards/catalog.generated.ts',
       'shared/cards/major/generated.ts',
+      'shared/cards/major/runtime.generated.ts',
     ]
     const before = new Map(
       generatedFiles.map((file) => [file, readFileSync(file, 'utf8')]),

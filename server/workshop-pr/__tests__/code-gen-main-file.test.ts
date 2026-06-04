@@ -5,7 +5,7 @@ describe('generatePrFiles — output file list', () => {
   const upstreamRegisterAll = `// generated\nimport { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'\n\nexport const ALL_CARD_IMPLS = {\n  'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,\n}\n\nexport type AllCardImpls = typeof ALL_CARD_IMPLS\n`
   const upstreamCommunityMd = `# Community Cards\n\n<!-- community-card-entries:begin -->\n<!-- community-card-entries:end -->\n`
 
-  it('emits 4 files (card source + smoke test + register-all + community.md)', async () => {
+  it('emits 5 files (card source + smoke test + generated catalogs + community.md)', async () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_NewCard',
@@ -24,6 +24,7 @@ describe('generatePrFiles — output file list', () => {
     const paths = files.map((f) => f.path).sort()
     expect(paths).toEqual([
       'docs/community_cards.md',
+      'shared/cards/catalog.generated.ts',
       'shared/cards/community/CUSTOM_NewCard.ts',
       'shared/cards/community/__tests__/CUSTOM_NewCard.test.ts',
       'shared/cards/register-all.ts',

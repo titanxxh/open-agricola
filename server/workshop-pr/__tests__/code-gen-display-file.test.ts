@@ -69,4 +69,41 @@ const CARD_IMPL = {}
     expect(out).toContain(`deck: "community"`)
     expect(out).toContain(`impl: cardImpl`)
   })
+
+  it('injects locales into object-literal Card Source metadata', () => {
+    const wcard = {
+      id: 'wc-loc-object',
+      card_id: 'CUSTOM_ObjectLocalisedCard',
+      card_type: 'minor',
+      card_json: JSON.stringify({
+        locales: { zh: { name: '新名称', desc: ['新描述。'] } },
+      }),
+      effect_code: `
+const CARD_ID = 'CUSTOM_ObjectLocalisedCard'
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Object Localised Card',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['English desc.'],
+    cost: {},
+    vp: 0,
+    locales: { zh: { name: '旧名称', desc: ['旧描述。'] } },
+  },
+}
+const CARD_IMPL = {}
+`.trim(),
+    }
+    const out = generateDisplayFile(wcard, {
+      githubLogin: 'gh',
+      iso: '2026-05-09T00:00:00Z',
+    })
+    expect(out).toContain('新名称')
+    expect(out).toContain('新描述。')
+    expect(out).not.toContain('旧名称')
+    expect(out).not.toContain('旧描述。')
+    expect(out).toContain(`deck: "community"`)
+  })
 })

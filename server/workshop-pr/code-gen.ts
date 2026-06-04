@@ -1,17 +1,26 @@
 /**
  * Pure code-generation module for workshop → PR integration.
  *
- * Given a workshop card row + upstream file contents, produce the 4-5 files
+ * Given a workshop card row + upstream file contents, produce the 5-6 files
  * that should be committed to a fork branch:
  *   1. shared/cards/community/{card_id}.ts              — main card file
  *   2. shared/cards/community/__tests__/{card_id}.test.ts — smoke test
- *   3. shared/cards/register-all.ts                     — patched (import + entry)
- *   4. docs/community_cards.md                          — patched (new row)
- *   5. public/card-art/community/{card_id}.{ext}        — (optional) binary art
- *
- * No I/O here. All inputs are passed in, outputs are plain objects.
+ *   3. shared/cards/register-all.ts                     — canonical generated file
+ *   4. shared/cards/catalog.generated.ts                — canonical generated file
+ *   5. docs/community_cards.md                          — patched (new row)
+ *   6. public/card-art/community/{card_id}.{ext}        — (optional) binary art
  */
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import ts from 'typescript'
+import { buildRegisterAll } from '../../scripts/generate-register-all'
 
 // ---------------------------------------------------------------------------
 // C-12: AST helper scan
@@ -207,6 +216,27 @@ function normalizeWorkshopEffectCode(
 
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
+    const syncLocalesObject = (object: ts.ObjectLiteralExpression) => {
+      const filtered: ts.ObjectLiteralElementLike[] = []
+      for (const prop of object.properties) {
+        if (
+          ts.isPropertyAssignment(prop)
+          && propertyNameMatches(prop.name, 'locales')
+        ) {
+          continue
+        }
+        filtered.push(prop)
+      }
+      if (localesToInject) {
+        filtered.push(
+          factory.createPropertyAssignment(
+            'locales',
+            buildLocalesLiteral(factory, localesToInject),
+          ),
+        )
+      }
+      return factory.updateObjectLiteralExpression(object, filtered)
+    }
     const visit: ts.Visitor = (node) => {
       // Sync the CARD_DEF locales field with card_json.locales (db is the
       // source of truth; LLM-generated locales in source may be stale once
@@ -220,31 +250,29 @@ function normalizeWorkshopEffectCode(
       ) {
         const arg = node.arguments[0]!
         if (ts.isObjectLiteralExpression(arg)) {
-          const filtered: ts.ObjectLiteralElementLike[] = []
-          for (const prop of arg.properties) {
-            if (
-              ts.isPropertyAssignment(prop)
-              && propertyNameMatches(prop.name, 'locales')
-            ) {
-              continue
-            }
-            filtered.push(prop)
-          }
-          if (localesToInject) {
-            filtered.push(
-              factory.createPropertyAssignment(
-                'locales',
-                buildLocalesLiteral(factory, localesToInject),
-              ),
-            )
-          }
-          const updatedArg = factory.updateObjectLiteralExpression(arg, filtered)
+          const updatedArg = syncLocalesObject(arg)
           return ts.visitEachChild(
             factory.updateNewExpression(node, node.expression, node.typeArguments, [updatedArg]),
             visit,
             context,
           )
         }
+      }
+
+      if (
+        ts.isPropertyAssignment(node)
+        && propertyNameMatches(node.name, 'meta')
+        && ts.isObjectLiteralExpression(node.initializer)
+      ) {
+        return ts.visitEachChild(
+          factory.updatePropertyAssignment(
+            node,
+            node.name,
+            syncLocalesObject(node.initializer),
+          ),
+          visit,
+          context,
+        )
       }
 
       if (
@@ -796,11 +824,29 @@ export type GenArgs = {
   art_data?: { ext: string; buffer: Buffer } | null
 }
 
+function generateCanonicalCardFiles(cardPath: string, cardContent: string) {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'oa-workshop-card-gen-'))
+  try {
+    const cardsSource = path.resolve(process.cwd(), 'shared', 'cards')
+    const cardsDest = path.join(tmp, 'shared', 'cards')
+    cpSync(cardsSource, cardsDest, { recursive: true })
+    const dest = path.join(tmp, cardPath)
+    mkdirSync(path.dirname(dest), { recursive: true })
+    writeFileSync(dest, cardContent, 'utf8')
+    const generated = buildRegisterAll({ repoRoot: tmp })
+    return {
+      registerAll: generated.registerAll,
+      catalogGenerated: generated.catalogGenerated,
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
 export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
   const {
     wcard,
     github_login,
-    upstream_register_all,
     upstream_community_md,
     pr_number,
     art_data,
@@ -812,9 +858,10 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     iso,
   })
   const testContent = generateSmokeTest({ card_id: wcard.card_id })
-  const newRegisterAll = patchRegisterAll(upstream_register_all, {
-    card_id: wcard.card_id,
-  })
+  const generated = generateCanonicalCardFiles(
+    `shared/cards/community/${wcard.card_id}.ts`,
+    cardContent,
+  )
 
   let cardName = wcard.card_id
   try {
@@ -847,7 +894,12 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     },
     {
       path: 'shared/cards/register-all.ts',
-      content: newRegisterAll,
+      content: generated.registerAll,
+      encoding: 'utf-8',
+    },
+    {
+      path: 'shared/cards/catalog.generated.ts',
+      content: generated.catalogGenerated,
       encoding: 'utf-8',
     },
     {

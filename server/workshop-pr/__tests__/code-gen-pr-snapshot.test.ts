@@ -17,10 +17,10 @@ import { generatePrFiles } from '../code-gen'
 const REPO_ROOT = resolve(__dirname, '../../..')
 
 // Slow test: copies repo into tmpdir, writes generated files, runs tsc + generate.
-// Validates that the 4-file PR output from `generatePrFiles` is self-consistent:
+// Validates that the 5-file PR output from `generatePrFiles` is self-consistent:
 //   1. The generated tree compiles under `tsc --noEmit -p tsconfig.app.json`
 //   2. Re-running `scripts/generate-register-all.ts` on the generated tree
-//      produces a byte-identical `register-all.ts`.
+//      produces byte-identical generated card files.
 // This catches drift between `patchRegisterAll` and the canonical scanner in
 // `generate-register-all.ts`.
 //
@@ -29,7 +29,7 @@ const REPO_ROOT = resolve(__dirname, '../../..')
 // here — diff would be vacuous.
 describe('PR files self-consistency (S9-B2)', () => {
   it(
-    'generated 4 files compile under tsc + register-all matches generate-register-all rerun',
+    'generated 5 files compile under tsc + generated card files match generate-register-all rerun',
     { timeout: 120_000 },
     async () => {
       const wcard = {
@@ -60,7 +60,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         upstream_community_md,
         pr_number: 999,
       })
-      expect(files.length).toBe(4)
+      expect(files.length).toBe(5)
 
       // 2. Mirror repo into tmpdir + apply files
       const tmp = mkdtempSync(join(tmpdir(), 's9-pr-snapshot-'))
@@ -125,7 +125,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
           stdio: 'inherit',
         })
 
-        // 4. Run generate-register-all and compare against the patcher output.
+        // 4. Run generate-register-all and compare against generatePrFiles output.
         execFileSync('./node_modules/.bin/tsx', [
           'scripts/generate-register-all.ts',
         ], {
@@ -133,14 +133,14 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
           stdio: 'pipe',
         })
 
-        const regeneratedRegister = readFileSync(
-          join(tmp, 'shared/cards/register-all.ts'),
-          'utf-8',
-        )
-        const expectedRegister = files.find(
-          (f) => f.path === 'shared/cards/register-all.ts',
-        )!.content
-        expect(regeneratedRegister).toBe(expectedRegister)
+        for (const generatedPath of [
+          'shared/cards/register-all.ts',
+          'shared/cards/catalog.generated.ts',
+        ]) {
+          const regenerated = readFileSync(join(tmp, generatedPath), 'utf-8')
+          const expected = files.find((f) => f.path === generatedPath)!.content
+          expect(regenerated).toBe(expected)
+        }
       } finally {
         rmSync(tmp, { recursive: true, force: true })
       }

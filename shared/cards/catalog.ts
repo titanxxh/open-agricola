@@ -1,6 +1,6 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import type { CardDefinition } from '../contract/cards'
-import { majorCardDefinitions } from './major'
+import { majorCardDefinitionsList } from './major/generated'
 import {
   minorImprovementCardsList,
   occupationCardsList,
@@ -40,7 +40,7 @@ export const getCardDefinition = (id: string): CardDefinition | undefined => {
   return (
     getMinorImprovementCard(id)
     ?? getOccupationCard(id)
-    ?? majorCardDefinitions.find((c) => c.id === id)
+    ?? majorCardDefinitionsList.find((c) => c.id === id)
   )
 }
 
