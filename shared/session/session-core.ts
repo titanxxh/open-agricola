@@ -78,12 +78,13 @@ import {
 import { getMinorImprovement } from '../cards/registry-display.ts'
 import {
   registerCustomCard,
+  clearCustomCardRuntimeFromRegistry,
   getCustomMinorImprovementIds,
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
-import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
+import { getActiveCardRegistry, setActiveCardRegistry, withActiveRegistry } from '../cards/active-registry.ts'
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
@@ -716,6 +717,7 @@ export class GameCore {
       const existing = getActiveCardRegistry()
       if (existing) {
         this.cardRegistry = existing.clone()
+        clearCustomCardRuntimeFromRegistry(this.cardRegistry)
       } else {
         this.cardRegistry = new CardRegistry()
         for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
@@ -838,7 +840,7 @@ export class GameCore {
 
   /** Run a function with this session's card context active. */
   withCtx<T>(fn: () => T): T {
-    return withSessionContext(this.sessionCardContext, fn)
+    return withActiveRegistry(this.cardRegistry, () => withSessionContext(this.sessionCardContext, fn))
   }
 
   /** Dispose of session resources. Call when replacing or removing a session. */
