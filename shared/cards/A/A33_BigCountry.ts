@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
-import { A33_BigCountry } from '../../cards-display/A/A33_BigCountry'
 
-const CARD_ID = A33_BigCountry.id
+const CARD_ID = 'A33_BigCountry'
 
-export const A33_BigCountry_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -32,3 +32,20 @@ export const A33_BigCountry_impl = {
   prerequisiteCheck: hasNoUnusedFarmyardSpaces,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A33_BigCountry = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Big Country',
+    deck: 'A',
+    number: 33,
+    category: 'POINTS_PROVIDER',
+    desc: ['For each complete round left to play, you immediately get 1 bonus <SCORE> and 2 <FOOD>.'],
+    cost: {},
+    prerequisite: 'All Farmyard Spaces Used',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A33_BigCountry_impl = A33_BigCountry.impl

@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { A71_ClearingSpade } from '../../cards-display/A/A71_ClearingSpade'
 
-const CARD_ID = A71_ClearingSpade.id
-
+const CARD_ID = 'A71_ClearingSpade'
 registerSelectionEffect('store-source-field', ({ player, positions, sourceCard }) => {
   if (sourceCard && positions.length > 0) {
     const [r, c] = positions[0]!.split('-').map(Number)
@@ -83,7 +82,22 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const A71_ClearingSpade_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A71_ClearingSpade = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Clearing Spade',
+    deck: 'A',
+    number: 71,
+    category: 'CROP_PROVIDER',
+    desc: ['At any time, you can move 1 crop from a planted field containing at least 2 crops to an empty field.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A71_ClearingSpade_impl = A71_ClearingSpade.impl

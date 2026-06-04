@@ -1,12 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D69_SmallGreenhouse } from '../../cards-display/D/D69_SmallGreenhouse'
 
-const CARD_ID = D69_SmallGreenhouse.id
+const CARD_ID = 'D69_SmallGreenhouse'
 
-export const D69_SmallGreenhouse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -36,3 +36,21 @@ export const D69_SmallGreenhouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D69_SmallGreenhouse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Small Greenhouse',
+    deck: 'D',
+    number: 69,
+    category: 'CROP_PROVIDER',
+    desc: ['Add 4 and 7 to the current round and place 1 <VEGETABLE> on each corresponding round space. At the start of these rounds, you can buy the <VEGETABLE> for 1 <FOOD>.'],
+    cost: { wood: 2 },
+    vp: 1,
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D69_SmallGreenhouse_impl = D69_SmallGreenhouse.impl

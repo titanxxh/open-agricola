@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
-import { C16_FieldFences } from '../../cards-display/C/C16_FieldFences'
 
-const CARD_ID = C16_FieldFences.id
-
+const CARD_ID = 'C16_FieldFences'
 const FLAG_KEY = 'c16Active'
 
 /**
@@ -67,7 +66,7 @@ const C16FenceListener: CardListenerRegistration = {
   },
 }
 
-export const C16_FieldFences_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => ({
@@ -83,3 +82,18 @@ export const C16_FieldFences_impl = {
   listeners: [C16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C16_FieldFences = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Field Fences',
+    deck: 'C',
+    number: 16,
+    category: 'FARM_PLANNER',
+    desc: ['You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for fences that you build next to field tiles.'],
+    cost: { food: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const C16_FieldFences_impl = C16_FieldFences.impl

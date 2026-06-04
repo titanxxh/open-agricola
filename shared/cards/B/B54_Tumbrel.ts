@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { B54_Tumbrel } from '../../cards-display/B/B54_Tumbrel'
 
-const CARD_ID = B54_Tumbrel.id
-
+const CARD_ID = 'B54_Tumbrel'
 /**
  * B54 Tumbrel (Minor Improvement):
  * When you play this card, you immediately get 2 Food.
@@ -33,7 +32,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B54_Tumbrel_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -41,3 +40,20 @@ export const B54_Tumbrel_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B54_Tumbrel = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tumbrel',
+    deck: 'B',
+    number: 54,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each stable you have.',
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B54_Tumbrel_impl = B54_Tumbrel.impl

@@ -1,21 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { returnCardToBoard } from '../helpers/return-card'
 import type { CardImpl } from '../registry'
-import { D60_LargePottery } from '../../cards-display/D/D60_LargePottery'
 
-const CARD_ID = D60_LargePottery.id
+const CARD_ID = 'D60_LargePottery'
 
-/**
- * D60 Large Pottery — dual-type minor that also counts as a major (BGA
- * `getOtherCardTypes() == [MAJOR]`). Buying it requires that the player has
- * already played Major_Pottery, then returns that Pottery to the common board
- * via a custom prerequisite + onBuy handler (not via `returnCards`, because
- * BGA models "Return the Pottery" as a prerequisite, not an "or" payment).
- * Anytime exchange CLAY → 2 FOOD. Endgame score from reserved CLAY, matching
- * BGA's scoresMap (3-4→1, 5→2, 6→3, 7+→4). `extraVp: true` flags the card as
- * carrying its own scoring rule on top of the printed `vp: 3`.
- */
-
-export const D60_LargePottery_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) =>
     player.improvements.includes('Major_Pottery'),
   effect: {
@@ -37,3 +26,33 @@ export const D60_LargePottery_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D60_LargePottery = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Large Pottery',
+    deck: 'D',
+    number: 60,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        '[Anytime]',
+        '<CLAY> <ARROW> 2<FOOD>',
+        '[Scoring]',
+        '3/5/6/7<CLAY> <ARROW-1X> 1/2/3/4<SCORE>',
+      ],
+    cost: { clay: 1, stone: 1 },
+    vp: 3,
+    extraVp: true,
+    prerequisite: 'Return the Pottery',
+    potteryIdentity: true,
+    alsoCountsAs: ['major'],
+    evenMoreSet: true,
+    waresSalesmanGains: [{ clay: 1, reed: 1 }],
+    exchanges: [
+        { from: { clay: 1 }, to: { food: 2 }, triggers: ['anytime'] },
+      ],
+  },
+  impl: cardImpl,
+})
+
+export const D60_LargePottery_impl = D60_LargePottery.impl

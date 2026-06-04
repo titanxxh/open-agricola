@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B104_SheepWalker } from '../../cards-display/B/B104_SheepWalker'
 
-const CARD_ID = B104_SheepWalker.id
+const CARD_ID = 'B104_SheepWalker'
 
-export const B104_SheepWalker_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     // Mirrors BGA `B104_SheepWalker::enforceReorganizeOnLastHarvest`. Forces
@@ -14,3 +14,26 @@ export const B104_SheepWalker_impl = {
     enforceReorganizeOnLastHarvest: (_state, player) => player.resources.sheep > 0,
   },
 } satisfies CardImpl
+
+export const B104_SheepWalker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sheep Walker',
+    deck: 'B',
+    number: 104,
+    category: 'GOODS_PROVIDER',
+    desc: [
+        'At any time, you can exchange 1 <SHEEP> on your farmyard for either 1 <PIG>, 1 <VEGETABLE>, or 1 <STONE>.',
+      ],
+    cost: {},
+    players: '1+',
+    exchanges: [
+        { from: { sheep: 1 }, to: { boar: 1 }, triggers: ['anytime'] },
+        { from: { sheep: 1 }, to: { vegetable: 1 }, triggers: ['anytime'] },
+        { from: { sheep: 1 }, to: { stone: 1 }, triggers: ['anytime'] },
+      ],
+  },
+  impl: cardImpl,
+})
+
+export const B104_SheepWalker_impl = B104_SheepWalker.impl

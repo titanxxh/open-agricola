@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A102_Grocer } from '../../cards-display/A/A102_Grocer'
 
-const CARD_ID = A102_Grocer.id
-
+const CARD_ID = 'A102_Grocer'
 /**
  * Stack order (bottom to top): wood, grain, reed, stone, vegetable, clay, reed, vegetable
  * Player pays 1 food to take the top good at any time.
@@ -35,7 +34,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const A102_Grocer_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -45,3 +44,19 @@ export const A102_Grocer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A102_Grocer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Grocer',
+    deck: 'A',
+    number: 102,
+    category: 'GOODS_PROVIDER',
+    desc: ['Pile the following goods on this card (<WOOD>, <GRAIN>, <REED>, <STONE>, <VEGETABLE>, <CLAY>, <REED>, <VEGETABLE>). At any time, you can buy the top good for 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A102_Grocer_impl = A102_Grocer.impl

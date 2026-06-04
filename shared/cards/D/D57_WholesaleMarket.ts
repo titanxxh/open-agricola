@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D57_WholesaleMarket } from '../../cards-display/D/D57_WholesaleMarket'
 
-const CARD_ID = D57_WholesaleMarket.id
+const CARD_ID = 'D57_WholesaleMarket'
 
-export const D57_WholesaleMarket_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -22,3 +22,19 @@ export const D57_WholesaleMarket_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D57_WholesaleMarket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wholesale Market',
+    deck: 'D',
+    number: 57,
+    category: 'FOOD_PROVIDER',
+    desc: ['Place 1 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.'],
+    cost: { wood: 2, vegetable: 2 },
+    vp: 3,
+  },
+  impl: cardImpl,
+})
+
+export const D57_WholesaleMarket_impl = D57_WholesaleMarket.impl

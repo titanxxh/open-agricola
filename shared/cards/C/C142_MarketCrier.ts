@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C142_MarketCrier } from '../../cards-display/C/C142_MarketCrier'
 
-const CARD_ID = C142_MarketCrier.id
-
+const CARD_ID = 'C142_MarketCrier'
 /**
  * After placing farmer on Grain Seeds: optionally gain 1 grain + 1 vegetable,
  * and if you do, each other player gets 1 grain.
@@ -31,7 +30,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C142_MarketCrier_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C142_MarketCrier = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Market Crier",
+    deck: "C",
+    number: 142,
+    category: "CROP_PROVIDER",
+    desc: ["Each time you use the __Grain Seeds__ action space, you can get an additional 1 <GRAIN> and 1 <VEGETABLE>. If you do, each other player gets 1 <GRAIN>."],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const C142_MarketCrier_impl = C142_MarketCrier.impl

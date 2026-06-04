@@ -1,10 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D10_StorksNest'
 
-export const D10_StorksNest_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
@@ -27,3 +28,20 @@ export const D10_StorksNest_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D10_StorksNest = defineMinorCard({
+  meta: {
+    id: "D10_StorksNest",
+    name: "Stork's Nest",
+    deck: "D",
+    number: 10,
+    category: "FARM_PLANNER",
+    desc: ["In the returning home phase of each round, if you have more rooms than people, you can pay 1 <FOOD> to take a __Family Growth__ action."],
+    cost: {"reed":1},
+    prerequisite: "5 Occupations",
+    occupationPrerequisites: {"min":5},
+  },
+  impl: cardImpl,
+})
+
+export const D10_StorksNest_impl = D10_StorksNest.impl

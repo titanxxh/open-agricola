@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
-import { B98_OrganicFarmer } from '../../cards-display/B/B98_OrganicFarmer'
 
-const CARD_ID = B98_OrganicFarmer.id
+const CARD_ID = 'B98_OrganicFarmer'
 
-export const B98_OrganicFarmer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (state, player) => {
@@ -16,3 +16,20 @@ export const B98_OrganicFarmer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B98_OrganicFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Organic Farmer",
+    deck: "B",
+    number: 98,
+    category: "POINTS_PROVIDER",
+    desc: ['During the scoring, you get 1 bonus <SCORE> for each pasture containing at least 1 animal while having unused capacity for at least three more animals.'],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B98_OrganicFarmer_impl = B98_OrganicFarmer.impl

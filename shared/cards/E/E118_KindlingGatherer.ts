@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E118_KindlingGatherer } from '../../cards-display/E/E118_KindlingGatherer'
 
-const CARD_ID = E118_KindlingGatherer.id
-
+const CARD_ID = 'E118_KindlingGatherer'
 type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
 
 const isFoodFromActionSpace = (
@@ -67,7 +66,23 @@ const gainListener: CardListenerRegistration = {
   },
 }
 
-export const E118_KindlingGatherer_impl = {
+const cardImpl = {
   listeners: [placeFarmerListener, collectListener, gainListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E118_KindlingGatherer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Kindling Gatherer',
+    deck: 'E',
+    number: 118,
+    category: 'BUILDING_RESOURCES_-_WOOD',
+    desc: ['Each time you get <FOOD> from an action space, you get 1 additional <WOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E118_KindlingGatherer_impl = E118_KindlingGatherer.impl

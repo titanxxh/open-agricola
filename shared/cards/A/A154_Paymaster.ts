@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A154_Paymaster } from '../../cards-display/A/A154_Paymaster'
 
-const CARD_ID = A154_Paymaster.id
-
+const CARD_ID = 'A154_Paymaster'
 /**
  * A154 Paymaster:
  * Each time an opponent uses a food accumulation space (Fishing, Traveling Players),
@@ -54,7 +53,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A154_Paymaster_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A154_Paymaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Paymaster',
+    deck: 'A',
+    number: 154,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: '4+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A154_Paymaster_impl = A154_Paymaster.impl

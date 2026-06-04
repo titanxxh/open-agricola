@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
@@ -9,10 +10,8 @@ import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
 import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
 import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
-const CARD_ID = C88_CarpentersApprentice.id
-
+const CARD_ID = 'C88_CarpentersApprentice'
 const constructCostListener: CardListenerRegistration = {
   id: 'C88-carpenters-apprentice-costs-construct',
   cardIds: [CARD_ID],
@@ -113,7 +112,23 @@ const fenceCostListener: CardListenerRegistration = {
   },
 }
 
-export const C88_CarpentersApprentice_impl = {
+const cardImpl = {
   listeners: [constructCostListener, stablesCostListener, fenceIsDoableListener, fenceCostListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C88_CarpentersApprentice = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carpenter's Apprentice",
+    deck: "C",
+    number: 88,
+    category: "FARM_PLANNER",
+    desc: ["Wood rooms cost you 2 <WOOD> less. Your 3rd and 4th stable each cost you 1 <WOOD> less. Your 13th to 15th fence each cost you nothing."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C88_CarpentersApprentice_impl = C88_CarpentersApprentice.impl

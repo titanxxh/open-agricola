@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
 import type { CardImpl } from '../registry'
-import { C30_HalfTimberedHouse } from '../../cards-display/C/C30_HalfTimberedHouse'
 
-const CARD_ID = C30_HalfTimberedHouse.id
+const CARD_ID = 'C30_HalfTimberedHouse'
 
-export const C30_HalfTimberedHouse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -13,3 +13,19 @@ export const C30_HalfTimberedHouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C30_HalfTimberedHouse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Half-Timbered House",
+    deck: "C",
+    number: 30,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each stone room you have. You can only use one card to get bonus points for your stone house."],
+    cost: { wood: 1, clay: 1, stone: 2, reed: 1 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C30_HalfTimberedHouse_impl = C30_HalfTimberedHouse.impl

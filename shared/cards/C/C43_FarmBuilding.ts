@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C43_FarmBuilding } from '../../cards-display/C/C43_FarmBuilding'
 
-const CARD_ID = C43_FarmBuilding.id
-
+const CARD_ID = 'C43_FarmBuilding'
 const listener: CardListenerRegistration = {
   id: 'C43-farm-building-after-improvement',
   cardIds: [CARD_ID],
@@ -28,7 +27,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C43_FarmBuilding_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C43_FarmBuilding = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Farm Building',
+    deck: 'C',
+    number: 43,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you build a major improvement, place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.',
+      ],
+    cost: { clay: 1, reed: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const C43_FarmBuilding_impl = C43_FarmBuilding.impl

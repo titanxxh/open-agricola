@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C44_ChickenCoop } from '../../cards-display/C/C44_ChickenCoop'
 
-const CARD_ID = C44_ChickenCoop.id
+const CARD_ID = 'C44_ChickenCoop'
 
-export const C44_ChickenCoop_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -20,3 +20,19 @@ export const C44_ChickenCoop_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C44_ChickenCoop = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Chicken Coop",
+    deck: "C",
+    number: 44,
+    category: "FOOD_PROVIDER",
+    desc: ["Place 1 <FOOD> on each of the next 8 round spaces. At the start of these rounds, you get the <FOOD>."],
+    vp: 1,
+    altCosts: [{ clay: 2 }, { wood: 2 }],
+  },
+  impl: cardImpl,
+})
+
+export const C44_ChickenCoop_impl = C44_ChickenCoop.impl

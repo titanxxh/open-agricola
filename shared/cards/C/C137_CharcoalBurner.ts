@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -5,10 +6,8 @@ import { getMinorImprovementCard } from '../catalog'
 import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { C137_CharcoalBurner } from '../../cards-display/C/C137_CharcoalBurner'
 
-const CARD_ID = C137_CharcoalBurner.id
-
+const CARD_ID = 'C137_CharcoalBurner'
 /**
  * C137 Charcoal Burner (Occupation, C, 137)
  * Each time any player plays/builds an improvement that has bake capability,
@@ -45,7 +44,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C137_CharcoalBurner_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C137_CharcoalBurner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Charcoal Burner',
+    deck: 'C',
+    number: 137,
+    category: 'GOODS_PROVIDER',
+    desc: [
+        'Each time any player (including you) plays or builds a <BAKE>-improvement, you get 1 <WOOD> and 1 <FOOD>.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const C137_CharcoalBurner_impl = C137_CharcoalBurner.impl

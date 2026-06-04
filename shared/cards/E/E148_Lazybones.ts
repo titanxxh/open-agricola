@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
@@ -8,10 +9,8 @@ import {
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
-import { E148_Lazybones } from '../../cards-display/E/E148_Lazybones'
 
-const CARD_ID = E148_Lazybones.id
-
+const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 const CHOICE_PREFIX = 'lazybones:'
 const DECLINE_CHOICE = CHOICE_PREFIX
@@ -103,7 +102,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E148_Lazybones_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
@@ -129,3 +128,19 @@ export const E148_Lazybones_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E148_Lazybones = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lazybones',
+    deck: 'E',
+    number: 148,
+    desc: ['Place (up to) 1 <STABLE> each on __Grain Seeds__, __Farmland__, __Day Laborer__, and __Farm Expansion__. Build the <STABLE> at no cost when another player uses that action space.'],
+    cost: {},
+    players: '4+',
+    category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+  },
+  impl: cardImpl,
+})
+
+export const E148_Lazybones_impl = E148_Lazybones.impl

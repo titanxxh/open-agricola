@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B73_GiftBasket } from '../../cards-display/B/B73_GiftBasket'
 
-const CARD_ID = B73_GiftBasket.id
+const CARD_ID = 'B73_GiftBasket'
 
-export const B73_GiftBasket_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -22,3 +22,21 @@ export const B73_GiftBasket_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B73_GiftBasket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Gift Basket',
+    deck: 'B',
+    number: 73,
+    category: 'CROP_PROVIDER',
+    desc: ['When you play this card, if you have exactly 2/3/4/5 rooms, you immediately get 1 <VEGETABLE>/<FOOD>/<GRAIN>/<VEGETABLE>.'],
+    cost: { reed: 1 },
+    vp: 1,
+    prerequisite: '3 Occupations',
+    occupationPrerequisites: { min: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const B73_GiftBasket_impl = B73_GiftBasket.impl

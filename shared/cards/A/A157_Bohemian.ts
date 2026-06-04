@@ -1,12 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { A157_Bohemian } from '../../cards-display/A/A157_Bohemian'
 
-const CARD_ID = A157_Bohemian.id
+const CARD_ID = 'A157_Bohemian'
 
-export const A157_Bohemian_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, _player) => {
@@ -23,3 +23,19 @@ export const A157_Bohemian_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A157_Bohemian = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bohemian',
+    deck: 'A',
+    number: 157,
+    category: 'FOOD_PROVIDER',
+    desc: ['At the start of each returning home phase, if at least one __Lessons__ action space is unoccupied, you get 1 <FOOD>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A157_Bohemian_impl = A157_Bohemian.impl

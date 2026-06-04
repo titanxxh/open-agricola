@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D45_SheepWell } from '../../cards-display/D/D45_SheepWell'
 
-const CARD_ID = D45_SheepWell.id
+const CARD_ID = 'D45_SheepWell'
 
-export const D45_SheepWell_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -27,3 +27,19 @@ export const D45_SheepWell_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D45_SheepWell = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sheep Well',
+    deck: 'D',
+    number: 45,
+    category: 'FOOD_PROVIDER',
+    desc: ['Place 1 <FOOD> on each of the next round spaces, up to the number of <SHEEP> you have. At the start of these rounds, you get the <FOOD>.'],
+    cost: { stone: 2 },
+    vp: 2,
+  },
+  impl: cardImpl,
+})
+
+export const D45_SheepWell_impl = D45_SheepWell.impl

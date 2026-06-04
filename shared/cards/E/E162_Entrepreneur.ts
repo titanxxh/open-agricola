@@ -1,17 +1,16 @@
+import { defineOccupationCard } from '../card-source'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E162_Entrepreneur } from '../../cards-display/E/E162_Entrepreneur'
 
-const CARD_ID = E162_Entrepreneur.id
-
+const CARD_ID = 'E162_Entrepreneur'
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 const getMissingBuildingResources = (player: { resources: Resource }): (keyof Resource)[] =>
   BUILDING_RESOURCES.filter((res) => (player.resources[res] ?? 0) === 0)
 
-export const E162_Entrepreneur_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (_state, player) => {
@@ -64,3 +63,19 @@ export const E162_Entrepreneur_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E162_Entrepreneur = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Entrepreneur',
+    deck: 'E',
+    number: 162,
+    desc: ['At the start of each round, you can move 1 <FOOD> to this card or discard 1 <FOOD> from it. If you do either, you get 1 building resource of a type you currently do not have.'],
+    cost: {},
+    players: '4+',
+    category: 'BUILDING_RESOURCES',
+  },
+  impl: cardImpl,
+})
+
+export const E162_Entrepreneur_impl = E162_Entrepreneur.impl

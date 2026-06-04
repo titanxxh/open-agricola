@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B159_LieutenantGeneral } from '../../cards-display/B/B159_LieutenantGeneral'
 
-const CARD_ID = B159_LieutenantGeneral.id
-
+const CARD_ID = 'B159_LieutenantGeneral'
 /**
  * B159 Lieutenant General (Occupation, B, 159)
  * Each time another player plows a field adjacent to an existing field,
@@ -36,7 +35,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B159_LieutenantGeneral_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B159_LieutenantGeneral = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Lieutenant General',
+    deck: 'B',
+    number: 159,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B159_LieutenantGeneral_impl = B159_LieutenantGeneral.impl

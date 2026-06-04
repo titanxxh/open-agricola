@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D17_DrillHarrow } from '../../cards-display/D/D17_DrillHarrow'
 
-const CARD_ID = D17_DrillHarrow.id
-
+const CARD_ID = 'D17_DrillHarrow'
 /**
  * D17 Drill Harrow (Minor Improvement):
  * Each time before you take an unconditional Sow action, you can pay 3 food to plow 1 field.
@@ -59,7 +58,23 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const D17_DrillHarrow_impl = {
+const cardImpl = {
   listeners: [beforeSowListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D17_DrillHarrow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Drill Harrow',
+    deck: 'D',
+    number: 17,
+    category: 'FARM_PLANNER',
+    desc: ['Each time before you take an unconditional __Sow__ action, you can pay 3 <FOOD> to plow 1 field.'],
+    cost: { wood: 1 },
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D17_DrillHarrow_impl = D17_DrillHarrow.impl

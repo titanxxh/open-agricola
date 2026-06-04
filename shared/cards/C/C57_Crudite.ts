@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
@@ -5,9 +6,8 @@ import type { ActionFlow, FarmTilePosition, Field } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
-import { C57_Crudite } from '../../cards-display/C/C57_Crudite'
 
-const CARD_ID = C57_Crudite.id
+const CARD_ID = 'C57_Crudite'
 const ANYTIME_ID = 'C57-crudite-anytime'
 const SELECTION_EFFECT = 'c57-crudite-remove-field-vegetables'
 
@@ -77,7 +77,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C57_Crudite_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
     id: CARD_ID,
@@ -101,3 +101,21 @@ export const C57_Crudite_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C57_Crudite = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Crudite',
+    deck: 'C',
+    number: 57,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you can immediately buy exactly 1 <VEGETABLE> for 3 <FOOD>. At any time, you can discard 1 <VEGETABLE> on top of another <VEGETABLE> in a field to get 4 <FOOD>.',
+      ],
+    cost: {},
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C57_Crudite_impl = C57_Crudite.impl

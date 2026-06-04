@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B103_FieldMerchant } from '../../cards-display/B/B103_FieldMerchant'
 
-const CARD_ID = B103_FieldMerchant.id
-
+const CARD_ID = 'B103_FieldMerchant'
 const computeReplaceListener: CardListenerRegistration = {
   id: 'B103-field-merchant-replace-improvement',
   cardIds: [CARD_ID],
@@ -56,7 +55,23 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const B103_FieldMerchant_impl = {
+const cardImpl = {
   listeners: [computeReplaceListener, onPlayListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B103_FieldMerchant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Field Merchant",
+    deck: "B",
+    number: 103,
+    category: "GOODS_PROVIDER",
+    desc: ["When you play this card, you immediately get 1 <WOOD> and 1 <REED>. Each time you decline a __Minor/Major Improvement__ action, you get 1 <FOOD>/<VEGETABLE> instead."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const B103_FieldMerchant_impl = B103_FieldMerchant.impl

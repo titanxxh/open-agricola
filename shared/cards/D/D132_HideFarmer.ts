@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type {
   ActionDefinition,
   PlayerState,
@@ -6,9 +7,8 @@ import type {
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
-import { D132_HideFarmer } from '../../cards-display/D/D132_HideFarmer'
 
-const CARD_ID = D132_HideFarmer.id
+const CARD_ID = 'D132_HideFarmer'
 const MARK_SPACES_ACTION_ID = `card_${CARD_ID}_markSpaces`
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -82,7 +82,7 @@ const markSpacesAction: ActionDefinition = {
 
 registerAdHocAction(markSpacesAction)
 
-export const D132_HideFarmer_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBeforeEndGame: (_state, player) => {
@@ -105,3 +105,19 @@ export const D132_HideFarmer_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D132_HideFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Hide Farmer",
+    deck: "D",
+    number: 132,
+    category: "POINTS_PROVIDER",
+    desc: ['During scoring, you can pay 1 <FOOD> each for any number of unused farmyard spaces. You do not lose points for these spaces.'],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const D132_HideFarmer_impl = D132_HideFarmer.impl

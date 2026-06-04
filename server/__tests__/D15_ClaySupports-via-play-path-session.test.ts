@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A143_Stonecutter } from '../../shared/cards-display/A/A143_Stonecutter'
-import { D15_ClaySupports } from '../../shared/cards-display/D/D15_ClaySupports'
+import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
+import { D15_ClaySupports } from '../../shared/cards/D/D15_ClaySupports'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
 
@@ -11,7 +11,7 @@ void D15_ClaySupports
 
 describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () => {
   it('D15 trade modifier is registered via play-path with scope:unit, surfaces in construct enumeration', () => {
-    // Both cards register through their cards-display static fields and reach
+    // Both cards register through their cards static fields and reach
     // `player.activeModifiers` via `rebuildActiveModifiers` during loadState.
     // D15 targets `construct`; A143 contributes a BonusModifier (`construct`,
     // stone -1) plus other listener paths. This test exercises the same

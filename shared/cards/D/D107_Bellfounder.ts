@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D107_Bellfounder } from '../../cards-display/D/D107_Bellfounder'
 
-const CARD_ID = D107_Bellfounder.id
+const CARD_ID = 'D107_Bellfounder'
 
-export const D107_Bellfounder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (_state, player) => {
@@ -34,3 +34,21 @@ export const D107_Bellfounder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D107_Bellfounder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Bellfounder",
+    deck: "D",
+    number: 107,
+    category: "FOOD_PROVIDER",
+    desc: ["In the returning home phase of each round, if you have at least 1 <CLAY>, you can use this card to discard all of your <CLAY> and get your choice of 3 <FOOD> or 1 bonus <SCORE>."],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+    waresSalesmanGains: [{ clay: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const D107_Bellfounder_impl = D107_Bellfounder.impl

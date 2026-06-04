@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { generateDisplayFile } from '../code-gen'
 
 describe('generateDisplayFile', () => {
-  it('emits cards-display path with MinorImprovement import + CARD_DEF only', () => {
+  it('emits a minor Card Source file', () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_Foo',
@@ -18,17 +18,16 @@ const CARD_IMPL = { effect: { id: CARD_ID } }
       githubLogin: 'alicegh',
       iso: '2026-05-09T00:00:00Z',
     })
-    expect(out).toContain(`import { MinorImprovement } from '../types'`)
-    expect(out).not.toContain(`import { Occupation }`)
-    expect(out).toContain(`const CARD_DEF = new MinorImprovement(`)
-    expect(out).toContain(`export const CUSTOM_Foo = CARD_DEF`)
-    expect(out).not.toContain(`CARD_IMPL`)
-    expect(out).not.toContain(`CardImpl`)
+    expect(out).toContain(`import { defineMinorCard } from '../card-source'`)
+    expect(out).not.toContain(`import { defineOccupationCard }`)
+    expect(out).toContain(`export const CUSTOM_Foo = defineMinorCard({`)
+    expect(out).toContain(`const CARD_IMPL`)
+    expect(out).toContain(`import type { CardImpl } from '../registry'`)
     expect(out).not.toContain(`gainLeaf`)
     expect(out).toContain(`@alicegh`)
   })
 
-  it('uses Occupation import for occupation cards', () => {
+  it('uses defineOccupationCard for occupation cards', () => {
     const wcard = {
       id: 'wc2',
       card_id: 'CUSTOM_Bar',
@@ -43,8 +42,8 @@ const CARD_IMPL = {}
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
-    expect(out).toContain(`import { Occupation } from '../types'`)
-    expect(out).not.toContain(`import { MinorImprovement }`)
+    expect(out).toContain(`import { defineOccupationCard } from '../card-source'`)
+    expect(out).not.toContain(`import { defineMinorCard }`)
   })
 
   it('injects locales from card_json into CARD_DEF', () => {
@@ -68,5 +67,6 @@ const CARD_IMPL = {}
     expect(out).toContain('本地化卡')
     expect(out).toContain('中文描述。')
     expect(out).toContain(`deck: "community"`)
+    expect(out).toContain(`impl: cardImpl`)
   })
 })

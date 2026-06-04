@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { D155_Ebonist as DisplayD155 } from '../../shared/cards-display/D/D155_Ebonist'
+import { D155_Ebonist as DisplayD155 } from '../../shared/cards/D/D155_Ebonist'
 import { D155_Ebonist as RuntimeD155 } from '../../shared/cards/D/D155_Ebonist'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState } from '../../shared/contract/types'

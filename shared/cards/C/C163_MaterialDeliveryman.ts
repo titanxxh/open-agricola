@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C163_MaterialDeliveryman } from '../../cards-display/C/C163_MaterialDeliveryman'
 
-const CARD_ID = C163_MaterialDeliveryman.id
-
+const CARD_ID = 'C163_MaterialDeliveryman'
 /**
  * C163 Material Deliveryman:
  * scope 'any' -- when any player takes 5+ goods from an accumulation space,
@@ -48,7 +47,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C163_MaterialDeliveryman_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C163_MaterialDeliveryman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Material Deliveryman',
+    deck: 'C',
+    number: 163,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time any player (including you) takes 5/6/7/8+ goods from an accumulation space, you get 1 <WOOD>/<CLAY>/<REED>/<STONE> from the general supply.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const C163_MaterialDeliveryman_impl = C163_MaterialDeliveryman.impl

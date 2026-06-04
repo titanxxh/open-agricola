@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A1_Shelter } from '../../cards-display/A/A1_Shelter'
 
-const CARD_ID = A1_Shelter.id
+const CARD_ID = 'A1_Shelter'
 
-export const A1_Shelter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => ({
@@ -20,3 +20,18 @@ export const A1_Shelter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A1_Shelter = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Shelter',
+    deck: 'A',
+    number: 1,
+    category: 'FARM_PLANNER',
+    desc: ['You can immediately build a stable at no cost, but only if you place it in a pasture covering exactly 1 farmyard space.'],
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const A1_Shelter_impl = A1_Shelter.impl

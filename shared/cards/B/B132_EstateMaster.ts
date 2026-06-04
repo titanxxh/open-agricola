@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import {
   readCardExtraData,
 } from '../helpers/card-state'
@@ -5,10 +6,8 @@ import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
-import { B132_EstateMaster } from '../../cards-display/B/B132_EstateMaster'
 
-const CARD_ID = B132_EstateMaster.id
-
+const CARD_ID = 'B132_EstateMaster'
 const FARM_TOTAL = 15
 
 const isFarmSaturated = (player: PlayerState): boolean => {
@@ -75,7 +74,7 @@ const reapListener: CardListenerRegistration = {
   },
 }
 
-export const B132_EstateMaster_impl = {
+const cardImpl = {
   listeners: [
     saturationCheckListener('construct'),
     saturationCheckListener('stables'),
@@ -92,3 +91,20 @@ export const B132_EstateMaster_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B132_EstateMaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Estate Master',
+    deck: 'B',
+    number: 132,
+    category: 'POINTS_PROVIDER',
+    desc: ['Once you have no unused farmyard spaces left, you get 1 bonus <SCORE> for each <VEGETABLE> that you harvest.'],
+    cost: {},
+    players: '3+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B132_EstateMaster_impl = B132_EstateMaster.impl

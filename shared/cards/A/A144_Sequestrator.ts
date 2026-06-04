@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource, setStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A144_Sequestrator } from '../../cards-display/A/A144_Sequestrator'
 
-const CARD_ID = A144_Sequestrator.id
-
+const CARD_ID = 'A144_Sequestrator'
 const getOwner = (context: CardListenerContext) =>
   context.state.players.find((player) => player.occupationPlayed.includes(CARD_ID))
 
@@ -63,7 +62,7 @@ const plowListener = createStorageReleaseListener({
   shouldTrigger: (player) => player.fields.length >= 5,
 })
 
-export const A144_Sequestrator_impl = {
+const cardImpl = {
   listeners: [fencingListener, plowListener],
   effect: {
   id: CARD_ID,
@@ -74,3 +73,19 @@ export const A144_Sequestrator_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A144_Sequestrator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Sequestrator",
+    deck: "A",
+    number: 144,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Place 3 <REED> and 4 <CLAY> on this card. The next player to have 3 pastures/5 field tiles gets the 3 <REED>/4 <CLAY> (not retroactively)."],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const A144_Sequestrator_impl = A144_Sequestrator.impl

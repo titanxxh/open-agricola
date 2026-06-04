@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D67_ReapHook } from '../../cards-display/D/D67_ReapHook'
 
-const CARD_ID = D67_ReapHook.id
+const CARD_ID = 'D67_ReapHook'
 
-export const D67_ReapHook_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -22,3 +22,18 @@ export const D67_ReapHook_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D67_ReapHook = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Reap Hook',
+    deck: 'D',
+    number: 67,
+    category: 'CROP_PROVIDER',
+    desc: ['Place 1 <GRAIN> on each of the next 3 of the round spaces 4, 7, 9, 11, 13, and 14. At the start of these rounds, you get the <GRAIN>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D67_ReapHook_impl = D67_ReapHook.impl

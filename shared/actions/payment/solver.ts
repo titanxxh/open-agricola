@@ -7,15 +7,17 @@ import type {
   PaymentExecuteResult,
 } from './types'
 import {
-  computeAllBuyableCombinations,
   isComplexCost,
   canPayResources,
   canPaySupplyTokens,
   payResources,
   paySupplyTokens,
+} from './internal/affordability'
+import { clearPaymentCache } from './internal/cache'
+import { computeAllBuyableCombinations } from './internal/enumerate'
+import {
   executePaymentSolution,
-  clearPaymentCache,
-} from './internal'
+} from './internal/execute'
 
 const computeOptions = (
   state: GameState,
@@ -88,11 +90,13 @@ const clearCache = (): void => {
   clearPaymentCache()
 }
 
+const isComplexCostPublic: typeof isComplexCost = (cost) => isComplexCost(cost)
+
 export const PaymentSolver = {
   computeOptions,
   canAfford,
   execute,
   pickAuto,
   clearCache,
-  isComplexCost,
+  isComplexCost: isComplexCostPublic,
 } as const

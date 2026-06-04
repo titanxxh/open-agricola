@@ -1,12 +1,14 @@
-import { Occupation } from '../../cards-display/types'
+import { defineOccupationCard } from '../card-source'
 
-export const A173_ClayThief = new Occupation({
-  id: 'A173_ClayThief',
-  name: 'Clay Thief',
-  deck: 'A',
-  number: 173,
-  category: 'FOOD_PROVIDER',
-  desc: ['Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the clay on the "Hollow" action space.'],
-  cost: {},
-  players: '5+',
+export const A173_ClayThief = defineOccupationCard({
+  meta: {
+    id: 'A173_ClayThief',
+    name: 'Clay Thief',
+    deck: 'A',
+    number: 173,
+    category: 'FOOD_PROVIDER',
+    desc: ['Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the clay on the "Hollow" action space.'],
+    cost: {},
+    players: '5+',
+  },
 })

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D149_CasualWorker } from '../../cards-display/D/D149_CasualWorker'
 
-const CARD_ID = D149_CasualWorker.id
-
+const CARD_ID = 'D149_CasualWorker'
 /**
  * D149 Casual Worker:
  * Each time another player uses the Eastern Quarry or Western Quarry,
@@ -45,7 +44,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D149_CasualWorker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D149_CasualWorker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Casual Worker',
+    deck: 'D',
+    number: 149,
+    category: 'FARM_PLANNER',
+    desc: [
+        'Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a stable without paying wood.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const D149_CasualWorker_impl = D149_CasualWorker.impl

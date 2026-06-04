@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C118_WoodCollector } from '../../cards-display/C/C118_WoodCollector'
 
-const CARD_ID = C118_WoodCollector.id
+const CARD_ID = 'C118_WoodCollector'
 
-export const C118_WoodCollector_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -20,3 +20,18 @@ export const C118_WoodCollector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C118_WoodCollector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wood Collector",
+    deck: "C",
+    number: 118,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Place 1 <WOOD> on each of the next 5 round spaces. At the start of these rounds, you get the <WOOD>."],
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const C118_WoodCollector_impl = C118_WoodCollector.impl

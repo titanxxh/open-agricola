@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { getPalisadeCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
-import { B30_WoodPalisades } from '../../cards-display/B/B30_WoodPalisades'
 
-const CARD_ID = B30_WoodPalisades.id
+const CARD_ID = 'B30_WoodPalisades'
 
-export const B30_WoodPalisades_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -13,3 +13,21 @@ export const B30_WoodPalisades_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B30_WoodPalisades = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wood Palisades',
+    deck: 'B',
+    number: 30,
+    category: 'POINTS_PROVIDER',
+    desc: ['Instead of a fence piece, you can place 2 <WOOD> from your supply on the fence spaces at the edge of your farmyard. These fence spaces with 2 <WOOD> are each worth 1 <SCORE>.'],
+    cost: { food: 1 },
+    vp: 0,
+    enablesPalisades: true,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B30_WoodPalisades_impl = B30_WoodPalisades.impl

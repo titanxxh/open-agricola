@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, GameEvent } from '../../contract/events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A41_VegetableSlicer } from '../../cards-display/A/A41_VegetableSlicer'
 
-const CARD_ID = A41_VegetableSlicer.id
-
+const CARD_ID = 'A41_VegetableSlicer'
 const COOKING_HEARTH_IDS = new Set(['Major_CookingHearth1', 'Major_CookingHearth2'])
 
 const FIREPLACE_IDS = new Set(['Major_Fireplace1', 'Major_Fireplace2'])
@@ -57,7 +56,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A41_VegetableSlicer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A41_VegetableSlicer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Vegetable Slicer',
+    deck: 'A',
+    number: 41,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you upgrade a Fireplace to a Cooking Hearth, you immediately get 2 <WOOD> and 1 <VEGETABLE> (not retroactively).'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A41_VegetableSlicer_impl = A41_VegetableSlicer.impl

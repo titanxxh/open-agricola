@@ -1,13 +1,14 @@
+import { defineOccupationCard } from '../card-source'
 import { runCardListeners, type CardListenerRegistration, type CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { stablesAction } from '../../actions/effects/stables'
 import type { ActionAvailabilityContext, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C94_StableCleaner } from '../../cards-display/C/C94_StableCleaner'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
-const CARD_ID = C94_StableCleaner.id
+const CARD_ID = 'C94_StableCleaner'
+
 const STABLES_CONTEXT = { exactCost: { wood: 1, food: 1 }, trueAction: false }
 
 const collectStablesCostDelta = (context: CardListenerContext): Partial<Resource> => {
@@ -81,7 +82,23 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C94_StableCleaner_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C94_StableCleaner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stable Cleaner',
+    deck: 'C',
+    number: 94,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['At any time, you can take the __Build Stables__ action without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C94_StableCleaner_impl = C94_StableCleaner.impl

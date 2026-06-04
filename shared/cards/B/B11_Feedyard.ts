@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B11_Feedyard } from '../../cards-display/B/B11_Feedyard'
 
-const CARD_ID = B11_Feedyard.id
+const CARD_ID = 'B11_Feedyard'
 
-export const B11_Feedyard_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, _state) => {
@@ -44,3 +44,20 @@ export const B11_Feedyard_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B11_Feedyard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Feedyard',
+    deck: 'B',
+    number: 11,
+    category: 'FARM_PLANNER',
+    desc: ['This card can hold 1 animal for each pasture you have, even different types. After the breeding phase of each harvest, you get 1 <FOOD> for each unused spot on this card.'],
+    cost: { clay: 1, grain: 1 },
+    animalHolder: true,
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const B11_Feedyard_impl = B11_Feedyard.impl

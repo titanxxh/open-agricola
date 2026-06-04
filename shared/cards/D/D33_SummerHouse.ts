@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D33_SummerHouse } from '../../cards-display/D/D33_SummerHouse'
 
-const CARD_ID = D33_SummerHouse.id
+const CARD_ID = 'D33_SummerHouse'
 
-export const D33_SummerHouse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -35,3 +35,22 @@ export const D33_SummerHouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D33_SummerHouse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Summer House",
+    deck: "D",
+    number: 33,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'During scoring, if you live in a stone house, you get 2 bonus <SCORE> for each unused farmyard space orthogonally adjacent to your house. (You still lose the points for these unused spaces.)',
+      ],
+    cost: { wood: 3, stone: 1 },
+    prerequisite: "Still in Wooden House",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D33_SummerHouse_impl = D33_SummerHouse.impl

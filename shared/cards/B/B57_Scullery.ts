@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B57_Scullery } from '../../cards-display/B/B57_Scullery'
 
-const CARD_ID = B57_Scullery.id
+const CARD_ID = 'B57_Scullery'
 
-export const B57_Scullery_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -14,3 +14,18 @@ export const B57_Scullery_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B57_Scullery = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Scullery',
+    deck: 'B',
+    number: 57,
+    category: 'FOOD_PROVIDER',
+    desc: ['At the start of each round, if you live in a wooden house, you get 1 <FOOD>.'],
+    cost: { wood: 1, clay: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B57_Scullery_impl = B57_Scullery.impl

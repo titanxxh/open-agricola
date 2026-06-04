@@ -1,13 +1,13 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
-import { B146_Illusionist } from '../../cards-display/B/B146_Illusionist'
 import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 import { playerHasCardCapability } from '../helpers/card-type'
 
-const CARD_ID = B146_Illusionist.id
+const CARD_ID = 'B146_Illusionist'
 
 const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 
@@ -155,7 +155,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B146_Illusionist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B146_Illusionist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Illusionist',
+    deck: 'B',
+    number: 146,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time you use a building resource accumulation space, you can discard exactly 1 card from your hand to get 1 additional building resource of the accumulating type.',
+      ],
+    cost: {},
+    players: '3+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B146_Illusionist_impl = B146_Illusionist.impl

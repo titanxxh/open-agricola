@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E104_SpiceTrader } from '../../cards-display/E/E104_SpiceTrader'
 
-const CARD_ID = E104_SpiceTrader.id
+const CARD_ID = 'E104_SpiceTrader'
 
-export const E104_SpiceTrader_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -21,3 +21,18 @@ export const E104_SpiceTrader_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E104_SpiceTrader = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Spice Trader',
+    deck: 'E',
+    number: 104,
+    category: 'GOODS_-_GET',
+    desc: ['If you play this card in round 4 or before, place 3 <VEGETABLE> on the space for round 11. At the start of that round, you get the <VEGETABLE>.'],
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E104_SpiceTrader_impl = E104_SpiceTrader.impl

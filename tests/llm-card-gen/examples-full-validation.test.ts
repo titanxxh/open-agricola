@@ -3,8 +3,8 @@
  *
  * For each example, three checks:
  *   1. Sandbox compile + execute (validateAndCompileCustomCode)
- *   2. PR file generation (generatePrFiles produces 6 syntactically valid TS files)
- *   3. Display/impl files cross-reference each other correctly
+ *   2. PR file generation (generatePrFiles produces 4 syntactically valid TS files)
+ *   3. Card Source file exports both UI metadata and implementation
  *
  * NOTE: We deliberately stop at "syntax + cross-ref" rather than full GameSession
  * integration because (a) each example's hook semantics are documented in markdown,
@@ -48,7 +48,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
         expect(result.valid).toBe(true)
       })
 
-      it('PR generation produces 6 syntactically valid TS files', async () => {
+      it('PR generation produces 4 syntactically valid TS files', async () => {
         const ex = get()
         const wcard = {
           id: `example-${idx}`,
@@ -65,18 +65,15 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
             resolve(REPO_ROOT, 'shared/cards/register-all.ts'),
             'utf-8',
           ),
-          upstream_auto_catalog: readFileSync(
-            resolve(REPO_ROOT, 'shared/cards/community/auto-catalog.ts'),
-            'utf-8',
-          ),
           upstream_community_md: readFileSync(
             resolve(REPO_ROOT, 'docs/community_cards.md'),
             'utf-8',
           ),
           pr_number: 1000 + idx,
         })
-        expect(files.length).toBe(6)
-        // Parse display + impl as TS — ensures no syntax errors
+        expect(files.length).toBe(4)
+        expect(files.some((f) => f.path.includes('cards-display'))).toBe(false)
+        // Parse generated TS files — ensures no syntax errors
         for (const f of files) {
           if (!f.path.endsWith('.ts')) continue
           const sf = ts.createSourceFile(
@@ -97,7 +94,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
         }
       })
 
-      it('display/impl files reference each other correctly', async () => {
+      it('card source file exports metadata and implementation correctly', async () => {
         const ex = get()
         const wcard = {
           id: `example-ref-${idx}`,
@@ -113,25 +110,18 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
             resolve(REPO_ROOT, 'shared/cards/register-all.ts'),
             'utf-8',
           ),
-          upstream_auto_catalog: readFileSync(
-            resolve(REPO_ROOT, 'shared/cards/community/auto-catalog.ts'),
-            'utf-8',
-          ),
           upstream_community_md: readFileSync(
             resolve(REPO_ROOT, 'docs/community_cards.md'),
             'utf-8',
           ),
           pr_number: 2000 + idx,
         })
-        const display = files.find(
-          (f) => f.path === `shared/cards-display/community/${ex.id}.ts`,
-        )!
-        const impl = files.find((f) => f.path === `shared/cards/community/${ex.id}.ts`)!
-        expect(display.content).toMatch(new RegExp(`export const ${ex.id} = CARD_DEF`))
-        expect(impl.content).toContain(`from '../../cards-display/community/${ex.id}'`)
-        expect(impl.content).toContain(
-          `export const ${ex.id}_impl = CARD_IMPL satisfies CardImpl`,
-        )
+        const source = files.find((f) => f.path === `shared/cards/community/${ex.id}.ts`)!
+        const factory = ex.cardType === 'occupation' ? 'defineOccupationCard' : 'defineMinorCard'
+        expect(source.content).toContain(`export const ${ex.id} = ${factory}({`)
+        expect(source.content).toContain('meta:')
+        expect(source.content).toContain('impl: cardImpl')
+        expect(source.content).toContain(`export const ${ex.id}_impl = ${ex.id}.impl`)
       })
     })
   }

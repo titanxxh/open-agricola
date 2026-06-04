@@ -4,7 +4,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
 import '../../shared/cards/E/E16_BriarHedge'
-import { E16_BriarHedge } from '../../shared/cards-display/E/E16_BriarHedge'
+import { E16_BriarHedge } from '../../shared/cards/E/E16_BriarHedge'
 import '../../shared/cards/B/B30_WoodPalisades'
 
 describe('E16_BriarHedge session', () => {

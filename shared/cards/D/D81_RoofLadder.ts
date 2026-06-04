@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D81_RoofLadder } from '../../cards-display/D/D81_RoofLadder'
 
-const CARD_ID = D81_RoofLadder.id
-
+const CARD_ID = 'D81_RoofLadder'
 const costListener: CardListenerRegistration = {
   id: 'D81-roof-ladder-compute-costs-renovation',
   cardIds: [CARD_ID],
@@ -26,7 +25,24 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-export const D81_RoofLadder_impl = {
+const cardImpl = {
   listeners: [costListener, afterListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D81_RoofLadder = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Roof Ladder',
+    deck: 'D',
+    number: 81,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time you renovate, you pay 1 fewer <REED> and, at the end of the action, you get 1 <STONE>.',
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D81_RoofLadder_impl = D81_RoofLadder.impl

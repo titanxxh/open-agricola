@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A2_ShiftingCultivation } from '../../cards-display/A/A2_ShiftingCultivation'
 
-const CARD_ID = A2_ShiftingCultivation.id
+const CARD_ID = 'A2_ShiftingCultivation'
 
-export const A2_ShiftingCultivation_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => ({
@@ -15,3 +15,19 @@ export const A2_ShiftingCultivation_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A2_ShiftingCultivation = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Shifting Cultivation',
+    deck: 'A',
+    number: 2,
+    category: 'FARM_PLANNER',
+    desc: ['Immediately plow 1 field.'],
+    cost: { food: 2 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const A2_ShiftingCultivation_impl = A2_ShiftingCultivation.impl

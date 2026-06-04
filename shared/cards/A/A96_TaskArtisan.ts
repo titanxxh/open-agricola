@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A96_TaskArtisan } from '../../cards-display/A/A96_TaskArtisan'
 
-const CARD_ID = A96_TaskArtisan.id
-
+const CARD_ID = 'A96_TaskArtisan'
 /**
  * A96 Task Artisan:
  * - onBuy: gain 1 wood + optional minor improvement action.
@@ -43,7 +42,7 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
-export const A96_TaskArtisan_impl = {
+const cardImpl = {
   listeners: [onBuyListener],
   effect: {
   id: CARD_ID,
@@ -55,3 +54,21 @@ export const A96_TaskArtisan_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A96_TaskArtisan = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Task Artisan',
+    deck: 'A',
+    number: 96,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'When you play this card and each time a stone accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A96_TaskArtisan_impl = A96_TaskArtisan.impl

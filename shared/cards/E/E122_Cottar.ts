@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E122_Cottar } from '../../cards-display/E/E122_Cottar'
 
-const CARD_ID = E122_Cottar.id
-
+const CARD_ID = 'E122_Cottar'
 const listener: CardListenerRegistration = {
   id: 'E122-cottar-after-pay',
   cardIds: [CARD_ID],
@@ -28,7 +27,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E122_Cottar_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E122_Cottar = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cottar',
+    deck: 'E',
+    number: 122,
+    category: 'BUILDING_RESOURCES_-_CLAY',
+    desc: [
+        'Each time you play or build an improvement, you get your choice of 1 <WOOD> or 1 <CLAY> immediately after paying its cost.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E122_Cottar_impl = E122_Cottar.impl

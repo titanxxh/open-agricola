@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../contract/types'
@@ -5,10 +6,8 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { B151_LittlePeasant } from '../../cards-display/B/B151_LittlePeasant'
 
-const CARD_ID = B151_LittlePeasant.id
-
+const CARD_ID = 'B151_LittlePeasant'
 const canIgnoreOccupiedSpaces = (player: PlayerState) =>
   player.houseType === 'wood' && player.rooms === 2
 
@@ -57,7 +56,23 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const B151_LittlePeasant_impl = {
+const cardImpl = {
   listeners: [onPlayListener, computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B151_LittlePeasant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Little Peasant",
+    deck: "B",
+    number: 151,
+    category: "ACTIONS_BOOSTER",
+    desc: ["You immediately get 1 <STONE>. As long as you live in a wooden house with exactly 2 rooms, actions spaces—excluding Meeting Place—are not considered occupied for you."],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const B151_LittlePeasant_impl = B151_LittlePeasant.impl

@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A146_StorehouseSteward } from '../../cards-display/A/A146_StorehouseSteward'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
-const CARD_ID = A146_StorehouseSteward.id
+const CARD_ID = 'A146_StorehouseSteward'
 
 const isFoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.food ?? 0) > 0
@@ -42,7 +42,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A146_StorehouseSteward_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A146_StorehouseSteward = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Storehouse Steward',
+    deck: 'A',
+    number: 146,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time you take exactly 2/3/4/5 <FOOD> from a food accumulation space, you also get 1 <STONE>/<REED>/<CLAY>/<WOOD>. (If you take 6 or more <FOOD>, you do not get a bonus good).'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const A146_StorehouseSteward_impl = A146_StorehouseSteward.impl

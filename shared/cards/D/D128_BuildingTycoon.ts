@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
-import { D128_BuildingTycoon } from '../../cards-display/D/D128_BuildingTycoon'
 
-const CARD_ID = D128_BuildingTycoon.id
-
+const CARD_ID = 'D128_BuildingTycoon'
 /**
  * D128 Building Tycoon:
  * Each time another player builds 1+ rooms, you can pay them 1 food
@@ -57,7 +56,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D128_BuildingTycoon_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D128_BuildingTycoon = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Building Tycoon',
+    deck: 'D',
+    number: 128,
+    category: 'FARM_PLANNER',
+    desc: [
+        'Each time after another player builds 1 or more rooms, you can give them 1 <FOOD> to build exactly 1 room yourself. (You must pay the building cost of the room.)',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D128_BuildingTycoon_impl = D128_BuildingTycoon.impl

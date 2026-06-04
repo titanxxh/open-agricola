@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
@@ -5,10 +6,8 @@ import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { D157_PartyOrganizer } from '../../cards-display/D/D157_PartyOrganizer'
 
-const CARD_ID = D157_PartyOrganizer.id
-
+const CARD_ID = 'D157_PartyOrganizer'
 const setFlagLeaf = (ownerPlayerId?: string): ActionFlow => ({
   type: 'leaf',
   actionId: 'special-effect',
@@ -52,7 +51,7 @@ const opponentGrowsToFiveListener: CardListenerRegistration = {
   },
 }
 
-export const D157_PartyOrganizer_impl = {
+const cardImpl = {
   listeners: [opponentGrowsToFiveListener],
   effect: {
     id: CARD_ID,
@@ -66,3 +65,19 @@ export const D157_PartyOrganizer_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D157_PartyOrganizer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Party Organizer',
+    deck: 'D',
+    number: 157,
+    category: 'FOOD_PROVIDER',
+    desc: ["As soon as the next player but you gains their 5th person, you immediately get 8 <FOOD> (not retroactively). During scoring, if only you have 5 people, you get 3 bonus <SCORE>."],
+    players: '4+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D157_PartyOrganizer_impl = D157_PartyOrganizer.impl

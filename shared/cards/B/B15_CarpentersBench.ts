@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
+import type { BonusModifier } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
-import { B15_CarpentersBench } from '../../cards-display/B/B15_CarpentersBench'
 
-const CARD_ID = B15_CarpentersBench.id
-
+const CARD_ID = 'B15_CarpentersBench'
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
@@ -62,7 +62,29 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-export const B15_CarpentersBench_impl = {
+const cardImpl = {
   listeners: [afterCollectListener],
+  modifiers: [{
+    type: 'bonus',
+    cardId: 'B15_CarpentersBench',
+    appliesTo: ['fencing'],
+    discount: { wood: 1 },
+  } as BonusModifier],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B15_CarpentersBench = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carpenter's Bench",
+    deck: 'B',
+    number: 15,
+    category: 'FARM_PLANNER',
+    desc: ["Immediately after each time you use a wood accumulation space, you can use the taken wood (and only that) to build exactly 1 pasture. If you do, one of the fences is free."],
+    cost: { wood: 1 },
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B15_CarpentersBench_impl = B15_CarpentersBench.impl

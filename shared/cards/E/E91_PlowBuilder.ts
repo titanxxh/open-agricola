@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E91_PlowBuilder } from '../../cards-display/E/E91_PlowBuilder'
 
-const CARD_ID = E91_PlowBuilder.id
-
+const CARD_ID = 'E91_PlowBuilder'
 const JOINERY_SOURCE_PREFIX = 'Major_Joinery'
 
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
@@ -69,7 +68,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const E91_PlowBuilder_impl = {
+const cardImpl = {
   listeners: [tradeAppliedListener, anytimeListener],
   effect: {
     id: CARD_ID,
@@ -83,3 +82,19 @@ export const E91_PlowBuilder_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E91_PlowBuilder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Plow Builder',
+    deck: 'E',
+    number: 91,
+    desc: ['You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 field.'],
+    cost: {},
+    players: '1+',
+    category: 'FARMYARD_-_PLOWING',
+  },
+  impl: cardImpl,
+})
+
+export const E91_PlowBuilder_impl = E91_PlowBuilder.impl

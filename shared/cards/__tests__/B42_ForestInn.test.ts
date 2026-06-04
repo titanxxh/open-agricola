@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { B42_ForestInn } from '../../cards-display/B/B42_ForestInn'
+import { B42_ForestInn } from '../../cards/B/B42_ForestInn'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import type { PlayerState } from '../../contract/types'
 

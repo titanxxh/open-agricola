@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
@@ -7,10 +8,8 @@ import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../domain/space'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { A130_MummysBoy } from '../../cards-display/A/A130_MummysBoy'
 
-const CARD_ID = A130_MummysBoy.id
-
+const CARD_ID = 'A130_MummysBoy'
 /**
  * A130 Mummy's Boy:
  * Once per round, when placing a person after your first two, you can place it on the
@@ -89,7 +88,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const A130_MummysBoy_impl = {
+const cardImpl = {
   listeners: [computeArgsListener, afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
@@ -102,3 +101,22 @@ export const A130_MummysBoy_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A130_MummysBoy = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Mummy's Boy",
+    deck: 'A',
+    number: 130,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        "Once per round, when placing a person after your first two, you can place it on the action space with your 2nd person and use that space again, unless it is on the __Meeting Place__ action space.",
+      ],
+    cost: {},
+    players: '3+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const A130_MummysBoy_impl = A130_MummysBoy.impl

@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B162_ForestClearer } from '../../cards-display/B/B162_ForestClearer'
 
-const CARD_ID = B162_ForestClearer.id
-
+const CARD_ID = 'B162_ForestClearer'
 /**
  * B162 Forest Clearer:
  * Each time you obtain exactly 2/3/4 wood from a wood accumulation space,
@@ -39,7 +38,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B162_ForestClearer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B162_ForestClearer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forest Clearer',
+    deck: 'B',
+    number: 162,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time you obtain exactly 2/3/4 <WOOD> from a wood accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>.',
+      ],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B162_ForestClearer_impl = B162_ForestClearer.impl

@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B107_Manservant } from '../../cards-display/B/B107_Manservant'
 
-const CARD_ID = B107_Manservant.id
-
+const CARD_ID = 'B107_Manservant'
 /**
  * B107 Manservant
  * Once you live in a stone house, place 3 food on each remaining round space.
@@ -47,7 +46,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B107_Manservant_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -55,3 +54,21 @@ export const B107_Manservant_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B107_Manservant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Manservant',
+    deck: 'B',
+    number: 107,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Once you live in a stone house, place 3 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B107_Manservant_impl = B107_Manservant.impl

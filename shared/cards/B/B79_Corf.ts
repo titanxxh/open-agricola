@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B79_Corf } from '../../cards-display/B/B79_Corf'
 
-const CARD_ID = B79_Corf.id
-
+const CARD_ID = 'B79_Corf'
 /**
  * B79 Corf (Minor Improvement):
  * Each time any player (including you) takes at least 3 Stone from an
@@ -30,7 +29,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B79_Corf_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B79_Corf = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Corf',
+    deck: 'B',
+    number: 79,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time any player (including you) takes at least 3 <STONE> from an accumulation space, you get 1 <STONE> from the general supply.',
+      ],
+    cost: { reed: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B79_Corf_impl = B79_Corf.impl

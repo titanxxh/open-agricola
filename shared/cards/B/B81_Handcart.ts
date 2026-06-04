@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
-import { B81_Handcart } from '../../cards-display/B/B81_Handcart'
 
-const CARD_ID = B81_Handcart.id
-
+const CARD_ID = 'B81_Handcart'
 const THRESHOLDS: Record<string, number> = {
   wood: 6,
   clay: 5,
@@ -14,7 +13,7 @@ const THRESHOLDS: Record<string, number> = {
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-export const B81_Handcart_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (state, _player) => {
@@ -46,3 +45,19 @@ export const B81_Handcart_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B81_Handcart = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Handcart',
+    deck: 'B',
+    number: 81,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Before each work phase, you can take 1 building resource from at most one <WOOD>/<CLAY>/<REED>/<STONE> accumulation space containing at least 6/5/4/4 building resources of the same type.'],
+    cost: { wood: 1 },
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const B81_Handcart_impl = B81_Handcart.impl

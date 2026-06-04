@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
@@ -43,7 +44,23 @@ const masterWorkmanIsDoableListener: CardListenerRegistration = {
   },
 }
 
-export const A126_MasterWorkman_impl = {
+const cardImpl = {
   listeners: [masterWorkmanBeforeListener, masterWorkmanIsDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A126_MasterWorkman = defineOccupationCard({
+  meta: {
+    id: "A126_MasterWorkman",
+    name: "Master Workman",
+    deck: "A",
+    number: 126,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Each time before you use an action space card on round spaces 1/2/3/4, you get 1 <WOOD>/<CLAY>/<REED>/<STONE>."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const A126_MasterWorkman_impl = A126_MasterWorkman.impl

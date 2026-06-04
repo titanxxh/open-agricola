@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
@@ -5,7 +6,7 @@ import { paretoOptimal } from '../helpers/pareto-bonus'
 
 const CARD_ID = 'C99_GardenDesigner'
 
-export const C99_GardenDesigner_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     computeCostedBonus: (_state, player, _ctx) => {
@@ -28,3 +29,20 @@ export const C99_GardenDesigner_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C99_GardenDesigner = defineOccupationCard({
+  meta: {
+    id: "C99_GardenDesigner",
+    name: "Garden Designer",
+    deck: "C",
+    number: 99,
+    category: "POINTS_PROVIDER",
+    desc: ["At the start of scoring, you can place <FOOD> in empty fields. You get 1/2/3 bonus <SCORE> for each field in which you place 1/4/7 <FOOD>."],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C99_GardenDesigner_impl = C99_GardenDesigner.impl

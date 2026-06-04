@@ -1,6 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 
-export const C32_AbortOriel_impl = {
+const CARD_ID = 'C32_AbortOriel'
+
+const cardImpl = {
   /**
    * C32 Abort Oriel: cannot be played once any player already has 5 or more
    * cards in front of them. ("May be played as your fifth card" — i.e. you
@@ -19,3 +22,20 @@ export const C32_AbortOriel_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C32_AbortOriel = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Abort Oriel',
+    deck: 'C',
+    number: 32,
+    category: 'POINTS_PROVIDER',
+    desc: ['You can no longer play this card when any player (including you) has 5 or more cards in front of them.'],
+    cost: { clay: 2 },
+    vp: 3,
+    prerequisite: 'see below',
+  },
+  impl: cardImpl,
+})
+
+export const C32_AbortOriel_impl = C32_AbortOriel.impl

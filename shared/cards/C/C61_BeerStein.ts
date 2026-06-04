@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C61_BeerStein } from '../../cards-display/C/C61_BeerStein'
 
-const CARD_ID = C61_BeerStein.id
-
+const CARD_ID = 'C61_BeerStein'
 const listener: CardListenerRegistration = {
   id: 'C61-beer-stein-after-bake-bread',
   cardIds: [CARD_ID],
@@ -20,7 +19,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C61_BeerStein_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C61_BeerStein = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Beer Stein',
+    deck: 'C',
+    number: 61,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you take a __Bake Bread__ action, you can use this card once to turn 1 <GRAIN> into 2 <FOOD> and 1 bonus <SCORE>.',
+      ],
+    cost: { clay: 1 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C61_BeerStein_impl = C61_BeerStein.impl

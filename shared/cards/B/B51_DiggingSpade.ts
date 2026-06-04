@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { PlayerState, Pasture } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B51_DiggingSpade } from '../../cards-display/B/B51_DiggingSpade'
 
-const CARD_ID = B51_DiggingSpade.id
-
+const CARD_ID = 'B51_DiggingSpade'
 /**
  * B51 Digging Spade — Each time you use a clay accumulation space,
  * you also get a number of FOOD equal to the number of PIG (boar) in your farmyard.
@@ -43,7 +42,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B51_DiggingSpade_impl = {
+const cardImpl = {
   // BGA isBuyable: turn < 7 → false.
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
@@ -52,3 +51,21 @@ export const B51_DiggingSpade_impl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B51_DiggingSpade = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Digging Spade',
+    deck: 'B',
+    number: 51,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time you use a clay accumulation space, you also get a number of <FOOD> equal to the number of <PIG> in your farmyard.',
+      ],
+    cost: { wood: 1 },
+    prerequisite: 'Play in Round 7 or Later',
+  },
+  impl: cardImpl,
+})
+
+export const B51_DiggingSpade_impl = B51_DiggingSpade.impl

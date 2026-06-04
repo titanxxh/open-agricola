@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
@@ -5,10 +6,8 @@ import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B29_CookeryLesson } from '../../cards-display/B/B29_CookeryLesson'
 
-const CARD_ID = B29_CookeryLesson.id
-
+const CARD_ID = 'B29_CookeryLesson'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const COOKED_TOKEN_KEY = 'cookedActionToken'
@@ -96,7 +95,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const B29_CookeryLesson_impl = {
+const cardImpl = {
   listeners: [afterExchangeListener, afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
@@ -124,3 +123,23 @@ export const B29_CookeryLesson_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B29_CookeryLesson = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cookery Lesson',
+    deck: 'B',
+    number: 29,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'Each time you use a __Lessons__ action space and a cooking improvement on the same turn, you get 1 bonus <SCORE>.',
+      ],
+    cost: { food: 2 },
+    extraVp: true,
+    evenMoreSet: true,
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const B29_CookeryLesson_impl = B29_CookeryLesson.impl

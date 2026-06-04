@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C81_MaterialHub } from '../../cards-display/C/C81_MaterialHub'
 
-const CARD_ID = C81_MaterialHub.id
-
+const CARD_ID = 'C81_MaterialHub'
 const THRESHOLDS: Record<string, number> = {
   wood: 5,
   clay: 4,
@@ -71,7 +70,7 @@ const collectListener: CardListenerRegistration = {
   },
 }
 
-export const C81_MaterialHub_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) =>
     (player.resources.reed ?? 0) >= 1 && (player.resources.stone ?? 0) >= 1,
   listeners: [collectListener],
@@ -92,3 +91,21 @@ export const C81_MaterialHub_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C81_MaterialHub = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Material Hub',
+    deck: 'C',
+    number: 81,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Immediately place 2 of each building resource on this card. Each time any player (including you) takes at least 5 <WOOD>, 4 <CLAY>, 3 <REED>, or 3 <STONE>, you get 1 of that building resource from this card.',
+      ],
+    cost: { wood: 1, clay: 1 },
+    prerequisite: '1 reed and 1 stone in your supply',
+  },
+  impl: cardImpl,
+})
+
+export const C81_MaterialHub_impl = C81_MaterialHub.impl

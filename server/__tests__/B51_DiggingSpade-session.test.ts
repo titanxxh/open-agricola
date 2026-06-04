@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { B51_DiggingSpade } from '../../shared/cards-display/B/B51_DiggingSpade'
+import { B51_DiggingSpade } from '../../shared/cards/B/B51_DiggingSpade'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B51_DiggingSpade'

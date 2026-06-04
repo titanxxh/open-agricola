@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { E116_FirCutter } from '../../cards-display/E/E116_FirCutter'
 
-const CARD_ID = E116_FirCutter.id
-
+const CARD_ID = 'E116_FirCutter'
 /**
  * E116 Fir Cutter:
  * When you play this card, you immediately get 1 food.
@@ -55,7 +54,26 @@ const animalMarketListener: CardListenerRegistration = {
   },
 }
 
-export const E116_FirCutter_impl = {
+const cardImpl = {
   listeners: [onBuyListener, animalMarketListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E116_FirCutter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Fir Cutter',
+    deck: 'E',
+    number: 116,
+    category: 'BUILDING_RESOURCES_-_WOOD',
+    desc: [
+        'When you play this card, you immediately get 1 <FOOD>. Each time after you use an animal accumulation space with your 1st/2nd/3rd/4th/5th person, you get 1/1/2/2/3 <WOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const E116_FirCutter_impl = E116_FirCutter.impl

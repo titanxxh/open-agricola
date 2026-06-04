@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { E109_BraidMaker } from '../../shared/cards-display/E/E109_BraidMaker'
-import { A143_Stonecutter } from '../../shared/cards-display/A/A143_Stonecutter'
+import { E109_BraidMaker } from '../../shared/cards/E/E109_BraidMaker'
+import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'E109_BraidMaker'

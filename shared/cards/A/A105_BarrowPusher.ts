@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A105_BarrowPusher } from '../../cards-display/A/A105_BarrowPusher'
 
-const CARD_ID = A105_BarrowPusher.id
-
+const CARD_ID = 'A105_BarrowPusher'
 const listener: CardListenerRegistration = {
   id: 'A105-barrow-pusher-after-plow',
   cardIds: [CARD_ID],
@@ -16,7 +15,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A105_BarrowPusher_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A105_BarrowPusher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Barrow Pusher",
+    deck: "A",
+    number: 105,
+    category: "GOODS_PROVIDER",
+    desc: ["For each new field tile you get, you also get 1 <CLAY> and 1 <FOOD>."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const A105_BarrowPusher_impl = A105_BarrowPusher.impl

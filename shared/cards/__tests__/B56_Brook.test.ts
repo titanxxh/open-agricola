@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../registry-display'
 import '../B/B56_Brook'
 import type { GameState, PlayerState } from '../../contract/types'
 

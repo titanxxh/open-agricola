@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C113_WinterCaretaker } from '../../cards-display/C/C113_WinterCaretaker'
 
-const CARD_ID = C113_WinterCaretaker.id
+const CARD_ID = 'C113_WinterCaretaker'
 
-export const C113_WinterCaretaker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
@@ -23,3 +23,21 @@ export const C113_WinterCaretaker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C113_WinterCaretaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Winter Caretaker',
+    deck: 'C',
+    number: 113,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 1 <GRAIN>. At the end of each harvest, you can buy exactly 1 <VEGETABLE> for 2 <FOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C113_WinterCaretaker_impl = C113_WinterCaretaker.impl

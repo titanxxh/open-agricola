@@ -3,7 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../D/D17_DrillHarrow'
-import { D17_DrillHarrow as D17Card } from '../../cards-display/D/D17_DrillHarrow'
+import { D17_DrillHarrow as D17Card } from '../../cards/D/D17_DrillHarrow'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D17_DrillHarrow'

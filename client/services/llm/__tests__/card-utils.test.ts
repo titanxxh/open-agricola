@@ -5,22 +5,25 @@ import { extractCardFromResponse } from '../card-utils'
 const SAMPLE_WITH_LOCALES = `\`\`\`typescript
 const CARD_ID = 'CUSTOM_TestCard'
 
-const CARD_DEF = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Test Card',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Effect text in English.'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '测试卡',
-      desc: ['中文效果文本。'],
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Test Card',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect text in English.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '测试卡',
+        desc: ['中文效果文本。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {}
 \`\`\``
@@ -28,25 +31,28 @@ const CARD_IMPL = {}
 const SAMPLE_WITH_PREREQUISITE_LOCALE = `\`\`\`typescript
 const CARD_ID = 'CUSTOM_AdvancedCard'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Advanced Worker',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Effect line one.', 'Effect line two.'],
-  cost: {},
-  vp: 0,
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  implemented: true,
-  locales: {
-    zh: {
-      name: '高级工人',
-      desc: ['效果第一行。', '效果第二行。'],
-      prerequisite: '2 张职业卡',
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Advanced Worker',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect line one.', 'Effect line two.'],
+    cost: {},
+    vp: 0,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    implemented: true,
+    locales: {
+      zh: {
+        name: '高级工人',
+        desc: ['效果第一行。', '效果第二行。'],
+        prerequisite: '2 张职业卡',
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {}
 \`\`\``
@@ -54,16 +60,19 @@ const CARD_IMPL = {}
 const SAMPLE_WITHOUT_LOCALES = `\`\`\`typescript
 const CARD_ID = 'CUSTOM_LegacyCard'
 
-const CARD_DEF = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Legacy Card',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Old card with no locales block.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-})
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Legacy Card',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Old card with no locales block.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+  },
+}
 
 const CARD_IMPL = {}
 \`\`\``

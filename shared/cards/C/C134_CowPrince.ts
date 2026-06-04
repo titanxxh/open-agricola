@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C134_CowPrince } from '../../cards-display/C/C134_CowPrince'
 
-const CARD_ID = C134_CowPrince.id
+const CARD_ID = 'C134_CowPrince'
 
-export const C134_CowPrince_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -16,3 +16,20 @@ export const C134_CowPrince_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C134_CowPrince = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Cow Prince",
+    deck: "C",
+    number: 134,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each space in your farmyard (including rooms) holding at least 1 <CATTLE>."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C134_CowPrince_impl = C134_CowPrince.impl

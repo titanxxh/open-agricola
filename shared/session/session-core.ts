@@ -725,9 +725,6 @@ export class GameCore {
         }
       }
     }
-    // Sync modifier definitions from catalog into per-session registry.
-    // Replaces the former card-modifiers.ts catalog-direct-query path; downstream
-    // callers (`getCardModifiers`) read from `active.getModifiers` only.
     this.cardRegistry.syncModifiersFromCatalog(
       allOccupationCards,
       allMinorImprovementCards,

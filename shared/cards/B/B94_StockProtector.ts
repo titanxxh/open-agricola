@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { B94_StockProtector } from '../../cards-display/B/B94_StockProtector'
 
-const CARD_ID = B94_StockProtector.id
-
+const CARD_ID = 'B94_StockProtector'
 const beforeListener: CardListenerRegistration = {
   id: 'B94-stock-protector-before-fencing',
   cardIds: [CARD_ID],
@@ -48,7 +47,23 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const B94_StockProtector_impl = {
+const cardImpl = {
   listeners: [beforeListener, afterListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B94_StockProtector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stock Protector",
+    deck: "B",
+    number: 94,
+    category: "ACTIONS_BOOSTER",
+    desc: ["Each time before you use the __Fencing__ action space, you get 2 <WOOD>. Immediately after that __Fencing__ action, you can place another person."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const B94_StockProtector_impl = B94_StockProtector.impl

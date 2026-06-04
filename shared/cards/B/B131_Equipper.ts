@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B131_Equipper } from '../../cards-display/B/B131_Equipper'
 
-const CARD_ID = B131_Equipper.id
-
+const CARD_ID = 'B131_Equipper'
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
@@ -28,7 +27,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B131_Equipper_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B131_Equipper = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Equipper',
+    deck: 'B',
+    number: 131,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Immediately after each time you use a wood accumulation space, you can play a minor improvement.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B131_Equipper_impl = B131_Equipper.impl

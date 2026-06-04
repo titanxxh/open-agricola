@@ -1,3 +1,4 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
@@ -56,7 +57,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const E161_ElderBaker_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, _player) => {
@@ -71,3 +72,19 @@ export const E161_ElderBaker_impl = {
   listeners: [stoneOvenCandidateListener],
   reaches: [STONE_OVEN_ID] as readonly string[],
 } satisfies CardImpl
+
+export const E161_ElderBaker = definePlayerActionCard({
+  meta: {
+    id: "E161_ElderBaker",
+    name: "Elder Baker",
+    deck: "E",
+    number: 161,
+    desc: ["This card is an action space for you only. When you use it, you get 3 <GRAIN>. You can build the __Stone Oven__ major improvement even when taking a __Minor Improvement__ action."],
+    cost: {},
+    players: "4+",
+    category: 'CROPS',
+  },
+  impl: cardImpl,
+})
+
+export const E161_ElderBaker_impl = E161_ElderBaker.impl

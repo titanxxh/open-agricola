@@ -1,3 +1,26 @@
+import { defineMinorCard } from '../card-source'
+/**
+ * B22 Walking Boots — Minor Improvement
+ *
+ * BGA `B22_WalkingBoots::onBuy` returns NODE_SEQ children:
+ *   1. gainNode([FOOD => 2])
+ *   2. PLACE_FARMER args { fromSupply: true, source, markForRemoval: true }
+ *
+ * The placed farmer is "marked for removal": at the start of the next
+ * returning-home phase, BGA removes it from play (deactivates) and returns
+ * it to the supply.
+ *
+ * Implementation:
+ *   - onBuy emits SEQ(gain food:2, place-farmer fromSupply markForRemoval).
+ *     The `place-farmer` leaf carries `actionContext.fromSupply` (already
+ *     supported by `placeFarmerAction.execute`) and `markForRemoval` (handled
+ *     by `placeFarmerAction.resolveChoice`, which writes the chosen spaceId
+ *     to `cardStates[B22].extraData.markedSpaceId`).
+ *   - onReturnHome reads markedSpaceId, finds the worker on that space,
+ *     deactivates it, removes it from the action space's takenBy, and
+ *     clears the flag so the effect is one-shot per buy.
+ */
+
 import { gainLeaf } from '../helpers/pay-gain-node'
 import {
   readCardExtraData,
@@ -6,11 +29,10 @@ import {
 import { familySize } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B22_WalkingBoots } from '../../cards-display/B/B22_WalkingBoots'
 
-const CARD_ID = B22_WalkingBoots.id
+const CARD_ID = 'B22_WalkingBoots'
 
-export const B22_WalkingBoots_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => familySize(player) <= 4,
   effect: {
     id: CARD_ID,
@@ -61,3 +83,19 @@ export const B22_WalkingBoots_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B22_WalkingBoots = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Walking Boots',
+    deck: 'B',
+    number: 22,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['You immediately get 2 <FOOD>. You must immediately place a person from your supply. If you do, in the next returning home phase, you must remove that person from play.'],
+    cost: {},
+    prerequisite: 'At Most 4 People',
+  },
+  impl: cardImpl,
+})
+
+export const B22_WalkingBoots_impl = B22_WalkingBoots.impl

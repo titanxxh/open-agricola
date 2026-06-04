@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import {
   collectOccupationActionPaymentOptions,
@@ -11,9 +12,8 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
 import { LESSONS_SPACE_IDS, isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { B93_Confidant } from '../../cards-display/B/B93_Confidant'
 
-const CARD_ID = B93_Confidant.id
+const CARD_ID = 'B93_Confidant'
 const MIN_FUTURE_FOOD = 2
 
 const readOccupationBaseCost = (context: CardListenerContext): Partial<Resource> => {
@@ -122,7 +122,7 @@ const receiveFlow = (round: number): ActionFlow => ({
   ],
 })
 
-export const B93_Confidant_impl = {
+const cardImpl = {
   listeners: [minimumScheduleListener],
   effect: {
   id: CARD_ID,
@@ -140,3 +140,19 @@ export const B93_Confidant_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B93_Confidant = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Confidant',
+    deck: 'B',
+    number: 93,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Place 1 <FOOD> from your supply on each of the next 2, 3, or 4 round spaces. At the start of these rounds, you get the <FOOD> back and your choice of a __Sow__ or __Build Fences__ action.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B93_Confidant_impl = B93_Confidant.impl

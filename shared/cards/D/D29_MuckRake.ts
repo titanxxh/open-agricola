@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D29_MuckRake } from '../../cards-display/D/D29_MuckRake'
 
-const CARD_ID = D29_MuckRake.id
+const CARD_ID = 'D29_MuckRake'
 
-export const D29_MuckRake_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -17,3 +17,21 @@ export const D29_MuckRake_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D29_MuckRake = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Muck Rake",
+    deck: "D",
+    number: 29,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced stable holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced stables.',
+      ],
+    cost: { wood: 1 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D29_MuckRake_impl = D29_MuckRake.impl

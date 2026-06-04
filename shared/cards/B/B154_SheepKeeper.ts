@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B154_SheepKeeper } from '../../cards-display/B/B154_SheepKeeper'
 
-const CARD_ID = B154_SheepKeeper.id
-
+const CARD_ID = 'B154_SheepKeeper'
 const anytimeListener: CardListenerRegistration = {
   id: 'B154-sheep-keeper-anytime',
   cardIds: [CARD_ID],
@@ -31,8 +30,26 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const B154_SheepKeeper_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => player.resources.sheep < 7,
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B154_SheepKeeper = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sheep Keeper',
+    deck: 'B',
+    number: 154,
+    category: 'POINTS_PROVIDER',
+    desc: ['You can only play this card if you have less than 7 <SHEEP>. Once this game, when you have 7 <SHEEP> on your farm, you immediately get 3 bonus <SCORE> and 2 <FOOD>.'],
+    cost: {},
+    players: '4+',
+    prerequisite: 'Less Than 7 Sheep',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B154_SheepKeeper_impl = B154_SheepKeeper.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E59_CombandCutter } from '../../cards-display/E/E59_CombandCutter'
 
-const CARD_ID = E59_CombandCutter.id
-
+const CARD_ID = 'E59_CombandCutter'
 const listener: CardListenerRegistration = {
   id: 'E59-comb-and-cutter-before-place-farmer',
   cardIds: [CARD_ID],
@@ -21,7 +20,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E59_CombandCutter_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E59_CombandCutter = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Comb and Cutter',
+    deck: 'E',
+    number: 59,
+    category: 'FOOD',
+    desc: ['Each time you use the __Day Laborer__ action space, you get 1 additional <FOOD> for each <SHEEP> on the __Sheep Market__ accumulation space, up to a maximum of 4 additional <FOOD>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E59_CombandCutter_impl = E59_CombandCutter.impl

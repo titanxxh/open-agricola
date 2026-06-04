@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A12_DrinkingTrough } from '../../cards-display/A/A12_DrinkingTrough'
 
-const CARD_ID = A12_DrinkingTrough.id
+const CARD_ID = 'A12_DrinkingTrough'
 
-export const A12_DrinkingTrough_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     computePastureCapacityModifiers: () => [{
@@ -14,3 +14,18 @@ export const A12_DrinkingTrough_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A12_DrinkingTrough = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Drinking Trough",
+    deck: "A",
+    number: 12,
+    category: "FARM_PLANNER",
+    desc: ["Each of your pastures (with or without a stable) can hold up to 2 more animals."],
+    cost: { clay: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A12_DrinkingTrough_impl = A12_DrinkingTrough.impl

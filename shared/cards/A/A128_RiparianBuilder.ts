@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A128_RiparianBuilder } from '../../cards-display/A/A128_RiparianBuilder'
 
-const CARD_ID = A128_RiparianBuilder.id
-
+const CARD_ID = 'A128_RiparianBuilder'
 const triggerBuildListener: CardListenerRegistration = {
   id: 'A128-riparian-builder-after-opponent-reed-bank',
   cardIds: [CARD_ID],
@@ -43,7 +42,23 @@ const constructDiscountListener: CardListenerRegistration = {
   },
 }
 
-export const A128_RiparianBuilder_impl = {
+const cardImpl = {
   listeners: [triggerBuildListener, constructDiscountListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A128_RiparianBuilder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Riparian Builder",
+    deck: "A",
+    number: 128,
+    category: "FARM_PLANNER",
+    desc: ["Each time another player uses the __Reed Bank__ accumulation space, you can build a room: if you build a clay/stone room, you get a discount of 1 <CLAY>/2 <STONE>."],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const A128_RiparianBuilder_impl = A128_RiparianBuilder.impl

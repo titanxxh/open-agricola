@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C152_Puppeteer } from '../../cards-display/C/C152_Puppeteer'
 
-const CARD_ID = C152_Puppeteer.id
-
+const CARD_ID = 'C152_Puppeteer'
 /**
  * C152 Puppeteer:
  * Each time another player uses the Traveling Players accumulation space,
@@ -50,7 +49,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C152_Puppeteer_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C152_Puppeteer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Puppeteer',
+    deck: 'C',
+    number: 152,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time another player uses the __Traveling Players__ accumulation space, you can pay them 1 <FOOD> to immediately play an occupation without paying an occupation cost.',
+      ],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C152_Puppeteer_impl = C152_Puppeteer.impl

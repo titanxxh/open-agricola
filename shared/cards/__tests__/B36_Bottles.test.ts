@@ -3,7 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../B/B36_Bottles'
-import { B36_Bottles as B36Card } from '../../cards-display/B/B36_Bottles'
+import { B36_Bottles as B36Card } from '../../cards/B/B36_Bottles'
 
 import { setActiveWorkerCount } from '../../domain/player'
 import type { CardListenerContext } from '../card-listeners'

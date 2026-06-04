@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C3_CarriageTrip } from '../../cards-display/C/C3_CarriageTrip'
 
-const CARD_ID = C3_CarriageTrip.id
+const CARD_ID = 'C3_CarriageTrip'
 
-export const C3_CarriageTrip_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -24,3 +24,20 @@ export const C3_CarriageTrip_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C3_CarriageTrip = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carriage Trip",
+    deck: "C",
+    number: 3,
+    category: "ACTIONS_BOOSTER",
+    desc: ["If you play this card in the work phase, you can immediately place another person."],
+    cost: {},
+    passing: true,
+    prerequisite: "1 Person yet to Place",
+  },
+  impl: cardImpl,
+})
+
+export const C3_CarriageTrip_impl = C3_CarriageTrip.impl

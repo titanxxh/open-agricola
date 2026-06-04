@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A142_Cordmaker } from '../../cards-display/A/A142_Cordmaker'
 
-const CARD_ID = A142_Cordmaker.id
-
+const CARD_ID = 'A142_Cordmaker'
 /**
  * A142 Cordmaker:
  * scope 'any' -- when any player collects 2+ reed from the Reed Bank:
@@ -45,7 +44,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A142_Cordmaker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A142_Cordmaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cordmaker',
+    deck: 'A',
+    number: 142,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time any player (including you) takes at least 2 <REED> from the __Reed Bank__ accumulation space, you can choose to take 1 <GRAIN> or buy 1 <VEGETABLE> for 2 <FOOD>.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const A142_Cordmaker_impl = A142_Cordmaker.impl

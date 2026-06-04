@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D66_PotterCeramics } from '../../cards-display/D/D66_PotterCeramics'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 
-const CARD_ID = D66_PotterCeramics.id
+const CARD_ID = 'D66_PotterCeramics'
 
 /**
  * Before bake-bread: exchange 1 clay for 1 grain. Trigger-select handles
@@ -50,7 +50,22 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const D66_PotterCeramics_impl = {
+const cardImpl = {
   listeners: [beforeBakeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D66_PotterCeramics = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Potter Ceramics",
+    deck: "D",
+    number: 66,
+    category: "CROP_PROVIDER",
+    desc: ["Each time before you take a __Bake Bread__ action, you can exchange 1 <CLAY> for 1 <GRAIN>."],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const D66_PotterCeramics_impl = D66_PotterCeramics.impl

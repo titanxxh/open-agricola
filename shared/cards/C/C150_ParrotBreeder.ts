@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState } from '../../contract/types'
@@ -10,10 +11,8 @@ import {
 import { payLeaf } from '../helpers/pay-gain-node'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
-import { C150_ParrotBreeder } from '../../cards-display/C/C150_ParrotBreeder'
 
-const CARD_ID = C150_ParrotBreeder.id
-
+const CARD_ID = 'C150_ParrotBreeder'
 const RIGHT_KEY = 'right'
 
 /**
@@ -167,7 +166,7 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const C150_ParrotBreeder_impl = {
+const cardImpl = {
   listeners: [
     afterPlaceFarmerSelfListener,
     afterPlaceFarmerOpponentListener,
@@ -182,3 +181,22 @@ export const C150_ParrotBreeder_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C150_ParrotBreeder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Parrot Breeder',
+    deck: 'C',
+    number: 150,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'On your turn, if you pay 1 <GRAIN> to the general supply, you can use the same action space (unless it is the __Meeting Place__ action space) that the player to your right has just used on their turn (not retroactive).',
+      ],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C150_ParrotBreeder_impl = C150_ParrotBreeder.impl

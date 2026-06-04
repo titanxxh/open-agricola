@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C9_AutomaticWaterTrough } from '../../cards-display/C/C9_AutomaticWaterTrough'
 
-const CARD_ID = C9_AutomaticWaterTrough.id
-
+const CARD_ID = 'C9_AutomaticWaterTrough'
 /**
  * C9 Automatic Water Trough — Minor Improvement
  *
@@ -49,7 +48,7 @@ const canAccommodate = (state: GameState, player: PlayerState, type: 'sheep' | '
   return false
 }
 
-export const C9_AutomaticWaterTrough_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player): ActionFlow | undefined => {
@@ -88,3 +87,19 @@ export const C9_AutomaticWaterTrough_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C9_AutomaticWaterTrough = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Automatic Water Trough',
+    deck: 'C',
+    number: 9,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['If you can accommodate the animal, you can immediately buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
+    cost: { wood: 1 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const C9_AutomaticWaterTrough_impl = C9_AutomaticWaterTrough.impl

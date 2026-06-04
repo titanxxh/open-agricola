@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { A46_ClawKnife } from '../../cards-display/A/A46_ClawKnife'
 
-const CARD_ID = A46_ClawKnife.id
-
+const CARD_ID = 'A46_ClawKnife'
 const listener: CardListenerRegistration = {
   id: 'A46-claw-knife-after-place-farmer',
   cardIds: [CARD_ID],
@@ -24,8 +23,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A46_ClawKnife_impl = {
+const cardImpl = {
   listeners: [listener],
   prerequisiteCheck: (player) => player.pastures.length === 1,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A46_ClawKnife = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Claw Knife',
+    deck: 'A',
+    number: 46,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Sheep Market__ accumulation space, place 1 <FOOD> on each of the next 2 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: { wood: 1 },
+    vp: 1,
+    prerequisite: 'Exactly 1 Pasture',
+  },
+  impl: cardImpl,
+})
+
+export const A46_ClawKnife_impl = A46_ClawKnife.impl

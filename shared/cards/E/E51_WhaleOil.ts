@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E51_WhaleOil } from '../../cards-display/E/E51_WhaleOil'
 
-const CARD_ID = E51_WhaleOil.id
-
+const CARD_ID = 'E51_WhaleOil'
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
@@ -65,7 +64,7 @@ const occupationListener: CardListenerRegistration = {
   },
 }
 
-export const E51_WhaleOil_impl = {
+const cardImpl = {
   listeners: [fishingListener, occupationListener],
   effect: {
   id: CARD_ID,
@@ -76,3 +75,18 @@ export const E51_WhaleOil_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E51_WhaleOil = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Whale Oil',
+    deck: 'E',
+    number: 51,
+    category: 'FOOD',
+    desc: ['Each time you use __Fishing__, place 1 <FOOD> from the general supply on this card. Each time before you play an occupation, you get <FOOD> equal to the amount on this card.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E51_WhaleOil_impl = E51_WhaleOil.impl

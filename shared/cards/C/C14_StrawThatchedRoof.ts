@@ -1,5 +1,6 @@
-import { MinorImprovement } from '../../cards-display/types'
+import { defineMinorCard } from '../card-source'
 import type { BonusModifier } from '../../contract/types'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C14_StrawThatchedRoof'
 
@@ -13,28 +14,36 @@ const CARD_ID = 'C14_StrawThatchedRoof'
  * caps at available cost. This effectively removes all reed from the cost.
  */
 
-export const C14_StrawThatchedRoof = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Straw-Thatched Roof',
-  deck: 'C',
-  number: 14,
-  category: 'FARM_PLANNER',
-  desc: ['You no longer need <REED> to renovate or build a room.'],
-  cost: {},
-  vp: 1,
-  prerequisite: '3 Grain Fields',
+export const C14_StrawThatchedRoof = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Straw-Thatched Roof',
+    deck: 'C',
+    number: 14,
+    category: 'FARM_PLANNER',
+    desc: ['You no longer need <REED> to renovate or build a room.'],
+    cost: {},
+    vp: 1,
+    prerequisite: '3 Grain Fields',
+  },
+  impl: {
   modifiers: [
-    {
-      type: 'bonus',
-      cardId: CARD_ID,
-      appliesTo: ['construct'],
-      discount: { reed: 99 },
-    },
-    {
-      type: 'bonus',
-      cardId: CARD_ID,
-      appliesTo: ['renovation'],
-      discount: { reed: 99 },
-    },
-  ] as BonusModifier[],
+    ...([
+        {
+          type: 'bonus',
+          cardId: CARD_ID,
+          appliesTo: ['construct'],
+          discount: { reed: 99 },
+        },
+        {
+          type: 'bonus',
+          cardId: CARD_ID,
+          appliesTo: ['renovation'],
+          discount: { reed: 99 },
+        },
+      ] as BonusModifier[]),
+  ],
+} satisfies CardImpl,
 })
+
+export const C14_StrawThatchedRoof_impl = C14_StrawThatchedRoof.impl

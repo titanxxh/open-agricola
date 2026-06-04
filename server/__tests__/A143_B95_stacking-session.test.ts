@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A143_Stonecutter } from '../../shared/cards-display/A/A143_Stonecutter'
-import { B95_MasterBricklayer } from '../../shared/cards-display/B/B95_MasterBricklayer'
+import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
+import { B95_MasterBricklayer } from '../../shared/cards/B/B95_MasterBricklayer'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 // Keep side-effect imports referenced.

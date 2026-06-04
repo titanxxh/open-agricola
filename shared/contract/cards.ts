@@ -1,6 +1,6 @@
 // Pure card-related types. Sourced from S6a split of shared/cards/types.ts.
 
-import type { Resource, PaymentResourceMap, CostModifier, TradeSideEffect, ComplexCost } from './types'
+import type { Resource, PaymentResourceMap, TradeSideEffect, ComplexCost } from './types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
@@ -51,8 +51,6 @@ export type CardDefinition = {
   improvementPrerequisites?: CardPrerequisites
   players?: string
   passing?: boolean
-  modifier?: CostModifier
-  modifiers?: CostModifier[]
   exchanges?: CardExchange[]
   implemented?: boolean
   evenMoreSet?: boolean

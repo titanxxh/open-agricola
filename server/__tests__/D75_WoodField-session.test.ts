@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { D75_WoodField } from '../../shared/cards-display/D/D75_WoodField'
+import { D75_WoodField } from '../../shared/cards/D/D75_WoodField'
 import {
   getMinorImprovementCard,
   isFieldCard,

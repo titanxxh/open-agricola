@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B4_WoodPile } from '../../cards-display/B/B4_WoodPile'
 
-const CARD_ID = B4_WoodPile.id
+const CARD_ID = 'B4_WoodPile'
 
-export const B4_WoodPile_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
@@ -22,3 +22,19 @@ export const B4_WoodPile_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B4_WoodPile = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wood Pile",
+    deck: "B",
+    number: 4,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["You immediately get a number of <WOOD> equal to the number of people you have on accumulation spaces."],
+    cost: {},
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const B4_WoodPile_impl = B4_WoodPile.impl

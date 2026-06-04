@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A159_JoineroftheSea } from '../../cards-display/A/A159_JoineroftheSea'
 
-const CARD_ID = A159_JoineroftheSea.id
-
+const CARD_ID = 'A159_JoineroftheSea'
 /**
  * A159 Joiner of the Sea:
  * Each time another player uses Fishing or Reed Bank,
@@ -48,7 +47,26 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A159_JoineroftheSea_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A159_JoineroftheSea = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Joiner of the Sea',
+    deck: 'A',
+    number: 159,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time another player uses the __Fishing__/__Reed Bank__ accumulation space, you can give them 1 <WOOD> to get 2 <FOOD>/3 <FOOD> from the general supply.',
+      ],
+    cost: {},
+    players: '4+',
+    waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const A159_JoineroftheSea_impl = A159_JoineroftheSea.impl

@@ -17,12 +17,11 @@ import { generatePrFiles } from '../code-gen'
 const REPO_ROOT = resolve(__dirname, '../../..')
 
 // Slow test: copies repo into tmpdir, writes generated files, runs tsc + generate.
-// Validates that the 6-file PR output from `generatePrFiles` is self-consistent:
+// Validates that the 4-file PR output from `generatePrFiles` is self-consistent:
 //   1. The generated tree compiles under `tsc --noEmit -p tsconfig.app.json`
 //   2. Re-running `scripts/generate-register-all.ts` on the generated tree
-//      produces a byte-identical `register-all.ts` and `community/auto-catalog.ts`.
-// This catches drift between the inline patcher (`patchRegisterAll` /
-// `patchCommunityAutoCatalog`) and the canonical scanner in
+//      produces a byte-identical `register-all.ts`.
+// This catches drift between `patchRegisterAll` and the canonical scanner in
 // `generate-register-all.ts`.
 //
 // Note: docs/community_cards.md is patched by patchCommunityCardsMarkdown but
@@ -30,7 +29,7 @@ const REPO_ROOT = resolve(__dirname, '../../..')
 // here — diff would be vacuous.
 describe('PR files self-consistency (S9-B2)', () => {
   it(
-    'generated 6 files compile under tsc + auto-catalog matches generate-register-all rerun',
+    'generated 4 files compile under tsc + register-all matches generate-register-all rerun',
     { timeout: 120_000 },
     async () => {
       const wcard = {
@@ -48,10 +47,6 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         join(REPO_ROOT, 'shared/cards/register-all.ts'),
         'utf-8',
       )
-      const upstream_auto_catalog = readFileSync(
-        join(REPO_ROOT, 'shared/cards/community/auto-catalog.ts'),
-        'utf-8',
-      )
       const upstream_community_md = readFileSync(
         join(REPO_ROOT, 'docs/community_cards.md'),
         'utf-8',
@@ -62,11 +57,10 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         wcard,
         github_login: 'snapshot',
         upstream_register_all,
-        upstream_auto_catalog,
         upstream_community_md,
         pr_number: 999,
       })
-      expect(files.length).toBe(6)
+      expect(files.length).toBe(4)
 
       // 2. Mirror repo into tmpdir + apply files
       const tmp = mkdtempSync(join(tmpdir(), 's9-pr-snapshot-'))
@@ -121,14 +115,14 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         }
 
         // 3. Run tsc --noEmit on the app project — exercises the full
-        // shared/ + cards-display + community graph including the new card.
+        // shared/ + cards + community graph including the new card.
         execFileSync('./node_modules/.bin/tsc', [
           '--noEmit',
           '-p',
           'tsconfig.app.json',
         ], {
           cwd: tmp,
-          stdio: 'pipe',
+          stdio: 'inherit',
         })
 
         // 4. Run generate-register-all and compare against the patcher output.
@@ -138,15 +132,6 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
           cwd: tmp,
           stdio: 'pipe',
         })
-
-        const regeneratedAutoCatalog = readFileSync(
-          join(tmp, 'shared/cards/community/auto-catalog.ts'),
-          'utf-8',
-        )
-        const expectedAutoCatalog = files.find(
-          (f) => f.path === 'shared/cards/community/auto-catalog.ts',
-        )!.content
-        expect(regeneratedAutoCatalog).toBe(expectedAutoCatalog)
 
         const regeneratedRegister = readFileSync(
           join(tmp, 'shared/cards/register-all.ts'),

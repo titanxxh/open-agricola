@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E120_ScrapCollector } from '../../cards-display/E/E120_ScrapCollector'
 
-const CARD_ID = E120_ScrapCollector.id
+const CARD_ID = 'E120_ScrapCollector'
 
-export const E120_ScrapCollector_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -39,3 +39,18 @@ export const E120_ScrapCollector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E120_ScrapCollector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Scrap Collector',
+    deck: 'E',
+    number: 120,
+    category: 'BUILDING_RESOURCES_-_CLAY_(AND_WOOD)',
+    desc: ['Alternate placing 1 <WOOD> and 1 <CLAY> on each of the next 6 round spaces, starting with <WOOD>. At the start of these rounds, you get the respective resource.'],
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E120_ScrapCollector_impl = E120_ScrapCollector.impl

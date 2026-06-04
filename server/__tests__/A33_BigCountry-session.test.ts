@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A33_BigCountry } from '../../shared/cards-display/A/A33_BigCountry'
+import { A33_BigCountry } from '../../shared/cards/A/A33_BigCountry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
 

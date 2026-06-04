@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../../cards-display/types'
+import { defineMinorCard } from '../card-source'
 
 const CARD_ID = 'D59_EarthOven'
 
@@ -10,30 +10,33 @@ const CARD_ID = 'D59_EarthOven'
  * BGA: isCookery=true, isBakingImprovement=true, returnCards = Fireplace variants.
  * VP: 3.
  */
-export const D59_EarthOven = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Earth Oven',
-  deck: 'D',
-  number: 59,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    '[Anytime]',
-    '<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>',
-    '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>',
-    '[__Bake Bread__ action:]',
-    '<GRAIN> <ARROW> 2<FOOD>',
-  ],
-  vp: 3,
-  cost: {},
-  isCookery: true,
-  isBaking: true,
-  returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
-  alsoCountsAs: ['major'],
-  exchanges: [
-    { from: { vegetable: 1 }, to: { food: 3 }, triggers: ['anytime'] },
-    { from: { sheep: 1 }, to: { food: 2 }, triggers: ['anytime'] },
-    { from: { boar: 1 }, to: { food: 3 }, triggers: ['anytime'] },
-    { from: { cattle: 1 }, to: { food: 3 }, triggers: ['anytime'] },
-    { from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] },
-  ],
+
+export const D59_EarthOven = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Earth Oven',
+    deck: 'D',
+    number: 59,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        '[Anytime]',
+        '<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>',
+        '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>',
+        '[__Bake Bread__ action:]',
+        '<GRAIN> <ARROW> 2<FOOD>',
+      ],
+    vp: 3,
+    cost: {},
+    isCookery: true,
+    isBaking: true,
+    returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
+    alsoCountsAs: ['major'],
+    exchanges: [
+        { from: { vegetable: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+        { from: { sheep: 1 }, to: { food: 2 }, triggers: ['anytime'] },
+        { from: { boar: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+        { from: { cattle: 1 }, to: { food: 3 }, triggers: ['anytime'] },
+        { from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] },
+      ],
+  },
 })

@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { D28_WritingDesk } from '../../cards-display/D/D28_WritingDesk'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 
-const CARD_ID = D28_WritingDesk.id
+const CARD_ID = 'D28_WritingDesk'
 
 const listener: CardListenerRegistration = {
   id: 'D28-writing-desk-before-place-farmer',
@@ -29,7 +29,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D28_WritingDesk_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D28_WritingDesk = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Writing Desk',
+    deck: 'D',
+    number: 28,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Each time you use a __Lessons__ action space, you can play 1 additional occupation for an occupation cost of 2 <FOOD>.'],
+    cost: { wood: 1 },
+    vp: 1,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const D28_WritingDesk_impl = D28_WritingDesk.impl

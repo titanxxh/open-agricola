@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E9_BarteringHut } from '../../cards-display/E/E9_BarteringHut'
 
-const CARD_ID = E9_BarteringHut.id
+const CARD_ID = 'E9_BarteringHut'
 
-export const E9_BarteringHut_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => {
@@ -46,3 +46,18 @@ export const E9_BarteringHut_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E9_BarteringHut = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bartering Hut',
+    deck: 'E',
+    number: 9,
+    category: 'PASSING_-_ANIMAL',
+    desc: ['Up to two times: Immediately spend any 2/3/4 building resources for 1 <SHEEP>/<PIG>/<CATTLE> from the general supply.'],
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const E9_BarteringHut_impl = E9_BarteringHut.impl

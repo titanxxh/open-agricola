@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E79_FieldSpade } from '../../cards-display/E/E79_FieldSpade'
 
-const CARD_ID = E79_FieldSpade.id
-
+const CARD_ID = 'E79_FieldSpade'
 const listener: CardListenerRegistration = {
   id: 'E79-field-spade-after-sow',
   cardIds: [CARD_ID],
@@ -16,7 +15,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E79_FieldSpade_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E79_FieldSpade = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Field Spade',
+    deck: 'E',
+    number: 79,
+    category: 'BUILDING_RESOURCES_-_STONE',
+    desc: ['Each time after you sow in at least 1 field, you get 1 <STONE>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E79_FieldSpade_impl = E79_FieldSpade.impl

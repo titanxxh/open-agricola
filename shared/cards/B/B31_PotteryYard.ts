@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { playerHasCardCapability } from '../helpers/card-type'
-import { B31_PotteryYard } from '../../cards-display/B/B31_PotteryYard'
 
-const CARD_ID = B31_PotteryYard.id
+const CARD_ID = 'B31_PotteryYard'
 
-export const B31_PotteryYard_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) =>
     playerHasCardCapability(player, 'potteryIdentity', { asType: 'major' }),
   effect: {
@@ -48,3 +48,23 @@ export const B31_PotteryYard_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B31_PotteryYard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pottery Yard',
+    deck: 'B',
+    number: 31,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'During the scoring, if there are at least 2 orthogonally adjacent unused spaces in your farm, you get 2 bonus <SCORE>. (You still get the negative points for those unused spaces.',
+      ],
+    cost: {},
+    vp: 1,
+    prerequisite: 'Pottery (or an Upgrade Thereof)',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B31_PotteryYard_impl = B31_PotteryYard.impl

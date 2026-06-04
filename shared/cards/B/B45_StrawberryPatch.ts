@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { B45_StrawberryPatch } from '../../cards-display/B/B45_StrawberryPatch'
 
-const CARD_ID = B45_StrawberryPatch.id
+const CARD_ID = 'B45_StrawberryPatch'
 
-export const B45_StrawberryPatch_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) =>
     player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length >= 2,
   effect: {
@@ -22,3 +22,20 @@ export const B45_StrawberryPatch_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B45_StrawberryPatch = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Strawberry Patch',
+    deck: 'B',
+    number: 45,
+    category: 'FOOD_PROVIDER',
+    desc: ['Place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: { wood: 1 },
+    vp: 2,
+    prerequisite: '2 Vegetable Fields',
+  },
+  impl: cardImpl,
+})
+
+export const B45_StrawberryPatch_impl = B45_StrawberryPatch.impl

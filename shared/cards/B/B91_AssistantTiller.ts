@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B91_AssistantTiller } from '../../cards-display/B/B91_AssistantTiller'
 
-const CARD_ID = B91_AssistantTiller.id
-
+const CARD_ID = 'B91_AssistantTiller'
 const listener: CardListenerRegistration = {
   id: 'B91-assistant-tiller-after-place-farmer',
   cardIds: [CARD_ID],
@@ -24,7 +23,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B91_AssistantTiller_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B91_AssistantTiller = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Assistant Tiller',
+    deck: 'B',
+    number: 91,
+    category: 'FARM_PLANNER',
+    desc: ['Each time you use the __Day Laborer__ action space, you can also plow 1 field.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B91_AssistantTiller_impl = B91_AssistantTiller.impl

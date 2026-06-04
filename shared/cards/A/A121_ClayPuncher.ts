@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { A121_ClayPuncher } from '../../cards-display/A/A121_ClayPuncher'
 
-const CARD_ID = A121_ClayPuncher.id
-
+const CARD_ID = 'A121_ClayPuncher'
 const listener: CardListenerRegistration = {
   id: 'A121-clay-puncher-after-lessons-clay',
   cardIds: [CARD_ID],
@@ -18,7 +17,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A121_ClayPuncher_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -26,3 +25,21 @@ export const A121_ClayPuncher_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A121_ClayPuncher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Clay Puncher",
+    deck: "A",
+    number: 121,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: [
+        "When you play this card and each time after you use a __Lessons__ action space or the __Clay Pit__ accumulation space, you get 1 <CLAY>.",
+      ],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const A121_ClayPuncher_impl = A121_ClayPuncher.impl

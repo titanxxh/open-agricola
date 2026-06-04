@@ -66,7 +66,7 @@ function loadTs() {
   // Key by deck+number (e.g. 'A100') to align with loadBga canonical bucket key.
   const map = new Map<string, TsCard>()
   for (const deck of ['A', 'B', 'C', 'D', 'E']) {
-    const dir = path.join(REPO_ROOT, 'shared/cards-display', deck)
+    const dir = path.join(REPO_ROOT, 'shared/cards', deck)
     if (!fs.existsSync(dir)) continue
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.ts')) continue
@@ -104,7 +104,7 @@ function main() {
     for (const dev of allFixDevs) {
       const id = dev.id
       const deck = id[0]
-      const tsPath = path.join(REPO_ROOT, 'shared/cards-display', deck, id + '.ts')
+      const tsPath = path.join(REPO_ROOT, 'shared/cards', deck, id + '.ts')
       if (!fs.existsSync(tsPath)) {
         console.warn(`Skip missing TS file: ${tsPath}`)
         continue

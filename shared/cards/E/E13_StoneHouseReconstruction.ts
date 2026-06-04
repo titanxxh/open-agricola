@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E13_StoneHouseReconstruction } from '../../cards-display/E/E13_StoneHouseReconstruction'
 
-const CARD_ID = E13_StoneHouseReconstruction.id
-
+const CARD_ID = 'E13_StoneHouseReconstruction'
 /**
  * E13 Stone House Reconstruction — At any time, you can renovate your clay house
  * to a stone house without placing a person. (You must pay the normal renovation cost.)
@@ -38,7 +37,23 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const E13_StoneHouseReconstruction_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E13_StoneHouseReconstruction = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stone House Reconstruction',
+    deck: 'E',
+    number: 13,
+    category: 'FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION',
+    desc: ['At any time, you can renovate your clay house to a stone house without placing a person. (You must pay the normal renovation cost.)'],
+    cost: { stone: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const E13_StoneHouseReconstruction_impl = E13_StoneHouseReconstruction.impl

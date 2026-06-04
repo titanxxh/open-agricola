@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B25_BreadPaddle } from '../../cards-display/B/B25_BreadPaddle'
 
-const CARD_ID = B25_BreadPaddle.id
-
+const CARD_ID = 'B25_BreadPaddle'
 const listener: CardListenerRegistration = {
   id: 'B25-bread-paddle-after-occupation',
   cardIds: [CARD_ID],
@@ -25,7 +24,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B25_BreadPaddle_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -33,3 +32,20 @@ export const B25_BreadPaddle_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B25_BreadPaddle = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bread Paddle',
+    deck: 'B',
+    number: 25,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'When you play this card, you immediately get 1 <FOOD>. For each occupation you play, you get an additional __Bake Bread__ action.',
+      ],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B25_BreadPaddle_impl = B25_BreadPaddle.impl

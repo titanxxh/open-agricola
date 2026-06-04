@@ -1090,7 +1090,7 @@ describe('InteractionBar', () => {
           number: 112,
           type: 'occupation',
         },
-        module: 'shared/cards-display/A/A112_ScytheWorker',
+        module: 'shared/cards/A/A112_ScytheWorker',
         reaches: [],
       },
     }

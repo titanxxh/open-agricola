@@ -1,12 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { E125_DelayedWayfarer } from '../../cards-display/E/E125_DelayedWayfarer'
 import { hasInactiveWorkerInSupply } from '../../domain/player'
 
-const CARD_ID = E125_DelayedWayfarer.id
+const CARD_ID = 'E125_DelayedWayfarer'
 
 const PLAYED_ROUND_KEY = 'playedRound'
 
@@ -37,7 +37,7 @@ const buildingChoiceFlow = (): ActionFlow => ({
   ],
 })
 
-export const E125_DelayedWayfarer_impl = {
+const cardImpl = {
   listeners: [{
   id: 'E125-isDoable-place-farmer-from-supply',
   cardIds: [CARD_ID],
@@ -76,3 +76,21 @@ export const E125_DelayedWayfarer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E125_DelayedWayfarer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Delayed Wayfarer',
+    deck: 'E',
+    number: 125,
+    category: 'BUILDING_RESOURCES_-_ALL',
+    desc: [
+        'When you play this card, you immediately get 1 building resource of your choice and, once all people have been placed this round, you can place a person from your supply.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E125_DelayedWayfarer_impl = E125_DelayedWayfarer.impl

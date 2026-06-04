@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import { isFieldCard } from '../catalog'
 import type { CardImpl } from '../registry'
-import { C80_RockyTerrain } from '../../cards-display/C/C80_RockyTerrain'
 
-const CARD_ID = C80_RockyTerrain.id
-
+const CARD_ID = 'C80_RockyTerrain'
 /**
  * C80 Rocky Terrain (BGA `Cards/C/C80_RockyTerrain.php`):
  *   "Each time you plow a field (tile or card), you can also buy 1 STONE for 1 FOOD."
@@ -63,7 +62,23 @@ const occupationFieldListener: CardListenerRegistration = {
   },
 }
 
-export const C80_RockyTerrain_impl = {
+const cardImpl = {
   listeners: [plowListener, improvementFieldListener, occupationFieldListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C80_RockyTerrain = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Rocky Terrain',
+    deck: 'C',
+    number: 80,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time you plow a field (tile or card), you can also buy 1 <STONE> for 1 <FOOD>.'],
+    cost: { food: 1 },
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C80_RockyTerrain_impl = C80_RockyTerrain.impl

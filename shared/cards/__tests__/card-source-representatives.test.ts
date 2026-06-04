@@ -12,7 +12,7 @@ import { confirmPlayerSwitch } from '../../../server/__tests__/_helpers/pending-
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '../../..')
-const cardsDisplayRoot = path.join(repoRoot, 'shared/cards-display')
+const cardsDisplayRoot = path.join(repoRoot, 'shared/cards')
 
 const manifest = () => buildCardsManifest(cardsDisplayRoot)
 

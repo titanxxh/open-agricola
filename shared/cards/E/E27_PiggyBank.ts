@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E27_PiggyBank } from '../../cards-display/E/E27_PiggyBank'
 
-const CARD_ID = E27_PiggyBank.id
-
+const CARD_ID = 'E27_PiggyBank'
 const FOOD_KEY = 'food'
 
 const FOOD_THRESHOLD = 6
@@ -97,7 +96,7 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
-export const E27_PiggyBank_impl = {
+const cardImpl = {
   listeners: [anytimeListener, computeCostsListener, updateInfoboxListener],
   effect: {
   id: CARD_ID,
@@ -127,3 +126,18 @@ export const E27_PiggyBank_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E27_PiggyBank = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Piggy Bank',
+    deck: 'E',
+    number: 27,
+    desc: ['At the end of each work phase, you can place 1 <FOOD> on this card, irretrievably. At any time, you can discard 6 <FOOD> from this card to build a major improvement at no cost.'],
+    cost: {},
+    category: 'ACTION_-_IMPROVEMENT',
+  },
+  impl: cardImpl,
+})
+
+export const E27_PiggyBank_impl = E27_PiggyBank.impl

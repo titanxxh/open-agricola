@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { E143_Hewer } from '../../cards-display/E/E143_Hewer'
 
-const CARD_ID = E143_Hewer.id
+const CARD_ID = 'E143_Hewer'
 
-export const E143_Hewer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, _player) => {
@@ -38,3 +38,21 @@ export const E143_Hewer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E143_Hewer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hewer',
+    deck: 'E',
+    number: 143,
+    category: 'BUILDING_RESOURCES_-_CLAY_OR_STONE',
+    desc: [
+        'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const E143_Hewer_impl = E143_Hewer.impl

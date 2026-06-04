@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { allCommunityCards } from '../auto-catalog'
+import {
+  implementedCommunityMinors,
+  implementedCommunityOccupations,
+} from '../../catalog'
 import { ALL_CARD_IMPLS } from '../../register-all'
+
+const allCommunityCards = [
+  ...implementedCommunityMinors,
+  ...implementedCommunityOccupations,
+]
 
 describe('community deck — load shape invariants', () => {
   it('every community card id starts with CUSTOM_', () => {

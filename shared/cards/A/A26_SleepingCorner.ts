@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { A26_SleepingCorner } from '../../cards-display/A/A26_SleepingCorner'
 
-const CARD_ID = A26_SleepingCorner.id
-
+const CARD_ID = 'A26_SleepingCorner'
 /**
  * A26 Sleeping Corner — You can use any __Wish for Children__ action space
  * even if it is occupied by one other player's person.
@@ -39,7 +38,24 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const A26_SleepingCorner_impl = {
+const cardImpl = {
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A26_SleepingCorner = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sleeping Corner',
+    deck: 'A',
+    number: 26,
+    category: 'ACTIONS_BOOSTER',
+    desc: ["You can use any __Wish for Children__ action space even if it is occupied by one other player's person."],
+    cost: { wood: 1 },
+    vp: 1,
+    prerequisite: '2 Grain Fields',
+  },
+  impl: cardImpl,
+})
+
+export const A26_SleepingCorner_impl = A26_SleepingCorner.impl

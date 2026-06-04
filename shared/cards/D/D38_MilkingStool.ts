@@ -1,9 +1,8 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D38_MilkingStool } from '../../cards-display/D/D38_MilkingStool'
 
-const CARD_ID = D38_MilkingStool.id
-
+const CARD_ID = 'D38_MilkingStool'
 const cattleFoodIncome = (cattle: number): number => {
   if (cattle >= 5) return 3
   if (cattle >= 3) return 2
@@ -11,7 +10,7 @@ const cattleFoodIncome = (cattle: number): number => {
   return 0
 }
 
-export const D38_MilkingStool_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
@@ -25,3 +24,23 @@ export const D38_MilkingStool_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D38_MilkingStool = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Milking Stool",
+    deck: "D",
+    number: 38,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'In the field phase of each harvest, if you have at least 1/3/5 <CATTLE>, you get 1/2/3 <FOOD>. During scoring, you get 1 bonus <SCORE> for every 2 <CATTLE> you have.',
+      ],
+    cost: { wood: 1 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D38_MilkingStool_impl = D38_MilkingStool.impl

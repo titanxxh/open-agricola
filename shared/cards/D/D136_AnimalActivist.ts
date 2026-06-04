@@ -1,9 +1,8 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D136_AnimalActivist } from '../../cards-display/D/D136_AnimalActivist'
 
-const CARD_ID = D136_AnimalActivist.id
-
+const CARD_ID = 'D136_AnimalActivist'
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
   if (remaining >= 9) return 4
@@ -12,7 +11,7 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   return 0
 }
 
-export const D136_AnimalActivist_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -30,3 +29,22 @@ export const D136_AnimalActivist_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D136_AnimalActivist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Animal Activist",
+    deck: "D",
+    number: 136,
+    category: "POINTS_PROVIDER",
+    desc: [
+        'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced stables gets 2 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D136_AnimalActivist_impl = D136_AnimalActivist.impl

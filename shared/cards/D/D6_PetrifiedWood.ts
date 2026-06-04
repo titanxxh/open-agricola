@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D6_PetrifiedWood } from '../../cards-display/D/D6_PetrifiedWood'
 
-const CARD_ID = D6_PetrifiedWood.id
+const CARD_ID = 'D6_PetrifiedWood'
 
-export const D6_PetrifiedWood_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -28,3 +28,21 @@ export const D6_PetrifiedWood_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D6_PetrifiedWood = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Petrified Wood',
+    deck: 'D',
+    number: 6,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Immediately exchange up to 3 <WOOD> for 1 <STONE> each.'],
+    cost: {},
+    passing: true,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const D6_PetrifiedWood_impl = D6_PetrifiedWood.impl

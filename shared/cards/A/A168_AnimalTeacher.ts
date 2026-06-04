@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
-import { A168_AnimalTeacher } from '../../cards-display/A/A168_AnimalTeacher'
 
-const CARD_ID = A168_AnimalTeacher.id
-
+const CARD_ID = 'A168_AnimalTeacher'
 const listener: CardListenerRegistration = {
   id: 'A168-animal-teacher-after-place-farmer',
   cardIds: [CARD_ID],
@@ -41,7 +40,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A168_AnimalTeacher_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A168_AnimalTeacher = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Animal Teacher',
+    deck: 'A',
+    number: 168,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['Immediately after each time you use a __Lessons__ action space, you can also buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A168_AnimalTeacher_impl = A168_AnimalTeacher.impl

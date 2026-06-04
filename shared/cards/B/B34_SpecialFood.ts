@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -8,10 +9,8 @@ import {
 } from '../helpers/card-state'
 import { sumActionSpaceMovedToTriggerPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
-import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
 
-const CARD_ID = B34_SpecialFood.id
-
+const CARD_ID = 'B34_SpecialFood'
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
@@ -118,7 +117,24 @@ const afterListener: CardListenerRegistration = {
   },
 }
 
-export const B34_SpecialFood_impl = {
+const cardImpl = {
   listeners: [beforeListener, afterListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B34_SpecialFood = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Special Food",
+    deck: "B",
+    number: 34,
+    category: "POINTS_PROVIDER",
+    desc: ["The next time you take animals from an accumulation space and accommodate all of them on your farm, you get 1 bonus <SCORE> for each of these animals."],
+    cost: {},
+    prerequisite: "No Animal",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B34_SpecialFood_impl = B34_SpecialFood.impl

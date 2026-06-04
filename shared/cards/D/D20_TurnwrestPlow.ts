@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { D20_TurnwrestPlow } from '../../cards-display/D/D20_TurnwrestPlow'
 
-const CARD_ID = D20_TurnwrestPlow.id
-
+const CARD_ID = 'D20_TurnwrestPlow'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
@@ -56,7 +55,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D20_TurnwrestPlow_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -66,3 +65,20 @@ export const D20_TurnwrestPlow_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D20_TurnwrestPlow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Turnwrest Plow',
+    deck: 'D',
+    number: 20,
+    category: 'FARM_PLANNER',
+    desc: ['Place 2 field tiles on this card. Each time you use the __Farmland__ or __Cultivation__ action space, you can also plow up to 2 fields from this card.'],
+    cost: { wood: 3 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const D20_TurnwrestPlow_impl = D20_TurnwrestPlow.impl

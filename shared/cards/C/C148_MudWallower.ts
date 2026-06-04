@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
@@ -6,10 +7,8 @@ import { initCardState } from '../__stubs__/helpers'
 import { sumResourcePaid } from '../helpers/event-provenance'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { C148_MudWallower } from '../../cards-display/C/C148_MudWallower'
 
-const CARD_ID = C148_MudWallower.id
-
+const CARD_ID = 'C148_MudWallower'
 /**
  * C148 Mud Wallower:
  * Every fourth time you use an accumulation space, you get 1 PIG, held by this card.
@@ -151,7 +150,7 @@ const afterPaySyncListener: CardListenerRegistration = {
   },
 }
 
-export const C148_MudWallower_impl = {
+const cardImpl = {
   listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, afterPaySyncListener, afterReorgSyncListener],
   effect: {
   id: CARD_ID,
@@ -182,3 +181,21 @@ export const C148_MudWallower_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C148_MudWallower = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mud Wallower',
+    deck: 'C',
+    number: 148,
+    category: 'FARM_PLANNER',
+    desc: ['Every fourth time you use an accumulation space, you get 1 <PIG>, held by this card.'],
+    cost: {},
+    animalHolder: true,
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C148_MudWallower_impl = C148_MudWallower.impl

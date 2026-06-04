@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { C47_GardenClaw } from '../../cards-display/C/C47_GardenClaw'
 
-const CARD_ID = C47_GardenClaw.id
+const CARD_ID = 'C47_GardenClaw'
 
-export const C47_GardenClaw_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -24,3 +24,18 @@ export const C47_GardenClaw_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C47_GardenClaw = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Garden Claw",
+    deck: "C",
+    number: 47,
+    category: "FOOD_PROVIDER",
+    desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C47_GardenClaw_impl = C47_GardenClaw.impl

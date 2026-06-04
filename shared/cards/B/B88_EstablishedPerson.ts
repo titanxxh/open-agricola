@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B88_EstablishedPerson } from '../../cards-display/B/B88_EstablishedPerson'
 
-const CARD_ID = B88_EstablishedPerson.id
+const CARD_ID = 'B88_EstablishedPerson'
 
-export const B88_EstablishedPerson_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (_state, player) => {
@@ -29,3 +29,19 @@ export const B88_EstablishedPerson_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B88_EstablishedPerson = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Established Person',
+    deck: 'B',
+    number: 88,
+    category: 'FARM_PLANNER',
+    desc: ['If your house has exactly 2 rooms, immediately renovate it without paying any building resources. If you do, you can immediately afterward take a __Build Fences__ action.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B88_EstablishedPerson_impl = B88_EstablishedPerson.impl
