@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerScoreSummary } from '../../shared/domain'
 import type { ClientInteractionState, GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
 import { rehydrateStateForClient, type ClientGameState } from '../services/rehydrate'
-import { registerCustomCard } from '../../shared/cards/custom-registry'
+import { registerCustomCardMetadata } from '../../shared/cards/custom-card-metadata'
 
 export const useGameSync = () => {
   const [state, setState] = useState<ClientGameState | null>(null)
@@ -28,13 +28,10 @@ export const useGameSync = () => {
 
   const applySnapshot = useCallback((payload: GameSyncPayload) => {
     if (!mountedRef.current) return
-    // Register custom card definitions so they resolve via getMinorImprovement/getOccupation
+    // Register custom card metadata for frontend display.
     if (payload.customCardDefs) {
       for (const def of payload.customCardDefs) {
-        registerCustomCard(
-          { cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl },
-          { allowGlobal: true },
-        )
+        registerCustomCardMetadata({ cardType: def.cardType, cardJson: def.cardJson, artUrl: def.artUrl })
       }
     }
     const hydrated = rehydrateStateForClient(payload.state)
