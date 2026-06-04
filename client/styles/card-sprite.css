@@ -385,17 +385,18 @@
 /* Alt cost (multi-choice, e.g. 2W/2C/2S) */
 .card-cost-alt {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
   height: 96.35px;
   overflow: hidden;
   padding-right: 4px;
-  gap: 1px;
+  gap: 3px;
 }
 .card-cost-alt .card-cost-option {
   display: inline-flex;
   align-items: center;
+  gap: 3px;
 }
 .card-cost-alt .card-cost-text {
   height: auto;
@@ -405,7 +406,9 @@
   background-image: none !important;
 }
 .card-cost-alt .card-cost-separator {
-  display: none;
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
 }
 .card-cost-alt .card-res-icon {
   font-size: 20px;
