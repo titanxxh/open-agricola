@@ -69,12 +69,12 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `C94_StableCleaner` | 46 | 85 | 1.85 | 原因：anytime build stables 要按 exact cost `{wood:1, food:1}`，同时 probe `computeCosts.stables` 让 C88 等折扣参与可支付判断。基础设施状态：`stablesAction.costPreview`、`runCardListeners`、stable supply helper 已可表达；不是开放债。 |
 | `C105_BasketCarrier` | 23 | 42 | 1.83 | 原因：主要是 display metadata 的 harvest exchange，比 BGA PHP 短实现还长。基础设施状态：harvest exchange metadata 已可表达；不是实现复杂度债。 |
 | `B157_Salter` | 107 | 194 | 1.81 | 原因：anytime 要选择并移除不同动物数量，再按动物种类生成不同轮数 future food，并验证只从 board animal 取。基础设施状态：`resource-quantity-select`、assigned animal helper、subtract animal、future meeple 已在 main；不是开放债。 |
-| `E156_ClaypitOwner` | 36 | 65 | 1.81 | 原因：对手打 improvement 后要判断打出的 major/minor printed cost 是否含 clay，而不是看实际支付。基础设施状态：major/minor lookup 与 payment cost parser 已可表达；可抽 printed-cost helper，不是 umbrella blocker。 |
+| `E156_ClaypitOwner` | 36 | 65 | 1.81 | 原因：对手打 improvement 后要判断打出的 major/minor printed cost 是否含 clay，而不是看实际支付。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`，按 printed/base cost candidates 取目标资源最大值；不是 umbrella blocker。 |
 | `E96_Elder` | 21 | 37 | 1.76 | 原因：手牌区 round 1 before-start optional 免费打本职业，需要 hand hook 和 exact cost。基础设施状态：handHooks、`occupation` allowedCards / exactCost 已在 main；不是开放债。 |
 | `D91_Plowman` | 29 | 51 | 1.76 | 原因：购买时按 +4/+7/+10 轮排多个 future plow opportunity，round start 再可选付 food plow。基础设施状态：future meeple、round-start hook、pay+plow flow 已可表达；不是开放债。 |
 | `A130_MummysBoy` | 57 | 99 | 1.74 | 原因：每轮一次，追踪第 2 个工人的行动格，并在第 3 个及以后放人时注入 occupied choice 和 flag。基础设施状态：round placement helper、occupied choice prefix、card flag 已在 main；不是开放债。 |
 | `A19_Handplow` | 26 | 45 | 1.73 | 原因：购买后排一个未来回合 optional plow，并在触发后清 card state。基础设施状态：future meeple 与 round-start hook 已可表达；不是开放债。 |
-| `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：要从 major/minor/altCosts 读取 printed wood cost，再注入 food→wood trade。基础设施状态：improvement cost lookup 与 payment trades 已可表达；可抽 printed-resource-cost helper，不是 umbrella blocker。 |
+| `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：要从 major/minor/altCosts 读取 printed wood cost，再注入 food→wood trade。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`；D117 当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 由 #239 跟踪。 |
 | `C41_FarmStore` | 47 | 80 | 1.70 | 原因：收获喂食后 7 种 pay 1 food 换资源组合逐一写成 XOR children。基础设施状态：harvest phase hook、pay/gain flow 已可表达；#241 已改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `E155_Visionary` | 28 | 46 | 1.64 | 原因：购买早期奖励加 family-growth isDoable gate，需要比较其他玩家 family size 与 round。基础设施状态：`isDoable.family-growth` 与 `familySize()` 已在 main；不是开放债。 |
 | `C162_ForestOwner` | 44 | 72 | 1.64 | 原因：注册所有人可用的 player action space，owner/非 owner 资源与 owner 分成事件不同。基础设施状态：`player-action-space` 与 `resource.moved` eventSink 已可表达；不是开放债。 |
@@ -82,7 +82,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `B34_SpecialFood` | 94 | 152 | 1.62 | 原因：拿动物前后都要记录 board animal count，判断来自 action space 的动物和是否发生容量丢弃歧义。基础设施状态：`resource.moved` provenance 已在 main；`getAssignedAnimalsByType()` 可替换本地计数以减行，不是机制缺口。 |
 | `A138_Harpooner` | 28 | 45 | 1.61 | 原因：Fishing 后 optional pay wood，再按 family size 给 food + reed。基础设施状态：place-farmer listener、`familySize()`、pay/gain flow 已可表达；不是开放债。 |
 | `B111_Rustic` | 32 | 51 | 1.59 | 原因：建房后按本次新增 room 数生成等量 optional food VP flow。基础设施状态：action snapshot room count 和 bonus-vp leaf 已可表达；不是开放债。 |
-| `D80_BrickHammer` | 34 | 54 | 1.59 | 原因：打 major improvement 后要读取 built card 的 printed clay cost 是否 >=2。基础设施状态：major/minor lookup 与 `readImprovementTypes()` 已可表达；可抽 printed-cost helper，不是 umbrella blocker。 |
+| `D80_BrickHammer` | 34 | 54 | 1.59 | 原因：打 major improvement 后要读取 built card 的 printed clay cost 是否 >=2。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`，避免把 `cost.clay` 与 `altCosts[].clay` 相加。 |
 | `E108_BlackberryFarmer` | 36 | 57 | 1.58 | 原因：fence 后从 `farm.fenceBuilt` 事件数新 fence edges，并按数量排 future food。基础设施状态：farm event provenance 与 future meeple 已在 main；不是开放债。 |
 | `A68_AsparagusGift` | 38 | 60 | 1.58 | 原因：fence 前记录数量，fence 后用 delta 判断是否达到当前 round，并检查空 field 前置。基础设施状态：before/after listener、fence count、field helper 已可表达；不是开放债。 |
 | `E160_KelpGatherer` | 32 | 50 | 1.56 | 原因：对手用 Fishing 时同时给触发玩家 food、给 owner vegetable。基础设施状态：opponent scope 与 targeted gain 已可表达；不是开放债。 |
@@ -112,6 +112,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice` | 新增交互必须显式暴露 command / options 并由后端校验；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
 | 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。 |
+| Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/D117/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
 | 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
@@ -122,7 +123,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 ## 6. 基础设施待办
 
-当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、extra-turn 轮转、family token supply、card boundary guard、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
+当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、card boundary guard、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
 
 后续若发现需要跨多张卡的新机制，先在本节新增待办；实现完成并有测试或守卫后，从本节移除并同步 §5 / §9 / §10 / §12。
 
@@ -993,7 +994,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D77_RecycledBrick` | 已对齐 |  |
 | `D78_ReedPond` | 已对齐 |  |
 | `D79_CarrotMuseum` | 已对齐 |  |
-| `D80_BrickHammer` | 已对齐 |  |
+| `D80_BrickHammer` | 已对齐 | after-improvement 判断改用 `getPrintedImprovementResourceCost(..., 'clay')`；`cost` 与 `altCosts` 是 base cost 候选，取最大 clay，不再把 minor `cost.clay` 与 `altCosts[].clay` 相加。 |
 | `D81_RoofLadder` | 已对齐 |  |
 | `D82_HuntingTrophy` | 已对齐 |  |
 | `D83_Pigswill` | 已对齐 |  |
@@ -1030,7 +1031,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D114_SeedTrader` | 已对齐 |  |
 | `D115_FodderPlanter` | 已对齐 |  |
 | `D116_TreeInspector` | 已对齐 |  |
-| `D117_WoodExpert` | 已对齐 |  |
+| `D117_WoodExpert` | 已对齐 | wood printed/base cost 读取改用 `getPrintedImprovementResourceCost(..., 'wood')`，继续支持 minor `altCosts` 中含 wood 的候选；当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 留给 #239。 |
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
@@ -1249,7 +1250,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E153_StoneSculptor` | 已对齐 |  |
 | `E154_Margrave` | 已对齐 |  |
 | `E155_Visionary` | 已对齐 |  |
-| `E156_ClaypitOwner` | 已对齐 |  |
+| `E156_ClaypitOwner` | 已对齐 | printed clay 判定改用 `getPrintedImprovementResourceCost(..., 'clay')`，可识别 minor `altCosts` 中含 clay 的 base cost 候选，并继续支持 major simple / complex fee cost。 |
 | `E157_Usufructuary` | 已对齐 |  |
 | `E158_StoneCustodian` | 已对齐 |  |
 | `E159_OldMiser` | 已对齐 |  |
