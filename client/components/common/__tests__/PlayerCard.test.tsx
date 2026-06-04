@@ -111,4 +111,14 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
       manifest.C54_MarketBooth.cost = originalCost
     }
   })
+
+  it('renders alternative costs with a visible slash separator', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="D80_BrickHammer" cardType="minor" />,
+    )
+
+    expect(html).toContain('card-cost-alt')
+    expect(html).toContain('card-cost-separator')
+    expect(html).toContain('card-cost-separator">/</span>')
+  })
 })
