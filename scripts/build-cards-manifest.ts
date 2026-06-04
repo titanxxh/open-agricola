@@ -42,6 +42,7 @@ export type CardMeta = {
   passing?: boolean
   returnCards?: string[]
   alsoCountsAs?: string[]
+  enablesPalisades?: boolean
 }
 
 export type CardManifestEntry = {
@@ -70,6 +71,86 @@ const CARD_CLASS_TO_TYPE: Record<string, CardMeta['type']> = {
   MinorImprovement: 'minor',
   MajorImprovement: 'major',
   PlayerActionCard: 'playerAction',
+}
+
+const CARD_SOURCE_FACTORY_TO_TYPE: Record<string, CardMeta['type']> = {
+  defineOccupationCard: 'occupation',
+  defineMinorCard: 'minor',
+  defineMajorCard: 'major',
+  definePlayerActionCard: 'playerAction',
+}
+
+function propertyNameText(name: ts.PropertyName): string {
+  return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+    ? name.text
+    : name.getText().replace(/["']/g, '')
+}
+
+function collectModuleConstInitializers(sf: ts.SourceFile): Map<string, ts.Expression> {
+  const constants = new Map<string, ts.Expression>()
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    if (!(stmt.declarationList.flags & ts.NodeFlags.Const)) continue
+    for (const decl of stmt.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer) {
+        constants.set(decl.name.text, decl.initializer)
+      }
+    }
+  }
+  return constants
+}
+
+function extractStaticJsonLikeValue(
+  expr: ts.Expression,
+  constants: Map<string, ts.Expression>,
+  context: string,
+  seen = new Set<string>(),
+): unknown {
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) return expr.text
+  if (ts.isNumericLiteral(expr)) return Number(expr.text)
+  if (expr.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return false
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return null
+  if (
+    ts.isParenthesizedExpression(expr) ||
+    ts.isAsExpression(expr) ||
+    ts.isTypeAssertionExpression(expr) ||
+    ts.isSatisfiesExpression(expr)
+  ) {
+    return extractStaticJsonLikeValue(expr.expression, constants, context, seen)
+  }
+  if (ts.isIdentifier(expr)) {
+    const initializer = constants.get(expr.text)
+    if (!initializer) {
+      throw new Error(`${context}: unresolved identifier ${expr.text}`)
+    }
+    if (seen.has(expr.text)) {
+      throw new Error(`${context}: circular identifier ${expr.text}`)
+    }
+    const nextSeen = new Set(seen)
+    nextSeen.add(expr.text)
+    return extractStaticJsonLikeValue(initializer, constants, context, nextSeen)
+  }
+  if (ts.isArrayLiteralExpression(expr)) {
+    return expr.elements.map((el, index) => {
+      if (ts.isSpreadElement(el)) {
+        throw new Error(`${context}[${index}]: spread is not statically supported`)
+      }
+      return extractStaticJsonLikeValue(el, constants, `${context}[${index}]`, seen)
+    })
+  }
+  if (ts.isObjectLiteralExpression(expr)) {
+    const obj: Record<string, unknown> = {}
+    for (const prop of expr.properties) {
+      if (!ts.isPropertyAssignment(prop)) {
+        throw new Error(`${context}: only property assignments are statically supported`)
+      }
+      const key = propertyNameText(prop.name)
+      obj[key] = extractStaticJsonLikeValue(prop.initializer, constants, `${context}.${key}`, seen)
+    }
+    return obj
+  }
+  throw new Error(`${context}: expression is not statically JSON-like`)
 }
 
 function extractValueFromExpr(expr: ts.Expression): unknown {
@@ -210,12 +291,62 @@ type ParsedCardFile = {
   metas: CardMeta[]
 }
 
-export function parseCardFile(filePath: string): ParsedCardFile {
+type ParseCardFileOptions = {
+  includeLegacyConstructors?: boolean
+  includeMajorLiterals?: boolean
+  includeCardSources?: boolean
+}
+
+function cardSourceCallToMeta(
+  filePath: string,
+  call: ts.CallExpression,
+  constants: Map<string, ts.Expression>,
+): CardMeta | null {
+  if (!ts.isIdentifier(call.expression)) return null
+  const type = CARD_SOURCE_FACTORY_TO_TYPE[call.expression.text]
+  if (!type) return null
+  const arg = call.arguments[0]
+  if (!arg || !ts.isObjectLiteralExpression(arg)) {
+    throw new Error(`${filePath}: Card Source input must be an object literal`)
+  }
+  const metaProp = arg.properties.find(
+    (prop): prop is ts.PropertyAssignment =>
+      ts.isPropertyAssignment(prop) && propertyNameText(prop.name) === 'meta',
+  )
+  if (!metaProp || !ts.isObjectLiteralExpression(metaProp.initializer)) {
+    throw new Error(`${filePath}: Card Source meta must be an object literal`)
+  }
+
+  const meta: Record<string, unknown> = {}
+  for (const prop of metaProp.initializer.properties) {
+    if (!ts.isPropertyAssignment(prop)) {
+      throw new Error(`${filePath}: Card Source meta only supports property assignments`)
+    }
+    const keyName = propertyNameText(prop.name)
+    if (!META_FIELDS.has(keyName)) continue
+    meta[keyName] = extractStaticJsonLikeValue(
+      prop.initializer,
+      constants,
+      `${filePath}: meta.${keyName}`,
+    )
+  }
+  if (typeof meta.id !== 'string') {
+    throw new Error(`${filePath}: Card Source meta.id must be a static string`)
+  }
+  meta.type = type
+  return meta as unknown as CardMeta
+}
+
+export function parseCardFile(filePath: string, options: ParseCardFileOptions = {}): ParsedCardFile {
+  const includeLegacyConstructors = options.includeLegacyConstructors ?? true
+  const includeMajorLiterals = options.includeMajorLiterals ?? true
+  const includeCardSources = options.includeCardSources ?? true
   const source = fs.readFileSync(filePath, 'utf8')
   const sf = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 
   // Pass 1: collect module-level string/number constants so we can resolve CARD_ID-style refs.
   const constants = new Map<string, unknown>()
+  const constInitializers = collectModuleConstInitializers(sf)
   for (const stmt of sf.statements) {
     if (ts.isVariableStatement(stmt)) {
       for (const decl of stmt.declarationList.declarations) {
@@ -233,7 +364,12 @@ export function parseCardFile(filePath: string): ParsedCardFile {
 
   // Pattern A: `new <CardClass>({...})` anywhere in the file.
   const visit = (node: ts.Node): void => {
+    if (includeCardSources && ts.isCallExpression(node)) {
+      const sourceMeta = cardSourceCallToMeta(filePath, node, constInitializers)
+      if (sourceMeta) metas.push(sourceMeta)
+    }
     if (
+      includeLegacyConstructors &&
       ts.isNewExpression(node) &&
       ts.isIdentifier(node.expression) &&
       CARD_CLASSES.has(node.expression.text)
@@ -265,13 +401,15 @@ export function parseCardFile(filePath: string): ParsedCardFile {
   visit(sf)
 
   // Pattern B: `export const x: MajorCardData = {...}`
-  const majorEffects = parseMajorCardDataVars(sf)
-  for (const { obj } of majorEffects) {
-    const meta = majorEffectObjectToMeta(obj)
-    if (!meta) continue
-    // Skip if we already captured this id via Pattern A (unlikely but defensive).
-    if (metas.some((m) => m.id === meta.id)) continue
-    metas.push(meta)
+  if (includeMajorLiterals) {
+    const majorEffects = parseMajorCardDataVars(sf)
+    for (const { obj } of majorEffects) {
+      const meta = majorEffectObjectToMeta(obj)
+      if (!meta) continue
+      // Skip if we already captured this id via Pattern A (unlikely but defensive).
+      if (metas.some((m) => m.id === meta.id)) continue
+      metas.push(meta)
+    }
   }
 
   return { metas }
@@ -281,12 +419,12 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
   const manifest: CardsManifest = {}
   const decks = ['A', 'B', 'C', 'D', 'E', 'major']
   const repoRoot = path.resolve(cardsRoot, '..', '..')
-  const scanDir = (deckDir: string) => {
+  const scanDir = (deckDir: string, parseOptions?: ParseCardFileOptions) => {
     if (!fs.existsSync(deckDir)) return
     const files = fs.readdirSync(deckDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     for (const file of files) {
       const filePath = path.join(deckDir, file)
-      const { metas } = parseCardFile(filePath)
+      const { metas } = parseCardFile(filePath, parseOptions)
       if (metas.length === 0) continue
       const modulePath = path.relative(repoRoot, filePath.replace(/\.ts$/, ''))
       for (const meta of metas) {
@@ -299,6 +437,13 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
         }
       }
     }
+  }
+  for (const deck of decks) {
+    scanDir(path.join(repoRoot, 'shared', 'cards', deck), {
+      includeLegacyConstructors: false,
+      includeMajorLiterals: false,
+      includeCardSources: true,
+    })
   }
   for (const deck of decks) {
     scanDir(path.join(cardsRoot, deck))
