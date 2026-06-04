@@ -112,6 +112,10 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**Cost Candidate（成本候选行）**:
+一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
+_Avoid_: Trade、资源兑换、支付替换器
+
 **Scoring Reserve**:
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
 _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
@@ -186,15 +190,19 @@ _Avoid_: dispatch 阶段直接 mutate state
 _Avoid_: 把单卡规则扩散到主路径
 
 **Card Definition**:
-卡牌外形和通用规则字段，如 id、名称、描述、成本、类型、前置条件、reward、`cardField`。
-_Avoid_: 卡牌运行时局部状态
+Card Source 的 `meta` 部分，包含可序列化、前端可见、无运行时行为的卡牌定义字段，如 id、名称、描述、成本、类型、前置条件、reward、`cardField`。
+_Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局部状态
+
+**Card Source**:
+单卡作者编辑的唯一源，包含卡牌的 `meta` 和 `impl`；构建和运行时必须从它投影出前端可读的 Card Display 和服务端可用的 Card Impl。
+_Avoid_: 让作者同时维护 display 文件和 impl 文件
 
 **Card Impl**:
-卡牌实现文件里的 hook、listener 和 helper 调用，位于 `shared/cards/{Deck}/`，服务端和 sandbox 使用，主 client bundle 禁止引入。
-_Avoid_: cards-display metadata
+服务端和 sandbox 使用的卡牌运行时实现，包含 hook、listener、effect、modifier、prerequisiteCheck 和 helper 调用；modifier 属于 impl，不属于 Card Display。
+_Avoid_: 前端主 bundle 可见
 
 **Card Display**:
-主前端可读的卡牌展示数据，位于 `shared/cards-display/`，只描述 UI metadata。
+主前端可读的卡牌展示投影，只描述 UI metadata。
 _Avoid_: 规则执行逻辑
 
 **Card State**:
