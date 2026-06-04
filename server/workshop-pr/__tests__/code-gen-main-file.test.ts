@@ -3,6 +3,18 @@ import { generatePrFiles } from '../code-gen'
 
 describe('generatePrFiles — output file list', () => {
   const upstreamRegisterAll = `// generated\nimport { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'\n\nexport const ALL_CARD_IMPLS = {\n  'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,\n}\n\nexport type AllCardImpls = typeof ALL_CARD_IMPLS\n`
+  const upstreamCatalogGenerated = `// generated
+export const catalogCardDefinitions = [
+  {
+    "id": "CUSTOM_FixtureHarvester",
+    "name": "Fixture Harvester",
+    "deck": "community",
+    "number": 0,
+    "desc": [],
+    "kind": "minor"
+  },
+]
+`
   const upstreamCommunityMd = `# Community Cards\n\n<!-- community-card-entries:begin -->\n<!-- community-card-entries:end -->\n`
 
   it('emits 5 files (card source + smoke test + generated catalogs + community.md)', async () => {
@@ -18,6 +30,7 @@ describe('generatePrFiles — output file list', () => {
       wcard,
       github_login: 'alicegh',
       upstream_register_all: upstreamRegisterAll,
+      upstream_catalog_generated: upstreamCatalogGenerated,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 1,
     })
@@ -42,6 +55,7 @@ describe('generatePrFiles — output file list', () => {
       wcard,
       github_login: 'gh',
       upstream_register_all: upstreamRegisterAll,
+      upstream_catalog_generated: upstreamCatalogGenerated,
       upstream_community_md: upstreamCommunityMd,
       pr_number: 2,
     })
