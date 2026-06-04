@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B33_Mantlepiece } from '../../cards-display/B/B33_Mantlepiece'
 
-const CARD_ID = B33_Mantlepiece.id
+const CARD_ID = 'B33_Mantlepiece'
 
-export const B33_Mantlepiece_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => player.houseType !== 'wood',
   effect: {
   id: CARD_ID,
@@ -21,3 +21,21 @@ export const B33_Mantlepiece_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B33_Mantlepiece = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mantlepiece',
+    deck: 'B',
+    number: 33,
+    category: 'POINTS_PROVIDER',
+    desc: ['When you play this card, you immediately get 1 bonus <SCORE> for each complete round left to play. You may no longer renovate your house.'],
+    cost: { stone: 1 },
+    vp: -3,
+    prerequisite: 'Clay or Stone House',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B33_Mantlepiece_impl = B33_Mantlepiece.impl

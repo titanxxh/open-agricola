@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E83_ShepherdsWhistle } from '../../cards-display/E/E83_ShepherdsWhistle'
 
-const CARD_ID = E83_ShepherdsWhistle.id
-
+const CARD_ID = 'E83_ShepherdsWhistle'
 const POST_REORG_CHECK_ACTION_ID = 'card_E83_ShepherdsWhistle_post-reorg-check'
 
 /**
@@ -50,7 +49,7 @@ const postReorgCheckAction: ActionDefinition = {
 
 registerAdHocAction(postReorgCheckAction)
 
-export const E83_ShepherdsWhistle_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvestFeedingPhase: (state, player): ActionFlow | undefined => {
@@ -80,3 +79,18 @@ export const E83_ShepherdsWhistle_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E83_ShepherdsWhistle = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Shepherd's Whistle",
+    deck: 'E',
+    number: 83,
+    category: 'ANIMALS_',
+    desc: ['At the start of the breeding phase of each harvest, if you have at least 1 unfenced stable without an animal, you get 1 <SHEEP>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E83_ShepherdsWhistle_impl = E83_ShepherdsWhistle.impl

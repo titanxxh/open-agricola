@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A62_BeerKeg } from '../../cards-display/A/A62_BeerKeg'
 
-const CARD_ID = A62_BeerKeg.id
+const CARD_ID = 'A62_BeerKeg'
 
-export const A62_BeerKeg_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, _player) => {
@@ -45,3 +45,20 @@ export const A62_BeerKeg_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A62_BeerKeg = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Beer Keg",
+    deck: "A",
+    number: 62,
+    category: "FOOD_PROVIDER",
+    desc: ["In the feeding phase of each harvest, you can use this card to exchange 1/2/3 <GRAIN> for 0/1/2 bonus <SCORE> and exactly 3 <FOOD>."],
+    cost: { wood: 1 },
+    prerequisite: "2 Grain in Your Supply",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A62_BeerKeg_impl = A62_BeerKeg.impl

@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
-import { clearCustomCards, registerCustomCard } from '../../../../shared/cards/custom-registry'
+import {
+  clearCustomCardMetadata,
+  registerCustomCardMetadata,
+} from '../../../../shared/cards/custom-card-metadata'
 import { loadCardsManifest } from '../../../services/card-meta'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   beforeEach(() => {
-    clearCustomCards()
+    clearCustomCardMetadata()
   })
 
   it('marks D60_LargePottery with data-also-counts-as="major"', () => {
@@ -72,7 +75,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   })
 
   it('renders globally registered custom cards even though they are absent from the static manifest', () => {
-    registerCustomCard({
+    registerCustomCardMetadata({
       cardType: 'minor',
       cardJson: {
         id: 'CUSTOM_DebugMallet',
@@ -84,7 +87,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
         vp: 0,
         implemented: true,
       },
-    }, { allowGlobal: true })
+    })
 
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="CUSTOM_DebugMallet" cardType="minor" />,

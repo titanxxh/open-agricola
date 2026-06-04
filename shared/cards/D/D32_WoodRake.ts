@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D32_WoodRake } from '../../cards-display/D/D32_WoodRake'
 
-const CARD_ID = D32_WoodRake.id
+const CARD_ID = 'D32_WoodRake'
 
-export const D32_WoodRake_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeHarvest: (state, player) => {
@@ -28,3 +28,19 @@ export const D32_WoodRake_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D32_WoodRake = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wood Rake",
+    deck: "D",
+    number: 32,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."],
+    cost: { wood: 1 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D32_WoodRake_impl = D32_WoodRake.impl

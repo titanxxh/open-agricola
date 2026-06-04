@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A124_Knapper } from '../../cards-display/A/A124_Knapper'
 
-const CARD_ID = A124_Knapper.id
-
+const CARD_ID = 'A124_Knapper'
 const isRound5to7ActionSpace = (context: CardListenerContext): boolean => {
   if (!context.space) return false
   const roundOrder = context.state.roundActionOrder
@@ -32,7 +31,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A124_Knapper_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A124_Knapper = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Knapper',
+    deck: 'A',
+    number: 124,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time before you use an action space card on round spaces 5 to 7, you get 1 <STONE>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A124_Knapper_impl = A124_Knapper.impl

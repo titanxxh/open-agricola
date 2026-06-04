@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { D93_SheepInspector } from '../../cards-display/D/D93_SheepInspector'
 
-const CARD_ID = D93_SheepInspector.id
-
+const CARD_ID = 'D93_SheepInspector'
 const MEETING_PLACE_PREFIX = 'meeting-place'
 
 /**
@@ -100,7 +99,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D93_SheepInspector_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -113,3 +112,20 @@ export const D93_SheepInspector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D93_SheepInspector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Sheep Inspector",
+    deck: "D",
+    number: 93,
+    category: "ACTIONS_BOOSTER",
+    desc: ["Once per work phase, after you complete a person action, you can pay 1 <SHEEP> and 2 <FOOD> to return another person you placed home, unless it is on the __Meeting Place__ action space."],
+    cost: {},
+    players: "1+",
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D93_SheepInspector_impl = D93_SheepInspector.impl

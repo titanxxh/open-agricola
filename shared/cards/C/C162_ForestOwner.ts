@@ -1,3 +1,4 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 
@@ -48,7 +49,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const C162_ForestOwner_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -62,3 +63,19 @@ export const C162_ForestOwner_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C162_ForestOwner = definePlayerActionCard({
+  meta: {
+    id: "C162_ForestOwner",
+    name: "Forest Owner",
+    deck: "C",
+    number: 162,
+    category: "ACTIONS_BOOSTER",
+    desc: ["This card is an action space for all. If another player uses it, they get 3 <WOOD> and must give you 1 <WOOD> from the general supply. If you use it, you get 4 <WOOD>."],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const C162_ForestOwner_impl = C162_ForestOwner.impl

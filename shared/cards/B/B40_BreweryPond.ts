@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B40_BreweryPond } from '../../cards-display/B/B40_BreweryPond'
 
-const CARD_ID = B40_BreweryPond.id
-
+const CARD_ID = 'B40_BreweryPond'
 const listener: CardListenerRegistration = {
   id: 'B40-brewery-pond-after-place-farmer',
   cardIds: [CARD_ID],
@@ -18,7 +17,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B40_BreweryPond_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B40_BreweryPond = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Brewery Pond',
+    deck: 'B',
+    number: 40,
+    category: 'GOODS_PROVIDER',
+    desc: ['Each time you use the __Fishing__ or __Reed Bank__ accumulation space, you also get 1 <GRAIN> and 1 <WOOD>.'],
+    vp: -1,
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const B40_BreweryPond_impl = B40_BreweryPond.impl

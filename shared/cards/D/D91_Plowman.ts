@@ -1,12 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D91_Plowman } from '../../cards-display/D/D91_Plowman'
 
-const CARD_ID = D91_Plowman.id
+const CARD_ID = 'D91_Plowman'
 
-export const D91_Plowman_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -39,3 +39,19 @@ export const D91_Plowman_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D91_Plowman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Plowman',
+    deck: 'D',
+    number: 91,
+    category: 'FARM_PLANNER',
+    desc: ['Add 4, 7, and 10 to the current round and place a field tile on each corresponding round space. At the start of these rounds, you can plow the field for 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D91_Plowman_impl = D91_Plowman.impl

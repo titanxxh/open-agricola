@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 import '../../shared/cards/E/E29_Heirloom'
-import { E29_Heirloom } from '../../shared/cards-display/E/E29_Heirloom'
+import { E29_Heirloom } from '../../shared/cards/E/E29_Heirloom'
 
 describe('E29_Heirloom session', () => {
   const setup = () => {

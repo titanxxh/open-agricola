@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import { fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import { readCardExtraData } from '../helpers/card-state'
 import { wrapOptional } from '../../actions/flow'
@@ -5,11 +6,10 @@ import type { ActionFlow } from '../../contract/types'
 import type { CardFieldStack } from '../helpers/card-field'
 import type { PlantAdditionalGoodLocation } from '../../actions/effects/special-effect'
 import type { CardImpl } from '../registry'
-import { C8_PlantFertilizer } from '../../cards-display/C/C8_PlantFertilizer'
 
-const CARD_ID = C8_PlantFertilizer.id
+const CARD_ID = 'C8_PlantFertilizer'
 
-export const C8_PlantFertilizer_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (_state, player): ActionFlow | undefined => {
@@ -42,3 +42,19 @@ export const C8_PlantFertilizer_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C8_PlantFertilizer = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Plant Fertilizer",
+    deck: "C",
+    number: 8,
+    category: "CROP_PROVIDER",
+    desc: ["In each field with exactly 1 good, you can immediately place 1 additional good of the same type."],
+    cost: {},
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const C8_PlantFertilizer_impl = C8_PlantFertilizer.impl

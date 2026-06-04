@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { C117_Legworker } from '../../cards-display/C/C117_Legworker'
 
-const CARD_ID = C117_Legworker.id
-
+const CARD_ID = 'C117_Legworker'
 /**
  * C117 Legworker (Occupation)
  *
@@ -118,7 +117,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C117_Legworker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C117_Legworker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Legworker',
+    deck: 'C',
+    number: 117,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time you use an action space that is orthogonally adjacent to another action space occupied by one of your people, you get 1 <WOOD>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C117_Legworker_impl = C117_Legworker.impl

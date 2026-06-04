@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B41_Hauberg } from '../../cards-display/B/B41_Hauberg'
 
-const CARD_ID = B41_Hauberg.id
+const CARD_ID = 'B41_Hauberg'
 
-export const B41_Hauberg_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -23,3 +23,20 @@ export const B41_Hauberg_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B41_Hauberg = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hauberg',
+    deck: 'B',
+    number: 41,
+    category: 'GOODS_PROVIDER',
+    desc: ['Alternate placing 2 <WOOD> and 1 <PIG> on the next 4 round spaces. You decide what to start with. At the start of these rounds, you get the goods.'],
+    cost: { food: 3 },
+    prerequisite: '3 Occupations',
+    occupationPrerequisites: { min: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const B41_Hauberg_impl = B41_Hauberg.impl

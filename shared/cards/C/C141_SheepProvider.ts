@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C141_SheepProvider } from '../../cards-display/C/C141_SheepProvider'
 
-const CARD_ID = C141_SheepProvider.id
-
+const CARD_ID = 'C141_SheepProvider'
 const listener: CardListenerRegistration = {
   id: 'C141-sheep-provider-any-sheep-market',
   cardIds: [CARD_ID],
@@ -18,7 +17,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C141_SheepProvider_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C141_SheepProvider = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Sheep Provider",
+    deck: "C",
+    number: 141,
+    category: "CROP_PROVIDER",
+    desc: [
+        'Each time any player (including you) uses the __Sheep Market__ accumulation space, you get 1 <GRAIN>.',
+      ],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const C141_SheepProvider_impl = C141_SheepProvider.impl

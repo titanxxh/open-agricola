@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { D130_RecreationalCarpenter } from '../../cards-display/D/D130_RecreationalCarpenter'
 
-const CARD_ID = D130_RecreationalCarpenter.id
+const CARD_ID = 'D130_RecreationalCarpenter'
 
-export const D130_RecreationalCarpenter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
@@ -21,3 +21,19 @@ export const D130_RecreationalCarpenter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D130_RecreationalCarpenter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Recreational Carpenter',
+    deck: 'D',
+    number: 130,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['At the end of each work phase in which you did not use the __Meeting Place__ action space, you can take a __Build Rooms__ action without placing a person.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D130_RecreationalCarpenter_impl = D130_RecreationalCarpenter.impl

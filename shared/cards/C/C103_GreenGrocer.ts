@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { payGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C103_GreenGrocer } from '../../cards-display/C/C103_GreenGrocer'
 
-const CARD_ID = C103_GreenGrocer.id
+const CARD_ID = 'C103_GreenGrocer'
 
-export const C103_GreenGrocer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -31,3 +31,19 @@ export const C103_GreenGrocer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C103_GreenGrocer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Green Grocer',
+    deck: 'C',
+    number: 103,
+    category: 'GOODS_PROVIDER',
+    desc: ['At the start of each round, you can make exactly one of the following exchanges: 1 <CATTLE> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 1 <CATTLE>; 2 <SHEEP> <ARROW> 1 <VEGETABLE>; 1 <VEGETABLE> <ARROW> 2 <SHEEP>; 2 <FOOD> <ARROW> 1 <GRAIN>; 1 <GRAIN> <ARROW> 2 <FOOD>'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C103_GreenGrocer_impl = C103_GreenGrocer.impl

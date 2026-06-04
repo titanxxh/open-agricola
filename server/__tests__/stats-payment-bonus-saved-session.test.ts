@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
-import { C122_Bricklayer } from '../../shared/cards-display/C/C122_Bricklayer'
+import { C122_Bricklayer } from '../../shared/cards/C/C122_Bricklayer'
 import type { PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'C122_Bricklayer'
@@ -32,7 +32,7 @@ describe('payment stats: bonus saved attribution (session)', () => {
       vegetable: 0,
     }
     owner.activeModifiers = [
-      ...((C122_Bricklayer as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(C122_Bricklayer.impl.modifiers ?? []),
     ]
     setWorkersAtHome(state, owner, 2)
 

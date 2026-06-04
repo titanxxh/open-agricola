@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C72_FestivalPlanning } from '../../cards-display/C/C72_FestivalPlanning'
 import { fieldIsEmpty } from '../../domain/field'
 import { hasAnyCardFieldCrops } from '../helpers/card-field'
 
-const CARD_ID = C72_FestivalPlanning.id
+const CARD_ID = 'C72_FestivalPlanning'
 
-export const C72_FestivalPlanning_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -32,3 +32,20 @@ export const C72_FestivalPlanning_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C72_FestivalPlanning = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Festival Planning",
+    deck: "C",
+    number: 72,
+    category: "CROP_PROVIDER",
+    desc: ["When you play this card, immediately carry out the field phase on your farmyard only (this is not a harvest). Afterwards, you get a __Major or Minor Improvement__ action."],
+    cost: { food: 1 },
+    prerequisite: "2 Occupations",
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const C72_FestivalPlanning_impl = C72_FestivalPlanning.impl

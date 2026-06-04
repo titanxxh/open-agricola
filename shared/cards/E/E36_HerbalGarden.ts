@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E36_HerbalGarden } from '../../cards-display/E/E36_HerbalGarden'
 
-const CARD_ID = E36_HerbalGarden.id
+const CARD_ID = 'E36_HerbalGarden'
 
-export const E36_HerbalGarden_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeAnimalZones: (_player, zones, _state) => {
@@ -33,3 +33,20 @@ export const E36_HerbalGarden_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E36_HerbalGarden = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Herbal Garden',
+    deck: 'E',
+    number: 36,
+    category: 'BONUS_POINTS_-_GET',
+    desc: ['From now on, at least one of your pastures must contain no animals.'],
+    cost: { wood: 1 },
+    vp: 2,
+    prerequisite: '1 Pasture',
+  },
+  impl: cardImpl,
+})
+
+export const E36_HerbalGarden_impl = E36_HerbalGarden.impl

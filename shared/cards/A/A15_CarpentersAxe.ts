@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { A15_CarpentersAxe } from '../../cards-display/A/A15_CarpentersAxe'
 
-const CARD_ID = A15_CarpentersAxe.id
-
+const CARD_ID = 'A15_CarpentersAxe'
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
@@ -29,7 +28,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A15_CarpentersAxe_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A15_CarpentersAxe = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carpenter's Axe",
+    deck: 'A',
+    number: 15,
+    category: 'FARM_PLANNER',
+    desc: ["Each time after you use a wood accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 stable for 1 <WOOD>."],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const A15_CarpentersAxe_impl = A15_CarpentersAxe.impl

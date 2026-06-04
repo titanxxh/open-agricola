@@ -1,16 +1,15 @@
+import { defineOccupationCard } from '../card-source'
 import { makeCardFieldImpl } from '../helpers/card-field'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B141_FieldCaretaker } from '../../cards-display/B/B141_FieldCaretaker'
 
-const CARD_ID = B141_FieldCaretaker.id
-
+const CARD_ID = 'B141_FieldCaretaker'
 const base = makeCardFieldImpl(CARD_ID, {
   allowedCrops: ['grain', 'vegetable', 'wood', 'stone'],
   capacity: 1,
 })
 
-export const B141_FieldCaretaker_impl = {
+const cardImpl = {
   ...base,
   effect: {
     ...base.effect,
@@ -38,3 +37,21 @@ export const B141_FieldCaretaker_impl = {
     }),
   },
 } satisfies CardImpl
+
+export const B141_FieldCaretaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Field Caretaker',
+    deck: 'B',
+    number: 141,
+    category: 'CROP_PROVIDER',
+    desc: ['When you play this card, you can immediately exchange 0/1/3 <CLAY> for 1/2/3 <GRAIN>. This card is a field.'],
+    cost: {},
+    players: '3+',
+    isField: true,
+    cardField: { allowedCrops: ['grain', 'vegetable', 'wood', 'stone'], capacity: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B141_FieldCaretaker_impl = B141_FieldCaretaker.impl

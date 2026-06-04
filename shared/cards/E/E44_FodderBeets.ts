@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { E44_FodderBeets } from '../../cards-display/E/E44_FodderBeets'
 
-const CARD_ID = E44_FodderBeets.id
+const CARD_ID = 'E44_FodderBeets'
 
-export const E44_FodderBeets_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -21,3 +21,19 @@ export const E44_FodderBeets_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E44_FodderBeets = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Fodder Beets',
+    deck: 'E',
+    number: 44,
+    category: 'FOOD_-_FUTURE_ROUND_SPACES',
+    desc: ['Place 1 <FOOD> on each remaining odd-numbered round space. At the start of these rounds, you get the <FOOD>.'],
+    vp: 1,
+    prerequisite: '3 Field Tiles',
+  },
+  impl: cardImpl,
+})
+
+export const E44_FodderBeets_impl = E44_FodderBeets.impl

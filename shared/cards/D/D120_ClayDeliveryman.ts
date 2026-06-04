@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D120_ClayDeliveryman } from '../../cards-display/D/D120_ClayDeliveryman'
 
-const CARD_ID = D120_ClayDeliveryman.id
+const CARD_ID = 'D120_ClayDeliveryman'
 
-export const D120_ClayDeliveryman_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -25,3 +25,19 @@ export const D120_ClayDeliveryman_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D120_ClayDeliveryman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Clay Deliveryman',
+    deck: 'D',
+    number: 120,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Place 1 <CLAY> on each remaining space for rounds 6 to 14. At the start of these rounds, you get the <CLAY>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D120_ClayDeliveryman_impl = D120_ClayDeliveryman.impl

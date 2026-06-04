@@ -135,6 +135,40 @@ describe('GitHubClient', () => {
       expect(result.commitSha).toBe('commitsha')
       expect(result.upstreamBaseSha).toBe('upstreamsha')
     })
+
+    it('uses provided upstream base sha for tree and parent', async () => {
+      let treeBody: { base_tree?: string } | null = null
+      let commitBody: { parents?: string[] } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/git/ref/heads/main'))
+          throw new Error('should not fetch main ref when base sha is provided')
+        if (url.includes('/git/blobs') && init?.method === 'POST') return okJson({ sha: 'blobsha' })
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as { base_tree?: string }
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') {
+          commitBody = JSON.parse(init.body as string) as { parents?: string[] }
+          return okJson({ sha: 'commitsha' })
+        }
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+      const result = await c.createCommit({
+        forkOwner: 'alice',
+        files: [{ path: 'a.txt', content: 'abc', encoding: 'utf-8' }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+      expect(result.upstreamBaseSha).toBe('fixed-base')
+      expect(treeBody?.base_tree).toBe('fixed-base')
+      expect(commitBody?.parents).toEqual(['fixed-base'])
+    })
   })
 
   describe('upsertBranch', () => {
@@ -278,6 +312,25 @@ describe('GitHubClient', () => {
       })
       const text = await c.getUpstreamFile('shared/cards/register-all.ts')
       expect(text).toBe('file content here')
+    })
+
+    it('fetches content at a pinned ref', async () => {
+      fetchHandler = (url) => {
+        if (url.includes('ref=fixedsha')) {
+          return okJson({
+            content: Buffer.from('pinned content').toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+      const text = await c.getUpstreamFile('shared/cards/register-all.ts', 'fixedsha')
+      expect(text).toBe('pinned content')
     })
 
     it('throws GitHubApiError on 404', async () => {

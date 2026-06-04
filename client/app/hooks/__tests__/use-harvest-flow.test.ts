@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../../shared/cards-display/types', () => ({
+vi.mock('../../../../shared/cards/registry-display', () => ({
+  getMinorImprovement: () => undefined,
+  getOccupation: () => undefined,
   getRegisteredMinorImprovement: () => undefined,
   getRegisteredOccupation: () => undefined,
+  majorImprovementIds: [],
 }))
 
 import { buildHarvestFeedOptions } from '../use-harvest-flow'
@@ -74,6 +77,16 @@ describe('buildHarvestFeedOptions', () => {
     const options = buildHarvestFeedOptions(player, 'en', cardLabel)
     const sheepWalker = options.filter((o) => o.sourceId === 'B104_SheepWalker')
     expect(sheepWalker.length).toBeGreaterThan(0)
+  })
+
+  it('lists major improvement exchanges from card metadata', () => {
+    const player = mkPlayer({
+      resources: { ...emptyResources, sheep: 1 },
+      improvements: ['Major_Fireplace1'],
+    })
+    const options = buildHarvestFeedOptions(player, 'en', cardLabel)
+    const fireplace = options.filter((o) => o.sourceId === 'Major_Fireplace1')
+    expect(fireplace.length).toBeGreaterThan(0)
   })
 
   it('skips exchanges whose from resources player cannot afford', () => {

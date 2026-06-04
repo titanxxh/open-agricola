@@ -1,11 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E41_MuddyWaters } from '../../cards-display/E/E41_MuddyWaters'
 
-const CARD_ID = E41_MuddyWaters.id
+const CARD_ID = 'E41_MuddyWaters'
 
-export const E41_MuddyWaters_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => {
     const total =
       player.occupationPlayed.length
@@ -55,3 +55,19 @@ export const E41_MuddyWaters_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E41_MuddyWaters = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Muddy Waters',
+    deck: 'E',
+    number: 41,
+    category: 'GOODS_-_GET',
+    desc: ['Alternate placing 1 <FOOD> and 1 <CLAY> on each remaining even-numbered round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
+    vp: 1,
+    prerequisite: '5 Cards in Play',
+  },
+  impl: cardImpl,
+})
+
+export const E41_MuddyWaters_impl = E41_MuddyWaters.impl

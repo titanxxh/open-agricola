@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { D26_CarpentersYard } from '../../cards-display/D/D26_CarpentersYard'
 
-const CARD_ID = D26_CarpentersYard.id
-
+const CARD_ID = 'D26_CarpentersYard'
 const ALLOWED_CARDS = ['Major_Well', 'Major_Joinery']
 
 const afterImprovementListener: CardListenerRegistration = {
@@ -41,7 +40,24 @@ const afterImprovementListener: CardListenerRegistration = {
   },
 }
 
-export const D26_CarpentersYard_impl = {
+const cardImpl = {
   listeners: [afterImprovementListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D26_CarpentersYard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carpenter's Yard",
+    deck: 'D',
+    number: 26,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['You can build the __Joinery__ and __Well__ major improvement even when taking a __Minor Improvement__ action, or you can build both with a single __Major Improvement__ action.'],
+    cost: { wood: 1, reed: 1 },
+    vp: 1,
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D26_CarpentersYard_impl = D26_CarpentersYard.impl

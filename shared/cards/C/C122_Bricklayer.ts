@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
+import type { BonusModifier } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C122_Bricklayer } from '../../cards-display/C/C122_Bricklayer'
 
-const CARD_ID = C122_Bricklayer.id
-
+const CARD_ID = 'C122_Bricklayer'
 /**
  * C122 Bricklayer — Each improvement and each renovation cost you 1 clay less.
  * Each room costs you 2 clay less.
@@ -24,7 +24,37 @@ const improvementCostListener: CardListenerRegistration = {
   },
 }
 
-export const C122_Bricklayer_impl = {
+const cardImpl = {
   listeners: [improvementCostListener],
+  modifiers: [
+    {
+      type: 'bonus',
+      cardId: CARD_ID,
+      appliesTo: ['construct'],
+      discount: { clay: 2 },
+    },
+    {
+      type: 'bonus',
+      cardId: CARD_ID,
+      appliesTo: ['renovation'],
+      discount: { clay: 1 },
+    },
+  ] as BonusModifier[],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C122_Bricklayer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bricklayer',
+    deck: 'C',
+    number: 122,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each improvement and each renovation cost you 1 <CLAY> less. Each room costs you 2 <CLAY> less.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C122_Bricklayer_impl = C122_Bricklayer.impl

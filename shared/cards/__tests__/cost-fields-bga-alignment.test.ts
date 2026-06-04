@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard, getOccupationCard } from '../catalog'
-import { C39_StudioBoat } from '../../cards-display/C/C39_StudioBoat'
+import { C39_StudioBoat } from '../../cards/C/C39_StudioBoat'
 
 type CostMap = Partial<Record<
   'wood' | 'clay' | 'reed' | 'stone' | 'food' | 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle',

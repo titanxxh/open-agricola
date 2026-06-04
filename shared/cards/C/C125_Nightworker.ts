@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { workersAvailable } from '../../domain/player'
-import { C125_Nightworker } from '../../cards-display/C/C125_Nightworker'
 
-const CARD_ID = C125_Nightworker.id
-
+const CARD_ID = 'C125_Nightworker'
 /**
  * C125 Nightworker (Occupation, C, 125)
  *
@@ -25,7 +24,7 @@ const CARD_ID = C125_Nightworker.id
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-export const C125_Nightworker_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (state, player): ActionFlow | undefined => {
@@ -61,3 +60,20 @@ export const C125_Nightworker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C125_Nightworker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Nightworker',
+    deck: 'C',
+    number: 125,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Before the start of each work phase, you can place a person on an accumulation space of a building resource not in your supply. (Then proceed with the start player.)'],
+    cost: {},
+    players: '1+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C125_Nightworker_impl = C125_Nightworker.impl

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { D95_SiteManager } from '../../shared/cards-display/D/D95_SiteManager'
-import { occupations } from '../../shared/cards-display/_lookup'
+import { D95_SiteManager } from '../../shared/cards/D/D95_SiteManager'
+import { occupations } from '../../shared/cards/_lookup'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'D95_SiteManager'

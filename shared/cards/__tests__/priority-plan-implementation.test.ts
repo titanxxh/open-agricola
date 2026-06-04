@@ -6,12 +6,12 @@ import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A29_AleBenches'
 import '../A/A81_InterimStorage'
-import { A123_FrameBuilder as A123Card } from '../../cards-display/A/A123_FrameBuilder'
+import { A123_FrameBuilder as A123Card } from '../../cards/A/A123_FrameBuilder'
 import '../B/B94_StockProtector'
 import '../B/B103_FieldMerchant'
 import '../B/B34_SpecialFood'
 import '../C/C60_SmallPottersOven'
-import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
+import { C60_SmallPottersOven } from '../../cards/C/C60_SmallPottersOven'
 import '../C/C71_Slurry'
 import '../C/C120_AgriculturalLabourer'
 import '../D/D115_FodderPlanter'
@@ -334,7 +334,7 @@ describe('priority plan implementations', () => {
     player.resources.wood = 1
     player.resources.reed = 2
     player.activeModifiers = [
-      ...((A123Card as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
+      ...(A123Card.impl.modifiers ?? []),
     ]
 
     expect(listener).toBeUndefined()

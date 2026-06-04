@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { D47_Churchyard } from '../../shared/cards-display/D/D47_Churchyard'
+import { D47_Churchyard } from '../../shared/cards/D/D47_Churchyard'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('D47_Churchyard prerequisite', () => {

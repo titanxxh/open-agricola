@@ -11,8 +11,8 @@ import type { CardDefinition } from '../../contract/cards'
 export type MajorEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
 
 /**
- * Display-only major card metadata (no hooks). Used by cards-display/major
- * and consumed via `getMajorCardDisplay` from client tree-shake-friendly paths.
+ * Display-only major card metadata (no hooks). Consumed via
+ * `getMajorCardDisplay` from client tree-shake-friendly paths.
  */
 export type MajorCardDisplay = CardDefinition & {
   cost: Partial<Resource> | ComplexCost
@@ -22,7 +22,7 @@ export type MajorCardDisplay = CardDefinition & {
 }
 
 /**
- * Major hooks layer. Map-keyed by major id in `cards/major/effects.ts`.
+ * Major hooks layer. Stored in each major Card Source impl.
  */
 export type MajorHooks = Pick<
   CardEffect,

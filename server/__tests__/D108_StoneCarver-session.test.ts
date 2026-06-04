@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { D108_StoneCarver } from '../../shared/cards-display/D/D108_StoneCarver'
+import { D108_StoneCarver } from '../../shared/cards/D/D108_StoneCarver'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 

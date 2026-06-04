@@ -13,13 +13,12 @@
  *   - Workshop raw ≤ 400 KB  (WORKSHOP_RAW_LIMIT_KB)
  *
  * S6 baseline (2026-05-08): main bundle measured at 529 KB raw / 161 KB gz
- * after physical layering + cards-display split + sandbox lazy boundary.
+ * after physical layering + Card Source split + sandbox lazy boundary.
  * Limits are KEPT at 1024/180 (raw/gz) — main bundle was never bloated by
- * impl leak (S6b confirmed via cards-display split + ESLint enforcement).
+ * impl leak (S6b confirmed via Card Source split + ESLint enforcement).
  * The remaining ~529 KB is React + UI + i18n + transports; further shrinking
  * would require route-level code splitting OR i18n lazy-load (out of S6 scope).
- * The S6 ESLint error-level rules (cards-display + contract + main-client +
- * impl-no-cards-display + utils) are the future-proof boundary against bloat.
+ * The S6 ESLint error-level rules are the future-proof boundary against bloat.
  *
  * Flags:
  *   --loose   disable strict mode (prints sizes, always exits 0)

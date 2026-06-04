@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A85_Homekeeper } from '../../cards-display/A/A85_Homekeeper'
 
-const CARD_ID = A85_Homekeeper.id
-
+const CARD_ID = 'A85_Homekeeper'
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1
 
-export const A85_Homekeeper_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
@@ -24,3 +23,19 @@ export const A85_Homekeeper_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A85_Homekeeper = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Homekeeper",
+    deck: "A",
+    number: 85,
+    category: "FARM_PLANNER",
+    desc: ["Exactly one clay or stone room in your house can hold an additional person if the room is adjacent to both a field and a pasture."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const A85_Homekeeper_impl = A85_Homekeeper.impl

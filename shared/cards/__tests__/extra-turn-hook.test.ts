@@ -7,7 +7,7 @@ import {
   countPendingExtraTurns,
   consumePendingExtraTurns,
 } from '../card-effects'
-import { A92_AdoptiveParents } from '../../cards-display/A/A92_AdoptiveParents'
+import { A92_AdoptiveParents } from '../../cards/A/A92_AdoptiveParents'
 import '../A/A92_AdoptiveParents'
 
 const A92 = A92_AdoptiveParents.id

@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D12_MilkingPlace } from '../../cards-display/D/D12_MilkingPlace'
 
-const CARD_ID = D12_MilkingPlace.id
+const CARD_ID = 'D12_MilkingPlace'
 
-export const D12_MilkingPlace_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFeedingPhase: (_state, _player) => {
@@ -13,3 +13,20 @@ export const D12_MilkingPlace_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D12_MilkingPlace = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Milking Place',
+    deck: 'D',
+    number: 12,
+    category: 'FARM_PLANNER',
+    desc: ['In the feeding phase of each harvest, you get 1 <FOOD>. You can no longer hold animals in your house (not even via another card).'],
+    cost: { grain: 1 },
+    vp: 1,
+    blocksHouseAnimalZones: true,
+  },
+  impl: cardImpl,
+})
+
+export const D12_MilkingPlace_impl = D12_MilkingPlace.impl

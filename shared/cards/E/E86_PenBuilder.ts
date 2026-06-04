@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E86_PenBuilder } from '../../cards-display/E/E86_PenBuilder'
 
-const CARD_ID = E86_PenBuilder.id
-
+const CARD_ID = 'E86_PenBuilder'
 const anytimeListener: CardListenerRegistration = {
   id: 'E86-pen-builder-anytime',
   cardIds: [CARD_ID],
@@ -31,7 +30,7 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const E86_PenBuilder_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
@@ -56,3 +55,20 @@ export const E86_PenBuilder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E86_PenBuilder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pen Builder',
+    deck: 'E',
+    number: 86,
+    category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
+    desc: ['At any time, you can discard 1 <WOOD> from your supply. This card can hold two animals of any type for each <WOOD> discarded this way.'],
+    cost: {},
+    animalHolder: true,
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E86_PenBuilder_impl = E86_PenBuilder.impl

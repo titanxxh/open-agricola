@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E96_Elder } from '../../cards-display/E/E96_Elder'
 
-const CARD_ID = E96_Elder.id
+const CARD_ID = 'E96_Elder'
 
-export const E96_Elder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   handHooks: ['onBeforeStartOfTurn'],
@@ -25,3 +25,19 @@ export const E96_Elder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E96_Elder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Elder',
+    deck: 'E',
+    number: 96,
+    category: 'ACTION_-_IMPROVEMENT',
+    desc: ['You can play this card at the start of the work phase of round 1 without placing a person. (This card has no effect other than counting as a played occupation.)'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E96_Elder_impl = E96_Elder.impl

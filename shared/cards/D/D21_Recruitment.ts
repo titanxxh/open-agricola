@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readImprovementTypes } from '../../actions/effects/improvement'
 import { getExtraRoomCapacity } from '../card-effects'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { D21_Recruitment } from '../../cards-display/D/D21_Recruitment'
 
-const CARD_ID = D21_Recruitment.id
-
+const CARD_ID = 'D21_Recruitment'
 /**
  * D21 Recruitment (Minor Improvement, D, 21)
  * From round 5 on, provided you have room in your house, each time you get a
@@ -86,7 +85,7 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const D21_Recruitment_impl = {
+const cardImpl = {
   /**
    * BGA `onBuy` throws when `getNextFarmerAvailable()` is not null — i.e. the
    * player still has a farmer waiting at home. We model this as the
@@ -108,3 +107,19 @@ export const D21_Recruitment_impl = {
   listeners: [computeReplaceListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D21_Recruitment = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Recruitment',
+    deck: 'D',
+    number: 21,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['From round 5 on, provided you have room in your house, each time you get a __Minor Improvement__ action, you can take a __Family Growth__ action instead.'],
+    cost: { food: 1 },
+    prerequisite: 'No People Left in the House',
+  },
+  impl: cardImpl,
+})
+
+export const D21_Recruitment_impl = D21_Recruitment.impl

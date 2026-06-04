@@ -5,7 +5,7 @@ import { playOccupationAction } from '../../actions/effects/occupation'
 import { actionDefinitions } from '../../actions'
 
 import '../A/A97_Freshman'
-import '../../cards-display/A/A123_FrameBuilder'
+import '../../cards/A/A123_FrameBuilder'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionExecutionContext } from '../../contract/types'
 

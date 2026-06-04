@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
@@ -10,9 +11,8 @@ import type {
 } from '../../contract/events'
 import type { CardImpl } from '../registry'
 import { computeAnimalZones } from '../../domain/animal-zones'
-import { D36_BreedRegistry } from '../../cards-display/D/D36_BreedRegistry'
 
-const CARD_ID = D36_BreedRegistry.id
+const CARD_ID = 'D36_BreedRegistry'
 const BOARD_SHEEP_KEY = 'boardSheep'
 const CARD_SHEEP_KEY = 'cardSheep'
 const CONVERTED_KEY = 'sheepConvertedToFood'
@@ -215,7 +215,7 @@ const opponentHarvestSheepConversionListener: CardListenerRegistration = {
   scope: 'opponent',
 }
 
-export const D36_BreedRegistry_impl = {
+const cardImpl = {
   listeners: [
     afterSheepGainListener,
     opponentSheepGainListener,
@@ -241,3 +241,20 @@ export const D36_BreedRegistry_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D36_BreedRegistry = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Breed Registry",
+    deck: "D",
+    number: 36,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any sheep into food, you get 3 bonus <SCORE>."],
+    cost: {},
+    prerequisite: "No Sheep",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D36_BreedRegistry_impl = D36_BreedRegistry.impl

@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState } from '../../contract/types'
@@ -5,10 +6,8 @@ import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { countPeopleOnSpace } from '../helpers/space-occupancy'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
-import { A25_Bassinet } from '../../cards-display/A/A25_Bassinet'
 
-const CARD_ID = A25_Bassinet.id
-
+const CARD_ID = 'A25_Bassinet'
 const MEETING_PLACE_ID = 'meeting-place'
 
 function findFirstNonAccumSpaceThisRound(state: GameState): string | null {
@@ -52,7 +51,25 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const A25_Bassinet_impl = {
+const cardImpl = {
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A25_Bassinet = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bassinet',
+    deck: 'A',
+    number: 25,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'You can place a(nother) person on the first non-accumulating action space used in each work phase, if there is only 1 person, including newborns, on that space. (There can never be two people on __Meeting Place__.)',
+      ],
+    cost: { wood: 1, reed: 1 },
+    vp: 0,
+  },
+  impl: cardImpl,
+})
+
+export const A25_Bassinet_impl = A25_Bassinet.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C102_TreeGuard } from '../../cards-display/C/C102_TreeGuard'
 
-const CARD_ID = C102_TreeGuard.id
-
+const CARD_ID = 'C102_TreeGuard'
 const listener: CardListenerRegistration = {
   id: 'C102-tree-guard-after-collect',
   cardIds: [CARD_ID],
@@ -22,7 +21,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C102_TreeGuard_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C102_TreeGuard = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tree Guard',
+    deck: 'C',
+    number: 102,
+    category: 'GOODS_PROVIDER',
+    desc: [
+        'Each time after you use a wood accumulation space, you can place 4 <WOOD> from your supply on that space to get 2 <STONE>, 1 <CLAY>, 1 <REED>, and 1 <GRAIN>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C102_TreeGuard_impl = C102_TreeGuard.impl

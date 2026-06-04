@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, FarmFenceBuiltEvent } from '../../contract/events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A83_ShepherdsCrook } from '../../cards-display/A/A83_ShepherdsCrook'
 
-const CARD_ID = A83_ShepherdsCrook.id
-
+const CARD_ID = 'A83_ShepherdsCrook'
 const MIN_PASTURE_SIZE = 4
 
 type QueryableFarmFenceBuiltEvent = FarmFenceBuiltEvent | DraftGameEvent<'farm.fenceBuilt'>
@@ -39,7 +38,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A83_ShepherdsCrook_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A83_ShepherdsCrook = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Shepherd's Crook",
+    deck: "A",
+    number: 83,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ["Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."],
+    cost: {"wood":1},
+  },
+  impl: cardImpl,
+})
+
+export const A83_ShepherdsCrook_impl = A83_ShepherdsCrook.impl

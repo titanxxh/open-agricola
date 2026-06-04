@@ -1,11 +1,10 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import type { ActionFlow } from '../../contract/types'
-import { B42_ForestInn } from '../../cards-display/B/B42_ForestInn'
 
-const CARD_ID = B42_ForestInn.id
-
+const CARD_ID = 'B42_ForestInn'
 const exchangeFlow = (): ActionFlow => ({
   type: 'xor',
   promptKey: 'ui.interactionForestInn',
@@ -70,7 +69,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const B42_ForestInn_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, _player) => {
@@ -84,3 +83,22 @@ export const B42_ForestInn_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B42_ForestInn = definePlayerActionCard({
+  meta: {
+    id: CARD_ID,
+    name: "Forest Inn",
+    deck: "B",
+    number: 42,
+    category: "GOODS_PROVIDER",
+    desc: ["This is an action space for all. A player who uses it can exchange 5/7/9 <WOOD> for 8 <WOOD> and 2/4/7 <FOOD>. When another player uses it, they must first pay you 1 <FOOD>."],
+    cost: {"clay":1,"reed":1},
+    vp: 1,
+    prerequisite: "Play in Round 6 or Before",
+    maxRound: 6,
+    waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const B42_ForestInn_impl = B42_ForestInn.impl

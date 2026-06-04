@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A52_ThrowingAxe } from '../../shared/cards-display/A/A52_ThrowingAxe'
+import { A52_ThrowingAxe } from '../../shared/cards/A/A52_ThrowingAxe'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('A52_ThrowingAxe prerequisite', () => {

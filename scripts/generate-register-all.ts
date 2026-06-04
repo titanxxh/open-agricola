@@ -1,129 +1,273 @@
 #!/usr/bin/env tsx
-/**
- * Generate `shared/cards/register-all.ts` — a single aggregation module that
- * imports every `<CARD_ID>_impl` export from the card files and exposes them
- * as `ALL_CARD_IMPLS` keyed by card id.
- *
- * Also generates `shared/cards/community/auto-catalog.ts` — aggregates all
- * community card definitions for catalog.ts to consume.
- *
- * Run manually after changing any card file that adds/removes an `_impl`:
- *   pnpm run generate:register-all
- *
- * Task 11 will wire `GameCore` to call `CardRegistry.loadImpl(cardId, impl)`
- * for each entry in `ALL_CARD_IMPLS`.
- */
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parseCardFile, type CardMeta } from './build-cards-manifest'
 
-const cardsRoot = path.resolve(process.cwd(), 'shared', 'cards')
-const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community', '__stubs__']
+const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'community'] as const
+const RUNTIME_DECKS = [...CATALOG_DECKS, '__stubs__'] as const
+const MAJOR_DECK = 'major'
 
-const imports: string[] = []
-const entries: string[] = []
+export type RegisterAllBuildResult = {
+  registerAll: string
+  catalogGenerated: string
+  majorGenerated: string
+  majorRuntimeGenerated: string
+  implCount: number
+  catalogDefinitionCount: number
+  majorDefinitionCount: number
+}
 
-const communityDefImports: string[] = []
-const communityDefEntries: string[] = []
+type BuildOptions = {
+  repoRoot?: string
+}
 
-for (const deck of decks) {
-  const deckDir = path.join(cardsRoot, deck)
-  if (!fs.existsSync(deckDir)) continue
-  const files = fs
-    .readdirSync(deckDir)
-    .filter(
-      (f) =>
-        f.endsWith('.ts') &&
-        !f.endsWith('.test.ts') &&
-        f !== 'auto-catalog.ts',
+type SourceExport = {
+  name: string
+  moduleRel: string
+  filePath: string
+  hasImpl: boolean
+  number?: number
+}
+
+const cardSourceExportRe =
+  /^export const (\w+)\s*=\s*define(?:Minor|Occupation|PlayerAction|Major)Card\s*\(/gm
+
+const listCardFiles = (dir: string): string[] => {
+  if (!fs.existsSync(dir)) return []
+  return fs
+    .readdirSync(dir)
+    .filter((f) =>
+      f.endsWith('.ts')
+      && !f.endsWith('.test.ts')
+      && f !== 'index.ts'
+      && f !== 'types.ts'
+      && f !== 'generated.ts'
+      && f !== 'runtime.generated.ts'
+      && f !== 'catalog.generated.ts'
+      && f !== 'register-all.ts',
     )
     .sort()
-  for (const file of files) {
-    const filePath = path.join(deckDir, file)
-    const source = fs.readFileSync(filePath, 'utf8')
+}
 
-    // Find `export const <ID>_impl` declarations.
-    const implMatch = source.match(/^export const (\w+)_impl\s*[=:]/m)
-    if (implMatch) {
-      const cardId = implMatch[1]
+const extractCardSourceExports = (source: string, moduleRel: string, filePath: string): SourceExport[] => {
+  const matches = [...source.matchAll(cardSourceExportRe)]
+  return matches.map((match, index) => {
+    const start = match.index ?? 0
+    const next = matches[index + 1]?.index ?? source.length
+    return {
+      name: match[1]!,
+      moduleRel,
+      filePath,
+      hasImpl: /\bimpl\s*:/.test(source.slice(start, next)),
+      number: Number(source.slice(start, next).match(/\bnumber\s*:\s*(\d+)/)?.[1] ?? Number.NaN),
+    }
+  })
+}
+
+const collectSources = (
+  cardsRoot: string,
+  decks: readonly string[],
+): SourceExport[] => {
+  const sources: SourceExport[] = []
+  for (const deck of decks) {
+    const deckDir = path.join(cardsRoot, deck)
+    for (const file of listCardFiles(deckDir)) {
+      const filePath = path.join(deckDir, file)
+      const source = fs.readFileSync(filePath, 'utf8')
       const moduleRel = `./${deck}/${path.basename(file, '.ts')}`
-      imports.push(`import { ${cardId}_impl } from '${moduleRel}'`)
-      entries.push(`  '${cardId}': ${cardId}_impl,`)
+      sources.push(...extractCardSourceExports(source, moduleRel, filePath))
     }
-
   }
+  return sources.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-// Scan cards-display/community/ for community card definition exports
-// (display consts live in cards-display after S6b split).
-const cardsDisplayRoot = path.resolve(process.cwd(), 'shared', 'cards-display')
-const communityDisplayDir = path.join(cardsDisplayRoot, 'community')
-if (fs.existsSync(communityDisplayDir)) {
-  const files = fs
-    .readdirSync(communityDisplayDir)
-    .filter(
-      (f) =>
-        f.endsWith('.ts') &&
-        !f.endsWith('.test.ts') &&
-        f !== 'auto-catalog.ts',
-    )
-    .sort()
-  for (const file of files) {
-    const filePath = path.join(communityDisplayDir, file)
+const collectMajorSources = (cardsRoot: string): SourceExport[] => {
+  const majorDir = path.join(cardsRoot, MAJOR_DECK)
+  const sources: SourceExport[] = []
+  for (const file of listCardFiles(majorDir)) {
+    const filePath = path.join(majorDir, file)
     const source = fs.readFileSync(filePath, 'utf8')
-    // Match `export const <ID> = CARD_DEF` or `export const <ID> = new (MinorImprovement|Occupation)`
-    const defMatch = source.match(
-      /^export const (\w+)\s*=\s*(?:CARD_DEF|new\s+(?:MinorImprovement|Occupation))/m,
-    )
-    if (defMatch) {
-      const defId = defMatch[1]
-      const moduleRel = `../../cards-display/community/${path.basename(file, '.ts')}`
-      communityDefImports.push(`import { ${defId} } from '${moduleRel}'`)
-      communityDefEntries.push(`  ${defId},`)
-    }
+    const moduleRel = `./major/${path.basename(file, '.ts')}`
+    sources.push(...extractCardSourceExports(source, moduleRel, filePath))
   }
+  return sources.sort((a, b) => {
+    const aNum = Number.isFinite(a.number) ? a.number! : 999
+    const bNum = Number.isFinite(b.number) ? b.number! : 999
+    if (aNum !== bNum) return aNum - bNum
+    return a.name.localeCompare(b.name)
+  })
 }
 
-// Write register-all.ts
-const output = `// GENERATED by scripts/generate-register-all.ts — do not edit by hand.
-// Run \`pnpm run generate:register-all\` after adding or removing card _impl exports.
+const majorImportBlock = (sources: readonly SourceExport[]) =>
+  sources
+    .map((source) => `import { ${source.name} } from '${source.moduleRel.replace('./major/', './')}'`)
+    .join('\n')
+
+const sourceArray = (sources: readonly SourceExport[]) =>
+  sources.map((source) => `  ${source.name},`).join('\n')
+
+const cardSourceKindFromType = (type: CardMeta['type']) => type
+
+const cardDefinitionLiteral = (meta: CardMeta) => {
+  const { type, ...definition } = meta
+  return JSON.stringify({ ...definition, kind: cardSourceKindFromType(type) }, null, 2)
+}
+
+const parseSourceMetas = (sources: readonly SourceExport[]) => {
+  const metas = new Map<string, CardMeta>()
+  const parsedFiles = new Map<string, CardMeta[]>()
+  for (const source of sources) {
+    if (!parsedFiles.has(source.filePath)) {
+      parsedFiles.set(
+        source.filePath,
+        parseCardFile(source.filePath, {
+          includeLegacyConstructors: false,
+          includeMajorLiterals: false,
+          includeCardSources: true,
+        }).metas,
+      )
+    }
+    const meta = parsedFiles.get(source.filePath)?.find((candidate) => candidate.id === source.name)
+    if (!meta) {
+      throw new Error(`${source.filePath}: missing static metadata for ${source.name}`)
+    }
+    metas.set(source.name, meta)
+  }
+  return metas
+}
+
+const definitionArray = (
+  sources: readonly SourceExport[],
+  metas: ReadonlyMap<string, CardMeta>,
+) =>
+  sources.map((source) => {
+    const meta = metas.get(source.name)
+    if (!meta) {
+      throw new Error(`${source.filePath}: missing static metadata for ${source.name}`)
+    }
+    return cardDefinitionLiteral(meta).split('\n').map((line) => `  ${line}`).join('\n') + ','
+  }).join('\n')
+
+export function buildRegisterAll(options: BuildOptions = {}): RegisterAllBuildResult {
+  const repoRoot = options.repoRoot ?? process.cwd()
+  const cardsRoot = path.resolve(repoRoot, 'shared', 'cards')
+  const catalogSources = collectSources(cardsRoot, CATALOG_DECKS)
+  const runtimeSources = collectSources(cardsRoot, RUNTIME_DECKS)
+  const majorSources = collectMajorSources(cardsRoot)
+  const implSources = [...runtimeSources, ...majorSources].filter((source) => source.hasImpl)
+  const catalogMetas = parseSourceMetas(catalogSources)
+  const majorMetas = parseSourceMetas(majorSources)
+
+  const registerImports = implSources.map((source) =>
+    `import { ${source.name} } from '${source.moduleRel}'`)
+  const registerEntries = implSources.map((source) => `  '${source.name}': ${source.name}.impl,`)
+
+  const registerAll = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
 import type { CardImpl } from './registry'
-// Load the catalog BEFORE pulling in card \`_impl\` modules. Catalog imports every
-// card-definition file (e.g. \`A93_BedMaker\`) and builds global arrays at module
-// scope; some card files (e.g. D117) circle back to catalog for helpers. If
-// register-all is the first entry into this subgraph, the \`_impl\` imports below
-// can reach catalog before its arrays are populated, surfacing undefined entries
-// (pre-existing cycle). Importing catalog first forces the whole card-definition
-// graph to finish initialising before we start harvesting \`_impl\` exports.
 import './catalog'
 
-${imports.join('\n')}
+${registerImports.join('\n')}
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
-${entries.join('\n')}
+${registerEntries.join('\n')}
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS
 `
 
-const outPath = path.join(cardsRoot, 'register-all.ts')
-fs.writeFileSync(outPath, output, 'utf8')
-console.log(`[generate-register-all] wrote ${entries.length} entries to ${outPath}`)
+  const catalogGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
+import type { CardDefinition } from '../contract/cards'
 
-// Write community/auto-catalog.ts
-const autoCatalogImportsBlock =
-  communityDefImports.length > 0 ? '\n' + communityDefImports.join('\n') + '\n' : ''
-const autoCatalogArrayBlock =
-  communityDefEntries.length > 0 ? '\n' + communityDefEntries.join('\n') + '\n' : ''
+type GeneratedCatalogCardDefinition = CardDefinition & {
+  kind: 'minor' | 'occupation' | 'playerAction'
+}
 
-const autoCatalogOutput = `// GENERATED by scripts/generate-register-all.ts — do not edit by hand.
-// Run \`pnpm run generate:register-all\` after adding or removing community card definitions.
-import type { MinorImprovement, Occupation } from '../../cards-display/types'
-${autoCatalogImportsBlock}
-export const allCommunityCards: Array<MinorImprovement | Occupation> = [${autoCatalogArrayBlock}]
+export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] = [
+${definitionArray(catalogSources, catalogMetas)}
+]
+
+const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
+  card.kind === 'minor' || card.kind === 'playerAction'
+
+const isOccupation = (card: GeneratedCatalogCardDefinition) =>
+  card.kind === 'occupation'
+
+const isImplemented = (card: GeneratedCatalogCardDefinition) => card.implemented !== false
+
+export const minorImprovementCardsList = catalogCardDefinitions
+  .filter(isMinorLike)
+
+export const occupationCardsList = catalogCardDefinitions
+  .filter(isOccupation)
+
+export const implementedMinorImprovementCardsList =
+  minorImprovementCardsList.filter(isImplemented)
+
+export const implementedOccupationCardsList =
+  occupationCardsList.filter(isImplemented)
+
+export const minorImprovementIdsList =
+  implementedMinorImprovementCardsList.map((card) => card.id)
+
+export const occupationIdsList =
+  implementedOccupationCardsList.map((card) => card.id)
 `
 
-const autoCatalogPath = path.join(cardsRoot, 'community', 'auto-catalog.ts')
-fs.writeFileSync(autoCatalogPath, autoCatalogOutput, 'utf8')
-console.log(
-  `[generate-register-all] wrote ${communityDefEntries.length} community card defs to ${autoCatalogPath}`,
-)
+  const majorGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
+import type { MajorCardDisplay } from './types'
+
+export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'major' })[] = [
+${definitionArray(majorSources, majorMetas)}
+]
+
+export const majorImprovementIdsList =
+  majorCardDefinitionsList.map((card) => card.id)
+`
+
+  const majorRuntimeGenerated = `// GENERATED by scripts/generate-register-all.ts. Do not edit by hand.
+import type { CardSource } from '../card-source'
+${majorImportBlock(majorSources)}
+
+export const majorCardSources = [
+${sourceArray(majorSources)}
+] as const satisfies readonly CardSource<'major'>[]
+`
+
+  return {
+    registerAll,
+    catalogGenerated,
+    majorGenerated,
+    majorRuntimeGenerated,
+    implCount: implSources.length,
+    catalogDefinitionCount: catalogSources.length,
+    majorDefinitionCount: majorSources.length,
+  }
+}
+
+export function writeRegisterAll(options: BuildOptions = {}): void {
+  const repoRoot = options.repoRoot ?? process.cwd()
+  const cardsRoot = path.resolve(repoRoot, 'shared', 'cards')
+  const result = buildRegisterAll({ repoRoot })
+
+  const registerAllPath = path.join(cardsRoot, 'register-all.ts')
+  fs.writeFileSync(registerAllPath, result.registerAll, 'utf8')
+  console.log(`[generate-register-all] wrote ${result.implCount} impl entries to ${registerAllPath}`)
+
+  const catalogGeneratedPath = path.join(cardsRoot, 'catalog.generated.ts')
+  fs.writeFileSync(catalogGeneratedPath, result.catalogGenerated, 'utf8')
+  console.log(`[generate-register-all] wrote ${result.catalogDefinitionCount} card defs to ${catalogGeneratedPath}`)
+
+  const majorGeneratedPath = path.join(cardsRoot, 'major', 'generated.ts')
+  fs.writeFileSync(majorGeneratedPath, result.majorGenerated, 'utf8')
+  console.log(`[generate-register-all] wrote ${result.majorDefinitionCount} major defs to ${majorGeneratedPath}`)
+
+  const majorRuntimeGeneratedPath = path.join(cardsRoot, 'major', 'runtime.generated.ts')
+  fs.writeFileSync(majorRuntimeGeneratedPath, result.majorRuntimeGenerated, 'utf8')
+  console.log(`[generate-register-all] wrote ${result.majorDefinitionCount} major runtime entries to ${majorRuntimeGeneratedPath}`)
+}
+
+const isCli = process.argv[1] === fileURLToPath(import.meta.url)
+if (isCli) {
+  writeRegisterAll()
+}

@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D164_PetGrower } from '../../cards-display/D/D164_PetGrower'
 import { countHouseAnimals } from '../../domain'
 
-const CARD_ID = D164_PetGrower.id
+const CARD_ID = 'D164_PetGrower'
 
 const listener: CardListenerRegistration = {
   id: 'D164-pet-grower-after-place-farmer',
@@ -20,7 +20,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D164_PetGrower_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D164_PetGrower = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pet Grower',
+    deck: 'D',
+    number: 164,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['Each time you use an animal accumulation space, if afterward you have no animal in your house, you also get 1 <SHEEP>.'],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const D164_PetGrower_impl = D164_PetGrower.impl

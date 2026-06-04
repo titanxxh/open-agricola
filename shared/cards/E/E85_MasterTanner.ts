@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E85_MasterTanner } from '../../cards-display/E/E85_MasterTanner'
 
-const CARD_ID = E85_MasterTanner.id
-
+const CARD_ID = 'E85_MasterTanner'
 const beforeExchangeListener: CardListenerRegistration = {
   id: 'E85-master-tanner-before-exchange',
   cardIds: [CARD_ID],
@@ -68,7 +67,7 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-export const E85_MasterTanner_impl = {
+const cardImpl = {
   listeners: [beforeExchangeListener, afterExchangeListener],
   effect: {
   id: CARD_ID,
@@ -79,3 +78,19 @@ export const E85_MasterTanner_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E85_MasterTanner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Master Tanner',
+    deck: 'E',
+    number: 85,
+    desc: ['For each <PIG> or <CATTLE> you turn into <FOOD>, you can place 1 of that <FOOD> on this card. While its <FOOD> equals your number of rooms, this card provides room for 1 person.'],
+    cost: {},
+    players: '1+',
+    category: 'FARMYARD_-_PLACE_FOR_PERSON',
+  },
+  impl: cardImpl,
+})
+
+export const E85_MasterTanner_impl = E85_MasterTanner.impl

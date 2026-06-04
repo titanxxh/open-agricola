@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { B160_PubOwner } from '../../cards-display/B/B160_PubOwner'
 
-const CARD_ID = B160_PubOwner.id
+const CARD_ID = 'B160_PubOwner'
 
-export const B160_PubOwner_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { grain: 1 }),
@@ -20,3 +20,21 @@ export const B160_PubOwner_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B160_PubOwner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pub Owner',
+    deck: 'B',
+    number: 160,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'When you play this card and at the end of each work phase in which the __Forest__, __Clay Pit__, and __Reed Bank__ accumulation spaces are all occupied, you get 1 <GRAIN>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const B160_PubOwner_impl = B160_PubOwner.impl

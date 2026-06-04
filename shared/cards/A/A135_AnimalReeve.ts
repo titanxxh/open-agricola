@@ -1,15 +1,14 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A135_AnimalReeve } from '../../cards-display/A/A135_AnimalReeve'
 
-const CARD_ID = A135_AnimalReeve.id
-
+const CARD_ID = 'A135_AnimalReeve'
 const WOOD_MAP: Record<number, number> = {
   0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4,
 }
 
 const SETS_VP_MAP = [0, 0, 1, 3, 5] as const
 
-export const A135_AnimalReeve_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -39,3 +38,20 @@ export const A135_AnimalReeve_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A135_AnimalReeve = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Animal Reeve',
+    deck: 'A',
+    number: 135,
+    category: 'POINTS_PROVIDER',
+    desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with 2/3/4+ animals of each type gets 1/3/5 bonus <SCORE>.'],
+    cost: {},
+    players: '3+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A135_AnimalReeve_impl = A135_AnimalReeve.impl

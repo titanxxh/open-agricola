@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import {
   getWorkPhaseBuildingResources,
 } from '../../session/work-phase-resources'
@@ -6,7 +7,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A53_Claypipe'
 
-export const A53_Claypipe_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -27,3 +28,18 @@ export const A53_Claypipe_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A53_Claypipe = defineMinorCard({
+  meta: {
+    id: "A53_Claypipe",
+    name: "Claypipe",
+    deck: "A",
+    number: 53,
+    category: "FOOD_PROVIDER",
+    desc: ["In the returning home phase of each round, if you gained at least 7 building resources in the preceding work phase, you get 2 <FOOD>."],
+    cost: {"clay":1},
+  },
+  impl: cardImpl,
+})
+
+export const A53_Claypipe_impl = A53_Claypipe.impl

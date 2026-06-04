@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A90_PlowDriver } from '../../cards-display/A/A90_PlowDriver'
 
-const CARD_ID = A90_PlowDriver.id
+const CARD_ID = 'A90_PlowDriver'
 
-export const A90_PlowDriver_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -22,3 +22,19 @@ export const A90_PlowDriver_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A90_PlowDriver = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Plow Driver',
+    deck: 'A',
+    number: 90,
+    category: 'FARM_PLANNER',
+    desc: ['Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 field.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A90_PlowDriver_impl = A90_PlowDriver.impl

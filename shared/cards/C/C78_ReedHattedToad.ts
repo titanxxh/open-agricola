@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C78_ReedHattedToad } from '../../cards-display/C/C78_ReedHattedToad'
 
-const CARD_ID = C78_ReedHattedToad.id
+const CARD_ID = 'C78_ReedHattedToad'
 
-export const C78_ReedHattedToad_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -24,3 +24,18 @@ export const C78_ReedHattedToad_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C78_ReedHattedToad = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Reed-Hatted Toad",
+    deck: "C",
+    number: 78,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Add 5, 7, 9, 11, and 13 to the current round and place 1 <REED> on each corresponding round space. At the start of these rounds, you get the <REED>."],
+    cost: { food: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C78_ReedHattedToad_impl = C78_ReedHattedToad.impl

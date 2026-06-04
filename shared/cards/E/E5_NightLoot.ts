@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
-import { E5_NightLoot } from '../../cards-display/E/E5_NightLoot'
 
-const CARD_ID = E5_NightLoot.id
-
+const CARD_ID = 'E5_NightLoot'
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 type Option = { spaceId: string; spaceName: string; type: keyof Resource }
@@ -18,7 +17,7 @@ const collectLeaf = (opt: Option): ActionFlow =>
     includeEffectPreview: true,
   })
 
-export const E5_NightLoot_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state): ActionFlow | undefined => {
@@ -57,3 +56,19 @@ export const E5_NightLoot_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E5_NightLoot = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Night Loot',
+    deck: 'E',
+    number: 5,
+    category: 'PASSING_-_BUILDING_RESOURCES_',
+    desc: ['Immediately remove 2 different building resources total from accumulation spaces and place them in your supply.'],
+    cost: { food: 2 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const E5_NightLoot_impl = E5_NightLoot.impl

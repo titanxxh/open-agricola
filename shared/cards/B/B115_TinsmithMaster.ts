@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../domain'
@@ -7,9 +8,8 @@ import { fieldTopStack } from '../../domain/field'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
-import { B115_TinsmithMaster } from '../../cards-display/B/B115_TinsmithMaster'
 
-const CARD_ID = B115_TinsmithMaster.id
+const CARD_ID = 'B115_TinsmithMaster'
 const SELECTION_EFFECT = 'B115-tinsmith-master-add-additional-good'
 
 /**
@@ -86,7 +86,7 @@ const afterSowListener: CardListenerRegistration = {
   },
 }
 
-export const B115_TinsmithMaster_impl = {
+const cardImpl = {
   listeners: [afterSowListener],
   effect: {
   id: CARD_ID,
@@ -105,3 +105,20 @@ export const B115_TinsmithMaster_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B115_TinsmithMaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Tinsmith Master',
+    deck: 'B',
+    number: 115,
+    category: 'CROP_PROVIDER',
+    desc: ['You can hold 1 additional animal in each pasture without a stable. Each time you sow in a field, you can place 1 additional crop of the respective type in that field.'],
+    cost: {},
+    players: '1+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const B115_TinsmithMaster_impl = B115_TinsmithMaster.impl

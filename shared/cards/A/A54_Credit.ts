@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A54_Credit } from '../../cards-display/A/A54_Credit'
 
-const CARD_ID = A54_Credit.id
-
+const CARD_ID = 'A54_Credit'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-export const A54_Credit_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => {
@@ -35,3 +34,21 @@ export const A54_Credit_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A54_Credit = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Credit',
+    deck: 'A',
+    number: 54,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'When you play this card, you immediately get 5 <FOOD>. At the end of each round that does not end with a harvest, you must pay 1 <FOOD>, or else take a <BEGGING> marker.',
+      ],
+    prerequisite: 'At Most 3 Occupations',
+    occupationPrerequisites: { max: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const A54_Credit_impl = A54_Credit.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A51_DriftNetBoat } from '../../cards-display/A/A51_DriftNetBoat'
 
-const CARD_ID = A51_DriftNetBoat.id
-
+const CARD_ID = 'A51_DriftNetBoat'
 const listener: CardListenerRegistration = {
   id: 'A51-drift-net-boat-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,7 +16,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A51_DriftNetBoat_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A51_DriftNetBoat = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Drift-Net Boat',
+    deck: 'A',
+    number: 51,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Fishing__ accumulation space, you get an additional 2 <FOOD>.'],
+    cost: { wood: 1, reed: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const A51_DriftNetBoat_impl = A51_DriftNetBoat.impl

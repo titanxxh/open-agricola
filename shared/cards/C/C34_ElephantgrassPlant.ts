@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C34_ElephantgrassPlant } from '../../cards-display/C/C34_ElephantgrassPlant'
 
-const CARD_ID = C34_ElephantgrassPlant.id
+const CARD_ID = 'C34_ElephantgrassPlant'
 
-export const C34_ElephantgrassPlant_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterHarvest: (_state, player) => {
@@ -22,3 +22,21 @@ export const C34_ElephantgrassPlant_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C34_ElephantgrassPlant = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Elephantgrass Plant",
+    deck: "C",
+    number: 34,
+    category: "POINTS_PROVIDER",
+    desc: ["Immediately after each harvest, you can use this card to exchange exactly 1 <REED> for 1 bonus <SCORE>."],
+    cost: { clay: 2, stone: 1 },
+    prerequisite: "2 Occupations",
+    occupationPrerequisites: { min: 2 },
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const C34_ElephantgrassPlant_impl = C34_ElephantgrassPlant.impl

@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C151_SowingDirector } from '../../cards-display/C/C151_SowingDirector'
 
-const CARD_ID = C151_SowingDirector.id
-
+const CARD_ID = 'C151_SowingDirector'
 /**
  * C151 Sowing Director:
  * Each time another player uses the Grain Utilization action space,
@@ -35,7 +34,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C151_SowingDirector_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C151_SowingDirector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sowing Director',
+    deck: 'C',
+    number: 151,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time after another player uses the __Grain Utilization__ action space, you get a __Sow__ action.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const C151_SowingDirector_impl = C151_SowingDirector.impl

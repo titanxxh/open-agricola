@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D139_Chairman } from '../../cards-display/D/D139_Chairman'
 
-const CARD_ID = D139_Chairman.id
-
+const CARD_ID = 'D139_Chairman'
 const opponentListener: CardListenerRegistration = {
   id: 'D139-chairman-opponent-meeting-place',
   cardIds: [CARD_ID],
@@ -47,7 +46,25 @@ const playerListener: CardListenerRegistration = {
   },
 }
 
-export const D139_Chairman_impl = {
+const cardImpl = {
   listeners: [opponentListener, playerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D139_Chairman = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Chairman",
+    deck: "D",
+    number: 139,
+    category: "FOOD_PROVIDER",
+    desc: [
+        'Each time another player uses the __Meeting Place__ action space, both they and you get 1 <FOOD> (before taking the actions). If you use it, you get 1 <FOOD>.',
+      ],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const D139_Chairman_impl = D139_Chairman.impl

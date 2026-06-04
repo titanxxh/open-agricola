@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C153_PatternMaker } from '../../cards-display/C/C153_PatternMaker'
 
-const CARD_ID = C153_PatternMaker.id
-
+const CARD_ID = 'C153_PatternMaker'
 /**
  * C153 Pattern Maker:
  * Each time another player renovates, the card owner can optionally
@@ -40,7 +39,27 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C153_PatternMaker_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C153_PatternMaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pattern Maker',
+    deck: 'C',
+    number: 153,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'Each time another player renovates, you can exchange exactly 2 <WOOD> for 1 <GRAIN>, 1 <FOOD>, and 1 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: '4+',
+    extraVp: true,
+    waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const C153_PatternMaker_impl = C153_PatternMaker.impl

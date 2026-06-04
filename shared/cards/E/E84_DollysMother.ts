@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E84_DollysMother } from '../../cards-display/E/E84_DollysMother'
 
-const CARD_ID = E84_DollysMother.id
+const CARD_ID = 'E84_DollysMother'
 
-export const E84_DollysMother_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBreedThreshold: (_state, _player, animalType, { sourceCard }) => {
@@ -14,3 +14,21 @@ export const E84_DollysMother_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E84_DollysMother = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Dolly's Mother",
+    deck: "E",
+    number: 84,
+    desc: ["You only require 1 <SHEEP> to breed sheep during the breeding phase of a harvest. This card can hold 1 <SHEEP>."],
+    cost: {},
+    animalHolder: true,
+    vp: 1,
+    prerequisite: "1 Sheep",
+    category: 'ANIMALS_',
+  },
+  impl: cardImpl,
+})
+
+export const E84_DollysMother_impl = E84_DollysMother.impl

@@ -135,7 +135,7 @@ function fakeRes(): FakeRes {
   } as unknown as FakeRes
 }
 
-// ── Minimal fake "upstream" register-all.ts / auto-catalog.ts / community_cards.md the
+// ── Minimal fake "upstream" register-all.ts / community_cards.md the
 //    code-gen patchers must recognise as valid. ────────────────────────────
 
 const FAKE_REGISTER_ALL = `// GENERATED
@@ -150,18 +150,24 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
 export type AllCardImpls = typeof ALL_CARD_IMPLS
 `
 
-const FAKE_AUTO_CATALOG = `// GENERATED
-import type { MinorImprovement, Occupation } from '../types'
-
-export const allCommunityCards: Array<MinorImprovement | Occupation> = [
-]
-`
-
 const FAKE_COMMUNITY_MD = `# Community cards
 
 <!-- community-card-entries:begin -->
 | ID | Name | Type | Author | PR |
 <!-- community-card-entries:end -->
+`
+
+const FAKE_CATALOG_GENERATED = `// generated
+export const catalogCardDefinitions = [
+  {
+    "id": "C99_Source",
+    "name": "Source",
+    "deck": "C",
+    "number": 99,
+    "desc": [],
+    "kind": "minor"
+  },
+]
 `
 
 // ── GitHub API stub factory ────────────────────────────────────────────────
@@ -225,7 +231,7 @@ function createGitHubApiStub(opts: StubOpts): {
       )
     }
 
-    // Upstream contents (register-all.ts, auto-catalog.ts, community_cards.md)
+    // Upstream contents (generated catalogs, community_cards.md)
     if (url.includes('/contents/shared/cards/register-all.ts')) {
       return Promise.resolve(
         new Response(
@@ -237,11 +243,11 @@ function createGitHubApiStub(opts: StubOpts): {
         ),
       )
     }
-    if (url.includes('/contents/shared/cards/community/auto-catalog.ts')) {
+    if (url.includes('/contents/shared/cards/catalog.generated.ts')) {
       return Promise.resolve(
         new Response(
           JSON.stringify({
-            content: Buffer.from(FAKE_AUTO_CATALOG).toString('base64'),
+            content: Buffer.from(FAKE_CATALOG_GENERATED).toString('base64'),
             encoding: 'base64',
           }),
           { status: 200 },

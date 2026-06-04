@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E121_HillCultivator } from '../../cards-display/E/E121_HillCultivator'
 
-const CARD_ID = E121_HillCultivator.id
-
+const CARD_ID = 'E121_HillCultivator'
 const listener: CardListenerRegistration = {
   id: 'E121-hill-cultivator-before-place-farmer',
   cardIds: [CARD_ID],
@@ -22,7 +21,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E121_HillCultivator_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E121_HillCultivator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hill Cultivator',
+    deck: 'E',
+    number: 121,
+    category: 'BUILDING_RESOURCES_-_CLAY',
+    desc: ['Each time you use the __Grain Seeds__ or __Vegetable Seeds__ action space, you also get 2 or 3 <CLAY>, respectively.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E121_HillCultivator_impl = E121_HillCultivator.impl

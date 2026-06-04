@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D125_ForestTrader } from '../../cards-display/D/D125_ForestTrader'
 
-const CARD_ID = D125_ForestTrader.id
-
+const CARD_ID = 'D125_ForestTrader'
 const listener: CardListenerRegistration = {
   id: 'D125-forest-trader-before-collect',
   cardIds: [CARD_ID],
@@ -32,7 +31,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D125_ForestTrader_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D125_ForestTrader = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forest Trader',
+    deck: 'D',
+    number: 125,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['Each time you use a wood or clay accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 food.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D125_ForestTrader_impl = D125_ForestTrader.impl

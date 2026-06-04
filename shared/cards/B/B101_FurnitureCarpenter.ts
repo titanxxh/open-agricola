@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B101_FurnitureCarpenter } from '../../cards-display/B/B101_FurnitureCarpenter'
 
-const CARD_ID = B101_FurnitureCarpenter.id
+const CARD_ID = 'B101_FurnitureCarpenter'
 
-export const B101_FurnitureCarpenter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (state, player) => {
@@ -30,3 +30,20 @@ export const B101_FurnitureCarpenter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B101_FurnitureCarpenter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Furniture Carpenter',
+    deck: 'B',
+    number: 101,
+    category: 'POINTS_PROVIDER',
+    desc: ['Each harvest, if any player (including you) owns the Joinery or an upgrade thereof, you can buy exactly 1 bonus <SCORE> for 2 <FOOD>.'],
+    cost: {},
+    players: '1+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B101_FurnitureCarpenter_impl = B101_FurnitureCarpenter.impl

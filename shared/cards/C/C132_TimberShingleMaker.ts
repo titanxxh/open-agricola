@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C132_TimberShingleMaker } from '../../cards-display/C/C132_TimberShingleMaker'
 
-const CARD_ID = C132_TimberShingleMaker.id
-
+const CARD_ID = 'C132_TimberShingleMaker'
 const afterRenovateListener: CardListenerRegistration = {
   id: 'C132-timber-shingle-maker-after-renovate',
   cardIds: [CARD_ID],
@@ -49,7 +48,7 @@ const afterRenovateListener: CardListenerRegistration = {
   },
 }
 
-export const C132_TimberShingleMaker_impl = {
+const cardImpl = {
   listeners: [afterRenovateListener],
   effect: {
   id: CARD_ID,
@@ -59,3 +58,23 @@ export const C132_TimberShingleMaker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C132_TimberShingleMaker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Timber Shingle Maker',
+    deck: 'C',
+    number: 132,
+    category: 'POINTS_PROVIDER',
+    desc: [
+        'When you renovate to stone, you can place up to 1 <WOOD> from your supply in each of your rooms. During scoring, each such <WOOD> is worth 1 bonus <SCORE>.',
+      ],
+    cost: {},
+    players: '3+',
+    extraVp: true,
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const C132_TimberShingleMaker_impl = C132_TimberShingleMaker.impl

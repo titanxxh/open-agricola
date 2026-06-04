@@ -1,11 +1,10 @@
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../../cards-display/types'
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { B100_Clutterer } from '../../cards-display/B/B100_Clutterer'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../registry-display'
 
-const CARD_ID = B100_Clutterer.id
-
+const CARD_ID = 'B100_Clutterer'
 const hasAccumulationText = (desc: string[]): boolean =>
   desc.some((line) => line.toLowerCase().includes('accumulation'))
 
@@ -54,7 +53,24 @@ const afterOccupationListener: CardListenerRegistration = {
   },
 }
 
-export const B100_Clutterer_impl = {
+const cardImpl = {
   listeners: [afterImprovementListener, afterOccupationListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B100_Clutterer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Clutterer",
+    deck: "B",
+    number: 100,
+    category: "POINTS_PROVIDER",
+    desc: ["During scoring, you get 1 bonus <SCORE> for each card played after this one that has \"accumulation space(s)\" in its text."],
+    cost: {},
+    players: "1+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B100_Clutterer_impl = B100_Clutterer.impl

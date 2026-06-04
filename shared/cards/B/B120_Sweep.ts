@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B120_Sweep } from '../../cards-display/B/B120_Sweep'
 
-const CARD_ID = B120_Sweep.id
-
+const CARD_ID = 'B120_Sweep'
 /**
  * B120 Sweep — Each time before you use the action space above the most recent
  * round 1-14 action space, you get 2 CLAY.
@@ -68,7 +67,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B120_Sweep_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B120_Sweep = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sweep',
+    deck: 'B',
+    number: 120,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'Each time before you use the action space above the most recent round 1-14 action space, you get 2 <CLAY>.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const B120_Sweep_impl = B120_Sweep.impl

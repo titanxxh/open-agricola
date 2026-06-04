@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E111_Recluse } from '../../cards-display/E/E111_Recluse'
 
-const CARD_ID = E111_Recluse.id
+const CARD_ID = 'E111_Recluse'
 
-export const E111_Recluse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -18,3 +18,21 @@ export const E111_Recluse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E111_Recluse = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Recluse',
+    deck: 'E',
+    number: 111,
+    category: 'FOOD',
+    desc: [
+        'As long as you have no minor improvements in front of you, you get 1 <FOOD> at the start of each round and 1 <WOOD> at the start of each harvest.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E111_Recluse_impl = E111_Recluse.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import type { ActionChoiceOption, ActionFlow, PlayerState, Resource } from '../../contract/types'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
-import { A136_DrudgeryReeve } from '../../cards-display/A/A136_DrudgeryReeve'
 
-const CARD_ID = A136_DrudgeryReeve.id
-
+const CARD_ID = 'A136_DrudgeryReeve'
 const WOOD_BY_REMAINING: number[] = [0, 1, 1, 2, 2, 2, 3, 3, 3, 4]
 
 const BONUS_BY_SETS: number[] = [0, 1, 3, 5]
@@ -45,7 +44,7 @@ const reserveForSets = (sets: number): Partial<Resource> => ({
   stone: sets,
 })
 
-export const A136_DrudgeryReeve_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     beforeEndGameScope: 'allPlayers',
@@ -94,3 +93,20 @@ export const A136_DrudgeryReeve_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A136_DrudgeryReeve = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Drudgery Reeve",
+    deck: "A",
+    number: 136,
+    category: "POINTS_PROVIDER",
+    desc: ["If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with 1+/2+/3+ building resources of each type gets 1/3/5 bonus <SCORE>."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A136_DrudgeryReeve_impl = A136_DrudgeryReeve.impl

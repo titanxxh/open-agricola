@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { sumResourcePaid } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D74_RoyalWood } from '../../cards-display/D/D74_RoyalWood'
 
-const CARD_ID = D74_RoyalWood.id
-
+const CARD_ID = 'D74_RoyalWood'
 const TRACKED_PAIRED_ACTIONS = ['construct']
 const TRACKED_PAIRED_PURPOSES = new Set(['construct'])
 const TRACKED_PAY_PURPOSES = new Set(['major-improvement', 'minor-improvement', 'stables'])
@@ -60,7 +59,7 @@ const afterPayListener: CardListenerRegistration = {
   },
 }
 
-export const D74_RoyalWood_impl = {
+const cardImpl = {
   listeners: [afterListener, afterPayListener],
   effect: {
   id: CARD_ID,
@@ -79,3 +78,20 @@ export const D74_RoyalWood_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D74_RoyalWood = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Royal Wood',
+    deck: 'D',
+    number: 74,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: [
+        'At the end of each turn in which you use the __Farm Expansion__ action space or build an improvement, you get 1 <WOOD> back for every 2 <WOOD> paid during those actions (rounded down).',
+      ],
+    cost: { food: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const D74_RoyalWood_impl = D74_RoyalWood.impl

@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-06-03。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-04。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -116,6 +116,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
 | 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
+| 自定义卡 runtime / frontend metadata 拆分 | `shared/cards/custom-registry.ts`、`shared/cards/custom-card-metadata.ts`、`client/services/card-meta.ts`、`scripts/__tests__/eslint-client-boundary.test.ts` | server / sandbox 只注册 impl、session context、effects、listeners、modifiers；main client 只注册 display metadata、art URL、O 编号，不 import custom runtime registry。 |
+| Card Source metadata / runtime 分离 | `shared/cards/card-source.ts`、`scripts/build-cards-manifest.ts`、`scripts/generate-register-all.ts`、`scripts/check-generated-cards-sync.ts`、`shared/cards/__tests__/card-source-representatives.test.ts` | Card Source 卡牌的运行时字段只放在 `impl`；manifest / generated catalog 只静态读取 `meta` 并输出 metadata 字面量；major runtime source 只在 `major/runtime.generated.ts` 进入后端实现路径；generated catalog 必须保持同步；workshop PR 生成必须基于已 fetch 的 upstream generated 文件 patch，不读部署机本地 cards tree；代表卡必须通过 production catalog / registry path 覆盖。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers | fence、linked occupancy、special stable、stable count、token supply 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
 | Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；不要反查外卡 `cardStates` 或临时改 live resources。 |
 
@@ -543,7 +545,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A166_Haydryer` | 已对齐 |  |
 | `A167_BreederBuyer` | 已对齐 |  |
 | `A168_AnimalTeacher` | 已对齐 |  |
-| `A169_OffSiter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A169_OffSiter` | 排除 | BGA implemented=false，本轮无运行时对齐目标；Card Source metadata-only 代表迁移，仍无运行时 impl |
 | `A170_Hayward` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A171_Sidekick` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A172_BoatPainter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
@@ -1154,13 +1156,13 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E57_CheeseFondue` | 已对齐 |  |
 | `E58_LunchtimeBeer` | 已对齐 |  |
 | `E59_CombandCutter` | 已对齐 |  |
-| `E60_WorkingGloves` | 已对齐 |  |
+| `E60_WorkingGloves` | 已对齐 | Card Source 代表迁移；4 条 occupation trade modifiers 已移入 `impl.modifiers`，session payment 覆盖 |
 | `E61_RaisedBed` | 已对齐 |  |
 | `E62_SourDough` | 已对齐 |  |
 | `E63_IronOven` | 已对齐 |  |
 | `E64_SimpleOven` | 已对齐 |  |
 | `E65_Almsbag` | 已对齐 |  |
-| `E66_BarnShed` | 已对齐 |  |
+| `E66_BarnShed` | 已对齐 | Card Source listener 代表迁移；session 覆盖 opponent forest trigger |
 | `E67_GrainBag` | 已对齐 |  |
 | `E68_CherryOrchard` | 已对齐 | 描述恢复 BGA sow/harvest-as-grain 语义，session 覆盖 wood field harvest |
 | `E69_MelonPatch` | 已对齐 |  |

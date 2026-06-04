@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
@@ -5,10 +6,8 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { A40_PottersYard } from '../../cards-display/A/A40_PottersYard'
 
-const CARD_ID = A40_PottersYard.id
-
+const CARD_ID = 'A40_PottersYard'
 /**
  * A40 Potter's Yard:
  * - onBuy: place 1 clay on each unused farm space (tracked in extraData).
@@ -153,7 +152,7 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
   },
 })
 
-export const A40_PottersYard_impl = {
+const cardImpl = {
   listeners: [beforePlowListener, beforeConstructListener, beforeFencingListener, beforeStablesListener, createAfterHandler('plow'), createAfterHandler('construct'), createAfterHandler('fence'), createAfterHandler('stables')],
   effect: {
   id: CARD_ID,
@@ -167,3 +166,21 @@ export const A40_PottersYard_impl = {
   prerequisiteCheck: (player) => countUnusedFarmyardSpaces(player) <= 7,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A40_PottersYard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Potter's Yard",
+    deck: 'A',
+    number: 40,
+    category: 'GOODS_PROVIDER',
+    desc: ["Immediately place 1 <CLAY> on each unused space in your farmyard. Each time you turn a space into a used space, you get the clay and you can immediately exchange it for 2 <FOOD>."],
+    cost: { wood: 1, reed: 1 },
+    prerequisite: 'At Most 7 Unused Farmyard Spaces',
+    evenMoreSet: true,
+    waresSalesmanGains: [{ clay: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const A40_PottersYard_impl = A40_PottersYard.impl

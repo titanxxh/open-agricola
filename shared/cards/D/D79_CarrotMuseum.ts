@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D79_CarrotMuseum } from '../../cards-display/D/D79_CarrotMuseum'
 
-const CARD_ID = D79_CarrotMuseum.id
+const CARD_ID = 'D79_CarrotMuseum'
 
-export const D79_CarrotMuseum_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterRoundEnd: (state, player) => {
@@ -31,3 +31,20 @@ export const D79_CarrotMuseum_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D79_CarrotMuseum = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Carrot Museum",
+    deck: "D",
+    number: 79,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["At the end of rounds 8, 10, and 12, you get 1 <STONE> for each vegetable field you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."],
+    vp: 2,
+    cost: { wood: 1, clay: 2 },
+    prerequisite: "Play in Round 8 or Before",
+  },
+  impl: cardImpl,
+})
+
+export const D79_CarrotMuseum_impl = D79_CarrotMuseum.impl

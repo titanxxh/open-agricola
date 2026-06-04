@@ -1,6 +1,6 @@
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardDefinition } from '../../contract/cards'
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../registry-display'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { fieldHasCrop } from '../../domain/field'

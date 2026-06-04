@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B12_Stockyard } from '../../cards-display/B/B12_Stockyard'
 
-const CARD_ID = B12_Stockyard.id
+const CARD_ID = 'B12_Stockyard'
 
-export const B12_Stockyard_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (_player, zones, _state) => {
@@ -18,3 +18,20 @@ export const B12_Stockyard_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B12_Stockyard = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stockyard',
+    deck: 'B',
+    number: 12,
+    category: 'FARM_PLANNER',
+    desc: ['This card can hold up to 3 animals of the same type. (It is not considered a pasture).'],
+    cost: { wood: 1, stone: 1 },
+    animalHolder: true,
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const B12_Stockyard_impl = B12_Stockyard.impl

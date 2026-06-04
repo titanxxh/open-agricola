@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { B5_StoreofExperience } from '../../cards-display/B/B5_StoreofExperience'
 
-const CARD_ID = B5_StoreofExperience.id
-
+const CARD_ID = 'B5_StoreofExperience'
 const REWARDS: (keyof Resource)[] = ['stone', 'stone', 'stone', 'stone', 'stone', 'reed', 'clay', 'wood']
 
-export const B5_StoreofExperience_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -19,3 +18,18 @@ export const B5_StoreofExperience_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B5_StoreofExperience = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Store of Experience",
+    deck: "B",
+    number: 5,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["If you have 0-4/5/6/7 occupations left in hand, you immediately get 1 <STONE>/<REED>/<CLAY>/<WOOD>."],
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const B5_StoreofExperience_impl = B5_StoreofExperience.impl

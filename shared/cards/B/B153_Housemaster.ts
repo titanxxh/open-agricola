@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { B153_Housemaster } from '../../cards-display/B/B153_Housemaster'
 import { collectCardDefinitionsAs } from '../helpers/card-type'
 
-const CARD_ID = B153_Housemaster.id
+const CARD_ID = 'B153_Housemaster'
 
-export const B153_Housemaster_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     computeBonusScore: (_state, player) => {
@@ -24,3 +24,20 @@ export const B153_Housemaster_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B153_Housemaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Housemaster",
+    deck: "B",
+    number: 153,
+    category: "POINTS_PROVIDER",
+    desc: ['During scoring, total the base point values of your major improvements. The smallest value counts double. If the total is at least 5/7/9/11, you get 1/2/3/4 bonus <SCORE>.'],
+    cost: {},
+    players: "4+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const B153_Housemaster_impl = B153_Housemaster.impl

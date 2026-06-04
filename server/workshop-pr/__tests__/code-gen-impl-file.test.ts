@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { generateImplFile } from '../code-gen'
 
 describe('generateImplFile', () => {
-  it('imports display const + CardImpl type + only used helpers', () => {
+  it('emits Card Source with CardImpl type + only used helpers', () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_Foo',
@@ -17,15 +17,13 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
-    expect(out).toContain(
-      `import { CUSTOM_Foo } from '../../cards-display/community/CUSTOM_Foo'`,
-    )
-    expect(out).toContain(`export { CUSTOM_Foo }`)
+    expect(out).toContain(`import { defineMinorCard } from '../card-source'`)
     expect(out).toContain(`import type { CardImpl } from '../registry'`)
     expect(out).toContain(`import { gainLeaf } from '../helpers/pay-gain-node'`)
     expect(out).not.toContain(`import { payLeaf }`)
     expect(out).toContain(`const CARD_IMPL`)
-    expect(out).toContain(`export const CUSTOM_Foo_impl = CARD_IMPL satisfies CardImpl`)
+    expect(out).toContain(`export const CUSTOM_Foo = defineMinorCard({`)
+    expect(out).toContain(`export const CUSTOM_Foo_impl = CUSTOM_Foo.impl`)
     expect(out).not.toContain(`new MinorImprovement(`)
     expect(out).not.toContain(`new Occupation(`)
   })
@@ -45,7 +43,8 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Hut', deck: 'communi
       iso: '2026-05-09T00:00:00Z',
     })
     expect(out).toContain(`const CARD_IMPL = {}`)
-    expect(out).toContain(`export const CUSTOM_Hut_impl = CARD_IMPL satisfies CardImpl`)
+    expect(out).toContain(`const CARD_ID = 'CUSTOM_Hut'`)
+    expect(out).toContain(`export const CUSTOM_Hut_impl = CUSTOM_Hut.impl`)
   })
 
   it('underscores unused listener handler params (TS6133 prevention)', () => {

@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { B64_MillWheel } from '../../cards-display/B/B64_MillWheel'
 
-const CARD_ID = B64_MillWheel.id
-
+const CARD_ID = 'B64_MillWheel'
 const listener: CardListenerRegistration = {
   id: 'B64-mill-wheel-after-place-farmer',
   cardIds: [CARD_ID],
@@ -20,7 +19,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B64_MillWheel_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B64_MillWheel = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mill Wheel',
+    deck: 'B',
+    number: 64,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Grain Utilization__ action space while the __Fishing__ accumulation space is occupied, you get an additional 2 <FOOD>.'],
+    vp: 1,
+    cost: { wood: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const B64_MillWheel_impl = B64_MillWheel.impl

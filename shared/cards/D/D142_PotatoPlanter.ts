@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { D142_PotatoPlanter } from '../../cards-display/D/D142_PotatoPlanter'
 
-const CARD_ID = D142_PotatoPlanter.id
+const CARD_ID = 'D142_PotatoPlanter'
 
-export const D142_PotatoPlanter_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
@@ -27,3 +27,19 @@ export const D142_PotatoPlanter_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D142_PotatoPlanter = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Potato Planter',
+    deck: 'D',
+    number: 142,
+    category: 'CROP_PROVIDER',
+    desc: ['At the end of each work phase in which you occupy the __Clay Pit__ or __Reed Bank__ accumulation space while the respective other is unoccupied, you get 1 <VEGETABLE>.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const D142_PotatoPlanter_impl = D142_PotatoPlanter.impl

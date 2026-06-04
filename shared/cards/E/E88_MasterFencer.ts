@@ -1,9 +1,8 @@
+import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E88_MasterFencer } from '../../cards-display/E/E88_MasterFencer'
 
-const CARD_ID = E88_MasterFencer.id
-
+const CARD_ID = 'E88_MasterFencer'
 const freeFencingLeaf = (max: number) => ({
   type: 'leaf' as const,
   actionId: 'fence',
@@ -19,7 +18,7 @@ const freeFencingLeaf = (max: number) => ({
   },
 })
 
-export const E88_MasterFencer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (_state, player) => {
@@ -57,3 +56,19 @@ export const E88_MasterFencer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E88_MasterFencer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Master Fencer',
+    deck: 'E',
+    number: 88,
+    category: 'FARMYARD_-_FENCING',
+    desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E88_MasterFencer_impl = E88_MasterFencer.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A158_CulinaryArtist } from '../../cards-display/A/A158_CulinaryArtist'
 
-const CARD_ID = A158_CulinaryArtist.id
-
+const CARD_ID = 'A158_CulinaryArtist'
 /**
  * A158 Culinary Artist:
  * Each time another player uses the Traveling Players accumulation space,
@@ -54,7 +53,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A158_CulinaryArtist_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A158_CulinaryArtist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Culinary Artist',
+    deck: 'A',
+    number: 158,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time another player uses the __Traveling Players__ accumulation space, you can exchange your choice of 1 <GRAIN>/<SHEEP>/<VEGETABLE> for 4/5/7 <FOOD>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const A158_CulinaryArtist_impl = A158_CulinaryArtist.impl

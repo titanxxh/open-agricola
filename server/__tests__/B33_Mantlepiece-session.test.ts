@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { B33_Mantlepiece } from '../../shared/cards-display/B/B33_Mantlepiece'
+import { B33_Mantlepiece } from '../../shared/cards/B/B33_Mantlepiece'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('B33_Mantlepiece prerequisite', () => {

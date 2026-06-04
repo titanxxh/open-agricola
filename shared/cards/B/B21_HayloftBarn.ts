@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
@@ -6,10 +7,9 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { B21_HayloftBarn } from '../../cards-display/B/B21_HayloftBarn'
 import { hasExchangeGained, hasResourceMovedToPlayer } from '../helpers/event-provenance'
 
-const CARD_ID = B21_HayloftBarn.id
+const CARD_ID = 'B21_HayloftBarn'
 
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, count > 0 ? `${count} Food` : 'Empty')
@@ -79,7 +79,7 @@ const grainGainListener: CardListenerRegistration = {
   },
 }
 
-export const B21_HayloftBarn_impl = {
+const cardImpl = {
   listeners: [grainGainListener],
   effect: {
   id: CARD_ID,
@@ -102,3 +102,20 @@ export const B21_HayloftBarn_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B21_HayloftBarn = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hayloft Barn',
+    deck: 'B',
+    number: 21,
+    category: 'ACTIONS_BOOSTER',
+    desc: ['Place 4 <FOOD> on this card. Each time you obtain at least 1 <GRAIN>, you also get 1 <FOOD> from this card. Once it is empty, you get a __Family Growth Even without Room__ action.'],
+    cost: { wood: 3 },
+    prerequisite: '1 Occupation',
+    occupationPrerequisites: { min: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const B21_HayloftBarn_impl = B21_HayloftBarn.impl

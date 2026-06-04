@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { E142_Smuggler } from '../../cards-display/E/E142_Smuggler'
 
-const CARD_ID = E142_Smuggler.id
-
+const CARD_ID = 'E142_Smuggler'
 type ResourceMap = Partial<Resource>
 type TradeOption = {
   from: ResourceMap
@@ -30,7 +29,7 @@ const payGainFlow = ({ from, to }: TradeOption, multiplier = 1): ActionFlow => (
   ],
 })
 
-export const E142_Smuggler_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onHarvestFeedingPhase: (_state, player) => {
@@ -60,3 +59,24 @@ export const E142_Smuggler_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E142_Smuggler = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Smuggler",
+    deck: "E",
+    number: 142,
+    category: "CROPS",
+    desc: [
+        'In the feeding phase of each harvest, you can exchange up to 2 goods as follows:',
+        '[<WOOD> <ARROW> <GRAIN>]',
+        'or',
+        '[<GRAIN> <ARROW> <STONE>]',
+      ],
+    cost: {},
+    players: "3+",
+  },
+  impl: cardImpl,
+})
+
+export const E142_Smuggler_impl = E142_Smuggler.impl

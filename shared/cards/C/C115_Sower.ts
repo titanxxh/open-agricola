@@ -1,13 +1,12 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C115_Sower } from '../../cards-display/C/C115_Sower'
 
-const CARD_ID = C115_Sower.id
-
+const CARD_ID = 'C115_Sower'
 const updateInfobox = (reedCount: number): ActionFlow => {
   if (reedCount <= 0) {
     return {
@@ -95,7 +94,23 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C115_Sower_impl = {
+const cardImpl = {
   listeners: [afterImprovementListener, anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C115_Sower = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sower',
+    deck: 'C',
+    number: 115,
+    category: 'CROP_PROVIDER',
+    desc: ['Each time you build a major improvement, place 1 <REED> from the general supply on this card. At any time, you can move the <REED> to your supply or exchange it for a __Sow__ action.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C115_Sower_impl = C115_Sower.impl

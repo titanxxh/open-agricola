@@ -21,6 +21,9 @@ describe('main client import boundary', () => {
     '../../shared/cards/register-all',
     '../../shared/cards/register-all.ts',
     '../../shared/cards/register-all.js',
+    '../../shared/cards/custom-registry',
+    '../../shared/cards/custom-registry.ts',
+    '../../shared/cards/custom-registry.js',
     '../../shared/cards/registry-runtime',
     '../../shared/cards/registry-runtime.ts',
     '../../shared/cards/registry-runtime.js',
@@ -52,6 +55,9 @@ describe('main client import boundary', () => {
     '../../shared/cards/register-all',
     '../../shared/cards/register-all.ts',
     '../../shared/cards/register-all.js',
+    '../../shared/cards/custom-registry',
+    '../../shared/cards/custom-registry.ts',
+    '../../shared/cards/custom-registry.js',
     '../../shared/cards/registry-runtime',
     '../../shared/cards/registry-runtime.ts',
     '../../shared/cards/registry-runtime.js',
@@ -74,7 +80,7 @@ describe('main client import boundary', () => {
 
   it.each([
     '../../shared/cards/basic-conversion',
-    '../../shared/cards/custom-registry',
+    '../../shared/cards/custom-card-metadata',
     '../../shared/cards/helpers/costs',
   ])('allows safe static and dynamic import %s', async (importPath) => {
     const errors = await lintErrors(`

@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../contract/types'
@@ -5,10 +6,8 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { spaceOccupantCount } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { C129_SecondSpouse } from '../../cards-display/C/C129_SecondSpouse'
 
-const CARD_ID = C129_SecondSpouse.id
-
+const CARD_ID = 'C129_SecondSpouse'
 /**
  * C129 Second Spouse — Occupation
  *
@@ -59,7 +58,25 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const C129_SecondSpouse_impl = {
+const cardImpl = {
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C129_SecondSpouse = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Second Spouse',
+    deck: 'C',
+    number: 129,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'You can use the __Urgent Wish for Children__ action space (from round 12-13) even if it is occupied by the first person another player placed.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const C129_SecondSpouse_impl = C129_SecondSpouse.impl

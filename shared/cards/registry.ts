@@ -108,28 +108,10 @@ export class CardRegistry {
     }
   }
 
-  /**
-   * Populate modifiersByCard from catalog card definitions. Reads
-   * `card.modifier` (singular) and `card.modifiers` (plural) fields and
-   * merges them. Majors don't carry modifier fields, so callers should
-   * pass occupation + minor arrays only.
-   *
-   * Called once per session by GameCore after loadByIds; replaces the old
-   * card-modifiers.ts catalog-direct-query path.
-   */
   syncModifiersFromCatalog(
-    occupations: readonly CardDefinition[],
-    minors: readonly CardDefinition[],
+    _occupations: readonly CardDefinition[],
+    _minors: readonly CardDefinition[],
   ): void {
-    for (const card of [...occupations, ...minors]) {
-      const mods: CostModifier[] = [
-        ...(card.modifiers ?? []),
-        ...(card.modifier ? [card.modifier] : []),
-      ]
-      if (mods.length > 0) {
-        this.modifiersByCard.set(card.id, mods)
-      }
-    }
   }
 
   /**
@@ -141,6 +123,7 @@ export class CardRegistry {
    */
   registerEffects(effects: readonly CardEffect[]): void {
     for (const effect of effects) {
+      if (this.effectsByCard.has(effect.id)) continue
       this.effectsByCard.set(effect.id, effect)
     }
   }

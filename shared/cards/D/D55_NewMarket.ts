@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D55_NewMarket } from '../../cards-display/D/D55_NewMarket'
 
-const CARD_ID = D55_NewMarket.id
-
+const CARD_ID = 'D55_NewMarket'
 const getOpenRound = (state: GameState, spaceId: string) => {
   const roundIndex = state.roundActionOrder.findIndex((id) => id === spaceId)
   return roundIndex === -1 ? -1 : roundIndex + 1
@@ -26,7 +25,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D55_NewMarket_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D55_NewMarket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "New Market",
+    deck: "D",
+    number: 55,
+    category: "FOOD_PROVIDER",
+    desc: ["Each time you use an action space card on round spaces 8 to 11, you get 1 additional <FOOD>."],
+    cost: { wood: 1, clay: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const D55_NewMarket_impl = D55_NewMarket.impl

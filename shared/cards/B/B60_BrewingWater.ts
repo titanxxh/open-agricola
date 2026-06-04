@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B60_BrewingWater } from '../../cards-display/B/B60_BrewingWater'
 
-const CARD_ID = B60_BrewingWater.id
-
+const CARD_ID = 'B60_BrewingWater'
 const listener: CardListenerRegistration = {
   id: 'B60-brewing-water-after-place-farmer',
   cardIds: [CARD_ID],
@@ -37,7 +36,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const B60_BrewingWater_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B60_BrewingWater = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Brewing Water',
+    deck: 'B',
+    number: 60,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Fishing__ accumulation space, you can pay 1 <GRAIN> to place 1 <FOOD> on each of the next 6 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const B60_BrewingWater_impl = B60_BrewingWater.impl

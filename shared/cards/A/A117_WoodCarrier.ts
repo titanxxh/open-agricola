@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A117_WoodCarrier } from '../../cards-display/A/A117_WoodCarrier'
 
-const CARD_ID = A117_WoodCarrier.id
+const CARD_ID = 'A117_WoodCarrier'
 
-export const A117_WoodCarrier_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -20,3 +20,19 @@ export const A117_WoodCarrier_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A117_WoodCarrier = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wood Carrier',
+    deck: 'A',
+    number: 117,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['When you play this card, you immediately get 1 <WOOD> for each improvement in front of you.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const A117_WoodCarrier_impl = A117_WoodCarrier.impl

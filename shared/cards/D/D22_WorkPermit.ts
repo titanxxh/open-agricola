@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
   isCardFlagged,
@@ -9,13 +10,11 @@ import {
 import { workersAvailable } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D22_WorkPermit } from '../../cards-display/D/D22_WorkPermit'
 
-const CARD_ID = D22_WorkPermit.id
-
+const CARD_ID = 'D22_WorkPermit'
 const TARGET_ROUND_KEY = 'targetRound'
 
-export const D22_WorkPermit_impl = {
+const cardImpl = {
   prerequisiteCheck: (player, state) => {
     const totalBuildRes =
       (player.resources.wood ?? 0)
@@ -69,3 +68,22 @@ export const D22_WorkPermit_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D22_WorkPermit = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Work Permit',
+    deck: 'D',
+    number: 22,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Add 1 to the current round for each building resource you have and place 1 person from your supply on the corresponding round space. In that round, you can use the person.',
+      ],
+    cost: { food: 1 },
+    prerequisite: 'At Least 1 Building Resource',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D22_WorkPermit_impl = D22_WorkPermit.impl

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { A72_CalciumFertilizers } from '../../cards-display/A/A72_CalciumFertilizers'
 
-const CARD_ID = A72_CalciumFertilizers.id
-
+const CARD_ID = 'A72_CalciumFertilizers'
 /**
  * A72 Calcium Fertilizers:
  * Prerequisite: No Field Tiles (player must have 0 fields to buy this card).
@@ -49,7 +48,23 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A72_CalciumFertilizers_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A72_CalciumFertilizers = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Calcium Fertilizers",
+    deck: "A",
+    number: 72,
+    category: "CROP_PROVIDER",
+    desc: ["Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted fields growing a single type of crop."],
+    cost: {},
+    prerequisite: "No Field Tiles",
+  },
+  impl: cardImpl,
+})
+
+export const A72_CalciumFertilizers_impl = A72_CalciumFertilizers.impl

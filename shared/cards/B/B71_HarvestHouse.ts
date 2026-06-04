@@ -1,9 +1,8 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B71_HarvestHouse } from '../../cards-display/B/B71_HarvestHouse'
 
-const CARD_ID = B71_HarvestHouse.id
-
+const CARD_ID = 'B71_HarvestHouse'
 const HARVEST_MAP: Record<number, number> = {
   1: 0, 2: 0, 3: 0, 4: 0,
   5: 1, 6: 1, 7: 1,
@@ -13,7 +12,7 @@ const HARVEST_MAP: Record<number, number> = {
   14: 5,
 }
 
-export const B71_HarvestHouse_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -25,3 +24,19 @@ export const B71_HarvestHouse_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B71_HarvestHouse = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Harvest House',
+    deck: 'B',
+    number: 71,
+    category: 'CROP_PROVIDER',
+    desc: ['When you play this card, if the number of completed harvests is equal to the number of occupations you played, you immediately get 1 <FOOD>, 1 <GRAIN>, and 1 <VEGETABLE>.'],
+    cost: { wood: 1, clay: 1, reed: 1 },
+    vp: 2,
+  },
+  impl: cardImpl,
+})
+
+export const B71_HarvestHouse_impl = B71_HarvestHouse.impl

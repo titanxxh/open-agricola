@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E133_ChampionBreeder } from '../../cards-display/E/E133_ChampionBreeder'
 
-const CARD_ID = E133_ChampionBreeder.id
+const CARD_ID = 'E133_ChampionBreeder'
 
-export const E133_ChampionBreeder_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
@@ -27,3 +27,20 @@ export const E133_ChampionBreeder_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E133_ChampionBreeder = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Champion Breeder",
+    deck: "E",
+    number: 133,
+    desc: ["Each time you place 2 or 3+ newborn animals on your farm during the breeding phase of the harvest, you get 1 or 2 bonus <SCORE>, respectively."],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+    category: 'BONUS_POINTS',
+  },
+  impl: cardImpl,
+})
+
+export const E133_ChampionBreeder_impl = E133_ChampionBreeder.impl

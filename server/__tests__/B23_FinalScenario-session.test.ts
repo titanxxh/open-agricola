@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { B23_FinalScenario } from '../../shared/cards-display/B/B23_FinalScenario'
+import { B23_FinalScenario } from '../../shared/cards/B/B23_FinalScenario'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { setWorkersAtHome } from '../../shared/domain/player'
 

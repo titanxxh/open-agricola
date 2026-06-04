@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
@@ -5,10 +6,8 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { cardCountsAs } from '../helpers/card-type'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D161_CabbageBuyer } from '../../cards-display/D/D161_CabbageBuyer'
 
-const CARD_ID = D161_CabbageBuyer.id
-
+const CARD_ID = 'D161_CabbageBuyer'
 /**
  * D161 Cabbage Buyer — Each time any player (including you) takes a
  * house-redevelopment action (renovate + optional improvement), you can
@@ -135,7 +134,25 @@ const drainTrackerListener: CardListenerRegistration = {
   },
 }
 
-export const D161_CabbageBuyer_impl = {
+const cardImpl = {
   listeners: [openTrackerListener, tagImprovementListener, drainTrackerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D161_CabbageBuyer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Cabbage Buyer',
+    deck: 'D',
+    number: 161,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'Each time any player (including you) renovates and then builds no/1 minor/1 major improvement, you can buy 1 <VEGETABLE> for 3/2/1 <FOOD>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const D161_CabbageBuyer_impl = D161_CabbageBuyer.impl

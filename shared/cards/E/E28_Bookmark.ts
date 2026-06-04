@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E28_Bookmark } from '../../cards-display/E/E28_Bookmark'
 
-const CARD_ID = E28_Bookmark.id
+const CARD_ID = 'E28_Bookmark'
 
-export const E28_Bookmark_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -33,3 +33,18 @@ export const E28_Bookmark_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E28_Bookmark = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bookmark',
+    deck: 'E',
+    number: 28,
+    desc: ['Add 3 to the current round and mark the corresponding round space. At the start of that round, you can play 1 occupation without paying an occupation cost.'],
+    cost: { wood: 1 },
+    category: 'ACTION_-_OCCUPATION',
+  },
+  impl: cardImpl,
+})
+
+export const E28_Bookmark_impl = E28_Bookmark.impl

@@ -1,3 +1,4 @@
+import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
@@ -25,7 +26,7 @@ registerPlayerActionSpace({
   }),
 })
 
-export const A162_ForestTallyman_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
@@ -39,3 +40,19 @@ export const A162_ForestTallyman_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A162_ForestTallyman = definePlayerActionCard({
+  meta: {
+    id: "A162_ForestTallyman",
+    name: "Forest Tallyman",
+    deck: "A",
+    number: 162,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Each time both the __Forest__ and __Clay Pit__ accumulation spaces are occupied, you can use this card as an action space to get 2 <CLAY> and 3 <WOOD>."],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const A162_ForestTallyman_impl = A162_ForestTallyman.impl

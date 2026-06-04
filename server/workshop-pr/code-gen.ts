@@ -1,15 +1,14 @@
 /**
  * Pure code-generation module for workshop → PR integration.
  *
- * Given a workshop card row + upstream file contents, produce the 4-5 files
+ * Given a workshop card row + upstream file contents, produce the 5-6 files
  * that should be committed to a fork branch:
  *   1. shared/cards/community/{card_id}.ts              — main card file
  *   2. shared/cards/community/__tests__/{card_id}.test.ts — smoke test
- *   3. shared/cards/register-all.ts                     — patched (import + entry)
- *   4. docs/community_cards.md                          — patched (new row)
- *   5. public/card-art/community/{card_id}.{ext}        — (optional) binary art
- *
- * No I/O here. All inputs are passed in, outputs are plain objects.
+ *   3. shared/cards/register-all.ts                     — patched from upstream main
+ *   4. shared/cards/catalog.generated.ts                — patched from upstream main
+ *   5. docs/community_cards.md                          — patched (new row)
+ *   6. public/card-art/community/{card_id}.{ext}        — (optional) binary art
  */
 import ts from 'typescript'
 
@@ -207,6 +206,27 @@ function normalizeWorkshopEffectCode(
 
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
+    const syncLocalesObject = (object: ts.ObjectLiteralExpression) => {
+      const filtered: ts.ObjectLiteralElementLike[] = []
+      for (const prop of object.properties) {
+        if (
+          ts.isPropertyAssignment(prop)
+          && propertyNameMatches(prop.name, 'locales')
+        ) {
+          continue
+        }
+        filtered.push(prop)
+      }
+      if (localesToInject) {
+        filtered.push(
+          factory.createPropertyAssignment(
+            'locales',
+            buildLocalesLiteral(factory, localesToInject),
+          ),
+        )
+      }
+      return factory.updateObjectLiteralExpression(object, filtered)
+    }
     const visit: ts.Visitor = (node) => {
       // Sync the CARD_DEF locales field with card_json.locales (db is the
       // source of truth; LLM-generated locales in source may be stale once
@@ -220,31 +240,29 @@ function normalizeWorkshopEffectCode(
       ) {
         const arg = node.arguments[0]!
         if (ts.isObjectLiteralExpression(arg)) {
-          const filtered: ts.ObjectLiteralElementLike[] = []
-          for (const prop of arg.properties) {
-            if (
-              ts.isPropertyAssignment(prop)
-              && propertyNameMatches(prop.name, 'locales')
-            ) {
-              continue
-            }
-            filtered.push(prop)
-          }
-          if (localesToInject) {
-            filtered.push(
-              factory.createPropertyAssignment(
-                'locales',
-                buildLocalesLiteral(factory, localesToInject),
-              ),
-            )
-          }
-          const updatedArg = factory.updateObjectLiteralExpression(arg, filtered)
+          const updatedArg = syncLocalesObject(arg)
           return ts.visitEachChild(
             factory.updateNewExpression(node, node.expression, node.typeArguments, [updatedArg]),
             visit,
             context,
           )
         }
+      }
+
+      if (
+        ts.isPropertyAssignment(node)
+        && propertyNameMatches(node.name, 'meta')
+        && ts.isObjectLiteralExpression(node.initializer)
+      ) {
+        return ts.visitEachChild(
+          factory.updatePropertyAssignment(
+            node,
+            node.name,
+            syncLocalesObject(node.initializer),
+          ),
+          visit,
+          context,
+        )
       }
 
       if (
@@ -490,33 +508,73 @@ export function extractCardImplSource(source: string): string {
   return printStatements(sf, stmts)
 }
 
-export function generateDisplayFile(
-  wcard: WorkshopCardForGen & { card_json?: string },
-  ctx: { githubLogin: string; iso: string },
-): string {
-  const classImport =
-    wcard.card_type === 'occupation'
-      ? `import { Occupation } from '../types'`
-      : `import { MinorImprovement } from '../types'`
-
-  const locales = readLocalesFromCardJson(wcard.card_json)
-  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
-  const cardDefSource = extractCardDefSource(normalised)
-
-  return `// Generated from Open Agricola workshop. Do not hand-edit.
-// Workshop card: ${wcard.card_id}
-// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
-// Submitted: ${ctx.iso}
-
-${classImport}
-
-${cardDefSource}
-
-export const ${wcard.card_id} = CARD_DEF
-`
+function expressionToSource(sf: ts.SourceFile, expr: ts.Expression): string {
+  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+  return printer
+    .printNode(ts.EmitHint.Expression, expr, sf)
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
 }
 
-export function generateImplFile(
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  if (
+    ts.isParenthesizedExpression(expr) ||
+    ts.isAsExpression(expr) ||
+    ts.isTypeAssertionExpression(expr) ||
+    ts.isSatisfiesExpression(expr)
+  ) {
+    return unwrapExpression(expr.expression)
+  }
+  return expr
+}
+
+export function extractCardMetaSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardDef = findTopLevelConst(sf, 'CARD_DEF')
+  if (!cardDef) {
+    throw new Error('CARD_DEF top-level const not found in workshop code')
+  }
+  const decl = cardDef.declarationList.declarations[0]
+  if (!decl?.initializer) {
+    throw new Error('CARD_DEF initializer not found in workshop code')
+  }
+  const initializer = unwrapExpression(decl.initializer)
+  if (ts.isNewExpression(initializer)) {
+    const arg = initializer.arguments?.[0]
+    if (arg && ts.isObjectLiteralExpression(arg)) return expressionToSource(sf, arg)
+  }
+  if (ts.isObjectLiteralExpression(initializer)) {
+    const metaProp = initializer.properties.find(
+      (prop): prop is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(prop) && propertyNameMatches(prop.name, 'meta'),
+    )
+    if (metaProp) {
+      const meta = unwrapExpression(metaProp.initializer)
+      if (ts.isObjectLiteralExpression(meta)) return expressionToSource(sf, meta)
+    }
+    return expressionToSource(sf, initializer)
+  }
+  throw new Error('CARD_DEF must be an object literal')
+}
+
+function cardSourceImport(cardType: string): string {
+  return cardType === 'occupation'
+    ? `import { defineOccupationCard } from '../card-source'`
+    : `import { defineMinorCard } from '../card-source'`
+}
+
+function cardSourceFactory(cardType: string): string {
+  return cardType === 'occupation' ? 'defineOccupationCard' : 'defineMinorCard'
+}
+
+export function generateCardSourceFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
 ): string {
@@ -529,23 +587,37 @@ export function generateImplFile(
 
   const locales = readLocalesFromCardJson(wcard.card_json)
   const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const cardMetaSource = extractCardMetaSource(normalised)
   const cardImplSource = extractCardImplSource(normalised)
+  const cardImplWithId = cardImplSource.includes('const CARD_ID')
+    ? cardImplSource
+    : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
+  const factory = cardSourceFactory(wcard.card_type)
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
 // Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
 // Submitted: ${ctx.iso}
 
+${cardSourceImport(wcard.card_type)}
 import type { CardImpl } from '../registry'
-import { ${wcard.card_id} } from '../../cards-display/community/${wcard.card_id}'
-export { ${wcard.card_id} }
 ${helperImports ? '\n' + helperImports : ''}
 
-${cardImplSource}
+${cardImplWithId}
 
-export const ${wcard.card_id}_impl = CARD_IMPL satisfies CardImpl
+const cardImpl = CARD_IMPL satisfies CardImpl
+
+export const ${wcard.card_id} = ${factory}({
+  meta: ${cardMetaSource},
+  impl: cardImpl,
+})
+
+export const ${wcard.card_id}_impl = ${wcard.card_id}.impl
 `
 }
+
+export const generateDisplayFile = generateCardSourceFile
+export const generateImplFile = generateCardSourceFile
 
 // ---------------------------------------------------------------------------
 // C-14: Smoke test generator
@@ -591,22 +663,21 @@ export function patchRegisterAll(
   args: { card_id: string },
 ): string {
   const id = args.card_id
-  const newImport = `import { ${id}_impl } from './community/${id}'`
-  const newEntry = `  '${id}': ${id}_impl,`
+  const newImport = `import { ${id} } from './community/${id}'`
+  const newEntry = `  '${id}': ${id}.impl,`
 
   if (source.includes(newImport)) return source
 
-  // === Insert import ===
-  const customImportRe = /^(import \{ (CUSTOM_\w+)_impl[^\n]*)\n/gm
-  const customImports: Array<{
+  const importRe = /^(import \{ (\w+) \} from '[^']+')\n/gm
+  const imports: Array<{
     full: string
     id: string
     start: number
     end: number
   }> = []
   let m: RegExpExecArray | null
-  while ((m = customImportRe.exec(source)) !== null) {
-    customImports.push({
+  while ((m = importRe.exec(source)) !== null) {
+    imports.push({
       full: m[0]!,
       id: m[2]!,
       start: m.index,
@@ -615,7 +686,7 @@ export function patchRegisterAll(
   }
 
   let withImport: string
-  if (customImports.length === 0) {
+  if (imports.length === 0) {
     const anchor = '\nexport const ALL_CARD_IMPLS'
     const idx = source.indexOf(anchor)
     if (idx === -1) {
@@ -626,7 +697,7 @@ export function patchRegisterAll(
     withImport = source.slice(0, idx) + '\n' + newImport + source.slice(idx)
   } else {
     let insertedBefore: { start: number } | null = null
-    for (const ci of customImports) {
+    for (const ci of imports) {
       if (ci.id.localeCompare(id) > 0) {
         insertedBefore = { start: ci.start }
         break
@@ -639,23 +710,22 @@ export function patchRegisterAll(
         '\n' +
         source.slice(insertedBefore.start)
     } else {
-      const last = customImports[customImports.length - 1]!
+      const last = imports[imports.length - 1]!
       withImport =
         source.slice(0, last.end) + newImport + '\n' + source.slice(last.end)
     }
   }
 
-  // === Insert entry ===
-  const customEntryRe = /^ {2}'(CUSTOM_\w+)': [^\n]*,\n/gm
-  const customEntries: Array<{
+  const entryRe = /^ {2}'(\w+)': [^\n]*,\n/gm
+  const entries: Array<{
     full: string
     id: string
     start: number
     end: number
   }> = []
   let em: RegExpExecArray | null
-  while ((em = customEntryRe.exec(withImport)) !== null) {
-    customEntries.push({
+  while ((em = entryRe.exec(withImport)) !== null) {
+    entries.push({
       full: em[0]!,
       id: em[1]!,
       start: em.index,
@@ -664,7 +734,7 @@ export function patchRegisterAll(
   }
 
   let final: string
-  if (customEntries.length === 0) {
+  if (entries.length === 0) {
     const anchor = '\n}\n\nexport type AllCardImpls'
     const idx = withImport.indexOf(anchor)
     if (idx === -1) {
@@ -676,7 +746,7 @@ export function patchRegisterAll(
       withImport.slice(0, idx) + '\n' + newEntry + withImport.slice(idx)
   } else {
     let insertedBefore: { start: number } | null = null
-    for (const ce of customEntries) {
+    for (const ce of entries) {
       if (ce.id.localeCompare(id) > 0) {
         insertedBefore = { start: ce.start }
         break
@@ -689,7 +759,7 @@ export function patchRegisterAll(
         '\n' +
         withImport.slice(insertedBefore.start)
     } else {
-      const last = customEntries[customEntries.length - 1]!
+      const last = entries[entries.length - 1]!
       final =
         withImport.slice(0, last.end) +
         newEntry +
@@ -699,6 +769,170 @@ export function patchRegisterAll(
   }
 
   return final
+}
+
+function collectStaticConstInitializers(sf: ts.SourceFile): Map<string, ts.Expression> {
+  const constants = new Map<string, ts.Expression>()
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    if (!(stmt.declarationList.flags & ts.NodeFlags.Const)) continue
+    for (const decl of stmt.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer) {
+        constants.set(decl.name.text, decl.initializer)
+      }
+    }
+  }
+  return constants
+}
+
+function staticJsonLikeValue(
+  expr: ts.Expression,
+  constants: Map<string, ts.Expression>,
+  context: string,
+  seen = new Set<string>(),
+): unknown {
+  const unwrapped = unwrapExpression(expr)
+  if (ts.isStringLiteral(unwrapped) || ts.isNoSubstitutionTemplateLiteral(unwrapped)) {
+    return unwrapped.text
+  }
+  if (ts.isNumericLiteral(unwrapped)) return Number(unwrapped.text)
+  if (
+    ts.isPrefixUnaryExpression(unwrapped)
+    && unwrapped.operator === ts.SyntaxKind.MinusToken
+    && ts.isNumericLiteral(unwrapped.operand)
+  ) {
+    return -Number(unwrapped.operand.text)
+  }
+  if (unwrapped.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (unwrapped.kind === ts.SyntaxKind.FalseKeyword) return false
+  if (unwrapped.kind === ts.SyntaxKind.NullKeyword) return null
+  if (ts.isIdentifier(unwrapped)) {
+    const initializer = constants.get(unwrapped.text)
+    if (!initializer) throw new Error(`${context}: unresolved identifier ${unwrapped.text}`)
+    if (seen.has(unwrapped.text)) throw new Error(`${context}: circular identifier ${unwrapped.text}`)
+    const nextSeen = new Set(seen)
+    nextSeen.add(unwrapped.text)
+    return staticJsonLikeValue(initializer, constants, context, nextSeen)
+  }
+  if (ts.isArrayLiteralExpression(unwrapped)) {
+    return unwrapped.elements.map((element, index) => {
+      if (ts.isSpreadElement(element)) {
+        throw new Error(`${context}[${index}]: spread is not supported`)
+      }
+      return staticJsonLikeValue(element, constants, `${context}[${index}]`, seen)
+    })
+  }
+  if (ts.isObjectLiteralExpression(unwrapped)) {
+    const out: Record<string, unknown> = {}
+    for (const prop of unwrapped.properties) {
+      if (ts.isSpreadAssignment(prop)) {
+        const spread = staticJsonLikeValue(prop.expression, constants, `${context}.<spread>`, seen)
+        if (!spread || typeof spread !== 'object' || Array.isArray(spread)) {
+          throw new Error(`${context}: spread must resolve to an object`)
+        }
+        Object.assign(out, spread)
+        continue
+      }
+      if (!ts.isPropertyAssignment(prop)) {
+        throw new Error(`${context}: only property assignments are supported`)
+      }
+      const key = propertyNameMatches(prop.name, prop.name.getText())
+        ? prop.name.getText()
+        : prop.name.getText().replace(/["']/g, '')
+      out[key] = staticJsonLikeValue(prop.initializer, constants, `${context}.${key}`, seen)
+    }
+    return out
+  }
+  throw new Error(`${context}: expression is not static JSON-like`)
+}
+
+function extractGeneratedCardMeta(cardContent: string, cardId: string): Record<string, unknown> {
+  const sf = ts.createSourceFile(
+    `${cardId}.ts`,
+    cardContent,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const constants = collectStaticConstInitializers(sf)
+  let metaExpression: ts.Expression | null = null
+  const visit = (node: ts.Node): void => {
+    if (metaExpression) return
+    if (
+      ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && (
+        node.expression.text === 'defineMinorCard'
+        || node.expression.text === 'defineOccupationCard'
+        || node.expression.text === 'definePlayerActionCard'
+      )
+    ) {
+      const arg = node.arguments[0]
+      if (!arg || !ts.isObjectLiteralExpression(arg)) return
+      const metaProp = arg.properties.find(
+        (prop): prop is ts.PropertyAssignment =>
+          ts.isPropertyAssignment(prop) && propertyNameMatches(prop.name, 'meta'),
+      )
+      if (metaProp) metaExpression = metaProp.initializer
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  if (!metaExpression) throw new Error(`${cardId}: generated Card Source meta not found`)
+  const meta = staticJsonLikeValue(metaExpression, constants, `${cardId}.meta`)
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+    throw new Error(`${cardId}: generated Card Source meta must be an object`)
+  }
+  const out = meta as Record<string, unknown>
+  if (out.id !== cardId) {
+    throw new Error(`${cardId}: generated Card Source meta.id mismatch`)
+  }
+  return out
+}
+
+function cardKind(cardType: string): 'minor' | 'occupation' {
+  return cardType === 'occupation' ? 'occupation' : 'minor'
+}
+
+function catalogEntryLiteral(meta: Record<string, unknown>, cardType: string): string[] {
+  const lines = JSON.stringify({ ...meta, kind: cardKind(cardType) }, null, 2)
+    .split('\n')
+    .map((line) => `  ${line}`)
+  lines[lines.length - 1] = `${lines[lines.length - 1]},`
+  return lines
+}
+
+export function patchCatalogGenerated(
+  source: string,
+  args: { card_id: string; card_type: string; card_content: string },
+): string {
+  if (source.includes(`"id": "${args.card_id}"`)) return source
+  const meta = extractGeneratedCardMeta(args.card_content, args.card_id)
+  const entryLines = catalogEntryLiteral(meta, args.card_type)
+  const lines = source.split('\n')
+  const idRe = /^\s+"id": "([^"]+)",?$/
+  let insertAt: number | null = null
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = lines[i]!.match(idRe)
+    if (!match) continue
+    if (match[1]!.localeCompare(args.card_id) <= 0) continue
+    for (let j = i; j >= 0; j -= 1) {
+      if (lines[j] === '  {') {
+        insertAt = j
+        break
+      }
+    }
+    break
+  }
+  if (insertAt === null) {
+    insertAt = lines.findIndex((line) => line === ']')
+  }
+  if (insertAt === -1) {
+    throw new Error('catalog.generated.ts structure not recognized')
+  }
+  lines.splice(insertAt, 0, ...entryLines)
+  return lines.join('\n')
 }
 
 // ---------------------------------------------------------------------------
@@ -723,61 +957,6 @@ export function patchCommunityCardsMarkdown(
   return source.slice(0, idx) + row + '\n' + source.slice(idx)
 }
 
-export function patchCommunityAutoCatalog(
-  source: string,
-  args: { card_id: string },
-): string {
-  const id = args.card_id
-  const newImport = `import { ${id} } from '../../cards-display/community/${id}'`
-  const newEntry = `  ${id},`
-  if (source.includes(newImport)) return source
-
-  const customImportRe =
-    /^(import \{ (CUSTOM_\w+) \} from '\.\.\/\.\.\/cards-display\/community\/CUSTOM_\w+')\n/gm
-  const customImports: Array<{ id: string; start: number; end: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = customImportRe.exec(source)) !== null) {
-    customImports.push({ id: m[2]!, start: m.index, end: m.index + m[0]!.length })
-  }
-
-  let withImport: string
-  if (customImports.length === 0) {
-    const anchor = '\nexport const allCommunityCards'
-    const idx = source.indexOf(anchor)
-    if (idx === -1) throw new Error('auto-catalog.ts structure not recognized')
-    withImport = source.slice(0, idx) + '\n' + newImport + '\n' + source.slice(idx)
-  } else {
-    const before = customImports.find((existing) => existing.id.localeCompare(id) > 0)
-    if (before) {
-      withImport = source.slice(0, before.start) + newImport + '\n' + source.slice(before.start)
-    } else {
-      const last = customImports[customImports.length - 1]!
-      withImport = source.slice(0, last.end) + newImport + '\n' + source.slice(last.end)
-    }
-  }
-
-  const customEntryRe = /^ {2}(CUSTOM_\w+),\n/gm
-  const customEntries: Array<{ id: string; start: number; end: number }> = []
-  let em: RegExpExecArray | null
-  while ((em = customEntryRe.exec(withImport)) !== null) {
-    customEntries.push({ id: em[1]!, start: em.index, end: em.index + em[0]!.length })
-  }
-
-  if (customEntries.length === 0) {
-    const anchor = '\n]'
-    const idx = withImport.indexOf(anchor)
-    if (idx === -1) throw new Error('auto-catalog.ts structure not recognized')
-    return withImport.slice(0, idx) + '\n' + newEntry + withImport.slice(idx)
-  }
-
-  const before = customEntries.find((existing) => existing.id.localeCompare(id) > 0)
-  if (before) {
-    return withImport.slice(0, before.start) + newEntry + '\n' + withImport.slice(before.start)
-  }
-  const last = customEntries[customEntries.length - 1]!
-  return withImport.slice(0, last.end) + newEntry + '\n' + withImport.slice(last.end)
-}
-
 // ---------------------------------------------------------------------------
 // C-17: generatePrFiles main entry
 // ---------------------------------------------------------------------------
@@ -792,7 +971,7 @@ export type GenArgs = {
   wcard: WorkshopCardForGen & { card_json?: string; art_url?: string | null }
   github_login: string
   upstream_register_all: string
-  upstream_auto_catalog: string
+  upstream_catalog_generated: string
   upstream_community_md: string
   pr_number: number
   art_data?: { ext: string; buffer: Buffer } | null
@@ -803,18 +982,14 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     wcard,
     github_login,
     upstream_register_all,
-    upstream_auto_catalog,
+    upstream_catalog_generated,
     upstream_community_md,
     pr_number,
     art_data,
   } = args
   const iso = new Date().toISOString()
 
-  const displayContent = generateDisplayFile(wcard, {
-    githubLogin: github_login,
-    iso,
-  })
-  const implContent = generateImplFile(wcard, {
+  const cardContent = generateCardSourceFile(wcard, {
     githubLogin: github_login,
     iso,
   })
@@ -822,8 +997,10 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
   const newRegisterAll = patchRegisterAll(upstream_register_all, {
     card_id: wcard.card_id,
   })
-  const newAutoCatalog = patchCommunityAutoCatalog(upstream_auto_catalog, {
+  const newCatalogGenerated = patchCatalogGenerated(upstream_catalog_generated, {
     card_id: wcard.card_id,
+    card_type: wcard.card_type,
+    card_content: cardContent,
   })
 
   let cardName = wcard.card_id
@@ -846,13 +1023,8 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
 
   const files: PrFile[] = [
     {
-      path: `shared/cards-display/community/${wcard.card_id}.ts`,
-      content: displayContent,
-      encoding: 'utf-8',
-    },
-    {
       path: `shared/cards/community/${wcard.card_id}.ts`,
-      content: implContent,
+      content: cardContent,
       encoding: 'utf-8',
     },
     {
@@ -866,8 +1038,8 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
       encoding: 'utf-8',
     },
     {
-      path: 'shared/cards/community/auto-catalog.ts',
-      content: newAutoCatalog,
+      path: 'shared/cards/catalog.generated.ts',
+      content: newCatalogGenerated,
       encoding: 'utf-8',
     },
     {

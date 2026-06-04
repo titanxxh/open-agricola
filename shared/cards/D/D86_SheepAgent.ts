@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D86_SheepAgent } from '../../cards-display/D/D86_SheepAgent'
 import { collectCardDefinitionsAs } from '../helpers/card-type'
 
-const CARD_ID = D86_SheepAgent.id
+const CARD_ID = 'D86_SheepAgent'
 
-export const D86_SheepAgent_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, _state) => {
@@ -25,3 +25,20 @@ export const D86_SheepAgent_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D86_SheepAgent = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sheep Agent',
+    deck: 'D',
+    number: 86,
+    category: 'FARM_PLANNER',
+    desc: ['You can keep 1 <SHEEP> on this card for each occupation card in front of you (including this one), unless it is already able to hold animals.'],
+    cost: {},
+    animalHolder: true,
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D86_SheepAgent_impl = D86_SheepAgent.impl

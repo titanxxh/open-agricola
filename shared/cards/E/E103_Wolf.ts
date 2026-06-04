@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
@@ -6,10 +7,8 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
-import { E103_Wolf } from '../../cards-display/E/E103_Wolf'
 
-const CARD_ID = E103_Wolf.id
-
+const CARD_ID = 'E103_Wolf'
 type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
 
 const isResourceExchangedEvent = (
@@ -66,7 +65,7 @@ const afterGainCollectListener: CardListenerRegistration = {
   },
 }
 
-export const E103_Wolf_impl = {
+const cardImpl = {
   listeners: [afterGainCollectListener],
   effect: {
   id: CARD_ID,
@@ -76,3 +75,21 @@ export const E103_Wolf_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E103_Wolf = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wolf',
+    deck: 'E',
+    number: 103,
+    desc: [
+        'Pile (from bottom to top) 1 <CLAY>, 1 <WOOD>, and 1 <GRAIN> on this card. Each time you get a good matching the top item, you can move that item to your supply and get 1 <PIG>.',
+      ],
+    cost: {},
+    players: '1+',
+    category: 'GOODS_-_GET',
+  },
+  impl: cardImpl,
+})
+
+export const E103_Wolf_impl = E103_Wolf.impl

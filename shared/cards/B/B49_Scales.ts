@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardPlayedEvent, DraftGameEvent } from '../../contract/events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
-import { B49_Scales } from '../../cards-display/B/B49_Scales'
 
-const CARD_ID = B49_Scales.id
-
+const CARD_ID = 'B49_Scales'
 /**
  * B49 Scales
  * Each time after you place an improvement or occupation in front of you,
@@ -69,7 +68,26 @@ const improvementListener: CardListenerRegistration = {
   },
 }
 
-export const B49_Scales_impl = {
+const cardImpl = {
   listeners: [occupationListener, improvementListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B49_Scales = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Scales',
+    deck: 'B',
+    number: 49,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time after you place an improvement or occupation in front of you, if you then have the same number of improvements and occupations in play, you get 2 <FOOD>.',
+      ],
+    cost: { wood: 1 },
+    prerequisite: 'No Occupation',
+    occupationPrerequisites: { max: 0 },
+  },
+  impl: cardImpl,
+})
+
+export const B49_Scales_impl = B49_Scales.impl

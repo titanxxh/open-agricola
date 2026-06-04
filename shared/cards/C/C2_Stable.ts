@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C2_Stable } from '../../cards-display/C/C2_Stable'
 
-const CARD_ID = C2_Stable.id
+const CARD_ID = 'C2_Stable'
 
-export const C2_Stable_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => {
@@ -17,3 +17,19 @@ export const C2_Stable_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C2_Stable = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Stable",
+    deck: "C",
+    number: 2,
+    category: "FARM_PLANNER",
+    desc: ["Immediately build 1 stable. (The stable costs you nothing, but you must pay the cost shown on this card.)"],
+    cost: { wood: 1 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const C2_Stable_impl = C2_Stable.impl

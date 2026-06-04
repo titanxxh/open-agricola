@@ -1,8 +1,7 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D30_ArtisanDistrict } from '../../cards-display/D/D30_ArtisanDistrict'
 
-const CARD_ID = D30_ArtisanDistrict.id
-
+const CARD_ID = 'D30_ArtisanDistrict'
 const BOTTOM_ROW_MAJORS = new Set([
   'Major_ClayOven',
   'Major_StoneOven',
@@ -11,7 +10,7 @@ const BOTTOM_ROW_MAJORS = new Set([
   'Major_Basket',
 ])
 
-export const D30_ArtisanDistrict_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -24,3 +23,21 @@ export const D30_ArtisanDistrict_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D30_ArtisanDistrict = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Artisan District",
+    deck: "D",
+    number: 30,
+    category: "POINTS_PROVIDER",
+    desc: ['During scoring, you get 2/5/8 bonus <SCORE> for having 3/4/5 major improvements from the bottom row of the supply board.'],
+    cost: { stone: 1 },
+    vp: 1,
+    prerequisite: '3 Occupations',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D30_ArtisanDistrict_impl = D30_ArtisanDistrict.impl

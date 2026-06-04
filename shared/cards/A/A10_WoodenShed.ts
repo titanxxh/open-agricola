@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A10_WoodenShed } from '../../cards-display/A/A10_WoodenShed'
 
-const CARD_ID = A10_WoodenShed.id
+const CARD_ID = 'A10_WoodenShed'
 
-export const A10_WoodenShed_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: () => 1,
@@ -11,3 +11,21 @@ export const A10_WoodenShed_impl = {
   prerequisiteCheck: (player) => player.houseType === 'wood',
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A10_WoodenShed = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wooden Shed',
+    deck: 'A',
+    number: 10,
+    category: 'FARM_PLANNER',
+    desc: ['This card can only be played via a __Major Improvement__ action. It provides room for one person. You may no longer renovate.'],
+    cost: { wood: 2, reed: 1 },
+    prerequisite: 'Still in Wooden House',
+    mustBePlayedViaMajorImprovementAction: true,
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const A10_WoodenShed_impl = A10_WoodenShed.impl

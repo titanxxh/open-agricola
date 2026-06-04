@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { BonusModifier } from '../../contract/types'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
-import { E87_MasterRenovator } from '../../cards-display/E/E87_MasterRenovator'
 
-const CARD_ID = E87_MasterRenovator.id
-
+const CARD_ID = 'E87_MasterRenovator'
 /**
  * BGA: `Utils::addBonusChoices($args['costs'], [[WOOD=>-1],[CLAY=>-1],
  * [STONE=>-1],[REED=>-1]], $this->id)` gated on `isFlagged()`. The flag is
@@ -55,7 +54,7 @@ const afterRenovateListener: CardListenerRegistration = {
   },
 }
 
-export const E87_MasterRenovator_impl = {
+const cardImpl = {
   listeners: [afterRenovateListener],
   effect: {
     id: CARD_ID,
@@ -85,3 +84,21 @@ export const E87_MasterRenovator_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E87_MasterRenovator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Master Renovator',
+    deck: 'E',
+    number: 87,
+    category: 'FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION',
+    desc: [
+        'At the end of the work phases of rounds 7 and 9, you can take a __Renovation__ action without placing a person and pay 1 building resource of your choice less.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E87_MasterRenovator_impl = E87_MasterRenovator.impl

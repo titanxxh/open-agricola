@@ -470,10 +470,9 @@ WorkshopPage
 
 | 文件                                                     | 说明                                          |
 | ------------------------------------------------------ | ------------------------------------------- |
-| `shared/cards/community/{CUSTOM_ID}.ts`                | community card 定义和 `CardImpl`               |
+| `shared/cards/community/{CUSTOM_ID}.ts`                | Card Source：UI metadata + `CardImpl`          |
 | `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts` | smoke test：定义存在、`deck === 'community'`、有行为  |
-| `shared/cards/register-all.ts`                         | 注册 `{CUSTOM_ID}_impl`                       |
-| `shared/cards/community/auto-catalog.ts`               | 注册 community deck card definition           |
+| `shared/cards/register-all.ts`                         | 注册 `{CUSTOM_ID}.impl`                       |
 | `docs/community_cards.md`                              | community card 索引；PR 创建后会用真实 PR number 二次提交 |
 | `public/card-art/community/{CUSTOM_ID}.{ext}`          | 可选，美术二进制                                    |
 
@@ -484,7 +483,7 @@ WorkshopPage
 - `CARD_IMPL` 会补上 `CardImpl` 上下文类型，避免 listener phase/action 字面量退化成 `string[]`。
 - 缺失 `id` 的 listener 会补稳定 id：`{cardId}-listener-{n}`。
 - `prerequisite: { occupation: N }` 会转为仓库支持的 `prerequisite: 'N Occupations'` + `occupationPrerequisites: { min: N }`。
-- 同步更新 `auto-catalog.ts`，保证 `pnpm run check:community-deck` 不报 out-of-sync。
+- 同步更新 `register-all.ts`；基础牌、major、community metadata 由 `pnpm run generate:register-all` 生成到 `catalog.generated.ts` / `major/generated.ts`。
 
 ### D6. 卡牌详情、版本历史和编辑回填
 
@@ -666,4 +665,3 @@ WorkshopPage
 | 功能   | 说明                |
 | ---- | ----------------- |
 | 邮箱验证 | 注册后验证邮件（需要外部邮件服务） |
-

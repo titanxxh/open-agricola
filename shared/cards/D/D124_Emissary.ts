@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D124_Emissary } from '../../cards-display/D/D124_Emissary'
 
-const CARD_ID = D124_Emissary.id
-
+const CARD_ID = 'D124_Emissary'
 const GOOD_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
 
 const listeners: CardListenerRegistration[] = GOOD_TYPES.map((good) => ({
@@ -33,7 +32,24 @@ const listeners: CardListenerRegistration[] = GOOD_TYPES.map((good) => ({
   },
 }))
 
-export const D124_Emissary_impl = {
+const cardImpl = {
   listeners,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D124_Emissary = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Emissary',
+    deck: 'D',
+    number: 124,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['At any time, you can place a good from your supply on this card to get 1 <STONE>. You must place different goods on this card. (<FOOD> is also considered a good.)'],
+    cost: {},
+    players: '1+',
+    implemented: true,
+  },
+  impl: cardImpl,
+})
+
+export const D124_Emissary_impl = D124_Emissary.impl

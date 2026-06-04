@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import { getPlowableTiles } from '../../actions/effects/plow'
 import type { CardImpl } from '../registry'
-import { E90_DungCollector } from '../../cards-display/E/E90_DungCollector'
 
-const CARD_ID = E90_DungCollector.id
+const CARD_ID = 'E90_DungCollector'
 
-export const E90_DungCollector_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onEndHarvest: (state, player) => {
@@ -26,3 +26,19 @@ export const E90_DungCollector_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E90_DungCollector = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Dung Collector",
+    deck: "E",
+    number: 90,
+    desc: ["Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 field."],
+    cost: {},
+    players: "1+",
+    category: 'FARMYARD_-_PLOWING',
+  },
+  impl: cardImpl,
+})
+
+export const E90_DungCollector_impl = E90_DungCollector.impl

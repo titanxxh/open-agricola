@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { A100_Curator } from '../../cards-display/A/A100_Curator'
 
-const CARD_ID = A100_Curator.id
+const CARD_ID = 'A100_Curator'
 
-export const A100_Curator_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
@@ -27,3 +27,21 @@ export const A100_Curator_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A100_Curator = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Curator',
+    deck: 'A',
+    number: 100,
+    category: 'POINTS_PROVIDER',
+    desc: ['In the returning home phase of each round, if you return at least 3 people from accumulation spaces, you can buy 1 bonus <SCORE> for 1 <FOOD>.'],
+    cost: {},
+    players: '1+',
+    evenMoreSet: true,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A100_Curator_impl = A100_Curator.impl

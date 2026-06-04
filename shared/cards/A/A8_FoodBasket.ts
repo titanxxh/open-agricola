@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A8_FoodBasket } from '../../cards-display/A/A8_FoodBasket'
 
-const CARD_ID = A8_FoodBasket.id
+const CARD_ID = 'A8_FoodBasket'
 
-export const A8_FoodBasket_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => ({
@@ -15,3 +15,22 @@ export const A8_FoodBasket_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A8_FoodBasket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Food Basket',
+    deck: 'A',
+    number: 8,
+    category: 'CROP_PROVIDER',
+    desc: ['You immediately get 1 <GRAIN> and 1 <VEGETABLE>.'],
+    cost: { reed: 1 },
+    passing: true,
+    prerequisite: '2 Occupations and 2 Improvements',
+    occupationPrerequisites: { min: 2 },
+    improvementPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const A8_FoodBasket_impl = A8_FoodBasket.impl

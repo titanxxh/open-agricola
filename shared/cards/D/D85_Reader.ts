@@ -1,9 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { D85_Reader } from '../../cards-display/D/D85_Reader'
 
-const CARD_ID = D85_Reader.id
+const CARD_ID = 'D85_Reader'
 
-export const D85_Reader_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {
@@ -12,3 +12,22 @@ export const D85_Reader_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D85_Reader = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Reader',
+    deck: 'D',
+    number: 85,
+    category: 'FARM_PLANNER',
+    desc: [
+        'As soon as you have 6 (__7 in draft mode__) occupations in front of you (including this one), this card provides room for one person.',
+      ],
+    cost: {},
+    players: '1+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D85_Reader_impl = D85_Reader.impl

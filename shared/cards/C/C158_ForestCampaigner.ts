@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C158_ForestCampaigner } from '../../cards-display/C/C158_ForestCampaigner'
 
-const CARD_ID = C158_ForestCampaigner.id
-
+const CARD_ID = 'C158_ForestCampaigner'
 /**
  * C158 Forest Campaigner (Occupation):
  * Before placing a family member, if there are 8 or more wood on all
@@ -52,7 +51,25 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const C158_ForestCampaigner_impl = {
+const cardImpl = {
   listeners: [beforePlaceFarmerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C158_ForestCampaigner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Forest Campaigner',
+    deck: 'C',
+    number: 158,
+    category: 'FOOD_PROVIDER',
+    desc: [
+        'Each time before you place a person, if there are at least 8 <WOOD> total on accumulation spaces, you get 1 <FOOD>.',
+      ],
+    cost: {},
+    players: '4+',
+  },
+  impl: cardImpl,
+})
+
+export const C158_ForestCampaigner_impl = C158_ForestCampaigner.impl

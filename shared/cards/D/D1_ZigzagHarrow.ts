@@ -1,10 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../../domain/farm'
-import { D1_ZigzagHarrow } from '../../cards-display/D/D1_ZigzagHarrow'
 
-const CARD_ID = D1_ZigzagHarrow.id
-
+const CARD_ID = 'D1_ZigzagHarrow'
 type Dir = 'W' | 'N' | 'E' | 'S'
 
 const DIR_DELTA: Record<Dir, { dr: number; dc: number }> = {
@@ -74,7 +73,7 @@ export const computeZigzagCandidates = (player: PlayerState): FarmTilePosition[]
   return candidates
 }
 
-export const D1_ZigzagHarrow_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => computeZigzagCandidates(player).length > 0,
   effect: {
     id: CARD_ID,
@@ -90,3 +89,20 @@ export const D1_ZigzagHarrow_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D1_ZigzagHarrow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Zigzag Harrow',
+    deck: 'D',
+    number: 1,
+    category: 'FARM_PLANNER',
+    desc: ['You can immediately plow 1 field such that it completes a "zigzag" pattern.'],
+    cost: { wood: 1 },
+    prerequisite: '3 Fields in an "L" Shape',
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const D1_ZigzagHarrow_impl = D1_ZigzagHarrow.impl

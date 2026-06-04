@@ -1,12 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { D106_WhiskyDistiller } from '../../cards-display/D/D106_WhiskyDistiller'
 
-const CARD_ID = D106_WhiskyDistiller.id
-
+const CARD_ID = 'D106_WhiskyDistiller'
 /**
  * D106 Whisky Distiller (Sprint 7a F5+F6).
  *
@@ -45,10 +44,26 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const D106_WhiskyDistiller_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   effect: {
     id: CARD_ID,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D106_WhiskyDistiller = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Whisky Distiller',
+    deck: 'D',
+    number: 106,
+    category: 'FOOD_PROVIDER',
+    desc: ['At any time, you can pay 1 <GRAIN>. If you do, add 2 to the current round and place 4 <FOOD> on the corresponding round space. At the start of that round, you get the <FOOD>.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const D106_WhiskyDistiller_impl = D106_WhiskyDistiller.impl

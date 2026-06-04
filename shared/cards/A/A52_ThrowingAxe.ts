@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A52_ThrowingAxe } from '../../cards-display/A/A52_ThrowingAxe'
 
-const CARD_ID = A52_ThrowingAxe.id
-
+const CARD_ID = 'A52_ThrowingAxe'
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space.gainPerRound?.wood ?? 0) > 0
 
@@ -24,7 +23,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A52_ThrowingAxe_impl = {
+const cardImpl = {
   listeners: [listener],
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
@@ -32,3 +31,19 @@ export const A52_ThrowingAxe_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A52_ThrowingAxe = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Throwing Axe',
+    deck: 'A',
+    number: 52,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use a wood accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>.'],
+    cost: { wood: 1 },
+    prerequisite: 'Play in Round 7 or Later',
+  },
+  impl: cardImpl,
+})
+
+export const A52_ThrowingAxe_impl = A52_ThrowingAxe.impl

@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
-import { A57_MilkingParlor } from '../../cards-display/A/A57_MilkingParlor'
 
-const CARD_ID = A57_MilkingParlor.id
+const CARD_ID = 'A57_MilkingParlor'
 
-export const A57_MilkingParlor_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -25,3 +25,20 @@ export const A57_MilkingParlor_impl = {
   prerequisiteCheck: (player) => countUnusedFarmyardSpaces(player) >= 4,
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A57_MilkingParlor = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Milking Parlor',
+    deck: 'A',
+    number: 57,
+    category: 'FOOD_PROVIDER',
+    desc: ['When you play this card, if you have at least 1/3/4 <SHEEP>, you immediately get 2/3/4 <FOOD>. The same applies if you have at least 1/2/3 <CATTLE>.'],
+    cost: { wood: 2 },
+    vp: 1,
+    prerequisite: 'At Least 4 Unused Farmyard Spaces',
+  },
+  impl: cardImpl,
+})
+
+export const A57_MilkingParlor_impl = A57_MilkingParlor.impl

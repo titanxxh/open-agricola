@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { E38_RodCollection } from '../../cards-display/E/E38_RodCollection'
 
-const CARD_ID = E38_RodCollection.id
-
+const CARD_ID = 'E38_RodCollection'
 const afterCollectListener: CardListenerRegistration = {
   id: 'E38-rod-collection-after-collect',
   cardIds: [CARD_ID],
@@ -25,7 +24,7 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-export const E38_RodCollection_impl = {
+const cardImpl = {
   listeners: [afterCollectListener],
   effect: {
   id: CARD_ID,
@@ -39,3 +38,20 @@ export const E38_RodCollection_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E38_RodCollection = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Rod Collection",
+    deck: "E",
+    number: 38,
+    category: "BONUS_POINTS_-_GET",
+    desc: ['Each time you use __Fishing__, you can place up to 2 <WOOD> on this card, irretrievably. During scoring, each such <WOOD> is worth 1 bonus <SCORE>, except the 1st, 4th, 7th, and 10th.'],
+    prerequisite: '3 Occupations',
+    vp: 1,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E38_RodCollection_impl = E38_RodCollection.impl

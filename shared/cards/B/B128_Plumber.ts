@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
-import { B128_Plumber } from '../../cards-display/B/B128_Plumber'
 
-const CARD_ID = B128_Plumber.id
-
+const CARD_ID = 'B128_Plumber'
 const triggerListener: CardListenerRegistration = {
   id: 'B128-plumber-after-place-farmer-major-improvement',
   cardIds: [CARD_ID],
@@ -46,7 +45,25 @@ const costListener: CardListenerRegistration = {
   },
 }
 
-export const B128_Plumber_impl = {
+const cardImpl = {
   listeners: [triggerListener, costListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B128_Plumber = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Plumber',
+    deck: 'B',
+    number: 128,
+    category: 'FARM_PLANNER',
+    desc: [
+        'Each time after you use the __Major Improvement__ action space, you can take a __Renovation__ action, paying 2 <CLAY> or 2 <STONE> less for the renovation.',
+      ],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const B128_Plumber_impl = B128_Plumber.impl

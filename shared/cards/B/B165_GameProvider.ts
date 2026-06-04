@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -23,7 +24,7 @@ registerSelectionEffect('discard-grain-for-pigs', ({ player, positions }) => {
   player.resources.boar = (player.resources.boar ?? 0) + pigs
 })
 
-export const B165_GameProvider_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
@@ -51,3 +52,19 @@ export const B165_GameProvider_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B165_GameProvider = defineOccupationCard({
+  meta: {
+    id: "B165_GameProvider",
+    name: "Game Provider",
+    deck: "B",
+    number: 165,
+    category: "LIVESTOCK_PROVIDER",
+    desc: ["Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different fields to get 1/2/3 <PIG>."],
+    cost: {},
+    players: "4+",
+  },
+  impl: cardImpl,
+})
+
+export const B165_GameProvider_impl = B165_GameProvider.impl

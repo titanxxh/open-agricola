@@ -1,9 +1,8 @@
+import { defineOccupationCard } from '../card-source'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { D153_WealthyMan } from '../../cards-display/D/D153_WealthyMan'
 
-const CARD_ID = D153_WealthyMan.id
-
+const CARD_ID = 'D153_WealthyMan'
 const harvestGrainFieldThreshold: Record<number, number> = {
   4: 1,
   7: 2,
@@ -13,7 +12,7 @@ const harvestGrainFieldThreshold: Record<number, number> = {
   14: 6,
 }
 
-export const D153_WealthyMan_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvest: (state, player) => {
@@ -35,3 +34,20 @@ export const D153_WealthyMan_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D153_WealthyMan = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wealthy Man",
+    deck: "D",
+    number: 153,
+    category: "POINTS_PROVIDER",
+    desc: ["At the start of each of the 1st/2nd/3rd/4th/5th/6th harvest, if you have at least 1/2/3/4/5/6 grain fields, you get 1 bonus <SCORE>."],
+    cost: {},
+    players: "4+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const D153_WealthyMan_impl = D153_WealthyMan.impl

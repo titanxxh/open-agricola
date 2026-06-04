@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E37_OxSkull } from '../../cards-display/E/E37_OxSkull'
 
-const CARD_ID = E37_OxSkull.id
+const CARD_ID = 'E37_OxSkull'
 
-export const E37_OxSkull_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
@@ -12,3 +12,21 @@ export const E37_OxSkull_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E37_OxSkull = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Ox Skull",
+    deck: "E",
+    number: 37,
+    category: "BONUS_POINTS_-_GET",
+    desc: ['During scoring, if you have no <CATTLE>, you get 3 bonus <SCORE>.'],
+    cost: {},
+    prerequisite: '1 cattle',
+    vp: 0,
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E37_OxSkull_impl = E37_OxSkull.impl

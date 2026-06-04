@@ -1,9 +1,8 @@
+import { defineOccupationCard } from '../card-source'
 import { Scoring } from '../../domain'
 import type { CardImpl } from '../registry'
-import { E127_DiligentFarmer } from '../../cards-display/E/E127_DiligentFarmer'
 
-const CARD_ID = E127_DiligentFarmer.id
-
+const CARD_ID = 'E127_DiligentFarmer'
 /**
  * E127 Diligent Farmer (Occupation, E, 127)
  * When you play this card, if you would score the maximum 4 points in 3 scoring
@@ -29,7 +28,7 @@ const FREE_SINGLE_ROOM_CONTEXT = {
   cancelPolicy: 'forbidCancel',
 }
 
-export const E127_DiligentFarmer_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -64,3 +63,18 @@ export const E127_DiligentFarmer_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E127_DiligentFarmer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Diligent Farmer',
+    deck: 'E',
+    number: 127,
+    category: 'FARMYARD_-_PLACE_FOR_PERSON',
+    desc: ['When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced stables), you can extend your house by 1 room at no cost.'],
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const E127_DiligentFarmer_impl = E127_DiligentFarmer.impl

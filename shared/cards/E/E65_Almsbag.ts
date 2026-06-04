@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { E65_Almsbag } from '../../cards-display/E/E65_Almsbag'
 
-const CARD_ID = E65_Almsbag.id
+const CARD_ID = 'E65_Almsbag'
 
-export const E65_Almsbag_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -20,3 +20,19 @@ export const E65_Almsbag_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E65_Almsbag = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Almsbag',
+    deck: 'E',
+    number: 65,
+    category: 'CROPS_-_GRAIN',
+    desc: ['When you play this card, you immediately get 1 <GRAIN> for every 2 completed rounds.'],
+    prerequisite: 'No Occupations',
+    occupationPrerequisites: { max: 0 },
+  },
+  impl: cardImpl,
+})
+
+export const E65_Almsbag_impl = E65_Almsbag.impl

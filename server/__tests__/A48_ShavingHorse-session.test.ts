@@ -187,7 +187,7 @@ describe('A48_ShavingHorse session', () => {
   })
 
   it('has cost { wood: 1 } aligned with BGA', async () => {
-    const mod = await import('../../shared/cards-display/A/A48_ShavingHorse')
+    const mod = await import('../../shared/cards/A/A48_ShavingHorse')
     expect(mod.A48_ShavingHorse.cost).toEqual({ wood: 1 })
   })
 })

@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { C45_Stew } from '../../cards-display/C/C45_Stew'
 
-const CARD_ID = C45_Stew.id
-
+const CARD_ID = 'C45_Stew'
 const listener: CardListenerRegistration = {
   id: 'C45-stew-after-place-farmer',
   cardIds: [CARD_ID],
@@ -24,7 +23,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const C45_Stew_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C45_Stew = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stew',
+    deck: 'C',
+    number: 45,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Day Laborer__ action space, also place 1 <FOOD> on each of the next 4 round spaces. At the start of these rounds, you get the <FOOD>.'],
+    cost: { clay: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const C45_Stew_impl = C45_Stew.impl

@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getMinorImprovementCard } from '../catalog'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E54_Contraband } from '../../cards-display/E/E54_Contraband'
 
-const CARD_ID = E54_Contraband.id
-
+const CARD_ID = 'E54_Contraband'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
 const listener: CardListenerRegistration = {
@@ -47,7 +46,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E54_Contraband_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E54_Contraband = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Contraband',
+    deck: 'E',
+    number: 54,
+    category: 'FOOD',
+    desc: [
+        'Each time you play or build an improvement after this, you can pay 1 additional building resource of a type in the printed cost to get 3 <FOOD>.',
+      ],
+    cost: { food: 1 },
+    waresSalesmanGains: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { reed: 2 }, { stone: 1, reed: 1 }],
+  },
+  impl: cardImpl,
+})
+
+export const E54_Contraband_impl = E54_Contraband.impl

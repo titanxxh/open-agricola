@@ -1,3 +1,4 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -7,10 +8,8 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { D166_StableMilker } from '../../cards-display/D/D166_StableMilker'
 
-const CARD_ID = D166_StableMilker.id
-
+const CARD_ID = 'D166_StableMilker'
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 /**
@@ -46,7 +45,7 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const D166_StableMilker_impl = {
+const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
@@ -57,3 +56,22 @@ export const D166_StableMilker_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D166_StableMilker = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stable Milker',
+    deck: 'D',
+    number: 166,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: [
+        'Each time you build at least 2 stables on the same turn, you also get 1 <CATTLE>.',
+      ],
+    cost: {},
+    players: '4+',
+    evenMoreSet: true,
+  },
+  impl: cardImpl,
+})
+
+export const D166_StableMilker_impl = D166_StableMilker.impl

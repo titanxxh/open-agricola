@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { D119_WoodBarterer } from '../../cards-display/D/D119_WoodBarterer'
 
-const CARD_ID = D119_WoodBarterer.id
-
+const CARD_ID = 'D119_WoodBarterer'
 const beforeListener: CardListenerRegistration = {
   id: 'D119-wood-barterer-before-fence-construct',
   cardIds: [CARD_ID],
@@ -50,7 +49,23 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-export const D119_WoodBarterer_impl = {
+const cardImpl = {
   listeners: [beforeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D119_WoodBarterer = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wood Barterer",
+    deck: "D",
+    number: 119,
+    category: "BUILDING_RESOURCE_PROVIDER",
+    desc: ["Each time before you use an action space with a __Build Fences__ or __Build Rooms__ action, you can choose to either get 2 <WOOD> or exchange up to 2 <WOOD> for 1 <REED> each."],
+    cost: {},
+    players: "1+",
+  },
+  impl: cardImpl,
+})
+
+export const D119_WoodBarterer_impl = D119_WoodBarterer.impl

@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
-import { A18_WheelPlow } from '../../cards-display/A/A18_WheelPlow'
 
-const CARD_ID = A18_WheelPlow.id
-
+const CARD_ID = 'A18_WheelPlow'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
@@ -45,7 +44,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const A18_WheelPlow_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A18_WheelPlow = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wheel Plow',
+    deck: 'A',
+    number: 18,
+    category: 'FARM_PLANNER',
+    desc: ['Once this game, when you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 2 additional fields.'],
+    cost: { wood: 2 },
+    prerequisite: '2 Occupations',
+    occupationPrerequisites: { min: 2 },
+  },
+  impl: cardImpl,
+})
+
+export const A18_WheelPlow_impl = A18_WheelPlow.impl

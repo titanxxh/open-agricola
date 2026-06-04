@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { A123_FrameBuilder } from '../../cards-display/A/A123_FrameBuilder'
+import { A123_FrameBuilder } from '../../cards/A/A123_FrameBuilder'
 import { PaymentSolver } from '../../actions/payment'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal'
 import type {
@@ -54,9 +54,7 @@ const createMockPlayer = (
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
   activeModifiers: [
-    ...((A123_FrameBuilder as unknown as {
-      modifiers: PlayerState['activeModifiers']
-    }).modifiers ?? []),
+    ...(A123_FrameBuilder.impl.modifiers ?? []),
   ],
   cardStates: {},
   stats: {} as any,
@@ -69,8 +67,8 @@ beforeEach(() => {
 describe('A123_FrameBuilder', () => {
   it('card is registered and modifiers reflect construct-trade + renovation-bonus shape', () => {
     expect(A123_FrameBuilder).toBeDefined()
-    expect(A123_FrameBuilder.modifiers).toBeDefined()
-    const modifiers = A123_FrameBuilder.modifiers ?? []
+    expect(A123_FrameBuilder.impl.modifiers).toBeDefined()
+    const modifiers = A123_FrameBuilder.impl.modifiers ?? []
     // 2 construct unit-trades (clay-house, stone-house) + 1 renovation bonus
     expect(modifiers.length).toBe(3)
 

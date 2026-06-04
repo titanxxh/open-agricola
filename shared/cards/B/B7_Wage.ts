@@ -1,12 +1,11 @@
+import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { B7_Wage } from '../../cards-display/B/B7_Wage'
 
-const CARD_ID = B7_Wage.id
-
+const CARD_ID = 'B7_Wage'
 const BOTTOM_ROW_MAJORS = ['Major_ClayOven', 'Major_StoneOven', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']
 
-export const B7_Wage_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -16,3 +15,18 @@ export const B7_Wage_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B7_Wage = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Wage",
+    deck: "B",
+    number: 7,
+    category: "FOOD_PROVIDER",
+    desc: ["You immediately get 2 <FOOD> and 1 additional <FOOD> for each major improvement you have from the bottom row of the supply board."],
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const B7_Wage_impl = B7_Wage.impl

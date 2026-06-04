@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { A153_PigOwner } from '../../cards-display/A/A153_PigOwner'
 
-const CARD_ID = A153_PigOwner.id
-
+const CARD_ID = 'A153_PigOwner'
 const countPigsOnFarm = (player: CardListenerContext['player']): number => {
   let count = 0
   for (const pasture of player.pastures) {
@@ -41,7 +40,24 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const A153_PigOwner_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A153_PigOwner = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Pig Owner',
+    deck: 'A',
+    number: 153,
+    category: 'POINTS_PROVIDER',
+    desc: ['The first time after you play this card that you have 5 <PIG> on your farm, you immediately get 3 bonus <SCORE>.'],
+    cost: {},
+    players: '4+',
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const A153_PigOwner_impl = A153_PigOwner.impl

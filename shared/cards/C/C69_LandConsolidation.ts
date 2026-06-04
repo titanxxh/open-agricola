@@ -1,3 +1,4 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionDefinition } from '../../contract/types'
@@ -5,10 +6,8 @@ import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { isExtraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
-import { C69_LandConsolidation } from '../../cards-display/C/C69_LandConsolidation'
 
-const CARD_ID = C69_LandConsolidation.id
-
+const CARD_ID = 'C69_LandConsolidation'
 const SWAP_ACTION_ID = 'card_C69_LandConsolidation_swap'
 
 const hasExtraCropPending = (context: CardListenerContext): boolean => {
@@ -96,7 +95,24 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-export const C69_LandConsolidation_impl = {
+const cardImpl = {
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C69_LandConsolidation = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Land Consolidation',
+    deck: 'C',
+    number: 69,
+    category: 'CROP_PROVIDER',
+    desc: [
+        'At any time, if you have a grain field with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the field for 1 <VEGETABLE> on the field.',
+      ],
+    cost: {},
+  },
+  impl: cardImpl,
+})
+
+export const C69_LandConsolidation_impl = C69_LandConsolidation.impl

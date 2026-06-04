@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C66_EternalRyeCultivation } from '../../cards-display/C/C66_EternalRyeCultivation'
 
-const CARD_ID = C66_EternalRyeCultivation.id
+const CARD_ID = 'C66_EternalRyeCultivation'
 
-export const C66_EternalRyeCultivation_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterHarvest: (_state, player) => {
@@ -33,3 +33,19 @@ export const C66_EternalRyeCultivation_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C66_EternalRyeCultivation = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Eternal Rye Cultivation",
+    deck: "C",
+    number: 66,
+    category: "CROP_PROVIDER",
+    desc: ["After each harvest in which you have 2 or 3+ <GRAIN> in your supply, you get 1 <FOOD> or 1 additional <GRAIN>, respectively."],
+    cost: {},
+    prerequisite: "1 Grain Field",
+  },
+  impl: cardImpl,
+})
+
+export const C66_EternalRyeCultivation_impl = C66_EternalRyeCultivation.impl

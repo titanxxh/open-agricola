@@ -69,8 +69,7 @@ shared/        零 React，前后端 + sandbox 共用
 ├── engine/        节点树引擎 + EngineStack
 ├── session/       SessionCore + phases/（setup, round, harvest, draft）
 ├── actions/       行动定义、effects/、payment/、Hook 系统
-├── cards/         卡牌实现（按 deck A/B/C/D/E + major + community 分目录）
-├── cards-display/ 卡牌展示数据（id/name/desc/cost/cardType/deck —— 主 bundle 引用）
+├── cards/         Card Source（按 deck A/B/C/D/E + major + community 分目录，单卡 meta + impl）
 ├── domain/        领域聚合层（PlayerBoard、farmyard、pasture、scoring、...）
 ├── draft/         simultaneous 卡牌选择
 ├── custom-code/   自定义卡牌 AST 校验
@@ -103,7 +102,7 @@ e2e-tests/     Playwright 浏览器测试
 ```
 
 ESLint 三层强制（`eslint.config.js`）：
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`
 - `client/sandbox/**` 全开
 - 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过
 - violation = CI error
@@ -112,7 +111,7 @@ ESLint 三层强制（`eslint.config.js`）：
 
 ## 4. shared/contract/ — 协议层
 
-**唯一作用**：把"前后端 + sandbox 都要看到的形状"集中到这里。前端主 bundle 只读 `shared/contract/` + `shared/cards-display/` + `shared/i18n/` + `shared/domain/`，其余不进 bundle。
+**唯一作用**：把"前后端 + sandbox 都要看到的形状"集中到这里。前端主 bundle 只读 `shared/contract/` + `shared/i18n/` + `shared/domain/` 和 manifest-backed `client/services/card-meta`，其余不进 bundle。
 
 ### 4.1 关键文件
 
@@ -787,28 +786,44 @@ OA-vs-BGA design notes:
 
 ---
 
-## 8. shared/cards/ + shared/cards-display/ — 卡牌闭环
+## 8. shared/cards/ — Card Source 闭环
 
-### 8.1 双产物：display vs impl
+### 8.1 Card Source + 投影
 
-| 目录 | 形态 | 谁能 import |
+目标态见 ADR-0002。单卡作者只维护一个 Card Source：
+
+```ts
+export const A123_FrameBuilder = defineOccupationCard({
+  meta: { id, name, deck, number, category, desc, cost, players },
+  impl: { modifiers, listeners, effect, prerequisiteCheck, reaches },
+})
+```
+
+| 概念 | 形态 | 谁能读取 |
 |---|---|---|
-| `shared/cards-display/{A..E,major,community}/` | 纯数据：`id` / `nameKey` / `descKey` / `imageId` / `costSpec` / `cardType` / `deck` / `prerequisiteSpec` | 主 client bundle ✅ + sandbox ✅ + server ✅ |
-| `shared/cards/{A..E,major,community}/` | hook 注册 + effect 函数 | sandbox + server（主 client bundle 禁止） |
+| Card Source | `shared/cards/{A..E,major,community}/{Card}.ts`，包含 `meta` + 可选 `impl` | server / sandbox / tests；主 client bundle 禁止 |
+| Card Display | 从 Card Source 的 `meta` 构建出的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
+| Card Impl | Card Source 的 `impl` 投影进 `shared/cards/catalog.generated.ts` / `CardRegistry` | server / sandbox；主 client bundle 禁止 |
 
-主 bundle 启动时 `GET /cards-manifest.json` 拉运行时元数据（`client/services/card-meta.ts`），切断对 `shared/cards/catalog` 的依赖链。
+目标态删除 `shared/cards-display/`，不生成 shadow display 目录。`shared/cards/community/*` 与基础牌、major 一样使用单源；`shared/cards/community/auto-catalog.ts` 不再存在。
 
-Card lookup bootstrap：`shared/cards-display/types.ts` 的 registered lookup 默认可为空，client 不安装 catalog lookup；server/test runtime 通过 `shared/cards/install-catalog-lookups.ts` 显式安装。client 需要卡牌 metadata 时使用 `client/services/card-meta` 的 manifest-backed lookup。
+`meta` 是 Card Definition：只允许可序列化、前端可见、无运行时行为的字段。允许 `cost`、`prerequisite`、`occupationPrerequisites`、`improvementPrerequisites`、`cardField`、`isCookery` 等声明式规则字段；禁止 `modifier` / `modifiers` / `listeners` / `effect` / `prerequisiteCheck`。`prerequisite` 是印刷文本，结构化静态条件走 `*Prerequisites`，动态条件走 `impl.prerequisiteCheck`。
 
-### 8.2 注册表
+`impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
+
+`scripts/build-cards-manifest.ts` 必须用 TypeScript AST 静态提取 `meta`，禁止 runtime import Card Source 或 generated catalog。`meta` 只允许 JSON-like 字面量和同文件简单常量引用；`impl` 可自由写运行时代码。
+
+### 8.2 Generated catalog + registry
 
 | 文件 | 作用 |
 |---|---|
-| `shared/cards/catalog.ts` | `minorImprovementCards` / `occupationCards` 聚合 |
+| `shared/cards/catalog.generated.ts` | 从 Card Source 生成 `allCardSources`、`minorImprovementCards`、`occupationCards`、`implemented*`、`ALL_CARD_IMPLS` |
 | `shared/cards/active-registry.ts` | `CardRegistry` 单例 |
 | `shared/cards/registry.ts` | `CardRegistry` 类（loadByIds / unload） |
-| `shared/cards/custom-registry.ts` | `CUSTOM_*` 前缀自定义卡牌 |
-| `shared/cards-display/_lookup.ts` | 主 bundle 用 lookup 表 |
+| `shared/cards/custom-registry.ts` | server / sandbox 的 `CUSTOM_*` runtime impl + session context / effects / listeners / modifiers |
+| `shared/cards/custom-card-metadata.ts` | 前端 `CUSTOM_*` Card Display、art URL、O 编号 |
+
+生产路径只通过 `catalog.generated.ts` 和 `CardRegistry` 访问卡牌；测试允许直接 import 单卡 Card Source 做精确断言。`CardBase` / `MinorImprovement` / `Occupation` / `PlayerActionCard` class 语义目标态删除，使用带 `kind: 'minor' | 'occupation' | 'playerAction' | 'major'` 的 plain Card Definition，并用 `kind` 替代 `instanceof`。
 
 `CardRegistry.loadByIds(ids, lookup)` / `unload(id)` 支持按房间动态装卡。
 
@@ -884,13 +899,13 @@ B113 / B141。
 - 优先用 Hook 系统、`CardDefinition` 通用字段（`cost` / `reward` / `prerequisite`）、`cardStates`。
 - 禁止：核心文件内针对单卡的 `if-else`；集中式卡牌效果注册表；前端硬编码卡牌特定规则。
 
-运行时跨卡身份/能力读取必须优先落到 `CardDefinition` typed metadata 和 played-card helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)`、`playerHasCardCapability(player, capability, { asType? })` 只检查 `player.improvements` / `player.minorPlayed` / `player.occupationPlayed`，手牌不参与；`asType` 复用 `cardCountsAs`，因此 dual-type card 仍按既有身份语义进入查询。当前已登记的通用 metadata 包括 `preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`。这些字段通过 `CardBase.toJSON()` 序列化，但不新增前端展示行为。已迁移路径包括 B146/C35 弃手牌禁止、B153 major identity scoring、C75/A27 fireplace/hearth/oven trigger、B31 pottery identity、E144 wares gain options、D86 animal-holder occupation filtering、D12 house animal zone blocking。
+运行时跨卡身份/能力读取必须优先落到 `CardDefinition` typed metadata 和 played-card helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)`、`playerHasCardCapability(player, capability, { asType? })` 只检查 `player.improvements` / `player.minorPlayed` / `player.occupationPlayed`，手牌不参与；`asType` 复用 `cardCountsAs`，因此 dual-type card 仍按既有身份语义进入查询。当前已登记的通用 metadata 包括 `preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`。这些字段属于 Card Source `meta`，可投影进 catalog / manifest，但不新增前端展示行为。已迁移路径包括 B146/C35 弃手牌禁止、B153 major identity scoring、C75/A27 fireplace/hearth/oven trigger、B31 pottery identity、E144 wares gain options、D86 animal-holder occupation filtering、D12 house animal zone blocking。
 
 `check:card-impl-boundaries` 是常规验证路径的一部分，并在 CI verify job 中默认严格执行。生产 `shared/cards/A-E/*.ts` 中的运行时跨非 Major 卡 id 读取必须迁入通用 capability、action context provenance、harvest outcome、breeding threshold modifier、synthetic occupancy、trigger snapshot 等扩展点；`Major_*`、`reaches`、`allowedPurchases` 和 prerequisite candidate list 是明确例外。需要临时审计时可显式传 `--warn-only`，但不能作为合入验证路径。
 
 ### 8.7 Minor improvement passing mechanism
 
-OA 通过 `CardBase.passing?: boolean` 标记 BGA minor improvement 的"过手"机制。
+OA 通过 `CardDefinition.passing?: boolean` 标记 BGA minor improvement 的"过手"机制。
 `shared/actions/effects/improvement.ts` 的 host action 先用 internal `pay` child 完成购买支付，再在 `completeInternalChildren` 阶段读取 payment result map 并提交卡牌购买。passing 卡：
 
 - 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
@@ -1046,7 +1061,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 | Bundle | 入口 | 路径 | 约束 |
 |---|---|---|---|
-| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `cards-display` / `i18n` |
+| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `i18n`，卡牌展示走 manifest-backed `card-meta` + `custom-card-metadata` |
 | `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 浏览器内直接 `new SessionCore(...)` 跑完整 in-process 引擎；可 import 任意 `shared/*`（含 `engine` / `session` / `actions` / `cards` / `custom-code` / `draft`） |
 
 主 bundle 预算：`scripts/check-bundle-size.ts` strict（main ≤ 550KB raw / ≤ 170KB gzip）。
@@ -1054,7 +1069,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 ### 12.2 服务层 client/services/
 
 - `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
-- `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据。
+- `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
 - `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
 - `llmPrompts.ts` —— LLM 辅助生成 / 校验。
 
@@ -1081,7 +1096,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 `eslint.config.js` 关键规则：
 
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`。
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`。
 - `client/sandbox/**` 全开。
 - `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。

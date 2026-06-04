@@ -1,10 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { C89_StableMaster } from '../../cards-display/C/C89_StableMaster'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
-const CARD_ID = C89_StableMaster.id
+const CARD_ID = 'C89_StableMaster'
 
-export const C89_StableMaster_impl = {
+const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
@@ -26,3 +26,19 @@ export const C89_StableMaster_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C89_StableMaster = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stable Master',
+    deck: 'C',
+    number: 89,
+    category: 'FARM_PLANNER',
+    desc: ['When you play this card, you can immediately build exactly 1 stable for 1 <WOOD>. Exactly one of your unfenced stables can hold up to 3 animals of one type.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const C89_StableMaster_impl = C89_StableMaster.impl

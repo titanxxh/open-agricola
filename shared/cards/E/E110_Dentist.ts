@@ -1,11 +1,11 @@
+import { defineOccupationCard } from '../card-source'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E110_Dentist } from '../../cards-display/E/E110_Dentist'
 
-const CARD_ID = E110_Dentist.id
+const CARD_ID = 'E110_Dentist'
 
-export const E110_Dentist_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   // At start of each harvest: optionally pay 1 wood to place on card
@@ -30,3 +30,19 @@ export const E110_Dentist_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E110_Dentist = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Dentist',
+    deck: 'E',
+    number: 110,
+    category: 'FOOD',
+    desc: ['At the start of each harvest, you can place 1 <WOOD> from your supply on this card, irretrievably. In each feeding phase, you get 1 <FOOD> for each <WOOD> on this card.'],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E110_Dentist_impl = E110_Dentist.impl

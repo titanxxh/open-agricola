@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B14_Hawktower } from '../../cards-display/B/B14_Hawktower'
 
-const CARD_ID = B14_Hawktower.id
+const CARD_ID = 'B14_Hawktower'
 
-export const B14_Hawktower_impl = {
+const cardImpl = {
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
     return state.round <= 7
@@ -21,3 +21,19 @@ export const B14_Hawktower_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B14_Hawktower = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Hawktower',
+    deck: 'B',
+    number: 14,
+    category: 'FARM_PLANNER',
+    desc: ['Place a stone room on round space 12. If you live in a stone house at the start of the round, you can build the stone room at no cost. Otherwise, discard the stone room.'],
+    cost: { clay: 2 },
+    prerequisite: 'Play in Round 7 or Before',
+  },
+  impl: cardImpl,
+})
+
+export const B14_Hawktower_impl = B14_Hawktower.impl

@@ -1,11 +1,10 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
-import { E89_Stallwright } from '../../cards-display/E/E89_Stallwright'
 
-const CARD_ID = E89_Stallwright.id
-
+const CARD_ID = 'E89_Stallwright'
 const TRIGGER_COUNTS = new Set([2, 3, 5, 7])
 
 const listener: CardListenerRegistration = {
@@ -29,7 +28,25 @@ const listener: CardListenerRegistration = {
   },
 }
 
-export const E89_Stallwright_impl = {
+const cardImpl = {
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E89_Stallwright = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Stallwright',
+    deck: 'E',
+    number: 89,
+    category: 'FARMYARD_-_STABLE_BUILDING',
+    desc: [
+        'After you play your 2nd, 3rd, 5th, and 7th occupation (including this one), you can build 1 stable at no cost.',
+      ],
+    cost: {},
+    players: '1+',
+  },
+  impl: cardImpl,
+})
+
+export const E89_Stallwright_impl = E89_Stallwright.impl

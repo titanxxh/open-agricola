@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { E135_Pickler } from '../../cards-display/E/E135_Pickler'
 
-const CARD_ID = E135_Pickler.id
-
+const CARD_ID = 'E135_Pickler'
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
   if (remaining >= 9) return 4
@@ -14,7 +13,7 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   return 0
 }
 
-export const E135_Pickler_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state) => {
@@ -34,3 +33,20 @@ export const E135_Pickler_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E135_Pickler = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: "Pickler",
+    deck: "E",
+    number: 135,
+    category: "BONUS_POINTS_-_4_WOOD_CARD_COMPETITION",
+    desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with the most total <VEGETABLE> gets 3 bonus <SCORE>.'],
+    cost: {},
+    players: "3+",
+    extraVp: true,
+  },
+  impl: cardImpl,
+})
+
+export const E135_Pickler_impl = E135_Pickler.impl

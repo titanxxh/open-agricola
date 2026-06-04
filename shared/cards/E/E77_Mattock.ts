@@ -1,11 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E77_Mattock } from '../../cards-display/E/E77_Mattock'
 
-const CARD_ID = E77_Mattock.id
-
+const CARD_ID = 'E77_Mattock'
 const isReedOrStoneAccumulationSpace = (context: CardListenerContext): boolean => {
   if (!context.space) return false
   const gpr = context.space.gainPerRound
@@ -36,7 +35,22 @@ const placeFarmerListener: CardListenerRegistration = {
   },
 }
 
-export const E77_Mattock_impl = {
+const cardImpl = {
   listeners: [collectListener, placeFarmerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E77_Mattock = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Mattock',
+    deck: 'E',
+    number: 77,
+    category: 'BUILDING_RESOURCES_-_CLAY',
+    desc: ['Each time you get <REED> and/or <STONE> from an action space, you get 1 additional <CLAY>.'],
+    cost: { wood: 1 },
+  },
+  impl: cardImpl,
+})
+
+export const E77_Mattock_impl = E77_Mattock.impl

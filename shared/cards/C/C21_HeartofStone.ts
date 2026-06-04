@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C21_HeartofStone } from '../../cards-display/C/C21_HeartofStone'
 
-const CARD_ID = C21_HeartofStone.id
+const CARD_ID = 'C21_HeartofStone'
 
-export const C21_HeartofStone_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (state, player) => {
@@ -23,3 +23,20 @@ export const C21_HeartofStone_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C21_HeartofStone = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Heart of Stone',
+    deck: 'C',
+    number: 21,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'Each time a __Quarry__ accumulation space is revealed, if you have room in your house, you can immediately take a __Family Growth__ action without placing a person.',
+      ],
+    cost: { food: 4 },
+  },
+  impl: cardImpl,
+})
+
+export const C21_HeartofStone_impl = C21_HeartofStone.impl

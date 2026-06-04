@@ -1,10 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
-import { B65_GrainDepot } from '../../cards-display/B/B65_GrainDepot'
 
-const CARD_ID = B65_GrainDepot.id
+const CARD_ID = 'B65_GrainDepot'
 
-export const B65_GrainDepot_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player, paymentInfo) => {
@@ -27,3 +27,19 @@ export const B65_GrainDepot_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const B65_GrainDepot = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: "Grain Depot",
+    deck: "B",
+    number: 65,
+    category: "CROP_PROVIDER",
+    desc: ["If you paid <WOOD>/<CLAY>/<STONE> for this card, place 1 <GRAIN> on each of the next 2/3/4 round spaces. At the start of these rounds, you get the <GRAIN>."],
+    cost: {},
+    altCosts: [{ wood: 2 }, { clay: 2 }, { stone: 2 }],
+  },
+  impl: cardImpl,
+})
+
+export const B65_GrainDepot_impl = B65_GrainDepot.impl

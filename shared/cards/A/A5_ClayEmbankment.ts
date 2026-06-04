@@ -1,9 +1,9 @@
+import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { A5_ClayEmbankment } from '../../cards-display/A/A5_ClayEmbankment'
 
-const CARD_ID = A5_ClayEmbankment.id
+const CARD_ID = 'A5_ClayEmbankment'
 
-export const A5_ClayEmbankment_impl = {
+const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
@@ -19,3 +19,19 @@ export const A5_ClayEmbankment_impl = {
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const A5_ClayEmbankment = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Clay Embankment',
+    deck: 'A',
+    number: 5,
+    category: 'BUILDING_RESOURCE_PROVIDER',
+    desc: ['You immediately get 1 <CLAY> for every 2 <CLAY> you already have in your supply.'],
+    cost: { food: 1 },
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const A5_ClayEmbankment_impl = A5_ClayEmbankment.impl

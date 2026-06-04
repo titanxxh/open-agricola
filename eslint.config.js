@@ -9,6 +9,7 @@ const mainClientForbiddenCardBootstrapModules = [
   'catalog',
   'install-catalog-lookups',
   'register-all',
+  'custom-registry',
   'registry-runtime',
 ]
 
@@ -26,7 +27,7 @@ const mainClientForbiddenImportGroups = [
   '**/shared/cards/__stubs__/**',
 ]
 
-const mainClientForbiddenDynamicImportPattern = String.raw`(?:^|\/)shared\/(?:session|engine)\/|(?:^|\/)shared\/cards\/(?:catalog|install-catalog-lookups|register-all|registry-runtime)(?:\.(?:ts|js))?$|(?:^|\/)shared\/cards\/(?:[A-E]|community|major|__stubs__)\/`
+const mainClientForbiddenDynamicImportPattern = String.raw`(?:^|\/)shared\/(?:session|engine)\/|(?:^|\/)shared\/cards\/(?:catalog|install-catalog-lookups|register-all|custom-registry|registry-runtime)(?:\.(?:ts|js))?$|(?:^|\/)shared\/cards\/(?:[A-E]|community|major|__stubs__)\/`
 
 export default defineConfig([
   globalIgnores(['dist', '.worktree/**', 'scripts/__tests__/fixtures/**', 'public/**']),
@@ -165,47 +166,6 @@ export default defineConfig([
       }],
     },
   },
-  // S6b: cards-display is the bundle-isolated display layer. It must not
-  // import impl layers (actions/engine/session) nor the per-deck card impl
-  // files under shared/cards/[A-E]/**, shared/cards/community/**, or
-  // shared/cards/__stubs__/**. Pure types may come from shared/contract/*.
-  //
-  // Excluded from this rule (Sprint S8 collapsed prior 3 exemptions):
-  //   - shared/cards-display/_lookup-data.ts — single forwarding seam for
-  //     `cards/custom-registry` (runtime overlay registry). custom-registry
-  //     has no transitive imports to cards/major or cards/catalog, so this
-  //     reverse edge is safe under vite dev ESM cycle resolution.
-  //   - shared/cards-display/types.ts — owns the CardBase class hierarchy
-  //     that all card display files extend (kept defensively; verify by
-  //     `grep '^import' shared/cards-display/types.ts`).
-  {
-    files: ['shared/cards-display/**/*.{ts,tsx}'],
-    ignores: [
-      'shared/cards-display/_lookup-data.ts',
-      'shared/cards-display/types.ts',
-    ],
-    rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [
-          {
-            group: [
-              '**/shared/actions/**',
-              '**/shared/engine/**',
-              '**/shared/session/**',
-              '**/shared/cards/[A-E]/**',
-              '**/shared/cards/community/**',
-              '**/shared/cards/__stubs__/**',
-              '../actions/**', '../engine/**', '../session/**',
-              '../cards/[A-E]/**', '../cards/community/**', '../cards/__stubs__/**',
-              '../../actions/**', '../../engine/**', '../../session/**',
-              '../../cards/[A-E]/**', '../../cards/community/**', '../../cards/__stubs__/**',
-            ],
-            message: 'shared/cards-display/** must not import impl layers (actions/engine/session) nor per-deck card impl files. Use shared/contract/* for shared types.',
-          },
-        ],
-      }],
-    },
-  },
   // S6c: shared/contract/** is type-only; runtime imports forbidden.
   // Type-only imports (`import type { ... }`) are allowed since they erase at
   // build time and don't produce runtime dependencies.
@@ -217,10 +177,10 @@ export default defineConfig([
           {
             group: [
               '../actions/**', '../engine/**', '../session/**',
-              '../cards/**', '../cards-display/**', '../domain/**',
+              '../cards/**', '../domain/**',
               '../utils/**',
               '../../actions/**', '../../engine/**', '../../session/**',
-              '../../cards/**', '../../cards-display/**', '../../domain/**',
+              '../../cards/**', '../../domain/**',
               '../../utils/**',
             ],
             message: 'shared/contract/** is type-only; do not import runtime modules.',
@@ -241,47 +201,20 @@ export default defineConfig([
             group: [
               ...mainClientForbiddenImportGroups,
             ],
-            message: 'Main client cannot import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use shared/cards-display or manifest-backed client/services/card-meta for UI metadata.',
+            message: 'Main client cannot import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use manifest-backed client/services/card-meta for UI metadata.',
             allowTypeImports: true,
           },
         ],
       }],
       'no-restricted-syntax': ['error', {
         selector: `ImportExpression[source.value=/${mainClientForbiddenDynamicImportPattern}/]`,
-        message: 'Main client cannot dynamically import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use shared/cards-display or manifest-backed client/services/card-meta for UI metadata.',
+        message: 'Main client cannot dynamically import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use manifest-backed client/services/card-meta for UI metadata.',
       }, {
         selector: "Literal[value='minor-improvement']",
         message: "Use 'improvement' action id with params.types instead. Legacy 'minor-improvement' was removed in the improvement-unification refactor.",
       }, {
         selector: "Literal[value='improvement-any']",
         message: "Use 'improvement' action id with params.types instead. Legacy 'improvement-any' was removed in the improvement-unification refactor.",
-      }],
-    },
-  },
-  // S6c: impl layers should consume card metadata via getCardDefinition/registry-runtime,
-  // not reach into cards-display directly (would couple impl to display chunk).
-  // Tests under __tests__/ are dev-only and may import cards-display directly
-  // for assertion fixtures (e.g. asserting a card's modifier shape).
-  {
-    files: [
-      'shared/actions/**/*.ts',
-      'shared/engine/**/*.ts',
-      'shared/session/**/*.ts',
-    ],
-    ignores: [
-      'shared/actions/**/__tests__/**',
-      'shared/engine/**/__tests__/**',
-      'shared/session/**/__tests__/**',
-    ],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', {
-        patterns: [
-          {
-            group: ['**/cards-display/**', '../cards-display/**', '../../cards-display/**'],
-            message: 'session/engine/actions should consume metadata via shared/cards/registry-runtime (getCardDefinition / getCardEffect), not import cards-display directly.',
-            allowTypeImports: true,
-          },
-        ],
       }],
     },
   },
@@ -294,7 +227,6 @@ export default defineConfig([
           {
             group: [
               '**/shared/cards/**',
-              '**/shared/cards-display/**',
               '**/shared/session/**',
               '**/shared/engine/**',
               '**/shared/actions/**',

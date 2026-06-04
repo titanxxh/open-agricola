@@ -11,9 +11,11 @@
  * catalog.ts lookup functions fall back to this registry when
  * the id starts with "CUSTOM_".
  */
-import { MinorImprovement, Occupation, type CardBase } from '../cards-display/types'
 import { getActiveCardRegistry } from './active-registry.ts'
+import type { CardRegistry } from './registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
+import type { CardDefinition } from '../contract/cards'
+import type { CostModifier } from '../contract/types'
 
 // Re-export for backward compatibility
 export type { CustomCardData } from './session-card-context.ts'
@@ -22,13 +24,29 @@ type RegisterCustomCardOptions = {
   allowGlobal?: boolean
 }
 
-const customMinorImprovements = new Map<string, CardBase>()
-const customOccupations = new Map<string, CardBase>()
-const customArtUrls = new Map<string, string>()
-/** Sequential numbering for custom cards: minor O001+, occupation O500+ */
-const customNumbering = new Map<string, string>()
-let nextMinorNumber = 1
-let nextOccupationNumber = 500
+const customMinorImprovements = new Map<string, CardDefinition>()
+const customOccupations = new Map<string, CardDefinition>()
+const isCustomCardId = (id: string): boolean => id.startsWith('CUSTOM_')
+
+type LegacyCardJson = CardDefinition & {
+  modifier?: CostModifier
+  modifiers?: CostModifier[]
+}
+
+const displayOnlyCardJson = (cardJson: LegacyCardJson): CardDefinition => {
+  const { modifier: _modifier, modifiers: _modifiers, ...display } = cardJson
+  return display
+}
+
+export function clearCustomCardRuntimeFromRegistry(registry: CardRegistry): void {
+  for (const id of registry.snapshot().cardIds) {
+    if (isCustomCardId(id)) registry.unload(id)
+  }
+  registry.removeEffectsWhere(isCustomCardId)
+  registry.removeListenersWhere((reg) =>
+    isCustomCardId(reg.id) || (reg.cardIds ?? []).some(isCustomCardId),
+  )
+}
 
 /**
  * Register a custom card into the runtime registry.
@@ -45,7 +63,7 @@ export function registerCustomCard(
   // so this runtime injection is the dedicated path for them.
   const active = getActiveCardRegistry()
   if (active) {
-    const { id, modifier, modifiers } = data.cardJson
+    const { id, modifier, modifiers } = data.cardJson as LegacyCardJson
     const allMods = [
       ...(modifiers ?? []),
       ...(modifier ? [modifier] : []),
@@ -68,31 +86,18 @@ export function registerCustomCard(
     )
   }
 
-  // Explicit global path (for tests without session context, and frontend)
-  const { cardType, cardJson, artUrl } = data
-
-  const card = cardType === 'minor'
-    ? new MinorImprovement(cardJson)
-    : new Occupation(cardJson)
+  // Explicit global path for tests without session context.
+  const { cardType, cardJson } = data
+  const card = displayOnlyCardJson(cardJson as LegacyCardJson)
 
   if (cardType === 'minor') {
     customMinorImprovements.set(cardJson.id, card)
-    if (!customNumbering.has(cardJson.id)) {
-      customNumbering.set(cardJson.id, `O${String(nextMinorNumber++).padStart(3, '0')}`)
-    }
   } else {
     customOccupations.set(cardJson.id, card)
-    if (!customNumbering.has(cardJson.id)) {
-      customNumbering.set(cardJson.id, `O${String(nextOccupationNumber++).padStart(3, '0')}`)
-    }
-  }
-
-  if (artUrl) {
-    customArtUrls.set(cardJson.id, artUrl)
   }
 }
 
-export function getCustomMinorImprovement(id: string): CardBase | null {
+export function getCustomMinorImprovement(id: string): CardDefinition | null {
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {
     const custom = sessionCtx.getCustomMinor(id)
@@ -101,7 +106,7 @@ export function getCustomMinorImprovement(id: string): CardBase | null {
   return customMinorImprovements.get(id) ?? null
 }
 
-export function getCustomOccupation(id: string): CardBase | null {
+export function getCustomOccupation(id: string): CardDefinition | null {
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {
     const custom = sessionCtx.getCustomOccupation(id)
@@ -110,33 +115,13 @@ export function getCustomOccupation(id: string): CardBase | null {
   return customOccupations.get(id) ?? null
 }
 
-/** Get the O-series numbering for a custom card (e.g. "O001", "O500"), or null. */
-export function getCustomCardNumbering(id: string): string | null {
-  return customNumbering.get(id) ?? null
-}
-
-/** Get the art URL for a custom card, or null if none. */
-export function getCustomCardArtUrl(id: string): string | null {
-  const sessionCtx = getCurrentSessionContext()
-  if (sessionCtx) {
-    const url = sessionCtx.customArtUrls.get(id)
-    if (url) return url
-  }
-  return customArtUrls.get(id) ?? null
-}
-
 /** Clear all custom cards — called when creating a fresh game session without workshop cards. */
 export function clearCustomCards(): void {
   customMinorImprovements.clear()
   customOccupations.clear()
-  customArtUrls.clear()
-  customNumbering.clear()
-  nextMinorNumber = 1
-  nextOccupationNumber = 500
   const active = getActiveCardRegistry()
   if (active) {
-    active.removeEffectsWhere((id) => id.startsWith('CUSTOM_'))
-    active.removeListenersWhere((reg) => reg.id.startsWith('CUSTOM_'))
+    clearCustomCardRuntimeFromRegistry(active)
   }
 }
 

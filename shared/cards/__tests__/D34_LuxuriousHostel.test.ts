@@ -3,7 +3,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 import { getCardEffect } from '../card-effects'
 
 import '../D/D34_LuxuriousHostel'
-import { D34_LuxuriousHostel as D34Card } from '../../cards-display/D/D34_LuxuriousHostel'
+import { D34_LuxuriousHostel as D34Card } from '../../cards/D/D34_LuxuriousHostel'
 
 const CARD_ID = 'D34_LuxuriousHostel'
 

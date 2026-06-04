@@ -1,10 +1,9 @@
+import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { C128_WoodenHutExtender } from '../../cards-display/C/C128_WoodenHutExtender'
 
-const CARD_ID = C128_WoodenHutExtender.id
-
+const CARD_ID = 'C128_WoodenHutExtender'
 /**
  * C128 Wooden Hut Extender — Wood rooms cost 1 reed, and additionally:
  *   - Rounds 1–5:  5 wood + 1 reed  (base 5+2, so -1 reed)
@@ -36,7 +35,23 @@ const constructCostListener: CardListenerRegistration = {
   },
 }
 
-export const C128_WoodenHutExtender_impl = {
+const cardImpl = {
   listeners: [constructCostListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const C128_WoodenHutExtender = defineOccupationCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Wooden Hut Extender',
+    deck: 'C',
+    number: 128,
+    category: 'FARM_PLANNER',
+    desc: ['Wood rooms now cost you 1 <REED>, and additionally 5 <WOOD> through round 5, 4 <WOOD> in rounds 6 and 7, and 3 <WOOD> in round 8 and later.'],
+    cost: {},
+    players: '3+',
+  },
+  impl: cardImpl,
+})
+
+export const C128_WoodenHutExtender_impl = C128_WoodenHutExtender.impl

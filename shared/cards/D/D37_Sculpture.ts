@@ -1,9 +1,10 @@
+import { defineMinorCard } from '../card-source'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 
-// D37 Sculpture: playable only if `roundsLeft > unusedFarmyardSpaces`,
-// where roundsLeft = 14 - currentRound (BGA uses `14 - Globals::getTurn()`).
-export const D37_Sculpture_impl = {
+const CARD_ID = 'D37_Sculpture'
+
+const cardImpl = {
   prerequisiteCheck: (player, state) => {
     if (!state) return true
     const used = new Set<string>()
@@ -21,3 +22,20 @@ export const D37_Sculpture_impl = {
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const D37_Sculpture = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sculpture',
+    deck: 'D',
+    number: 37,
+    category: 'POINTS_PROVIDER',
+    desc: ['You can only play this card if there are more complete rounds left to play than you have unused farmyard spaces.'],
+    cost: { stone: 1 },
+    vp: 2,
+    prerequisite: 'see below',
+  },
+  impl: cardImpl,
+})
+
+export const D37_Sculpture_impl = D37_Sculpture.impl

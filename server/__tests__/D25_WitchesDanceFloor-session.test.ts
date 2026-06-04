@@ -25,7 +25,7 @@ import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry
 import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/D/D25_WitchesDanceFloor'
-import { D25_WitchesDanceFloor } from '../../shared/cards-display/D/D25_WitchesDanceFloor'
+import { D25_WitchesDanceFloor } from '../../shared/cards/D/D25_WitchesDanceFloor'
 
 const CARD_ID = 'D25_WitchesDanceFloor'
 

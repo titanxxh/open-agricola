@@ -289,7 +289,7 @@ describe('applySafeFix', () => {
   })
 
   it('replaces existing category value', () => {
-    const src = `import { Occupation } from '../../../../shared/cards-display/types'\n\nexport const X = new Occupation({\n  id: 'X1_A',\n  name: 'X',\n  deck: 'X',\n  number: 1,\n  category: 'OLD',\n  desc: ['x'],\n  cost: {},\n  players: '1+',\n})\n`
+    const src = `import { Occupation } from '../../../../shared/cards/types'\n\nexport const X = new Occupation({\n  id: 'X1_A',\n  name: 'X',\n  deck: 'X',\n  number: 1,\n  category: 'OLD',\n  desc: ['x'],\n  cost: {},\n  players: '1+',\n})\n`
     const patched = applySafeFix(src, [{ field: 'category', target: 'NEW' }])
     expect(patched).toContain("category: 'NEW',")
     expect(patched).not.toContain("category: 'OLD'")

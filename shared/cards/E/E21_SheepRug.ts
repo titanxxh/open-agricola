@@ -1,13 +1,12 @@
+import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, PlayerState } from '../../contract/types'
 import { isSpaceOccupied } from '../../domain/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
-import { E21_SheepRug } from '../../cards-display/E/E21_SheepRug'
 
-const CARD_ID = E21_SheepRug.id
-
+const CARD_ID = 'E21_SheepRug'
 const countSheepOnBoard = (player: PlayerState): number => {
   let total = 0
   for (const pasture of player.pastures) {
@@ -44,8 +43,25 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-export const E21_SheepRug_impl = {
+const cardImpl = {
   prerequisiteCheck: (player) => countSheepOnBoard(player) >= 4,
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
+
+export const E21_SheepRug = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Sheep Rug',
+    deck: 'E',
+    number: 21,
+    category: 'ACTION_-_FAMILY_GROWTH',
+    desc: ["You can use any __Wish for Children__ action space, even if it is occupied by another player's person."],
+    vp: 1,
+    cost: { sheep: 1 },
+    prerequisite: '4 Sheep',
+  },
+  impl: cardImpl,
+})
+
+export const E21_SheepRug_impl = E21_SheepRug.impl
