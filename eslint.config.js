@@ -9,6 +9,7 @@ const mainClientForbiddenCardBootstrapModules = [
   'catalog',
   'install-catalog-lookups',
   'register-all',
+  'custom-registry',
   'registry-runtime',
 ]
 
@@ -26,7 +27,7 @@ const mainClientForbiddenImportGroups = [
   '**/shared/cards/__stubs__/**',
 ]
 
-const mainClientForbiddenDynamicImportPattern = String.raw`(?:^|\/)shared\/(?:session|engine)\/|(?:^|\/)shared\/cards\/(?:catalog|install-catalog-lookups|register-all|registry-runtime)(?:\.(?:ts|js))?$|(?:^|\/)shared\/cards\/(?:[A-E]|community|major|__stubs__)\/`
+const mainClientForbiddenDynamicImportPattern = String.raw`(?:^|\/)shared\/(?:session|engine)\/|(?:^|\/)shared\/cards\/(?:catalog|install-catalog-lookups|register-all|custom-registry|registry-runtime)(?:\.(?:ts|js))?$|(?:^|\/)shared\/cards\/(?:[A-E]|community|major|__stubs__)\/`
 
 export default defineConfig([
   globalIgnores(['dist', '.worktree/**', 'scripts/__tests__/fixtures/**', 'public/**']),

@@ -10,11 +10,10 @@
  * `CardMeta` type in sync with that script's output.
  */
 import {
-  getCustomMinorImprovement,
-  getCustomOccupation,
-} from '../../shared/cards/custom-registry'
+  getCustomCardMetadata,
+  type CustomCardMetadata,
+} from '../../shared/cards/custom-card-metadata'
 import type { CardExchange } from '../../shared/contract/cards'
-import type { CardBase } from '../../shared/cards-display/types'
 
 export type CardMeta = {
   id: string
@@ -87,15 +86,14 @@ export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
   return manifestPromise
 }
 
-const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMeta => ({
+const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): CardMeta => ({
   id: card.id,
   name: card.name,
   deck: card.deck,
   number: card.number,
-  type,
+  type: cardType,
   category: card.category,
   desc: card.desc,
-  // Custom cards use simple Partial<Resource> costs (ComplexCost is majors-only).
   cost: card.cost as Record<string, number> | undefined,
   altCosts: card.altCosts,
   exchanges: card.exchanges,
@@ -111,11 +109,8 @@ const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMet
 
 const getCustomCardMeta = (id: string): CardMeta | undefined => {
   if (!id.startsWith('CUSTOM_')) return undefined
-  const minor = getCustomMinorImprovement(id)
-  if (minor) return customCardToMeta(minor, 'minor')
-  const occupation = getCustomOccupation(id)
-  if (occupation) return customCardToMeta(occupation, 'occupation')
-  return undefined
+  const custom = getCustomCardMetadata(id)
+  return custom ? customCardToMeta(custom) : undefined
 }
 
 /**
