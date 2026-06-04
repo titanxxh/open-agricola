@@ -38,6 +38,9 @@ jobs:
       - name: Check effects file list
         run: pnpm run check:effects-file-list
 
+      - name: Check generated card catalog sync
+        run: pnpm run check:generated-cards-sync
+
       - name: Build (includes cards manifest)
         run: pnpm run build
 
