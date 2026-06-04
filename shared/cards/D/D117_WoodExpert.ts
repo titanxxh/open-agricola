@@ -46,8 +46,8 @@ const computeCostsListener: CardListenerRegistration = {
 export const D117_WoodExpert_impl = {
   listeners: [computeCostsListener],
   effect: {
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
-},
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
