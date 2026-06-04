@@ -1,9 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getMinorImprovementCard } from '../catalog'
-import { getMajorCard } from '../major'
-import { isMajorCardId } from '../helpers/card-type'
+import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
 import type { CardImpl } from '../registry'
 import { D117_WoodExpert } from '../../cards-display/D/D117_WoodExpert'
 
@@ -22,26 +20,6 @@ const CARD_ID = D117_WoodExpert.id
  * apply { wood: -2, food: 1 } discount.
  */
 
-const getImprovementWoodCost = (cardId: string): number => {
-  const minor = getMinorImprovementCard(cardId)
-  if (minor) {
-    const cost = minor.cost as { wood?: number } | undefined
-    if (cost?.wood && cost.wood > 0) return cost.wood
-    if (minor.altCosts) {
-      return Math.max(0, ...minor.altCosts.map((c) => c.wood ?? 0))
-    }
-    return 0
-  }
-  if (isMajorCardId(cardId)) {
-    const major = getMajorCard(cardId)
-    if (major) {
-      const costs = Array.isArray(major.cost) ? major.cost : [major.cost ?? {}]
-      return costs.reduce((m, c) => Math.max(m, (c as Record<string, number>).wood ?? 0), 0)
-    }
-  }
-  return 0
-}
-
 const computeCostsListener: CardListenerRegistration = {
   id: 'D117-wood-expert-compute-costs-improvement',
   cardIds: [CARD_ID],
@@ -49,7 +27,7 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.cardId) return
-    const woodInCost = getImprovementWoodCost(context.cardId)
+    const woodInCost = getPrintedImprovementResourceCost(context.cardId, 'wood')
     if (woodInCost <= 0) return
     return {
       trades: [

@@ -1,10 +1,7 @@
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getMajorCard } from '../major'
-import { isMajorCardId } from '../helpers/card-type'
-import { PaymentSolver } from '../../actions/payment'
+import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
 import type { CardImpl } from '../registry'
 import { E156_ClaypitOwner } from '../../cards-display/E/E156_ClaypitOwner'
 
@@ -22,29 +19,8 @@ const CARD_ID = E156_ClaypitOwner.id
  * Players 4+.
  */
 
-const hasPrintedClayCost = (cardId: string): boolean => {
-  if (isMajorCardId(cardId)) {
-    const major = getMajorCard(cardId)
-    if (major?.cost) {
-      const cost = major.cost
-      if (PaymentSolver.isComplexCost(cost)) {
-        return (cost.fees ?? []).some((fee) => (fee.clay ?? 0) > 0)
-          || (cost.fee ? (cost.fee.clay ?? 0) > 0 : false)
-      }
-      return (cost.clay ?? 0) > 0
-    }
-    return false
-  }
-
-  // Check minor improvements
-  const minor = getRegisteredMinorImprovement(cardId)
-  if (minor?.cost) {
-    const cost = minor.cost as { clay?: number }
-    return (cost.clay ?? 0) > 0
-  }
-
-  return false
-}
+const hasPrintedClayCost = (cardId: string): boolean =>
+  getPrintedImprovementResourceCost(cardId, 'clay') > 0
 
 const getBuiltCardId = (choice: string | undefined): string | undefined => {
   if (!choice) return undefined

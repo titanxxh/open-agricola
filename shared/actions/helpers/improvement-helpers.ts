@@ -1,4 +1,4 @@
-import type { ComplexCost, GameState, PaymentResourceMap, PlayerState } from '../../contract/types'
+import type { ComplexCost, GameState, PaymentResourceMap, PlayerState, ResourceKey } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { PaymentSolver } from '../payment'
@@ -96,6 +96,31 @@ export const getMinorImprovementBaseCost = (
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
   return { ...improvement.cost }
+}
+
+const readBaseCostCandidates = (
+  cost: PaymentResourceMap | ComplexCost | null | undefined,
+): PaymentResourceMap[] => {
+  if (!cost) return []
+  if (PaymentSolver.isComplexCost(cost)) {
+    if (cost.fees && cost.fees.length > 0) return cost.fees
+    return cost.fee ? [cost.fee] : []
+  }
+  return [cost]
+}
+
+export const getPrintedImprovementResourceCost = (
+  improvementId: string,
+  resource: ResourceKey,
+): number => {
+  const minor = getMinorImprovement(improvementId)
+  const candidates = minor
+    ? [
+        ...readBaseCostCandidates(minor.cost),
+        ...(minor.altCosts ?? []),
+      ]
+    : readBaseCostCandidates(getMajorCard(improvementId)?.cost)
+  return Math.max(0, ...candidates.map((cost) => cost[resource] ?? 0))
 }
 
 export const getMinorImprovementEffectiveCost = (
