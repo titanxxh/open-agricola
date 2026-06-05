@@ -14,9 +14,6 @@ const CARD_ID = 'D117_WoodExpert'
  * BGA: onBuy → gain 2 wood.
  * onPlayerComputeCardCosts → for major/minor improvements with wood in cost,
  *   adds an alternative trade: -2 wood (capped to actual wood cost) +1 food.
- *
- * Simplified: When an improvement being bought has wood in its cost,
- * apply { wood: -2, food: 1 } discount.
  */
 
 const computeCostsListener: CardListenerRegistration = {
@@ -29,13 +26,22 @@ const computeCostsListener: CardListenerRegistration = {
     const woodInCost = getPrintedImprovementResourceCost(context.cardId, 'wood')
     if (woodInCost <= 0) return
     return {
-      trades: [
+      candidateDerivers: [
         {
-          from: { food: 1 },
-          to: { wood: 2 },
-          max: 1,
-          source: CARD_ID,
-          sourceId: CARD_ID,
+          id: `${CARD_ID}:wood-expert-cost-deriver`,
+          sourceCardId: CARD_ID,
+          derive(candidate) {
+            const wood = candidate.cost.wood ?? 0
+            if (wood <= 0) return []
+            const reducedWood = wood - Math.min(2, wood)
+            return [{
+              cost: {
+                ...candidate.cost,
+                wood: reducedWood,
+                food: (candidate.cost.food ?? 0) + 1,
+              },
+            }]
+          },
         },
       ],
     }

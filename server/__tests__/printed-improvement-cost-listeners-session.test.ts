@@ -145,7 +145,7 @@ describe('printed improvement cost listeners', () => {
     })
   })
 
-  it('D117 discounts improvements with wood only in minor altCosts', () => {
+  it('D117 derives candidate costs for improvements with wood in minor altCosts', () => {
     const player = makePlayer('p1')
     player.occupationPlayed = ['D117_WoodExpert']
     const result = executeCardListener(findListener('D117-wood-expert-compute-costs-improvement'), {
@@ -157,13 +157,36 @@ describe('printed improvement cost listeners', () => {
       cardId: 'E30_ChildsToy',
     } as CardListenerContext)
 
-    expect(result?.trades).toEqual([
-      expect.objectContaining({
-        from: { food: 1 },
-        to: { wood: 2 },
-        max: 1,
-        source: 'D117_WoodExpert',
-      }),
-    ])
+    expect(result?.candidateDerivers).toHaveLength(1)
+    const deriver = result?.candidateDerivers?.[0]
+    expect(deriver).toMatchObject({
+      id: 'D117_WoodExpert:wood-expert-cost-deriver',
+      sourceCardId: 'D117_WoodExpert',
+    })
+    expect(deriver?.derive({
+      cost: { wood: 1 },
+      metadata: { sourceCards: [] },
+      applied: new Set(),
+    }, {
+      actionId: 'improvement',
+      targetCardId: 'E30_ChildsToy',
+      targetPlayKind: 'minor',
+      targetCardTypes: ['minor'],
+    })).toEqual([{ cost: { wood: 0, food: 1 } }])
+  })
+
+  it('D117 does not derive candidate costs for improvements without wood', () => {
+    const player = makePlayer('p1')
+    player.occupationPlayed = ['D117_WoodExpert']
+    const result = executeCardListener(findListener('D117-wood-expert-compute-costs-improvement'), {
+      state: makeState([player]),
+      player,
+      space,
+      actionId: 'improvement',
+      phase: 'computeCosts',
+      cardId: 'Major_Basket',
+    } as CardListenerContext)
+
+    expect(result).toBeUndefined()
   })
 })
