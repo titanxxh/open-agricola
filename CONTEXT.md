@@ -116,6 +116,18 @@ _Avoid_: 每张卡手写支付分支
 一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
 _Avoid_: Trade、资源兑换、支付替换器
 
+**Cost Candidate Deriver（成本候选派生器）**:
+基于已有成本候选行追加零到多条新成本候选行的卡牌能力，例如“含 wood 的候选可派生为最多少付 2 wood 且多付 1 food”。它只产生新的可选成本，不表示资源兑换，也不强制删除原候选。派生候选可带 `metadata.sourceCards` 供 UI/日志展示来源，但该 metadata 不是规则维度。
+_Avoid_: Cost Modifier、TradeModifier、BonusModifier
+
+**Target Play Kind（目标打出路径类型）**:
+一次 improvement 支付实际走的 major/minor 打出路径，例如 major payment path 或 minor payment path。它来自最终选择的支付路径，不来自行动入口声明。它不是卡牌完整身份；双类型 minor 仍可能通过 minor 路径打出。
+_Avoid_: Card Type Set、卡牌身份集合
+
+**Card Type Set（卡牌身份集合）**:
+一张卡在规则上算作的所有类型。普通 major 是 `{major}`，普通 minor 是 `{minor}`，双类型 minor 可以同时算作 `{minor, major}`。在 cost candidate deriver 的 improvement 上下文中，第一版只包含 `major` / `minor`；非 improvement 类型不进入集合。列表顺序固定为 primary type 在前，`alsoCountsAs` 后续按定义顺序追加并去重；顺序只服务稳定展示/测试，不表示规则优先级。
+_Avoid_: Target Play Kind、支付路径类型
+
 **Scoring Reserve**:
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
 _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减

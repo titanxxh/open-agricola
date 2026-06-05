@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-06-04。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-05。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -24,7 +24,11 @@
 
 BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；OA 路径默认相对本仓库。
 
-当前没有开放的问题优先条目。
+当前开放跟踪项：
+
+| Issue | 范围 | 状态 |
+|---|---|---|
+| #258 `Audit legacy computeCosts cost-candidate cards after D117 deriver migration` | 审计旧 `computeCosts` 卡牌里的 `costs` / `bonuses` / `trades` 语义；确认 candidate-transform 后再逐卡迁移到 Cost Candidate Deriver | 已创建，`ready-for-agent` |
 
 ## 3. 已接受差异
 
@@ -74,7 +78,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `D91_Plowman` | 29 | 51 | 1.76 | 原因：购买时按 +4/+7/+10 轮排多个 future plow opportunity，round start 再可选付 food plow。基础设施状态：future meeple、round-start hook、pay+plow flow 已可表达；不是开放债。 |
 | `A130_MummysBoy` | 57 | 99 | 1.74 | 原因：每轮一次，追踪第 2 个工人的行动格，并在第 3 个及以后放人时注入 occupied choice 和 flag。基础设施状态：round placement helper、occupied choice prefix、card flag 已在 main；不是开放债。 |
 | `A19_Handplow` | 26 | 45 | 1.73 | 原因：购买后排一个未来回合 optional plow，并在触发后清 card state。基础设施状态：future meeple 与 round-start hook 已可表达；不是开放债。 |
-| `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：要从 major/minor/altCosts 读取 printed wood cost，再注入 food→wood trade。基础设施状态：#242 已抽 `getPrintedImprovementResourceCost()`；D117 当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 由 #239 跟踪。 |
+| `D117_WoodExpert` | 42 | 72 | 1.71 | 原因：BGA 把 `costs.trades` 当费用候选行追加，OA 需要用 Cost Candidate Deriver 表达“保留原候选 + 追加最多 -2 wood +1 food 候选”，并覆盖 major/minor/altCosts 与 payment option 来源显示。基础设施状态：Cost Candidate Deriver DFS closure 已建立，D117 不再使用 OA `Trade` 模拟费用候选。 |
 | `C41_FarmStore` | 47 | 80 | 1.70 | 原因：收获喂食后 7 种 pay 1 food 换资源组合逐一写成 XOR children。基础设施状态：harvest phase hook、pay/gain flow 已可表达；#241 已改为卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `E155_Visionary` | 28 | 46 | 1.64 | 原因：购买早期奖励加 family-growth isDoable gate，需要比较其他玩家 family size 与 round。基础设施状态：`isDoable.family-growth` 与 `familySize()` 已在 main；不是开放债。 |
 | `C162_ForestOwner` | 44 | 72 | 1.64 | 原因：注册所有人可用的 player action space，owner/非 owner 资源与 owner 分成事件不同。基础设施状态：`player-action-space` 与 `resource.moved` eventSink 已可表达；不是开放债。 |
@@ -111,8 +115,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice` | 新增交互必须显式暴露 command / options 并由后端校验；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
-| 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。 |
-| Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/D117/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
+| 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`costCandidateSourceCards`、`PaymentSolution.sourceCards`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。Cost Candidate Deriver 来源只服务支付选项 / 日志展示，不作为后续规则条件。 |
+| Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。D117 已改为只看当前 Cost Candidate，不再读 printed/base cost。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
 | 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
@@ -1033,7 +1037,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D114_SeedTrader` | 已对齐 |  |
 | `D115_FodderPlanter` | 已对齐 |  |
 | `D116_TreeInspector` | 已对齐 |  |
-| `D117_WoodExpert` | 已对齐 | wood printed/base cost 读取改用 `getPrintedImprovementResourceCost(..., 'wood')`，继续支持 minor `altCosts` 中含 wood 的候选；当前仍保留 OA 简化 trade 表达，BGA-style computeCosts trade-list transformation 留给 #239。 |
+| `D117_WoodExpert` | 已对齐 | `computeCosts.improvement` 返回 Cost Candidate Deriver，DFS 对每条含 wood 的 candidate 追加“最多少付 2 wood，多付 1 food”候选并保留原候选；支持 major、minor、minor `altCosts`，也能继续作用于其它 deriver 先生成的含 wood candidate。支付选项通过 `sourceCards` 显示来源。 |
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
