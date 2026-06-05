@@ -175,7 +175,7 @@ describe('printed improvement cost listeners', () => {
     })).toEqual([{ cost: { wood: 0, food: 1 } }])
   })
 
-  it('D117 does not derive candidate costs for improvements without wood', () => {
+  it('D117 deriver is inert for candidates without wood', () => {
     const player = makePlayer('p1')
     player.occupationPlayed = ['D117_WoodExpert']
     const result = executeCardListener(findListener('D117-wood-expert-compute-costs-improvement'), {
@@ -187,6 +187,16 @@ describe('printed improvement cost listeners', () => {
       cardId: 'Major_Basket',
     } as CardListenerContext)
 
-    expect(result).toBeUndefined()
+    const deriver = result?.candidateDerivers?.[0]
+    expect(deriver?.derive({
+      cost: { reed: 2 },
+      metadata: { sourceCards: [] },
+      applied: new Set(),
+    }, {
+      actionId: 'improvement',
+      targetCardId: 'Major_Basket',
+      targetPlayKind: 'major',
+      targetCardTypes: ['major'],
+    })).toEqual([])
   })
 })
