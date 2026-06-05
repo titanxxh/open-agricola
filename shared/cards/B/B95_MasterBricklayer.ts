@@ -17,12 +17,21 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only applies to major improvements
     const cardId = context.cardId
     if (!cardId || !isMajorCardId(cardId)) return
     const nbNewRooms = (context.player.rooms ?? 2) - 2
     if (nbNewRooms <= 0) return
-    return { costs: { stone: -nbNewRooms } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:master-bricklayer-stone-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const stone = candidate.cost.stone ?? 0
+          if (stone <= 0) return []
+          return [{ cost: { ...candidate.cost, stone: Math.max(0, stone - nbNewRooms) } }]
+        },
+      }],
+    }
   },
 }
 

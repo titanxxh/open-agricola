@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { PaymentResourceMap } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D95_SiteManager'
@@ -11,19 +12,7 @@ const CARD_ID = 'D95_SiteManager'
  * MAJOR improvement. When paying its cost, you can replace up to 1 building
  * resource of each type with 1 FOOD each.
  *
- * We express the "up to 1 of each of {wood, clay, stone, reed} → 1 food"
- * substitution as four independent, optional `Bonus` entries emitted from the
- * `computeCosts` hook. The shared bonus expander (`computeAllBuyableCombinations`
- * + `applyOptionalBonus`) then multiplies them out into 2^4 fee variants,
- * `keepOnlyOptimals` prunes Pareto-dominated ones (e.g. "swap stone" on a
- * cost with no stone), and `buildPaymentChoiceResult` surfaces the survivors
- * as a `prompt.selectPayment` choice. The existing `sourceCards` attribution
- * thread then shows "via Site Manager" on each assisted option.
- *
- * BGA also declares `orderComputeCardCosts` (D95 before A143 / C27 / B95).
- * We intentionally do NOT implement listener ordering: our bonus expander
- * unions all orderings via Pareto-optimal enumeration, which is a strict
- * superset of any single ordering's output.
+ * Candidate deriver mirrors BGA's appended replacement trades.
  */
 const onBuyListener: CardListenerRegistration = {
   id: 'D95-site-manager-onbuy',
@@ -48,6 +37,37 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
+const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
+
+const deriveFoodReplacements = (cost: PaymentResourceMap): PaymentResourceMap[] => {
+  const result: PaymentResourceMap[] = []
+  const seen = new Set<string>()
+  for (let mask = 1; mask < (1 << BUILDING_RESOURCES.length); mask++) {
+    const next: PaymentResourceMap = { ...cost }
+    let changed = false
+    for (let index = 0; index < BUILDING_RESOURCES.length; index++) {
+      if ((mask & (1 << index)) === 0) continue
+      const resource = BUILDING_RESOURCES[index]!
+      const amount = next[resource] ?? 0
+      if (amount <= 0) continue
+      changed = true
+      const reduced = amount - 1
+      if (reduced > 0) {
+        next[resource] = reduced
+      } else {
+        delete next[resource]
+      }
+      next.food = (next.food ?? 0) + 1
+    }
+    if (!changed) continue
+    const key = JSON.stringify(Object.entries(next).sort(([left], [right]) => left.localeCompare(right)))
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(next)
+  }
+  return result
+}
+
 const computeCostsListener: CardListenerRegistration = {
   id: 'D95-site-manager-compute-costs',
   cardIds: [CARD_ID],
@@ -57,12 +77,11 @@ const computeCostsListener: CardListenerRegistration = {
     if (context.actionCardId !== CARD_ID) return
     if (!context.cardId) return
     return {
-      bonuses: [
-        { optional: true, discount: { wood: 1, food: -1 }, sources: [CARD_ID] },
-        { optional: true, discount: { clay: 1, food: -1 }, sources: [CARD_ID] },
-        { optional: true, discount: { stone: 1, food: -1 }, sources: [CARD_ID] },
-        { optional: true, discount: { reed: 1, food: -1 }, sources: [CARD_ID] },
-      ],
+      candidateDerivers: [{
+        id: `${CARD_ID}:building-resource-food-replacements`,
+        sourceCardId: CARD_ID,
+        derive: (candidate) => deriveFoodReplacements(candidate.cost).map((cost) => ({ cost })),
+      }],
     }
   },
 }

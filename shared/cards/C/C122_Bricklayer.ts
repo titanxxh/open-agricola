@@ -20,7 +20,17 @@ const improvementCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { clay: -1 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:bricklayer-clay-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const clay = candidate.cost.clay ?? 0
+          if (clay <= 0) return []
+          return [{ cost: { ...candidate.cost, clay: Math.max(0, clay - 1) } }]
+        },
+      }],
+    }
   },
 }
 

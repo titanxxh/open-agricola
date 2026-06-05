@@ -32,8 +32,13 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== 'Major_Basket') return
-    // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.
-    return { costs: { stone: -1, reed: -1 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:basket-fixed-price`,
+        sourceCardId: CARD_ID,
+        derive: () => [{ cost: { stone: 1, reed: 1 } }],
+      }],
+    }
   },
 }
 

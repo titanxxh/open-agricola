@@ -48,8 +48,17 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
-    // Reduce wood cost by 1 (the improvement doesn't need to cost any wood per BGA ruling)
-    return { costs: { wood: -1 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:furnisher-wood-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const wood = candidate.cost.wood ?? 0
+          if (wood <= 0) return []
+          return [{ cost: { ...candidate.cost, wood: Math.max(0, wood - 1) } }]
+        },
+      }],
+    }
   },
 }
 

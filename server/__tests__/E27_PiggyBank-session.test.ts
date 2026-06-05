@@ -144,7 +144,7 @@ describe('E27_PiggyBank session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('computeCosts listener zeroes costs when card is flagged', () => {
+  it('computeCosts listener derives a free major candidate when card is flagged', () => {
     const listeners = getRegisteredCardListeners()
     const costListener = listeners.find((l) => l.id === 'E27-piggy-bank-compute-costs')
     expect(costListener).toBeDefined()
@@ -169,8 +169,19 @@ describe('E27_PiggyBank session', () => {
 
     const result = executeCardListener(costListener!, context)
     expect(result).toBeDefined()
-    expect(result!.costs).toBeDefined()
-    expect(result!.costs!.wood).toBe(-99)
+    expect(result!.candidateDerivers).toHaveLength(1)
+    const deriver = result!.candidateDerivers![0]!
+    expect(deriver.sourceCardId).toBe(CARD_ID)
+    expect(deriver.derive({
+      cost: { wood: 2, stone: 2 },
+      metadata: { sourceCards: [] },
+      applied: new Set(),
+    }, {
+      actionId: 'improvement',
+      targetCardId: 'Major_Joinery',
+      targetPlayKind: 'major',
+      targetCardTypes: ['major'],
+    })).toEqual([{ cost: {} }])
   })
 
   it('computeCosts listener returns nothing when card is not flagged', () => {

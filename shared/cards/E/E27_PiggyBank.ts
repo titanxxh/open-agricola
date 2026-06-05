@@ -91,8 +91,15 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
-    // When flagged, the improvement is free — zero out all costs
-    return { costs: { wood: -99, clay: -99, reed: -99, stone: -99, food: -99 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:free-major-candidate`,
+        sourceCardId: CARD_ID,
+        derive: (_candidate, target) => target.targetCardTypes.includes('major')
+          ? [{ cost: {} }]
+          : [],
+      }],
+    }
   },
 }
 

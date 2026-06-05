@@ -30,6 +30,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|
 | #258 `Audit legacy computeCosts cost-candidate cards after D117 deriver migration` | 审计旧 `computeCosts` 卡牌里的 `costs` / `bonuses` / `trades` 语义；确认 candidate-transform 后再逐卡迁移到 Cost Candidate Deriver | 已创建，`ready-for-agent` |
 | #262 `Audit and migrate non-improvement computeCosts deltas` | 审计 construct / renovation / fence / plow / stables 以及 D82/E123 非 improvement computeCosts；candidate-transform 迁到 Cost Candidate Deriver，强制 delta 保留 `costs` | 本分支已完成审计与最小迁移，等待 #258 最终 PR 汇总 |
+| #261 `Audit and migrate improvement computeCosts cost-candidate cards` | improvement 支付切片已按 BGA PHP 分类；candidate-transform 卡迁移到 `candidateDerivers`，mandatory delta / optional bonus / true substitution 保留原机制 | 本分支已完成审计与最小迁移，等待 #258 最终 PR 汇总 |
 
 ## 3. 已接受差异
 
@@ -401,14 +402,14 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A17_ReclamationPlow` | 已对齐 |  |
 | `A18_WheelPlow` | 已对齐 |  |
 | `A19_Handplow` | 已对齐 |  |
-| `A20_DoubleTurnPlow` | 已对齐 |  |
+| `A20_DoubleTurnPlow` | 已对齐 | #261 分类：mandatory delta / dynamic base cost。BGA `getBaseCosts()` 在 round > 3 增加 1 food；OA 保留 card-scoped `computeCosts.improvement`。 |
 | `A21_FamilyFriendHome` | 已对齐 |  |
 | `A22_Telegram` | 已对齐 | turn-start optional extraPlacement 的 skip/use session 路径已覆盖，行为等价于 BGA flag 后并入放人选择 |
 | `A23_StoneCompany` | 已对齐 |  |
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
 | `A26_SleepingCorner` | 已对齐 |  |
-| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。 |
+| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。#261 分类：mandatory fixed-price delta，保留 source-card scoped `costs`。 |
 | `A28_ForestSchool` | 已对齐 |  |
 | `A29_AleBenches` | 已对齐 |  |
 | `A30_BakingSheet` | 已对齐 |  |
@@ -456,7 +457,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A72_CalciumFertilizers` | 已对齐 |  |
 | `A73_AgriculturalFertilizers` | 已对齐 |  |
 | `A74_StableTree` | 已对齐 |  |
-| `A75_LumberMill` | 已对齐 |  |
+| `A75_LumberMill` | 已对齐 | #261 分类：mandatory delta。BGA 使用 `Utils::addBonus(... [WOOD => -1])`，OA 保留 `computeCosts.improvement` 的 `costs.wood=-1`。 |
 | `A76_Cob` | 已对齐 |  |
 | `A77_Hod` | 已对齐 |  |
 | `A78_Canoe` | 已对齐 |  |
@@ -524,7 +525,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A140_ShovelBearer` | 已对齐 |  |
 | `A141_TurnipFarmer` | 已对齐 |  |
 | `A142_Cordmaker` | 已对齐 |  |
-| `A143_Stonecutter` | 已对齐 |  |
+| `A143_Stonecutter` | 已对齐 | #261 分类：candidate transform。BGA 遍历 `costs.trades` 追加 -1 stone candidate；OA 已迁移为 `candidateDerivers`。 |
 | `A144_Sequestrator` | 已对齐 |  |
 | `A145_Ropemaker` | 已对齐 |  |
 | `A146_StorehouseSteward` | 已对齐 |  |
@@ -597,7 +598,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
 | `B34_SpecialFood` | 已对齐 | 行动格动物 provenance 已收敛到 `sumActionSpaceMovedToTriggerPlayer()`；保留动物检查改用 assigned animal 口径，bonus VP 只记一次并在牌面显示累计值 |
 | `B35_HookKnife` | 已对齐 |  |
-| `B36_Bottles` | 已对齐 |  |
+| `B36_Bottles` | 已对齐 | #261 分类：mandatory delta / dynamic base cost。BGA `getBaseCosts()` 按 family size 生成 clay+food；OA 保留 card-scoped `computeCosts.improvement` 加总动态费用。 |
 | `B37_Grange` | 已对齐 |  |
 | `B38_FutureBuildingSite` | 已对齐 |  |
 | `B39_Loom` | 已对齐 |  |
@@ -656,7 +657,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B92_LittleStickKnitter` | 已对齐 |  |
 | `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按可选 occupation 支付方案过滤，并通过 `reserveResources` 要求职业支付后仍有最低 2 个真实 food 支付 future schedule；`isDoable.lessons*` 在 B93 是唯一且不可支付的职业时 veto lessons action space，避免占格后无职业可打；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
 | `B94_StockProtector` | 已对齐 |  |
-| `B95_MasterBricklayer` | 已对齐 |  |
+| `B95_MasterBricklayer` | 已对齐 | #261 分类：candidate transform。BGA 对 major improvement 的含 stone trade 追加按扩建房间数减 stone 的候选；OA 已迁移为 `candidateDerivers`。 |
 | `B96_TreeFarmJoiner` | 已对齐 |  |
 | `B97_Scholar` | 已对齐 |  |
 | `B98_OrganicFarmer` | 已对齐 |  |
@@ -768,7 +769,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C24_BedintheGrainField` | 已对齐 | 下一次 harvest 有空房时提供 optional `family-growth`，skip/accept 后都清理一次性 marker；无空房也消费 marker |
 | `C25_SteamMachine` | 已对齐 | 最后一个普通工人使用 accumulation space 后返回 `SEQ[optional bake-bread, special-effect.consume-pending-extra-turns]`；消费步骤走通用 pending extra-turn 聚合，不引用 A92。无 pending/不可支付时 silent no-op；有多个 pending opportunity 时全部写入 `_extraTurnConsumedCount`，并只在实际消费时由 C25 发 `card.triggered`。Card-sourced follow-up leaf 通过 `sourceCard` 守卫避免 immediatelyAfter 自触发循环，也不把卡牌额外放人当作“普通工人最后行动”。 |
 | `C26_Flail` | 已对齐 |  |
-| `C27_Blueprint` | 已对齐 | 三张 workshop major 保留原支付 trade，并追加 Blueprint 折扣 trade；minor-improvement 入口维持 listener 模式 |
+| `C27_Blueprint` | 已对齐 | #261 分类：optional bonus / preserveOriginal。三张 workshop major 保留原支付路径并追加 Blueprint stone 折扣路径；OA 保留 `bonuses` + `preserveOriginal`，minor-improvement 入口维持 listener 模式。 |
 | `C28_TeachersDesk` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C29_BeerTable` | 已对齐 |  |
 | `C30_HalfTimberedHouse` | 已对齐 |  |
@@ -836,7 +837,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C92_AutumnMother` | 已对齐 |  |
 | `C93_InnerDistrictsDirector` | 已对齐 | 放 stone 与可选额外放人已作为整段 optional，skip 不再强制放 stone |
 | `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
-| `C95_BasketWeaver` | 已对齐 |  |
+| `C95_BasketWeaver` | 已对齐 | #261 分类：candidate transform。BGA flagged onBuy 对 Major_Basket 追加固定 1 stone + 1 reed candidate；OA 已迁移为 source-card scoped `candidateDerivers`。 |
 | `C96_Merchant` | 已对齐 |  |
 | `C97_SeedResearcher` | 已对齐 |  |
 | `C98_CubeCutter` | 已对齐 |  |
@@ -863,7 +864,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C119_SkillfulRenovator` | 已对齐 |  |
 | `C120_AgriculturalLabourer` | 已对齐 | gain/receive/reap/exchange 转换 grain 均触发从卡上取 clay 的路径 |
 | `C121_ClayKneader` | 已对齐 |  |
-| `C122_Bricklayer` | 已对齐 |  |
+| `C122_Bricklayer` | 已对齐 | #261 分类：candidate transform（improvement）；construct / renovation 仍是 mandatory bonus/delta。BGA 对 improvement 含 clay trade 追加 -1 clay candidate；OA improvement listener 已迁移为 `candidateDerivers`。 |
 | `C123_Freemason` | 已对齐 |  |
 | `C124_StoneImporter` | 已对齐 |  |
 | `C125_Nightworker` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -1003,7 +1004,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D79_CarrotMuseum` | 已对齐 |  |
 | `D80_BrickHammer` | 已对齐 | after-improvement 判断改用 `getPrintedImprovementResourceCost(..., 'clay')`；`cost` 与 `altCosts` 是 base cost 候选，取最大 clay，不再把 minor `cost.clay` 与 `altCosts[].clay` 相加。 |
 | `D81_RoofLadder` | 已对齐 | #262：BGA renovation reed discount 是 bonus，不是 mandatory total delta；已从 raw `costs` 迁到 `bonuses`。 |
-| `D82_HuntingTrophy` | 已对齐 | #262：非 improvement 的 farm/house redevelopment fence 部分是 mandatory delta；保留 `computeCosts.fence` 的 `costs`。 |
+| `D82_HuntingTrophy` | 已对齐 | #261/#262 分类：bonus/choice discount（improvement）+ mandatory fence delta（fence）。House Redevelopment improvement 保留 4 选 1 building-resource bonus；Farm Redevelopment fence 保留 `costs.wood=-3` 与 isDoable gate。 |
 | `D83_Pigswill` | 已对齐 |  |
 | `D84_FeedPellets` | 已对齐 |  |
 | `D85_Reader` | 已对齐 |  |
@@ -1016,8 +1017,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D92_ChildOmbudsman` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D93_SheepInspector` | 已对齐 |  |
 | `D94_HenpeckedHusband` | 已对齐 |  |
-| `D95_SiteManager` | 已对齐 |  |
-| `D96_Furnisher` | 已对齐 |  |
+| `D95_SiteManager` | 已对齐 | #261 分类：candidate transform / true food substitution。BGA 对当前 candidate 追加“每类 building resource 最多 1 个换 1 food”的组合候选；OA 已迁移为 `candidateDerivers`，支付仍扣真实 food。 |
+| `D96_Furnisher` | 已对齐 | #261 分类：candidate transform。BGA 对 Furnisher 后续 improvement 的含 wood trade 追加 -1 wood candidate；OA 已迁移为 source-card scoped `candidateDerivers`。 |
 | `D97_BeggingStudent` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D98_Transactor` | 已对齐 |  |
 | `D99_EarthenwarePotter` | 已对齐 |  |
@@ -1128,7 +1129,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E24_Ambition` | 已对齐 |  |
 | `E25_BumperCrop` | 已对齐 | onBuy 走 `private-field-phase`；`2 Grain Fields` 前置同时计入普通 grain field 与带 grain 的 Card Field |
 | `E26_Sundial` | 已对齐 |  |
-| `E27_PiggyBank` | 已对齐 |  |
+| `E27_PiggyBank` | 已对齐 | #261 分类：blocking/sentinel hack replacement → candidate transform。BGA flagged free major 追加空 cost candidate；OA 已移除 broad `-99` costs，改为 flagged major-only free `candidateDerivers`。 |
 | `E28_Bookmark` | 已对齐 |  |
 | `E29_Heirloom` | 已对齐 |  |
 | `E30_ChildsToy` | 已对齐 |  |
@@ -1210,7 +1211,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E106_EmergencySeller` | 已对齐 |  |
 | `E107_LandSurveyor` | 已对齐 |  |
 | `E108_BlackberryFarmer` | 已对齐 |  |
-| `E109_BraidMaker` | 已对齐 |  |
+| `E109_BraidMaker` | 已对齐 | #261 分类：candidate transform。BGA 对 Major_Basket 追加固定 1 stone + 1 reed candidate；OA 已迁移为 `candidateDerivers`，harvest reed→food exchange 不变。 |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
 | `E112_GrainThief` | 已对齐 | start 选择 grain fields；reap 通过 Harvest Count modifier 写入 `supply-instead-of-field` tag，end field phase 只读 `harvestCountApplications`，带 `full-field-reap` tag 的同田不补 grain；D72 额外 count 可在 E112 供应堆替代 top grain 后继续收下一层 crop；同时注册 selection threshold modifier，把 A112/D72 的 grain field 门槛降为 1；end harvest 清理 selectedPositions |
@@ -1224,14 +1225,14 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 已对齐 | #262：非 improvement construct / renovation `useTopK` 是 optional bonus，不是 candidate transform；engine 现在把完整 `costHookResults` 传给 construct / renovation payment，after-pay 继续读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径。 |
+| `E123_ResourceHoarder` | 已对齐 | #261/#262 分类：optional bonus / choose top-k；BGA `addBonusChoices(... optional=true)`，不是 candidate transform。engine 现在把完整 `costHookResults` 传给 construct / renovation payment；after-pay 继续读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径。 |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |
 | `E127_DiligentFarmer` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `E128_Saddler` | 已对齐 |  |
 | `E129_Imitator` | 已对齐 |  |
-| `E130_Overachiever` | 已对齐 |  |
+| `E130_Overachiever` | 已对齐 | #261 分类：bonus/choice discount。BGA Wish for Children follow-up improvement 走 `addBonusChoices` 减 1 个所选资源；OA 保留 `bonuses` 路径，不迁移 candidateDeriver。 |
 | `E131_MarketMaster` | 已对齐 |  |
 | `E132_VeggieLover` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `E133_ChampionBreeder` | 已对齐 |  |

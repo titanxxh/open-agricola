@@ -120,7 +120,7 @@ describe('D96_Furnisher', () => {
     expect(result).toBeUndefined()
   })
 
-  it('computeCosts reduces wood by 1 when actionCardId is D96_Furnisher', () => {
+  it('computeCosts derives a wood-discount candidate when actionCardId is D96_Furnisher', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -132,7 +132,20 @@ describe('D96_Furnisher', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ wood: -1 })
+    expect(result!.candidateDerivers).toHaveLength(1)
+    const deriver = result!.candidateDerivers![0]!
+    expect(deriver.sourceCardId).toBe(CARD_ID)
+    expect(deriver.derive({
+      cost: { wood: 2, stone: 1 },
+      metadata: { sourceCards: [] },
+      applied: new Set(),
+    }, {
+      actionId: 'improvement',
+      targetCardId: 'Major_Joinery',
+      targetPlayKind: 'major',
+      targetCardTypes: ['major'],
+      actionCardId: CARD_ID,
+    })).toEqual([{ cost: { wood: 1, stone: 1 } }])
   })
 
   it('computeCosts does not apply when actionCardId is different', () => {
