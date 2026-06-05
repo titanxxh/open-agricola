@@ -1241,11 +1241,13 @@ describe('InteractionBar', () => {
           labelParams: {
             resourcesPaid: { wood: 2 },
             cardUsed: 'Major_ClayOven',
+            sourceCards: ['D117_WoodExpert'],
           },
           effectPreview: {
             kind: 'payment',
             resourcesPaid: { wood: 2 },
             cardUsed: 'Major_ClayOven',
+            sourceCards: ['D117_WoodExpert'],
           },
         },
       ],
@@ -1300,6 +1302,8 @@ describe('InteractionBar', () => {
     expect(html).toContain('data-resource=\"wood\"')
     expect(html).toContain('Return')
     expect(html).toContain('Clay Oven')
+    expect(html).toContain('via')
+    expect(html).toContain('Wood Expert')
   })
 
   it('renders recursive action descriptions for composite choice options', () => {

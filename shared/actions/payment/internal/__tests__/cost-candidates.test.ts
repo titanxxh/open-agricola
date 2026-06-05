@@ -256,5 +256,16 @@ describe('cost candidate derivation', () => {
       candidate({ wood: 1 }, { feeIndex: 0 }),
       candidate({ clay: 1 }, { feeIndex: 1 }),
     ])
+
+    expect(expandCostCandidates({
+      fees: [{ wood: 1 }, { food: 1 }],
+      costCandidateSourceCards: [[], ['D117_WoodExpert']],
+    })).toEqual([
+      candidate({ wood: 1 }, { feeIndex: 0 }),
+      candidate({ food: 1 }, {
+        feeIndex: 1,
+        metadata: { sourceCards: ['D117_WoodExpert'] },
+      }),
+    ])
   })
 })

@@ -114,9 +114,13 @@ export const executePaymentSolution = (
       }
     }
   }
-  if (solution.bonusUsed && player._activeActionBonusSources) {
+  if (player._activeActionBonusSources) {
     const seen = new Set(player._activeActionBonusSources)
-    for (const source of solution.bonusUsed.split(',')) {
+    const sources = [
+      ...(solution.bonusUsed ? solution.bonusUsed.split(',') : []),
+      ...(solution.sourceCards ?? []),
+    ]
+    for (const source of sources) {
       const trimmed = source.trim()
       if (trimmed && !seen.has(trimmed)) {
         player._activeActionBonusSources.push(trimmed)

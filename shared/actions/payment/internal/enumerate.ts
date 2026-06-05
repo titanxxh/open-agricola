@@ -100,6 +100,11 @@ const hashSolution = (solution: PaymentSolution): number => {
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
   }
+  for (const source of solution.sourceCards ?? []) {
+    for (const ch of source) {
+      h = ((h + ch.charCodeAt(0) * 37) * 31) >>> 0
+    }
+  }
   if (solution.preservedOriginalFor) {
     for (const source of [...solution.preservedOriginalFor].sort()) {
       for (const ch of source) {
@@ -250,6 +255,10 @@ export const sortPaymentSolutions = (
     const leftBonus = left.bonusUsed ?? ''
     const rightBonus = right.bonusUsed ?? ''
     if (leftBonus !== rightBonus) return leftBonus.localeCompare(rightBonus)
+
+    const leftSources = (left.sourceCards ?? []).join(',')
+    const rightSources = (right.sourceCards ?? []).join(',')
+    if (leftSources !== rightSources) return leftSources.localeCompare(rightSources)
 
     const leftCard = left.cardUsed ?? ''
     const rightCard = right.cardUsed ?? ''
@@ -745,6 +754,7 @@ export const computeAllBuyableCombinations = (
         for (const { cost: effectiveCostFee, sources, preservedOriginalFor, choiceIndices } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           if (canCoverCost(tradeCombo.result, realCost) && canPaySupplyTokens(state, player, effectiveCostFee)) {
+            const sourceCards = effectiveCost.costCandidateSourceCards?.[feeIdx]?.filter(Boolean) ?? []
             const remaining = subtractResources(tradeCombo.result, realCost)
             const remainingWithSupplyTokens = {
               ...remaining,
@@ -760,6 +770,7 @@ export const computeAllBuyableCombinations = (
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
+              sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
             })
           }
         }
@@ -789,6 +800,7 @@ export const computeAllBuyableCombinations = (
       preservedOriginalFor: sol.preservedOriginalFor,
       bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
+      sourceCards: sol.sourceCards,
     }
 
     const hash = hashSolution(solution)

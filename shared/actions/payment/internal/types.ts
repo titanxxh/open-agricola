@@ -20,4 +20,5 @@ export type InternalSolution = {
   preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
+  sourceCards?: string[]
 }
