@@ -66,8 +66,12 @@ const normalizeCandidate = (candidate: CostCandidate): CostCandidate => ({
   applied: new Set(candidate.applied),
 })
 
-const costSignature = (cost: PaymentResourceMap): string =>
-  JSON.stringify(Object.entries(normalizeCost(cost)))
+const duplicateSignature = (candidate: CostCandidate): string =>
+  JSON.stringify({
+    cost: Object.entries(normalizeCost(candidate.cost)),
+    feeIndex: candidate.feeIndex ?? null,
+    sourceCards: candidate.metadata.sourceCards,
+  })
 
 const visitedSignature = (candidate: CostCandidate): string =>
   JSON.stringify({
@@ -94,7 +98,9 @@ export const expandCostCandidates = (
     feeIndex?: number,
   ): CostCandidate => ({
     cost: normalizeCost(fee),
-    feeIndex,
+    feeIndex: isComplexCost(cost)
+      ? cost.costCandidateFeeIndices?.[feeIndex ?? 0] ?? feeIndex
+      : feeIndex,
     metadata: {
       sourceCards: isComplexCost(cost)
         ? cost.costCandidateSourceCards?.[feeIndex ?? 0] ?? []
@@ -138,7 +144,7 @@ export const mergeDuplicateCostCandidates = (
   const result: CostCandidate[] = []
   for (const candidate of candidates) {
     const normalized = normalizeCandidate(candidate)
-    const key = costSignature(normalized.cost)
+    const key = duplicateSignature(normalized)
     const existing = merged.get(key)
     if (existing) {
       mergeSourcesInto(existing, normalized)

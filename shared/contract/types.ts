@@ -150,6 +150,7 @@ export type ComplexCost = {
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
   costCandidateSourceCards?: string[][]
+  costCandidateFeeIndices?: number[]
 }
 
 export type PaymentSolution = {

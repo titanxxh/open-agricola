@@ -24,19 +24,19 @@ card purchase 的候选派生采用 DFS/backtracking closure：
 4. 每个 deriver 可返回 0-N 条新候选；返回 0 表示当前候选上不适用。返回多条候选时，每条子分支都标记该 deriver 已应用，防止同一 deriver 在自身派生结果上重复应用。
 5. 原候选永远保留；deriver 只追加候选，不删除原候选。
 6. 派生结果不得包含负 cost。会产生负 cost 时 deriver 必须返回 `[]` 表示当前候选不适用；若实际返回负 cost，框架直接报错，不静默过滤。
-7. DFS 完成后、bonus 枚举前，只合并 normalized cost dimensions 完全相同的 duplicate candidate；candidate 阶段不做 domination / Pareto 剔除。更贵候选仍保留进入后续 payment solver，以对齐 BGA 的候选追加语义。
+7. DFS 完成后、bonus 枚举前，只合并 normalized cost、原始 `feeIndex`、`metadata.sourceCards` 都相同的 duplicate candidate；candidate 阶段不做 domination / Pareto 剔除。更贵候选仍保留进入后续 payment solver，以对齐 BGA 的候选追加语义。
 8. 玩家可见 payment options 仍走 payment solver 的 `keepOnlyOptimals`。这对齐 BGA 的两层模型：`computeAllBuyableCombinations()` 生成候选，`argsPay()` 展示前调用 `keepOnlyOptimals()`。
 9. Deriver 只输出来源卡 provenance。支付选项 UI 复用现有 `sourceCards` 显示，不允许 deriver 提供每卡自定义 label 文案。
-10. `ComplexCost` 用 `costCandidateSourceCards` 保存与 `fees` 同下标的 candidate provenance；`PaymentSolution`、choice `labelParams` 和 `effectPreview` 用 `sourceCards` 暴露给支付选择 UI。
+10. `ComplexCost` 用 `costCandidateSourceCards` 保存与派生后 `fees` 同下标的 candidate provenance，用 `costCandidateFeeIndices` 保存派生后 candidate 到原始 printed fee index 的映射；`PaymentSolution`、choice `labelParams` 和 `effectPreview` 用 `sourceCards` 暴露给支付选择 UI。
 11. Candidate provenance 不是规则输入。卡牌不应根据 candidate 来源触发后续规则效果。
 12. `bonusUsed` 仍只表示 `BonusModifier.sources`。支付日志沿用现有 `resource.paid.bonusSources` / action-detail 展示通道来显示参与支付的卡牌来源，但 `PaymentSolution.sourceCards` 与 `bonusUsed` 在 payment solver 内保持独立。
-13. 多个 deriver 来源按首次出现顺序去重；顺序只影响 UI/日志可读性，不参与规则 key。DFS `visited` key 不包含 `sourceCards`，但包含 `feeIndex`、normalized cost dimensions 和 branch-local applied deriver ids；最终 duplicate key 仍不包含 `feeIndex`。
+13. 多个 deriver 来源按首次出现顺序去重；顺序只影响 UI/日志可读性，不参与规则 key。DFS `visited` key 不包含 `sourceCards`，但包含 `feeIndex`、normalized cost dimensions 和 branch-local applied deriver ids；最终 duplicate key 包含 `feeIndex` 和 `sourceCards`，避免把相同费用的 printed path 与 deriver path 混同。
 14. Deriver 可以读取只读 target context（`actionId`、`targetCardId`、`targetPlayKind`、`targetCardTypes`、`actionCardId`）做适用性判断，但不能回读目标卡 printed/base cost 来决定是否派生。费用派生必须基于当前 candidate cost。`targetPlayKind` 表示本次 major/minor 支付路径，来自最终选择的 payment path，不来自行动入口声明；`targetCardTypes` 表示卡牌规则身份集合，由 primary type + `alsoCountsAs` 生成，可同时包含 major 和 minor。第一版 improvement 上下文只保留 `major` / `minor`，过滤非 improvement 类型。顺序固定为 primary type 在前、`alsoCountsAs` 按定义顺序追加并去重，不表示规则优先级。
 15. Deriver effect id 必须全局唯一；完整收集后统一校验，遇到重复 id 直接报错，并报告重复 id 与来源 listener/card。
 16. 每个 deriver 声明非空 `sourceCardId`，框架在成功派生候选时自动追加来源；card-level listener 返回的 deriver 默认必须使用当前 `ownerCardId`，helper 由调用卡显式传入来源。第一版 deriver 返回值只包含 `cost`，不携带 metadata 或 `feeIndex`，卡牌实现不手写自身 `metadata.sourceCards`。
 17. 派生 `{ cost: {} }` 合法，表示免费候选；不适用必须返回空数组。
-18. 派生与输入完全相同的 normalized cost 合法；该 deriver 仍在 branch 上标记为已应用，最终 duplicate 合并归并 provenance。
-19. 相同 cost duplicate 合并后的唯一 payment option 可显示被归并 deriver 的来源卡；不为了保留“原价来源为空”而复制视觉相同的选项。
+18. 派生与输入完全相同的 normalized cost 合法；该 deriver 仍在 branch 上标记为已应用。若来源或 fee identity 不同，最终仍保留为不同 candidate path。
+19. 相同 cost 但来源或原始 fee identity 不同的 candidate 不合并；printed duplicate cost 不应被显示为使用了 deriver。
 20. `derive()` 不能用异常表示“不适用”；不适用必须返回 `[]`，异常代表机制错误并向上暴露。
 21. 机制错误直接抛 `Error`，不转成游戏内可恢复 fail；message 必须包含 `candidateDeriver` 和 deriver/listener/source 定位字段。
 22. `candidateDerivers` 只允许 `computeCosts` phase 返回；其它 phase 返回时直接报错，不静默忽略。
@@ -47,7 +47,7 @@ card purchase 的候选派生采用 DFS/backtracking closure：
 27. 收集顺序沿用现有 listener 匹配顺序和 listener 返回数组顺序，不引入 topo/global sort。DFS 对每个 candidate 先 emit 原候选，再按收集顺序尝试 deriver；顺序只影响 first-seen 来源展示。
 28. `costs` delta 按现有 listener 顺序逐个 `applyCostOverride` 到每条 base candidate，每步 clamp 到 0；它不是 deriver，不保留未应用分支。
 29. `ComplexCost` 先展开 `fee/fees` 并保留 `feeIndex`，再跑 `costs` delta 和 deriver；`bonuses` / `trades` 仍由现有 solver 在候选闭包之后处理。
-30. DFS `visited` 命中时不递归，但必须把新路径的 `sourceCards` union 到已存在 candidate；最终 duplicate merge 再按 normalized cost dimensions union provenance。
+30. DFS `visited` 命中时不递归，但必须把新路径的 `sourceCards` union 到已存在 candidate；最终 duplicate merge 只处理 cost、fee identity、sourceCards 都相同的重复 candidate。
 31. normalized cost key 去 0，并按所有成本维度稳定排序；未来 card token / supply token 也作为成本维度处理，不做 domination。
 32. 不设置额外业务 cap。爆炸控制依赖 deriver 数量上限、visited key 和 duplicate 合并；非法状态直接抛错，不静默截断。
 33. 实现 PR 需要同步 `docs/ARCHITECTURE.md` 和 `docs/card_implementation_status.md`；旧卡迁移只自动创建审计 issue，不在机制 PR 中批量整改。

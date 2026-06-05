@@ -113,7 +113,7 @@ _Avoid_: UI 按钮定义
 _Avoid_: 每张卡手写支付分支
 
 **Cost Candidate（成本候选行）**:
-一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
+一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，并保留原始 printed fee 身份和来源 metadata；相同费用但不同来源/fee 身份仍可作为不同候选路径存在。它不表示把一种资源兑换成另一种资源。
 _Avoid_: Trade、资源兑换、支付替换器
 
 **Cost Candidate Deriver（成本候选派生器）**:

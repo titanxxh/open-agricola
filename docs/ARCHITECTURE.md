@@ -539,8 +539,9 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
 - `costCandidateSourceCards?: string[][]` —— 与 `fees` 同下标的候选来源 metadata。它由 Cost Candidate Deriver 生成，进入 `PaymentSolution.sourceCards` 和 payment option `sourceCards` 展示；不参与费用可支付性和规则判定。
+- `costCandidateFeeIndices?: number[]` —— 与派生后的 `fees` 同下标，记录每个候选对应的原始 printed fee index。它只服务 `PaymentSolution.feeIndex` 回填，避免派生候选插入后把后续 printed alt-cost 的 fee identity 打乱。
 
-**Cost Candidate Deriver**：`computeCosts.improvement` listener 可返回 `candidateDerivers`。支付预览先把 `fee/fees` 展开成 Cost Candidate，再按 listener 顺序应用强制 `costs` delta（每步 clamp 到 0），然后用朴素 DFS/backtracking 对 deriver 做闭包：每个 deriver 在同一 branch 最多应用一次，返回 0 条表示当前 candidate 不适用，返回多条表示追加多个候选。原 candidate 永远保留，派生结果若包含负 cost 直接报机制错误。DFS visited key 包含 normalized cost、`feeIndex` 和已应用 deriver id，不包含 provenance；最终只合并 normalized cost 完全相同的候选并 union `metadata.sourceCards`，不做 domination/Pareto 剔除。第一阶段只支持 `actionId='improvement'`，deriver id 必须全局唯一，card-level listener 的 `sourceCardId` 必须匹配 owner card。
+**Cost Candidate Deriver**：`computeCosts.improvement` listener 可返回 `candidateDerivers`。支付预览先把 `fee/fees` 展开成 Cost Candidate，再按 listener 顺序应用强制 `costs` delta（每步 clamp 到 0），然后用朴素 DFS/backtracking 对 deriver 做闭包：每个 deriver 在同一 branch 最多应用一次，返回 0 条表示当前 candidate 不适用，返回多条表示追加多个候选。原 candidate 永远保留，派生结果若包含负 cost 直接报机制错误。DFS visited key 包含 normalized cost、`feeIndex` 和已应用 deriver id，不包含 provenance；最终 duplicate key 保留 normalized cost、原始 `feeIndex` 和 `metadata.sourceCards`，因此不会把 printed duplicate cost 归因到 deriver，不做 domination/Pareto 剔除。第一阶段只支持 `actionId='improvement'`，deriver id 必须全局唯一，card-level listener 的 `sourceCardId` 必须匹配 owner card。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
