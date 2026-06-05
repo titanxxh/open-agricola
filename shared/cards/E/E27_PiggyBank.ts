@@ -92,7 +92,7 @@ const computeCostsListener: CardListenerRegistration = {
       candidateDerivers: [{
         id: `${CARD_ID}:free-major-candidate`,
         sourceCardId: CARD_ID,
-        derive: (_candidate, target) => target.targetCardTypes.includes('major')
+        derive: (_candidate, target) => target.targetCardTypes?.includes('major') === true
           ? [{ cost: {} }]
           : [],
       }],
