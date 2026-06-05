@@ -81,9 +81,6 @@ const updateInfoboxListener: CardListenerRegistration = {
   },
 }
 
-/**
- * computeCosts listener: when card is flagged, zero out costs for major improvements.
- */
 const computeCostsListener: CardListenerRegistration = {
   id: 'E27-piggy-bank-compute-costs',
   cardIds: [CARD_ID],

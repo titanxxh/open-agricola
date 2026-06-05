@@ -144,7 +144,7 @@ describe('E27_PiggyBank session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('computeCosts listener derives a free major candidate when card is flagged', () => {
+  it('computeCosts listener adds a free major candidate deriver when card is flagged', () => {
     const listeners = getRegisteredCardListeners()
     const costListener = listeners.find((l) => l.id === 'E27-piggy-bank-compute-costs')
     expect(costListener).toBeDefined()
@@ -182,6 +182,16 @@ describe('E27_PiggyBank session', () => {
       targetPlayKind: 'major',
       targetCardTypes: ['major'],
     })).toEqual([{ cost: {} }])
+    expect(deriver.derive({
+      cost: { wood: 2 },
+      metadata: { sourceCards: [] },
+      applied: new Set(),
+    }, {
+      actionId: 'improvement',
+      targetCardId: 'A1_Minor',
+      targetPlayKind: 'minor',
+      targetCardTypes: ['minor'],
+    })).toEqual([])
   })
 
   it('computeCosts listener returns nothing when card is not flagged', () => {

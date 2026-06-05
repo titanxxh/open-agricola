@@ -138,7 +138,7 @@ describe('D13_Trowel listener wiring', () => {
     expect(result?.costs).toEqual({ reed: -1 })
   })
 
-  it('computeCosts on selectedOption=clay returns a prohibitive cost (filters the clay option out)', () => {
+  it('computeCosts on selectedOption=clay is silent because D13 never resolves through clay', () => {
     const listener = findListener('D13-trowel-compute-costs-renovation')!
     const player = createPlayer({ houseType: 'wood', rooms: 2 })
     const state = createState(player)
@@ -150,11 +150,7 @@ describe('D13_Trowel listener wiring', () => {
       sourceCard: CARD_ID,
       params: { selectedOption: 'clay' },
     } as unknown as CardListenerContext)
-    expect(result?.costs).toBeDefined()
-    const clayCost = (result!.costs!.clay ?? 0)
-    const reedCost = (result!.costs!.reed ?? 0)
-    expect(clayCost).toBeGreaterThan(100)
-    expect(reedCost).toBeGreaterThan(100)
+    expect(result).toBeUndefined()
   })
 
   it('computeCosts is silent without D13 sourceCard', () => {
@@ -237,6 +233,23 @@ describe('D13_Trowel session integration', () => {
     expect(owner.houseType).toBe('stone')
     expect(owner.resources.stone).toBe(0)
     expect(owner.resources.reed).toBe(0)
+    expect(owner.resources.food).toBe(0)
+  })
+
+  it('wood-house full flow ignores the base clay target even when clay is affordable', () => {
+    const session = setupSession({
+      houseType: 'wood',
+      rooms: 2,
+      resources: { clay: 2, stone: 2, reed: 3, food: 2 },
+    })
+    enterActiveInteraction(session)
+    const resp = session.takeAnytimeAction(0, 'D13-trowel-anytime')
+    expect(resp.ok).toBe(true)
+    const owner = resp.state.players[0]!
+    expect(owner.houseType).toBe('stone')
+    expect(owner.resources.clay).toBe(2)
+    expect(owner.resources.stone).toBe(0)
+    expect(owner.resources.reed).toBe(1)
     expect(owner.resources.food).toBe(0)
   })
 

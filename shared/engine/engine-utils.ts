@@ -809,7 +809,11 @@ export function maybeBuildChoiceCandidates(
     seen.add(opt.value)
     merged.push(opt)
   }
-  const affordable = merged.filter((opt) => {
+  const selectedOption = executionContext.params?.selectedOption
+  const choicePool = typeof selectedOption === 'string'
+    ? merged.filter((opt) => opt.value === selectedOption)
+    : merged
+  const affordable = choicePool.filter((opt) => {
     const probeCtx = {
       ...executionContext,
       params: { ...(executionContext.params ?? {}), selectedOption: opt.value },

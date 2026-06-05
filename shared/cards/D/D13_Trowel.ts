@@ -26,10 +26,7 @@ const CARD_ID = 'D13_Trowel'
  *    `stone` candidate when the owner is on a wooden house — base options
  *    for wood-house only include `clay`.
  *  - `computeCosts` listener (sourceCard scoped) adds the BGA wood→stone
- *    food/reed delta on the stone path. The wood→clay sibling option still
- *    surfaces during the affordability probe; we publish a prohibitive
- *    cost on the `clay` probe so the engine filters it out and `stone`
- *    remains the sole affordable target (single-option auto-resolve).
+ *    food/reed delta on the stone path.
  */
 
 const anytimeListener: CardListenerRegistration = {
@@ -79,14 +76,6 @@ const computeCostsListener: CardListenerRegistration = {
     const selected = (context.params as { selectedOption?: unknown } | undefined)?.selectedOption
     const houseType = context.player.houseType
     const rooms = context.player.rooms
-    if (selected === 'clay') {
-      // Trowel never resolves via wood→clay; publish a prohibitive delta so
-      // the affordability probe drops this option and leaves `stone` alone.
-      return {
-        costs: { clay: 999, reed: 999 },
-        sourceCard: CARD_ID,
-      }
-    }
     if (selected === 'stone' && houseType === 'wood') {
       // base plan {stone: rooms, reed: 1} → target {stone: rooms, reed: rooms, food: rooms}
       return {

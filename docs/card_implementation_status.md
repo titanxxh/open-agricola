@@ -117,7 +117,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice` | 新增交互必须显式暴露 command / options 并由后端校验；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
-| 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`costCandidateSourceCards`、`costCandidateFeeIndices`、`PaymentSolution.sourceCards`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。Cost Candidate Deriver 来源只服务支付选项 / 日志展示，不作为后续规则条件；原始 fee identity 用于 `feeIndex` 回填，避免派生候选打乱 printed alt-cost 语义。 |
+| 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`costCandidateSourceCards`、`costCandidateFeeIndices`、`PaymentSolution.sourceCards`、`candidateDerivers`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。Cost Candidate Deriver 来源只服务支付选项 / 日志展示，不作为后续规则条件；原始 fee identity 用于 `feeIndex` 回填，避免派生候选打乱 printed alt-cost 语义。费用候选变体用 deriver/bonus/trade 显式建模，不用大正数/大负数哨兵费用表达阻断或免费。 |
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。D117 已改为只看当前 Cost Candidate，不再读 printed/base cost。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
@@ -935,7 +935,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D10_StorksNest` | 已对齐 |  |
 | `D11_LawnFertilizer` | 已对齐 | size-one pasture replacement 走 `computePastureCapacityModifiers`；先替换为 `3 * (stables + 1)`，再叠加 A12/B72 等 additive。 |
 | `D12_MilkingPlace` | 已对齐 | 通过 `blocksHouseAnimalZones` metadata 触发 `computeAnimalZones()` 通用过滤，不再直接读取 D148。 |
-| `D13_Trowel` | 已对齐 |  |
+| `D13_Trowel` | 已对齐 | anytime 翻修通过 `params.selectedOption='stone'` 强制只评估 stone 目标；`computeChoiceCandidates.renovate-house` 注入 stone 目标，`computeCosts.renovate-house` 只补 BGA wood→stone 的 food/reed delta 或 clay→stone 的免 reed delta，不再用 prohibitive clay sentinel 过滤 sibling target。 |
 | `D14_HammerCrusher` | 已对齐 |  |
 | `D15_ClaySupports` | 已对齐 |  |
 | `D16_WoodenWheyBucket` | 已对齐 | BGA `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达羊市场 1 wood、牛市场免费，且最多 1 个 stable。 |
@@ -1129,7 +1129,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E24_Ambition` | 已对齐 |  |
 | `E25_BumperCrop` | 已对齐 | onBuy 走 `private-field-phase`；`2 Grain Fields` 前置同时计入普通 grain field 与带 grain 的 Card Field |
 | `E26_Sundial` | 已对齐 |  |
-| `E27_PiggyBank` | 已对齐 | #261 分类：blocking/sentinel hack replacement → candidate transform。BGA flagged free major 追加空 cost candidate；OA 已移除 broad `-99` costs，改为 flagged major-only free `candidateDerivers`。 |
+| `E27_PiggyBank` | 已对齐 | #261/#263 分类：blocking/sentinel hack replacement → candidate transform。6 food payoff 的 major improvement 免费路径用 `computeCosts.improvement` 返回 Cost Candidate Deriver，给 major/dual-major target 追加空费用 candidate 并保留来源；不再用 `-99` resource delta 抹平费用。 |
 | `E28_Bookmark` | 已对齐 |  |
 | `E29_Heirloom` | 已对齐 |  |
 | `E30_ChildsToy` | 已对齐 |  |
