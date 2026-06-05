@@ -24,22 +24,52 @@ const setup = () => {
 }
 
 describe('B109_PaperMaker session', () => {
-  it('makes lessons available when wood can cover the food cost via preview payment', () => {
+  it('makes lessons available when wood can fund the before-occupation payoff', () => {
     const resp = setup().getState()
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.actionAvailability?.lessons).toBe(true)
   })
 
-  it('plays an occupation without surfacing the legacy PaperMaker prompt', () => {
+  it('offers the BGA before-occupation pay/gain before paying the occupation cost', () => {
     const session = setup()
 
-    const resp = session.takeAction(0, 'lessons')
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationHand).not.toContain('A123_FrameBuilder')
+  })
+
+  it('gains food beyond the occupation cost when multiple occupations are already played', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed = ['B109_PaperMaker', 'A153_PigOwner']
+    player.occupationHand = ['A123_FrameBuilder']
+    player.resources = { ...player.resources, wood: 1, food: 0 }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
   })
 })

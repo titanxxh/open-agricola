@@ -1,32 +1,46 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B109_PaperMaker'
-const computeCostsListener: CardListenerRegistration = {
-  id: 'B109-paper-maker-compute-costs-occupation',
+const beforeListener: CardListenerRegistration = {
+  id: 'B109-paper-maker-before-occupation',
   cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const occupationCount = context.player.occupationPlayed.length
     if (occupationCount <= 0) return
+    if ((context.player.resources.wood ?? 0) < 1) return
     return {
-      trades: [{
-        from: { wood: 1 },
-        to: { food: occupationCount },
-        max: 1,
-        source: CARD_ID,
-        sourceId: CARD_ID,
-      }],
+      flow: payGainFlow({
+        cardId: CARD_ID,
+        cost: { wood: 1 },
+        gain: { food: occupationCount },
+      }),
       sourceCard: CARD_ID,
     }
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'B109-paper-maker-isdoable-occupation',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['occupation'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    if (context.player.occupationPlayed.length <= 0) return
+    if ((context.player.resources.wood ?? 0) < 1) return
+    return { doable: true, sourceCard: CARD_ID }
+  },
+}
+
 const cardImpl = {
-  listeners: [computeCostsListener],
+  listeners: [beforeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

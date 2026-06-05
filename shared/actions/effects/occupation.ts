@@ -290,24 +290,26 @@ const buildPlayableOccupationOptions = (
       (occupation): occupation is NonNullable<typeof occupation> =>
         !!occupation,
     )
-    .filter((occupation) =>
-      canAffordOccupationPreviewCost(
+    .map((occupation) => ({
+      occupation,
+      policy: getOccupationChoicePolicy(
         state,
         player,
+        space,
         occupation.id,
         cost,
         actionCardId,
+        canAffordOccupationPreviewCost(
+          state,
+          player,
+          occupation.id,
+          cost,
+          actionCardId,
+        ),
       ),
-    )
-    .filter((occupation) => getOccupationChoicePolicy(
-      state,
-      player,
-      space,
-      occupation.id,
-      cost,
-      actionCardId,
-    ).doable)
-    .map((occupation) => ({
+    }))
+    .filter(({ policy }) => policy.doable)
+    .map(({ occupation }) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
     }))
@@ -319,8 +321,9 @@ const getOccupationChoicePolicy = (
   occupationId: string,
   baseCost: Partial<PlayerState['resources']>,
   actionCardId?: string,
+  initialDoable = true,
 ): OccupationChoicePolicy => {
-  let doable = true
+  let doable = initialDoable
   let reserveResources: Partial<Resource> | undefined
   const results = runCardListeners({
     state,
@@ -337,6 +340,8 @@ const getOccupationChoicePolicy = (
   for (const result of results) {
     if (result.doable === false) {
       doable = false
+    } else if (result.doable === true) {
+      doable = true
     }
     reserveResources = mergeResourceReserve(
       reserveResources,

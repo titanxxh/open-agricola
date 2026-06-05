@@ -282,7 +282,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `before.lessons-3` | `B63_Tasting` |
 | listener | `before.lessons-4` | `B63_Tasting` |
 | listener | `before.meeting-place` | `D139_Chairman` |
-| listener | `before.occupation` | `D152_Patron`, `D49_Bookshelf`, `E51_WhaleOil` |
+| listener | `before.occupation` | `B109_PaperMaker`, `D152_Patron`, `D49_Bookshelf`, `E51_WhaleOil` |
 | listener | `before.place-farmer` | `A92_AdoptiveParents`, `C154_TwinResearcher`, `C158_ForestCampaigner`, `C15_Trellis`, `C160_Outrider`, `C28_TeachersDesk`, `C48_Farmstead`, `D110_FishFarmer`, `D147_TrapBuilder`, `D16_WoodenWheyBucket`, `D28_WritingDesk`, `D83_Pigswill`, `D90_PlowMaker`, `E121_HillCultivator`, `E137_FlaxFarmer`, `E141_VegetableVendor`, `E166_Roastmaster`, `E17_SkimmerPlow`, `E55_StoneWeir`, `E59_CombandCutter`, `E67_GrainBag` |
 | listener | `before.plow` | `A40_PottersYard` |
 | listener | `before.renovate-house` | `D14_HammerCrusher` |
@@ -294,7 +294,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
 | listener | `computeCosts.fence` | `C16_FieldFences`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
 | listener | `computeCosts.improvement` | `A143_Stonecutter`, `A20_DoubleTurnPlow`, `A27_OvenSite`, `A75_LumberMill`, `B36_Bottles`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D82_HuntingTrophy`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
-| listener | `computeCosts.occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
+| listener | `computeCosts.occupation` | `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
 | listener | `computeCosts.renovate-house` | `B128_Plumber`, `D121_ClayPlasterer`, `D13_Trowel`, `D154_ChimneySweep`, `D81_RoofLadder`, `E123_ResourceHoarder` |
 | listener | `computeCosts.stables` | `C88_CarpentersApprentice` |
@@ -330,7 +330,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `isDoable.lessons` | `B93_Confidant` |
 | listener | `isDoable.lessons-3` | `B93_Confidant` |
 | listener | `isDoable.lessons-4` | `B93_Confidant` |
-| listener | `isDoable.occupation` | `B93_Confidant`, `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
+| listener | `isDoable.occupation` | `B109_PaperMaker`, `B93_Confidant`, `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
 | listener | `isDoable.place-farmer` | `E125_DelayedWayfarer` |
 | listener | `isDoable.renovate-house` | `A87_Conservator`, `D14_HammerCrusher` |
 | listener | `isDoable.sow` | `A65_SeedPellets`, `A94_LazySowman`, `B113_PatchCaregiver`, `B141_FieldCaretaker`, `B26_AgrarianFences`, `B68_Beanfield`, `B72_LoveforAgriculture`, `C112_Thresher`, `C70_LettucePatch`, `D17_DrillHarrow`, `D25_WitchesDanceFloor`, `D75_WoodField`, `E68_CherryOrchard`, `E69_MelonPatch`, `E70_CropRotationField`, `E72_ArtichokeField`, `E80_RockGarden` |
@@ -671,7 +671,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B106_MoralCrusader` | 已对齐 |  |
 | `B107_Manservant` | 已对齐 |  |
 | `B108_OvenFiringBoy` | 已对齐 |  |
-| `B109_PaperMaker` | 已对齐 |  |
+| `B109_PaperMaker` | 已对齐 | BGA 是 `beforeOccupation` optional pay/gain：打出后续 occupation 前可支付 1 wood，按已打出 occupation 数获得 food，再支付 occupation cost。OA 用 `before.occupation` 的 optional `payGainFlow` 表达，并用 `isDoable.occupation` 在当前 food 不足但 wood 可触发收益时救回 lessons 入口；不再把它建模成 `computeCosts.occupation` 的 wood→food 支付 trade。 |
 | `B110_Pavior` | 已对齐 |  |
 | `B111_Rustic` | 已对齐 |  |
 | `B112_Silokeeper` | 已对齐 |  |
@@ -717,7 +717,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B152_JuniorArtist` | 已对齐 |  |
 | `B153_Housemaster` | 已对齐 | 终局计分按 major identity 汇总真实 major 与 `alsoCountsAs: ['major']` 的 minor，不再保留 A60 单卡特判。 |
 | `B154_SheepKeeper` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
-| `B155_ArtTeacher` | 已对齐 |  |
+| `B155_ArtTeacher` | 已对齐 | BGA 在 occupation cost candidates 上追加 `FOOD_TRAVEL` 变体。OA 没有独立 FOOD_TRAVEL 资源，保留 `computeCosts.occupation` trade + `drainSpace(traveling-players, food)` side effect 表达“用 Traveling Players 食物支付 occupation food cost”；这是外部支付来源替代，不是免费/折扣 candidate deriver。 |
 | `B156_StorehouseKeeper` | 已对齐 |  |
 | `B157_Salter` | 已对齐 |  |
 | `B158_DistrictManager` | 已对齐 |  |

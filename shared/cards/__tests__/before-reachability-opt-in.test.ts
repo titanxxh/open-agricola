@@ -7,6 +7,7 @@ import '../A/A65_SeedPellets'
 import '../A/A126_MasterWorkman'
 import '../B/B67_HandTruck'
 import '../B/B75_WoodWorkshop'
+import '../B/B109_PaperMaker'
 import '../B/B94_StockProtector'
 import '../C/C112_Thresher'
 import '../D/D14_HammerCrusher'
@@ -106,6 +107,7 @@ const cases = [
   ['A126-master-workman-isdoable', 'fencing'],
   ['B67-hand-truck-isdoable-bake', 'bake-bread'],
   ['B75-wood-workshop-isdoable-improvement', 'improvement'],
+  ['B109-paper-maker-isdoable-occupation', 'occupation'],
   ['B94-stock-protector-isdoable-fencing', 'fence'],
   ['C112-thresher-isdoable-sow', 'sow'],
   ['D14-hammer-crusher-isdoable-renovate', 'renovate-house'],

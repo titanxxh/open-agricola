@@ -173,10 +173,7 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(2)
   })
 
-  it('case 3: lessons-4 with B109 PaperMaker discount-via-trade pays 1 wood → 0 wood gained (no food paid)', () => {
-    // B109 trade: pay 1 wood total to get N food (N = occupations played).
-    // With 2 occupations played the trade yields 2 food, covering lessons-4
-    // base cost of 2 food. C116 sees paid wood but no paid food, so it should NOT fire.
+  it('case 3: lessons-4 with B109 PaperMaker before payoff pays 1 wood, then occupation pays 2 food', () => {
     const { session, state } = setupBase(4)
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
@@ -190,11 +187,21 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',
-        paymentFor: 'occupation',
+        paymentFor: 'cardEffect',
         resources: expect.objectContaining({ wood: 1 }),
       }),
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'occupation',
+        resources: expect.objectContaining({ food: 2 }),
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        resources: expect.objectContaining({ wood: 2 }),
+      }),
     ]))
-    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
