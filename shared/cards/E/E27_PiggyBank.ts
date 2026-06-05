@@ -26,7 +26,7 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          // Flag card so computeCosts zeroes out major costs
+          // Flag card so computeCosts can add the free-major candidate.
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           // Move 6 food from card counter to player supply, then discard
           {

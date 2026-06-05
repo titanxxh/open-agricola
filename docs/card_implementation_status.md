@@ -24,13 +24,17 @@
 
 BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；OA 路径默认相对本仓库。
 
-当前开放跟踪项：
+本轮 #258 跟踪项：
 
 | Issue | 范围 | 状态 |
 |---|---|---|
-| #258 `Audit legacy computeCosts cost-candidate cards after D117 deriver migration` | 审计旧 `computeCosts` 卡牌里的 `costs` / `bonuses` / `trades` 语义；确认 candidate-transform 后再逐卡迁移到 Cost Candidate Deriver | 已创建，`ready-for-agent` |
-| #262 `Audit and migrate non-improvement computeCosts deltas` | 审计 construct / renovation / fence / plow / stables 以及 D82/E123 非 improvement computeCosts；candidate-transform 迁到 Cost Candidate Deriver，强制 delta 保留 `costs` | 本分支已完成审计与最小迁移，等待 #258 最终 PR 汇总 |
-| #261 `Audit and migrate improvement computeCosts cost-candidate cards` | improvement 支付切片已按 BGA PHP 分类；candidate-transform 卡迁移到 `candidateDerivers`，mandatory delta / optional bonus / true substitution 保留原机制 | 本分支已完成审计与最小迁移，等待 #258 最终 PR 汇总 |
+| #258 `Audit legacy computeCosts cost-candidate cards after D117 deriver migration` | 审计旧 `computeCosts` 卡牌里的 `costs` / `bonuses` / `trades` 语义；确认 candidate-transform 后再逐卡迁移到 Cost Candidate Deriver | 已由 #260 拆分并在 #261-#265 汇总完成；由最终 PR 关闭 |
+| #260 `PRD: Legacy computeCosts candidate semantics audit and migration` | 明确 BGA 对齐原则、DFS candidate derivation、preserveOriginal / bonus / trade / mandatory delta 分类，以及 UI provenance metadata 范围 | 已转为 #261-#265 实施；由最终 PR 关闭 |
+| #261 `Audit and migrate improvement computeCosts cost-candidate cards` | improvement 支付切片已按 BGA PHP 分类；candidate-transform 卡迁移到 `candidateDerivers`，mandatory delta / optional bonus / true substitution 保留原机制 | 已完成 |
+| #262 `Audit and migrate non-improvement computeCosts deltas` | 审计 construct / renovation / fence / plow / stables 以及 D82/E123 非 improvement computeCosts；candidate-transform 迁到 Cost Candidate Deriver，强制 delta 保留 `costs` | 已完成 |
+| #263 `Replace computeCosts blocking and sentinel hacks with explicit semantics` | 移除 D13 / E27 里的 prohibitive / broad free-cost sentinel，改为 selectedOption 过滤和 major-only free candidate deriver | 已完成 |
+| #264 `Audit occupation computeCosts trade cards` | B109 改回 BGA before-occupation optional pay/gain + reachability opt-in；B155 保留 Traveling Players trade side effect | 已完成 |
+| #265 `Finalize #258 audit documentation and parent closure` | 汇总最终审计文档、确认 final PR 关闭 #258 / #260-#265，不提交临时 scratch 文件 | 已完成 |
 
 ## 3. 已接受差异
 
