@@ -1,13 +1,16 @@
 import type {
   ActionAvailabilityContext,
   ActionChoiceOption,
+  ActionCostHookResult,
   ActionCostPreview,
   ActionDefinition,
   ActionExecutionResult,
   InternalActionChild,
+  Bonus,
   ComplexCost,
   PlayerState,
   Resource,
+  Trade,
 } from '../../contract/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
@@ -62,7 +65,7 @@ const mergeRenovationCost = (
   // legacy semantic where pre-spec baseCost was the pre-multiplied
   // {[material]: rooms, reed: 1} and override modified that total. It lands
   // in fees[0]; unitFee × nb stays the BGA-aligned per-room cost. Negative
-  // entries (e.g. D154 ChimneySweep `stone: -2`) remain in fees[0]; enumerate
+  // entries (e.g. D121 ClayPlasterer `clay: -(rooms - 1)`) remain in fees[0]; enumerate
   // clamps the merged baseFee at the affordability stage so wood→clay (no
   // stone in unitFee) doesn't credit a refund on the unrelated resource.
   return {
@@ -75,13 +78,25 @@ const resolveRenovationActionCost = (
   baseCost: ComplexCost,
   actionContext?: Record<string, unknown>,
   costOverride?: Partial<Resource>,
+  costHookResults?: ActionCostHookResult[],
 ): ComplexCost | null => {
   const exactCost = readExactCost(actionContext)
-  if (exactCost) {
-    const resolved = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
-    return resolved ? { fee: resolved } : null
+  const cost: ComplexCost | null = exactCost
+    ? (() => {
+        const resolved = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+        return resolved ? { fee: resolved } : null
+      })()
+    : mergeRenovationCost(baseCost, costOverride)
+  if (!cost) return null
+  const bonuses: Bonus[] = []
+  const trades: Trade[] = []
+  for (const result of costHookResults ?? []) {
+    if (result.bonuses) bonuses.push(...result.bonuses)
+    if (result.trades) trades.push(...result.trades)
   }
-  return mergeRenovationCost(baseCost, costOverride)
+  if (bonuses.length > 0) cost.bonuses = [...(cost.bonuses ?? []), ...bonuses]
+  if (trades.length > 0) cost.trades = [...(cost.trades ?? []), ...trades]
+  return cost
 }
 
 /**
@@ -184,7 +199,12 @@ const renovateHouseCostPreview: ActionCostPreview = {
     const plan = planForContext(player, params)
     if (!plan) return false
     const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
-    const cost = resolveRenovationActionCost(plan.cost, actionContext, costOverride)
+    const cost = resolveRenovationActionCost(
+      plan.cost,
+      actionContext,
+      costOverride,
+      context.costHookResults,
+    )
     return cost ? canAffordTypedFlatCost(player, cost, 'renovation') : false
   },
   getBaseCost: (context) => {
@@ -239,7 +259,7 @@ export const renovateHouseAction: ActionDefinition = {
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
-  resolveChoice: ({ player, params, costs, actionContext }, choice) => {
+  resolveChoice: ({ player, params, costs, actionContext, costHookResults }, choice) => {
     const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const target: RenovationTarget | null =
       (choice === 'clay' || choice === 'stone' ? choice : null)
@@ -247,7 +267,12 @@ export const renovateHouseAction: ActionDefinition = {
     if (!target) return failure
     const plan = buildRenovationPlan(player, target)
     if (!plan) return failure
-    const totalCost = resolveRenovationActionCost(plan.cost, actionContext, costs)
+    const totalCost = resolveRenovationActionCost(
+      plan.cost,
+      actionContext,
+      costs,
+      costHookResults,
+    )
     if (!totalCost) return failure
     const from = player.houseType
     return {

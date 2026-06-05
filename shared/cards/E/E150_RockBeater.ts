@@ -47,7 +47,17 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType !== 'stone') return
-    return { costs: { stone: -2 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:construct-stone-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const stone = candidate.cost.stone ?? 0
+          if (stone <= 0) return []
+          return [{ cost: { ...candidate.cost, stone: Math.max(0, stone - 2) } }]
+        },
+      }],
+    }
   },
 }
 

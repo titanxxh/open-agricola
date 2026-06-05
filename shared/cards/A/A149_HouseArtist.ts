@@ -30,7 +30,17 @@ const costListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
-    return { costs: { reed: -1 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:construct-reed-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const reed = candidate.cost.reed ?? 0
+          if (reed <= 0) return []
+          return [{ cost: { ...candidate.cost, reed: Math.max(0, reed - 1) } }]
+        },
+      }],
+    }
   },
 }
 

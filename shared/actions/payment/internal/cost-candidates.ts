@@ -177,7 +177,7 @@ const validateDerivers = (derivers: CostCandidateDeriver[]) => {
 }
 
 const validateContext = (context: CostCandidateDerivationContext) => {
-  if (context.targetCardTypes.length === 0) {
+  if (context.targetCardId && context.targetCardTypes?.length === 0) {
     throw candidateDeriverError(`targetCardId=${context.targetCardId} empty targetCardTypes`)
   }
 }

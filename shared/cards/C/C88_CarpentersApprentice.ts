@@ -19,7 +19,22 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType !== 'wood') return
-    return { costs: { wood: -2 } }
+    return {
+      candidateDerivers: [{
+        id: `${CARD_ID}:construct-wood-discount`,
+        sourceCardId: CARD_ID,
+        derive(candidate) {
+          const wood = candidate.cost.wood ?? 0
+          if (wood <= 0) return []
+          return [{
+            cost: {
+              ...candidate.cost,
+              wood: Math.max(0, wood - 2),
+            },
+          }]
+        },
+      }],
+    }
   },
 }
 

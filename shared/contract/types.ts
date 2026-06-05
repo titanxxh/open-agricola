@@ -468,6 +468,14 @@ export type ActionAvailabilityContext = {
   space?: ActionSpace
   params?: Record<string, unknown>
   sourceCard?: string
+  costHookResults?: ActionCostHookResult[]
+}
+
+export type ActionCostHookResult = {
+  costs?: Partial<Resource>
+  trades?: Trade[]
+  bonuses?: Bonus[]
+  candidateDerivers?: unknown[]
 }
 
 export type ActionExecutionContext = {
@@ -475,6 +483,7 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
+  costHookResults?: ActionCostHookResult[]
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>

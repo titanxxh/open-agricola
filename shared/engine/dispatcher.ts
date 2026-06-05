@@ -81,10 +81,14 @@ export class HookDispatcher {
       })
       return acc
     }, {})
-    if (preview.canExecute) {
-      return preview.canExecute(context, costOverride)
+    const previewContext = {
+      ...context,
+      costHookResults: previewResults,
     }
-    const previewCost = resolveActionPreviewCost(preview, context, costOverride)
+    if (preview.canExecute) {
+      return preview.canExecute(previewContext, costOverride)
+    }
+    const previewCost = resolveActionPreviewCost(preview, previewContext, costOverride)
     return canPayResources(context.player, previewCost)
   }
 

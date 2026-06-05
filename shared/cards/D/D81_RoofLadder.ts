@@ -11,7 +11,7 @@ const costListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { reed: -1 } }
+    return { bonuses: [{ discount: { reed: 1 }, sources: [CARD_ID] }] }
   },
 }
 

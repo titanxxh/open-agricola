@@ -1150,6 +1150,7 @@ export function engineProceed(
     )
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
+    executionContext.costHookResults = costResults
     const eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
       sourceActionId: replacedActionId,

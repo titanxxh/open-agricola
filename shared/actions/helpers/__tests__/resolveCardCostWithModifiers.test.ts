@@ -296,7 +296,7 @@ describe('resolveCardCostWithModifiers', () => {
       resolveCardCostWithModifiers(
         state, player, 'occupation', 'Some_Occupation', { food: 1 },
       ),
-    ).toThrow(/candidateDeriver.*actionId=occupation.*actionId=improvement/)
+    ).toThrow(/candidateDeriver.*actionId=occupation.*actionId=improvement\|construct/)
   })
 
   it('throws when a card-level listener returns a mismatched sourceCardId', () => {

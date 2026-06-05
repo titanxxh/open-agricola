@@ -17,9 +17,9 @@ export type DerivedCostCandidate = {
 
 export type CostCandidateDerivationContext = {
   actionId: string
-  targetCardId: string
-  targetPlayKind: 'major' | 'minor'
-  targetCardTypes: Array<'major' | 'minor'>
+  targetCardId?: string
+  targetPlayKind?: 'major' | 'minor'
+  targetCardTypes?: Array<'major' | 'minor'>
   actionCardId?: string
 }
 

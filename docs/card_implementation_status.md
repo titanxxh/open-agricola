@@ -29,6 +29,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Issue | 范围 | 状态 |
 |---|---|---|
 | #258 `Audit legacy computeCosts cost-candidate cards after D117 deriver migration` | 审计旧 `computeCosts` 卡牌里的 `costs` / `bonuses` / `trades` 语义；确认 candidate-transform 后再逐卡迁移到 Cost Candidate Deriver | 已创建，`ready-for-agent` |
+| #262 `Audit and migrate non-improvement computeCosts deltas` | 审计 construct / renovation / fence / plow / stables 以及 D82/E123 非 improvement computeCosts；candidate-transform 迁到 Cost Candidate Deriver，强制 delta 保留 `costs` | 本分支已完成审计与最小迁移，等待 #258 最终 PR 汇总 |
 
 ## 3. 已接受差异
 
@@ -508,7 +509,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A125_Priest` | 已对齐 |  |
 | `A126_MasterWorkman` | 已对齐 |  |
 | `A127_Lodger` | 已对齐 |  |
-| `A128_RiparianBuilder` | 已对齐 |  |
+| `A128_RiparianBuilder` | 已对齐 | #262：BGA `CONSTRUCT` 对 clay / stone house room cost 做 source-card scoped 折扣，属于 candidate transform；已迁到 `computeCosts.construct` Cost Candidate Deriver，保留原 printed room candidate 并给派生支付归因。 |
 | `A129_Swagman` | 已对齐 |  |
 | `A130_MummysBoy` | 已对齐 |  |
 | `A131_CraftTeacher` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -529,7 +530,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A146_StorehouseSteward` | 已对齐 |  |
 | `A147_AnimalDealer` | 已对齐 |  |
 | `A148_Woolgrower` | 已对齐 |  |
-| `A149_HouseArtist` | 已对齐 |  |
+| `A149_HouseArtist` | 已对齐 | #262：BGA `CONSTRUCT` source-card scoped reed discount 属于 candidate transform；已迁到 `computeCosts.construct` Cost Candidate Deriver。 |
 | `A150_Stagehand` | 已对齐 |  |
 | `A151_Minstrel` | 已对齐 |  |
 | `A152_NightSchoolStudent` | 已对齐 |  |
@@ -573,7 +574,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B10_Caravan` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B11_Feedyard` | 已对齐 |  |
 | `B12_Stockyard` | 已对齐 |  |
-| `B13_CarpentersParlor` | 已对齐 |  |
+| `B13_CarpentersParlor` | 已对齐 | #262：BGA wood room discount 是 mandatory delta；保留 `computeCosts.construct` 的 `costs`。 |
 | `B14_Hawktower` | 已对齐 |  |
 | `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、最多 `n+1` 段、恰好 1 个新牧场、1 段免费。 |
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
@@ -686,9 +687,9 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B123_RoofBallaster` | 已对齐 |  |
 | `B124_Trimmer` | 已对齐 | after fence 不再写本工作阶段奖励 flag；每次牧场覆盖面积增加都可得 2 stone，return-home flag 仍阻止非工作阶段误触 |
 | `B125_EstateWorker` | 已对齐 |  |
-| `B126_Carpenter` | 已对齐 |  |
+| `B126_Carpenter` | 已对齐 | #262：BGA `CONSTRUCT` 强制房间总成本改写等价为每间房 mandatory delta；保留 `costs`。 |
 | `B127_Seducer` | 已对齐 |  |
-| `B128_Plumber` | 已对齐 |  |
+| `B128_Plumber` | 已对齐 | #262：BGA `addBonusChoices` 是非 optional bonus choice，不是 candidate transform；renovation 折扣已从 raw `costs` 迁到 `bonuses.choices`。 |
 | `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 且 owner 自己未在 r13 时才注入 allow-occupied；3p 任一邻座占且 owner 自己未在 r13 时注入；round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
@@ -756,7 +757,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C13_WoodSlideHammer` | 已对齐 |  |
 | `C14_StrawThatchedRoof` | 已对齐 |  |
 | `C15_Trellis` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
-| `C16_FieldFences` | 已对齐 |  |
+| `C16_FieldFences` | 已对齐 | #262：BGA field-adjacent fence edge discount 是 mandatory edge delta；保留 `computeCosts.fence` 的 `costs`。 |
 | `C17_NewlyPlowedField` | 已对齐 |  |
 | `C18_RollOverPlow` | 已对齐 | discard selection 默认至少选 1 个有作物田，空提交或选择空田不会绕过 discard 直接进入 plow。 |
 | `C19_SwingPlow` | 已对齐 |  |
@@ -777,7 +778,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C34_ElephantgrassPlant` | 已对齐 |  |
 | `C35_LanternHouse` | 已对齐 |  |
 | `C36_ClayDeposit` | 已对齐 |  |
-| `C37_DwellingMound` | 已对齐 |  |
+| `C37_DwellingMound` | 已对齐 | #262：BGA plow surcharge 是 mandatory delta；保留 `computeCosts.plow` 的 `costs`。 |
 | `C38_Christianity` | 已对齐 |  |
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
@@ -828,7 +829,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C85_DenBuilder` | 已对齐 |  |
 | `C86_LivestockFeeder` | 已对齐 |  |
 | `C87_Mason` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
-| `C88_CarpentersApprentice` | 已对齐 | 第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
+| `C88_CarpentersApprentice` | 已对齐 | #262：wood-room construct 折扣是 candidate transform，已迁到 `computeCosts.construct` Cost Candidate Deriver，支付事件保留 `C88_CarpentersApprentice` 归因；第 13–15 根 fence 免费区间和第 3/4 座 stable 非线性总额折扣是 mandatory delta / count-aware total cost，继续保留现有 fence/stables 机制。第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
 | `C89_StableMaster` | 已对齐 | onBuy 的 1 wood stable 走 `stables` exactCost，入口不做 raw wood gate，允许 C88 等 `computeCosts.stables` 折扣叠加。 |
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
@@ -868,7 +869,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C125_Nightworker` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C126_Excavator` | 已对齐 |  |
 | `C127_Lover` | 已对齐 |  |
-| `C128_WoodenHutExtender` | 已对齐 |  |
+| `C128_WoodenHutExtender` | 已对齐 | #262：BGA wood room extension 是 mandatory delta；保留 `computeCosts.construct` 的 `costs`。 |
 | `C129_SecondSpouse` | 已对齐 |  |
 | `C130_OutskirtsDirector` | 已对齐 |  |
 | `C131_PrivateTeacher` | 已对齐 |  |
@@ -1001,8 +1002,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D78_ReedPond` | 已对齐 |  |
 | `D79_CarrotMuseum` | 已对齐 |  |
 | `D80_BrickHammer` | 已对齐 | after-improvement 判断改用 `getPrintedImprovementResourceCost(..., 'clay')`；`cost` 与 `altCosts` 是 base cost 候选，取最大 clay，不再把 minor `cost.clay` 与 `altCosts[].clay` 相加。 |
-| `D81_RoofLadder` | 已对齐 |  |
-| `D82_HuntingTrophy` | 已对齐 |  |
+| `D81_RoofLadder` | 已对齐 | #262：BGA renovation reed discount 是 bonus，不是 mandatory total delta；已从 raw `costs` 迁到 `bonuses`。 |
+| `D82_HuntingTrophy` | 已对齐 | #262：非 improvement 的 farm/house redevelopment fence 部分是 mandatory delta；保留 `computeCosts.fence` 的 `costs`。 |
 | `D83_Pigswill` | 已对齐 |  |
 | `D84_FeedPellets` | 已对齐 |  |
 | `D85_Reader` | 已对齐 |  |
@@ -1041,7 +1042,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
-| `D121_ClayPlasterer` | 已对齐 |  |
+| `D121_ClayPlasterer` | 已对齐 | #262：construct / renovation clay discount 是 mandatory room-count delta；保留 `costs`。 |
 | `D122_ClayCarrier` | 已对齐 |  |
 | `D123_RenovationPreparer` | 已对齐 |  |
 | `D124_Emissary` | 已对齐 |  |
@@ -1074,7 +1075,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D151_SpinDoctor` | 已对齐 |  |
 | `D152_Patron` | 已对齐 |  |
 | `D153_WealthyMan` | 已对齐 |  |
-| `D154_ChimneySweep` | 已对齐 |  |
+| `D154_ChimneySweep` | 已对齐 | #262：BGA renovation stone discount 是 bonus，不是 mandatory total delta；已从 raw `costs` 迁到 `bonuses`。 |
 | `D155_Ebonist` | 已对齐 | runtime/display exchange 都为 harvest window，`sourceId=D155_Ebonist`，不再暴露为 anytime exchange |
 | `D156_RetailDealer` | 已对齐 |  |
 | `D157_PartyOrganizer` | 已对齐 |  |
@@ -1116,7 +1117,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E13_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |
 | `E14_WoodSaw` | 已对齐 |  |
 | `E15_NailBasket` | 已对齐 |  |
-| `E16_BriarHedge` | 已对齐 | prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener。 |
+| `E16_BriarHedge` | 已对齐 | #262：fence discount 是 mandatory edge-count delta；保留 `computeCosts.fence` 的 `costs`。prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener。 |
 | `E17_SkimmerPlow` | 已对齐 |  |
 | `E18_SeedAlmanac` | 已对齐 |  |
 | `E19_OxGoad` | 已对齐 |  |
@@ -1223,7 +1224,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 已对齐 | after-pay 优先读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径 |
+| `E123_ResourceHoarder` | 已对齐 | #262：非 improvement construct / renovation `useTopK` 是 optional bonus，不是 candidate transform；engine 现在把完整 `costHookResults` 传给 construct / renovation payment，after-pay 继续读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径。 |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |
@@ -1250,7 +1251,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E147_AnimalDriver` | 已对齐 |  |
 | `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
 | `E149_MidnightFencer` | 已对齐 | 第 14 轮 harvest start 提供 optional real borrowed `fence` leaf；donor cap 按其他玩家 own ordinary reserve 各最多 2，跳过或建造均不再产生 owed-fence bonus VP；借围栏选择可 undo 回 E149 optional，但不能继续 undo 穿过 round-end 边界 |
-| `E150_RockBeater` | 已对齐 |  |
+| `E150_RockBeater` | 已对齐 | #262：BGA stone-room construct discount 是 candidate transform；已迁到 `computeCosts.construct` Cost Candidate Deriver。 |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |
 | `E153_StoneSculptor` | 已对齐 |  |

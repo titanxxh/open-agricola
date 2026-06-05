@@ -10,7 +10,7 @@ const renovateCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { stone: -2 } }
+    return { bonuses: [{ discount: { stone: 2 }, sources: [CARD_ID] }] }
   },
 }
 

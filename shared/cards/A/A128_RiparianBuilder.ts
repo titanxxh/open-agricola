@@ -34,10 +34,30 @@ const constructDiscountListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
     if (context.player.houseType === 'clay') {
-      return { costs: { clay: -1 } }
+      return {
+        candidateDerivers: [{
+          id: `${CARD_ID}:construct-clay-discount`,
+          sourceCardId: CARD_ID,
+          derive(candidate) {
+            const clay = candidate.cost.clay ?? 0
+            if (clay <= 0) return []
+            return [{ cost: { ...candidate.cost, clay: Math.max(0, clay - 1) } }]
+          },
+        }],
+      }
     }
     if (context.player.houseType === 'stone') {
-      return { costs: { stone: -2 } }
+      return {
+        candidateDerivers: [{
+          id: `${CARD_ID}:construct-stone-discount`,
+          sourceCardId: CARD_ID,
+          derive(candidate) {
+            const stone = candidate.cost.stone ?? 0
+            if (stone <= 0) return []
+            return [{ cost: { ...candidate.cost, stone: Math.max(0, stone - 2) } }]
+          },
+        }],
+      }
     }
   },
 }

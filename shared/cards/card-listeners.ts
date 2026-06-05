@@ -312,8 +312,8 @@ export const executeCardListener = (
     if (listenerContext.phase !== 'computeCosts') {
       throw new Error(`candidateDeriver listenerId=${registration.id} phase=${listenerContext.phase} only phase=computeCosts is supported`)
     }
-    if (listenerContext.actionId !== 'improvement') {
-      throw new Error(`candidateDeriver listenerId=${registration.id} actionId=${listenerContext.actionId} only actionId=improvement is supported`)
+    if (listenerContext.actionId !== 'improvement' && listenerContext.actionId !== 'construct') {
+      throw new Error(`candidateDeriver listenerId=${registration.id} actionId=${listenerContext.actionId} only actionId=improvement|construct is supported`)
     }
     for (const deriver of result.candidateDerivers) {
       if (!deriver.sourceCardId.trim()) {

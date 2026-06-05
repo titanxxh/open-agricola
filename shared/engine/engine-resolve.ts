@@ -570,6 +570,7 @@ export function engineResolveChoice(
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
+      executionContext.costHookResults = costResults
       const eventFrame = int.events.beginFrame({
         actorPlayerId: executionContext.player.id,
         sourceActionId: actionId,
@@ -905,6 +906,7 @@ export function engineResolveChoice(
     )
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
+    executionContext.costHookResults = costResults
   }
   pendingHost?.clearPending()
   let result: ActionExecutionResult

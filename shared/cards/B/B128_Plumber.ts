@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
+import type { Bonus } from '../../contract/types'
 
 const CARD_ID = 'B128_Plumber'
 const triggerListener: CardListenerRegistration = {
@@ -36,11 +37,19 @@ const costListener: CardListenerRegistration = {
     if (context.sourceCard !== CARD_ID) return
     const renovation = getRenovation(context.player)
     if (!renovation) return
+    const bonus = (resource: 'clay' | 'stone'): Bonus => ({
+      choices: [
+        { discount: { [resource]: 1 } },
+        { discount: { [resource]: 2 } },
+      ],
+      optional: false,
+      sources: [CARD_ID],
+    })
     if (renovation.nextType === 'clay') {
-      return { costs: { clay: -2 } }
+      return { bonuses: [bonus('clay')] }
     }
     if (renovation.nextType === 'stone') {
-      return { costs: { stone: -2 } }
+      return { bonuses: [bonus('stone')] }
     }
   },
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards/C/C88_CarpentersApprentice'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'
@@ -191,6 +192,55 @@ describe('construct room payment session', () => {
     expect(resp.state.players[0]!.rooms).toBe(4)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
+  })
+
+  it('attributes Carpenter\'s Apprentice construct discount as a derived cost candidate', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 3,
+      reed: 2,
+    }
+    player.occupationPlayed.push('C88_CarpentersApprentice')
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const constructOption = resp.interaction.options?.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.rooms).toBe(3)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.resources.reed).toBe(0)
+
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'construct',
+        resources: { wood: 3, reed: 2 },
+        bonusSources: ['C88_CarpentersApprentice'],
+      }),
+    ]))
   })
 
   it('returns to farm-expansion choice after building a room when stables remain possible', () => {
