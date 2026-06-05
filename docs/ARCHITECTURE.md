@@ -538,6 +538,9 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
+- `costCandidateSourceCards?: string[][]` —— 与 `fees` 同下标的候选来源 metadata。它由 Cost Candidate Deriver 生成，进入 `PaymentSolution.sourceCards` 和 payment option `sourceCards` 展示；不参与费用可支付性和规则判定。
+
+**Cost Candidate Deriver**：`computeCosts.improvement` listener 可返回 `candidateDerivers`。支付预览先把 `fee/fees` 展开成 Cost Candidate，再按 listener 顺序应用强制 `costs` delta（每步 clamp 到 0），然后用朴素 DFS/backtracking 对 deriver 做闭包：每个 deriver 在同一 branch 最多应用一次，返回 0 条表示当前 candidate 不适用，返回多条表示追加多个候选。原 candidate 永远保留，派生结果若包含负 cost 直接报机制错误。DFS visited key 包含 normalized cost、`feeIndex` 和已应用 deriver id，不包含 provenance；最终只合并 normalized cost 完全相同的候选并 union `metadata.sourceCards`，不做 domination/Pareto 剔除。第一阶段只支持 `actionId='improvement'`，deriver id 必须全局唯一，card-level listener 的 `sourceCardId` 必须匹配 owner card。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
@@ -593,7 +596,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, reserveResources?, sourceCard? }`。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, candidateDerivers?, reserveResources?, sourceCard? }`。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。`candidateDerivers` 只允许 `computeCosts.improvement` listener 返回。
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
