@@ -182,6 +182,31 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     })).toBe(true)
   })
 
+  it('maps derived candidate array positions back to original feeIndex', () => {
+    const player = baseTestPlayer({ wood: 1, food: 1, clay: 1, stone: 1 })
+    const sols = computeAllBuyableCombinations(player, {
+      fees: [{ wood: 1 }, { food: 1 }, { clay: 1 }, { stone: 1 }],
+      costCandidateSourceCards: [[], ['D117_WoodExpert'], [], []],
+      costCandidateFeeIndices: [0, 0, 1, 2],
+    })
+
+    expect(sols).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        resourcesPaid: expect.objectContaining({ food: 1 }),
+        feeIndex: 0,
+        sourceCards: ['D117_WoodExpert'],
+      }),
+      expect.objectContaining({
+        resourcesPaid: expect.objectContaining({ clay: 1 }),
+        feeIndex: 1,
+      }),
+      expect.objectContaining({
+        resourcesPaid: expect.objectContaining({ stone: 1 }),
+        feeIndex: 2,
+      }),
+    ]))
+  })
+
   it('B145 renovation can replace 2 reed with 1 wood', () => {
     const player = baseTestPlayer({ stone: 2, food: 2, wood: 1 })
     player.activeModifiers = [{

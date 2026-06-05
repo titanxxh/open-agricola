@@ -212,6 +212,36 @@ describe('resolveCardCostWithModifiers', () => {
     expect(result.costCandidateSourceCards).toEqual([[], ['HookDeriver']])
   })
 
+  it('preserves printed duplicate costs as separate un-attributed candidates', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDeriver']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-deriver', cardIds: ['HookDeriver'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({
+        candidateDerivers: [{
+          id: 'HookDeriver:wood-to-food',
+          sourceCardId: 'HookDeriver',
+          derive(candidate) {
+            const wood = candidate.cost.wood ?? 0
+            if (wood <= 0) return []
+            return [{ cost: { food: 1, wood: wood - 1 } }]
+          },
+        }],
+      }),
+    })
+
+    const result = resolveCardCostWithModifiers(
+      state, player, 'improvement', 'Major_Basket', { fees: [{ wood: 1 }, { food: 1 }] },
+    ) as ComplexCost
+
+    expect(result.fees).toEqual([{ wood: 1 }, { food: 1 }, { food: 1 }])
+    expect(result.costCandidateSourceCards).toEqual([[], ['HookDeriver'], []])
+    expect(result.costCandidateFeeIndices).toEqual([0, 0, 1])
+  })
+
   it('applies mandatory costs deltas before candidateDerivers', () => {
     const player = createPlayer()
     player.occupationPlayed = ['HookDelta', 'HookDeriver']

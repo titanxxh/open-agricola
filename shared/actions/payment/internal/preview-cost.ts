@@ -79,7 +79,9 @@ const buildCostFromCandidates = (
   const baseComplex = isComplexCost(baseCost) ? baseCost : undefined
   const fees = candidates.map((candidate) => candidate.cost)
   const costCandidateSourceCards = candidates.map((candidate) => candidate.metadata.sourceCards)
+  const costCandidateFeeIndices = candidates.map((candidate, index) => candidate.feeIndex ?? index)
   const hasCostCandidateSources = costCandidateSourceCards.some((sourceCards) => sourceCards.length > 0)
+  const hasCostCandidateFeeIndexRemap = costCandidateFeeIndices.some((feeIndex, index) => feeIndex !== index)
   if (!baseComplex && fees.length === 1 && collectedBonuses.length === 0 && collectedTrades.length === 0 && !hasCostCandidateSources) {
     return fees[0] ?? {}
   }
@@ -89,6 +91,7 @@ const buildCostFromCandidates = (
   if (baseComplex?.nb !== undefined) complexCost.nb = baseComplex.nb
   if (baseComplex?.cards) complexCost.cards = baseComplex.cards
   if (baseComplex?.costCandidateSourceCards) complexCost.costCandidateSourceCards = baseComplex.costCandidateSourceCards
+  if (baseComplex?.costCandidateFeeIndices) complexCost.costCandidateFeeIndices = baseComplex.costCandidateFeeIndices
   if (fees.length === 1 && !baseComplex?.fees) {
     complexCost.fee = fees[0] ?? {}
   } else {
@@ -96,6 +99,9 @@ const buildCostFromCandidates = (
   }
   if (hasCostCandidateSources) {
     complexCost.costCandidateSourceCards = costCandidateSourceCards
+  }
+  if (hasCostCandidateFeeIndexRemap) {
+    complexCost.costCandidateFeeIndices = costCandidateFeeIndices
   }
   const trades = [
     ...(baseComplex?.trades ?? []),

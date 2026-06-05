@@ -173,7 +173,7 @@ describe('cost candidate derivation', () => {
     ])
   })
 
-  it('keeps fee identity in visited keys but removes it from final duplicate keys', () => {
+  it('keeps equal costs from different fee identities separate', () => {
     const addFood: CostCandidateDeriver = {
       id: 'AddFood',
       sourceCardId: 'AddFood',
@@ -196,7 +196,11 @@ describe('cost candidate derivation', () => {
     )).toEqual([
       expect.objectContaining({
         feeIndex: 0,
-        metadata: { sourceCards: ['base-0', 'AddFood', 'base-1'] },
+        metadata: { sourceCards: ['base-0', 'AddFood'] },
+      }),
+      expect.objectContaining({
+        feeIndex: 1,
+        metadata: { sourceCards: ['base-1', 'AddFood'] },
       }),
     ])
   })

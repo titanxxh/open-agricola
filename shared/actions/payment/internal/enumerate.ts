@@ -611,6 +611,8 @@ export const computeAllBuyableCombinations = (
     : effectiveCost.fee
       ? [effectiveCost.fee]
       : [{}]
+  const feeIndexForCandidate = (candidateIndex: number): number =>
+    effectiveCost.costCandidateFeeIndices?.[candidateIndex] ?? candidateIndex
   // Clamp negative resource entries to 0 after merging fees + unitFee*nb.
   // Negative deltas (e.g. D154_ChimneySweep `costs: { stone: -2 }`) cancel
   // against the matching positive amount in unitFee×nb. They MUST NOT remain
@@ -769,7 +771,7 @@ export const computeAllBuyableCombinations = (
               preservedOriginalFor: preservedOriginalFor.length > 0 ? preservedOriginalFor : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
-              feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
+              feeIndex: baseFeesRaw.length > 1 ? feeIndexForCandidate(feeIdx) : undefined,
               sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
             })
           }
