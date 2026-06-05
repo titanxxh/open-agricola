@@ -7,10 +7,17 @@ import '../../shared/cards/B/B43_Chophouse'
 
 const CARD_ID = 'D117_WoodExpert'
 
+type PaymentLabel = {
+  resourcesPaid?: Record<string, number>
+  sourceCards?: string[]
+}
+
 const setup = (opts?: {
   food?: number
   wood?: number
   clay?: number
+  stone?: number
+  reed?: number
   minor?: string
 }) => {
   const session = new GameSession(/* seed */ 1)
@@ -27,13 +34,16 @@ const setup = (opts?: {
     food: opts?.food ?? 10,
     wood: opts?.wood ?? 0,
     clay: opts?.clay ?? 0,
+    stone: opts?.stone ?? 0,
+    reed: opts?.reed ?? 0,
   }
   if (!player.occupationPlayed.includes(CARD_ID)) {
     player.occupationPlayed.push(CARD_ID)
   }
-  if (opts?.minor && !player.minorHand.includes(opts.minor)) {
-    player.minorHand.push(opts.minor)
-  }
+  player.minorHand = [opts?.minor ?? '__test_placeholder__']
+  player.occupationHand = ['__test_placeholder__']
+  state.players[1]!.minorHand = ['__test_placeholder__']
+  state.players[1]!.occupationHand = ['__test_placeholder__']
   state.players[1]!.workersAvailable = 2
 
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
@@ -44,19 +54,58 @@ const setup = (opts?: {
   return session
 }
 
-const chooseMinor = (
+const chooseImprovement = (
   session: GameSession,
   response: ReturnType<GameSession['takeAction']>,
-  cardId: string,
+  value: string,
 ) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  if (response.interaction.request.kind === 'confirm-next-player') return response
+  if (response.interaction.promptKey === 'prompt.selectPayment') return response
+  const option = response.interaction.options?.find((entry) => entry.value === value)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
 
-describe('D117_WoodExpert session — computeCosts trades', () => {
+const chooseMinor = (
+  session: GameSession,
+  response: ReturnType<GameSession['takeAction']>,
+  cardId: string,
+) => chooseImprovement(session, response, `minor:${cardId}`)
+
+const paymentLabels = (response: ReturnType<GameSession['takeAction']>) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return []
+  expect(response.interaction.promptKey).toBe('prompt.selectPayment')
+  return (response.interaction.options ?? []).map((option) => ({
+    value: option.value,
+    label: option.labelParams as PaymentLabel | undefined,
+  }))
+}
+
+const hasPaid = (
+  label: PaymentLabel | undefined,
+  expected: Record<string, number>,
+) => !!label?.resourcesPaid && Object.entries(expected).every(
+  ([key, value]) => (label.resourcesPaid?.[key] ?? 0) === value,
+)
+
+describe('D117_WoodExpert session — candidate cost derivation', () => {
+  it('major wood cost preserves original candidate and offers derived candidate with source', () => {
+    const session = setup({ food: 10, wood: 2, stone: 2 })
+    let resp = session.takeAction(0, 'major-improvement')
+    resp = chooseImprovement(session, resp, 'major:Major_Joinery')
+    const labels = paymentLabels(resp)
+    const original = labels.find(({ label }) => hasPaid(label, { wood: 2, stone: 2, food: 0 }))
+    const derived = labels.find(({ label }) => hasPaid(label, { wood: 0, stone: 2, food: 1 }))
+    expect(original).toBeDefined()
+    expect(derived).toBeDefined()
+    expect(original?.label?.sourceCards ?? []).toEqual([])
+    expect(derived?.label?.sourceCards).toContain(CARD_ID)
+    expect(derived?.value).toMatch(/^pay:/)
+  })
+
   it('cost wood:1 minor + food=10 wood=2 → multi-solution choice', () => {
     const session = setup({ food: 10, wood: 2, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
@@ -100,64 +149,33 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
   })
 
   it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + wood-trade + clay-base', () => {
-    // After pay-helpers stops short-circuiting on ComplexCost, D117 trade is
-    // appended to the ComplexCost.trades list and computeAllBuyableCombinations
-    // enumerates it per fee. With food=10 wood=2 clay=2 we expect at least
-    // three meaningful solutions: wood:2 (no trade), wood:0+food:1 (trade), and
-    // clay:2 (no trade). pay.ts may emit additional combinations when trades
-    // are applied to non-wood fees; we only assert the spec-mandated three.
     const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
     resp = chooseMinor(session, resp, 'B43_Chophouse')
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(3)
-    const getPaid = (o: typeof resp.interaction.options[number]) =>
-      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
-        | Record<string, number>
-        | undefined
-    const woodBase = resp.interaction.options?.find((o) => {
-      const paid = getPaid(o)
-      return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
-    })
-    const woodTrade = resp.interaction.options?.find((o) => {
-      const paid = getPaid(o)
-      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
-    })
-    const clayBase = resp.interaction.options?.find((o) => {
-      const paid = getPaid(o)
-      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 2 && (paid.food ?? 0) === 0
-    })
+    const labels = paymentLabels(resp)
+    expect(labels.length).toBeGreaterThanOrEqual(3)
+    const woodBase = labels.find(({ label }) => hasPaid(label, { wood: 2, clay: 0, food: 0 }))
+    const woodDerived = labels.find(({ label }) => hasPaid(label, { wood: 0, clay: 0, food: 1 }))
+    const clayBase = labels.find(({ label }) => hasPaid(label, { wood: 0, clay: 2, food: 0 }))
     expect(woodBase).toBeDefined()
-    expect(woodTrade).toBeDefined()
+    expect(woodDerived).toBeDefined()
     expect(clayBase).toBeDefined()
+    expect(woodBase?.label?.sourceCards ?? []).toEqual([])
+    expect(woodDerived?.label?.sourceCards).toContain(CARD_ID)
+    expect(clayBase?.label?.sourceCards ?? []).toEqual([])
   })
 
   it('altCosts minor + food=10 wood=2 clay=0 → wood-base + wood-trade (clay alt unaffordable)', () => {
-    // food=10 wood=2 clay=0 — wood-base (wood:2) and wood-trade (wood:0+food:1)
-    // are affordable; clay-base alt (clay:2) is not.
     const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
     resp = chooseMinor(session, resp, 'B43_Chophouse')
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
-    const getPaid = (o: typeof resp.interaction.options[number]) =>
-      (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
-        | Record<string, number>
-        | undefined
-    const woodBase = resp.interaction.options?.find((o) => {
-      const paid = getPaid(o)
-      return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
-    })
-    const woodTrade = resp.interaction.options?.find((o) => {
-      const paid = getPaid(o)
-      return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
-    })
+    const labels = paymentLabels(resp)
+    expect(labels.length).toBeGreaterThanOrEqual(2)
+    const woodBase = labels.find(({ label }) => hasPaid(label, { wood: 2, clay: 0, food: 0 }))
+    const woodDerived = labels.find(({ label }) => hasPaid(label, { wood: 0, clay: 0, food: 1 }))
     expect(woodBase).toBeDefined()
-    expect(woodTrade).toBeDefined()
+    expect(woodDerived).toBeDefined()
   })
 })
