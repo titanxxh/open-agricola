@@ -1,8 +1,7 @@
 import { defineOccupationCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D117_WoodExpert'
@@ -21,10 +20,7 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.cardId) return
-    const woodInCost = getPrintedImprovementResourceCost(context.cardId, 'wood')
-    if (woodInCost <= 0) return
+  handler: (): ActionHookResult => {
     return {
       candidateDerivers: [
         {
