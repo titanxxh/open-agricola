@@ -38,6 +38,7 @@ const collectPaymentSolutionSources = (
   if (solution.bonusUsed) {
     solution.bonusUsed.split(',').forEach(add)
   }
+  solution.sourceCards?.forEach(add)
   solution.tradesUsed.forEach(({ trade }) => {
     if (trade.sourceId) add(trade.sourceId)
   })

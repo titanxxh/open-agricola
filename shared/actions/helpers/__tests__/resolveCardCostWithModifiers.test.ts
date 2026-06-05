@@ -209,6 +209,7 @@ describe('resolveCardCostWithModifiers', () => {
     ) as ComplexCost
 
     expect(result.fees).toEqual([{ wood: 1 }, { food: 1 }])
+    expect(result.costCandidateSourceCards).toEqual([[], ['HookDeriver']])
   })
 
   it('applies mandatory costs deltas before candidateDerivers', () => {

@@ -1095,6 +1095,52 @@ describe('payAction: ComplexCost multi-solution choice', () => {
     expect(player.resources.food).toBe(2)
   })
 
+  it('cost candidate source cards reach solutions, pending options, and extraData', () => {
+    const player = createMockPlayer({ wood: 1, food: 1 })
+    const cost: ComplexCost = {
+      fees: [{ wood: 1 }, { food: 1 }],
+      costCandidateSourceCards: [[], ['D117_WoodExpert']],
+    }
+    const solutions = computeAllBuyableCombinations(player, cost)
+    const derivedSolution = solutions.find(
+      (solution) => (solution.resourcesPaid.food ?? 0) === 1,
+    )
+    expect(derivedSolution?.sourceCards).toEqual(['D117_WoodExpert'])
+
+    const pending = buildPaymentChoiceResult(solutions, 'pay:candidate')
+    expect(pending.type).toBe('request')
+    if (pending.type !== 'request') throw new Error('expected request')
+    if (pending.request.kind !== 'choice') throw new Error('expected choice kind')
+    const derivedOption = pending.request.options.find((option) => {
+      const paid = (
+        (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+          ?.resourcesPaid ?? {}
+      )
+      return paid.food === 1
+    })
+    expect((derivedOption?.labelParams as { sourceCards?: string[] } | undefined)?.sourceCards).toEqual(['D117_WoodExpert'])
+    expect(derivedOption?.effectPreview).toMatchObject({
+      kind: 'payment',
+      sourceCards: ['D117_WoodExpert'],
+    })
+
+    const { result, capturedEvents } = callPay(player, {
+      cost,
+      optionPrefix: 'pay:candidate',
+      paymentChoice: derivedOption!.value,
+    })
+    expect(result.type).toBe('ok')
+    if (result.type === 'ok') {
+      expect(result.extraData?.sourceCards).toEqual(['D117_WoodExpert'])
+    }
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        bonusSources: ['D117_WoodExpert'],
+      }),
+    ])
+  })
+
   it('multi-choice bonus: extraData.bonusChoiceIndex carries chosen index', () => {
     const player = createMockPlayer({ wood: 3, clay: 3 })
     const cost: ComplexCost = {

@@ -107,6 +107,7 @@ const attachImprovementPayment = (
   improvementId: string,
   resourcesPaid: NonNullable<PaymentInfo['resourcesPaid']>,
   returnedCardId?: string,
+  sourceCards?: string[],
 ): SuccessfulImprovementResult => {
   result.extraData = {
     ...(result.extraData ?? {}),
@@ -114,6 +115,7 @@ const attachImprovementPayment = (
       improvementId,
       resourcesPaid: getPositiveResourceLog(resourcesPaid) ?? {},
       ...(returnedCardId ? { returnedCardId } : {}),
+      ...(sourceCards && sourceCards.length > 0 ? { bonusSources: [...sourceCards], sourceCards: [...sourceCards] } : {}),
     },
   }
   return result
@@ -233,7 +235,7 @@ const commitImprovementPurchase = (
       sourceCardId: improvementId,
     })
   }
-  return attachImprovementPayment({ type: 'ok' }, improvementId, costResources, paymentInfo.returnedCardId)
+  return attachImprovementPayment({ type: 'ok' }, improvementId, costResources, paymentInfo.returnedCardId, paymentInfo.sourceCards)
 }
 
 const finalizeMajorImprovementPurchase = (
@@ -250,7 +252,7 @@ const finalizeMajorImprovementPurchase = (
   const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
 
-  return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
+  return attachImprovementPayment(result, improvementId, costResources, returnedMajorId, paymentInfo.sourceCards)
 }
 
 const finalizeMinorImprovementPurchase = (
@@ -270,12 +272,13 @@ const finalizeMinorImprovementPurchase = (
       improvement.id,
       costResources,
       returnedCardId,
+      paymentInfo.sourceCards,
     )
   }
 
   return attachImprovementPayment({
     type: 'ok',
-  }, improvement.id, costResources, returnedCardId)
+  }, improvement.id, costResources, returnedCardId, paymentInfo.sourceCards)
 }
 
 const readImprovementCommitData = (
@@ -326,6 +329,7 @@ const resolveImprovementPayment = (
       resourcesPaid: PaymentResourceMap
       feeIndex?: number
       returnedCardId?: string
+      sourceCards?: string[]
     } => {
   const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
   const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
@@ -353,6 +357,7 @@ const resolveImprovementPayment = (
     resourcesPaid: resolved.solution.resourcesPaid,
     feeIndex: resolved.solution.feeIndex,
     returnedCardId,
+    sourceCards: resolved.solution.sourceCards,
   }
 }
 
@@ -392,6 +397,7 @@ const playMajorImprovement = (
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
+    sourceCards: resolvedPayment.sourceCards,
   }
   return finalizeMajorImprovementPurchase(
     state,
@@ -455,6 +461,7 @@ export const playMinorImprovement = (
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
+    sourceCards: resolvedPayment.sourceCards,
   }
   return finalizeMinorImprovementPurchase(
     state,

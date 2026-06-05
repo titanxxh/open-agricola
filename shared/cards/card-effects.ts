@@ -59,6 +59,7 @@ export type PaymentInfo = {
   resourcesPaid: PaymentResourceMap
   feeIndex?: number
   returnedCardId?: string
+  sourceCards?: string[]
 }
 
 export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'

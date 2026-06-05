@@ -95,7 +95,11 @@ export const expandCostCandidates = (
   ): CostCandidate => ({
     cost: normalizeCost(fee),
     feeIndex,
-    metadata: { sourceCards: [] },
+    metadata: {
+      sourceCards: isComplexCost(cost)
+        ? cost.costCandidateSourceCards?.[feeIndex ?? 0] ?? []
+        : [],
+    },
     applied: new Set(),
   })
 

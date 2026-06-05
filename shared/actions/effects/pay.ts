@@ -56,7 +56,8 @@ export type PayParams = {
  * Pay leaf success result includes `extraData.bonusUsed` (string[] of card ids
  * whose BonusModifier.sources fired this payment), `bonusChoiceIndex`
  * (per-card chosen variant index, only when the bonus had multiple choices),
- * `feeIndex` (which fee variant in a fees[] array was paid), and
+ * `feeIndex` (which fee variant in a fees[] array was paid), `sourceCards`
+ * (card ids whose cost candidates contributed to this payment), and
  * `returnedCardId` (when `includeReturnedCard` was set on params and the
  * payment consumed a card).
  *
@@ -197,12 +198,18 @@ const emitPaidEvent = (
   sourceActionId: string | undefined,
   provenance: {
     bonusUsed?: string
+    sourceCards?: string[]
     bonusChoiceIndex?: Record<string, number>
     returnedCardId?: string
   } = {},
 ) => {
   const paid = positiveResources(resources)
-  const bonusSources = splitSourceIds(provenance.bonusUsed)
+  const bonusSources = [
+    ...new Set([
+      ...splitSourceIds(provenance.bonusUsed),
+      ...(provenance.sourceCards ?? []).map((source) => source.trim()).filter(Boolean),
+    ]),
+  ]
   if (
     Object.keys(paid).length === 0 &&
     bonusSources.length === 0 &&
@@ -245,6 +252,7 @@ const buildSelectedResult = (
   }
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
+    sourceCards: solution.sourceCards,
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
   })
@@ -256,6 +264,9 @@ const buildSelectedResult = (
   }
   if (solution.bonusChoiceIndex) {
     extraData.bonusChoiceIndex = solution.bonusChoiceIndex
+  }
+  if (solution.sourceCards && solution.sourceCards.length > 0) {
+    extraData.sourceCards = [...solution.sourceCards]
   }
   if (solution.cardUsed) {
     extraData.returnedCardId = solution.cardUsed

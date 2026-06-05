@@ -149,6 +149,7 @@ export type ComplexCost = {
   trades?: Trade[]
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
+  costCandidateSourceCards?: string[][]
 }
 
 export type PaymentSolution = {
@@ -159,6 +160,7 @@ export type PaymentSolution = {
   preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
+  sourceCards?: string[]
 }
 
 export type PaymentSource = 'reserve' | 'field' | 'card'
@@ -502,7 +504,7 @@ export type ChoiceEffectPreview =
       kind: 'payment'
       resourcesPaid?: PaymentResourceMap
       cardUsed?: string
-      /** Card ids whose modifiers contributed to this payment (bonus.sources + trade.sourceId). */
+      /** Card ids whose modifiers contributed to this payment. */
       sourceCards?: string[]
     }
   | {
