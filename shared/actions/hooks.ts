@@ -5,6 +5,7 @@ import type {
   ActionFlow,
   Resource,
 } from '../contract/types'
+import type { CostCandidateDeriver } from './cost-candidate-deriver'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 
@@ -61,6 +62,7 @@ export type ActionHookResult = {
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
+  candidateDerivers?: CostCandidateDeriver[]
   reserveResources?: Partial<Resource>
   trades?: import('../contract/types').Trade[]
   bonuses?: import('../contract/types').Bonus[]

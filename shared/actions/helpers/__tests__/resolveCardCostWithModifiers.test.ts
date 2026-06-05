@@ -182,4 +182,113 @@ describe('resolveCardCostWithModifiers', () => {
     expect(result.trades).toHaveLength(1)
     expect(result.bonuses).toHaveLength(1)
   })
+
+  it('turns candidateDerivers into derived fee candidates for improvement costs', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDeriver']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-deriver', cardIds: ['HookDeriver'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({
+        candidateDerivers: [{
+          id: 'HookDeriver:wood-to-food',
+          sourceCardId: 'HookDeriver',
+          derive(candidate) {
+            const wood = candidate.cost.wood ?? 0
+            if (wood <= 0) return []
+            return [{ cost: { food: 1, wood: wood - 1 } }]
+          },
+        }],
+      }),
+    })
+
+    const result = resolveCardCostWithModifiers(
+      state, player, 'improvement', 'Major_Basket', { wood: 1 },
+    ) as ComplexCost
+
+    expect(result.fees).toEqual([{ wood: 1 }, { food: 1 }])
+  })
+
+  it('applies mandatory costs deltas before candidateDerivers', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDelta', 'HookDeriver']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-delta', cardIds: ['HookDelta'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({ costs: { wood: 1 } }),
+    })
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-deriver', cardIds: ['HookDeriver'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({
+        candidateDerivers: [{
+          id: 'HookDeriver:wood-to-food',
+          sourceCardId: 'HookDeriver',
+          derive(candidate) {
+            return (candidate.cost.wood ?? 0) > 0
+              ? [{ cost: { ...candidate.cost, wood: 0, food: 1 } }]
+              : []
+          },
+        }],
+      }),
+    })
+
+    const result = resolveCardCostWithModifiers(
+      state, player, 'improvement', 'Major_Basket', {},
+    ) as ComplexCost
+
+    expect(result.fees).toEqual([{ wood: 1 }, { food: 1 }])
+  })
+
+  it('throws when candidateDerivers are returned for unsupported action ids', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDeriver']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-deriver', cardIds: ['HookDeriver'], phases: ['computeCosts'],
+      actions: ['occupation'],
+      handler: () => ({
+        candidateDerivers: [{
+          id: 'HookDeriver:bad-action',
+          sourceCardId: 'HookDeriver',
+          derive: () => [],
+        }],
+      }),
+    })
+
+    expect(() =>
+      resolveCardCostWithModifiers(
+        state, player, 'occupation', 'Some_Occupation', { food: 1 },
+      ),
+    ).toThrow(/candidateDeriver.*actionId=occupation.*actionId=improvement/)
+  })
+
+  it('throws when a card-level listener returns a mismatched sourceCardId', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDeriver']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-deriver', cardIds: ['HookDeriver'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({
+        candidateDerivers: [{
+          id: 'HookDeriver:wrong-source',
+          sourceCardId: 'OtherCard',
+          derive: () => [],
+        }],
+      }),
+    })
+
+    expect(() =>
+      resolveCardCostWithModifiers(
+        state, player, 'improvement', 'Major_Basket', { wood: 1 },
+      ),
+    ).toThrow(/candidateDeriver.*HookDeriver:wrong-source.*sourceCardId=OtherCard.*ownerCardId=HookDeriver/)
+  })
 })

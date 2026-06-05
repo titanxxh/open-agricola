@@ -306,11 +306,25 @@ export const executeCardListener = (
   context: CardListenerContextInput,
   options?: CardListenerOwnerOptions,
 ): ActionHookResult | undefined => {
-  return (
-    registration.handler(
-      buildCardListenerContext(registration, context, options),
-    ) ?? undefined
-  )
+  const listenerContext = buildCardListenerContext(registration, context, options)
+  const result = registration.handler(listenerContext) ?? undefined
+  if (result?.candidateDerivers?.length) {
+    if (listenerContext.phase !== 'computeCosts') {
+      throw new Error(`candidateDeriver listenerId=${registration.id} phase=${listenerContext.phase} only phase=computeCosts is supported`)
+    }
+    if (listenerContext.actionId !== 'improvement') {
+      throw new Error(`candidateDeriver listenerId=${registration.id} actionId=${listenerContext.actionId} only actionId=improvement is supported`)
+    }
+    for (const deriver of result.candidateDerivers) {
+      if (!deriver.sourceCardId.trim()) {
+        throw new Error(`candidateDeriver listenerId=${registration.id} id=${deriver.id} empty sourceCardId`)
+      }
+      if (listenerContext.ownerCardId && deriver.sourceCardId !== listenerContext.ownerCardId) {
+        throw new Error(`candidateDeriver listenerId=${registration.id} id=${deriver.id} sourceCardId=${deriver.sourceCardId} ownerCardId=${listenerContext.ownerCardId}`)
+      }
+    }
+  }
+  return result
 }
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {

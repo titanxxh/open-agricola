@@ -23,12 +23,85 @@ import type {
   Resource,
   Trade,
 } from '../../../contract/types'
+import type {
+  CostCandidateDerivationContext,
+  CostCandidateDeriver,
+} from '../../cost-candidate-deriver'
 import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
+import { getCardDefinitionById, getCardPrimaryType } from '../../../cards/helpers/card-type'
 import { applyCostOverride, isComplexCost } from './affordability'
+import {
+  applyCostDeltasToCandidates,
+  deriveCostCandidates,
+  expandCostCandidates,
+} from './cost-candidates'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
 import { buildCardCostListenerContext } from './hook-context'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './typed-flat'
+
+const collectTargetCardTypes = (cardId: string): Array<'major' | 'minor'> => {
+  const result: Array<'major' | 'minor'> = []
+  const add = (value: unknown) => {
+    if ((value === 'major' || value === 'minor') && !result.includes(value)) {
+      result.push(value)
+    }
+  }
+  add(getCardPrimaryType(cardId))
+  getCardDefinitionById(cardId)?.alsoCountsAs?.forEach(add)
+  return result
+}
+
+const buildCostCandidateDerivationContext = (
+  actionId: string,
+  cardId: string,
+  actionCardId: string | undefined,
+): CostCandidateDerivationContext => {
+  const targetCardTypes = collectTargetCardTypes(cardId)
+  if (targetCardTypes.length === 0) {
+    throw new Error(`candidateDeriver targetCardId=${cardId} empty targetCardTypes`)
+  }
+  return {
+    actionId,
+    targetCardId: cardId,
+    targetPlayKind: targetCardTypes[0],
+    targetCardTypes,
+    actionCardId,
+  }
+}
+
+const buildCostFromCandidates = (
+  baseCost: PaymentResourceMap | ComplexCost,
+  fees: PaymentResourceMap[],
+  collectedBonuses: Bonus[],
+  collectedTrades: Trade[],
+): PaymentResourceMap | ComplexCost => {
+  const baseComplex = isComplexCost(baseCost) ? baseCost : undefined
+  if (!baseComplex && fees.length === 1 && collectedBonuses.length === 0 && collectedTrades.length === 0) {
+    return fees[0] ?? {}
+  }
+
+  const complexCost: ComplexCost = {}
+  if (baseComplex?.unitFee) complexCost.unitFee = baseComplex.unitFee
+  if (baseComplex?.nb !== undefined) complexCost.nb = baseComplex.nb
+  if (baseComplex?.cards) complexCost.cards = baseComplex.cards
+  if (fees.length === 1 && !baseComplex?.fees) {
+    complexCost.fee = fees[0] ?? {}
+  } else {
+    complexCost.fees = fees
+  }
+  const trades = [
+    ...(baseComplex?.trades ?? []),
+    ...collectedTrades,
+  ]
+  const bonuses = [
+    ...(baseComplex?.bonuses ?? []),
+    ...collectedBonuses,
+  ]
+  if (trades.length > 0) complexCost.trades = trades
+  if (bonuses.length > 0) complexCost.bonuses = bonuses
+  return complexCost
+}
 
 export const resolveCardCostWithModifiers = (
   state: GameState,
@@ -42,7 +115,8 @@ export const resolveCardCostWithModifiers = (
   const matched = getMatchingListeners(context)
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
-  let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
+  const collectedCostDeltas: Partial<Resource>[] = []
+  const collectedDerivers: CostCandidateDeriver[] = []
 
   for (const entry of matched) {
     const listenerContext = {
@@ -51,8 +125,8 @@ export const resolveCardCostWithModifiers = (
       actionCardId,
     }
     const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
-    if (result?.costs && !isComplexCost(baseCost)) {
-      cost = applyCostOverride(cost, result.costs)
+    if (result?.costs) {
+      collectedCostDeltas.push(result.costs)
     }
     if (result?.bonuses) {
       collectedBonuses.push(...result.bonuses)
@@ -60,36 +134,38 @@ export const resolveCardCostWithModifiers = (
     if (result?.trades) {
       collectedTrades.push(...result.trades)
     }
+    if (result?.candidateDerivers) {
+      collectedDerivers.push(...result.candidateDerivers)
+    }
   }
 
-  if (isComplexCost(baseCost)) {
-    if (collectedBonuses.length === 0 && collectedTrades.length === 0) {
-      return baseCost
-    }
-    const merged: ComplexCost = { ...baseCost }
-    if (collectedTrades.length > 0) {
-      merged.trades = [...(baseCost.trades ?? []), ...collectedTrades]
-    }
-    if (collectedBonuses.length > 0) {
-      merged.bonuses = [...(baseCost.bonuses ?? []), ...collectedBonuses]
-    }
-    return merged
+  if (
+    collectedCostDeltas.length === 0 &&
+    collectedDerivers.length === 0 &&
+    collectedBonuses.length === 0 &&
+    collectedTrades.length === 0
+  ) {
+    return baseCost
   }
 
-  if (collectedBonuses.length > 0 || collectedTrades.length > 0) {
-    const complexCost: ComplexCost = {
-      fee: cost,
-    }
-    if (collectedBonuses.length > 0) {
-      complexCost.bonuses = collectedBonuses
-    }
-    if (collectedTrades.length > 0) {
-      complexCost.trades = collectedTrades
-    }
-    return complexCost
-  }
+  const adjustedCandidates = applyCostDeltasToCandidates(
+    expandCostCandidates(baseCost),
+    collectedCostDeltas,
+  )
+  const candidates = collectedDerivers.length > 0
+    ? deriveCostCandidates(
+      adjustedCandidates,
+      collectedDerivers,
+      buildCostCandidateDerivationContext(actionId, cardId, actionCardId),
+    )
+    : adjustedCandidates
 
-  return cost
+  return buildCostFromCandidates(
+    baseCost,
+    candidates.map((candidate) => candidate.cost),
+    collectedBonuses,
+    collectedTrades,
+  )
 }
 
 const resolveCardPreviewCost = (
