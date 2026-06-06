@@ -3,6 +3,21 @@ import type { ComplexCost, GameState, PlayerState } from '../../contract/types'
 import { isComplexCost, resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
 import { getMinorImprovementPreviewCostDetailed } from '../../actions/helpers/improvement-helpers'
 import { setActiveWorkerCount } from '../../domain/player'
+import type { CardImpl } from '../registry'
+import { A20_DoubleTurnPlow_impl } from '../A/A20_DoubleTurnPlow'
+import { A27_OvenSite_impl } from '../A/A27_OvenSite'
+import { A75_LumberMill_impl } from '../A/A75_LumberMill'
+import { A143_Stonecutter_impl } from '../A/A143_Stonecutter'
+import { B36_Bottles_impl } from '../B/B36_Bottles'
+import { B95_MasterBricklayer_impl } from '../B/B95_MasterBricklayer'
+import { C27_Blueprint_impl } from '../C/C27_Blueprint'
+import { C95_BasketWeaver_impl } from '../C/C95_BasketWeaver'
+import { C122_Bricklayer_impl } from '../C/C122_Bricklayer'
+import { D95_SiteManager_impl } from '../D/D95_SiteManager'
+import { D96_Furnisher_impl } from '../D/D96_Furnisher'
+import { D117_WoodExpert_impl } from '../D/D117_WoodExpert'
+import { E27_PiggyBank_impl } from '../E/E27_PiggyBank'
+import { E109_BraidMaker_impl } from '../E/E109_BraidMaker'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -69,6 +84,11 @@ const createState = (player: PlayerState): GameState =>
   }) as unknown as GameState
 
 describe('card-purchase cost candidate cards', () => {
+  const computeCardPurchaseListeners = (impl: CardImpl) =>
+    (impl.listeners ?? []).filter((listener) =>
+      listener.phases?.includes('computeCosts') && listener.actions?.includes('improvement'),
+    )
+
   const expectFeesAndSources = (
     result: ReturnType<typeof resolveCardCostWithModifiersDetailed>,
     fees: NonNullable<ComplexCost['fees']>,
@@ -91,6 +111,40 @@ describe('card-purchase cost candidate cards', () => {
       ),
     )
   }
+
+  it('keeps migrated card-purchase costs on candidate/base-cost APIs', () => {
+    const migratedCandidateImpls = [
+      { id: 'A27_OvenSite', impl: A27_OvenSite_impl },
+      { id: 'A75_LumberMill', impl: A75_LumberMill_impl },
+      { id: 'A143_Stonecutter', impl: A143_Stonecutter_impl },
+      { id: 'B95_MasterBricklayer', impl: B95_MasterBricklayer_impl },
+      { id: 'C27_Blueprint', impl: C27_Blueprint_impl },
+      { id: 'C95_BasketWeaver', impl: C95_BasketWeaver_impl },
+      { id: 'C122_Bricklayer', impl: C122_Bricklayer_impl },
+      { id: 'D95_SiteManager', impl: D95_SiteManager_impl },
+      { id: 'D96_Furnisher', impl: D96_Furnisher_impl },
+      { id: 'D117_WoodExpert', impl: D117_WoodExpert_impl },
+      { id: 'E27_PiggyBank', impl: E27_PiggyBank_impl },
+      { id: 'E109_BraidMaker', impl: E109_BraidMaker_impl },
+    ] satisfies Array<{ id: string, impl: CardImpl }>
+
+    for (const { id, impl } of migratedCandidateImpls) {
+      const listeners = computeCardPurchaseListeners(impl)
+      expect(listeners.length, id).toBeGreaterThan(0)
+      for (const listener of listeners) {
+        expect(listener.computeCardCostCandidates, id).toBeTypeOf('function')
+        expect(listener.handler, id).toBeUndefined()
+      }
+    }
+
+    for (const { id, impl } of [
+      { id: 'A20_DoubleTurnPlow', impl: A20_DoubleTurnPlow_impl },
+      { id: 'B36_Bottles', impl: B36_Bottles_impl },
+    ] satisfies Array<{ id: string, impl: CardImpl }>) {
+      expect(impl.getBaseCosts, id).toBeTypeOf('function')
+      expect(computeCardPurchaseListeners(impl), id).toEqual([])
+    }
+  })
 
   it('simple resource discount cards append sourced candidates', () => {
     const cases = [

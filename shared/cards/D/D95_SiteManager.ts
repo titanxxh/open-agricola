@@ -13,19 +13,9 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
  * MAJOR improvement. When paying its cost, you can replace up to 1 building
  * resource of each type with 1 FOOD each.
  *
- * We express the "up to 1 of each of {wood, clay, stone, reed} → 1 food"
- * substitution as four independent, optional `Bonus` entries emitted from the
- * `computeCosts` hook. The shared bonus expander (`computeAllBuyableCombinations`
- * + `applyOptionalBonus`) then multiplies them out into 2^4 fee variants,
- * `keepOnlyOptimals` prunes Pareto-dominated ones (e.g. "swap stone" on a
- * cost with no stone), and `buildPaymentChoiceResult` surfaces the survivors
- * as a `prompt.selectPayment` choice. The existing `sourceCards` attribution
- * thread then shows "via Site Manager" on each assisted option.
- *
- * BGA also declares `orderComputeCardCosts` (D95 before A143 / C27 / B95).
- * We intentionally do NOT implement listener ordering: our bonus expander
- * unions all orderings via Pareto-optimal enumeration, which is a strict
- * superset of any single ordering's output.
+ * The card-purchase candidate listener appends one sourced replacement
+ * candidate for every non-empty subset of building resources present in the
+ * current candidate, preserving the original candidate.
  */
 const onBuyListener: CardListenerRegistration = {
   id: 'D95-site-manager-onbuy',

@@ -1302,6 +1302,75 @@ describe('InteractionBar', () => {
     expect(html).toContain('Clay Oven')
   })
 
+  it('renders payment source cards from candidate cost metadata', () => {
+    const paymentChoice: PendingChoice = {
+      promptKey: 'prompt.selectPayment',
+      options: [
+        {
+          value: 'pay:test:0',
+          labelKey: 'prompt.selectPaymentOption',
+          labelParams: {
+            resourcesPaid: { wood: 1 },
+            sourceCards: ['D117_WoodExpert'],
+          },
+          effectPreview: {
+            kind: 'payment',
+            resourcesPaid: { wood: 1 },
+            sourceCards: ['D117_WoodExpert'],
+          },
+        },
+      ],
+      playerIndex: 0,
+      spaceId: 'major-improvement',
+    }
+
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={paymentChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('via D117 Wood Expert')
+    expect(html).not.toContain('D117_WoodExpert')
+  })
+
   it('renders recursive action descriptions for composite choice options', () => {
     const compositeChoice: PendingChoice = {
       promptKey: 'ui.interactionChooseOne',
