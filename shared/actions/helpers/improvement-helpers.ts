@@ -12,6 +12,7 @@ import {
 } from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
+import { getActiveCardRegistry } from '../../cards/active-registry'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 export type { ResolvedMinorImprovement }
@@ -128,9 +129,25 @@ export const getPrintedImprovementResourceCost = (
 }
 
 export const getMinorImprovementEffectiveCost = (
-  _player: PlayerState,
+  state: GameState,
+  player: PlayerState,
   improvement: ResolvedMinorImprovement,
+  actionCardId?: string,
 ) => {
+  const getBaseCosts = getActiveCardRegistry()?.getBaseCosts(improvement.id)
+  const dynamicBaseCost = getBaseCosts?.({
+    state,
+    player,
+    cardId: improvement.id,
+    actionId: 'improvement',
+    actionCardId,
+  })
+  if (Array.isArray(dynamicBaseCost)) {
+    return { fees: dynamicBaseCost } as ComplexCost
+  }
+  if (dynamicBaseCost) {
+    return dynamicBaseCost
+  }
   if (improvement.altCosts && improvement.altCosts.length > 0) {
     return { fees: improvement.altCosts } as ComplexCost
   }
@@ -264,7 +281,7 @@ export const getMinorImprovementPreviewCost = (
     player,
     'improvement',
     improvementId,
-    () => getMinorImprovementEffectiveCost(player, improvement),
+    () => getMinorImprovementEffectiveCost(state, player, improvement, actionCardId),
     actionCardId,
   )
   return attachRequiredReturnCards(previewCost, improvement.returnCards)
@@ -283,7 +300,7 @@ export const getMinorImprovementPreviewCostDetailed = (
     player,
     'improvement',
     improvementId,
-    () => getMinorImprovementEffectiveCost(player, improvement),
+    () => getMinorImprovementEffectiveCost(state, player, improvement, actionCardId),
     actionCardId,
   )
   if (!previewCost) return null

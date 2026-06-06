@@ -1,5 +1,6 @@
 import type {
   ActionExecutionResult,
+  CardCostCandidateMetadata,
   ActionFlow,
   ComplexCost,
   CostModifierType,
@@ -20,6 +21,7 @@ export type PayChildOptions = {
   reserveResources?: Partial<Resource>
   includeReturnedCard?: boolean
   sourceActionId?: string
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
 }
 
 export const buildPayChild = (options: PayChildOptions): ActionFlow => {

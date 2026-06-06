@@ -28,6 +28,7 @@ import { buildCardListenerContext, executeCardListener, getMatchingListeners, li
 import { applyCostOverride, isComplexCost } from './affordability'
 import {
   buildCandidateMetadataByFeeIndex,
+  cardCostCandidatesEqual,
   dedupeCardCostCandidates,
   normalizeCardCostCandidates,
 } from './card-cost-candidates'
@@ -69,10 +70,13 @@ export const resolveCardCostWithModifiersDetailed = (
         listenerContext,
         listenerOwnerOptions(entry),
       )
-      candidates = dedupeCardCostCandidates(
+      const nextCandidates = dedupeCardCostCandidates(
         entry.registration.computeCardCostCandidates(builtContext, candidates),
       )
-      usedCandidatePipeline = true
+      if (!cardCostCandidatesEqual(candidates, nextCandidates)) {
+        usedCandidatePipeline = true
+      }
+      candidates = nextCandidates
     }
     const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
     if (result?.costs && !isComplexCost(baseCost)) {
