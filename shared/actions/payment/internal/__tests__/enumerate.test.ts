@@ -158,7 +158,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(sols2[0]?.resourcesPaid.wood).toBe(10)
   })
 
-  it('optional bonus with preserveOriginal keeps original and discounted paths', () => {
+  it('optional bonus keeps original and discounted paths', () => {
     const player = baseTestPlayer({ wood: 2, stone: 2 })
     const cost: ComplexCost = {
       fee: { wood: 2, stone: 2 },
@@ -166,7 +166,6 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
         discount: { stone: 1 },
         optional: true,
         sources: ['C27_Blueprint'],
-        preserveOriginal: true,
       }],
     }
 

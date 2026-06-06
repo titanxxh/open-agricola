@@ -29,7 +29,6 @@ const computeCostsListener: CardListenerRegistration = {
         discount: { stone: 1 },
         optional: true,
         sources: [CARD_ID],
-        preserveOriginal: true,
       }],
     }
   },

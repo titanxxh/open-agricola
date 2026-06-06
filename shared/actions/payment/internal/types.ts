@@ -17,7 +17,6 @@ export type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
-  preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
