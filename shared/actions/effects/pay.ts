@@ -52,6 +52,7 @@ export type PayParams = {
   playedCards?: string[]
   reserveResources?: Partial<Resource>
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+  trackSourceCardPaymentStats?: boolean
 }
 
 /**
@@ -100,6 +101,7 @@ const PAY_PARAM_KEYS = new Set([
   'playedCards',
   'reserveResources',
   'candidateMetadataByFeeIndex',
+  'trackSourceCardPaymentStats',
 ])
 
 const looksLikeFlatResource = (
@@ -149,6 +151,9 @@ const normalizePaymentChoiceValue = (
     ? paymentChoice.slice(prefix.length)
     : paymentChoice
 }
+
+const shouldTrackSourceCardPaymentStats = (p: PayParams): boolean =>
+  p.trackSourceCardPaymentStats ?? p.costType === undefined
 
 const resolvePayActionPaymentSelection = (
   state: GameState,
@@ -245,13 +250,14 @@ const buildSelectedResult = (
   eventSink?: EventSink,
   sourceActionId?: string,
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>,
+  trackSourceCardPaymentStats = costType === undefined,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
   const resourcesPaid = solution.resourcesPaid
-  if (sourceCard) {
+  if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
@@ -369,6 +375,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         p.candidateMetadataByFeeIndex,
+        shouldTrackSourceCardPaymentStats(p),
       )
     }
     const flat = p.cost as PaymentResourceMap
@@ -404,6 +411,8 @@ export const payAction: ActionDefinition = {
           p.includeReturnedCard,
           eventSink,
           p.sourceActionId,
+          undefined,
+          shouldTrackSourceCardPaymentStats(p),
         )
       }
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
@@ -423,7 +432,7 @@ export const payAction: ActionDefinition = {
         bonusChoiceIndex: detailed.bonusChoiceIndex,
         returnedCardId: detailed.cardUsed,
       })
-      if (sourceCard) {
+      if (sourceCard && shouldTrackSourceCardPaymentStats(p)) {
         addCardResourcePaid(player, sourceCard, resourcesPaid)
         return { type: 'ok', resourcesPaid, extraData }
       }
@@ -441,7 +450,7 @@ export const payAction: ActionDefinition = {
     payResources(player, flat)
     paySupplyTokens(player, flat)
     emitPaidEvent(eventSink, player, flat, p.costType, sourceCard, p.sourceActionId)
-    if (sourceCard) {
+    if (sourceCard && shouldTrackSourceCardPaymentStats(p)) {
       addCardResourcePaid(player, sourceCard, flat)
       return { type: 'ok', resourcesPaid: flat }
     }
@@ -499,6 +508,8 @@ export const payAction: ActionDefinition = {
         p.includeReturnedCard,
         eventSink,
         p.sourceActionId,
+        undefined,
+        shouldTrackSourceCardPaymentStats(p),
       )
     }
     if (!PaymentSolver.isComplexCost(p.cost)) {
@@ -549,6 +560,7 @@ export const payAction: ActionDefinition = {
       eventSink,
       p.sourceActionId,
       p.candidateMetadataByFeeIndex,
+      shouldTrackSourceCardPaymentStats(p),
     )
   },
 }

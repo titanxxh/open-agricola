@@ -128,6 +128,10 @@ _Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
 玩家在多个基础成本候选之间选择的路径身份；它可以影响后续卡牌效果，且不等同于最终实际支付掉的资源明细。
 _Avoid_: PaymentSolution、实际扣减资源、Trade
 
+**Cost Attribution（成本归因）**:
+卡牌改变成本后，用于卡牌统计展示的 saved / paid 归因。它描述“这张卡让成本少付或额外多付了什么”，不表示这张卡拥有整笔支付，也不表示一次真实资源移动。
+_Avoid_: Payment Path、resource.paid、整笔行动支付归属
+
 **Scoring Reserve**:
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
 _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减

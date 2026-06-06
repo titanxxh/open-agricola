@@ -31,6 +31,7 @@ import type {
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import { A28_ForestSchool } from '../../../cards/A/A28_ForestSchool'
 import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.impl.modifiers![0] as TradeModifier
 
@@ -982,6 +983,40 @@ describe('payAction', () => {
         ],
       },
     ])
+  })
+
+  it('does not attribute typed action payments to the source card by default', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const { result } = callPay(
+      player,
+      { cost: { wood: 2 }, costType: 'construct' },
+      { sourceCard: 'A128_RiparianBuilder' },
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'A128_RiparianBuilder')).toBeUndefined()
+  })
+
+  it('honors explicit source-card payment stat tracking for card-effect payments', () => {
+    const disabledPlayer = createMockPlayer({ food: 3 })
+    const disabled = callPay(
+      disabledPlayer,
+      { cost: { food: 1 }, trackSourceCardPaymentStats: false },
+      { sourceCard: 'B82_ValueAssets' },
+    )
+
+    expect(disabled.result.type).toBe('ok')
+    expect(readCardResourceStats(disabledPlayer, 'B82_ValueAssets')).toBeUndefined()
+
+    const enabledPlayer = createMockPlayer({ food: 3 })
+    const enabled = callPay(
+      enabledPlayer,
+      { cost: { food: 1 }, trackSourceCardPaymentStats: true },
+      { sourceCard: 'B82_ValueAssets' },
+    )
+
+    expect(enabled.result.type).toBe('ok')
+    expect(readCardResourceStats(enabledPlayer, 'B82_ValueAssets')?.paid).toEqual({ food: 1 })
   })
 })
 
