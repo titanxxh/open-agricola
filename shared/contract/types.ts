@@ -150,9 +150,17 @@ export type ComplexCost = {
   bonuses?: Bonus[]
 }
 
+export type CostAttribution = {
+  saved?: PaymentResourceMap
+  paid?: PaymentResourceMap
+}
+
+export type CostAttributionBySource = Record<string, CostAttribution>
+
 export type CardCostCandidateMetadata = {
   originalFeeIndex: number
   sources: string[]
+  costAttribution?: CostAttributionBySource
 }
 
 export type CardCostCandidate = CardCostCandidateMetadata & {

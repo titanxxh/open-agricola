@@ -239,10 +239,26 @@ describe('resolveCardCostWithModifiers', () => {
       0: { originalFeeIndex: 0, sources: [] },
       1: { originalFeeIndex: 1, sources: [] },
       2: { originalFeeIndex: 2, sources: [] },
-      3: { originalFeeIndex: 0, sources: ['HookA'] },
-      4: { originalFeeIndex: 2, sources: ['HookA'] },
-      5: { originalFeeIndex: 0, sources: ['HookA', 'HookB'] },
-      6: { originalFeeIndex: 2, sources: ['HookA', 'HookB'] },
+      3: {
+        originalFeeIndex: 0,
+        sources: ['HookA'],
+        costAttribution: { HookA: { saved: { wood: 1 } } },
+      },
+      4: {
+        originalFeeIndex: 2,
+        sources: ['HookA'],
+        costAttribution: { HookA: { saved: { wood: 2 } } },
+      },
+      5: {
+        originalFeeIndex: 0,
+        sources: ['HookA', 'HookB'],
+        costAttribution: { HookA: { saved: { wood: 1 } } },
+      },
+      6: {
+        originalFeeIndex: 2,
+        sources: ['HookA', 'HookB'],
+        costAttribution: { HookA: { saved: { wood: 2 } } },
+      },
     })
   })
 
@@ -278,8 +294,61 @@ describe('resolveCardCostWithModifiers', () => {
     expect(cost.fees).toEqual([{ wood: 1 }, { wood: 0 }, { wood: 0 }])
     expect(result.candidateMetadataByFeeIndex).toEqual({
       0: { originalFeeIndex: 0, sources: [] },
-      1: { originalFeeIndex: 0, sources: ['HookA'] },
-      2: { originalFeeIndex: 0, sources: ['HookB'] },
+      1: {
+        originalFeeIndex: 0,
+        sources: ['HookA'],
+        costAttribution: { HookA: { saved: { wood: 1 } } },
+      },
+      2: {
+        originalFeeIndex: 0,
+        sources: ['HookB'],
+        costAttribution: { HookB: { saved: { wood: 1 } } },
+      },
+    })
+  })
+
+  it('records actual saved attribution on discounted card-purchase candidates', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookDiscount']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-discount', cardIds: ['HookDiscount'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => undefined,
+      computeCardCostCandidates: (_context, candidates) =>
+        appendDiscountedCardCostCandidates(candidates, 'HookDiscount', { wood: 2 }),
+    })
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { fees: [{ wood: 1 }, { wood: 3 }, { clay: 2 }] },
+    )
+    const cost = result.cost as ComplexCost
+    expect(cost.fees).toEqual([
+      { wood: 1 },
+      { wood: 3 },
+      { clay: 2 },
+      { wood: 0 },
+      { wood: 1 },
+    ])
+    expect(result.candidateMetadataByFeeIndex).toEqual({
+      0: { originalFeeIndex: 0, sources: [] },
+      1: { originalFeeIndex: 1, sources: [] },
+      2: { originalFeeIndex: 2, sources: [] },
+      3: {
+        originalFeeIndex: 0,
+        sources: ['HookDiscount'],
+        costAttribution: { HookDiscount: { saved: { wood: 1 } } },
+      },
+      4: {
+        originalFeeIndex: 1,
+        sources: ['HookDiscount'],
+        costAttribution: { HookDiscount: { saved: { wood: 2 } } },
+      },
     })
   })
 
