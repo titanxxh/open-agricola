@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, CardCostCandidate, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -57,7 +57,11 @@ export type CardListenerRegistration = {
    * a trigger-select ParallelNode when two or more match.
    */
   dispatchMode?: CardListenerDispatchMode
-  handler: (context: CardListenerContext) => ActionHookResult | void
+  computeCardCostCandidates?: (
+    context: CardListenerContext,
+    candidates: readonly CardCostCandidate[],
+  ) => CardCostCandidate[]
+  handler?: (context: CardListenerContext) => ActionHookResult | void
 }
 
 export const getRegisteredCardListeners = (): CardListenerRegistration[] => {
@@ -306,6 +310,7 @@ export const executeCardListener = (
   context: CardListenerContextInput,
   options?: CardListenerOwnerOptions,
 ): ActionHookResult | undefined => {
+  if (!registration.handler) return undefined
   return (
     registration.handler(
       buildCardListenerContext(registration, context, options),

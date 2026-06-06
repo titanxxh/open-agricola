@@ -9,6 +9,7 @@
 
 export * from './types'
 export * from './cache'
+export * from './card-cost-candidates'
 export * from './affordability'
 export * from './cost-modifiers'
 export * from './enumerate'
