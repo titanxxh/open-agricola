@@ -150,6 +150,15 @@ export type ComplexCost = {
   bonuses?: Bonus[]
 }
 
+export type CardCostCandidateMetadata = {
+  originalFeeIndex: number
+  sources: string[]
+}
+
+export type CardCostCandidate = CardCostCandidateMetadata & {
+  resources: PaymentResourceMap
+}
+
 export type PaymentSolution = {
   resourcesPaid: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]

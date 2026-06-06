@@ -597,6 +597,32 @@ describe('payment choice ordering', () => {
       },
     ])
   })
+
+  it('merges extra payment sources into labels and effect previews', () => {
+    const result = buildPaymentChoiceResult([
+      { resourcesPaid: { wood: 1 }, tradesUsed: [], feeIndex: 0 },
+      { resourcesPaid: { food: 1 }, tradesUsed: [], feeIndex: 1 },
+    ], 'pay:test', false, {
+      extraSourcesForSolution: (solution) =>
+        solution.feeIndex === 1 ? ['HookCandidate'] : [],
+    })
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    const sourced = result.request.options.find((option) =>
+      Array.isArray(option.labelParams.sourceCards),
+    )
+    expect(sourced?.labelParams).toMatchObject({
+      resourcesPaid: { food: 1 },
+      sourceCards: ['HookCandidate'],
+    })
+    expect(sourced?.effectPreview).toMatchObject({
+      resourcesPaid: { food: 1 },
+      sourceCards: ['HookCandidate'],
+    })
+  })
 })
 
 describe('getCheapestSolution', () => {

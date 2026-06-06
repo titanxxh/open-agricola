@@ -97,15 +97,21 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('case 4: player food=2, TP food=3 → engine prefers cheapest (own food, no trade)', () => {
+  it('case 4: player food=2, TP food=3 → direct or TP-food payment stays consistent', () => {
     // Player can pay {food:1} from supply OR via 1 B155 trade. Both produce
     // resourcesPaid={food:1}, but the trade variant adds a sideEffect (drain TP).
-    // keepOnlyOptimals dedupes to a single non-dominated solution; in this
-    // implementation, the no-trade variant wins (no extra cost) and is
-    // auto-applied. TP unchanged.
+    // The engine may auto-apply a single path or ask the player to choose.
     const { session } = setupSubsequent(3, 2)
-    const resp = session.takeAction(0, 'lessons')
+    let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
+    if (
+      resp.interaction.stateId === 'wait'
+      && resp.interaction.promptKey === 'prompt.selectPayment'
+    ) {
+      const option = resp.interaction.options?.[0]
+      expect(option).toBeDefined()
+      resp = session.resolveChoice(0, option!.value)
+    }
     expect(resp.state.players[0]!.occupationPlayed).toContain('A153_PigOwner')
     // Either path is acceptable per BGA semantics — player optionally uses TP
     // food. We just verify state consistency (player food + TP food) sums to

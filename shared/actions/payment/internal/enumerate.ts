@@ -116,6 +116,9 @@ const hashSolution = (solution: PaymentSolution): number => {
       h = ((h + ch.charCodeAt(0) * 19) * 31) >>> 0
     }
   }
+  if (solution.feeIndex !== undefined) {
+    h = ((h + (solution.feeIndex + 1) * 43) * 31) >>> 0
+  }
   return h
 }
 

@@ -1,6 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../cards/card-listeners'
-import { resolveCardCostWithModifiers } from '../../payment/internal'
+import {
+  appendDiscountedCardCostCandidates,
+  resolveCardCostWithModifiers,
+  resolveCardCostWithModifiersDetailed,
+} from '../../payment/internal'
 import type { GameState, PlayerState, ComplexCost } from '../../../contract/types'
 import { CardRegistry } from '../../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../../shared/cards/active-registry'
@@ -181,5 +185,138 @@ describe('resolveCardCostWithModifiers', () => {
     expect(result.fee).toEqual({ reed: 1, clay: 1, stone: 1 })
     expect(result.trades).toHaveLength(1)
     expect(result.bonuses).toHaveLength(1)
+  })
+
+  it('derives card-purchase candidates from each base fee with source metadata', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookA', 'HookB']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-a', cardIds: ['HookA'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => undefined,
+      computeCardCostCandidates: (_context, candidates) =>
+        appendDiscountedCardCostCandidates(candidates, 'HookA', { wood: 2 }),
+    })
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-b', cardIds: ['HookB'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => undefined,
+      computeCardCostCandidates: (_context, candidates) => [
+        ...candidates,
+        ...candidates
+          .filter((candidate) => candidate.sources.includes('HookA'))
+          .map((candidate) => ({
+            ...candidate,
+            resources: {
+              ...candidate.resources,
+              clay: (candidate.resources.clay ?? 0) + 1,
+            },
+            sources: [...candidate.sources, 'HookB'],
+          })),
+      ],
+    })
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { fees: [{ wood: 1 }, { clay: 2 }, { wood: 3 }] },
+    )
+    const cost = result.cost as ComplexCost
+    expect(cost.fees).toEqual([
+      { wood: 1 },
+      { clay: 2 },
+      { wood: 3 },
+      { wood: 0 },
+      { wood: 1 },
+      { wood: 0, clay: 1 },
+      { wood: 1, clay: 1 },
+    ])
+    expect(result.candidateMetadataByFeeIndex).toEqual({
+      0: { originalFeeIndex: 0, sources: [] },
+      1: { originalFeeIndex: 1, sources: [] },
+      2: { originalFeeIndex: 2, sources: [] },
+      3: { originalFeeIndex: 0, sources: ['HookA'] },
+      4: { originalFeeIndex: 2, sources: ['HookA'] },
+      5: { originalFeeIndex: 0, sources: ['HookA', 'HookB'] },
+      6: { originalFeeIndex: 2, sources: ['HookA', 'HookB'] },
+    })
+  })
+
+  it('keeps identical resource candidates when their sources differ', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookA', 'HookB']
+    const state = createState(player)
+
+    for (const id of ['HookA', 'HookB']) {
+      requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+        id: `hook-${id}`, cardIds: [id], phases: ['computeCosts'],
+        actions: ['improvement'],
+        handler: () => undefined,
+        computeCardCostCandidates: (_context, candidates) => [
+          ...candidates,
+          ...appendDiscountedCardCostCandidates(
+            candidates.filter((candidate) => candidate.sources.length === 0),
+            id,
+            { wood: 1 },
+          ).filter((candidate) => candidate.sources.includes(id)),
+        ],
+      })
+    }
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { wood: 1 },
+    )
+    const cost = result.cost as ComplexCost
+    expect(cost.fees).toEqual([{ wood: 1 }, { wood: 0 }, { wood: 0 }])
+    expect(result.candidateMetadataByFeeIndex).toEqual({
+      0: { originalFeeIndex: 0, sources: [] },
+      1: { originalFeeIndex: 0, sources: ['HookA'] },
+      2: { originalFeeIndex: 0, sources: ['HookB'] },
+    })
+  })
+
+  it('keeps bonus-producing card-purchase hooks on the existing bonus path', () => {
+    const player = createPlayer()
+    player.occupationPlayed = ['HookCandidates', 'HookBonus']
+    const state = createState(player)
+
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-candidates', cardIds: ['HookCandidates'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => undefined,
+      computeCardCostCandidates: (_context, candidates) =>
+        appendDiscountedCardCostCandidates(candidates, 'HookCandidates', { stone: 1 }),
+    })
+    requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
+      id: 'hook-bonus', cardIds: ['HookBonus'], phases: ['computeCosts'],
+      actions: ['improvement'],
+      handler: () => ({
+        bonuses: [{ discount: { reed: 1 }, sources: ['HookBonus'] }],
+      }),
+    })
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { reed: 2, stone: 1 },
+    )
+    const cost = result.cost as ComplexCost
+    expect(cost.fees).toEqual([
+      { reed: 2, stone: 1 },
+      { reed: 2, stone: 0 },
+    ])
+    expect(cost.bonuses).toEqual([
+      { discount: { reed: 1 }, sources: ['HookBonus'] },
+    ])
   })
 })
