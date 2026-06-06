@@ -90,7 +90,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `B156_StorehouseKeeper` | 31 | 48 | 1.55 | 原因：Resource Market 行动后给 clay/grain XOR 选择。基础设施状态：after place-farmer listener 与 XOR gain flow 已可表达；不是开放债。 |
 | `E140_Carter` | 44 | 68 | 1.55 | 原因：购买时记录下一轮并显示 infobox，下一轮从 building-resource accumulation 的实际 moved 数量给 food。基础设施状态：#243 已改用 `sumActionSpaceMovedToTriggerPlayer()` 收敛 action-space provenance；不是开放债。 |
 | `A106_SlurrySpreader` | 22 | 34 | 1.55 | 原因：购买时按当前已种 crop field 给资源奖励，需遍历 field crop state。基础设施状态：field helper 与 gain flow 已可表达；不是开放债。 |
-| `C27_Blueprint` | 41 | 63 | 1.54 | 原因：minor action 中注入指定 major candidates，并给这些 major optional stone discount。基础设施状态：`computeChoiceCandidates.improvement`、payment bonus `preserveOriginal`、`readImprovementTypes()` 已在 main；不是开放债。 |
+| `C27_Blueprint` | 41 | 63 | 1.54 | 原因：minor action 中注入指定 major candidates，并给这些 major optional stone discount。基础设施状态：`computeChoiceCandidates.improvement`、payment candidate 保留、`readImprovementTypes()` 已在 main；不是开放债。 |
 | `D112_YoungFarmer` | 49 | 75 | 1.53 | 原因：Major Improvement 行动格可重复占用，during 给 grain，after optional sow。基础设施状态：occupied choice prefix、during/after place-farmer listener、sow flow 已可表达；不是开放债。 |
 | `B107_Manservant` | 36 | 55 | 1.53 | 原因：购买时或 renovation 后若已住 stone house，要给后续所有回合排 3 food。基础设施状态：renovate-house listener 与 future meeple 已在 main；不是开放债。 |
 | `E142_Smuggler` | 55 | 84 | 1.53 | 原因：harvest feeding phase 可选 wood→grain、grain→stone，且支持同类两次或混合 OR。基础设施状态：harvest phase hook、pay/gain flow、OR/XOR 已可表达；#241 已改为卡内 `TRADE_OPTIONS` 表生成同类 2x 选项并保留 mixed optional OR。 |

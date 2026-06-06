@@ -87,7 +87,6 @@ export type Bonus = {
   discount?: Partial<Resource>
   choices?: BonusChoice[]
   optional?: boolean
-  preserveOriginal?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -156,7 +155,6 @@ export type PaymentSolution = {
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
-  preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }

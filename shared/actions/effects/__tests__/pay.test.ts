@@ -149,15 +149,14 @@ describe('keepOnlyOptimals', () => {
     expect(keepOnlyOptimals(solutions)).toEqual(solutions)
   })
 
-  it('removes dominated solutions', () => {
+  it('keeps dominated solutions', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 5 }, tradesUsed: [] },
       { resourcesPaid: { wood: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toHaveLength(1)
-    expect(optimal[0].resourcesPaid.wood).toBe(3)
+    expect(optimal).toEqual(solutions)
   })
 
   it('keeps solutions that are optimal in different resources', () => {
@@ -169,15 +168,14 @@ describe('keepOnlyOptimals', () => {
     expect(optimal).toHaveLength(2)
   })
 
-  it('removes solution dominated in all dimensions', () => {
+  it('keeps solution dominated in all dimensions', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 3, clay: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 2, clay: 2 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4, clay: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toHaveLength(1)
-    expect(optimal[0].resourcesPaid).toEqual({ wood: 2, clay: 2 })
+    expect(optimal).toEqual(solutions)
   })
 
   it('handles equal solutions', () => {
@@ -271,9 +269,7 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    // keepOnlyOptimals drops the dominated {5} path when {3} path exists.
-    expect(solutions.length).toBe(1)
-    expect(solutions[0]!.resourcesPaid.wood).toBe(3)
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([3, 5])
   })
 
   it('combines optional and mandatory bonuses', () => {
@@ -286,8 +282,7 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    expect(solutions.length).toBe(1)
-    expect(solutions[0]!.resourcesPaid.wood).toBe(2)
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([2, 4])
   })
 
   it('expands bonus.choices into alternative paths (optional: false = must pick one)', () => {
