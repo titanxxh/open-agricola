@@ -287,9 +287,9 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `computeChoiceCandidates.renovate-house` | `A87_Conservator`, `D13_Trowel` |
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
 | listener | `computeCosts.fence` | `C16_FieldFences`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
-| listener | `computeCardCostCandidates.improvement` | `A143_Stonecutter`, `A75_LumberMill`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `D117_WoodExpert`, `D96_Furnisher` |
+| listener | `computeCardCostCandidates.improvement` | `A27_OvenSite`, `A143_Stonecutter`, `A75_LumberMill`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E27_PiggyBank` |
 | base cost | `getBaseCosts.improvement` | `A20_DoubleTurnPlow`, `B36_Bottles` |
-| listener | `computeCosts.improvement` | `A27_OvenSite`, `C95_BasketWeaver`, `D82_HuntingTrophy`, `D95_SiteManager`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
+| listener | `computeCosts.improvement` | `D82_HuntingTrophy`, `E123_ResourceHoarder`, `E130_Overachiever` |
 | listener | `computeCosts.occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
 | listener | `computeCosts.renovate-house` | `B128_Plumber`, `D121_ClayPlasterer`, `D13_Trowel`, `D154_ChimneySweep`, `D81_RoofLadder`, `E123_ResourceHoarder` |
