@@ -180,4 +180,38 @@ describe('A128_RiparianBuilder session', () => {
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.options).toHaveLength(2)
   })
+
+  it('re-enters room selection after undoing the granted construct choice', () => {
+    const session = setup()
+
+    let resp = session.takeAction(1, 'reed-bank')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    let constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+
+    resp = session.undoStep()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionRiparianBuilderConstruct')
+
+    constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
+    expect(resp.interaction.farm.farmType).toBe('room')
+  })
 })

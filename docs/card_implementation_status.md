@@ -506,7 +506,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A125_Priest` | 已对齐 |  |
 | `A126_MasterWorkman` | 已对齐 |  |
 | `A127_Lodger` | 已对齐 |  |
-| `A128_RiparianBuilder` | 已对齐 |  |
+| `A128_RiparianBuilder` | 已对齐 | Reed Bank 触发的跨玩家 construct prompt 覆盖 undo 后重选 construct，确保不会重复进入 confirm-player-switch |
 | `A129_Swagman` | 已对齐 |  |
 | `A130_MummysBoy` | 已对齐 |  |
 | `A131_CraftTeacher` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |

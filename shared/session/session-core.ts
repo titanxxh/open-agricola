@@ -301,6 +301,7 @@ type HistoryEntry = {
   engineSnapshot: ReturnType<Engine['snapshot']> | null
   engineSource: EngineSource | null
   stageResume: StageResumeState | null
+  deferredPlayerSwitch: EngineFrame['deferredPlayerSwitch']
   turnOwnerPlayerIndex: number | null
   actionStart: boolean
   undoBoundary?: boolean
@@ -1928,6 +1929,7 @@ export class GameCore {
     if (this.state.pendingUndoBoundary) {
       this.state.pendingUndoBoundary = false
     }
+    const frame = this.engineStack.current()
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       // Task 10/11: the previous GameCore pending field is gone; derive the
@@ -1942,6 +1944,9 @@ export class GameCore {
         ? JSON.parse(JSON.stringify(this.engineSource)) as EngineSource
         : null,
       stageResume: this.stageResume ? { ...this.stageResume } : null,
+      deferredPlayerSwitch: frame?.deferredPlayerSwitch
+        ? { ...frame.deferredPlayerSwitch }
+        : null,
       turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
       actionStart,
       undoBoundary: effectiveBoundary,
@@ -1981,7 +1986,9 @@ export class GameCore {
         ownerPlayerIndex: entry.activePlayerIndex!,
         spaceId: entry.activeSpaceId!,
         stageResume: entry.stageResume ? { ...entry.stageResume } : null,
-        deferredPlayerSwitch: null,
+        deferredPlayerSwitch: entry.deferredPlayerSwitch
+          ? { ...entry.deferredPlayerSwitch }
+          : null,
         // Restore-from-history frames default to 'top-level' because the
         // HistoryEntry schema does not persist a sub-flow `reason`. Cursor-
         // based serialize/rehydrate (Task 8) round-trips reason through
