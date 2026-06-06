@@ -4,6 +4,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { addCardCostCandidateAttribution } from '../../actions/payment/internal'
 
 const CARD_ID = 'D117_WoodExpert'
 /**
@@ -24,17 +25,25 @@ const computeCostsListener: CardListenerRegistration = {
   computeCardCostCandidates: (_context, candidates): CardCostCandidate[] => {
     const derived = candidates
       .filter((candidate) => candidate.resources.wood !== undefined)
-      .map((candidate) => ({
-        resources: {
-          ...candidate.resources,
-          wood: Math.max(0, (candidate.resources.wood ?? 0) - 2),
-          food: (candidate.resources.food ?? 0) + 1,
-        },
-        originalFeeIndex: candidate.originalFeeIndex,
-        sources: candidate.sources.includes(CARD_ID)
-          ? [...candidate.sources]
-          : [...candidate.sources, CARD_ID],
-      }))
+      .map((candidate) => {
+        const beforeWood = candidate.resources.wood ?? 0
+        const afterWood = Math.max(0, beforeWood - 2)
+        return addCardCostCandidateAttribution(
+          {
+            ...candidate,
+            resources: {
+              ...candidate.resources,
+              wood: afterWood,
+              food: (candidate.resources.food ?? 0) + 1,
+            },
+          },
+          CARD_ID,
+          {
+            saved: { wood: beforeWood - afterWood },
+            paid: { food: 1 },
+          },
+        )
+      })
     return [...candidates, ...derived]
   },
 }

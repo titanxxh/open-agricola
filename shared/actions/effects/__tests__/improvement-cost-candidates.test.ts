@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { requireActiveCardRegistry } from '../../../cards/active-registry'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import { appendDiscountedCardCostCandidates } from '../../payment/internal'
 import { playImprovement } from '../improvement'
 
 import '../../../cards/A/A53_Claypipe'
+import '../../../cards/D/D20_TurnwrestPlow'
+import '../../../cards/D/D96_Furnisher'
+import '../../../cards/D/D117_WoodExpert'
 
 const SOURCE_CARD = 'HookCandidate'
 const LISTENER_ID = 'hook-candidate-cost'
@@ -66,7 +70,6 @@ const createPlayer = (): PlayerState =>
     startPlayer: false,
     activeModifiers: [],
     cardStates: {},
-    stats: {},
   }) as unknown as PlayerState
 
 const registerCandidateListener = (discount: { clay: number }) => {
@@ -128,5 +131,114 @@ describe('improvement card cost candidates', () => {
     const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
 
     expectSourcedPaymentOption(result)
+  })
+
+  it('records selected card-purchase candidate attribution on the source card', () => {
+    registerCandidateListener({ clay: 2 })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+
+    const request = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'choice') return
+    const option = request.request.options.find((entry) =>
+      Array.isArray(entry.labelParams.sourceCards)
+        && entry.labelParams.sourceCards.includes(SOURCE_CARD),
+    )
+    expect(option).toBeDefined()
+
+    const result = playImprovement(state, player, option!.value, 'any')
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, SOURCE_CARD)?.saved).toEqual({ clay: 2 })
+  })
+
+  it('records Wood Expert saved and paid attribution without attributing it to Turnwrest Plow', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.resources = { ...player.resources, wood: 3, food: 1 }
+    player.minorHand = ['D20_TurnwrestPlow']
+    player.occupationPlayed = ['D117_WoodExpert', 'OtherOccupation']
+    state.players = [player]
+
+    const request = playImprovement(state, player, 'minor:D20_TurnwrestPlow', 'any')
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'choice') return
+    const option = request.request.options.find((entry) =>
+      Array.isArray(entry.labelParams.sourceCards)
+        && entry.labelParams.sourceCards.includes('D117_WoodExpert'),
+    )
+    expect(option).toBeDefined()
+
+    const result = playImprovement(state, player, option!.value, 'any')
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'D117_WoodExpert')).toMatchObject({
+      saved: { wood: 2 },
+      paid: { food: 1 },
+    })
+    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
+  })
+
+  it('does not record optional derived attribution when the original candidate is selected', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.resources = { ...player.resources, wood: 3, food: 1 }
+    player.minorHand = ['D20_TurnwrestPlow']
+    player.occupationPlayed = ['D117_WoodExpert', 'OtherOccupation']
+    state.players = [player]
+
+    const request = playImprovement(state, player, 'minor:D20_TurnwrestPlow', 'any')
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'choice') return
+    const option = request.request.options.find((entry) =>
+      !Array.isArray(entry.labelParams.sourceCards),
+    )
+    expect(option).toBeDefined()
+
+    const result = playImprovement(state, player, option!.value, 'any')
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'D117_WoodExpert')).toBeUndefined()
+    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
+  })
+
+  it('records Furnisher saved attribution when its discounted candidate is selected', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.resources = { ...player.resources, wood: 3 }
+    player.minorHand = ['D20_TurnwrestPlow']
+    player.occupationPlayed = ['D96_Furnisher', 'OtherOccupation']
+    state.players = [player]
+
+    const request = playImprovement(
+      state,
+      player,
+      'minor:D20_TurnwrestPlow',
+      'any',
+      undefined,
+      'D96_Furnisher',
+    )
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'choice') return
+    const option = request.request.options.find((entry) =>
+      Array.isArray(entry.labelParams.sourceCards)
+        && entry.labelParams.sourceCards.includes('D96_Furnisher'),
+    )
+    expect(option).toBeDefined()
+
+    const result = playImprovement(
+      state,
+      player,
+      option!.value,
+      'any',
+      undefined,
+      'D96_Furnisher',
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'D96_Furnisher')?.saved).toEqual({ wood: 1 })
+    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
   })
 })

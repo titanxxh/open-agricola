@@ -1018,6 +1018,45 @@ describe('payAction', () => {
     expect(enabled.result.type).toBe('ok')
     expect(readCardResourceStats(enabledPlayer, 'B82_ValueAssets')?.paid).toEqual({ food: 1 })
   })
+
+  it('records selected card-purchase candidate attribution without source-card PAID stats', () => {
+    const player = createMockPlayer({ wood: 3, food: 1 })
+    const cost: ComplexCost = {
+      fees: [
+        { wood: 3 },
+        { wood: 1, food: 1 },
+      ],
+    }
+    const { result } = callPay(
+      player,
+      {
+        cost,
+        costType: 'minor-improvement',
+        paymentChoice: '0',
+        candidateMetadataByFeeIndex: {
+          0: { originalFeeIndex: 0, sources: [] },
+          1: {
+            originalFeeIndex: 0,
+            sources: ['D117_WoodExpert'],
+            costAttribution: {
+              D117_WoodExpert: {
+                saved: { wood: 2 },
+                paid: { food: 1 },
+              },
+            },
+          },
+        },
+      },
+      { sourceCard: 'D20_TurnwrestPlow' },
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'D117_WoodExpert')).toMatchObject({
+      saved: { wood: 2 },
+      paid: { food: 1 },
+    })
+    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')).toBeUndefined()
+  })
 })
 
 describe('payAction: ComplexCost typed-flat single solution', () => {

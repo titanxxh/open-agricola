@@ -12,7 +12,7 @@ import type {
   Resource,
 } from '../../contract/types'
 import type { EventSink, PaymentPurpose } from '../../contract/events'
-import { addCardResourcePaid } from '../../cards/helpers/card-state'
+import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
@@ -265,6 +265,10 @@ const buildSelectedResult = (
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
   })
+  const metadata = solution.feeIndex === undefined
+    ? undefined
+    : candidateMetadataByFeeIndex?.[solution.feeIndex]
+  recordCardCostAttribution(player, metadata?.costAttribution)
   const extraData: Record<string, unknown> = {
     resourcesPaid,
     bonusUsed: solution.bonusUsed
@@ -279,7 +283,6 @@ const buildSelectedResult = (
   }
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
-    const metadata = candidateMetadataByFeeIndex?.[solution.feeIndex]
     if (metadata) {
       extraData.originalFeeIndex = metadata.originalFeeIndex
     }
