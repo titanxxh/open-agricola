@@ -25,9 +25,10 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 5. 直改 candidate 的资源减少 clamp 到 0；如果候选本来没有该资源，则不派生对应折扣候选。同一张卡不对自己刚追加的候选重复应用。
 6. Replacement / fixed-price 类卡牌追加新候选并保留原候选；不删除原候选。
 7. 候选只做完全重复去重，不做 domination / Pareto 剪枝。去重 key 包含资源、原始 `feeIndex` 和 `sources`。
-8. Candidate metadata 最小包含 `sources` 与原始 `feeIndex`。`feeIndex` 表示基础支付路径身份，不随后续资源变形改变；B65 使用它决定 2/3/4 个 future grain。
+8. Candidate metadata 包含 `sources`、原始 `feeIndex`，以及可选的 Cost Attribution。`feeIndex` 表示基础支付路径身份，不随后续资源变形改变；B65 使用它决定 2/3/4 个 future grain。Cost Attribution 只用于卡牌统计展示，不表示真实资源移动或整笔支付归属。
 9. 本 pipeline 不重做 bonus 机制。`D82_HuntingTrophy`、`E130_Overachiever`、`E123_ResourceHoarder` 等 bonus / bonusChoiceIndex 语义继续走现有 solver。
-10. UI 展示复用现有 payment option `sourceCards` 链路：后端把 candidate `sources` 合并进 payment option / effect preview 的 `sourceCards`，前端继续由 `InteractionBar` 展示卡名。
+10. UI 展示复用现有 payment option `sourceCards` 链路：后端把 candidate `sources` 合并进 payment option / effect preview 的 `sourceCards`，前端继续由 `InteractionBar` 展示卡名。hover stats 读取 Card Resource Stats；选定候选后才把 Cost Attribution 写入对应 source cards。
+11. 非 card-purchase action cost 不进入本 candidate pipeline。A128 Riparian Builder 这类 action `computeCosts` 折扣若需要 hover stats，应在旧 action cost path 上显式声明 Cost Attribution。
 
 ## Consequences
 
@@ -40,12 +41,12 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 负面 / 风险：
 - 同一套项目里会短期并存两种 cost extension 语义：card-purchase candidate pipeline 与其他 action 的旧 `computeCosts` 聚合。
 - listener id 顺序是稳定但非 BGA topo；若未来出现必须排序的卡牌冲突，需要新增单点顺序机制。
-- Candidate metadata 必须和 solver 的 `feeIndex` 排序保持一致，否则 B65 和 UI 来源展示会错配。
+- Candidate metadata 必须和 solver 的 `feeIndex` 排序保持一致，否则 B65、UI 来源展示和 Cost Attribution 都会错配。
 
 ## Alternatives considered
 
 - **引入 BGA topo 排序**：拒。虽然更接近 BGA，但会迫使新卡作者在多处声明顺序，且当前冲突规模不足以证明需要全局 topo。
 - **只修 D117 / B65 局部逻辑**：拒。会继续保留无法表达 candidate append 的核心缺口，后续 C27 / D95 / fixed-price cards 仍会重复补丁。
 - **把 candidate pipeline 扩展到所有 `computeCosts` action path**：拒。范围过大，会同时影响 construct、renovation、fence、stables、plow、occupation，和本次 card-purchase parity 目标不匹配。
-- **把 candidate sources 写入通用 `PaymentSolution`**：拒。`PaymentSolution` 是所有支付路径共用类型；candidate sources 仅属于 card-purchase preview/payment glue，应在 improvement payment builder 中合并到现有 `sourceCards`。
+- **把 candidate sources / attribution 写入通用 `PaymentSolution`**：拒。`PaymentSolution` 是所有支付路径共用类型；candidate metadata 仅属于 card-purchase preview/payment glue，应在 improvement payment builder 中合并到现有 `sourceCards`，并在支付选定后写入 Card Resource Stats。
 - **重新引入 `preserveOriginal` 或 domination 例外**：拒。BGA append candidate 语义天然保留原候选；OA 已决定不再用 Pareto 剪枝表达这件事。
