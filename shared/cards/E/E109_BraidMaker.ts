@@ -16,14 +16,9 @@ const CARD_ID = 'E109_BraidMaker'
  * Implementation:
  *   - exchanges field on the card definition handles the harvest reed → food.
  *   - computeCosts listener on improvement-any keyed off context.cardId ===
- *     Major_Basket → applies delta that reduces base cost { reed: 2, stone: 2 }
- *     to { reed: 1, stone: 1 }. No flag / actionCardId gate — BGA applies it
- *     any time this card is owned.
- *   - BGA uses orderComputeCardCosts to sort this before Stonecutter /
- *     Blueprint / MasterBricklayer because those can do trade-absolute-assignment
- *     variants. Our implementation emits deltas (commutative addition), so
- *     order is a no-op. See shared/actions/hooks.ts ActionHookRegistration.order
- *     for details.
+ *     Major_Basket → appends a sourced fixed-price candidate
+ *     { reed: 1, stone: 1 }. No flag / actionCardId gate — BGA applies it any
+ *     time this card is owned.
  */
 
 const computeCostsListener: CardListenerRegistration = {

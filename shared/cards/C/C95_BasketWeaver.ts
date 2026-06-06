@@ -23,12 +23,11 @@ const TARGET_MAJOR = 'Major_Basket'
  * Here:
  *   - occupation after-listener triggered when this card is played →
  *     offer optional improvement-any with allowedPurchases = [Major_Basket]
- *     and sourceCard = CARD_ID (so computeCosts listener can scope the
- *     discount via context.actionCardId).
+ *     and sourceCard = CARD_ID (so the candidate listener can scope the
+ *     fixed-price candidate via context.actionCardId).
  *   - computeCosts listener on improvement-any keyed off context.actionCardId
- *     === CARD_ID and context.cardId === Major_Basket → applies delta so the
- *     effective cost becomes { stone: 1, reed: 1 } (base is 2 reed + 2 stone,
- *     so delta = { stone: -1, reed: -1 }).
+ *     === CARD_ID and context.cardId === Major_Basket → appends a sourced
+ *     fixed-price candidate { stone: 1, reed: 1 } while keeping the original.
  */
 
 const onBuyListener: CardListenerRegistration = {
