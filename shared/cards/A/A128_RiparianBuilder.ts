@@ -34,10 +34,12 @@ const constructDiscountListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
     if (context.player.houseType === 'clay') {
-      return { costs: { clay: -1 } }
+      const costs = { clay: -1 }
+      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
     }
     if (context.player.houseType === 'stone') {
-      return { costs: { stone: -2 } }
+      const costs = { stone: -2 }
+      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
     }
   },
 }

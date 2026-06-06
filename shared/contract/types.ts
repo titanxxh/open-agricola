@@ -167,6 +167,11 @@ export type CardCostCandidate = CardCostCandidateMetadata & {
   resources: PaymentResourceMap
 }
 
+export type ActionCostAttribution = {
+  sourceCard: string
+  costs: Partial<Resource>
+}
+
 export type PaymentSolution = {
   resourcesPaid: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
@@ -487,6 +492,7 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
+  costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>

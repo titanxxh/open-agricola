@@ -4,6 +4,7 @@ import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
@@ -121,6 +122,65 @@ describe('A128_RiparianBuilder session', () => {
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+  })
+
+  it('records saved clay instead of paid resources after granted clay-room construct', () => {
+    const session = setup()
+
+    let resp = session.takeAction(1, 'reed-bank')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(constructOption).toBeDefined()
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+
+    expect(resp.ok).toBe(true)
+    const stats = readCardResourceStats(resp.state.players[0]!, CARD_ID)
+    expect(stats?.saved).toEqual({ clay: 1 })
+    expect(stats?.paid).toEqual({})
+  })
+
+  it('records saved stone after granted stone-room construct', () => {
+    const session = setup()
+    const state = session.getState().state
+    const owner = state.players[0]!
+    owner.houseType = 'stone'
+    owner.resources = { ...owner.resources, wood: 0, clay: 0, stone: 5, reed: 2 }
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'reed-bank')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(constructOption).toBeDefined()
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+
+    expect(resp.ok).toBe(true)
+    const stats = readCardResourceStats(resp.state.players[0]!, CARD_ID)
+    expect(stats?.saved).toEqual({ stone: 2 })
+    expect(stats?.paid).toEqual({})
   })
 
   it('marks the gifted construct as non-trueAction for later listeners', () => {

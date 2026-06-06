@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../../cards/B/B38_FutureBuildingSite'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import { constructAction } from '../construct'
 import type {
   ActionExecutionContext,
@@ -11,6 +12,10 @@ import type {
 } from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
+
+type TestCostAttributionContext = ActionExecutionContext & {
+  costAttribution?: Array<{ sourceCard: string; costs: Partial<Resource> }>
+}
 
 const b38LockedAdjacentRooms: FarmTilePosition[] = [
   { row: 0, col: 0 },
@@ -243,6 +248,74 @@ describe('constructAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(result.resourcesPaid).toEqual({ wood: 1, food: 1 })
+  })
+
+  it('attributes construct computeCosts savings to the source card', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        houseType: 'clay',
+        resources: { wood: 0, clay: 4, stone: 0, reed: 2, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+      costs: { clay: -1 },
+      sourceCard: 'A128_RiparianBuilder',
+    }) as TestCostAttributionContext
+    ctx.costAttribution = [
+      { sourceCard: 'A128_RiparianBuilder', costs: { clay: -1 } },
+    ]
+
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ clay: 4, reed: 2 })
+    const stats = readCardResourceStats(ctx.player, 'A128_RiparianBuilder')
+    expect(stats?.saved).toEqual({ clay: 1 })
+    expect(stats?.paid).toEqual({})
+  })
+
+  it('clamps construct computeCosts savings attribution to the original cost', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        houseType: 'clay',
+        resources: { wood: 0, clay: 0, stone: 0, reed: 2, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+      actionContext: { exactCost: { clay: 1, reed: 2 } },
+      costs: { clay: -2 },
+      sourceCard: 'A128_RiparianBuilder',
+    }) as TestCostAttributionContext
+    ctx.costAttribution = [
+      { sourceCard: 'A128_RiparianBuilder', costs: { clay: -2 } },
+    ]
+
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ reed: 2 })
+    expect(readCardResourceStats(ctx.player, 'A128_RiparianBuilder')?.saved).toEqual({ clay: 1 })
+  })
+
+  it('attributes construct computeCosts surcharges to the source card', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        resources: { wood: 5, clay: 0, stone: 0, reed: 2, grain: 0, vegetable: 0, food: 1, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+      costs: { food: 1 },
+      sourceCard: 'TEST_SurchargeCard',
+    }) as TestCostAttributionContext
+    ctx.costAttribution = [
+      { sourceCard: 'TEST_SurchargeCard', costs: { food: 1 } },
+    ]
+
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 5, reed: 2, food: 1 })
+    expect(readCardResourceStats(ctx.player, 'TEST_SurchargeCard')?.paid).toEqual({ food: 1 })
   })
 
   it('credits sourceCard stats with roomWood when wooden house', () => {

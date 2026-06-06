@@ -5,6 +5,7 @@ import type {
 } from '../contract/events.ts'
 import type {
   ActionChoiceOption,
+  ActionExecutionContext,
   ActionFlow,
   ActionSpace,
   ActionExecutionResult,
@@ -170,6 +171,7 @@ const subflowSpaceId = (reason: SubFlowReason): string =>
 type PendingContextSnapshot = {
   params?: Record<string, unknown>
   costs?: Partial<Resource>
+  costAttribution?: ActionExecutionContext['costAttribution']
   sourceCard?: string
   actionContext?: Record<string, unknown>
 }
@@ -3804,6 +3806,7 @@ export class GameCore {
       contextSnapshot: {
         params: undefined,
         costs: undefined,
+        costAttribution: undefined,
         sourceCard: undefined,
         actionContext: undefined,
       },
