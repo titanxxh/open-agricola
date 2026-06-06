@@ -5,7 +5,11 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import { resolveCardPreviewCostByProvider } from '../payment/internal'
+import {
+  resolveCardPreviewCostByProvider,
+  resolveCardPreviewCostDetailedByProvider,
+  type ResolvedCardCostWithMetadata,
+} from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 
@@ -231,6 +235,22 @@ export const getMajorImprovementPreviewCost = (
   )
 }
 
+export const getMajorImprovementPreviewCostDetailed = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  actionCardId?: string,
+): ResolvedCardCostWithMetadata | null => {
+  return resolveCardPreviewCostDetailedByProvider(
+    state,
+    player,
+    'improvement',
+    improvementId,
+    () => getMajorCard(improvementId)?.cost ?? null,
+    actionCardId,
+  )
+}
+
 export const getMinorImprovementPreviewCost = (
   state: GameState,
   player: PlayerState,
@@ -248,6 +268,29 @@ export const getMinorImprovementPreviewCost = (
     actionCardId,
   )
   return attachRequiredReturnCards(previewCost, improvement.returnCards)
+}
+
+export const getMinorImprovementPreviewCostDetailed = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  actionCardId?: string,
+): ResolvedCardCostWithMetadata | null => {
+  const improvement = getMinorImprovement(improvementId)
+  if (!improvement) return null
+  const previewCost = resolveCardPreviewCostDetailedByProvider(
+    state,
+    player,
+    'improvement',
+    improvementId,
+    () => getMinorImprovementEffectiveCost(player, improvement),
+    actionCardId,
+  )
+  if (!previewCost) return null
+  return {
+    ...previewCost,
+    cost: attachRequiredReturnCards(previewCost.cost, improvement.returnCards) ?? {},
+  }
 }
 
 export const canAffordMajorImprovement = (

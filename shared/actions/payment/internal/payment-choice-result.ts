@@ -25,6 +25,7 @@ import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate
 
 const collectPaymentSolutionSources = (
   solution: PaymentSolution,
+  extraSources: readonly string[] = [],
 ): string[] => {
   const sources: string[] = []
   const seen = new Set<string>()
@@ -41,14 +42,23 @@ const collectPaymentSolutionSources = (
   solution.tradesUsed.forEach(({ trade }) => {
     if (trade.sourceId) add(trade.sourceId)
   })
+  extraSources.forEach(add)
   return sources
+}
+
+type PaymentChoiceResultOptions = {
+  extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
 }
 
 const describePaymentSolution = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
+  options: PaymentChoiceResultOptions = {},
 ): Record<string, unknown> => {
-  const sourceCards = collectPaymentSolutionSources(solution)
+  const sourceCards = collectPaymentSolutionSources(
+    solution,
+    options.extraSourcesForSolution?.(solution) ?? [],
+  )
   return {
     resourcesPaid: solution.resourcesPaid,
     cardUsed: includeReturnedCard && solution.cardUsed ? solution.cardUsed : undefined,
@@ -59,8 +69,12 @@ const describePaymentSolution = (
 const describePaymentEffectPreview = (
   solution: PaymentSolution,
   includeReturnedCard: boolean,
+  options: PaymentChoiceResultOptions = {},
 ) => {
-  const sourceCards = collectPaymentSolutionSources(solution)
+  const sourceCards = collectPaymentSolutionSources(
+    solution,
+    options.extraSourcesForSolution?.(solution) ?? [],
+  )
   return {
     kind: 'payment' as const,
     resourcesPaid: solution.resourcesPaid,
@@ -99,13 +113,18 @@ export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
   optionValuePrefix: string,
   includeReturnedCard = false,
+  choiceOptions: PaymentChoiceResultOptions = {},
 ): ActionExecutionResult => {
   const orderedSolutions = sortPaymentSolutions(solutions)
   const options = orderedSolutions.map((solution, idx) => ({
     value: `${optionValuePrefix}:${idx}`,
     labelKey: 'prompt.selectPaymentOption',
-    labelParams: describePaymentSolution(solution, includeReturnedCard) as unknown as Record<string, string | number>,
-    effectPreview: describePaymentEffectPreview(solution, includeReturnedCard),
+    labelParams: describePaymentSolution(
+      solution,
+      includeReturnedCard,
+      choiceOptions,
+    ) as unknown as Record<string, string | number>,
+    effectPreview: describePaymentEffectPreview(solution, includeReturnedCard, choiceOptions),
   }))
   return {
     type: 'request',
@@ -120,6 +139,7 @@ export const resolvePaymentSolutionSelection = (
   optionValuePrefix: string,
   includeReturnedCard: boolean,
   failure: ActionExecutionResult,
+  options: PaymentChoiceResultOptions = {},
 ):
   | ActionExecutionResult
   | { type: 'selected'; solution: PaymentSolution } => {
@@ -145,6 +165,7 @@ export const resolvePaymentSolutionSelection = (
     orderedSolutions,
     optionValuePrefix,
     includeReturnedCard,
+    options,
   )
 }
 
@@ -165,6 +186,7 @@ type ResolveCostPaymentSelectionOptions = {
   playedCards?: string[]
   state?: GameState
   reserveResources?: Partial<Resource>
+  extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
 }
 
 export const resolveCostPaymentSelection = (
@@ -200,5 +222,8 @@ export const resolveCostPaymentSelection = (
     optionValuePrefix,
     options.includeReturnedCard ?? false,
     failure,
+    {
+      extraSourcesForSolution: options.extraSourcesForSolution,
+    },
   )
 }
