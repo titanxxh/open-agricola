@@ -89,10 +89,23 @@ const stableValue = (value: unknown): unknown => {
   )
 }
 
+const logEntryIdentityParams = (entry: LogEntry): unknown => {
+  const params = entry.params ?? {}
+  if (
+    entry.key !== 'log.playImprovement' &&
+    entry.key !== 'log.playMinorImprovement' &&
+    entry.key !== 'log.playOccupation'
+  ) {
+    return params
+  }
+  const { player: _player, ...rest } = params
+  return rest
+}
+
 const logEntryIdentity = (entry: LogEntry): string =>
   JSON.stringify({
     key: entry.key,
-    params: stableValue(entry.params ?? {}),
+    params: stableValue(logEntryIdentityParams(entry)),
   })
 
 const paymentForEvent = (

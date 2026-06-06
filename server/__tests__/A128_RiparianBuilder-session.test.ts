@@ -68,7 +68,13 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.playerIndex).toBe(0)
 
     resp = session.resolveChoice(0, '__skip__')
-    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
@@ -107,7 +113,13 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[1]!.rooms).toBe(2)
 
-    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 

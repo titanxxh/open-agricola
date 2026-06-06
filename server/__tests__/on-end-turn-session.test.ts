@@ -75,6 +75,11 @@ describe('onEndTurn session', () => {
     expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
     resp = session.resolveChoice(0, '__skip__')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+    expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
+    expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
     expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBe(1)

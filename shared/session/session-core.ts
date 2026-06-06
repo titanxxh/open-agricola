@@ -3084,6 +3084,40 @@ export class GameCore {
     return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
   }
 
+  private visiblePlayerIndexForFrame(frame: EngineFrame): number {
+    return frame.deferredPlayerSwitch?.confirmed
+      ? frame.deferredPlayerSwitch.toPlayerIndex
+      : frame.ownerPlayerIndex
+  }
+
+  private returnTargetIndexForFrame(frame: EngineFrame): {
+    playerIndex: number
+    returnPlayerStack?: number[]
+  } {
+    const stack = frame.deferredPlayerSwitch?.returnPlayerStack ?? []
+    if (stack.length === 0) return { playerIndex: frame.ownerPlayerIndex }
+    return {
+      playerIndex: stack[stack.length - 1]!,
+      returnPlayerStack: stack.slice(0, -1),
+    }
+  }
+
+  private pushNestedReturnPointForFrame(frame: EngineFrame, playerIndex: number): void {
+    if (
+      !frame.deferredPlayerSwitch?.confirmed ||
+      frame.deferredPlayerSwitch.toPlayerIndex !== playerIndex ||
+      playerIndex === frame.ownerPlayerIndex
+    ) {
+      return
+    }
+    const stack = frame.deferredPlayerSwitch.returnPlayerStack ?? []
+    if (stack[stack.length - 1] === playerIndex) return
+    frame.deferredPlayerSwitch = {
+      ...frame.deferredPlayerSwitch,
+      returnPlayerStack: [...stack, playerIndex],
+    }
+  }
+
   private currentFrameOwnerPlayerId(defaultPlayerId?: string): string | undefined {
     const frame = this.engineStack.current()
     if (!frame) return defaultPlayerId
@@ -3114,28 +3148,6 @@ export class GameCore {
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
-      const existing = frame.deferredPlayerSwitch
-      if (existing && !existing.confirmed && existing.toPlayerIndex === effectivePlayerIndex) {
-        frame.deferredPlayerSwitch = existing
-      } else if (existing?.confirmed && existing.toPlayerIndex !== effectivePlayerIndex) {
-        frame.deferredPlayerSwitch = {
-          fromPlayerIndex: existing.toPlayerIndex,
-          toPlayerIndex: effectivePlayerIndex,
-        }
-      } else if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
-        if (
-          !existing ||
-          existing.fromPlayerIndex !== frame.ownerPlayerIndex ||
-          existing.toPlayerIndex !== effectivePlayerIndex
-        ) {
-          frame.deferredPlayerSwitch = {
-            fromPlayerIndex: frame.ownerPlayerIndex,
-            toPlayerIndex: effectivePlayerIndex,
-          }
-        }
-      } else {
-        frame.deferredPlayerSwitch = null
-      }
       const before = this.clonePlayer(player)
       const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
       this.flushEngineLog()
@@ -3153,7 +3165,19 @@ export class GameCore {
         // Snapshot the relevant fields from the current frame BEFORE deciding
         // whether to pop. runPlaceFarmerAfterHooks mutates the same frame's
         // engine, so we keep the frame on the stack for that branch.
-        frame.deferredPlayerSwitch = null
+        const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
+        const returnTarget = this.returnTargetIndexForFrame(frame)
+        if (visiblePlayerIndex !== returnTarget.playerIndex) {
+          frame.deferredPlayerSwitch = {
+            fromPlayerIndex: visiblePlayerIndex,
+            toPlayerIndex: returnTarget.playerIndex,
+            returnPlayerStack: returnTarget.returnPlayerStack,
+          }
+          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          this.flushEngineLog()
+          this.startConfirmPlayerSwitch(visiblePlayerIndex, returnTarget.playerIndex)
+          return
+        }
         const isActionEngine = frame.source.kind === 'action'
         const stageResume = (frame.stageResume ?? null) as StageResumeState | null
         const ownerIdx = frame.ownerPlayerIndex
@@ -3243,9 +3267,24 @@ export class GameCore {
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
+        const choiceOwnerIndex = this.effectiveOwnerIndexForFrame(
+          frame,
+          pendingEnvelope?.hostNodeId,
+          pendingEnvelope,
+        )
+        const visiblePlayerIndex = frame.deferredPlayerSwitch?.confirmed
+          ? frame.deferredPlayerSwitch.toPlayerIndex
+          : frame.deferredPlayerSwitch?.fromPlayerIndex ?? frame.ownerPlayerIndex
+        if (choiceOwnerIndex !== visiblePlayerIndex) {
+          const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
+          frame.deferredPlayerSwitch = {
+            fromPlayerIndex: visiblePlayerIndex,
+            toPlayerIndex: choiceOwnerIndex,
+            returnPlayerStack,
+          }
+        }
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
-          frame.deferredPlayerSwitch = null
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
@@ -3284,6 +3323,9 @@ export class GameCore {
               this.buildEngineExecutionContext(player, space),
             )
             this.flushEngineLog()
+            if (result.type === 'flow') {
+              this.pushNestedReturnPointForFrame(frame, effectivePlayerIndex)
+            }
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
               this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
               this.flushLeafActionDetail(resolvedActionId, false)
@@ -3344,6 +3386,10 @@ export class GameCore {
         delete player._activeActionBonusSources
         this.turnOwnerPlayerIndex = null
         return
+      }
+
+      if (step.type === 'ok' && step.result.type === 'flow') {
+        this.pushNestedReturnPointForFrame(frame, effectivePlayerIndex)
       }
 
       if (
@@ -3607,6 +3653,7 @@ export class GameCore {
     // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
     // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
     // ActionFlow that runs after the engine's own choice resolution.
+    let insertedCardFollowUpFlow = false
     if (pendingSourceCard && !protectedDirectCancel) {
       const cardEffect = getCardEffect(pendingSourceCard)
       if (cardEffect?.resolveChoice) {
@@ -3619,6 +3666,7 @@ export class GameCore {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
           // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
           this.engineStack.insertFlowAfterPendingChoice(cardFlow, player.id)
+          insertedCardFollowUpFlow = true
         }
       }
     }
@@ -3628,6 +3676,9 @@ export class GameCore {
       payload,
     )
     this.flushEngineLog()
+    if (frame && (result.type === 'flow' || insertedCardFollowUpFlow)) {
+      this.pushNestedReturnPointForFrame(frame, pendingPlayerIndex)
+    }
     if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
       this.recordActionResultDetails(
         result,

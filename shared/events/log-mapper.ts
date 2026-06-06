@@ -512,11 +512,13 @@ const isNearestFollowingStablePayment = (
 const mapCardPlayed = (
   event: CardPlayedEvent,
   payment: ResourcePaidEvent | undefined,
+  ctx: EventLogMapperContext,
 ): LogEntry => {
   if (event.cardType === 'occupation') {
     return {
       key: 'log.playOccupation',
       params: {
+        player: playerName(ctx, event.actorPlayerId),
         occupations: event.cardId,
         costResources: positiveResources(payment?.resources ?? {}),
         ...(payment?.bonusSources?.length ? { bonusSources: payment.bonusSources } : {}),
@@ -526,6 +528,7 @@ const mapCardPlayed = (
   return {
     key: event.cardType === 'major' ? 'log.playImprovement' : 'log.playMinorImprovement',
     params: {
+      player: playerName(ctx, event.actorPlayerId),
       improvements: event.cardId,
       costResources: positiveResources(payment?.resources ?? {}),
       ...(payment?.returnedCardId ? { returnedCards: [payment.returnedCardId] } : {}),
@@ -575,7 +578,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       if (event.type === 'card.played') {
         const payment = cardPaymentFor(events, event)
         if (payment) consumedPaymentSeqs.add(payment.seq)
-        return [mapCardPlayed(event, payment)]
+        return [mapCardPlayed(event, payment, ctx)]
       }
 
       if (event.type === 'card.triggered') {

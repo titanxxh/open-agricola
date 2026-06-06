@@ -302,6 +302,7 @@ describe('occupation play result', () => {
       expect(state.events).toEqual(expect.arrayContaining([
         expect.objectContaining({
           type: 'card.played',
+          actorPlayerId: player.id,
           cardId: SELF_AFTER_CARD_ID,
           sourceActionId: 'occupation',
           sourceCardId: SELF_AFTER_CARD_ID,
