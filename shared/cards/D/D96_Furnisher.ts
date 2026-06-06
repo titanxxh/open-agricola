@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
+import { appendDiscountedCardCostCandidates } from '../../actions/payment/internal'
 
 const CARD_ID = 'D96_Furnisher'
 const afterConstructListener: CardListenerRegistration = {
@@ -15,8 +16,6 @@ const afterConstructListener: CardListenerRegistration = {
     const roomsBuilt = getRoomsBuiltThisAction(context.player)
     if (roomsBuilt <= 0) return
 
-    // Build one optional improvement-any per room built, each with sourceCard = CARD_ID
-    // so computeCosts can scope the wood discount
     const children = Array.from({ length: roomsBuilt }, () => ({
       type: 'seq' as const,
       optional: true,
@@ -46,10 +45,9 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionCardId !== CARD_ID) return
-    // Reduce wood cost by 1 (the improvement doesn't need to cost any wood per BGA ruling)
-    return { costs: { wood: -1 } }
+  computeCardCostCandidates: (context, candidates) => {
+    if (context.actionCardId !== CARD_ID) return [...candidates]
+    return appendDiscountedCardCostCandidates(candidates, CARD_ID, { wood: 1 })
   },
 }
 

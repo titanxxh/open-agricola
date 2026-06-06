@@ -1,6 +1,7 @@
 import type {
   ActionDefinition,
   ActionExecutionResult,
+  CardCostCandidateMetadata,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -50,6 +51,7 @@ export type PayParams = {
   includeReturnedCard?: boolean
   playedCards?: string[]
   reserveResources?: Partial<Resource>
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
 }
 
 /**
@@ -97,6 +99,7 @@ const PAY_PARAM_KEYS = new Set([
   'includeReturnedCard',
   'playedCards',
   'reserveResources',
+  'candidateMetadataByFeeIndex',
 ])
 
 const looksLikeFlatResource = (
@@ -159,6 +162,7 @@ const resolvePayActionPaymentSelection = (
     includeReturnedCard?: boolean
     playedCards?: string[]
     reserveResources?: Partial<Resource>
+    candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
   } = {},
 ):
   | ActionExecutionResult
@@ -185,6 +189,12 @@ const resolvePayActionPaymentSelection = (
     optionValuePrefix,
     options.includeReturnedCard ?? false,
     failure,
+    {
+      extraSourcesForSolution: (solution) =>
+        solution.feeIndex === undefined
+          ? []
+          : options.candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+    },
   )
 }
 
@@ -338,6 +348,7 @@ export const payAction: ActionDefinition = {
           includeReturnedCard: p.includeReturnedCard,
           playedCards: p.playedCards,
           reserveResources: p.reserveResources,
+          candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
         },
       )
       if (selection.type !== 'selected') {
@@ -516,6 +527,7 @@ export const payAction: ActionDefinition = {
         includeReturnedCard: p.includeReturnedCard,
         playedCards: p.playedCards,
         reserveResources: p.reserveResources,
+        candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
       },
     )
     if (selection.type !== 'selected') {

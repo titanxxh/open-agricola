@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
+import type { GameState, PlayerState, ActionFlow } from '../../contract/types'
 
 import '../A/A20_DoubleTurnPlow'
 import { A20_DoubleTurnPlow as A20Card } from '../../cards/A/A20_DoubleTurnPlow'
-import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
 
@@ -42,17 +40,6 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-const createSpace = (id: string): ActionSpace =>
-  ({
-    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
-    roundAvailable: 1, gainPerRound: {},
-    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-  }) as ActionSpace
-
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
-
 describe('A20_DoubleTurnPlow', () => {
   it('card definition has correct cost and maxRound', () => {
     expect(A20Card.cost).toEqual({ grain: 1 })
@@ -79,50 +66,29 @@ describe('A20_DoubleTurnPlow', () => {
     expect(seq.children[1].sourceCard).toBe(CARD_ID)
   })
 
-  it('computeCosts adds 1 food after round 3', () => {
-    const listener = findListener('A20-double-turn-plow-compute-costs')!
-    expect(listener).toBeDefined()
+  it('getBaseCosts adds 1 food after round 3', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 4
 
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
+    expect(A20Card.impl.getBaseCosts?.({
+      state,
+      player,
       cardId: CARD_ID,
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ food: 1 })
+      actionId: 'improvement',
+    })).toEqual([{ grain: 1, food: 1 }])
   })
 
-  it('computeCosts does not add food in round 3 or before', () => {
-    const listener = findListener('A20-double-turn-plow-compute-costs')!
+  it('getBaseCosts keeps food at 0 in round 3 or before', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 3
 
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
+    expect(A20Card.impl.getBaseCosts?.({
+      state,
+      player,
       cardId: CARD_ID,
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
-
-  it('computeCosts does not trigger for a different card', () => {
-    const listener = findListener('A20-double-turn-plow-compute-costs')!
-    const player = createPlayer()
-    const state = createState(player)
-    state.round = 5
-
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
-      cardId: 'SomeOtherCard',
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+      actionId: 'improvement',
+    })).toEqual([{ grain: 1, food: 0 }])
   })
 })

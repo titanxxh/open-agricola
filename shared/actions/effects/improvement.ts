@@ -28,9 +28,7 @@ import {
   buildMinorImprovementOptions,
   buildPlayableMinorOptions,
   canAffordInjectedImprovement,
-  getMajorImprovementPreviewCost,
   getMajorImprovementPreviewCostDetailed,
-  getMinorImprovementPreviewCost,
   getMinorImprovementPreviewCostDetailed,
   getPlayedCardsForCost,
   getPositiveResourceLog,
@@ -577,19 +575,21 @@ const buildImprovementInternalChildren = (
     }
   }
   const previewCost = kind === 'major'
-    ? getMajorImprovementPreviewCost(state, player, id, actionCardId)
-    : getMinorImprovementPreviewCost(state, player, id, actionCardId)
+    ? getMajorImprovementPreviewCostDetailed(state, player, id, actionCardId)
+    : getMinorImprovementPreviewCostDetailed(state, player, id, actionCardId)
   if (!previewCost) return null
+  const cost = previewCost.cost
   const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
-  const includeReturnedCard = PaymentSolver.isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const includeReturnedCard = PaymentSolver.isComplexCost(cost) && !!cost.cards?.list?.length
   const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
-  const playedCards = getPlayedCardsForCost(player, previewCost)
+  const playedCards = getPlayedCardsForCost(player, cost)
   const payParams: PayChildOptions = {
-    cost: previewCost,
+    cost,
     costType,
     optionPrefix,
     includeReturnedCard,
     playedCards,
+    candidateMetadataByFeeIndex: previewCost.candidateMetadataByFeeIndex,
   }
   const payActionContext: Record<string, unknown> = {
     costType,

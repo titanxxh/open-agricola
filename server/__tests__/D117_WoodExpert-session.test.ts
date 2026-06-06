@@ -56,7 +56,7 @@ const chooseMinor = (
   return session.resolveChoice(0, option!.value)
 }
 
-describe('D117_WoodExpert session — computeCosts trades', () => {
+describe('D117_WoodExpert session — card-purchase cost candidates', () => {
   it('cost wood:1 minor + food=10 wood=2 → multi-solution choice', () => {
     const session = setup({ food: 10, wood: 2, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
@@ -89,7 +89,7 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('cost wood:1 minor → trade max=1 + base wood=1 → both solutions affordable', () => {
+  it('cost wood:1 minor → D117 candidate + base wood=1 → both solutions affordable', () => {
     const session = setup({ food: 10, wood: 1, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
@@ -99,13 +99,8 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + wood-trade + clay-base', () => {
-    // After pay-helpers stops short-circuiting on ComplexCost, D117 trade is
-    // appended to the ComplexCost.trades list and computeAllBuyableCombinations
-    // enumerates it per fee. With food=10 wood=2 clay=2 we expect at least
-    // three meaningful solutions: wood:2 (no trade), wood:0+food:1 (trade), and
-    // clay:2 (no trade). pay.ts may emit additional combinations when trades
-    // are applied to non-wood fees; we only assert the spec-mandated three.
+  it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + D117 candidate + clay-base', () => {
+    // D117 appends one candidate for the wood fee and leaves the clay fee alone.
     const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
@@ -135,8 +130,8 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(clayBase).toBeDefined()
   })
 
-  it('altCosts minor + food=10 wood=2 clay=0 → wood-base + wood-trade (clay alt unaffordable)', () => {
-    // food=10 wood=2 clay=0 — wood-base (wood:2) and wood-trade (wood:0+food:1)
+  it('altCosts minor + food=10 wood=2 clay=0 → wood-base + D117 candidate (clay alt unaffordable)', () => {
+    // food=10 wood=2 clay=0 — wood-base (wood:2) and D117 candidate (wood:0+food:1)
     // are affordable; clay-base alt (clay:2) is not.
     const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
