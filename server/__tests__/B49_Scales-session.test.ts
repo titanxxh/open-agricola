@@ -115,6 +115,7 @@ describe('B49_Scales session', () => {
     expect(player.resources.food).toBe(2)
     expect(playedEvents(resp.state, 'A37_Bucksaw')).toContainEqual(expect.objectContaining({
       type: 'card.played',
+      actorPlayerId: player.id,
       cardId: 'A37_Bucksaw',
       cardType: 'minor',
       sourceActionId: 'improvement',
@@ -162,6 +163,7 @@ describe('B49_Scales session', () => {
     expect(player.resources.food).toBe(2)
     expect(playedEvents(resp.state, 'Major_Basket')).toContainEqual(expect.objectContaining({
       type: 'card.played',
+      actorPlayerId: player.id,
       cardId: 'Major_Basket',
       cardType: 'major',
       sourceActionId: 'improvement',
@@ -184,6 +186,7 @@ describe('B49_Scales session', () => {
     expect(player.resources.food).toBe(2)
     expect(playedEvents(resp.state, 'A123_FrameBuilder')).toContainEqual(expect.objectContaining({
       type: 'card.played',
+      actorPlayerId: player.id,
       cardId: 'A123_FrameBuilder',
       cardType: 'occupation',
       sourceActionId: 'occupation',

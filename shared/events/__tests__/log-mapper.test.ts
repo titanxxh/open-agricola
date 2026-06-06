@@ -121,6 +121,49 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps card played logs with the actor player name', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        resources: { food: 1 },
+        paymentFor: 'minor-improvement',
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        type: 'card.played',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        sourceCardId: 'D20_TurnwrestPlow',
+        cardId: 'D20_TurnwrestPlow',
+        cardType: 'minor',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          player: 'Alice',
+          improvements: 'D20_TurnwrestPlow',
+          costResources: { food: 1 },
+        },
+      },
+    ])
+  })
+
   it('maps explicit action detail log events', () => {
     const events = [
       {

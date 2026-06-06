@@ -192,6 +192,7 @@ describe('buildActionLogTimelineRows', () => {
       logEntry: {
         key: 'log.playMinorImprovement',
         params: {
+          player: 'Alice',
           improvements: 'A1_TestMinor',
           costResources: { wood: 1 },
         },

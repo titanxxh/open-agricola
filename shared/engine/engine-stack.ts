@@ -45,6 +45,7 @@ export type EngineFrame = {
     fromPlayerIndex: number
     toPlayerIndex: number
     confirmed?: boolean
+    returnPlayerStack?: number[]
   } | null
   reason: SubFlowReason
 }
@@ -59,6 +60,7 @@ export type EngineFrameCursor = {
     fromPlayerIndex: number
     toPlayerIndex: number
     confirmed?: boolean
+    returnPlayerStack?: number[]
   } | null
   reason: SubFlowReason
 }
