@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ComplexCost, GameState, PlayerState } from '../../contract/types'
+import type { ComplexCost, CostAttributionBySource, GameState, PlayerState } from '../../contract/types'
 import { isComplexCost, resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
 import { getMinorImprovementPreviewCostDetailed } from '../../actions/helpers/improvement-helpers'
 import { setActiveWorkerCount } from '../../domain/player'
@@ -93,6 +93,7 @@ describe('card-purchase cost candidate cards', () => {
     result: ReturnType<typeof resolveCardCostWithModifiersDetailed>,
     fees: NonNullable<ComplexCost['fees']>,
     sourcesByFeeIndex: Record<number, string[]>,
+    attributionByFeeIndex: Record<number, CostAttributionBySource> = {},
   ) => {
     expect(isComplexCost(result.cost)).toBe(true)
     const cost = result.cost as ComplexCost
@@ -106,6 +107,7 @@ describe('card-purchase cost candidate cards', () => {
           {
             originalFeeIndex: index < 2 ? index : 0,
             sources: sourcesByFeeIndex[index] ?? [],
+            ...(attributionByFeeIndex[index] ? { costAttribution: attributionByFeeIndex[index] } : {}),
           },
         ]),
       ),
@@ -154,6 +156,7 @@ describe('card-purchase cost candidate cards', () => {
         target: 'Major_Test',
         base: { fees: [{ stone: 1 }, { wood: 1 }] },
         fees: [{ stone: 1 }, { wood: 1 }, { stone: 0 }],
+        attribution: { 2: { A143_Stonecutter: { saved: { stone: 1 } } } },
       },
       {
         playedZone: 'minorPlayed',
@@ -161,6 +164,7 @@ describe('card-purchase cost candidate cards', () => {
         target: 'Major_Test',
         base: { fees: [{ wood: 2 }, { stone: 1 }] },
         fees: [{ wood: 2 }, { stone: 1 }, { wood: 1 }],
+        attribution: { 2: { A75_LumberMill: { saved: { wood: 1 } } } },
       },
       {
         playedZone: 'occupationPlayed',
@@ -168,6 +172,7 @@ describe('card-purchase cost candidate cards', () => {
         target: 'Major_Test',
         base: { fees: [{ clay: 1 }, { wood: 1 }] },
         fees: [{ clay: 1 }, { wood: 1 }, { clay: 0 }],
+        attribution: { 2: { C122_Bricklayer: { saved: { clay: 1 } } } },
       },
     ] as const
 
@@ -181,7 +186,7 @@ describe('card-purchase cost candidate cards', () => {
         entry.target,
         entry.base,
       )
-      expectFeesAndSources(result, entry.fees, { 2: [entry.source] })
+      expectFeesAndSources(result, entry.fees, { 2: [entry.source] }, entry.attribution)
     }
   })
 
@@ -326,8 +331,26 @@ describe('card-purchase cost candidate cards', () => {
       0: { originalFeeIndex: 0, sources: [] },
       1: { originalFeeIndex: 1, sources: [] },
       2: { originalFeeIndex: 2, sources: [] },
-      3: { originalFeeIndex: 0, sources: ['D117_WoodExpert'] },
-      4: { originalFeeIndex: 2, sources: ['D117_WoodExpert'] },
+      3: {
+        originalFeeIndex: 0,
+        sources: ['D117_WoodExpert'],
+        costAttribution: {
+          D117_WoodExpert: {
+            saved: { wood: 1 },
+            paid: { food: 1 },
+          },
+        },
+      },
+      4: {
+        originalFeeIndex: 2,
+        sources: ['D117_WoodExpert'],
+        costAttribution: {
+          D117_WoodExpert: {
+            saved: { wood: 2 },
+            paid: { food: 1 },
+          },
+        },
+      },
     })
   })
 })

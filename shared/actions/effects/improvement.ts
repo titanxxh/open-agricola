@@ -18,6 +18,7 @@ import { activateCardEffect } from './internal/activate-card-effect'
 import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
+import { recordCardCostAttribution } from '../../cards/helpers/card-state'
 import { buildInternalPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
 import {
   cardEffectHandChangedEvent,
@@ -359,6 +360,7 @@ const resolveImprovementPayment = (
     : candidateMetadataByFeeIndex?.[resolved.solution.feeIndex]
 
   const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
+  recordCardCostAttribution(player, metadata?.costAttribution)
   return {
     type: 'selected',
     resourcesPaid: resolved.solution.resourcesPaid,

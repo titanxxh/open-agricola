@@ -2,6 +2,7 @@ import type {
   CardResourceStats,
   CardStatGained,
   CardState,
+  CostAttributionBySource,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -209,6 +210,17 @@ export const addCardResourcePaidToOthers = (
   resources: Partial<Resource>,
 ) => {
   addCardResourceStats(player, cardId, 'paidToOthers', resources)
+}
+
+export const recordCardCostAttribution = (
+  player: PlayerState,
+  attribution: CostAttributionBySource | undefined,
+) => {
+  if (!attribution) return
+  for (const [cardId, entry] of Object.entries(attribution)) {
+    if (entry.saved) addCardResourceSaved(player, cardId, entry.saved)
+    if (entry.paid) addCardResourcePaid(player, cardId, entry.paid)
+  }
 }
 
 export const getCardStack = (player: PlayerState, cardId: string): string[] =>
