@@ -156,13 +156,21 @@ describe('E109_BraidMaker session', () => {
     }
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'major-improvement')
+    let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    const option = resp.interaction.options?.find((entry) =>
+      Array.isArray(entry.labelParams.sourceCards)
+        && entry.labelParams.sourceCards.includes('A143_Stonecutter'),
+    )
+    expect(option).toBeDefined()
+
+    resp = session.resolveChoice(0, option!.value)
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
-    // E109: {reed:-1, stone:-1}. A143 improvement-any hook: {stone:-1}. Accumulated: {reed:-1, stone:-2}.
-    // Applied to base {reed:2, stone:2} via applyCostOverride (with clamping) -> {reed:1, stone:0}.
     expect(after.resources.reed).toBe(1) // 2 - 1 = 1
     expect(after.resources.stone).toBe(2) // 2 - 0 (clamped at 0 payment)
   })

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
+import type { ActionSpace, ComplexCost, GameState, PlayerState } from '../../shared/contract/types'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
+import { getMinorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
+import { isComplexCost } from '../../shared/actions/payment/internal'
 
 import '../../shared/cards/D/D80_BrickHammer'
 import '../../shared/cards/D/D117_WoodExpert'
@@ -148,22 +150,18 @@ describe('printed improvement cost listeners', () => {
   it('D117 discounts improvements with wood only in minor altCosts', () => {
     const player = makePlayer('p1')
     player.occupationPlayed = ['D117_WoodExpert']
-    const result = executeCardListener(findListener('D117-wood-expert-compute-costs-improvement'), {
-      state: makeState([player]),
+    const result = getMinorImprovementPreviewCostDetailed(
+      makeState([player]),
       player,
-      space,
-      actionId: 'improvement',
-      phase: 'computeCosts',
-      cardId: 'E30_ChildsToy',
-    } as CardListenerContext)
+      'E30_ChildsToy',
+    )
 
-    expect(result?.trades).toEqual([
-      expect.objectContaining({
-        from: { food: 1 },
-        to: { wood: 2 },
-        max: 1,
-        source: 'D117_WoodExpert',
-      }),
+    expect(isComplexCost(result?.cost)).toBe(true)
+    expect((result?.cost as ComplexCost).fees).toEqual([
+      { wood: 1 },
+      { clay: 1 },
+      { wood: 0, food: 1 },
     ])
+    expect(result?.candidateMetadataByFeeIndex?.[2]?.sources).toEqual(['D117_WoodExpert'])
   })
 })

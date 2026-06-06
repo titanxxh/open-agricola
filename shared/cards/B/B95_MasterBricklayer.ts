@@ -1,8 +1,9 @@
 import { defineOccupationCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
+import { appendDiscountedCardCostCandidates } from '../../actions/payment/internal'
 
 const CARD_ID = 'B95_MasterBricklayer'
 /**
@@ -16,13 +17,11 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only applies to major improvements
-    const cardId = context.cardId
-    if (!cardId || !isMajorCardId(cardId)) return
+  computeCardCostCandidates: (context, candidates) => {
+    if (!context.cardId || !isMajorCardId(context.cardId)) return [...candidates]
     const nbNewRooms = (context.player.rooms ?? 2) - 2
-    if (nbNewRooms <= 0) return
-    return { costs: { stone: -nbNewRooms } }
+    if (nbNewRooms <= 0) return [...candidates]
+    return appendDiscountedCardCostCandidates(candidates, CARD_ID, { stone: nbNewRooms })
   },
 }
 

@@ -41,6 +41,14 @@ const candidateKey = (candidate: CardCostCandidate) =>
     sources: candidate.sources,
   })
 
+export const cardCostCandidatesEqual = (
+  left: readonly CardCostCandidate[],
+  right: readonly CardCostCandidate[],
+): boolean => {
+  if (left.length !== right.length) return false
+  return left.every((candidate, index) => candidateKey(candidate) === candidateKey(right[index]!))
+}
+
 export const normalizeCardCostCandidates = (
   baseCost: PaymentResourceMap | ComplexCost,
 ): CardCostCandidate[] => {

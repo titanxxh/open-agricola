@@ -1,8 +1,8 @@
 import { defineOccupationCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
+import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D117_WoodExpert'
@@ -12,11 +12,8 @@ const CARD_ID = 'D117_WoodExpert'
  * Each improvement costs you up to 2 wood less, if you pay 1 food instead.
  *
  * BGA: onBuy → gain 2 wood.
- * onPlayerComputeCardCosts → for major/minor improvements with wood in cost,
- *   adds an alternative trade: -2 wood (capped to actual wood cost) +1 food.
- *
- * Simplified: When an improvement being bought has wood in its cost,
- * apply { wood: -2, food: 1 } discount.
+ * onPlayerComputeCardCosts → for each major/minor cost candidate containing wood,
+ *   appends an alternative candidate: -2 wood (clamped to 0) +1 food.
  */
 
 const computeCostsListener: CardListenerRegistration = {
@@ -24,21 +21,21 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.cardId) return
-    const woodInCost = getPrintedImprovementResourceCost(context.cardId, 'wood')
-    if (woodInCost <= 0) return
-    return {
-      trades: [
-        {
-          from: { food: 1 },
-          to: { wood: 2 },
-          max: 1,
-          source: CARD_ID,
-          sourceId: CARD_ID,
+  computeCardCostCandidates: (_context, candidates): CardCostCandidate[] => {
+    const derived = candidates
+      .filter((candidate) => candidate.resources.wood !== undefined)
+      .map((candidate) => ({
+        resources: {
+          ...candidate.resources,
+          wood: Math.max(0, (candidate.resources.wood ?? 0) - 2),
+          food: (candidate.resources.food ?? 0) + 1,
         },
-      ],
-    }
+        originalFeeIndex: candidate.originalFeeIndex,
+        sources: candidate.sources.includes(CARD_ID)
+          ? [...candidate.sources]
+          : [...candidate.sources, CARD_ID],
+      }))
+    return [...candidates, ...derived]
   },
 }
 

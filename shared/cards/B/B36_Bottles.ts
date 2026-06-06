@@ -1,6 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -14,22 +12,11 @@ const CARD_ID = 'B36_Bottles'
  * - vp: 4
  */
 
-// computeCosts: set cost to (familySize * clay) + (familySize * food)
-// The base cost on the card is {} (empty), so the listener adds the full dynamic cost.
-const computeCostsListener: CardListenerRegistration = {
-  id: 'B36-bottles-compute-costs',
-  cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.cardId !== CARD_ID) return
-    const farmers = familySize(context.player)
-    return { costs: { clay: farmers, food: farmers } }
-  },
-}
-
 const cardImpl = {
-  listeners: [computeCostsListener],
+  getBaseCosts: ({ player }) => {
+    const farmers = familySize(player)
+    return [{ clay: farmers, food: farmers }]
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

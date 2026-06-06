@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 import '../B/B36_Bottles'
 import { B36_Bottles as B36Card } from '../../cards/B/B36_Bottles'
 
 import { setActiveWorkerCount } from '../../domain/player'
-import type { CardListenerContext } from '../card-listeners'
 const CARD_ID = 'B36_Bottles'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -42,83 +40,48 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-const createSpace = (id: string): ActionSpace =>
-  ({
-    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
-    roundAvailable: 1, gainPerRound: {},
-    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-  }) as ActionSpace
-
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
-
 describe('B36_Bottles', () => {
   it('card definition has 4 VP and empty base cost', () => {
     expect(B36Card.vp).toBe(4)
     expect(B36Card.cost).toEqual({})
   })
 
-  it('computeCosts sets cost based on family size (2 farmers)', () => {
-    const listener = findListener('B36-bottles-compute-costs')!
-    expect(listener).toBeDefined()
+  it('getBaseCosts sets cost based on family size (2 farmers)', () => {
     const player = createPlayer()
     setActiveWorkerCount(player, 2)
     const state = createState(player)
 
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
+    expect(B36Card.impl.getBaseCosts?.({
+      state,
+      player,
       cardId: CARD_ID,
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ clay: 2, food: 2 })
+      actionId: 'improvement',
+    })).toEqual([{ clay: 2, food: 2 }])
   })
 
-  it('computeCosts scales with 3 farmers', () => {
-    const listener = findListener('B36-bottles-compute-costs')!
+  it('getBaseCosts scales with 3 farmers', () => {
     const player = createPlayer()
     setActiveWorkerCount(player, 3)
     const state = createState(player)
 
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
+    expect(B36Card.impl.getBaseCosts?.({
+      state,
+      player,
       cardId: CARD_ID,
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ clay: 3, food: 3 })
+      actionId: 'improvement',
+    })).toEqual([{ clay: 3, food: 3 }])
   })
 
-  it('computeCosts scales with 5 farmers', () => {
-    const listener = findListener('B36-bottles-compute-costs')!
+  it('getBaseCosts scales with 5 farmers', () => {
     const player = createPlayer()
     setActiveWorkerCount(player, 5)
     const state = createState(player)
 
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
+    expect(B36Card.impl.getBaseCosts?.({
+      state,
+      player,
       cardId: CARD_ID,
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ clay: 5, food: 5 })
-  })
-
-  it('computeCosts does not trigger for a different card', () => {
-    const listener = findListener('B36-bottles-compute-costs')!
-    const player = createPlayer()
-    const state = createState(player)
-
-    const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement'),
-      actionId: 'improvement', phase: 'computeCosts',
-      cardId: 'SomeOtherCard',
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+      actionId: 'improvement',
+    })).toEqual([{ clay: 5, food: 5 }])
   })
 })

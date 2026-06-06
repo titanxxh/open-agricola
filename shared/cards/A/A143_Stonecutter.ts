@@ -1,8 +1,9 @@
 import { defineOccupationCard } from '../card-source'
 import type { BonusModifier } from '../../contract/types'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardListenerRegistration } from '../card-listeners'
+import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { appendDiscountedCardCostCandidates } from '../../actions/payment/internal'
 
 const CARD_ID = 'A143_Stonecutter'
 /**
@@ -12,7 +13,7 @@ const CARD_ID = 'A143_Stonecutter'
  * onPlayerComputeCostsRenovation.
  *
  * For construct and renovation we use BonusModifier (the modifier system).
- * For improvements (majors/minors) we use a computeCosts listener on improvement-any.
+ * For improvements (majors/minors) we append sourced card-purchase cost candidates.
  */
 
 const improvementCostListener: CardListenerRegistration = {
@@ -20,9 +21,8 @@ const improvementCostListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { stone: -1 } }
-  },
+  computeCardCostCandidates: (_context, candidates) =>
+    appendDiscountedCardCostCandidates(candidates, CARD_ID, { stone: 1 }),
 }
 
 const cardImpl = {
