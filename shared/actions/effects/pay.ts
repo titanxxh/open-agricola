@@ -244,6 +244,7 @@ const buildSelectedResult = (
   includeReturnedCard?: boolean,
   eventSink?: EventSink,
   sourceActionId?: string,
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
@@ -272,6 +273,10 @@ const buildSelectedResult = (
   }
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
+    const metadata = candidateMetadataByFeeIndex?.[solution.feeIndex]
+    if (metadata) {
+      extraData.originalFeeIndex = metadata.originalFeeIndex
+    }
   }
   return {
     type: 'ok',
@@ -363,6 +368,7 @@ export const payAction: ActionDefinition = {
         p.includeReturnedCard,
         eventSink,
         p.sourceActionId,
+        p.candidateMetadataByFeeIndex,
       )
     }
     const flat = p.cost as PaymentResourceMap
@@ -542,6 +548,7 @@ export const payAction: ActionDefinition = {
       p.includeReturnedCard,
       eventSink,
       p.sourceActionId,
+      p.candidateMetadataByFeeIndex,
     )
   },
 }

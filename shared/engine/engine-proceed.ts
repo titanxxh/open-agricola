@@ -304,6 +304,7 @@ const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
   const paymentInfo: Record<string, unknown> = {}
   if (resourcesPaid !== undefined) paymentInfo.resourcesPaid = resourcesPaid
   if (extraData.feeIndex !== undefined) paymentInfo.feeIndex = extraData.feeIndex
+  if (extraData.originalFeeIndex !== undefined) paymentInfo.originalFeeIndex = extraData.originalFeeIndex
   if (extraData.returnedCardId !== undefined) paymentInfo.returnedCardId = extraData.returnedCardId
   return Object.keys(paymentInfo).length > 0 ? paymentInfo : result
 }

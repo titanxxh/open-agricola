@@ -405,7 +405,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
 | `A26_SleepingCorner` | 已对齐 |  |
-| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。 |
+| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。onBuy 期间购买 Clay/Stone Oven 的 1 clay + 1 stone 固定价改走 card-purchase candidate append，保留 printed oven cost candidate。 |
 | `A28_ForestSchool` | 已对齐 |  |
 | `A29_AleBenches` | 已对齐 |  |
 | `A30_BakingSheet` | 已对齐 |  |
@@ -623,7 +623,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B62_Pitchfork` | 已对齐 |  |
 | `B63_Tasting` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B64_MillWheel` | 已对齐 |  |
-| `B65_GrainDepot` | 已对齐 |  |
+| `B65_GrainDepot` | 已对齐 | wood/clay/stone base paths 作为 card-purchase candidates 进入 ComputeCardCosts；派生候选支付后 onBuy 使用 `originalFeeIndex` 保持原路径身份，wood/clay/stone 仍分别排 2/3/4 个 future grain。 |
 | `B66_SackCart` | 已对齐 |  |
 | `B67_HandTruck` | 已对齐 | bake 前先 optional gain grain，随后保留 mandatory bake continuation；无 bake provider 时不触发 |
 | `B68_Beanfield` | 已对齐 |  |
@@ -833,7 +833,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C92_AutumnMother` | 已对齐 |  |
 | `C93_InnerDistrictsDirector` | 已对齐 | 放 stone 与可选额外放人已作为整段 optional，skip 不再强制放 stone |
 | `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
-| `C95_BasketWeaver` | 已对齐 |  |
+| `C95_BasketWeaver` | 已对齐 | onBuy 期间 Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源。 |
 | `C96_Merchant` | 已对齐 |  |
 | `C97_SeedResearcher` | 已对齐 |  |
 | `C98_CubeCutter` | 已对齐 |  |
@@ -1013,7 +1013,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D92_ChildOmbudsman` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D93_SheepInspector` | 已对齐 |  |
 | `D94_HenpeckedHusband` | 已对齐 |  |
-| `D95_SiteManager` | 已对齐 |  |
+| `D95_SiteManager` | 已对齐 | onBuy 期间 major improvement 支付改走 card-purchase candidate append；对当前候选中已有 wood/clay/stone/reed 的每个非空 subset 生成“每类最多 1 个 building resource -> 1 food”replacement candidate，保留原候选。 |
 | `D96_Furnisher` | 已对齐 | `actionCardId === D96_Furnisher` 的 improvement 追加 wood-discount candidate；普通 improvement 不产生 candidate pipeline 输出。 |
 | `D97_BeggingStudent` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D98_Transactor` | 已对齐 |  |
@@ -1125,7 +1125,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E24_Ambition` | 已对齐 |  |
 | `E25_BumperCrop` | 已对齐 | onBuy 走 `private-field-phase`；`2 Grain Fields` 前置同时计入普通 grain field 与带 grain 的 Card Field |
 | `E26_Sundial` | 已对齐 |  |
-| `E27_PiggyBank` | 已对齐 |  |
+| `E27_PiggyBank` | 已对齐 | flagged free-major 支付改走 card-purchase candidate append，追加 free major candidate 并保留原价 candidate。 |
 | `E28_Bookmark` | 已对齐 |  |
 | `E29_Heirloom` | 已对齐 |  |
 | `E30_ChildsToy` | 已对齐 |  |
@@ -1207,7 +1207,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E106_EmergencySeller` | 已对齐 |  |
 | `E107_LandSurveyor` | 已对齐 |  |
 | `E108_BlackberryFarmer` | 已对齐 |  |
-| `E109_BraidMaker` | 已对齐 |  |
+| `E109_BraidMaker` | 已对齐 | Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源。 |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
 | `E112_GrainThief` | 已对齐 | start 选择 grain fields；reap 通过 Harvest Count modifier 写入 `supply-instead-of-field` tag，end field phase 只读 `harvestCountApplications`，带 `full-field-reap` tag 的同田不补 grain；D72 额外 count 可在 E112 供应堆替代 top grain 后继续收下一层 crop；同时注册 selection threshold modifier，把 A112/D72 的 grain field 门槛降为 1；end harvest 清理 selectedPositions |
