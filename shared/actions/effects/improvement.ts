@@ -326,6 +326,7 @@ const resolveImprovementPayment = (
       type: 'selected'
       resourcesPaid: PaymentResourceMap
       feeIndex?: number
+      originalFeeIndex?: number
       returnedCardId?: string
     } => {
   const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
@@ -353,12 +354,16 @@ const resolveImprovementPayment = (
   if (resolved.type !== 'selected') {
     return resolved
   }
+  const metadata = resolved.solution.feeIndex === undefined
+    ? undefined
+    : candidateMetadataByFeeIndex?.[resolved.solution.feeIndex]
 
   const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
   return {
     type: 'selected',
     resourcesPaid: resolved.solution.resourcesPaid,
     feeIndex: resolved.solution.feeIndex,
+    originalFeeIndex: metadata?.originalFeeIndex,
     returnedCardId,
   }
 }
@@ -405,6 +410,7 @@ const playMajorImprovement = (
   const paymentInfo: PaymentInfo = {
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
+    originalFeeIndex: resolvedPayment.originalFeeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
   }
   return finalizeMajorImprovementPurchase(
@@ -475,6 +481,7 @@ export const playMinorImprovement = (
   const paymentInfo: PaymentInfo = {
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
+    originalFeeIndex: resolvedPayment.originalFeeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
   }
   return finalizeMinorImprovementPurchase(

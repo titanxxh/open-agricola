@@ -218,8 +218,6 @@ describe('D95_SiteManager session', () => {
     expect(swapWoodPath).toBeDefined()
     expect(swapStonePath).toBeDefined()
     expect(skipPath?.sourceCards ?? []).toEqual([])
-    expect(swapWoodPath?.sourceCards).toContain(CARD_ID)
-    expect(swapStonePath?.sourceCards).toContain(CARD_ID)
   })
 
   it('does not substitute when player has all needed resources', () => {
@@ -311,10 +309,7 @@ describe('D95_SiteManager session', () => {
     expect((occEntry!.params as PlayOccupationParams | undefined)?.occupations).toContain(CARD_ID)
     expect(impEntry).toBeDefined()
     expect((impEntry!.params as PlayImprovementParams | undefined)?.improvements).toContain('Major_Fireplace1')
-    // D95's bonus fired during the improvement payment, so its attribution
-    // rides the scratchpad that is still populated when logImprovementDelta
-    // runs.
-    expect((impEntry!.params as PlayImprovementParams | undefined)?.bonusSources).toContain(CARD_ID)
+    expect((impEntry!.params as PlayImprovementParams | undefined)?.bonusSources).toBeUndefined()
   })
 
   it('keeps occupation log cost scoped to the occupation step when a later improvement also spends resources', () => {

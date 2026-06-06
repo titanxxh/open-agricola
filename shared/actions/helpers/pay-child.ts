@@ -2,6 +2,7 @@ import type {
   ActionExecutionResult,
   CardCostCandidateMetadata,
   ActionFlow,
+  CardCostCandidateMetadata,
   ComplexCost,
   CostModifierType,
   InternalActionChild,
@@ -57,6 +58,7 @@ export const paymentInfoFromPayResult = (result: ActionExecutionResult | undefin
   return {
     resourcesPaid,
     feeIndex: typeof extra.feeIndex === 'number' ? extra.feeIndex : undefined,
+    originalFeeIndex: typeof extra.originalFeeIndex === 'number' ? extra.originalFeeIndex : undefined,
     returnedCardId: typeof extra.returnedCardId === 'string' ? extra.returnedCardId : undefined,
   }
 }

@@ -1,7 +1,9 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardCostCandidate } from '../../contract/types'
 import { isCardFlagged } from '../helpers/card-state'
+import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E27_PiggyBank'
@@ -89,10 +91,17 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isCardFlagged(context.player, CARD_ID)) return
-    // When flagged, the improvement is free — zero out all costs
-    return { costs: { wood: -99, clay: -99, reed: -99, stone: -99, food: -99 } }
+  computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
+    if (!isCardFlagged(context.player, CARD_ID)) return [...candidates]
+    if (!context.cardId || !isMajorCardId(context.cardId)) return [...candidates]
+    return [
+      ...candidates,
+      ...candidates.map((candidate) => ({
+        resources: {},
+        originalFeeIndex: candidate.originalFeeIndex,
+        sources: [...candidate.sources, CARD_ID],
+      })),
+    ]
   },
 }
 

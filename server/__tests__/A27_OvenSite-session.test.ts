@@ -7,6 +7,15 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 
 const CARD_ID = 'A27_OvenSite'
 
+const hasPaidResources = (
+  option: { labelParams?: Record<string, unknown> },
+  expected: Record<string, number>,
+) => {
+  const actual = (option.labelParams?.resourcesPaid ?? {}) as Record<string, number>
+  const keys = new Set([...Object.keys(actual), ...Object.keys(expected)])
+  return [...keys].every((key) => (actual[key] ?? 0) === (expected[key] ?? 0))
+}
+
 // Catalog registration is handled by the parent agent; for local testing we
 // splice the card into the minor-improvements registry if absent.
 if (!minorImprovements.some((c) => c.id === CARD_ID)) {
@@ -152,6 +161,12 @@ describe('A27_OvenSite session', () => {
       )
       if (clayOven) {
         resp = session.resolveChoice(0, clayOven.value)
+        expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+        const fixed = resp.interaction.options?.find((option) =>
+          hasPaidResources(option, { clay: 1, stone: 1 }),
+        )
+        expect(fixed).toBeDefined()
+        resp = session.resolveChoice(0, fixed!.value)
         break
       }
       const progressOption = options.find((o) => o.value !== '__skip__' && o.value !== 'cancel')

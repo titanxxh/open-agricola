@@ -8,12 +8,13 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player, paymentInfo) => {
-    if (!paymentInfo || paymentInfo.feeIndex === undefined) return
+    const pathIndex = paymentInfo?.originalFeeIndex ?? paymentInfo?.feeIndex
+    if (pathIndex === undefined) return
 
     // altCosts order: [{ wood: 2 }, { clay: 2 }, { stone: 2 }]
     // wood → 2 rounds, clay → 3 rounds, stone → 4 rounds
     const roundsByFee = [2, 3, 4]
-    const rounds = roundsByFee[paymentInfo.feeIndex]
+    const rounds = roundsByFee[pathIndex]
     if (!rounds) return
 
     return queueFutureMeeplesFlow(state, {
