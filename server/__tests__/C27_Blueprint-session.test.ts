@@ -57,7 +57,6 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
       discount: { stone: 1 },
       optional: true,
       sources: [CARD_ID],
-      preserveOriginal: true,
     }])
   })
 
