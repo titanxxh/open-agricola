@@ -26,7 +26,11 @@ import {
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
-import { addCardResourceGained } from '../../cards/helpers/card-state'
+import {
+  addCardResourceGained,
+  addCardResourcePaid,
+  addCardResourceSaved,
+} from '../../cards/helpers/card-state'
 import { incRoomsBuilt } from '../../session/stats'
 
 type ConstructAvailabilityContext = ActionAvailabilityContext & {
@@ -103,6 +107,76 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
+const addResource = (
+  target: Partial<Resource>,
+  key: keyof Resource,
+  amount: number,
+) => {
+  if (amount <= 0) return
+  target[key] = (target[key] ?? 0) + amount
+}
+
+const totalComplexCostResources = (cost: ComplexCost): Partial<Resource> => {
+  const total: Partial<Resource> = {}
+  const add = (resources: Partial<Resource> | undefined, multiplier = 1) => {
+    if (!resources) return
+    Object.entries(resources).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value <= 0) return
+      addResource(total, key as keyof Resource, value * multiplier)
+    })
+  }
+  add(cost.fee)
+  cost.fees?.forEach((fee) => add(fee))
+  add(cost.unitFee, cost.nb ?? 1)
+  return total
+}
+
+const recordConstructCostAttribution = (
+  ctx: ActionMutationContext,
+  baseCost: ComplexCost,
+  finalCost: ComplexCost,
+  rooms: number,
+) => {
+  if (!ctx.costAttribution?.length) return
+  const base = totalComplexCostResources(baseCost)
+  const final = totalComplexCostResources(finalCost)
+  const remainingSaved: Partial<Resource> = {}
+  const remainingPaid: Partial<Resource> = {}
+  ctx.costAttribution.forEach((entry) => {
+    Object.entries(entry.costs).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value === 0) return
+      const resourceKey = key as keyof Resource
+      if (value < 0 && remainingSaved[resourceKey] === undefined) {
+        remainingSaved[resourceKey] = Math.max(0, (base[resourceKey] ?? 0) - (final[resourceKey] ?? 0))
+      }
+      if (value > 0 && remainingPaid[resourceKey] === undefined) {
+        remainingPaid[resourceKey] = Math.max(0, (final[resourceKey] ?? 0) - (base[resourceKey] ?? 0))
+      }
+    })
+  })
+  ctx.costAttribution.forEach((entry) => {
+    if (!entry.sourceCard) return
+    const saved: Partial<Resource> = {}
+    const paid: Partial<Resource> = {}
+    Object.entries(entry.costs).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value === 0) return
+      const resourceKey = key as keyof Resource
+      const requested = Math.abs(value) * rooms
+      if (value < 0) {
+        const amount = Math.min(requested, remainingSaved[resourceKey] ?? 0)
+        addResource(saved, resourceKey, amount)
+        remainingSaved[resourceKey] = Math.max(0, (remainingSaved[resourceKey] ?? 0) - amount)
+      } else {
+        const amount = Math.min(requested, remainingPaid[resourceKey] ?? 0)
+        addResource(paid, resourceKey, amount)
+        remainingPaid[resourceKey] = Math.max(0, (remainingPaid[resourceKey] ?? 0) - amount)
+      }
+    })
+    addCardResourceSaved(ctx.player, entry.sourceCard, saved)
+    addCardResourcePaid(ctx.player, entry.sourceCard, paid)
+  })
+}
+
 const buildConstructPayCost = (
   player: PlayerState,
   costs: Partial<Resource> | undefined,
@@ -144,6 +218,13 @@ const finalizeRoom = (
     rooms.length,
   )
   if (!payCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
+  const baseCost = buildConstructPayCost(
+    ctx.player,
+    undefined,
+    ctx.actionContext,
+    rooms.length,
+  )
+  if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.roomTiles = [...nextPlayer.roomTiles, ...rooms]
@@ -158,6 +239,7 @@ const finalizeRoom = (
       : 'roomStone'
     addCardResourceGained(ctx.player, ctx.sourceCard, { [roomKey]: rooms.length })
   }
+  recordConstructCostAttribution(ctx, baseCost, payCost, rooms.length)
   incRoomsBuilt(ctx.player, rooms.length)
   ctx.eventSink?.emit<'farm.roomBuilt'>({
     type: 'farm.roomBuilt',

@@ -71,7 +71,7 @@ export type PendingEnvelope = {
 
 export type InteractionContextSnapshot = Pick<
   ActionExecutionContext,
-  'params' | 'costs' | 'sourceCard' | 'actionContext'
+  'params' | 'costs' | 'costAttribution' | 'sourceCard' | 'actionContext'
 >
 
 export type EngineStepResult =

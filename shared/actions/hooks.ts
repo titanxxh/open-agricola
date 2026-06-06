@@ -61,6 +61,7 @@ export type ActionHookResult = {
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
+  costAttribution?: import('../contract/types').ActionCostAttribution[]
   reserveResources?: Partial<Resource>
   trades?: import('../contract/types').Trade[]
   bonuses?: import('../contract/types').Bonus[]
