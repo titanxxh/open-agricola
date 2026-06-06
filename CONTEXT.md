@@ -120,6 +120,10 @@ _Avoid_: 建房、翻修、围栏等非卡牌购买成本
 一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
 _Avoid_: Trade、资源兑换、支付替换器
 
+**Cost Candidate List（成本候选列表）**:
+购买卡牌时当前可支付成本候选行的集合。ComputeCardCosts 读取并返回这个列表；卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
+_Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
+
 **Payment Path（支付路径）**:
 玩家在多个基础成本候选之间选择的路径身份；它可以影响后续卡牌效果，且不等同于最终实际支付掉的资源明细。
 _Avoid_: PaymentSolution、实际扣减资源、Trade
