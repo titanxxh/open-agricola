@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C95_BasketWeaver'
@@ -59,11 +60,17 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionCardId !== CARD_ID) return
-    if (context.cardId !== TARGET_MAJOR) return
-    // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.
-    return { costs: { stone: -1, reed: -1 } }
+  computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
+    if (context.actionCardId !== CARD_ID) return [...candidates]
+    if (context.cardId !== TARGET_MAJOR) return [...candidates]
+    return [
+      ...candidates,
+      ...candidates.map((candidate) => ({
+        resources: { stone: 1, reed: 1 },
+        originalFeeIndex: candidate.originalFeeIndex,
+        sources: [...candidate.sources, CARD_ID],
+      })),
+    ]
   },
 }
 

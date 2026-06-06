@@ -7,6 +7,26 @@ import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
 import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'E109_BraidMaker'
 
+const hasPaidResources = (
+  option: { labelParams?: Record<string, unknown> },
+  expected: Record<string, number>,
+) => {
+  const actual = (option.labelParams?.resourcesPaid ?? {}) as Record<string, number>
+  const keys = new Set([...Object.keys(actual), ...Object.keys(expected)])
+  return [...keys].every((key) => (actual[key] ?? 0) === (expected[key] ?? 0))
+}
+
+const choosePaymentByResources = (
+  session: GameSession,
+  resp: ReturnType<GameSession['takeAction']>,
+  expected: Record<string, number>,
+) => {
+  expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+  const option = resp.interaction.options?.find((candidate) => hasPaidResources(candidate, expected))
+  expect(option).toBeDefined()
+  return session.resolveChoice(0, option!.value)
+}
+
 // Keep side-effect imports referenced.
 void A143_Stonecutter
 
@@ -116,8 +136,9 @@ describe('E109_BraidMaker session', () => {
 
   it('applies Basket discount when E109 is played (1 reed + 1 stone)', () => {
     const session = setup()
-    const resp = session.takeAction(0, 'major-improvement')
+    let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
+    resp = choosePaymentByResources(session, resp, { reed: 1, stone: 1 })
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
@@ -127,7 +148,7 @@ describe('E109_BraidMaker session', () => {
     expect(after.resources.stone).toBe(2)
   })
 
-  it('stacks E109 + A143 Stonecutter for Major_Basket', () => {
+  it('offers E109 fixed price alongside A143 discounted printed Basket path', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -161,17 +182,20 @@ describe('E109_BraidMaker session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const option = resp.interaction.options?.find((entry) =>
-      Array.isArray(entry.labelParams.sourceCards)
-        && entry.labelParams.sourceCards.includes('A143_Stonecutter'),
+    const stonecutterOption = resp.interaction.options?.find((option) =>
+      hasPaidResources(option, { reed: 2, stone: 1 }),
     )
-    expect(option).toBeDefined()
+    expect(stonecutterOption?.labelParams.sourceCards).toContain('A143_Stonecutter')
+    const braidMakerOption = resp.interaction.options?.find((option) =>
+      hasPaidResources(option, { reed: 1, stone: 1 }),
+    )
+    expect(braidMakerOption?.labelParams.sourceCards).toContain(CARD_ID)
 
-    resp = session.resolveChoice(0, option!.value)
+    resp = session.resolveChoice(0, braidMakerOption!.value)
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
-    expect(after.resources.reed).toBe(1) // 2 - 1 = 1
-    expect(after.resources.stone).toBe(2) // 2 - 0 (clamped at 0 payment)
+    expect(after.resources.reed).toBe(1)
+    expect(after.resources.stone).toBe(1)
   })
 })
