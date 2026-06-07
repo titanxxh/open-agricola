@@ -2650,20 +2650,21 @@
   max-width: min(320px, calc(100vw - 24px));
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(33, 25, 17, 0.96);
-  color: #f8f0df;
-  border: 1px solid rgba(226, 193, 141, 0.45);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+  background: #fff8e7;
+  color: #2f2112;
+  border: 1px solid rgba(133, 93, 40, 0.34);
+  box-shadow: 0 14px 28px rgba(65, 43, 17, 0.26);
 }
 .played-card-stats-title {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 700;
+  color: #1f160c;
 }
 .played-card-stats-section + .played-card-stats-section {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(119, 83, 36, 0.22);
 }
 .played-card-stats-label {
   margin-bottom: 4px;
@@ -2671,10 +2672,13 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #d9c49a;
+  color: #6f4b1f;
 }
 .played-card-stats-line {
-  color: inherit;
+  color: #24180b;
+}
+.played-card-stats-line .resource-inline-amount {
+  color: #24180b;
 }
 .hand-empty,
 .hand-hidden {
