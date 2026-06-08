@@ -21,7 +21,7 @@ export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
 export type PaymentResource = Resource & Record<SupplyTokenKey, number>
 export type PaymentResourceMap = Partial<PaymentResource>
 export type PaymentResourceKey = keyof PaymentResource
-export type FutureMeepleResourceMap = Partial<Resource> & Partial<Pick<PaymentResource, 'stable'>>
+export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
@@ -338,6 +338,7 @@ export type FutureMeeple = {
   actionId: string | null
   resources: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
+  actionContext?: Record<string, unknown>
 }
 
 export type FutureMeepleSourceSummary = {
@@ -361,6 +362,7 @@ export type FutureMeepleRequest =
       startRound: number
       count: number
       resources: FutureMeepleResourceMap
+      actionContext?: Record<string, unknown>
     }
   | {
       cardId: string
@@ -370,6 +372,7 @@ export type FutureMeepleRequest =
         round: number
         resources?: FutureMeepleResourceMap
         roomType?: FutureMeepleRoomType
+        actionContext?: Record<string, unknown>
       }[]
     }
 

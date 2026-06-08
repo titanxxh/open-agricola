@@ -1,9 +1,9 @@
 import type {
   ActionDefinition,
   ActionFlow,
+  FutureMeepleResourceMap,
   FutureMeepleRequest,
   GameState,
-  Resource,
 } from '../../../contract/types'
 import type { EventSink } from '../../../contract/events'
 
@@ -31,13 +31,13 @@ export const queueFutureMeeplesFlow = (
 const clampRound = (round: number) => Math.max(1, Math.min(14, round))
 
 const addResourceCounts = (
-  target: Partial<Resource>,
-  addition: Partial<Resource>,
+  target: FutureMeepleResourceMap,
+  addition: FutureMeepleResourceMap,
 ) => {
   Object.entries(addition).forEach(([key, value]) => {
     const amount = value ?? 0
     if (amount <= 0) return
-    const typedKey = key as keyof Resource
+    const typedKey = key as keyof FutureMeepleResourceMap
     target[typedKey] = (target[typedKey] ?? 0) + amount
   })
 }
@@ -55,8 +55,8 @@ export const removeFutureMeeples = (
 
 export const buildFutureEntries = (
   baseRound: number,
-  items: { offset: number; resources: Partial<Resource> }[],
-): { round: number; resources: Partial<Resource> }[] =>
+  items: { offset: number; resources: FutureMeepleResourceMap }[],
+): { round: number; resources: FutureMeepleResourceMap }[] =>
   items.map(({ offset, resources }) => ({ round: baseRound + offset, resources }))
 
 export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventSink) => {
@@ -65,12 +65,12 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
   state.pendingFutureMeeples = []
   const nextEntries = [...state.futureMeeples]
   requests.forEach((request, requestIndex) => {
-    const queuedEntries: { round: number; resources?: Partial<Resource>; roomType?: NonNullable<GameState['futureMeeples'][number]['roomType']> }[] = []
+    const queuedEntries: { round: number; resources?: FutureMeepleResourceMap; roomType?: NonNullable<GameState['futureMeeples'][number]['roomType']> }[] = []
     if ('entries' in request) {
       for (const entry of request.entries) {
         const round = clampRound(entry.round)
         if (round <= state.round) continue
-        const resources: Partial<Resource> = {}
+        const resources: FutureMeepleResourceMap = {}
         if (entry.resources) addResourceCounts(resources, entry.resources)
         const queued = {
           round,
@@ -86,6 +86,7 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
           actionId: state.roundActionOrder[round - 1] ?? null,
           resources,
           ...(entry.roomType ? { roomType: entry.roomType } : {}),
+          ...(entry.actionContext ? { actionContext: entry.actionContext } : {}),
         })
       }
     } else {
@@ -93,7 +94,7 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
       const endRound = clampRound(request.startRound + request.count - 1)
       for (let round = startRound; round <= endRound; round += 1) {
         const actionId = state.roundActionOrder[round - 1] ?? null
-        const resources: Partial<Resource> = {}
+        const resources: FutureMeepleResourceMap = {}
         addResourceCounts(resources, request.resources)
         const queued = {
           round,
@@ -107,6 +108,7 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
           round,
           actionId,
           resources,
+          ...(request.actionContext ? { actionContext: request.actionContext } : {}),
         })
       }
     }

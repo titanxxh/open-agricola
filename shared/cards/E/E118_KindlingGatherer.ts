@@ -30,35 +30,11 @@ const hasActionSpaceFoodMovedToTriggerPlayer = (context: CardListenerContext) =>
     (event) => isFoodFromActionSpace(context, event),
   ) > 0
 
-const placeFarmerListener: CardListenerRegistration = {
-  id: 'E118-kindling-gatherer-after-place-farmer',
+const listener: CardListenerRegistration = {
+  id: 'E118-kindling-gatherer-after-action-space-food',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (hasActionSpaceFoodMovedToTriggerPlayer(context)) {
-      return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
-    }
-  },
-}
-
-const collectListener: CardListenerRegistration = {
-  id: 'E118-kindling-gatherer-after-collect',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (hasActionSpaceFoodMovedToTriggerPlayer(context)) {
-      return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
-    }
-  },
-}
-
-const gainListener: CardListenerRegistration = {
-  id: 'E118-kindling-gatherer-after-gain',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['gain'],
+  actions: ['place-farmer', 'collect', 'gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (hasActionSpaceFoodMovedToTriggerPlayer(context)) {
       return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
@@ -67,7 +43,7 @@ const gainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [placeFarmerListener, collectListener, gainListener],
+  listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

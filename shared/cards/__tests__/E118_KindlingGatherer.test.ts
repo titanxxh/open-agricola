@@ -7,6 +7,7 @@ import '../E/E118_KindlingGatherer'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E118_KindlingGatherer'
+const LISTENER_ID = 'E118-kindling-gatherer-after-action-space-food'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -77,7 +78,7 @@ const foodGainedFromSupply = (
 
 describe('E118_KindlingGatherer', () => {
   it('gains 1 wood after collecting from fishing', () => {
-    const listener = findListener('E118-kindling-gatherer-after-collect')!
+    const listener = findListener(LISTENER_ID)!
     expect(listener).toBeDefined()
     const player = createPlayer()
     const space = createSpace('fishing', { gainPerRound: { food: 1 } })
@@ -96,7 +97,7 @@ describe('E118_KindlingGatherer', () => {
   })
 
   it('gains 1 wood after collecting from traveling-players', () => {
-    const listener = findListener('E118-kindling-gatherer-after-collect')!
+    const listener = findListener(LISTENER_ID)!
     const player = createPlayer()
     const space = createSpace('traveling-players', { gainPerRound: { food: 1 } })
     const actionEvents = [foodMoved(player.id, 'traveling-players', 2)]
@@ -114,7 +115,7 @@ describe('E118_KindlingGatherer', () => {
   })
 
   it('gains 1 wood after place-farmer on resource-market-4', () => {
-    const listener = findListener('E118-kindling-gatherer-after-place-farmer')!
+    const listener = findListener(LISTENER_ID)!
     expect(listener).toBeDefined()
     const player = createPlayer()
     const actionEvents = [foodMoved(player.id, 'resource-market-4', 1)]
@@ -131,7 +132,7 @@ describe('E118_KindlingGatherer', () => {
   })
 
   it('gains 1 wood after gain with food from day-laborer', () => {
-    const listener = findListener('E118-kindling-gatherer-after-gain')!
+    const listener = findListener(LISTENER_ID)!
     expect(listener).toBeDefined()
     const player = createPlayer()
     const actionEvents = [foodGainedFromSupply(player.id, 2)]
@@ -149,7 +150,7 @@ describe('E118_KindlingGatherer', () => {
   })
 
   it('does not trigger for unrelated spaces', () => {
-    const listener = findListener('E118-kindling-gatherer-after-place-farmer')!
+    const listener = findListener(LISTENER_ID)!
     const player = createPlayer()
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('farmland'),

@@ -88,13 +88,23 @@ describe('supply token helpers', () => {
       stableTiles: [{ row: 0, col: 1 }],
       supplyTokensConsumed: { stable: 1 },
       cardStates: {
-        A89_StablePlanner: { extraData: { targetRounds: [6] } },
         E148_Lazybones: { extraData: { reservedActionSpaces: ['grain-seeds'] } },
         B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
       },
     })
+    const state = {
+      players: [p],
+      futureMeeples: [{
+        id: 'future-stable',
+        cardId: 'A89_StablePlanner',
+        playerId: p.id,
+        round: 6,
+        actionId: null,
+        resources: { stable: 1 },
+      }],
+    }
 
-    expect(getAvailableStableSupplyCount({ players: [p] } as never, p)).toBe(0)
+    expect(getAvailableStableSupplyCount(state as never, p)).toBe(0)
     expect(MAX_STABLE_PIECES).toBe(4)
   })
 })

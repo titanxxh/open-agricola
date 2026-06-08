@@ -36,29 +36,16 @@ export const getOwnOrdinaryFenceReserveCount = (player: PlayerState): number =>
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 
-const readNumberArray = (value: unknown): number[] =>
-  Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === 'number') : []
-
-const A89_STABLE_PLANNER_ID = 'A89_StablePlanner'
-
 const getQueuedFutureStableCount = (
   state: GameState,
   player: PlayerState,
-  cardId?: string,
 ): number =>
   (state.futureMeeples ?? [])
     .filter((entry) => entry.playerId === player.id)
-    .filter((entry) => !cardId || entry.cardId === cardId)
     .reduce((sum, entry) => sum + Math.max(0, entry.resources?.stable ?? 0), 0)
 
-export const getReservedFutureStableCount = (state: GameState, player: PlayerState): number => {
-  const queued = getQueuedFutureStableCount(state, player)
-  const stablePlannerTargets = readNumberArray(
-    player.cardStates?.A89_StablePlanner?.extraData?.targetRounds,
-  ).length
-  const stablePlannerQueued = getQueuedFutureStableCount(state, player, A89_STABLE_PLANNER_ID)
-  return queued + Math.max(0, stablePlannerTargets - stablePlannerQueued)
-}
+export const getReservedFutureStableCount = (state: GameState, player: PlayerState): number =>
+  getQueuedFutureStableCount(state, player)
 
 export const getReservedActionSpaceStableCount = (player: PlayerState): number =>
   readStringArray(player.cardStates?.E148_Lazybones?.extraData?.reservedActionSpaces).length

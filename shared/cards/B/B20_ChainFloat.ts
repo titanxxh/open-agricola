@@ -13,9 +13,9 @@ const cardImpl = {
       cardId: CARD_ID,
       playerId: player.id,
       entries: [
-        { round: base + 7, resources: {} },
-        { round: base + 8, resources: {} },
-        { round: base + 9, resources: {} },
+        { round: base + 7, resources: { field: 1 } },
+        { round: base + 8, resources: { field: 1 } },
+        { round: base + 9, resources: { field: 1 } },
       ],
     })
   },

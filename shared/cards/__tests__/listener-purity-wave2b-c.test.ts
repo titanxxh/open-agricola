@@ -375,11 +375,10 @@ describe('listener purity wave 2b/c', () => {
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'B18_GrasslandHarrow', params: { kind: 'set-extra-data', key: 'targetRound', value: 7 } },
-        { type: 'leaf', actionId: 'future-meeples', params: { __futureMeepleRequest: { cardId: 'B18_GrasslandHarrow', playerId: p.id } } },
-      ],
+      type: 'leaf',
+      actionId: 'future-meeples',
+      sourceCard: 'B18_GrasslandHarrow',
+      params: { __futureMeepleRequest: { cardId: 'B18_GrasslandHarrow', playerId: p.id } },
     })
   })
 

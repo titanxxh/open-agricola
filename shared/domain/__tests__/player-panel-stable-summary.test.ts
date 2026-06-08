@@ -151,12 +151,8 @@ describe('player panel stable supply summary', () => {
     expect(stableSummary(p, s)).toEqual({ used: 1, limit: 4 })
   })
 
-  it('keeps A89 target rounds as future reservations without double-counting queued entries', () => {
-    const p = player({
-      cardStates: {
-        A89_StablePlanner: { extraData: { targetRounds: [5, 8] } },
-      },
-    })
+  it('counts A89 queued stable future meeples as future reservations', () => {
+    const p = player()
     const s = state([p], {
       futureMeeples: [
         {
@@ -194,15 +190,22 @@ describe('player panel stable supply summary', () => {
   })
 
   it('keeps supply usage distinct from card-facing stable count', () => {
-    const p = player({
-      stableTiles: [{ row: 0, col: 0 }],
-      cardStates: {
-        A89_StablePlanner: { extraData: { targetRounds: [5] } },
-      },
+    const p = player({ stableTiles: [{ row: 0, col: 0 }] })
+    const s = state([p], {
+      futureMeeples: [
+        {
+          id: 'A89-p1-5',
+          cardId: 'A89_StablePlanner',
+          playerId: p.id,
+          round: 5,
+          actionId: null,
+          resources: { stable: 1 },
+        },
+      ],
     })
 
     expect(getStableCountForCards(p)).toBe(1)
-    expect(stableSummary(p)).toEqual({ used: 2, limit: 4 })
+    expect(stableSummary(p, s)).toEqual({ used: 2, limit: 4 })
   })
 
   it('summarizes the viewed player instead of the current player', () => {
