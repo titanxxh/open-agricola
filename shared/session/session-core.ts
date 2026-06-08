@@ -272,6 +272,13 @@ const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
   'onEndHarvestFieldPhase',
 ])
 
+type FutureMeepleActionKey = 'field' | 'stable'
+
+const futureMeepleActionCount = (
+  entry: GameState['futureMeeples'][number],
+  key: FutureMeepleActionKey,
+): number => Math.max(0, Math.floor(entry.resources?.[key] ?? 0))
+
 type SelectionCommitPayload = {
   cancel?: boolean
   positions?: FarmTilePosition[]
@@ -335,6 +342,7 @@ type StageResumeState = {
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
+    | 'futureMeepleActions'
     | 'onReorganizeComplete'
   playerIndex: number
   cardIndex: number
@@ -2322,6 +2330,49 @@ export class GameCore {
   /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
   private finalizeActionLog(player: PlayerState) { return roundPhase.finalizeActionLog(this, player) }
 
+  private buildFutureMeepleActionFlow() {
+    const children: ActionFlow[] = []
+    let firstPlayerIndex = -1
+    for (const entry of this.state.futureMeeples) {
+      if (entry.round !== this.state.round) continue
+      const playerIndex = this.state.players.findIndex((player) => player.id === entry.playerId)
+      if (playerIndex === -1) continue
+      if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
+      const actionContext = entry.actionContext ?? {}
+      for (let i = 0; i < futureMeepleActionCount(entry, 'field'); i += 1) {
+        children.push({
+          type: 'seq',
+          optional: true,
+          children: [{
+            type: 'leaf',
+            actionId: 'plow',
+            sourceCard: entry.cardId,
+            targetPlayerId: entry.playerId,
+            actionContext: { ...actionContext, trueAction: false },
+          }],
+        })
+      }
+      for (let i = 0; i < futureMeepleActionCount(entry, 'stable'); i += 1) {
+        children.push({
+          type: 'seq',
+          optional: true,
+          children: [{
+            type: 'leaf',
+            actionId: 'stables',
+            sourceCard: entry.cardId,
+            targetPlayerId: entry.playerId,
+            actionContext: { max: 1, exactCost: { max: 1 }, ...actionContext, trueAction: false },
+          }],
+        })
+      }
+    }
+    if (children.length === 0 || firstPlayerIndex === -1) return null
+    return {
+      flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
+      playerIndex: firstPlayerIndex,
+    }
+  }
+
   private startStageFlow(
     flow: ActionFlow,
     hook: StageResumeState['hook'],
@@ -2902,6 +2953,7 @@ export class GameCore {
       }
       return events
     })
+    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
     const committedStartEvents = appendImmediateEvents(this.state, [
@@ -2910,6 +2962,20 @@ export class GameCore {
       ...actionEvents,
     ])
     this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
+    if (futureMeepleActionFlow) {
+      this.startStageFlow(
+        futureMeepleActionFlow.flow,
+        'futureMeepleActions',
+        futureMeepleActionFlow.playerIndex,
+        0,
+        0,
+      )
+      return this.respond()
+    }
+    return this.continueAfterFutureMeepleActions()
+  }
+
+  private continueAfterFutureMeepleActions(): SessionResponse {
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -2970,6 +3036,9 @@ export class GameCore {
         return
       case 'onRoundStart':
         this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'futureMeepleActions':
+        this.continueAfterFutureMeepleActions()
         return
       case 'onStartHarvestFeedingPhase':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)

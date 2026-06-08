@@ -648,7 +648,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 ### 7.6 阶段型 Hook（按触发顺序）
 
 ```
-回合开始: onBeforeStartOfTurn → onRoundStart
+回合开始: onBeforeStartOfTurn → futureMeepleActions → onRoundStart
 工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
 回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
 回合结束: onRoundEnd → onAfterRoundEnd
@@ -672,7 +672,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
 
-阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
+阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`futureMeepleActions` 是 round-start 内部 stage：`FutureMeepleResourceMap.field/stable` 到期后先由 `applyFutureMeeples` 消费 token，再把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`；entry 可携带 `actionContext`，用于 D91 这类付费 plow。该 stage 完成后继续普通 `onRoundStart`，不重复 round-start 初始化。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
 
 ### 7.7 Listener activation purity + BGA 对齐
 

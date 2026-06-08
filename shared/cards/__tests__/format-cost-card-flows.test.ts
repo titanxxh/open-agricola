@@ -7,7 +7,6 @@ import type { DraftGameEvent } from '../../contract/events'
 import '../A/A13_RenovationCompany'
 import '../A/A15_CarpentersAxe'
 import '../A/A85_Homekeeper'
-import '../A/A89_StablePlanner'
 import '../A/A118_Treegardener'
 import '../B/B2_MiniPasture'
 import '../B/B16_MiningHammer'
@@ -209,20 +208,6 @@ describe('formatCost migrated card flows', () => {
     }))
     const leaf = expectLeaf(result?.flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
-    expectNoLegacyCostFields(leaf)
-  })
-
-  it('A89_StablePlanner emits one free stable from actionContext', () => {
-    const actor = player({
-      occupationPlayed: ['A89_StablePlanner'],
-      cardStates: { A89_StablePlanner: { extraData: { targetRounds: [5] } } },
-    })
-    const gameState = state(actor)
-    gameState.round = 5
-    const flow = getCardEffect('A89_StablePlanner')!.onRoundStart!(gameState, actor)
-    const leaf = expectLeaf(flow, 'stables')
-    expect(leaf.params).toBeUndefined()
-    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
     expectNoLegacyCostFields(leaf)
   })
 

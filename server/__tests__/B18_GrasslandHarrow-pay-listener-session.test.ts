@@ -127,11 +127,9 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
     expect(result!.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-extra-data', key: 'targetRound', value: 7 } },
-        { type: 'leaf', actionId: 'future-meeples', params: { __futureMeepleRequest: { cardId: CARD_ID, playerId: 'p1' } } },
-      ],
+      type: 'leaf',
+      actionId: 'future-meeples',
+      params: { __futureMeepleRequest: { cardId: CARD_ID, playerId: 'p1' } },
     })
     executeDeterministicLeaves(result!.flow, state, player)
     expect(state.futureMeeples.length).toBe(1)
@@ -139,10 +137,12 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(entry.round).toBe(7)
     expect(entry.cardId).toBe(CARD_ID)
     expect(entry.playerId).toBe('p1')
-    const req = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children[1]!.params!.__futureMeepleRequest
+    expect(entry.resources).toEqual({ field: 1 })
+    const req = (result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params!.__futureMeepleRequest
     if (req && typeof req === 'object' && 'entries' in req) {
       // current round 3 + reserve 4 = round 7
       expect(req.entries.map((e) => e.round)).toEqual([7])
+      expect(req.entries.map((e) => e.resources)).toEqual([{ field: 1 }])
       expect(req.cardId).toBe(CARD_ID)
       expect(req.playerId).toBe('p1')
     } else {
@@ -162,8 +162,8 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       result: { type: 'ok', resourcesPaid: {} },
     } as unknown as CardListenerContext)
     expect(result?.flow).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    const req = flow.children[1]!.params!.__futureMeepleRequest
+    const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
+    const req = flow.params!.__futureMeepleRequest
     if (req && typeof req === 'object' && 'entries' in req) {
       expect(req.entries[0]!.round).toBe(14)
     } else {
@@ -259,12 +259,12 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
     expect(p0.minorPlayed).toContain(CARD_ID)
-    expect(p0.cardStates?.[CARD_ID]?.extraData?.targetRound).toBe(5)
     expect(resp.state.futureMeeples).toEqual([
       expect.objectContaining({
         cardId: CARD_ID,
         playerId: p0.id,
         round: 5,
+        resources: { field: 1 },
       }),
     ])
   })

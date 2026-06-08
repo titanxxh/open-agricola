@@ -88,9 +88,16 @@ const setupForPurchase = (options?: { noStableReserve?: boolean }) => {
     player.supplyTokensConsumed = { stable: 1 }
     player.cardStates = {
       ...player.cardStates,
-      A89_StablePlanner: { extraData: { targetRounds: [6] } },
       B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
     }
+    state.futureMeeples.push({
+      id: 'future-stable',
+      cardId: 'A89_StablePlanner',
+      playerId: player.id,
+      round: 6,
+      actionId: null,
+      resources: { stable: 1 },
+    })
   }
 
   session.loadState(state)

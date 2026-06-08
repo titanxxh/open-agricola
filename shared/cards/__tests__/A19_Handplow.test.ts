@@ -52,39 +52,12 @@ describe('A19_Handplow', () => {
     expect('entries' in req).toBe(true)
     if ('entries' in req) {
       expect(req.entries[0]!.round).toBe(8)
+      expect(req.entries[0]!.resources).toEqual({ field: 1 })
     }
   })
 
-  it('onRoundStart offers optional plow at target round', () => {
-    const player = createPlayer()
-    const state = createState(player)
-    state.round = 3
+  it('does not expose a card-local onRoundStart flow', () => {
     const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    state.round = 8
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeTruthy()
-    expect((flow as { type: string }).type).toBe('seq')
-  })
-
-  it('onRoundStart returns nothing on non-target round', () => {
-    const player = createPlayer()
-    const state = createState(player)
-    state.round = 3
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    state.round = 5
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeFalsy()
-  })
-
-  it('onRoundStart returns nothing if player does not have card', () => {
-    const player = createPlayer()
-    player.minorPlayed = []
-    const state = createState(player)
-    state.round = 8
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeFalsy()
+    expect(effect!.onRoundStart).toBeUndefined()
   })
 })
