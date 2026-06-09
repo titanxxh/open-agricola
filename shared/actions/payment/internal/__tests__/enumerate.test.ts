@@ -181,6 +181,108 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     })).toBe(true)
   })
 
+  it('non-optional bonus choices prune choices that do not reduce the current cost', () => {
+    const player = baseTestPlayer({ wood: 2 })
+    const cost: ComplexCost = {
+      fee: { wood: 2 },
+      bonuses: [{
+        optional: false,
+        sources: ['TEST_BONUS'],
+        choices: [
+          { discount: { clay: 1 }, sources: ['TEST_BONUS'] },
+          { discount: { wood: 1 }, sources: ['TEST_BONUS'] },
+        ],
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+    const payments = sols.map(nonZeroPaid)
+
+    expect(payments).toEqual([{ wood: 1 }])
+    expect(sols[0]?.bonusUsed).toBe('TEST_BONUS')
+  })
+
+  it('non-optional bonus choices fall back to no-op when no choice applies', () => {
+    const player = baseTestPlayer({ wood: 2 })
+    const cost: ComplexCost = {
+      fee: { wood: 2 },
+      bonuses: [{
+        optional: false,
+        sources: ['TEST_BONUS'],
+        choices: [
+          { discount: { clay: 1 }, sources: ['TEST_BONUS'] },
+        ],
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+
+    expect(sols.map(nonZeroPaid)).toEqual([{ wood: 2 }])
+    expect(sols[0]?.bonusUsed).toBeUndefined()
+  })
+
+  it('top-k bonus choices cannot skip an unusable intermediate resource', () => {
+    const player = baseTestPlayer({ clay: 5, reed: 2 })
+    const cost: ComplexCost = {
+      fee: { clay: 5, reed: 2 },
+      bonuses: [{
+        optional: true,
+        sources: ['E123_ResourceHoarder'],
+        choices: [
+          { discount: {} },
+          { discount: { clay: 1 } },
+          { discount: { clay: 1, wood: 1 } },
+          { discount: { clay: 1, wood: 1, reed: 1 } },
+        ],
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+    const payments = sols.map(nonZeroPaid)
+
+    expect(payments).toContainEqual({ clay: 4, reed: 2 })
+    expect(payments).not.toContainEqual({ clay: 4, reed: 1 })
+  })
+
+  it('replacement bonus choices cannot add replacement cost unless the reduction fully applies', () => {
+    const player = baseTestPlayer({ stone: 1, reed: 1, wood: 1 })
+    const cost: ComplexCost = {
+      fee: { stone: 1, reed: 1 },
+      bonuses: [{
+        optional: true,
+        sources: ['A123_FrameBuilder'],
+        choices: [
+          { discount: { wood: -1, stone: 2 }, sources: ['A123_FrameBuilder'] },
+        ],
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+    const payments = sols.map(nonZeroPaid)
+
+    expect(payments).toContainEqual({ reed: 1, stone: 1 })
+    expect(payments).not.toContainEqual({ reed: 1, wood: 1 })
+  })
+
+  it('capDiscountAtCost removes the current cost for a resource without requiring an exact discount amount', () => {
+    const player = baseTestPlayer({ wood: 5, reed: 2 })
+    const cost: ComplexCost = {
+      fee: { wood: 5, reed: 2 },
+      bonuses: [{
+        discount: { reed: 99 },
+        capDiscountAtCost: true,
+        optional: true,
+        sources: ['C14_StrawThatchedRoof'],
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+    const payments = sols.map(nonZeroPaid)
+
+    expect(payments).toContainEqual({ wood: 5, reed: 2 })
+    expect(payments).toContainEqual({ wood: 5 })
+  })
+
   it('B145 renovation can replace 2 reed with 1 wood', () => {
     const player = baseTestPlayer({ stone: 2, food: 2, wood: 1 })
     player.activeModifiers = [{

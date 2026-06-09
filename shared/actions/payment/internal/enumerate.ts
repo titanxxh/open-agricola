@@ -206,14 +206,43 @@ export const sortPaymentSolutions = (
 const applyBonus = (
   cost: PaymentResourceMap,
   discount: Partial<Resource>,
+  capDiscountAtCost = false,
 ): PaymentResourceMap => {
   const result: PaymentResourceMap = { ...cost }
   const discountKeys = Object.keys(discount) as ResourceKey[]
   for (const key of discountKeys) {
     const discountAmount = discount[key] ?? 0
-    result[key] = Math.max(0, (result[key] ?? 0) - discountAmount)
+    if (discountAmount === 0) continue
+    const currentAmount = result[key] ?? 0
+    const nextAmount = capDiscountAtCost && discountAmount > 0
+      ? Math.max(0, currentAmount - discountAmount)
+      : currentAmount - discountAmount
+    if (nextAmount === 0) {
+      delete result[key]
+    } else {
+      result[key] = nextAmount
+    }
   }
   return result
+}
+
+const canApplyBonus = (
+  cost: PaymentResourceMap,
+  discount: Partial<Resource>,
+  capDiscountAtCost = false,
+): boolean => {
+  const discountKeys = Object.keys(discount) as ResourceKey[]
+  for (const key of discountKeys) {
+    const discountAmount = discount[key] ?? 0
+    if (discountAmount <= 0) continue
+    const currentAmount = cost[key] ?? 0
+    if (capDiscountAtCost) {
+      if (currentAmount <= 0) return false
+      continue
+    }
+    if (currentAmount - discountAmount < 0) return false
+  }
+  return true
 }
 
 const getMaxTradeTimesFromPartial = (
@@ -616,6 +645,7 @@ export const computeAllBuyableCombinations = (
           }
           const rawCandidates: {
             discount: Partial<Resource>
+            capDiscountAtCost?: boolean
             sources?: string[]
             conditions?: Record<string, number>
             minCost?: Partial<Resource>
@@ -624,6 +654,7 @@ export const computeAllBuyableCombinations = (
           }[] = bonus.choices
             ? bonus.choices.map((c, i) => ({
                 ...c,
+                capDiscountAtCost: c.capDiscountAtCost ?? bonus.capDiscountAtCost,
                 minCost: c.minCost ?? bonus.minCost,
                 maxCost: c.maxCost ?? bonus.maxCost,
                 _origIndex: i,
@@ -631,6 +662,7 @@ export const computeAllBuyableCombinations = (
             : [
                 {
                   discount: bonus.discount!,
+                  capDiscountAtCost: bonus.capDiscountAtCost,
                   sources: bonus.sources,
                   minCost: bonus.minCost,
                   maxCost: bonus.maxCost,
@@ -650,7 +682,10 @@ export const computeAllBuyableCombinations = (
               if (!costBoundsSatisfied(path.cost, candidate.minCost, candidate.maxCost)) {
                 continue
               }
-              const nextCost = applyBonus(path.cost, candidate.discount)
+              if (!canApplyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)) {
+                continue
+              }
+              const nextCost = applyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)
               const combined = new Set([
                 ...path.sources,
                 ...(bonus.sources ?? []),
@@ -668,7 +703,7 @@ export const computeAllBuyableCombinations = (
               })
             }
           }
-          bonusPaths = expanded
+          bonusPaths = expanded.length > 0 || bonus.optional ? expanded : bonusPaths
         }
 
         for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
