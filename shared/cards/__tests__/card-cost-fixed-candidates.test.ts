@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { GameState, PaymentResourceMap, PlayerState } from '../../contract/types'
+import type { ComplexCost, GameState, PaymentResourceMap, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 import { requireActiveCardRegistry } from '../active-registry'
 import { playImprovement } from '../../actions/effects/improvement'
-import { resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
+import { computeAllBuyableCombinations, resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
 import type { CardListenerRegistration } from '../card-listeners'
 import { createInitialPlayerStats } from '../../session/stats'
 
 import '../A/A27_OvenSite'
+import '../A/A75_LumberMill'
+import '../A/A143_Stonecutter'
 import '../B/B65_GrainDepot'
 import '../C/C95_BasketWeaver'
+import '../D/D117_WoodExpert'
 import '../D/D95_SiteManager'
+import '../E/E130_Overachiever'
 import '../E/E109_BraidMaker'
 import '../E/E27_PiggyBank'
 
@@ -94,6 +98,48 @@ const hasPaidResources = (
   )
 }
 
+const nonZeroPaid = (solution: PaymentSolution): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  for (const [key, value] of Object.entries(solution.resourcesPaid)) {
+    if ((value ?? 0) !== 0) out[key as keyof Resource] = value
+  }
+  return out
+}
+
+const sortedJson = (values: unknown[]) =>
+  values.map((value) => JSON.stringify(value)).sort()
+
+const RESOURCE_ORDER: (keyof Resource)[] = [
+  'wood',
+  'clay',
+  'reed',
+  'stone',
+  'food',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+]
+
+const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
+  for (const key of RESOURCE_ORDER) {
+    const value = resources[key]
+    if ((value ?? 0) > 0) out[key] = value
+  }
+  return out
+}
+
+const candidateOptions = (result: ReturnType<typeof resolveCardCostWithModifiersDetailed>) => {
+  const cost = result.cost as ComplexCost
+  return (cost.fees ?? []).map((resources, index) => ({
+    resources: positiveResources(resources),
+    sources: [...(result.candidateMetadataByFeeIndex?.[index]?.sources ?? [])].sort(),
+  }))
+}
+
 describe('fixed card-purchase cost candidates', () => {
   afterEach(() => {
     requireActiveCardRegistry('card-cost-fixed-candidates')
@@ -149,7 +195,7 @@ describe('fixed card-purchase cost candidates', () => {
     })
   })
 
-  it('A27 appends a fixed oven payment candidate and keeps the printed oven cost', () => {
+  it('A27 replaces the printed oven cost with the fixed oven payment candidate', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -158,23 +204,115 @@ describe('fixed card-purchase cost candidates', () => {
     player.resources.clay = 3
     player.resources.stone = 1
 
-    const result = playImprovement(
+    const result = resolveCardCostWithModifiersDetailed(
       state,
       player,
-      'major:Major_ClayOven',
-      'any',
-      undefined,
+      'improvement',
+      'Major_ClayOven',
+      { clay: 3, stone: 1 },
       'A27_OvenSite',
     )
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { clay: 3, stone: 1 }))).toBe(true)
-    const fixed = options.find((option) => hasPaidResources(option, { clay: 1, stone: 1 }))
-    expect(fixed?.labelParams.sourceCards).toEqual(['A27_OvenSite'])
-    expect(fixed?.effectPreview).toMatchObject({
-      resourcesPaid: { clay: 1, stone: 1 },
-      sourceCards: ['A27_OvenSite'],
+    expect(candidateOptions(result)).toEqual([
+      {
+        resources: { clay: 1, stone: 1 },
+        sources: ['A27_OvenSite'],
+      },
+    ])
+  })
+
+  it('A75 mandatory discount does not preserve the original payment candidate', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.minorPlayed = ['A75_LumberMill']
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Joinery',
+      { wood: 2, clay: 2, reed: 2, stone: 2 },
+    )
+
+    expect(candidateOptions(result)).toEqual([
+      {
+        resources: { wood: 1, clay: 2, reed: 2, stone: 2 },
+        sources: ['A75_LumberMill'],
+      },
+    ])
+  })
+
+  it('E130 offers exactly one non-optional resource discount choice', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.occupationPlayed = ['E130_Overachiever']
+    player.resources = {
+      ...player.resources,
+      wood: 2,
+      clay: 2,
+      reed: 2,
+      stone: 2,
+    }
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Joinery',
+      { wood: 2, clay: 2, reed: 2, stone: 2 },
+      'E130_Overachiever',
+    )
+    const cost = result.cost as ComplexCost
+    expect(cost.bonuses).toHaveLength(1)
+    expect(cost.bonuses?.[0]).toMatchObject({
+      optional: false,
+      sources: ['E130_Overachiever'],
     })
+    expect(cost.bonuses?.[0]?.choices).toHaveLength(10)
+
+    const payments = computeAllBuyableCombinations(player, cost).map(nonZeroPaid)
+    expect(sortedJson(payments)).toEqual(sortedJson([
+      { wood: 1, clay: 2, reed: 2, stone: 2 },
+      { wood: 2, clay: 1, reed: 2, stone: 2 },
+      { wood: 2, clay: 2, reed: 1, stone: 2 },
+      { wood: 2, clay: 2, reed: 2, stone: 1 },
+    ]))
+  })
+
+  it('Basket fixed-price candidates combine only with later applicable wood and stone modifiers', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.occupationPlayed = [
+      'C95_BasketWeaver',
+      'E109_BraidMaker',
+      'A143_Stonecutter',
+      'D117_WoodExpert',
+    ]
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Basket',
+      { wood: 2, reed: 2, stone: 2 },
+      'C95_BasketWeaver',
+    )
+
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver'] },
+      { resources: { reed: 1, stone: 1 }, sources: ['E109_BraidMaker'] },
+      { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver', 'E109_BraidMaker'] },
+      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver'] },
+      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'E109_BraidMaker'] },
+      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver', 'E109_BraidMaker'] },
+      { resources: { reed: 2, stone: 1, food: 1 }, sources: ['A143_Stonecutter', 'D117_WoodExpert'] },
+      { resources: { reed: 2, stone: 2, food: 1 }, sources: ['D117_WoodExpert'] },
+      { resources: { wood: 2, reed: 2, stone: 1 }, sources: ['A143_Stonecutter'] },
+      { resources: { wood: 2, reed: 2, stone: 2 }, sources: [] },
+    ]))
   })
 
   it('E27 appends a free major improvement payment candidate and keeps the original', () => {

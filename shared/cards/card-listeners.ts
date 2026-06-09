@@ -46,7 +46,8 @@ export type CardListenerRegistration = {
   zones?: CardListenerZone[]
   mandatory?: boolean
   /**
-   * Listener priority. Higher values execute earlier; default is 0.
+   * Narrow collector priority, currently used by the card-purchase cost
+   * candidate pipeline. Higher values execute earlier; default is 0.
    */
   order?: number
   /**

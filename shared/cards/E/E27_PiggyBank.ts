@@ -91,6 +91,7 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
+  order: 100,
   computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
     if (!isCardFlagged(context.player, CARD_ID)) return [...candidates]
     if (!context.cardId || !isMajorCardId(context.cardId)) return [...candidates]

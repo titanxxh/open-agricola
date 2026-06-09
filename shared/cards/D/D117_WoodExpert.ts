@@ -28,14 +28,19 @@ const computeCostsListener: CardListenerRegistration = {
       .map((candidate) => {
         const beforeWood = candidate.resources.wood ?? 0
         const afterWood = Math.max(0, beforeWood - 2)
+        const resources = {
+          ...candidate.resources,
+          food: (candidate.resources.food ?? 0) + 1,
+        }
+        if (afterWood === 0) {
+          delete resources.wood
+        } else {
+          resources.wood = afterWood
+        }
         return addCardCostCandidateAttribution(
           {
             ...candidate,
-            resources: {
-              ...candidate.resources,
-              wood: afterWood,
-              food: (candidate.resources.food ?? 0) + 1,
-            },
+            resources,
           },
           CARD_ID,
           {

@@ -230,9 +230,9 @@ describe('resolveCardCostWithModifiers', () => {
       { wood: 1 },
       { clay: 2 },
       { wood: 3 },
-      { wood: 0 },
+      {},
       { wood: 1 },
-      { wood: 0, clay: 1 },
+      { clay: 1 },
       { wood: 1, clay: 1 },
     ])
     expect(result.candidateMetadataByFeeIndex).toEqual({
@@ -291,7 +291,7 @@ describe('resolveCardCostWithModifiers', () => {
       { wood: 1 },
     )
     const cost = result.cost as ComplexCost
-    expect(cost.fees).toEqual([{ wood: 1 }, { wood: 0 }, { wood: 0 }])
+    expect(cost.fees).toEqual([{ wood: 1 }, {}, {}])
     expect(result.candidateMetadataByFeeIndex).toEqual({
       0: { originalFeeIndex: 0, sources: [] },
       1: {
@@ -332,7 +332,7 @@ describe('resolveCardCostWithModifiers', () => {
       { wood: 1 },
       { wood: 3 },
       { clay: 2 },
-      { wood: 0 },
+      {},
       { wood: 1 },
     ])
     expect(result.candidateMetadataByFeeIndex).toEqual({
@@ -382,7 +382,7 @@ describe('resolveCardCostWithModifiers', () => {
     const cost = result.cost as ComplexCost
     expect(cost.fees).toEqual([
       { reed: 2, stone: 1 },
-      { reed: 2, stone: 0 },
+      { reed: 2 },
     ])
     expect(cost.bonuses).toEqual([
       { discount: { reed: 1 }, sources: ['HookBonus'] },
