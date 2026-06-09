@@ -4,17 +4,24 @@ import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import { constructAction } from '../construct'
 import type {
   ActionExecutionContext,
+  ActionChoiceOption,
   ActionSpace,
   FarmTilePosition,
   GameState,
+  PaymentResourceMap,
   PlayerState,
   Resource,
+  Trade,
 } from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
 
 type TestCostAttributionContext = ActionExecutionContext & {
   costAttribution?: Array<{ sourceCard: string; costs: Partial<Resource> }>
+}
+
+type TestCostTradeContext = ActionExecutionContext & {
+  costTrades?: Trade[]
 }
 
 const b38LockedAdjacentRooms: FarmTilePosition[] = [
@@ -74,6 +81,33 @@ const makeCtx = (
     costs: opts.costs,
     sourceCard: opts.sourceCard,
   } as ActionExecutionContext
+}
+
+const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
+  for (const [key, value] of Object.entries(resources)) {
+    if (typeof value === 'number' && value > 0) {
+      out[key as keyof PaymentResourceMap] = value
+    }
+  }
+  return out
+}
+
+const optionShape = (option: ActionChoiceOption) => {
+  const preview = option.effectPreview as
+    | { resourcesPaid?: PaymentResourceMap; sourceCards?: string[] }
+    | undefined
+  return {
+    resources: positiveResources(preview?.resourcesPaid ?? {}),
+    sources: [...(preview?.sourceCards ?? [])].sort(),
+  }
+}
+
+const carpenterTrade: Trade = {
+  from: {},
+  to: { wood: 2 },
+  scope: 'unit',
+  sourceId: 'B126_Carpenter',
 }
 
 describe('constructAction.resolveChoice', () => {
@@ -248,6 +282,39 @@ describe('constructAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(result.resourcesPaid).toEqual({ wood: 1, food: 1 })
+  })
+
+  it('uses computeCosts unit trades to make discounted room construction payable', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        resources: { wood: 3, clay: 0, stone: 0, reed: 2, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+    }) as TestCostTradeContext
+    ctx.costTrades = [carpenterTrade]
+
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 3, reed: 2 })
+  })
+
+  it('surfaces sourced computeCosts unit trade alternatives in the room payment request', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx() as TestCostTradeContext
+    ctx.costTrades = [carpenterTrade]
+
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'choice') return
+    const options = result.request.options.map(optionShape)
+    expect(options).toContainEqual({ resources: { wood: 5, reed: 2 }, sources: [] })
+    expect(options).toContainEqual({
+      resources: { wood: 3, reed: 2 },
+      sources: ['B126_Carpenter'],
+    })
   })
 
   it('attributes construct computeCosts savings to the source card', () => {

@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-06-04。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-09。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -505,7 +505,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A125_Priest` | 已对齐 |  |
 | `A126_MasterWorkman` | 已对齐 |  |
 | `A127_Lodger` | 已对齐 |  |
-| `A128_RiparianBuilder` | 已对齐 | Reed Bank 触发的跨玩家 construct prompt 覆盖 undo 后重选 construct，确保不会重复进入 confirm-player-switch；授予 construct 的 clay/stone 折扣通过 action computeCosts Cost Attribution 记录 saved clay/stone，不把整笔建房支付记为 PAID |
+| `A128_RiparianBuilder` | 已对齐 | Reed Bank 触发的跨玩家 construct prompt 覆盖 undo 后重选 construct，确保不会重复进入 confirm-player-switch；授予 construct 的 clay/stone 折扣走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。 |
 | `A129_Swagman` | 已对齐 |  |
 | `A130_MummysBoy` | 已对齐 |  |
 | `A131_CraftTeacher` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -526,7 +526,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A146_StorehouseSteward` | 已对齐 |  |
 | `A147_AnimalDealer` | 已对齐 |  |
 | `A148_Woolgrower` | 已对齐 |  |
-| `A149_HouseArtist` | 已对齐 |  |
+| `A149_HouseArtist` | 已对齐 | 授予 construct 的 reed 折扣走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。 |
 | `A150_Stagehand` | 已对齐 |  |
 | `A151_Minstrel` | 已对齐 |  |
 | `A152_NightSchoolStudent` | 已对齐 |  |
@@ -570,7 +570,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B10_Caravan` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B11_Feedyard` | 已对齐 |  |
 | `B12_Stockyard` | 已对齐 |  |
-| `B13_CarpentersParlor` | 已对齐 |  |
+| `B13_CarpentersParlor` | 已对齐 | 木房固定 2 wood + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `B14_Hawktower` | 已对齐 |  |
 | `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、最多 `n+1` 段、恰好 1 个新牧场、1 段免费。 |
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
@@ -683,7 +683,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B123_RoofBallaster` | 已对齐 |  |
 | `B124_Trimmer` | 已对齐 | after fence 不再写本工作阶段奖励 flag；每次牧场覆盖面积增加都可得 2 stone，return-home flag 仍阻止非工作阶段误触 |
 | `B125_EstateWorker` | 已对齐 |  |
-| `B126_Carpenter` | 已对齐 |  |
+| `B126_Carpenter` | 已对齐 | 固定 3 building-resource + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `B127_Seducer` | 已对齐 |  |
 | `B128_Plumber` | 已对齐 |  |
 | `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 且 owner 自己未在 r13 时才注入 allow-occupied；3p 任一邻座占且 owner 自己未在 r13 时注入；round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
@@ -825,7 +825,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C85_DenBuilder` | 已对齐 |  |
 | `C86_LivestockFeeder` | 已对齐 |  |
 | `C87_Mason` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
-| `C88_CarpentersApprentice` | 已对齐 | 第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
+| `C88_CarpentersApprentice` | 已对齐 | 木房建房 -2 wood 走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
 | `C89_StableMaster` | 已对齐 | onBuy 的 1 wood stable 走 `stables` exactCost，入口不做 raw wood gate，允许 C88 等 `computeCosts.stables` 折扣叠加。 |
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
@@ -865,7 +865,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C125_Nightworker` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C126_Excavator` | 已对齐 |  |
 | `C127_Lover` | 已对齐 |  |
-| `C128_WoodenHutExtender` | 已对齐 |  |
+| `C128_WoodenHutExtender` | 已对齐 | 分轮次木房固定成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `C129_SecondSpouse` | 已对齐 |  |
 | `C130_OutskirtsDirector` | 已对齐 |  |
 | `C131_PrivateTeacher` | 已对齐 |  |
@@ -1038,7 +1038,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
-| `D121_ClayPlasterer` | 已对齐 |  |
+| `D121_ClayPlasterer` | 已对齐 | 黏土房固定 3 clay + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选；翻修到 clay 仍走总成本 delta。 |
 | `D122_ClayCarrier` | 已对齐 |  |
 | `D123_RenovationPreparer` | 已对齐 |  |
 | `D124_Emissary` | 已对齐 |  |
@@ -1247,7 +1247,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E147_AnimalDriver` | 已对齐 |  |
 | `E148_Lazybones` | 已对齐 | 行动格预留 marker 走 `action-space-tokens` helper；reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
 | `E149_MidnightFencer` | 已对齐 | 第 14 轮 harvest start 提供 optional real borrowed `fence` leaf；donor cap 按其他玩家 own ordinary reserve 各最多 2，跳过或建造均不再产生 owed-fence bonus VP；借围栏选择可 undo 回 E149 optional，但不能继续 undo 穿过 round-end 边界 |
-| `E150_RockBeater` | 已对齐 |  |
+| `E150_RockBeater` | 已对齐 | 石房建房 -2 stone 走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。 |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |
 | `E153_StoneSculptor` | 已对齐 |  |

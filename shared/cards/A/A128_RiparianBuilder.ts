@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
 const CARD_ID = 'A128_RiparianBuilder'
 const triggerBuildListener: CardListenerRegistration = {
@@ -34,12 +35,10 @@ const constructDiscountListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
     if (context.player.houseType === 'clay') {
-      const costs = { clay: -1 }
-      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
+      return { trades: [constructUnitDiscountTrade(CARD_ID, { clay: 1 })] }
     }
     if (context.player.houseType === 'stone') {
-      const costs = { stone: -2 }
-      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
+      return { trades: [constructUnitDiscountTrade(CARD_ID, { stone: 2 })] }
     }
   },
 }
