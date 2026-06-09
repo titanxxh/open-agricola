@@ -7,11 +7,15 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 35
+Differences: 33
+Payment differences: 29
+Source-only differences: 4
+Report-only artifacts: 0
 
 ## A27 oven fixed cost
 
 Kind: card-purchase
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -53,6 +57,7 @@ OA:
 ## A75 card-purchase wood bonus
 
 Kind: card-purchase
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -100,10 +105,22 @@ OA:
 ## E130 overachiever resource choice discount
 
 Kind: card-purchase
+Difference type: payment-diff
 
 BGA:
 ```json
 [
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 2,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
   {
     "resources": {
       "wood": 2,
@@ -132,17 +149,6 @@ BGA:
       "clay": 2,
       "reed": 2,
       "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 2,
-      "reed": 2,
-      "stone": 2
     },
     "sources": [
       "E130_Overachiever"
@@ -167,29 +173,7 @@ OA:
   },
   {
     "resources": {
-      "wood": 2,
-      "clay": 1,
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
       "wood": 1,
-      "clay": 1,
-      "reed": 1,
-      "stone": 2
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2,
       "clay": 1,
       "reed": 1,
       "stone": 2
@@ -211,17 +195,6 @@ OA:
   },
   {
     "resources": {
-      "wood": 2,
-      "clay": 1,
-      "reed": 2,
-      "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
       "wood": 1,
       "clay": 1,
       "reed": 2,
@@ -233,6 +206,83 @@ OA:
   },
   {
     "resources": {
+      "wood": 1,
+      "clay": 2,
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 2,
+      "reed": 1,
+      "stone": 2
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 2,
+      "reed": 2,
+      "stone": 1
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 2,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 1,
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 1,
+      "reed": 1,
+      "stone": 2
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 1,
+      "reed": 2,
+      "stone": 1
+    },
+    "sources": [
+      "E130_Overachiever"
+    ]
+  },
+  {
+    "resources": {
       "wood": 2,
       "clay": 1,
       "reed": 2,
@@ -244,32 +294,10 @@ OA:
   },
   {
     "resources": {
-      "wood": 1,
-      "clay": 2,
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
       "wood": 2,
       "clay": 2,
       "reed": 1,
       "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 2,
-      "reed": 1,
-      "stone": 2
     },
     "sources": [
       "E130_Overachiever"
@@ -288,32 +316,10 @@ OA:
   },
   {
     "resources": {
-      "wood": 1,
-      "clay": 2,
-      "reed": 2,
-      "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
       "wood": 2,
       "clay": 2,
       "reed": 2,
       "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 2,
-      "reed": 2,
-      "stone": 2
     },
     "sources": [
       "E130_Overachiever"
@@ -345,10 +351,67 @@ OA:
 ## combo card-purchase basket fixed price plus stone and wood modifiers
 
 Kind: card-purchase
+Difference type: payment-diff
 
 BGA:
 ```json
 [
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "C95_BasketWeaver",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "C95_BasketWeaver"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "C95_BasketWeaver",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "C95_BasketWeaver"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "E109_BraidMaker"
+    ]
+  },
   {
     "resources": {
       "reed": 2,
@@ -368,62 +431,6 @@ BGA:
     },
     "sources": [
       "D117_WoodExpert"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "C95_BasketWeaver",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "E109_BraidMaker"
     ]
   },
   {
@@ -452,6 +459,86 @@ OA:
 [
   {
     "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "C95_BasketWeaver",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "C95_BasketWeaver"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "D117_WoodExpert",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "A143_Stonecutter",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "C95_BasketWeaver",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "C95_BasketWeaver"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "D117_WoodExpert",
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E109_BraidMaker"
+    ]
+  },
+  {
+    "resources": {
       "reed": 2,
       "stone": 1,
       "food": 1
@@ -469,86 +556,6 @@ OA:
     },
     "sources": [
       "D117_WoodExpert"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "C95_BasketWeaver",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "D117_WoodExpert",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "D117_WoodExpert",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E109_BraidMaker"
     ]
   },
   {
@@ -575,6 +582,7 @@ OA:
 ## A128 riparian construct discount
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -614,6 +622,7 @@ OA:
 ## A149 house artist reed discount
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -653,6 +662,7 @@ OA:
 ## B126 carpenter fixed room cost
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -692,6 +702,7 @@ OA:
 ## B13 carpenter parlor fixed wood room cost
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -731,6 +742,7 @@ OA:
 ## C128 wooden hut extender round cost
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -770,6 +782,7 @@ OA:
 ## C88 apprentice wood room discount
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -809,6 +822,7 @@ OA:
 ## D121 clay plasterer fixed clay room cost
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -848,40 +862,11 @@ OA:
 ## D88 millwright construct bonuses
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
 [
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
   {
     "resources": {
       "wood": 3,
@@ -894,8 +879,38 @@ BGA:
   },
   {
     "resources": {
+      "wood": 4,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 4,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
       "wood": 5,
       "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 5,
+      "reed": 1,
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
@@ -916,86 +931,86 @@ OA:
 [
   {
     "resources": {
-      "wood": 5,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 3,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 3,
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "wood": 3,
       "grain": 4
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 3,
+      "reed": 1,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 3,
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 4,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 4,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 4,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 5,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 5,
+      "reed": 1,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 5,
+      "reed": 2,
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
@@ -1014,6 +1029,7 @@ OA:
 ## E123 construct top resource choices
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1098,6 +1114,7 @@ OA:
 ## E150 rock beater stone room discount
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1137,6 +1154,7 @@ OA:
 ## A123 renovation frame replacement
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1144,19 +1162,19 @@ BGA:
   {
     "resources": {
       "reed": 1,
-      "stone": 1,
-      "wood": 1
+      "stone": 3
+    },
+    "sources": []
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "reed": 1,
+      "stone": 1
     },
     "sources": [
       "A123_FrameBuilder"
     ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
   }
 ]
 ```
@@ -1164,6 +1182,13 @@ BGA:
 OA:
 ```json
 [
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3
+    },
+    "sources": []
+  },
   {
     "resources": {
       "wood": 1,
@@ -1183,13 +1208,6 @@ OA:
     "sources": [
       "A123_FrameBuilder"
     ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
   }
 ]
 ```
@@ -1197,6 +1215,7 @@ OA:
 ## A143 renovation stone discount
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1238,6 +1257,7 @@ OA:
 ## B128 plumber renovation choices
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1276,65 +1296,18 @@ OA:
 ]
 ```
 
-## B145 brushwood renovation reed replacement
-
-Kind: renovation
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "clay": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 3
-    },
-    "sources": [
-      "B145_BrushwoodCollector"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 3
-    },
-    "sources": [
-      "B145_BrushwoodCollector"
-    ]
-  }
-]
-```
-
 ## C122 renovation clay discount
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
 [
   {
     "resources": {
-      "reed": 1,
-      "clay": 2
+      "clay": 2,
+      "reed": 1
     },
     "sources": [
       "C122_Bricklayer"
@@ -1368,6 +1341,7 @@ OA:
 ## C13 wood slide hammer stone discount
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1406,55 +1380,10 @@ OA:
 ]
 ```
 
-## C14 straw roof removes renovation reed
-
-Kind: renovation
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "clay": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "clay": 3
-    },
-    "sources": [
-      "C14_StrawThatchedRoof"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "clay": 3
-    },
-    "sources": [
-      "C14_StrawThatchedRoof"
-    ]
-  }
-]
-```
-
 ## D121 clay plasterer fixed clay renovation
 
 Kind: renovation
+Difference type: source-diff
 
 BGA:
 ```json
@@ -1487,6 +1416,7 @@ OA:
 ## D13 trowel wood to stone fixed cost
 
 Kind: renovation
+Difference type: source-diff
 
 BGA:
 ```json
@@ -1521,6 +1451,7 @@ OA:
 ## D154 chimney sweep stone discount
 
 Kind: renovation
+Difference type: source-diff
 
 BGA:
 ```json
@@ -1553,6 +1484,7 @@ OA:
 ## D81 roof ladder reed discount
 
 Kind: renovation
+Difference type: source-diff
 
 BGA:
 ```json
@@ -1583,29 +1515,11 @@ OA:
 ## D88 millwright renovation bonuses
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
 [
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
   {
     "resources": {
       "reed": 1,
@@ -1618,8 +1532,9 @@ BGA:
   },
   {
     "resources": {
+      "reed": 1,
       "stone": 2,
-      "grain": 2
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
@@ -1631,6 +1546,24 @@ BGA:
       "stone": 3
     },
     "sources": []
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 3,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
   }
 ]
 ```
@@ -1638,35 +1571,6 @@ BGA:
 OA:
 ```json
 [
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
   {
     "resources": {
       "reed": 1,
@@ -1679,12 +1583,30 @@ OA:
   },
   {
     "resources": {
+      "reed": 1,
       "stone": 2,
-      "grain": 2
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
     ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3
+    },
+    "sources": []
   },
   {
     "resources": {
@@ -1697,10 +1619,21 @@ OA:
   },
   {
     "resources": {
-      "reed": 1,
-      "stone": 3
+      "stone": 2,
+      "grain": 2
     },
-    "sources": []
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 3,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
   }
 ]
 ```
@@ -1708,6 +1641,7 @@ OA:
 ## E123 renovation top resource choices
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1780,6 +1714,7 @@ OA:
 ## E87 master renovator flagged choices
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1839,6 +1774,7 @@ OA:
 ## D82 farm redevelopment fence discount
 
 Kind: fencing
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1871,6 +1807,7 @@ OA:
 ## D88 millwright fence bonuses
 
 Kind: fencing
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -1897,7 +1834,6 @@ OA:
 [
   {
     "resources": {
-      "wood": 1,
       "grain": 1
     },
     "sources": [
@@ -1906,6 +1842,7 @@ OA:
   },
   {
     "resources": {
+      "wood": 1,
       "grain": 1
     },
     "sources": [
@@ -1924,14 +1861,14 @@ OA:
 ## D88 millwright stable bonuses
 
 Kind: stables
+Difference type: payment-diff
 
 BGA:
 ```json
 [
   {
     "resources": {
-      "wood": 1,
-      "grain": 1
+      "grain": 2
     },
     "sources": [
       "D88_Millwright"
@@ -1939,7 +1876,8 @@ BGA:
   },
   {
     "resources": {
-      "grain": 2
+      "wood": 1,
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
@@ -1957,6 +1895,14 @@ BGA:
 OA:
 ```json
 [
+  {
+    "resources": {
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
   {
     "resources": {
       "wood": 1,
@@ -1977,14 +1923,6 @@ OA:
   },
   {
     "resources": {
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "wood": 2
     },
     "sources": []
@@ -1995,12 +1933,212 @@ OA:
 ## combo construct clay room replacement plus grain substitution
 
 Kind: construct
+Difference type: payment-diff
 
 BGA:
 ```json
 [
   {
     "resources": {
+      "clay": 1,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "grain": 2
+    },
+    "sources": [
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 1,
+      "grain": 1
+    },
+    "sources": [
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 2
+    },
+    "sources": [
+      "D121_ClayPlasterer"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 4,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 4,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 5,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 5,
+      "reed": 1,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 5,
+      "reed": 2
+    },
+    "sources": []
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D121_ClayPlasterer",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
       "wood": 1,
       "clay": 1,
       "reed": 1,
@@ -2014,30 +2152,6 @@ BGA:
   },
   {
     "resources": {
-      "clay": 1,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "wood": 1,
       "clay": 1,
       "reed": 2,
@@ -2045,29 +2159,6 @@ BGA:
     },
     "sources": [
       "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D121_ClayPlasterer",
       "D88_Millwright"
     ]
   },
@@ -2086,52 +2177,7 @@ BGA:
     "resources": {
       "wood": 1,
       "clay": 2,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 2,
       "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "reed": 2,
       "grain": 2
     },
     "sources": [
@@ -2142,55 +2188,12 @@ BGA:
   {
     "resources": {
       "wood": 1,
-      "clay": 3,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
+      "clay": 2,
       "reed": 2,
       "grain": 1
     },
     "sources": [
       "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
       "D88_Millwright"
     ]
   },
@@ -2207,11 +2210,13 @@ BGA:
   },
   {
     "resources": {
+      "wood": 1,
       "clay": 3,
-      "grain": 2
+      "reed": 1,
+      "grain": 1
     },
     "sources": [
-      "D121_ClayPlasterer",
+      "A123_FrameBuilder",
       "D88_Millwright"
     ]
   },
@@ -2227,73 +2232,6 @@ BGA:
   },
   {
     "resources": {
-      "clay": 3,
-      "reed": 2
-    },
-    "sources": [
-      "D121_ClayPlasterer"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 4,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 4,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D121_ClayPlasterer",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "wood": 1,
       "reed": 1,
       "grain": 2
@@ -2306,8 +2244,9 @@ BGA:
   },
   {
     "resources": {
+      "wood": 1,
       "reed": 2,
-      "grain": 2
+      "grain": 1
     },
     "sources": [
       "A123_FrameBuilder",
@@ -2323,71 +2262,6 @@ OA:
 [
   {
     "resources": {
-      "wood": 1,
-      "clay": 1,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "clay": 1,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "clay": 1,
       "grain": 3
     },
@@ -2402,6 +2276,165 @@ OA:
       "grain": 4
     },
     "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 1,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "reed": 1,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 2,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 1,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 3,
+      "reed": 2
+    },
+    "sources": []
+  },
+  {
+    "resources": {
+      "grain": 4
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "grain": 3
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "grain": 2
+    },
+    "sources": [
+      "A123_FrameBuilder",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "reed": 1,
+      "grain": 1
+    },
+    "sources": [
+      "A123_FrameBuilder",
       "D88_Millwright"
     ]
   },
@@ -2417,74 +2450,8 @@ OA:
   },
   {
     "resources": {
-      "clay": 2,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 2
-    },
-    "sources": []
-  },
-  {
-    "resources": {
       "wood": 1,
-      "reed": 2,
-      "grain": 1
+      "grain": 3
     },
     "sources": [
       "A123_FrameBuilder",
@@ -2504,37 +2471,9 @@ OA:
   },
   {
     "resources": {
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "wood": 1,
-      "grain": 3
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "grain": 4
+      "reed": 2,
+      "grain": 1
     },
     "sources": [
       "A123_FrameBuilder",
@@ -2547,6 +2486,7 @@ OA:
 ## combo renovation trowel brushwood and millwright
 
 Kind: renovation
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -2554,48 +2494,11 @@ BGA:
   {
     "resources": {
       "reed": 1,
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
       "stone": 1,
       "food": 2,
-      "grain": 1
+      "grain": 2
     },
     "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
       "D13_Trowel",
       "D88_Millwright"
     ]
@@ -2603,9 +2506,9 @@ BGA:
   {
     "resources": {
       "reed": 1,
-      "stone": 1,
+      "stone": 2,
       "food": 2,
-      "grain": 2
+      "grain": 1
     },
     "sources": [
       "D13_Trowel",
@@ -2625,35 +2528,12 @@ BGA:
   },
   {
     "resources": {
+      "reed": 2,
       "stone": 1,
       "food": 2,
-      "grain": 2
+      "grain": 1
     },
     "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
       "D13_Trowel",
       "D88_Millwright"
     ]
@@ -2666,6 +2546,66 @@ BGA:
     },
     "sources": [
       "D13_Trowel"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
     ]
   },
   {
@@ -2687,147 +2627,6 @@ OA:
 [
   {
     "resources": {
-      "reed": 1,
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "food": 2,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 1,
-      "food": 2,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "food": 2,
       "grain": 3
     },
@@ -2847,11 +2646,152 @@ OA:
   },
   {
     "resources": {
+      "reed": 1,
+      "food": 2,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
       "reed": 2,
       "stone": 2,
       "food": 2
     },
     "sources": []
+  },
+  {
+    "resources": {
+      "stone": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 1,
+      "food": 2,
+      "grain": 3
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D88_Millwright"
+    ]
   },
   {
     "resources": {
@@ -2869,6 +2809,7 @@ OA:
 ## combo fencing clay/free/grain alternatives
 
 Kind: fencing
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -2926,15 +2867,6 @@ OA:
   },
   {
     "resources": {
-      "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "grain": 1
     },
     "sources": [
@@ -2944,6 +2876,15 @@ OA:
   },
   {
     "resources": {
+      "grain": 1
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
       "grain": 1
     },
     "sources": [
@@ -2968,6 +2909,7 @@ OA:
 ## combo stables clay alternative plus grain substitution
 
 Kind: stables
+Difference type: payment-diff
 
 BGA:
 ```json
@@ -2982,15 +2924,6 @@ BGA:
   },
   {
     "resources": {
-      "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "grain": 1
     },
     "sources": [
@@ -3001,6 +2934,15 @@ BGA:
   {
     "resources": {
       "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "grain": 1
     },
     "sources": [
       "D88_Millwright"
@@ -3028,6 +2970,23 @@ OA:
   },
   {
     "resources": {
+      "grain": 1
+    },
+    "sources": [
+      "C56_FeedFence",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "grain": 2
+    },
+    "sources": [
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
       "wood": 1,
       "grain": 1
     },
@@ -3039,23 +2998,6 @@ OA:
     "resources": {
       "wood": 2,
       "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "grain": 1
-    },
-    "sources": [
-      "C56_FeedFence",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "grain": 2
     },
     "sources": [
       "D88_Millwright"

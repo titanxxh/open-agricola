@@ -57,7 +57,13 @@ describe('A150_Stagehand session', () => {
 
     // First choice: optional "do or skip" wrapping the XOR
     resp = session.resolveChoice(0, '__skip__')
-    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
@@ -96,7 +102,13 @@ describe('A150_Stagehand session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
 
-    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
