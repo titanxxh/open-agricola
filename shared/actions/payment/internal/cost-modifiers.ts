@@ -88,6 +88,7 @@ export const applyCostModifiers = (
       effectiveBonuses.push({
         discount: bonusMod.discount,
         choices: bonusMod.choices,
+        ...(bonusMod.capDiscountAtCost ? { capDiscountAtCost: true } : {}),
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
         ...(bonusMod.minCost ? { minCost: bonusMod.minCost } : {}),

@@ -69,6 +69,7 @@ export type Trade = {
 
 export type BonusChoice = {
   discount: Partial<Resource>
+  capDiscountAtCost?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -86,6 +87,7 @@ export type BonusChoice = {
 export type Bonus = {
   discount?: Partial<Resource>
   choices?: BonusChoice[]
+  capDiscountAtCost?: boolean
   optional?: boolean
   sources?: string[]
   /**
@@ -132,6 +134,7 @@ export type BonusModifier = {
   appliesTo: CostModifierType[]
   discount?: Partial<Resource>
   choices?: BonusChoice[]
+  capDiscountAtCost?: boolean
   optional?: boolean
   conditions?: Record<string, number>
   minCost?: Partial<Resource>

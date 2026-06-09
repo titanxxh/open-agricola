@@ -7,8 +7,8 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 33
-Payment differences: 29
+Differences: 29
+Payment differences: 25
 Source-only differences: 4
 Report-only artifacts: 0
 
@@ -320,17 +320,6 @@ OA:
       "clay": 2,
       "reed": 2,
       "stone": 1
-    },
-    "sources": [
-      "E130_Overachiever"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2,
-      "clay": 2,
-      "reed": 2,
-      "stone": 2
     },
     "sources": [
       "E130_Overachiever"
@@ -1026,91 +1015,6 @@ OA:
 ]
 ```
 
-## E123 construct top resource choices
-
-Kind: construct
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "clay": 4,
-      "reed": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
-    "sources": []
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 1
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 4,
-      "reed": 1
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 4,
-      "reed": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
-    "sources": []
-  }
-]
-```
-
 ## E150 rock beater stone room discount
 
 Kind: construct
@@ -1147,67 +1051,6 @@ OA:
       "stone": 3
     },
     "sources": []
-  }
-]
-```
-
-## A123 renovation frame replacement
-
-Kind: renovation
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A123_FrameBuilder"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "A123_FrameBuilder"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": [
-      "A123_FrameBuilder"
-    ]
   }
 ]
 ```
@@ -1633,139 +1476,6 @@ OA:
     },
     "sources": [
       "D88_Millwright"
-    ]
-  }
-]
-```
-
-## E123 renovation top resource choices
-
-Kind: renovation
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "stone": 1
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  }
-]
-```
-
-## E87 master renovator flagged choices
-
-Kind: renovation
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2
-    },
-    "sources": [
-      "E87_MasterRenovator"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3
-    },
-    "sources": [
-      "E87_MasterRenovator"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2
-    },
-    "sources": [
-      "E87_MasterRenovator"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": [
-      "E87_MasterRenovator"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3
-    },
-    "sources": [
-      "E87_MasterRenovator"
     ]
   }
 ]
