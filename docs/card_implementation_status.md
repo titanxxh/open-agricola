@@ -109,7 +109,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 事件与支付 provenance | `resource.paid`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。 |
 | Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
-| Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`computeCardCostCandidates`、`CardImpl.getBaseCosts()`、`appendDiscountedCardCostCandidates()`、ADR 0003 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 improvement payment glue 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats。 |
+| Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`computeCardCostCandidates`、`CardImpl.getBaseCosts()`、`appendDiscountedCardCostCandidates()`、`replaceWithDiscountedCardCostCandidates()`、ADR 0003 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；candidate pipeline 局部支持 `CardListenerRegistration.order` 让 fixed-price 先于普通折扣；append helper 保留原候选，replacement helper 只替换实际改变的候选；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 improvement payment glue 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats。 |
 | Payment bonus choices | `Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、C14、D88 | 普通 bonus choice 必须在折扣后不产生负 cost；只有“移除当前 cost 中某资源”这类卡牌显式设置 cap 时，折扣才按当前 cost 封顶。multi-choice 默认记录 `bonusChoiceIndex`，仅无状态 replacement choice 显式关闭以避免重复支付项。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
@@ -404,7 +404,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
 | `A26_SleepingCorner` | 已对齐 |  |
-| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。onBuy 期间购买 Clay/Stone Oven 的 1 clay + 1 stone 固定价改走 card-purchase candidate append，保留 printed oven cost candidate。 |
+| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。onBuy 期间购买 Clay/Stone Oven 的 1 clay + 1 stone 固定价改走 card-purchase candidate replacement，不保留 printed oven cost candidate。 |
 | `A28_ForestSchool` | 已对齐 |  |
 | `A29_AleBenches` | 已对齐 |  |
 | `A30_BakingSheet` | 已对齐 |  |
@@ -452,7 +452,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A72_CalciumFertilizers` | 已对齐 |  |
 | `A73_AgriculturalFertilizers` | 已对齐 |  |
 | `A74_StableTree` | 已对齐 |  |
-| `A75_LumberMill` | 已对齐 | improvement wood 折扣走 `computeCardCostCandidates` 追加 sourced candidate，保留原候选。 |
+| `A75_LumberMill` | 已对齐 | improvement wood 强制折扣走 `replaceWithDiscountedCardCostCandidates`；含 wood 的候选替换为 sourced discounted candidate，不保留该原价分支。 |
 | `A76_Cob` | 已对齐 |  |
 | `A77_Hod` | 已对齐 |  |
 | `A78_Canoe` | 已对齐 |  |
@@ -832,7 +832,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C92_AutumnMother` | 已对齐 |  |
 | `C93_InnerDistrictsDirector` | 已对齐 | 放 stone 与可选额外放人已作为整段 optional，skip 不再强制放 stone |
 | `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
-| `C95_BasketWeaver` | 已对齐 | onBuy 期间 Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源。 |
+| `C95_BasketWeaver` | 已对齐 | onBuy 期间 Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源；fixed-price listener 在 candidate pipeline 中先于普通折扣执行，避免组合来源污染。 |
 | `C96_Merchant` | 已对齐 |  |
 | `C97_SeedResearcher` | 已对齐 |  |
 | `C98_CubeCutter` | 已对齐 |  |
@@ -1013,7 +1013,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D93_SheepInspector` | 已对齐 |  |
 | `D94_HenpeckedHusband` | 已对齐 |  |
 | `D95_SiteManager` | 已对齐 | onBuy 期间 major improvement 支付改走 card-purchase candidate append；对当前候选中已有 wood/clay/stone/reed 的每个非空 subset 生成“每类最多 1 个 building resource -> 1 food”replacement candidate，保留原候选。 |
-| `D96_Furnisher` | 已对齐 | `actionCardId === D96_Furnisher` 的 improvement 追加 wood-discount candidate；普通 improvement 不产生 candidate pipeline 输出；选择折扣候选后记录 Furnisher saved wood。 |
+| `D96_Furnisher` | 已对齐 | `actionCardId === D96_Furnisher` 的 improvement 追加 wood-discount candidate；普通 improvement 不产生 candidate pipeline 输出；选择折扣候选后记录 Furnisher saved wood；折到 0 的 wood 不保留零值键。 |
 | `D97_BeggingStudent` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D98_Transactor` | 已对齐 |  |
 | `D99_EarthenwarePotter` | 已对齐 |  |
@@ -1034,7 +1034,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D114_SeedTrader` | 已对齐 |  |
 | `D115_FodderPlanter` | 已对齐 |  |
 | `D116_TreeInspector` | 已对齐 |  |
-| `D117_WoodExpert` | 已对齐 | 从当前 Cost Candidate List 中每个含 wood 的候选追加 `{wood - 2 clamp 0, food + 1}` sourced candidate；无 wood 候选不派生，继续支持 minor `altCosts`；选择派生候选后按实际 clamp 差值记录 saved wood，并记录 paid food。 |
+| `D117_WoodExpert` | 已对齐 | 从当前 Cost Candidate List 中每个含 wood 的候选追加 `{wood - 2 clamp 0, food + 1}` sourced candidate；无 wood 候选不派生，继续支持 minor `altCosts`；折到 0 的 wood 不保留零值键；选择派生候选后按实际 clamp 差值记录 saved wood，并记录 paid food。 |
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
@@ -1124,7 +1124,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E24_Ambition` | 已对齐 |  |
 | `E25_BumperCrop` | 已对齐 | onBuy 走 `private-field-phase`；`2 Grain Fields` 前置同时计入普通 grain field 与带 grain 的 Card Field |
 | `E26_Sundial` | 已对齐 |  |
-| `E27_PiggyBank` | 已对齐 | flagged free-major 支付改走 card-purchase candidate append，追加 free major candidate 并保留原价 candidate。 |
+| `E27_PiggyBank` | 已对齐 | flagged free-major 支付改走 card-purchase candidate append，追加 free major candidate 并保留原价 candidate；free candidate 在 pipeline 中先于普通折扣执行。 |
 | `E28_Bookmark` | 已对齐 |  |
 | `E29_Heirloom` | 已对齐 |  |
 | `E30_ChildsToy` | 已对齐 |  |
@@ -1206,7 +1206,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E106_EmergencySeller` | 已对齐 |  |
 | `E107_LandSurveyor` | 已对齐 |  |
 | `E108_BlackberryFarmer` | 已对齐 |  |
-| `E109_BraidMaker` | 已对齐 | Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源。 |
+| `E109_BraidMaker` | 已对齐 | Basketmaker's Workshop 的 1 reed + 1 stone 固定价改走 card-purchase candidate append，保留原价 candidate，并在 payment option 展示来源；fixed-price listener 在 candidate pipeline 中先于普通折扣执行。 |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
 | `E112_GrainThief` | 已对齐 | start 选择 grain fields；reap 通过 Harvest Count modifier 写入 `supply-instead-of-field` tag，end field phase 只读 `harvestCountApplications`，带 `full-field-reap` tag 的同田不补 grain；D72 额外 count 可在 E112 供应堆替代 top grain 后继续收下一层 crop；同时注册 selection threshold modifier，把 A112/D72 的 grain field 门槛降为 1；end harvest 清理 selectedPositions |
@@ -1227,7 +1227,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E127_DiligentFarmer` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `E128_Saddler` | 已对齐 |  |
 | `E129_Imitator` | 已对齐 |  |
-| `E130_Overachiever` | 已对齐 |  |
+| `E130_Overachiever` | 已对齐 | Wish for Children 触发的额外 improvement 使用一个 mandatory resource-choice bonus（10 个资源选择），每次只减 1 个所选资源；不再作为 10 个可叠加 optional bonus。 |
 | `E131_MarketMaster` | 已对齐 |  |
 | `E132_VeggieLover` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `E133_ChampionBreeder` | 已对齐 |  |

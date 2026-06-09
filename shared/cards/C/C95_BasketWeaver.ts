@@ -59,6 +59,7 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
+  order: 100,
   computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
     if (context.actionCardId !== CARD_ID) return [...candidates]
     if (context.cardId !== TARGET_MAJOR) return [...candidates]

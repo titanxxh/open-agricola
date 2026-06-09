@@ -136,7 +136,7 @@ describe('D96_Furnisher', () => {
     expect(result).toEqual([
       { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
       {
-        resources: { wood: 0 },
+        resources: {},
         originalFeeIndex: 0,
         sources: [CARD_ID],
         costAttribution: { [CARD_ID]: { saved: { wood: 1 } } },
