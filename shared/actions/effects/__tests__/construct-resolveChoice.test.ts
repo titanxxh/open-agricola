@@ -300,6 +300,41 @@ describe('constructAction.resolveChoice', () => {
     expect(result.resourcesPaid).toEqual({ wood: 3, reed: 2 })
   })
 
+  it('execute uses computeCosts unit trades for farm maxSelections', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: { wood: 3, clay: 0, stone: 0, reed: 2, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+    }) as TestCostTradeContext
+    ctx.costTrades = [carpenterTrade]
+
+    const result = constructAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'farm-select') return
+    expect(result.request.farm.farmType).toBe('room')
+    if (result.request.farm.farmType !== 'room') return
+    expect(result.request.farm.maxSelections).toBe(1)
+  })
+
+  it('execute recomputes room reachability when costTrades raise farm maxSelections', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: { wood: 6, clay: 0, stone: 0, reed: 4, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+      },
+    }) as TestCostTradeContext
+    ctx.costTrades = [carpenterTrade]
+
+    const result = constructAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'farm-select') return
+    expect(result.request.farm.farmType).toBe('room')
+    if (result.request.farm.farmType !== 'room') return
+    expect(result.request.farm.maxSelections).toBe(2)
+    expect(result.request.farm.selectableTiles).toContainEqual({ row: 1, col: 3 })
+  })
+
   it('surfaces sourced computeCosts unit trade alternatives in the room payment request', () => {
     const room: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx() as TestCostTradeContext

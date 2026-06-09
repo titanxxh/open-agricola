@@ -109,6 +109,8 @@ const BGA_HARNESS = path.resolve(
   '../../../bga-agricola/.worktree/bga-cost-pay-ut/tests/bga-cost-pay-parity.php',
 )
 
+const BGA_FIXTURE = path.resolve(process.cwd(), 'tests/__fixtures__/cost-pay-bga-parity.json')
+
 const REPORT_PATH = path.resolve(process.cwd(), 'docs/cost-pay-bga-parity-report.md')
 
 const baseResources = {
@@ -287,16 +289,21 @@ const actionScenarios: ActionScenario[] = [
 
 const scenarios: Scenario[] = [...cardPurchaseScenarios, ...actionScenarios]
 
+type BgaPayload = {
+  singleCardCaseCount: number
+  comboCaseCount: number
+  results: Record<string, BgaCost>
+  coveredCardIds: string[]
+}
+
 const getBgaPayload = () => {
-  expect(existsSync(BGA_HARNESS), `missing BGA harness: ${BGA_HARNESS}`).toBe(true)
-  const result = spawnSync('php', [BGA_HARNESS, '--json'], { encoding: 'utf8' })
-  expect(result.status, result.stderr || result.stdout).toBe(0)
-  return JSON.parse(result.stdout) as {
-    singleCardCaseCount: number
-    comboCaseCount: number
-    results: Record<string, BgaCost>
-    coveredCardIds: string[]
+  if (existsSync(BGA_HARNESS)) {
+    const result = spawnSync('php', [BGA_HARNESS, '--json'], { encoding: 'utf8' })
+    expect(result.status, result.stderr || result.stdout).toBe(0)
+    return JSON.parse(result.stdout) as BgaPayload
   }
+  expect(existsSync(BGA_FIXTURE), `missing BGA harness: ${BGA_HARNESS}; missing fixture: ${BGA_FIXTURE}`).toBe(true)
+  return JSON.parse(readFileSync(BGA_FIXTURE, 'utf8')) as BgaPayload
 }
 
 const stripResources = (raw: Record<string, unknown>, multiplier = 1): Record<string, number> => {
