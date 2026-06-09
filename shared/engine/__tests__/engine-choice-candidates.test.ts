@@ -124,6 +124,44 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
     expect(resolveCalls[0]!.params?.selectedOption).toBe('only')
   })
 
+  it('recomputes computeCosts with selectedOption before auto-resolved resolveChoice', () => {
+    requireActiveCardRegistry('engine-choice-candidates').registerListener({
+      id: 'test-selected-costs',
+      actions: ['opt-in-choice-action'],
+      phases: ['computeCosts'],
+      handler: (ctx) => ctx.params?.selectedOption === 'stone'
+        ? {
+            costs: { stone: -2 },
+            bonuses: [{ discount: { stone: 2 }, optional: false, sources: ['TestCard'] }],
+          }
+        : { costs: { clay: 1 } },
+    })
+    const resolveCalls: Array<{
+      value: string
+      params: Record<string, unknown> | undefined
+      costs: Record<string, unknown> | undefined
+      costBonuses: unknown
+    }> = []
+    const action: ActionDefinition = {
+      ...buildOptInAction([{ value: 'stone', labelKey: 'stone' }], []),
+      resolveChoice: ({ params, costs, costBonuses }, choice) => {
+        resolveCalls.push({ value: choice, params, costs, costBonuses })
+        return { type: 'ok' }
+      },
+    }
+    const { engine } = buildEngine(action, false)
+    const ctx = { state: createState(), player: createPlayer(), space: createSpace(action) }
+
+    engine.proceed(ctx)
+
+    expect(resolveCalls).toHaveLength(1)
+    expect(resolveCalls[0]!.params?.selectedOption).toBe('stone')
+    expect(resolveCalls[0]!.costs).toEqual({ stone: -2 })
+    expect(resolveCalls[0]!.costBonuses).toEqual([
+      { discount: { stone: 2 }, optional: false, sources: ['TestCard'] },
+    ])
+  })
+
   it('presents a choice when ≥2 affordable options after merging hook extras', () => {
     requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-extra-option',

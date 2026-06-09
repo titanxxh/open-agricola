@@ -533,9 +533,9 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 
-- `fees: Partial<Resource>[]` —— per-action 总固定费用。Renovation 的 `computeCosts` 总成本 delta（D154_ChimneySweep `{stone:-2}`、D121_ClayPlasterer `{clay:-(rooms-1)}`、D81_RoofLadder `{reed:-1}`）写入 `fees[0]`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
+- `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 BGA `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 BGA `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
 - `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced per-room 折扣候选。
+- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `Bonus.capDiscountAtCost` —— 只用于“移除当前 cost 中某资源”的显式语义；普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
 - `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，供 E123 这类 after-pay 卡牌消费；D88 这类无状态 replacement choice 可显式关闭，避免同一支付结果因选择顺序不同重复展示。
@@ -564,9 +564,9 @@ scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit
 - `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合。
 - `validateBonus(bonus)` —— 恰好一个 `discount` 或 `choices`、`choices` 非空。
 
-**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；负 delta（D154 等）在 enumerate baseFee 合并后 clamp。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
+**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；`trades` / `bonuses` 经 `executionContext.costTrades` / `costBonuses` 追加到本次 payment child。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
 
-D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。renovation 仍走 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
+D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。Renovation 的 mandatory 折扣走 `Bonus.optional=false`；B128_Plumber 等 target-sensitive listener 从 `params.selectedOption` 读取本次目标材质后返回 sourced mandatory bonus choices。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
@@ -597,7 +597,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, costAttribution?, reserveResources?, sourceCard? }`。`computeCosts` 返回的 `costs` / `trades` / `bonuses` 会通过 `applyComputeCostResults()` 进入本次 `executionContext.costs` / `costTrades` / `costBonuses`；construct payment 会把它们附加到 `ComplexCost` 后再枚举。`costAttribution` 只服务 action-path `computeCosts` 的 Card Resource Stats 归因；listener 声明 source card 与成本 delta，host action 在真实执行后按 before/after 成本差和 clamp 写入 saved / paid，不表示整笔 action payment 属于该卡。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, costAttribution?, reserveResources?, sourceCard? }`。`computeCosts` 返回的 `costs` / `trades` / `bonuses` 会通过 `applyComputeCostResults()` 进入本次 `executionContext.costs` / `costTrades` / `costBonuses`；construct / renovation payment 会把它们附加到 `ComplexCost` 后再枚举。`costAttribution` 只服务 action-path `computeCosts` 的 Card Resource Stats 归因；listener 声明 source card 与成本 delta，host action 在真实执行后按 before/after 成本差和 clamp 写入 saved / paid，不表示整笔 action payment 属于该卡。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 

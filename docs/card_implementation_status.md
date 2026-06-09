@@ -520,7 +520,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A140_ShovelBearer` | 已对齐 |  |
 | `A141_TurnipFarmer` | 已对齐 |  |
 | `A142_Cordmaker` | 已对齐 |  |
-| `A143_Stonecutter` | 已对齐 | improvement stone 折扣走 `computeCardCostCandidates` 追加 sourced candidate；construct / renovation 仍走既有 bonus modifier。 |
+| `A143_Stonecutter` | 已对齐 | improvement stone 折扣走 `computeCardCostCandidates` 追加 sourced candidate；construct 仍走 optional bonus modifier，renovation 走 mandatory sourced bonus modifier，不保留原始翻修成本分支。 |
 | `A144_Sequestrator` | 已对齐 |  |
 | `A145_Ropemaker` | 已对齐 |  |
 | `A146_StorehouseSteward` | 已对齐 |  |
@@ -685,7 +685,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B125_EstateWorker` | 已对齐 |  |
 | `B126_Carpenter` | 已对齐 | 固定 3 building-resource + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `B127_Seducer` | 已对齐 |  |
-| `B128_Plumber` | 已对齐 |  |
+| `B128_Plumber` | 已对齐 | Major Improvement 后 optional `renovate-house` leaf 以 `sourceCard` 触发；翻修 cost listener 读取 `params.selectedOption` 的目标材质，提供 mandatory sourced 1/2 个目标资源折扣 choices。 |
 | `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 且 owner 自己未在 r13 时才注入 allow-occupied；3p 任一邻座占且 owner 自己未在 r13 时注入；round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
@@ -750,7 +750,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C10_BunkBeds` | 已对齐 |  |
 | `C11_WildlifeReserve` | 已对齐 |  |
 | `C12_CattleFarm` | 已对齐 |  |
-| `C13_WoodSlideHammer` | 已对齐 |  |
+| `C13_WoodSlideHammer` | 已对齐 | wood house 且至少 5 rooms 的直接翻修到 stone 折扣走 mandatory sourced bonus modifier，不保留原始 stone 翻修成本分支。 |
 | `C14_StrawThatchedRoof` | 已对齐 | construct / renovation 移除 reed 通过 `capDiscountAtCost` 表达，不再依赖过量折扣被 payment 枚举器截断。 |
 | `C15_Trellis` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
 | `C16_FieldFences` | 已对齐 |  |
@@ -859,7 +859,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C119_SkillfulRenovator` | 已对齐 |  |
 | `C120_AgriculturalLabourer` | 已对齐 | gain/receive/reap/exchange 转换 grain 均触发从卡上取 clay 的路径 |
 | `C121_ClayKneader` | 已对齐 |  |
-| `C122_Bricklayer` | 已对齐 | improvement clay 折扣走 `computeCardCostCandidates` 追加 sourced candidate；construct / renovation 仍走既有 bonus modifier。 |
+| `C122_Bricklayer` | 已对齐 | improvement clay 折扣走 `computeCardCostCandidates` 追加 sourced candidate；construct 仍走 optional bonus modifier，renovation 走 mandatory sourced bonus modifier，不保留原始 clay 翻修成本分支。 |
 | `C123_Freemason` | 已对齐 |  |
 | `C124_StoneImporter` | 已对齐 |  |
 | `C125_Nightworker` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -930,7 +930,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D10_StorksNest` | 已对齐 |  |
 | `D11_LawnFertilizer` | 已对齐 | size-one pasture replacement 走 `computePastureCapacityModifiers`；先替换为 `3 * (stables + 1)`，再叠加 A12/B72 等 additive。 |
 | `D12_MilkingPlace` | 已对齐 | 通过 `blocksHouseAnimalZones` metadata 触发 `computeAnimalZones()` 通用过滤，不再直接读取 D148。 |
-| `D13_Trowel` | 已对齐 |  |
+| `D13_Trowel` | 已对齐 | anytime 直接翻修到 stone 通过 `params.selectedOption='stone'` 进入真实 `renovate-house`；wood→stone / clay→stone 固定成本用 sourced mandatory bonus 表达，payment option 保留 Trowel 来源。 |
 | `D14_HammerCrusher` | 已对齐 |  |
 | `D15_ClaySupports` | 已对齐 |  |
 | `D16_WoodenWheyBucket` | 已对齐 | BGA `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达羊市场 1 wood、牛市场免费，且最多 1 个 stable。 |
@@ -998,8 +998,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D78_ReedPond` | 已对齐 |  |
 | `D79_CarrotMuseum` | 已对齐 |  |
 | `D80_BrickHammer` | 已对齐 | after-improvement 判断改用 `getPrintedImprovementResourceCost(..., 'clay')`；`cost` 与 `altCosts` 是 base cost 候选，取最大 clay，不再把 minor `cost.clay` 与 `altCosts[].clay` 相加。 |
-| `D81_RoofLadder` | 已对齐 |  |
-| `D82_HuntingTrophy` | 已对齐 |  |
+| `D81_RoofLadder` | 已对齐 | 翻修少付 1 reed 走 sourced mandatory bonus；after.renovate-house 仍给 1 stone。 |
+| `D82_HuntingTrophy` | 已对齐 | House Redevelopment 的 improvement 折扣走 mandatory sourced resource choice；Farm Redevelopment 的 fence 总计最多 3 wood 折扣走 sourced action trade，保留原始围栏成本并追加 BGA `addCost` 折扣候选。 |
 | `D83_Pigswill` | 已对齐 |  |
 | `D84_FeedPellets` | 已对齐 |  |
 | `D85_Reader` | 已对齐 |  |
@@ -1038,7 +1038,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D118_Bonehead` | 已对齐 |  |
 | `D119_WoodBarterer` | 已对齐 |  |
 | `D120_ClayDeliveryman` | 已对齐 |  |
-| `D121_ClayPlasterer` | 已对齐 | 黏土房固定 3 clay + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选；翻修到 clay 仍走总成本 delta。 |
+| `D121_ClayPlasterer` | 已对齐 | 黏土房固定 3 clay + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选；翻修到 clay 走 sourced mandatory bonus，把 clay 成本固定到 1。 |
 | `D122_ClayCarrier` | 已对齐 |  |
 | `D123_RenovationPreparer` | 已对齐 |  |
 | `D124_Emissary` | 已对齐 |  |
@@ -1071,7 +1071,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D151_SpinDoctor` | 已对齐 |  |
 | `D152_Patron` | 已对齐 |  |
 | `D153_WealthyMan` | 已对齐 |  |
-| `D154_ChimneySweep` | 已对齐 |  |
+| `D154_ChimneySweep` | 已对齐 | 翻修目标为 stone 时提供 sourced mandatory 2 stone bonus；wood→clay 普通翻修不产生 source-marked no-op candidate。 |
 | `D155_Ebonist` | 已对齐 | runtime/display exchange 都为 harvest window，`sourceId=D155_Ebonist`，不再暴露为 anytime exchange |
 | `D156_RetailDealer` | 已对齐 |  |
 | `D157_PartyOrganizer` | 已对齐 |  |

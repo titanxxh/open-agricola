@@ -38,6 +38,7 @@ const cardImpl = {
       cardId: CARD_ID,
       appliesTo: ['renovation'],
       discount: { clay: 1 },
+      optional: false,
     },
   ] as BonusModifier[],
   reaches: [] as readonly string[],

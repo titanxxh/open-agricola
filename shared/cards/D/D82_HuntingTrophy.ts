@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Bonus } from '../../contract/types'
+import type { Bonus, Trade } from '../../contract/types'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 
@@ -38,7 +38,14 @@ const farmRedevFenceCostListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isFarmRedev(context)) return
-    return { costs: { wood: -3 } }
+    const trade: Trade = {
+      from: {},
+      to: { wood: 1 },
+      max: 3,
+      scope: 'action',
+      sourceId: CARD_ID,
+    }
+    return { trades: [trade] }
   },
 }
 

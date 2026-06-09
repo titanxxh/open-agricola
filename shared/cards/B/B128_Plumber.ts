@@ -3,6 +3,10 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
+import {
+  selectedRenovationTarget,
+  sourcedMandatoryBonusChoices,
+} from '../helpers/renovation-cost'
 
 const CARD_ID = 'B128_Plumber'
 const triggerListener: CardListenerRegistration = {
@@ -34,13 +38,16 @@ const costListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
-    const renovation = getRenovation(context.player)
-    if (!renovation) return
-    if (renovation.nextType === 'clay') {
-      return { costs: { clay: -2 } }
-    }
-    if (renovation.nextType === 'stone') {
-      return { costs: { stone: -2 } }
+    const target = selectedRenovationTarget(context)
+    if (!target) return
+    return {
+      bonuses: [
+        sourcedMandatoryBonusChoices(CARD_ID, [
+          { [target]: 1 },
+          { [target]: 2 },
+        ]),
+      ],
+      sourceCard: CARD_ID,
     }
   },
 }
