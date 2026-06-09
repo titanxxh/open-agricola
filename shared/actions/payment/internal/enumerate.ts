@@ -544,6 +544,49 @@ const hasSupplyTokenCost = (cost: ComplexCost): boolean => {
   return maps.some((map) => (map.fence ?? 0) > 0 || (map.stable ?? 0) > 0)
 }
 
+const normalizeTypedFlatUnitCost = (
+  cost: ComplexCost,
+  costType?: CostModifierType,
+): ComplexCost => {
+  if (
+    cost.nb !== undefined ||
+    cost.unitFee !== undefined ||
+    cost.fees !== undefined ||
+    cost.cards !== undefined ||
+    (costType !== 'fencing' && costType !== 'stables') ||
+    cost.fee === undefined
+  ) {
+    return cost
+  }
+
+  const positiveEntries = Object.entries(cost.fee)
+    .filter(([, value]) => typeof value === 'number' && value > 0)
+  if (
+    positiveEntries.length > 1 ||
+    (positiveEntries.length === 1 && positiveEntries[0]![0] !== 'wood')
+  ) {
+    return cost
+  }
+
+  const wood = cost.fee.wood ?? 0
+  if (!Number.isInteger(wood) || wood < 0) return cost
+
+  if (costType === 'fencing') {
+    const { fee: _fee, ...rest } = cost
+    return { ...rest, unitFee: { wood: 1 }, nb: wood }
+  }
+
+  const stableUnits = Math.floor(wood / 2)
+  const remainder = wood % 2
+  const { fee: _fee, ...rest } = cost
+  return {
+    ...rest,
+    ...(remainder > 0 ? { fee: { wood: remainder } } : {}),
+    unitFee: { wood: 2 },
+    nb: stableUnits,
+  }
+}
+
 export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
@@ -551,10 +594,11 @@ export const computeAllBuyableCombinations = (
   costType?: CostModifierType,
   state?: GameState,
 ): PaymentSolution[] => {
-  validateComplexCost(cost)
+  const normalizedCost = normalizeTypedFlatUnitCost(cost, costType)
+  validateComplexCost(normalizedCost)
   const effectiveCost = costType
-    ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
-    : cost
+    ? applyCostModifiers(normalizedCost, getModifiersForCostType(player, costType))
+    : normalizedCost
   validateComplexCost(effectiveCost)
 
   const canUseCache = !hasSupplyTokenCost(effectiveCost)
@@ -738,12 +782,8 @@ export const computeAllBuyableCombinations = (
 
   for (const sol of rawSolutions) {
     const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
-    const tradesActuallyUsed = sol.tradesUsed.filter((entry) => entry.times > 0)
-    const exemptFromNegativeFilter =
-      tradesActuallyUsed.length === 1 && tradesActuallyUsed[0]!.times === 1
     if (
       costType
-      && !exemptFromNegativeFilter
       && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)
     ) {
       continue
