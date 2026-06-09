@@ -46,6 +46,22 @@ describe('recordPaymentStats', () => {
     expect(stats?.paid).toEqual({ stone: 3 })
   })
 
+  it('attributes empty-from trades as pure saved resources', () => {
+    const player = mockPlayer()
+    const solution: PaymentSolution = {
+      resourcesPaid: { clay: 4, reed: 2 },
+      tradesUsed: [
+        { trade: trade({ from: {}, to: { clay: 1 }, sourceId: 'A128_RiparianBuilder' }), times: 1 },
+      ],
+      bonusUsed: undefined,
+      cardUsed: undefined,
+    }
+    recordPaymentStats(player, solution)
+    const stats = readCardResourceStats(player, 'A128_RiparianBuilder')
+    expect(stats?.saved).toEqual({ clay: 1 })
+    expect(stats?.paid).toEqual({})
+  })
+
   it('ignores trades without sourceId (engine-internal trades)', () => {
     const player = mockPlayer()
     const solution: PaymentSolution = {

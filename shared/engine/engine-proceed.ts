@@ -1315,6 +1315,8 @@ export function engineProceed(
         ownerNodeId: null,
         params: executionContext.params,
         costs: executionContext.costs,
+        costTrades: executionContext.costTrades,
+        costBonuses: executionContext.costBonuses,
         costAttribution: executionContext.costAttribution,
         sourceCard: executionContext.sourceCard ?? result.sourceCard,
         actionContext: executionContext.actionContext,

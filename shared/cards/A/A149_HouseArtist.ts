@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
 const CARD_ID = 'A149_HouseArtist'
 const triggerListener: CardListenerRegistration = {
@@ -30,7 +31,7 @@ const costListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
-    return { costs: { reed: -1 } }
+    return { trades: [constructUnitDiscountTrade(CARD_ID, { reed: 1 })] }
   },
 }
 

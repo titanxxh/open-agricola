@@ -10,6 +10,7 @@ import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
 import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
 import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
 const CARD_ID = 'C88_CarpentersApprentice'
 const constructCostListener: CardListenerRegistration = {
@@ -19,7 +20,7 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType !== 'wood') return
-    return { costs: { wood: -2 } }
+    return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 2 })] }
   },
 }
 
