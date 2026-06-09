@@ -37,6 +37,16 @@ type PaymentOption = {
   sources: string[]
 }
 
+type DiffKind = 'payment-diff' | 'source-diff'
+
+type ScenarioDiff = {
+  name: string
+  kind: Scenario['kind']
+  diffKind: DiffKind
+  bga: PaymentOption[]
+  oa: PaymentOption[]
+}
+
 type PlayedZone = 'occupationPlayed' | 'minorPlayed' | 'improvements'
 
 type PlayedCard = {
@@ -301,15 +311,57 @@ const stripResources = (raw: Record<string, unknown>, multiplier = 1): Record<st
 const normalizeSources = (sources: unknown): string[] =>
   Array.isArray(sources) ? [...new Set(sources.filter((value): value is string => typeof value === 'string'))].sort() : []
 
+const normalizeResources = (resources: Record<string, number>): Record<string, number> => {
+  const out: Record<string, number> = {}
+  const known = new Set<string>(RESOURCE_KEYS)
+  for (const key of RESOURCE_KEYS) {
+    const value = resources[key]
+    if (typeof value === 'number' && value > 0) out[key] = value
+  }
+  for (const key of Object.keys(resources).filter((value) => !known.has(value)).sort()) {
+    const value = resources[key]
+    if (typeof value === 'number' && value > 0) out[key] = value
+  }
+  return out
+}
+
+const canonicalOption = (option: PaymentOption): PaymentOption => ({
+  resources: normalizeResources(option.resources),
+  sources: normalizeSources(option.sources),
+})
+
 const optionKey = (option: PaymentOption): string =>
-  JSON.stringify({
-    resources: Object.fromEntries(Object.entries(option.resources).sort(([a], [b]) => a.localeCompare(b))),
-    sources: [...option.sources].sort(),
-  })
+  JSON.stringify(canonicalOption(option))
 
 const uniqueSortedOptions = (options: PaymentOption[]) =>
-  [...new Map(options.map((option) => [optionKey(option), option])).values()]
+  [...new Map(options.map((option) => {
+    const canonical = canonicalOption(option)
+    return [optionKey(canonical), canonical]
+  })).values()]
     .sort((left, right) => optionKey(left).localeCompare(optionKey(right)))
+
+const optionListKey = (options: PaymentOption[]): string =>
+  JSON.stringify(uniqueSortedOptions(options))
+
+const paymentShapeKey = (options: PaymentOption[]): string =>
+  JSON.stringify(uniqueSortedOptions(options).map((option) => option.resources))
+
+const compareOptions = (
+  scenario: Scenario,
+  bga: PaymentOption[],
+  oa: PaymentOption[],
+): ScenarioDiff[] => {
+  const expected = uniqueSortedOptions(bga)
+  const actual = uniqueSortedOptions(oa)
+  if (optionListKey(expected) === optionListKey(actual)) return []
+  return [{
+    name: scenario.name,
+    kind: scenario.kind,
+    diffKind: paymentShapeKey(expected) === paymentShapeKey(actual) ? 'source-diff' : 'payment-diff',
+    bga: expected,
+    oa: actual,
+  }]
+}
 
 const addCost = (base: PaymentOption, raw: Record<string, unknown>, multiplier = 1): PaymentOption | null => {
   const resources = { ...base.resources }
@@ -546,13 +598,17 @@ const oaOptions = (scenario: Scenario): PaymentOption[] =>
     : oaActionOptions(scenario)
 
 const renderReport = (
-  diffs: Array<{ name: string, kind: Scenario['kind'], bga: PaymentOption[], oa: PaymentOption[] }>,
+  diffs: ScenarioDiff[],
   covered: string[],
 ) => {
   const counts = scenarios.reduce<Record<string, number>>((acc, scenario) => {
     acc[scenario.kind] = (acc[scenario.kind] ?? 0) + 1
     return acc
   }, {})
+  const diffKindCounts = diffs.reduce<Record<DiffKind, number>>((acc, diff) => {
+    acc[diff.diffKind] = (acc[diff.diffKind] ?? 0) + 1
+    return acc
+  }, { 'payment-diff': 0, 'source-diff': 0 })
   const lines = [
     '# BGA/OA Cost-Pay Parity Report',
     '',
@@ -564,13 +620,16 @@ const renderReport = (
     `Compared fencing scenarios: ${counts.fencing ?? 0}`,
     `Compared stables scenarios: ${counts.stables ?? 0}`,
     `Differences: ${diffs.length}`,
+    `Payment differences: ${diffKindCounts['payment-diff']}`,
+    `Source-only differences: ${diffKindCounts['source-diff']}`,
+    'Report-only artifacts: 0',
     '',
   ]
   if (diffs.length === 0) {
     lines.push('No differences found in the compared scenarios.', '')
   } else {
     for (const diff of diffs) {
-      lines.push(`## ${diff.name}`, '', `Kind: ${diff.kind}`, '', 'BGA:', '```json', JSON.stringify(diff.bga, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
+      lines.push(`## ${diff.name}`, '', `Kind: ${diff.kind}`, `Difference type: ${diff.diffKind}`, '', 'BGA:', '```json', JSON.stringify(diff.bga, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
     }
   }
   mkdirSync(path.dirname(REPORT_PATH), { recursive: true })
@@ -590,14 +649,15 @@ describe('BGA/OA cost-pay parity', () => {
     const diffs = scenarios.flatMap((scenario) => {
       const bgaScenario = bga.results[scenario.name]
       expect(bgaScenario, scenario.name).toBeDefined()
-      const expected = bgaOptions(bgaScenario, scenario)
-      const actual = oaOptions(scenario)
-      return JSON.stringify(expected) === JSON.stringify(actual)
-        ? []
-        : [{ name: scenario.name, kind: scenario.kind, bga: expected, oa: actual }]
+      return compareOptions(scenario, bgaOptions(bgaScenario, scenario), oaOptions(scenario))
     })
 
     renderReport(diffs, bga.coveredCardIds)
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain(`Differences: ${diffs.length}`)
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Payment differences:')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Source-only differences:')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Report-only artifacts:')
+    expect(diffs.map((diff) => diff.name)).not.toContain('B145 brushwood renovation reed replacement')
+    expect(diffs.map((diff) => diff.name)).not.toContain('C14 straw roof removes renovation reed')
   })
 })

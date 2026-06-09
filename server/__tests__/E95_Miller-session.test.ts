@@ -110,7 +110,13 @@ describe('E95_Miller session', () => {
     // Skip the optional bake action
     resp = session.resolveChoice(0, '__skip__')
 
-    // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
     // Verify no grain consumed, no food gained
