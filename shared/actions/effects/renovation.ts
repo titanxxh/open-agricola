@@ -3,11 +3,14 @@ import type {
   ActionChoiceOption,
   ActionCostPreview,
   ActionDefinition,
+  ActionExecutionContext,
   ActionExecutionResult,
   InternalActionChild,
+  Bonus,
   ComplexCost,
   PlayerState,
   Resource,
+  Trade,
 } from '../../contract/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
@@ -35,6 +38,25 @@ type PendingRenovation = {
   from: PlayerState['houseType']
   to: RenovationTarget
   rooms: { row: number; col: number }[]
+}
+
+type RenovationCostAdjustments = {
+  trades?: Trade[]
+  bonuses?: Bonus[]
+}
+
+const readRenovationCostAdjustments = (
+  context: unknown,
+): RenovationCostAdjustments | undefined => {
+  if (!context || typeof context !== 'object') return undefined
+  const raw = context as {
+    costTrades?: ActionExecutionContext['costTrades']
+    costBonuses?: ActionExecutionContext['costBonuses']
+  }
+  const trades = raw.costTrades ?? []
+  const bonuses = raw.costBonuses ?? []
+  if (trades.length === 0 && bonuses.length === 0) return undefined
+  return { trades, bonuses }
 }
 
 const readPendingRenovation = (
@@ -71,17 +93,32 @@ const mergeRenovationCost = (
   }
 }
 
+const appendRenovationAdjustments = (
+  cost: ComplexCost,
+  costAdjustments?: RenovationCostAdjustments,
+): ComplexCost => {
+  const trades = costAdjustments?.trades ?? []
+  const bonuses = costAdjustments?.bonuses ?? []
+  if (trades.length === 0 && bonuses.length === 0) return cost
+  return {
+    ...cost,
+    ...(trades.length > 0 ? { trades: [...(cost.trades ?? []), ...trades] } : {}),
+    ...(bonuses.length > 0 ? { bonuses: [...(cost.bonuses ?? []), ...bonuses] } : {}),
+  }
+}
+
 const resolveRenovationActionCost = (
   baseCost: ComplexCost,
   actionContext?: Record<string, unknown>,
   costOverride?: Partial<Resource>,
+  costAdjustments?: RenovationCostAdjustments,
 ): ComplexCost | null => {
   const exactCost = readExactCost(actionContext)
   if (exactCost) {
     const resolved = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
-    return resolved ? { fee: resolved } : null
+    return resolved ? appendRenovationAdjustments({ fee: resolved }, costAdjustments) : null
   }
-  return mergeRenovationCost(baseCost, costOverride)
+  return appendRenovationAdjustments(mergeRenovationCost(baseCost, costOverride), costAdjustments)
 }
 
 /**
@@ -184,7 +221,12 @@ const renovateHouseCostPreview: ActionCostPreview = {
     const plan = planForContext(player, params)
     if (!plan) return false
     const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
-    const cost = resolveRenovationActionCost(plan.cost, actionContext, costOverride)
+    const cost = resolveRenovationActionCost(
+      plan.cost,
+      actionContext,
+      costOverride,
+      readRenovationCostAdjustments(context),
+    )
     return cost ? canAffordTypedFlatCost(player, cost, 'renovation') : false
   },
   getBaseCost: (context) => {
@@ -239,7 +281,8 @@ export const renovateHouseAction: ActionDefinition = {
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
-  resolveChoice: ({ player, params, costs, actionContext }, choice) => {
+  resolveChoice: (ctx, choice) => {
+    const { player, params, costs, actionContext } = ctx
     const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const target: RenovationTarget | null =
       (choice === 'clay' || choice === 'stone' ? choice : null)
@@ -247,7 +290,12 @@ export const renovateHouseAction: ActionDefinition = {
     if (!target) return failure
     const plan = buildRenovationPlan(player, target)
     if (!plan) return failure
-    const totalCost = resolveRenovationActionCost(plan.cost, actionContext, costs)
+    const totalCost = resolveRenovationActionCost(
+      plan.cost,
+      actionContext,
+      costs,
+      readRenovationCostAdjustments(ctx),
+    )
     if (!totalCost) return failure
     const from = player.houseType
     return {

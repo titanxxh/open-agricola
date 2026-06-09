@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { sourcedMandatoryBonus } from '../helpers/renovation-cost'
 
 const CARD_ID = 'D81_RoofLadder'
 const costListener: CardListenerRegistration = {
@@ -11,7 +12,7 @@ const costListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { reed: -1 } }
+    return { bonuses: [sourcedMandatoryBonus(CARD_ID, { reed: 1 })] }
   },
 }
 

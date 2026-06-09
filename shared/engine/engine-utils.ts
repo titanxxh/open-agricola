@@ -35,6 +35,7 @@ import {
   type ActivateCardActionNode,
   type ActivateCardActionParams,
 } from './activation-action'
+import { applyComputeCostResults } from './compute-cost-results'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -826,6 +827,11 @@ export function maybeBuildChoiceCandidates(
       ...(executionContext.params ?? {}),
       selectedOption: value,
     }
+    const selectedCostResults = int.hooks.computeCosts({
+      ...executionContext,
+      actionId,
+    })
+    applyComputeCostResults(executionContext, selectedCostResults)
     return action.resolveChoice({ ...executionContext, eventSink }, value, undefined)
   }
   return {

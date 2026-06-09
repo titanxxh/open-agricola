@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { GameEvent, PlayerState } from '../../../contract/types'
+import type { Bonus, GameEvent, PlayerState } from '../../../contract/types'
 import {
   buildRenovationPlan,
   canRenovate,
@@ -232,6 +232,36 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     if (result.type !== 'ok') return
     expect(result.internalChildren?.beforeHostListeners?.[0]?.params).toMatchObject({
       cost: { fee: {} },
+      costType: 'renovation',
+      optionPrefix: 'renovation',
+    })
+  })
+
+  it('carries computed cost bonuses into affordability and payment', () => {
+    const player = createPlayer({ rooms: 3, resources: { clay: 2, reed: 1 } })
+    const bonus: Bonus = {
+      discount: { clay: 1 },
+      optional: false,
+      sources: ['C122_Bricklayer'],
+    }
+    const ctx = {
+      ...buildExecutionContext(player),
+      costBonuses: [bonus],
+    }
+
+    expect(renovateHouseAction.costPreview?.canExecute?.(buildExecutionContext(player), {})).toBe(false)
+    expect(renovateHouseAction.costPreview?.canExecute?.(ctx, {})).toBe(true)
+
+    const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren?.beforeHostListeners?.[0]?.params).toMatchObject({
+      cost: {
+        fees: [{ reed: 1 }],
+        unitFee: { clay: 1 },
+        nb: 3,
+        bonuses: [bonus],
+      },
       costType: 'renovation',
       optionPrefix: 'renovation',
     })
