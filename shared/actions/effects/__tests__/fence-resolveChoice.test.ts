@@ -668,6 +668,53 @@ describe('fenceAction.resolveChoice', () => {
     expect(result.resourcesPaid).toEqual({ wood: 1 })
   })
 
+  it('applies computeCosts trades when settling a farm-choice fence payment', () => {
+    const sessionContext = new SessionCardContext()
+    const listener: CardListenerRegistration = {
+      id: 'test-farm-choice-fence-trade',
+      phases: ['computeCosts'],
+      actions: ['fence'],
+      handler: () => ({
+        trades: [{
+          from: {},
+          to: { wood: 1 },
+          max: 3,
+          scope: 'action',
+          sourceId: 'D82_HuntingTrophy',
+        }],
+      }),
+    }
+    sessionContext.registerListener(listener)
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 1,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+    })
+
+    const result = withSessionContext(sessionContext, () =>
+      fenceAction.resolveChoice!(ctx, 'confirm', {
+        edges: edgesForTile(0, 0),
+        palisadeEdges: [],
+        extraWood: 0,
+      }),
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 1 })
+  })
+
   it('first call with multi-combo payment returns choice + actionContextWrite', () => {
     // 1 wood + clay/stone trade modifiers force the payment-combo prompt for
     // a 4-fence enclosure that costs 4 wood total.

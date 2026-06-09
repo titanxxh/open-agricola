@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, CardCostCandidate, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -418,13 +418,19 @@ const makeDummySpace = (actionId: string): ActionSpace => ({
  * `Partial<Resource>` and accepts an optional `space` (defaults to a dummy
  * placeholder — listeners must not read `ctx.space`).
  */
-export const collectComputeCostsForFarmChoice = (
+export type FarmChoiceCostAdjustments = {
+  costs: Partial<Resource>
+  trades: Trade[]
+  bonuses: Bonus[]
+}
+
+export const collectFarmChoiceCostAdjustments = (
   state: GameState,
   player: PlayerState,
   actionId: string,
   params: Record<string, unknown>,
   space?: ActionSpace,
-): Partial<Resource> => {
+): FarmChoiceCostAdjustments => {
   const ctx: ActionHookContext = {
     state,
     player,
@@ -435,19 +441,33 @@ export const collectComputeCostsForFarmChoice = (
     transactionEvents: [],
     eventQuery: createEventQuery([]),
   }
-  const aggregated: Partial<Resource> = {}
+  const aggregated: FarmChoiceCostAdjustments = { costs: {}, trades: [], bonuses: [] }
   const merge = (costs?: Partial<Resource>) => {
     if (!costs) return
     for (const [key, value] of Object.entries(costs)) {
       if (typeof value !== 'number') continue
       const k = key as keyof Resource
-      aggregated[k] = (aggregated[k] ?? 0) + value
+      aggregated.costs[k] = (aggregated.costs[k] ?? 0) + value
     }
   }
-  runActionHooks(ctx).forEach((r: ActionHookResult) => merge(r.costs))
+  const mergeResult = (result: ActionHookResult) => {
+    merge(result.costs)
+    if (result.trades) aggregated.trades.push(...result.trades)
+    if (result.bonuses) aggregated.bonuses.push(...result.bonuses)
+  }
+  runActionHooks(ctx).forEach(mergeResult)
   for (const entry of getMatchingListeners(ctx)) {
     const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
-    if (result) merge(result.costs)
+    if (result) mergeResult(result)
   }
   return aggregated
 }
+
+export const collectComputeCostsForFarmChoice = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  params: Record<string, unknown>,
+  space?: ActionSpace,
+): Partial<Resource> =>
+  collectFarmChoiceCostAdjustments(state, player, actionId, params, space).costs

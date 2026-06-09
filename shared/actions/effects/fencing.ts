@@ -3,11 +3,14 @@ import type {
   ActionExecutionResult,
   ActionMutationContext,
   ActionSpace,
+  Bonus,
+  ComplexCost,
   FenceSegment,
   FenceSegmentType,
   GameState,
   PlayerState,
   Resource,
+  Trade,
 } from '../../contract/types'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -42,7 +45,7 @@ import {
   addConsumedSupplyTokenCount,
 } from '../../domain/supply-tokens'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
-import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
+import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import {
   consumePendingFenceBonus,
@@ -593,20 +596,32 @@ const computeFenceCostAdjustment = (
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
-): { freeFences: number; extraWood: number } => {
+): { freeFences: number; extraWood: number; trades: Trade[]; bonuses: Bonus[] } => {
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
-  const fenceOverride = collectComputeCostsForFarmChoice(
+  const fenceOverride = collectFarmChoiceCostAdjustments(
     state,
     player,
     'fence',
     { newFenceEdges, newPalisadeEdges },
     space,
   )
-  const hookWood = fenceOverride.wood ?? 0
+  const hookWood = fenceOverride.costs.wood ?? 0
   return {
     freeFences: pendingFreeFences + Math.max(0, -hookWood),
     extraWood: Math.max(0, hookWood),
+    trades: fenceOverride.trades,
+    bonuses: fenceOverride.bonuses,
   }
+}
+
+const buildFencePaymentCost = (
+  payableWoodCost: number,
+  adjustment: { trades: Trade[]; bonuses: Bonus[] },
+): ComplexCost => {
+  const cost: ComplexCost = { fee: { wood: payableWoodCost } }
+  if (adjustment.trades.length > 0) cost.trades = adjustment.trades
+  if (adjustment.bonuses.length > 0) cost.bonuses = adjustment.bonuses
+  return cost
 }
 
 const countBorrowedFenceSources = (
@@ -667,9 +682,10 @@ const finalizeFence = (
   if (!validated.ok) {
     return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
   }
+  const paymentCost = buildFencePaymentCost(validated.payableWoodCost, costAdjustment)
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
-    { wood: validated.payableWoodCost },
+    paymentCost,
     'pay:fence',
     paymentChoice,
     { type: 'fail', errorKey: 'log.fencingFail' },
@@ -738,7 +754,7 @@ const finalizeFence = (
     internalChildren: {
       beforeHostListeners: [
         buildInternalPayChild({
-          cost: { fee: { wood: validated.payableWoodCost } },
+          cost: paymentCost,
           costType: 'fencing',
           optionPrefix: 'pay:fence',
           paymentChoice,
@@ -871,9 +887,10 @@ export const fenceAction: ActionDefinition = {
       if (!validated.ok) {
         return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
       }
+      const paymentCost = buildFencePaymentCost(validated.payableWoodCost, costAdjustment)
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
-        { wood: validated.payableWoodCost },
+        paymentCost,
         'pay:fence',
         undefined,
         { type: 'fail', errorKey: 'log.fencingFail' },

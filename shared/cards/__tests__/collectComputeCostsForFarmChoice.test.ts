@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectComputeCostsForFarmChoice } from '../card-listeners'
+import { collectComputeCostsForFarmChoice, collectFarmChoiceCostAdjustments } from '../card-listeners'
 import type { GameState, PlayerState } from '../../contract/types'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -35,5 +35,28 @@ describe('collectComputeCostsForFarmChoice', () => {
       newPalisadeEdges: [],
     })
     expect(result.wood ?? 0).toBe(0)
+  })
+
+  it('aggregates trades and bonuses for farm-choice settlement', () => {
+    const player = makePlayer({ minorPlayed: ['D82_HuntingTrophy'] })
+    const state = makeState(player)
+    const result = collectFarmChoiceCostAdjustments(
+      state,
+      player,
+      'fence',
+      { newFenceEdges: ['H-0-0'], newPalisadeEdges: [] },
+      { id: 'farm-redevelopment' } as never,
+    )
+    expect(result.costs.wood ?? 0).toBe(0)
+    expect(result.trades).toEqual([
+      {
+        from: {},
+        to: { wood: 1 },
+        max: 3,
+        scope: 'action',
+        sourceId: 'D82_HuntingTrophy',
+      },
+    ])
+    expect(result.bonuses).toEqual([])
   })
 })

@@ -1,0 +1,2221 @@
+{
+    "coveredCardIds": [
+        "A123_FrameBuilder",
+        "A128_RiparianBuilder",
+        "A143_Stonecutter",
+        "A149_HouseArtist",
+        "A14_CarpentersHammer",
+        "A16_RammedClay",
+        "A27_OvenSite",
+        "A75_LumberMill",
+        "A88_HedgeKeeper",
+        "B126_Carpenter",
+        "B128_Plumber",
+        "B13_CarpentersParlor",
+        "B145_BrushwoodCollector",
+        "B15_CarpentersBench",
+        "B95_MasterBricklayer",
+        "C122_Bricklayer",
+        "C128_WoodenHutExtender",
+        "C13_WoodSlideHammer",
+        "C14_StrawThatchedRoof",
+        "C27_Blueprint",
+        "C56_FeedFence",
+        "C88_CarpentersApprentice",
+        "C95_BasketWeaver",
+        "D117_WoodExpert",
+        "D121_ClayPlasterer",
+        "D13_Trowel",
+        "D154_ChimneySweep",
+        "D15_ClaySupports",
+        "D81_RoofLadder",
+        "D82_HuntingTrophy",
+        "D88_Millwright",
+        "D95_SiteManager",
+        "D96_Furnisher",
+        "E109_BraidMaker",
+        "E123_ResourceHoarder",
+        "E130_Overachiever",
+        "E150_RockBeater",
+        "E27_PiggyBank",
+        "E87_MasterRenovator"
+    ],
+    "singleCardCaseCount": 53,
+    "comboCaseCount": 5,
+    "results": {
+        "A143 card-purchase stone discount": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A143_Stonecutter"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                }
+            ]
+        },
+        "A27 oven fixed cost": {
+            "trades": [
+                {
+                    "clay": 1,
+                    "max": 1,
+                    "sources": [
+                        "A27_OvenSite"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "A75 card-purchase wood bonus": {
+            "bonuses": [
+                {
+                    "optional": false,
+                    "sources": [
+                        "A75_LumberMill"
+                    ],
+                    "wood": -1
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                }
+            ]
+        },
+        "B95 major stone discount by rooms": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "B95_MasterBricklayer"
+                    ],
+                    "wood": 2
+                }
+            ]
+        },
+        "C122 card-purchase clay discount": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "C122_Bricklayer"
+                    ],
+                    "stone": 2,
+                    "wood": 2
+                }
+            ]
+        },
+        "C27 blueprint major discount": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "C27_Blueprint"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                }
+            ]
+        },
+        "C95 basket fixed cost": {
+            "trades": [
+                {
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "C95_BasketWeaver"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "D117 wood for food candidates": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D117_WoodExpert"
+                    ],
+                    "stone": 2
+                }
+            ]
+        },
+        "D82 house redevelopment improvement discount choice": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "D82_HuntingTrophy"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "D82_HuntingTrophy"
+                            ]
+                        },
+                        {
+                            "sources": [
+                                "D82_HuntingTrophy"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "reed": -1,
+                            "sources": [
+                                "D82_HuntingTrophy"
+                            ]
+                        }
+                    ],
+                    "optional": false
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                }
+            ]
+        },
+        "D95 site manager replacement candidates": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 1
+                },
+                {
+                    "clay": 2,
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "food": 3,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 1
+                },
+                {
+                    "clay": 2,
+                    "food": 1,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "food": 3,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 2,
+                    "wood": 1
+                },
+                {
+                    "clay": 2,
+                    "food": 2,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "food": 3,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "food": 3,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "food": 4,
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "D95_SiteManager"
+                    ],
+                    "stone": 1,
+                    "wood": 1
+                }
+            ]
+        },
+        "D96 furnisher wood discount": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D96_Furnisher"
+                    ],
+                    "stone": 2,
+                    "wood": 1
+                }
+            ]
+        },
+        "E109 basket fixed cost": {
+            "trades": [
+                {
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "E109_BraidMaker"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "E123 card-purchase top resource choices": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -2,
+                            "wood": -1
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                }
+            ]
+        },
+        "E130 overachiever resource choice discount": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "E130_Overachiever"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "sources": [
+                                "E130_Overachiever"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "reed": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "food": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "grain": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "sources": [
+                                "E130_Overachiever"
+                            ],
+                            "vegetable": -1
+                        },
+                        {
+                            "sheep": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "pig": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        },
+                        {
+                            "cattle": -1,
+                            "sources": [
+                                "E130_Overachiever"
+                            ]
+                        }
+                    ],
+                    "optional": false
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                }
+            ]
+        },
+        "E27 piggy bank free major candidate": {
+            "trades": [
+                {
+                    "clay": 2,
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "max": 1,
+                    "sources": [
+                        "E27_PiggyBank"
+                    ]
+                }
+            ]
+        },
+        "A123 construct frame replacement": {
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 3,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A123_FrameBuilder"
+                    ],
+                    "wood": 1
+                }
+            ]
+        },
+        "A128 riparian construct discount": {
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 4,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A128_RiparianBuilder"
+                    ]
+                }
+            ]
+        },
+        "A149 house artist reed discount": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 1,
+                    "sources": [
+                        "A149_HouseArtist"
+                    ],
+                    "wood": 5
+                }
+            ]
+        },
+        "A14 carpenter hammer construct bonuses": {
+            "bonuses": [
+                {
+                    "conditions": {
+                        "minNumRooms": 2
+                    },
+                    "optional": false,
+                    "reed": -2,
+                    "sources": [
+                        "A14_CarpentersHammer"
+                    ]
+                },
+                {
+                    "conditions": {
+                        "minNumRooms": 2
+                    },
+                    "optional": false,
+                    "sources": [
+                        "A14_CarpentersHammer"
+                    ],
+                    "wood": -2
+                }
+            ],
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                }
+            ]
+        },
+        "A143 construct stone discount": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "stone": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A143_Stonecutter"
+                    ],
+                    "stone": 4
+                }
+            ]
+        },
+        "B126 carpenter fixed room cost": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "reed": 2,
+                    "sources": [
+                        "B126_Carpenter"
+                    ],
+                    "wood": 3
+                }
+            ]
+        },
+        "B13 carpenter parlor fixed wood room cost": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "reed": 2,
+                    "sources": [
+                        "B13_CarpentersParlor"
+                    ],
+                    "wood": 2
+                }
+            ]
+        },
+        "B145 brushwood construct reed replacement": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "sources": [
+                        "B145_BrushwoodCollector"
+                    ],
+                    "wood": 6
+                }
+            ]
+        },
+        "C122 construct clay discount": {
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 3,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "C122_Bricklayer"
+                    ]
+                }
+            ]
+        },
+        "C128 wooden hut extender round cost": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "reed": 1,
+                    "sources": [
+                        "C128_WoodenHutExtender"
+                    ],
+                    "wood": 3
+                }
+            ]
+        },
+        "C14 straw roof removes construct reed": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "sources": [
+                        "C14_StrawThatchedRoof"
+                    ],
+                    "wood": 5
+                }
+            ]
+        },
+        "C88 apprentice wood room discount": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "C88_CarpentersApprentice"
+                    ],
+                    "wood": 3
+                }
+            ]
+        },
+        "D121 clay plasterer fixed clay room cost": {
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 3,
+                    "reed": 2,
+                    "sources": [
+                        "D121_ClayPlasterer"
+                    ]
+                }
+            ]
+        },
+        "D15 clay supports alternative clay room cost": {
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 2,
+                    "reed": 1,
+                    "sources": [
+                        "D15_ClaySupports"
+                    ],
+                    "wood": 1
+                }
+            ]
+        },
+        "D88 millwright construct bonuses": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "wood": 5
+                }
+            ]
+        },
+        "E123 construct top resource choices": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -2,
+                            "wood": -1
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                }
+            ]
+        },
+        "E150 rock beater stone room discount": {
+            "trades": [
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "stone": 5
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "E150_RockBeater"
+                    ],
+                    "stone": 3
+                }
+            ]
+        },
+        "A123 renovation frame replacement": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "clay": -2,
+                            "sources": [
+                                "A123_FrameBuilder"
+                            ],
+                            "wood": 1
+                        },
+                        {
+                            "sources": [
+                                "A123_FrameBuilder"
+                            ],
+                            "stone": -2,
+                            "wood": 1
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "A143 renovation stone discount": {
+            "bonuses": [
+                {
+                    "optional": false,
+                    "sources": [
+                        "A143_Stonecutter"
+                    ],
+                    "stone": -1
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "B128 plumber renovation choices": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "B128_Plumber"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "sources": [
+                                "B128_Plumber"
+                            ],
+                            "stone": -2
+                        }
+                    ],
+                    "optional": false
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "B145 brushwood renovation reed replacement": {
+            "fees": [
+                {
+                    "reed": 1
+                },
+                {
+                    "sources": [
+                        "B145_BrushwoodCollector"
+                    ],
+                    "wood": 1
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 1,
+                    "max": 5,
+                    "nb": 1
+                }
+            ]
+        },
+        "C122 renovation clay discount": {
+            "bonuses": [
+                {
+                    "clay": -1,
+                    "optional": false,
+                    "sources": [
+                        "C122_Bricklayer"
+                    ]
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 1,
+                    "max": 5,
+                    "nb": 1
+                }
+            ]
+        },
+        "C13 wood slide hammer stone discount": {
+            "bonuses": [
+                {
+                    "optional": false,
+                    "sources": [
+                        "C13_WoodSlideHammer"
+                    ],
+                    "stone": -2
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "C14 straw roof removes renovation reed": {
+            "fees": [
+                {
+                    "reed": 1
+                },
+                {
+                    "sources": [
+                        "C14_StrawThatchedRoof"
+                    ]
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 1,
+                    "max": 5,
+                    "nb": 1
+                }
+            ]
+        },
+        "D121 clay plasterer fixed clay renovation": {
+            "fees": [
+                {
+                    "clay": 1,
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "sources": [
+                        "D121_ClayPlasterer"
+                    ]
+                }
+            ]
+        },
+        "D13 trowel wood to stone fixed cost": {
+            "fees": [
+                {
+                    "reed": 3,
+                    "sources": [
+                        "D13_Trowel"
+                    ]
+                }
+            ],
+            "trades": [
+                {
+                    "food": 1,
+                    "max": 5,
+                    "nb": 1,
+                    "sources": [
+                        "D13_Trowel"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "D154 chimney sweep stone discount": {
+            "bonuses": [
+                {
+                    "optional": false,
+                    "sources": [
+                        "D154_ChimneySweep"
+                    ],
+                    "stone": -2
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "D81 roof ladder reed discount": {
+            "bonuses": [
+                {
+                    "optional": false,
+                    "reed": -1,
+                    "sources": [
+                        "D81_RoofLadder"
+                    ]
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 1,
+                    "max": 5,
+                    "nb": 1
+                }
+            ]
+        },
+        "D88 millwright renovation bonuses": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "E123 renovation top resource choices": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ]
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -1,
+                            "wood": -1
+                        },
+                        {
+                            "clay": -2,
+                            "reed": -1,
+                            "sources": [
+                                "E123_ResourceHoarder"
+                            ],
+                            "stone": -2,
+                            "wood": -1
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "E87 master renovator flagged choices": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "sources": [
+                                "E87_MasterRenovator"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "sources": [
+                                "E87_MasterRenovator"
+                            ]
+                        },
+                        {
+                            "sources": [
+                                "E87_MasterRenovator"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "reed": -1,
+                            "sources": [
+                                "E87_MasterRenovator"
+                            ]
+                        }
+                    ],
+                    "optional": false
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 1
+                }
+            ],
+            "trades": [
+                {
+                    "max": 5,
+                    "nb": 1,
+                    "stone": 1
+                }
+            ]
+        },
+        "A16 rammed clay fence trade": {
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "max": 15,
+                    "nb": 1,
+                    "sources": [
+                        "A16_RammedClay"
+                    ]
+                }
+            ]
+        },
+        "A88 hedge keeper free fences": {
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "sources": [
+                        "A88_HedgeKeeper"
+                    ]
+                }
+            ]
+        },
+        "B15 carpenters bench constrained free fence": {
+            "constraints": [
+                "B15_CarpentersBench"
+            ],
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                },
+                {
+                    "max": 1,
+                    "nb": 1,
+                    "sources": [
+                        "B15_CarpentersBench"
+                    ]
+                }
+            ]
+        },
+        "D82 farm redevelopment fence discount": {
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "sources": [
+                        "D82_HuntingTrophy"
+                    ]
+                }
+            ]
+        },
+        "D88 millwright fence bonuses": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                }
+            ]
+        },
+        "C56 feed fence stable clay alternative": {
+            "trades": [
+                {
+                    "max": 4,
+                    "nb": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "max": 1,
+                    "sources": [
+                        "C56_FeedFence"
+                    ]
+                }
+            ]
+        },
+        "D88 millwright stable bonuses": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "max": 4,
+                    "nb": 1,
+                    "wood": 2
+                }
+            ]
+        },
+        "combo card-purchase basket fixed price plus stone and wood modifiers": {
+            "trades": [
+                {
+                    "max": 1,
+                    "reed": 2,
+                    "stone": 2,
+                    "wood": 2
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "C95_BasketWeaver"
+                    ],
+                    "stone": 1
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "E109_BraidMaker"
+                    ],
+                    "stone": 1
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "C95_BasketWeaver",
+                        "E109_BraidMaker"
+                    ],
+                    "stone": 1
+                },
+                {
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A143_Stonecutter"
+                    ],
+                    "stone": 1,
+                    "wood": 2
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "C95_BasketWeaver",
+                        "A143_Stonecutter"
+                    ]
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "E109_BraidMaker",
+                        "A143_Stonecutter"
+                    ]
+                },
+                {
+                    "max": 1,
+                    "reed": 1,
+                    "sources": [
+                        "C95_BasketWeaver",
+                        "E109_BraidMaker",
+                        "A143_Stonecutter"
+                    ]
+                },
+                {
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D117_WoodExpert"
+                    ],
+                    "stone": 2
+                },
+                {
+                    "food": 1,
+                    "max": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A143_Stonecutter",
+                        "D117_WoodExpert"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "combo construct clay room replacement plus grain substitution": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "clay": 5,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2
+                },
+                {
+                    "clay": 3,
+                    "reed": 2,
+                    "sources": [
+                        "D121_ClayPlasterer"
+                    ]
+                },
+                {
+                    "clay": 3,
+                    "max": 3,
+                    "nb": 1,
+                    "reed": 2,
+                    "sources": [
+                        "A123_FrameBuilder"
+                    ],
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "reed": 2,
+                    "sources": [
+                        "D121_ClayPlasterer",
+                        "A123_FrameBuilder"
+                    ],
+                    "wood": 1
+                }
+            ]
+        },
+        "combo renovation trowel brushwood and millwright": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "fees": [
+                {
+                    "reed": 2,
+                    "sources": [
+                        "D13_Trowel"
+                    ]
+                },
+                {
+                    "sources": [
+                        "D13_Trowel",
+                        "B145_BrushwoodCollector"
+                    ],
+                    "wood": 1
+                }
+            ],
+            "trades": [
+                {
+                    "food": 1,
+                    "max": 5,
+                    "nb": 1,
+                    "sources": [
+                        "D13_Trowel"
+                    ],
+                    "stone": 1
+                }
+            ]
+        },
+        "combo fencing clay/free/grain alternatives": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "max": 15,
+                    "nb": 1,
+                    "wood": 1
+                },
+                {
+                    "clay": 1,
+                    "max": 15,
+                    "nb": 1,
+                    "sources": [
+                        "A16_RammedClay"
+                    ]
+                },
+                {
+                    "max": 3,
+                    "nb": 1,
+                    "sources": [
+                        "A88_HedgeKeeper"
+                    ]
+                }
+            ]
+        },
+        "combo stables clay alternative plus grain substitution": {
+            "bonuses": [
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                },
+                {
+                    "choices": [
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "wood": -1
+                        },
+                        {
+                            "clay": -1,
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        },
+                        {
+                            "grain": 1,
+                            "sources": [
+                                "D88_Millwright"
+                            ],
+                            "stone": -1
+                        },
+                        {
+                            "grain": 1,
+                            "reed": -1,
+                            "sources": [
+                                "D88_Millwright"
+                            ]
+                        }
+                    ],
+                    "optional": true
+                }
+            ],
+            "trades": [
+                {
+                    "max": 4,
+                    "nb": 1,
+                    "wood": 2
+                },
+                {
+                    "clay": 1,
+                    "max": 1,
+                    "sources": [
+                        "C56_FeedFence"
+                    ]
+                }
+            ]
+        }
+    }
+}

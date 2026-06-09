@@ -303,14 +303,34 @@ export const constructAction: ActionDefinition = {
   canBeExecutedByPlayer: (_state, player, context) =>
     canStartConstruct(_state, player, undefined, context?.actionContext, undefined),
   costPreview: constructCostPreview,
-  execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
+  execute: (context): ActionExecutionResult => {
+    const { state, player, costs, actionContext } = context
     const idx = state.players.indexOf(player)
     const costDelta = readConstructCostDelta(actionContext, costs)
-    const farm = playerBoard(state, idx).farmyard.selectableTiles('room', {
+    let farm = playerBoard(state, idx).farmyard.selectableTiles('room', {
       costOverride: costDelta,
       exactCost: readExactCost(actionContext),
       actionContext,
     })
+    const roomFarm = farm.farmType === 'room' ? farm : undefined
+    if (roomFarm) {
+      const maxBuildableRooms = getMaxBuildableRooms(
+        player,
+        costs,
+        actionContext,
+        readConstructCostAdjustments(context),
+      )
+      let selectedRoomFarm = roomFarm
+      if (maxBuildableRooms > roomFarm.maxSelections) {
+        const fallbackFarm = playerBoard(state, idx).farmyard.selectableTiles('room', {
+          exactCost: { max: maxBuildableRooms },
+          actionContext,
+        })
+        if (fallbackFarm.farmType === 'room') selectedRoomFarm = fallbackFarm
+      }
+      selectedRoomFarm.maxSelections = Math.min(selectedRoomFarm.selectableTiles.length, maxBuildableRooms)
+      farm = selectedRoomFarm
+    }
     return {
       type: 'request',
       request: {
