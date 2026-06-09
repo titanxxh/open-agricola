@@ -646,6 +646,7 @@ export const computeAllBuyableCombinations = (
           const rawCandidates: {
             discount: Partial<Resource>
             capDiscountAtCost?: boolean
+            trackChoiceIndex?: boolean
             sources?: string[]
             conditions?: Record<string, number>
             minCost?: Partial<Resource>
@@ -655,6 +656,7 @@ export const computeAllBuyableCombinations = (
             ? bonus.choices.map((c, i) => ({
                 ...c,
                 capDiscountAtCost: c.capDiscountAtCost ?? bonus.capDiscountAtCost,
+                trackChoiceIndex: c.trackChoiceIndex ?? bonus.trackChoiceIndex,
                 minCost: c.minCost ?? bonus.minCost,
                 maxCost: c.maxCost ?? bonus.maxCost,
                 _origIndex: i,
@@ -663,6 +665,7 @@ export const computeAllBuyableCombinations = (
                 {
                   discount: bonus.discount!,
                   capDiscountAtCost: bonus.capDiscountAtCost,
+                  trackChoiceIndex: bonus.trackChoiceIndex,
                   sources: bonus.sources,
                   minCost: bonus.minCost,
                   maxCost: bonus.maxCost,
@@ -693,7 +696,7 @@ export const computeAllBuyableCombinations = (
               ])
               const nextSources = [...combined]
               const nextChoiceIndices =
-                isMultiChoice && bonusKey
+                isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
                   ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
                   : { ...path.choiceIndices }
               expanded.push({

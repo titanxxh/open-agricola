@@ -1,32 +1,29 @@
 import { defineOccupationCard } from '../card-source'
-import type { TradeModifier } from '../../contract/types'
+import type { BonusChoice, BonusModifier } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D88_Millwright'
 
 const COST_TYPES = ['construct', 'renovation', 'fencing', 'stables'] as const
+const CHOICES: BonusChoice[] = [
+  { discount: { wood: 1, grain: -1 } },
+  { discount: { clay: 1, grain: -1 } },
+  { discount: { stone: 1, grain: -1 } },
+  { discount: { reed: 1, grain: -1 } },
+]
 
-const buildTradeModifiers = (): TradeModifier[] => {
-  const modifiers: TradeModifier[] = []
+const buildBonusModifiers = (): BonusModifier[] => {
+  const modifiers: BonusModifier[] = []
   for (const costType of COST_TYPES) {
-    for (const resource of ['wood', 'clay', 'stone', 'reed'] as const) {
-      // Two trades per resource type (up to 2 substitutions total)
+    for (let index = 0; index < 2; index += 1) {
       modifiers.push({
-        type: 'trade',
+        type: 'bonus',
         cardId: CARD_ID,
         appliesTo: [costType],
-        from: { grain: 1 },
-        to: { [resource]: 1 },
-        max: 1,
-      })
-      modifiers.push({
-        type: 'trade',
-        cardId: CARD_ID,
-        appliesTo: [costType],
-        from: { grain: 1 },
-        to: { [resource]: 1 },
-        max: 1,
+        choices: CHOICES,
+        trackChoiceIndex: false,
+        optional: true,
       })
     }
   }
@@ -38,7 +35,7 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
 },
-  modifiers: buildTradeModifiers(),
+  modifiers: buildBonusModifiers(),
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

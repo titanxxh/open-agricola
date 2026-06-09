@@ -7,9 +7,9 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 29
-Payment differences: 25
-Source-only differences: 4
+Differences: 25
+Payment differences: 20
+Source-only differences: 5
 Report-only artifacts: 0
 
 ## A27 oven fixed cost
@@ -848,173 +848,6 @@ OA:
 ]
 ```
 
-## D88 millwright construct bonuses
-
-Kind: construct
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "wood": 3,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 2
-    },
-    "sources": []
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "wood": 3,
-      "grain": 4
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 3,
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 3,
-      "reed": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 4,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 5,
-      "reed": 2
-    },
-    "sources": []
-  }
-]
-```
-
 ## E150 rock beater stone room discount
 
 Kind: construct
@@ -1355,132 +1188,6 @@ OA:
 ]
 ```
 
-## D88 millwright renovation bonuses
-
-Kind: renovation
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 3
-    },
-    "sources": []
-  },
-  {
-    "resources": {
-      "stone": 1,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 3,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  }
-]
-```
-
 ## D82 farm redevelopment fence discount
 
 Kind: fencing
@@ -1509,132 +1216,6 @@ OA:
 [
   {
     "resources": {},
-    "sources": []
-  }
-]
-```
-
-## D88 millwright fence bonuses
-
-Kind: fencing
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1
-    },
-    "sources": []
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1
-    },
-    "sources": []
-  }
-]
-```
-
-## D88 millwright stable bonuses
-
-Kind: stables
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2
-    },
-    "sources": []
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2
-    },
     "sources": []
   }
 ]
@@ -1973,40 +1554,11 @@ OA:
   {
     "resources": {
       "clay": 1,
-      "grain": 3
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "grain": 4
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
       "reed": 1,
       "grain": 2
     },
     "sources": [
       "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 1,
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
       "D88_Millwright"
     ]
   },
@@ -2026,15 +1578,6 @@ OA:
       "clay": 1,
       "reed": 2,
       "grain": 2
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 2,
-      "grain": 3
     },
     "sources": [
       "D88_Millwright"
@@ -2073,16 +1616,6 @@ OA:
     "resources": {
       "clay": 3,
       "reed": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 3,
-      "reed": 2,
       "grain": 1
     },
     "sources": [
@@ -2095,25 +1628,6 @@ OA:
       "reed": 2
     },
     "sources": []
-  },
-  {
-    "resources": {
-      "grain": 4
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "grain": 3
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
   },
   {
     "resources": {
@@ -2161,16 +1675,6 @@ OA:
   {
     "resources": {
       "wood": 1,
-      "grain": 3
-    },
-    "sources": [
-      "A123_FrameBuilder",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
       "reed": 1,
       "grain": 2
     },
@@ -2196,7 +1700,7 @@ OA:
 ## combo renovation trowel brushwood and millwright
 
 Kind: renovation
-Difference type: payment-diff
+Difference type: source-diff
 
 BGA:
 ```json
@@ -2337,35 +1841,6 @@ OA:
 [
   {
     "resources": {
-      "food": 2,
-      "grain": 3
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "food": 2,
-      "grain": 4
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "food": 2,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "reed": 1,
       "stone": 1,
       "food": 2,
@@ -2400,17 +1875,6 @@ OA:
     "resources": {
       "reed": 2,
       "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 2,
       "food": 2,
       "grain": 1
     },
@@ -2439,16 +1903,6 @@ OA:
   },
   {
     "resources": {
-      "stone": 1,
-      "food": 2,
-      "grain": 3
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
       "stone": 2,
       "food": 2,
       "grain": 1
@@ -2483,18 +1937,6 @@ OA:
     "resources": {
       "wood": 1,
       "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 2,
       "food": 2,
       "grain": 1
     },
@@ -2569,6 +2011,16 @@ OA:
 [
   {
     "resources": {
+      "clay": 1,
+      "grain": 1
+    },
+    "sources": [
+      "A16_RammedClay",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
       "clay": 1
     },
     "sources": [
@@ -2580,21 +2032,12 @@ OA:
       "grain": 1
     },
     "sources": [
-      "A16_RammedClay",
+      "A88_HedgeKeeper",
       "D88_Millwright"
     ]
   },
   {
     "resources": {
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
       "grain": 1
     },
     "sources": [
@@ -2672,19 +2115,30 @@ OA:
 [
   {
     "resources": {
-      "clay": 1
-    },
-    "sources": [
-      "C56_FeedFence"
-    ]
-  },
-  {
-    "resources": {
+      "clay": 1,
       "grain": 1
     },
     "sources": [
       "C56_FeedFence",
       "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1,
+      "grain": 2
+    },
+    "sources": [
+      "C56_FeedFence",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 1
+    },
+    "sources": [
+      "C56_FeedFence"
     ]
   },
   {
@@ -2698,15 +2152,6 @@ OA:
   {
     "resources": {
       "wood": 1,
-      "grain": 1
-    },
-    "sources": [
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2,
       "grain": 1
     },
     "sources": [
