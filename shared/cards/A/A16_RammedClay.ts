@@ -16,6 +16,7 @@ const cardImpl = {
     appliesTo: ['fencing'],
     from: { clay: 1 },
     to: { wood: 1 },
+    scope: 'unit',
   } as TradeModifier],
   reaches: [] as readonly string[],
 } satisfies CardImpl
