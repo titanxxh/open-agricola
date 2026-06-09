@@ -20,6 +20,9 @@ const scaleResources = (
   return out
 }
 
+const hasPositiveResources = (resources: Partial<Resource>): boolean =>
+  Object.values(resources).some((value) => typeof value === 'number' && value > 0)
+
 /**
  * Distribute `paid` and `saved` over each card that contributed to a
  * PaymentSolution. Mirrors BGA `Pay::updateSourceCardStatsFromCost`
@@ -45,8 +48,14 @@ export const recordPaymentStats = (
   for (const used of solution.tradesUsed) {
     const sourceId = used.trade.sourceId
     if (!sourceId) continue
-    const saved = scaleResources(used.trade.from as Partial<Resource>, used.times)
-    const paid = scaleResources(used.trade.to as Partial<Resource>, used.times)
+    const isPureDiscount = !hasPositiveResources(used.trade.from as Partial<Resource>)
+    const saved = scaleResources(
+      (isPureDiscount ? used.trade.to : used.trade.from) as Partial<Resource>,
+      used.times,
+    )
+    const paid = isPureDiscount
+      ? {}
+      : scaleResources(used.trade.to as Partial<Resource>, used.times)
     if (Object.keys(saved).length > 0) {
       addCardResourceSaved(player, sourceId, saved)
     }

@@ -14,8 +14,8 @@ const CARD_ID = 'D15_ClaySupports'
  * `player.activeModifiers` (populated from this field via
  * `syncModifiersFromCatalog`) and merges trades into the cost; the enumerator
  * then enumerates all decompositions.
- * Note: `computeCosts` listeners are NOT invoked on the construct path,
- * so this modifier replaces the previous (dead) D15 listener implementation.
+ * Static modifiers keep this always-on room alternative in the player's
+ * active construct cost modifiers.
  */
 
 export const D15_ClaySupports = defineMinorCard({

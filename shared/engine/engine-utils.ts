@@ -842,7 +842,7 @@ export function buildChoiceExecutionContext(
     space: ActionExecutionContext['space']
     emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   },
-  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
+  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
     state: context.state,
@@ -850,6 +850,8 @@ export function buildChoiceExecutionContext(
     space: context.space,
     params: base?.params,
     costs: base?.costs,
+    costTrades: base?.costTrades,
+    costBonuses: base?.costBonuses,
     costAttribution: base?.costAttribution,
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
@@ -967,6 +969,8 @@ export function applyInteractionRequest(
     ownerNodeId: string | null
     params: ActionExecutionContext['params']
     costs: ActionExecutionContext['costs']
+    costTrades?: ActionExecutionContext['costTrades']
+    costBonuses?: ActionExecutionContext['costBonuses']
     costAttribution?: ActionExecutionContext['costAttribution']
     sourceCard: string | undefined
     actionContext: Record<string, unknown> | undefined
@@ -1002,6 +1006,8 @@ export function applyInteractionRequest(
     contextSnapshot: {
       params: args.params,
       costs: args.costs,
+      costTrades: args.costTrades,
+      costBonuses: args.costBonuses,
       costAttribution: args.costAttribution,
       sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
       actionContext: mergedActionContext,

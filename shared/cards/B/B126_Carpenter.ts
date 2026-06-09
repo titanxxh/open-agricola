@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
 const CARD_ID = 'B126_Carpenter'
 /**
@@ -9,7 +10,6 @@ const CARD_ID = 'B126_Carpenter'
  * and 2 reed (instead of the standard 5+2).
  *
  * BGA reference: onPlayerComputeCostsConstruct calls Utils::addCost with [res => 3, REED => 2].
- * Base cost is 5+2, so we apply -2 to the room material.
  */
 
 const constructCostListener: CardListenerRegistration = {
@@ -19,9 +19,9 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const houseType = context.player.houseType
-    if (houseType === 'clay') return { costs: { clay: -2 } }
-    if (houseType === 'stone') return { costs: { stone: -2 } }
-    return { costs: { wood: -2 } }
+    if (houseType === 'clay') return { trades: [constructUnitDiscountTrade(CARD_ID, { clay: 2 })] }
+    if (houseType === 'stone') return { trades: [constructUnitDiscountTrade(CARD_ID, { stone: 2 })] }
+    return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 2 })] }
   },
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
-import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
+import type { ActionChoiceOption, PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
@@ -10,6 +10,27 @@ import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
 
 const CARD_ID = 'A128_RiparianBuilder'
+
+const optionSourceCards = (option: ActionChoiceOption): string[] => {
+  const preview = option.effectPreview as { sourceCards?: string[] } | undefined
+  return preview?.sourceCards ?? []
+}
+
+const chooseA128RoomPayment = (
+  session: GameSession,
+  playerIndex: number,
+  resp: ReturnType<GameSession['commitSelectionChoice']>,
+) => {
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+  const paymentOption = resp.interaction.options?.find((option: ActionChoiceOption) =>
+    optionSourceCards(option).includes(CARD_ID),
+  )
+  expect(paymentOption).toBeDefined()
+  return session.resolveChoice(playerIndex, paymentOption!.value)
+}
 
 describe('A128_RiparianBuilder session', () => {
   const setup = () => {
@@ -109,7 +130,11 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.farm.maxSelections).toBe(1)
 
     // Build a room
-    resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
+    resp = chooseA128RoomPayment(
+      session,
+      0,
+      session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] }),
+    )
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[1]!.rooms).toBe(2)
@@ -143,7 +168,11 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitSelectionChoice(0, { rooms: [room] })
+    resp = chooseA128RoomPayment(
+      session,
+      0,
+      session.commitSelectionChoice(0, { rooms: [room] }),
+    )
 
     expect(resp.ok).toBe(true)
     const stats = readCardResourceStats(resp.state.players[0]!, CARD_ID)
@@ -175,7 +204,11 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitSelectionChoice(0, { rooms: [room] })
+    resp = chooseA128RoomPayment(
+      session,
+      0,
+      session.commitSelectionChoice(0, { rooms: [room] }),
+    )
 
     expect(resp.ok).toBe(true)
     const stats = readCardResourceStats(resp.state.players[0]!, CARD_ID)
@@ -201,7 +234,11 @@ describe('A128_RiparianBuilder session', () => {
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
+    resp = chooseA128RoomPayment(
+      session,
+      0,
+      session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] }),
+    )
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.observedCount).toBeUndefined()
   })
@@ -250,7 +287,10 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.options).toHaveLength(2)
+    expect(resp.interaction.options?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.options?.some((option: ActionChoiceOption) =>
+      optionSourceCards(option).includes(CARD_ID),
+    )).toBe(true)
   })
 
   it('re-enters room selection after undoing the granted construct choice', () => {

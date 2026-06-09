@@ -501,6 +501,8 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
+  costTrades?: Trade[]
+  costBonuses?: Bonus[]
   costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string
