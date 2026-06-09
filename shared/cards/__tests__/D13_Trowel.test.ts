@@ -120,7 +120,9 @@ describe('D13_Trowel listener wiring', () => {
       sourceCard: CARD_ID,
       params: { selectedOption: 'stone' },
     } as unknown as CardListenerContext)
-    expect(result?.costs).toEqual({ food: 2, reed: 1 })
+    expect(result?.bonuses).toEqual([
+      { discount: { food: -2, reed: -1 }, optional: false, sources: [CARD_ID] },
+    ])
   })
 
   it('computeCosts on clay + selectedOption=stone waives the reed fee', () => {
@@ -135,7 +137,9 @@ describe('D13_Trowel listener wiring', () => {
       sourceCard: CARD_ID,
       params: { selectedOption: 'stone' },
     } as unknown as CardListenerContext)
-    expect(result?.costs).toEqual({ reed: -1 })
+    expect(result?.bonuses).toEqual([
+      { discount: { reed: 1 }, optional: false, sources: [CARD_ID] },
+    ])
   })
 
   it('computeCosts on selectedOption=clay returns a prohibitive cost (filters the clay option out)', () => {

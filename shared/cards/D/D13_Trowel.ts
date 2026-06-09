@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { sourcedMandatoryBonus } from '../helpers/renovation-cost'
 
 const CARD_ID = 'D13_Trowel'
 /**
@@ -90,14 +91,14 @@ const computeCostsListener: CardListenerRegistration = {
     if (selected === 'stone' && houseType === 'wood') {
       // base plan {stone: rooms, reed: 1} → target {stone: rooms, reed: rooms, food: rooms}
       return {
-        costs: { food: rooms, reed: rooms - 1 },
+        bonuses: [sourcedMandatoryBonus(CARD_ID, { food: -rooms, reed: -(rooms - 1) })],
         sourceCard: CARD_ID,
       }
     }
     if (selected === 'stone' && houseType === 'clay') {
       // base plan {stone: rooms, reed: 1} → target {stone: rooms} (waive reed)
       return {
-        costs: { reed: -1 },
+        bonuses: [sourcedMandatoryBonus(CARD_ID, { reed: 1 })],
         sourceCard: CARD_ID,
       }
     }

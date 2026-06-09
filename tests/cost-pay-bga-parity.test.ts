@@ -491,6 +491,10 @@ const collectActionAdjustments = (
   state: GameState,
   player: PlayerState,
 ): ActionAdjustments => {
+  const params = scenario.params
+    ?? (scenario.kind === 'renovation' && scenario.targetHouseType
+      ? { selectedOption: scenario.targetHouseType }
+      : undefined)
   const results = runCardListeners({
     state,
     player,
@@ -498,7 +502,7 @@ const collectActionAdjustments = (
     actionId: scenario.kind === 'renovation' ? 'renovate-house' : scenario.kind === 'fencing' ? 'fence' : scenario.kind,
     phase: 'computeCosts',
     sourceCard: scenario.sourceCard,
-    params: scenario.params,
+    params,
   })
   const costs: Partial<Resource> = {}
   const bonuses: Bonus[] = []

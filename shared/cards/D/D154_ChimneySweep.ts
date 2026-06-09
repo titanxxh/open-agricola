@@ -2,6 +2,10 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import {
+  selectedRenovationTarget,
+  sourcedMandatoryBonus,
+} from '../helpers/renovation-cost'
 
 const CARD_ID = 'D154_ChimneySweep'
 const renovateCostListener: CardListenerRegistration = {
@@ -9,8 +13,9 @@ const renovateCostListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { stone: -2 } }
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (selectedRenovationTarget(context) !== 'stone') return
+    return { bonuses: [sourcedMandatoryBonus(CARD_ID, { stone: 2 })] }
   },
 }
 

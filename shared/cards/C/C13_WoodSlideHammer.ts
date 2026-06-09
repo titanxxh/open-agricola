@@ -35,6 +35,7 @@ export const C13_WoodSlideHammer = defineMinorCard({
         cardId: CARD_ID,
         appliesTo: ['renovation'],
         discount: { stone: 2 },
+        optional: false,
         conditions: { houseTypeWood: 1, minNumRooms: 5 },
       } as BonusModifier],
 } satisfies CardImpl,
