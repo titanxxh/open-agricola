@@ -1,11 +1,12 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
 import {
-  getReservedActionSpaces,
-  setReservedActionSpaces,
-} from '../helpers/card-state'
+  actionSpaceTokenChoiceFlow,
+  consumeActionSpaceToken,
+  ownerSpecialEffect,
+  resolveActionSpaceTokenChoice,
+} from '../helpers/action-space-tokens'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
@@ -13,52 +14,6 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 const CHOICE_PREFIX = 'lazybones:'
-const DECLINE_CHOICE = CHOICE_PREFIX
-
-const ownerSpecialEffect = (
-  ownerPlayerId: string,
-  params: Record<string, unknown>,
-): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'special-effect',
-  sourceCard: CARD_ID,
-  actionContext: { targetPlayerId: ownerPlayerId },
-  params,
-})
-
-const actionSpaceSubsets = (maxCount: number): string[][] => {
-  const subsets: string[][] = []
-  const limit = Math.min(TRIGGER_SPACES.length, maxCount)
-  const visit = (index: number, selected: string[]) => {
-    if (selected.length > 0) subsets.push([...selected])
-    if (selected.length === limit) return
-    for (let next = index; next < TRIGGER_SPACES.length; next += 1) {
-      selected.push(TRIGGER_SPACES[next]!)
-      visit(next + 1, selected)
-      selected.pop()
-    }
-  }
-  visit(0, [])
-  return subsets
-}
-
-const choiceOptions = (reserve: number): ActionChoiceOption[] => [
-  { value: DECLINE_CHOICE, labelKey: 'ui.interactionOptionalSkip', sourceCard: CARD_ID },
-  ...actionSpaceSubsets(reserve).map((spaces) => ({
-    value: `${CHOICE_PREFIX}${spaces.join(',')}`,
-    labelKey: 'cards.E148_Lazybones.choice',
-    labelParams: { spaces: spaces.join(', ') },
-    sourceCard: CARD_ID,
-  })),
-]
-
-const parseChoice = (choice: string): string[] => {
-  if (!choice.startsWith(CHOICE_PREFIX)) return []
-  const selected = choice.slice(CHOICE_PREFIX.length).split(',').filter(Boolean)
-  const unique = [...new Set(selected)]
-  if (unique.length !== selected.length) return []
-  return unique.every((spaceId) => TRIGGER_SPACES.includes(spaceId)) ? unique : []
-}
 
 const listener: CardListenerRegistration = {
   id: 'E148-lazybones-opponent-trigger',
@@ -75,30 +30,18 @@ const listener: CardListenerRegistration = {
     )
     if (!ownerPlayer) return
 
-    const spaces = getReservedActionSpaces(ownerPlayer, CARD_ID)
-    if (!spaces.includes(spaceId)) return
-
-    const tile = getNextEmptyTileForPlayer(ownerPlayer)
-    const children: ActionFlow[] = [
-      ownerSpecialEffect(ownerPlayer.id, {
-        kind: 'set-extra-data',
-        key: 'reservedActionSpaces',
-        value: spaces.filter((s) => s !== spaceId),
-      }),
-    ]
-    if (tile) {
-      children.push(
-        ownerSpecialEffect(ownerPlayer.id, {
+    const reward = getNextEmptyTileForPlayer(ownerPlayer)
+      ? ownerSpecialEffect(CARD_ID, ownerPlayer.id, {
           kind: 'build-stable-on-first-empty-tile',
-        }),
-      )
-    }
-
-    return {
-      flow: children.length === 1 ? children[0] : { type: 'seq', children },
-      ...(tile ? {} : { countCardUse: false }),
-      sourceCard: CARD_ID,
-    }
+        })
+      : undefined
+    return consumeActionSpaceToken({
+      cardId: CARD_ID,
+      owner: ownerPlayer,
+      ownerPlayerId: ownerPlayer.id,
+      spaceId,
+      reward,
+    })
   },
 }
 
@@ -106,24 +49,22 @@ const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => {
-      const reserve = getAvailableStableSupplyCount(state, player)
-      if (reserve <= 0) return
-      return {
-        type: 'leaf',
-        actionId: 'emit-choice',
-        sourceCard: CARD_ID,
-        params: {
-          options: choiceOptions(reserve),
-          promptKey: 'cards.E148_Lazybones.name',
-        },
-      } as ActionFlow
-    },
+    onBuy: (state, player) => actionSpaceTokenChoiceFlow({
+      cardId: CARD_ID,
+      spaces: TRIGGER_SPACES,
+      max: getAvailableStableSupplyCount(state, player),
+      choicePrefix: CHOICE_PREFIX,
+      choiceLabelKey: 'cards.E148_Lazybones.choice',
+      promptKey: 'cards.E148_Lazybones.name',
+    }),
     resolveChoice: (state, player, choice) => {
-      const spaces = parseChoice(choice)
-      if (spaces.length === 0) return
-      if (spaces.length > getAvailableStableSupplyCount(state, player)) return
-      setReservedActionSpaces(player, CARD_ID, spaces)
+      resolveActionSpaceTokenChoice(player, choice, {
+        cardId: CARD_ID,
+        spaces: TRIGGER_SPACES,
+        max: getAvailableStableSupplyCount(state, player),
+        choicePrefix: CHOICE_PREFIX,
+        choiceLabelKey: 'cards.E148_Lazybones.choice',
+      })
     },
   },
   reaches: [] as readonly string[],
