@@ -21,9 +21,9 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 1. Pipeline 输入是 `Cost Candidate List`：由当前卡牌的基础 `fee` / `fees` 规范化而来。
 2. 官方卡牌购买成本 modifier 一次性迁移到专用 candidate mutation API；迁移范围是当前 17 张 `computeCosts.improvement` 官方卡和 `B65_GrainDepot` 的路径成本。
 3. `A20_DoubleTurnPlow` / `B36_Bottles` 不作为 cost modifier；它们对齐 BGA `getBaseCosts()`，在进入 pipeline 前产出动态基础候选。
-4. Pipeline 不引入 BGA topo。多个 mutation 按当前 `getMatchingListeners()` 的稳定 listener id 顺序执行；如果未来发现真实冲突，再设计单点顺序规则。
-5. 直改 candidate 的资源减少 clamp 到 0；如果候选本来没有该资源，则不派生对应折扣候选。同一张卡不对自己刚追加的候选重复应用。
-6. Replacement / fixed-price 类卡牌追加新候选并保留原候选；不删除原候选。
+4. Pipeline 不引入 BGA topo。多个 mutation 默认按稳定 listener id 顺序执行；发现 fixed-price 必须先于普通折扣的真实冲突后，pipeline 局部读取 `CardListenerRegistration.order` 作为单点优先级（高值先执行，再按 id 稳定排序），不影响普通 trigger listener 结算。
+5. 直改 candidate 的资源减少 clamp 到 0；如果候选本来没有该资源，则不派生对应折扣候选；折到 0 的资源从 candidate 资源 map 中省略。同一张卡不对自己刚追加的候选重复应用。
+6. Append / fixed-price 类卡牌追加新候选并保留原候选；replacement 类卡牌只替换被实际改变的候选，未受影响的基础候选保留。
 7. 候选只做完全重复去重，不做 domination / Pareto 剪枝。去重 key 包含资源、原始 `feeIndex` 和 `sources`。
 8. Candidate metadata 包含 `sources`、原始 `feeIndex`，以及可选的 Cost Attribution。`feeIndex` 表示基础支付路径身份，不随后续资源变形改变；B65 使用它决定 2/3/4 个 future grain。Cost Attribution 只用于卡牌统计展示，不表示真实资源移动或整笔支付归属。
 9. 本 pipeline 不重做 bonus 机制。`D82_HuntingTrophy`、`E130_Overachiever`、`E123_ResourceHoarder` 等 bonus / bonusChoiceIndex 语义继续走现有 solver。
@@ -36,11 +36,11 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 - D117 Wood Expert、B65 Grain Depot、Blueprint / Site Manager / fixed-price cards 可以按 BGA 的 candidate append/mutation 语义表达。
 - 卡牌购买路径与其他 action cost path 分离，避免把 candidate mutation 概念扩散到 construct、renovation、fence 等已有稳定路径。
 - UI 可以显示 card-purchase candidate 的来源，不需要新前端组件。
-- 不引入 topo，避免新卡作者在多个位置声明顺序。
+- 不引入 topo，避免新卡作者在多个位置声明顺序；当前只为 candidate pipeline 暴露单点 `order` 逃生口。
 
 负面 / 风险：
 - 同一套项目里会短期并存两种 cost extension 语义：card-purchase candidate pipeline 与其他 action 的旧 `computeCosts` 聚合。
-- listener id 顺序是稳定但非 BGA topo；若未来出现必须排序的卡牌冲突，需要新增单点顺序机制。
+- listener id 顺序和局部 `order` 仍不是 BGA topo；后续如果出现跨阶段依赖，仍需重新设计更明确的顺序模型。
 - Candidate metadata 必须和 solver 的 `feeIndex` 排序保持一致，否则 B65、UI 来源展示和 Cost Attribution 都会错配。
 
 ## Alternatives considered

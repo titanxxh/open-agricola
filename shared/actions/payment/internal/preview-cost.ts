@@ -42,6 +42,14 @@ export type ResolvedCardCostWithMetadata = {
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
 }
 
+const orderCardCostListeners = <T extends { registration: { id: string; order?: number } }>(
+  entries: readonly T[],
+): T[] =>
+  [...entries].sort((left, right) =>
+    (right.registration.order ?? 0) - (left.registration.order ?? 0)
+    || left.registration.id.localeCompare(right.registration.id),
+  )
+
 export const resolveCardCostWithModifiersDetailed = (
   state: GameState,
   player: PlayerState,
@@ -51,7 +59,7 @@ export const resolveCardCostWithModifiersDetailed = (
   actionCardId?: string,
 ): ResolvedCardCostWithMetadata => {
   const context = buildCardCostListenerContext(state, player, actionId)
-  const matched = getMatchingListeners(context)
+  const matched = orderCardCostListeners(getMatchingListeners(context))
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
   let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }

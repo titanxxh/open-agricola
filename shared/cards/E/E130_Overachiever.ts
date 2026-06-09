@@ -37,11 +37,13 @@ const computeCostsListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
     return {
-      bonuses: DISCOUNT_RESOURCES.map((res) => ({
-        discount: { [res]: 1 },
-        optional: true,
+      bonuses: [{
+        choices: DISCOUNT_RESOURCES.map((res) => ({
+          discount: { [res]: 1 },
+        })),
+        optional: false,
         sources: [CARD_ID],
-      })),
+      }],
     }
   },
 }

@@ -155,7 +155,7 @@ describe('card-purchase cost candidate cards', () => {
         source: 'A143_Stonecutter',
         target: 'Major_Test',
         base: { fees: [{ stone: 1 }, { wood: 1 }] },
-        fees: [{ stone: 1 }, { wood: 1 }, { stone: 0 }],
+        fees: [{ stone: 1 }, { wood: 1 }, {}],
         attribution: { 2: { A143_Stonecutter: { saved: { stone: 1 } } } },
       },
       {
@@ -163,15 +163,15 @@ describe('card-purchase cost candidate cards', () => {
         source: 'A75_LumberMill',
         target: 'Major_Test',
         base: { fees: [{ wood: 2 }, { stone: 1 }] },
-        fees: [{ wood: 2 }, { stone: 1 }, { wood: 1 }],
-        attribution: { 2: { A75_LumberMill: { saved: { wood: 1 } } } },
+        fees: [{ wood: 1 }, { stone: 1 }],
+        attribution: { 0: { A75_LumberMill: { saved: { wood: 1 } } } },
       },
       {
         playedZone: 'occupationPlayed',
         source: 'C122_Bricklayer',
         target: 'Major_Test',
         base: { fees: [{ clay: 1 }, { wood: 1 }] },
-        fees: [{ clay: 1 }, { wood: 1 }, { clay: 0 }],
+        fees: [{ clay: 1 }, { wood: 1 }, {}],
         attribution: { 2: { C122_Bricklayer: { saved: { clay: 1 } } } },
       },
     ] as const
@@ -186,7 +186,8 @@ describe('card-purchase cost candidate cards', () => {
         entry.target,
         entry.base,
       )
-      expectFeesAndSources(result, entry.fees, { 2: [entry.source] }, entry.attribution)
+      const sourceIndex = entry.source === 'A75_LumberMill' ? 0 : 2
+      expectFeesAndSources(result, entry.fees, { [sourceIndex]: [entry.source] }, entry.attribution)
     }
   })
 
@@ -207,7 +208,7 @@ describe('card-purchase cost candidate cards', () => {
     expect((major.cost as ComplexCost).fees).toEqual([
       { stone: 1 },
       { stone: 3 },
-      { stone: 0 },
+      {},
       { stone: 1 },
     ])
     expect(major.candidateMetadataByFeeIndex?.[2]?.sources).toEqual(['B95_MasterBricklayer'])
@@ -268,7 +269,7 @@ describe('card-purchase cost candidate cards', () => {
       'D96_Furnisher',
     )
     expect(isComplexCost(triggered.cost)).toBe(true)
-    expect((triggered.cost as ComplexCost).fees).toEqual([{ wood: 1 }, { wood: 0 }])
+    expect((triggered.cost as ComplexCost).fees).toEqual([{ wood: 1 }, {}])
     expect(triggered.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['D96_Furnisher'])
 
     const ordinary = resolveCardCostWithModifiersDetailed(
@@ -323,7 +324,7 @@ describe('card-purchase cost candidate cards', () => {
       { wood: 1, clay: 1 },
       { stone: 1 },
       { wood: 3 },
-      { wood: 0, clay: 1, food: 1 },
+      { clay: 1, food: 1 },
       { wood: 1, food: 1 },
     ])
     expect(cost.trades).toBeUndefined()

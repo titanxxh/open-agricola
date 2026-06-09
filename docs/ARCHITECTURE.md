@@ -541,6 +541,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，供 E123 这类 after-pay 卡牌消费；D88 这类无状态 replacement choice 可显式关闭，避免同一支付结果因选择顺序不同重复展示。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
 
+**Card-purchase ComputeCardCosts candidate pipeline**：major / minor improvement 购买成本在进入 payment solver 前先规范化成 Cost Candidate List，再让 `computeCardCostCandidates` listener 按顺序 mutate 当前 candidates。默认顺序是稳定 listener id；仅本 pipeline 局部读取 `CardListenerRegistration.order`（高值先执行）处理 BGA 中 fixed-price 必须先于普通折扣的冲突，不改变普通 before/after trigger listener 结算。append 类 helper 保留原候选，replacement 类 helper 只替换实际被折扣改变的候选；折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution，支付选定后由 improvement payment glue 写入 option `sourceCards` 和 Card Resource Stats。
+
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
 - `evaluateStaticConditions(player, conditions)` —— 仅依赖 player 当前状态的静态判定（`houseTypeWood/Clay/Stone`）。

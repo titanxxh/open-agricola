@@ -160,7 +160,7 @@ describe('printed improvement cost listeners', () => {
     expect((result?.cost as ComplexCost).fees).toEqual([
       { wood: 1 },
       { clay: 1 },
-      { wood: 0, food: 1 },
+      { food: 1 },
     ])
     expect(result?.candidateMetadataByFeeIndex?.[2]?.sources).toEqual(['D117_WoodExpert'])
   })

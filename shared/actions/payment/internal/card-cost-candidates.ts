@@ -149,36 +149,64 @@ export const addCardCostCandidateAttribution = (
   }
 }
 
+const discountCardCostCandidate = (
+  candidate: CardCostCandidate,
+  source: string,
+  discount: Partial<Resource>,
+): CardCostCandidate | null => {
+  const resources = cloneResources(candidate.resources)
+  const saved: PaymentResourceMap = {}
+  for (const [rawKey, rawAmount] of Object.entries(discount)) {
+    const amount = rawAmount ?? 0
+    if (amount <= 0) continue
+    const key = rawKey as PaymentResourceKey
+    if (candidate.resources[key] === undefined) continue
+    const before = resources[key] ?? 0
+    const after = Math.max(0, before - amount)
+    const actualSaved = before - after
+    if (actualSaved <= 0) continue
+    if (after === 0) {
+      delete resources[key]
+    } else {
+      resources[key] = after
+    }
+    saved[key] = actualSaved
+  }
+  if (!hasPositiveResources(saved)) return null
+  return addCardCostCandidateAttribution(
+    { ...candidate, resources },
+    source,
+    { saved },
+  )
+}
+
+const deriveDiscountedCardCostCandidates = (
+  candidates: readonly CardCostCandidate[],
+  source: string,
+  discount: Partial<Resource>,
+): CardCostCandidate[] =>
+  candidates
+    .map((candidate) => discountCardCostCandidate(candidate, source, discount))
+    .filter((candidate): candidate is CardCostCandidate => Boolean(candidate))
+
 export const appendDiscountedCardCostCandidates = (
   candidates: readonly CardCostCandidate[],
   source: string,
   discount: Partial<Resource>,
 ): CardCostCandidate[] => {
-  const derived: CardCostCandidate[] = []
-  for (const candidate of candidates) {
-    let changed = false
-    const resources = cloneResources(candidate.resources)
-    const saved: PaymentResourceMap = {}
-    for (const [rawKey, rawAmount] of Object.entries(discount)) {
-      const amount = rawAmount ?? 0
-      if (amount <= 0) continue
-      const key = rawKey as PaymentResourceKey
-      if (candidate.resources[key] === undefined) continue
-      const before = resources[key] ?? 0
-      const after = Math.max(0, before - amount)
-      resources[key] = after
-      const actualSaved = before - after
-      if (actualSaved > 0) saved[key] = actualSaved
-      changed = true
-    }
-    if (!changed) continue
-    derived.push(addCardCostCandidateAttribution(
-      { ...candidate, resources },
-      source,
-      { saved },
-    ))
-  }
+  const derived = deriveDiscountedCardCostCandidates(candidates, source, discount)
   return dedupeCardCostCandidates([...candidates, ...derived])
+}
+
+export const replaceWithDiscountedCardCostCandidates = (
+  candidates: readonly CardCostCandidate[],
+  source: string,
+  discount: Partial<Resource>,
+): CardCostCandidate[] => {
+  const replaced = candidates.map((candidate) =>
+    discountCardCostCandidate(candidate, source, discount) ?? candidate,
+  )
+  return dedupeCardCostCandidates(replaced)
 }
 
 export const buildCandidateMetadataByFeeIndex = (

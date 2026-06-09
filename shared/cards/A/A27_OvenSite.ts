@@ -14,18 +14,16 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
+  order: 100,
   computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
     if (context.actionCardId !== CARD_ID) return [...candidates]
     if (!context.cardId) return [...candidates]
     if (!OVEN_IDS.includes(context.cardId as (typeof OVEN_IDS)[number])) return [...candidates]
-    return [
-      ...candidates,
-      ...candidates.map((candidate) => ({
-        resources: { clay: 1, stone: 1 },
-        originalFeeIndex: candidate.originalFeeIndex,
-        sources: [...candidate.sources, CARD_ID],
-      })),
-    ]
+    return candidates.map((candidate) => ({
+      resources: { clay: 1, stone: 1 },
+      originalFeeIndex: candidate.originalFeeIndex,
+      sources: [...candidate.sources, CARD_ID],
+    }))
   },
 }
 
