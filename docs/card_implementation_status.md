@@ -42,17 +42,21 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 ## 4. 简洁度审阅
 
-行数只是信号，不是结论。复核口径：按当前 Card Source 文件和 canonical BGA PHP 文件统计非空非注释行。OA 行数包含 import / meta / impl，因为单卡作者实际维护的是同一个源文件。
+行数只是信号，不是结论。复核口径：按当前 Card Source 文件和 canonical BGA PHP 文件统计非空非注释行；方法 / 函数声明行保留。仅剔除 OA 的 `import` / `export` 行，以及 BGA 的 `<?php` / `namespace` / `use` 行。
 
 简洁度比较要先排除 BGA 坏味道：如果 BGA 通过 `Actions/*`、`Core/*`、`Models/*` 等主路径，或其他卡牌文件里的显式 cardId 分支来补某张卡的行为，这张卡不进入简洁度比较。BGA `implemented=false` 的卡没有可比实现，直接跳过且不在本节列出。
 
-当前原始扫描有 55 张卡达到 OA/BGA >= 1.5，其中 15 张达到 >= 2.0。剔除 BGA 坏味道和未实现项后，>= 2.0 且可公平比较的卡牌如下：
+剔除 BGA 坏味道和未实现项后，当前 OA/BGA > 1.5 且可公平比较的卡牌剩 7 张：
 
-| 卡牌 | BGA | OA | 比例 | 结论 |
+| 卡牌 | BGA | OA | 比例 | 原因 / 后续判断 |
 |---|---:|---:|---:|---|
-| `C150_ParrotBreeder` | 74 | 161 | 2.18 | 右邻追踪、anytime flag、occupied action 注入、自己/对手放人后清理，是完整单卡状态机；抽高阶 helper 目前收益不足。 |
-| `B93_Confidant` | 69 | 148 | 2.14 | 需要 reserveResources、future schedule、lessons doability、低价 fence policy；相关机制已在 main。 |
-| `A111_WallBuilder` | 29 | 58 | 2.00 | 建房后按 action snapshot 触发一次，并排未来 4 轮 food；snapshot token 和 future meeple 已在 main。 |
+| `B93_Confidant` | 59 | 132 | 2.24 | BGA 用 `FOODPLUS` future meeple + `getPostReceiveBonus()` 隐式串起返还 food 后的 sow/fence；OA 还要显式处理职业支付时的 `reserveResources`、lessons doability、future meeple resolved provenance、防重复 `lastResolvedRound`、以及 1 wood fence policy。可等 future meeple 支持 post-receive bonus 后再简化。 |
+| `C150_ParrotBreeder` | 67 | 147 | 2.19 | BGA 直接读座位 / actionCardId，并用 flag + extraData + dummy playerConstraint 注入已占行动格；OA 需要显式追踪右邻、anytime 付 grain 后 flag、自己 / 对手放人后清理、再向 `place-farmer` 注入 occupied option。完整单卡状态机，暂不抽通用 helper。 |
+| `C94_StableCleaner` | 42 | 78 | 1.86 | BGA 直接返回 fixed-cost `STABLES` flow；OA 在暴露 anytime 前要 probe `stables` 的 cost modifier / affordability，并显式包 flag、`trueAction:false`、固定 cost context 和执行后清理。若 anytime action 可统一内建 affordability probe，可再降。 |
+| `B157_Salter` | 104 | 177 | 1.70 | BGA 的 `payNode` / `argsSalt` / `actSalt` 承担动物选择与支付；OA 需要自定义 `resource-quantity-select` ad-hoc action、校验动物必须来自农场且 reserve 为空、从 board 扣动物、单动物快捷路径、future food schedule 和日志。BGA 本身也长，优先级低。 |
+| `A130_MummysBoy` | 53 | 90 | 1.70 | BGA 依赖 `Globals::getPlacedFarmers()` / `Farmers` manager 直接找到第 2 个农夫位置并注入 dummy action；OA 需要用 placement order、occupied-space option、meeting-place 过滤、once-per-round flag 和 start-turn 清理显式实现。和 C150 同类，除非抽 occupied action helper，否则保持卡内闭环。 |
+| `B156_StorehouseKeeper` | 29 | 44 | 1.52 | BGA 用 `isActionCardEvent('ResourceMarket')` + `gainNode` XOR；OA 需要显式列出 resource-market 变体并包 listener / typed flow。低边界项，只有出现更多 action-space alias 卡时才值得抽 helper。 |
+| `B107_Manservant` | 33 | 50 | 1.52 | BGA 的 `onBuy` 复用 `onPlayerAfterRenovation()` 并直接返回 `futureMeeplesNode`；OA 需要复用 `placeFood`、after-renovation listener、stone-house guard、`queueFutureMeeples` + node bridge。低边界项，优先级低。 |
 
 因 BGA 坏味道而排除的卡牌：
 
@@ -69,18 +73,28 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `B138_ForestGuardian` | BGA `B100_Clutterer.php` 的其他卡牌路径显式枚举本卡。 |
 | `C16_FieldFences` | BGA 在 `Actions/Fencing.php` 对本卡做围栏路径特判。 |
 | `C27_Blueprint` | BGA 在 `Actions/Improvement.php` 对本卡做主路径特判。 |
+| `B146_Illusionist` | BGA `B100_Clutterer.php` 的其他卡牌路径显式枚举本卡。 |
+| `B42_ForestInn` | BGA `E144_WaresSalesman.php` 的其他卡牌路径显式枚举本卡。 |
+| `C162_ForestOwner` | BGA `E47_SyrupTap.php` 的其他卡牌路径显式判断本卡。 |
+| `A106_SlurrySpreader` | BGA 在 `Actions/Reap.php` 对本卡做收获路径特判。 |
+| `D132_HideFarmer` | BGA 在 `Managers/Scores.php` 对本卡做计分路径特判。 |
+| `E96_Elder` | BGA 在 `States/TurnTrait.php` 对本卡做回合路径特判。 |
+| `E155_Visionary` | BGA 在 `Actions/WishChildren.php` 和 `E130_Overachiever.php` 对本卡做特判。 |
+| `E153_StoneSculptor` | BGA `E144_WaresSalesman.php` 的其他卡牌路径显式枚举本卡。 |
 
 近期 PR / 本轮简化后已经降下来的旧高比例项：
 
-| 卡牌 | 当前比例 | 变化 |
-|---|---:|---|
-| `B18_GrasslandHarrow` | 1.61 | 本轮让 future meeple 支持 `field`/`stable` 到期触发 action；B18 只保留 after-pay 计算目标轮并排 `field` future meeple，移除卡内 `targetRound` / `onRoundStart` 状态机。 |
-| `E118_KindlingGatherer` | 1.68 | 本轮合并 `place-farmer` / `collect` / `gain` 三个同 handler listener，保留 action-space provenance 过滤。 |
-| `C41_FarmStore` | 1.04 | #244 后用卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
-| `D80_BrickHammer` | 1.15 | #244 后走 `getPrintedImprovementResourceCost()`，不再手写 cost / altCosts 分支。 |
-| `E142_Smuggler` | 1.29 | #244 后 `TRADE_OPTIONS` 表生成同类 2x 选项，并保留 mixed optional OR。 |
-| `E156_ClaypitOwner` | 1.28 | #244 后 printed/base cost helper 覆盖 minor altCosts 与 major fee candidates。 |
-| `D117_WoodExpert` | 1.48 | #259/#272 后从当前 Cost Candidate List 派生候选，已低于 1.5 阈值。 |
+| 卡牌 | 变化 |
+|---|---|
+| `A111_WallBuilder` | 本轮改为 after construct 直接返回 inline `futureMeeplesNode`，去掉 built-room delta、action snapshot token 和卡内 extraData 防重；按当前复核口径已低于 1.5。 |
+| `B18_GrasslandHarrow` | 本轮让 future meeple 支持 `field`/`stable` 到期触发 action；B18 只保留 after-pay 计算目标轮并排 `field` future meeple，移除卡内 `targetRound` / `onRoundStart` 状态机。 |
+| `E118_KindlingGatherer` | 本轮合并 `place-farmer` / `collect` / `gain` 三个同 handler listener，保留 action-space provenance 过滤。 |
+| `E148_Lazybones` | 本轮抽出 `action-space-tokens` helper，统一 bounded token choice、choice resolve、owner-targeted token consume flow；E148 卡内只保留触发空间、空地判断和 helper 调用，按当前复核口径降至 BGA 65 / OA 66 = 1.02。 |
+| `C41_FarmStore` | #244 后用卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
+| `D80_BrickHammer` | #244 后走 `getPrintedImprovementResourceCost()`，不再手写 cost / altCosts 分支。 |
+| `E142_Smuggler` | #244 后 `TRADE_OPTIONS` 表生成同类 2x 选项，并保留 mixed optional OR。 |
+| `E156_ClaypitOwner` | #244 后 printed/base cost helper 覆盖 minor altCosts 与 major fee candidates。 |
+| `D117_WoodExpert` | #259/#272 后从当前 Cost Candidate List 派生候选，已低于 1.5 阈值。 |
 
 后续简化原则：只有当同一种 helper 能服务至少两张当前或近期目标卡，才抽新抽象；否则维持卡内闭环。
 
@@ -101,7 +115,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
 | 自定义卡 runtime / frontend metadata 拆分 | `shared/cards/custom-registry.ts`、`shared/cards/custom-card-metadata.ts`、`client/services/card-meta.ts`、`scripts/__tests__/eslint-client-boundary.test.ts` | server / sandbox 只注册 impl、session context、effects、listeners、modifiers；main client 只注册 display metadata、art URL、O 编号，不 import custom runtime registry。 |
 | Card Source metadata / runtime 分离 | `shared/cards/card-source.ts`、`scripts/build-cards-manifest.ts`、`scripts/generate-register-all.ts`、`scripts/check-generated-cards-sync.ts`、`shared/cards/__tests__/card-source-representatives.test.ts` | Card Source 卡牌的运行时字段只放在 `impl`；manifest / generated catalog 只静态读取 `meta` 并输出 metadata 字面量；major runtime source 只在 `major/runtime.generated.ts` 进入后端实现路径；generated catalog 必须保持同步；workshop PR 生成必须基于已 fetch 的 upstream generated 文件 patch，不读部署机本地 cards tree；代表卡必须通过 production catalog / registry path 覆盖。 |
-| Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers | fence、linked occupancy、special stable、stable count、token supply 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
+| Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens` | fence、linked occupancy、special stable、stable count、token supply、行动格预留 marker 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
 | Future meeple action token | `FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的 `field` / `stable` future meeple 由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
 | Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；不要反查外卡 `cardStates` 或临时改 live resources。 |
 
@@ -1230,7 +1244,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E145_Parvenu` | 已对齐 |  |
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
-| `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
+| `E148_Lazybones` | 已对齐 | 行动格预留 marker 走 `action-space-tokens` helper；reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
 | `E149_MidnightFencer` | 已对齐 | 第 14 轮 harvest start 提供 optional real borrowed `fence` leaf；donor cap 按其他玩家 own ordinary reserve 各最多 2，跳过或建造均不再产生 owed-fence bonus VP；借围栏选择可 undo 回 E149 optional，但不能继续 undo 穿过 round-end 边界 |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
