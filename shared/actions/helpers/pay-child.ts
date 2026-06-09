@@ -1,6 +1,7 @@
 import type {
   ActionExecutionResult,
   ActionFlow,
+  CardCostCandidateMetadata,
   ComplexCost,
   CostModifierType,
   InternalActionChild,
@@ -20,6 +21,7 @@ export type PayChildOptions = {
   reserveResources?: Partial<Resource>
   includeReturnedCard?: boolean
   sourceActionId?: string
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
 }
 
 export const buildPayChild = (options: PayChildOptions): ActionFlow => {
@@ -55,6 +57,7 @@ export const paymentInfoFromPayResult = (result: ActionExecutionResult | undefin
   return {
     resourcesPaid,
     feeIndex: typeof extra.feeIndex === 'number' ? extra.feeIndex : undefined,
+    originalFeeIndex: typeof extra.originalFeeIndex === 'number' ? extra.originalFeeIndex : undefined,
     returnedCardId: typeof extra.returnedCardId === 'string' ? extra.returnedCardId : undefined,
   }
 }

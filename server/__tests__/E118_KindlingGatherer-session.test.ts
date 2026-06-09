@@ -12,6 +12,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E118_KindlingGatherer'
 
 const CARD_ID = 'E118_KindlingGatherer'
+const LISTENER_ID = 'E118-kindling-gatherer-after-action-space-food'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((listener) => listener.id === id)
@@ -131,7 +132,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener('E118-kindling-gatherer-after-place-farmer', 'place-farmer', 'resource-market-4', events)
+    const flow = runListener(LISTENER_ID, 'place-farmer', 'resource-market-4', events)
 
     expectWoodFlow(flow)
   })
@@ -146,7 +147,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener('E118-kindling-gatherer-after-collect', 'collect', 'fishing', events)
+    const flow = runListener(LISTENER_ID, 'collect', 'fishing', events)
 
     expectWoodFlow(flow)
   })
@@ -161,7 +162,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
       }),
     ]))
-    const flow = runListener('E118-kindling-gatherer-after-gain', 'gain', 'day-laborer', events)
+    const flow = runListener(LISTENER_ID, 'gain', 'day-laborer', events)
 
     expectWoodFlow(flow)
   })
@@ -170,35 +171,35 @@ describe('E118_KindlingGatherer action-space provenance', () => {
     const { player } = setup()
 
     expect(runListener(
-      'E118-kindling-gatherer-after-place-farmer',
+      LISTENER_ID,
       'place-farmer',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'supply' })],
       { food: 1 },
     )).toBeUndefined()
     expect(runListener(
-      'E118-kindling-gatherer-after-place-farmer',
+      LISTENER_ID,
       'place-farmer',
       'resource-market-4',
       [moved({ food: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 1 },
     )).toBeUndefined()
     expect(runListener(
-      'E118-kindling-gatherer-after-collect',
+      LISTENER_ID,
       'collect',
       'fishing',
       [moved({ food: 2 }, player.id, { kind: 'supply' })],
       { food: 2 },
     )).toBeUndefined()
     expect(runListener(
-      'E118-kindling-gatherer-after-collect',
+      LISTENER_ID,
       'collect',
       'fishing',
       [moved({ food: 2 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
       { food: 2 },
     )).toBeUndefined()
     expect(runListener(
-      'E118-kindling-gatherer-after-gain',
+      LISTENER_ID,
       'gain',
       'day-laborer',
       [moved({ food: 2 }, player.id, { kind: 'card', playerId: player.id, cardId: 'Test_Source' })],
@@ -212,7 +213,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
     const currentWood = moved({ wood: 1 }, player.id, { kind: 'card', playerId: player.id, cardId: CARD_ID })
 
     expect(runListener(
-      'E118-kindling-gatherer-after-gain',
+      LISTENER_ID,
       'gain',
       'gain',
       [staleFood, currentWood],

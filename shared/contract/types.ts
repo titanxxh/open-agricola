@@ -21,7 +21,7 @@ export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
 export type PaymentResource = Resource & Record<SupplyTokenKey, number>
 export type PaymentResourceMap = Partial<PaymentResource>
 export type PaymentResourceKey = keyof PaymentResource
-export type FutureMeepleResourceMap = Partial<Resource> & Partial<Pick<PaymentResource, 'stable'>>
+export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
@@ -69,6 +69,8 @@ export type Trade = {
 
 export type BonusChoice = {
   discount: Partial<Resource>
+  capDiscountAtCost?: boolean
+  trackChoiceIndex?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -86,8 +88,9 @@ export type BonusChoice = {
 export type Bonus = {
   discount?: Partial<Resource>
   choices?: BonusChoice[]
+  capDiscountAtCost?: boolean
+  trackChoiceIndex?: boolean
   optional?: boolean
-  preserveOriginal?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -133,6 +136,8 @@ export type BonusModifier = {
   appliesTo: CostModifierType[]
   discount?: Partial<Resource>
   choices?: BonusChoice[]
+  capDiscountAtCost?: boolean
+  trackChoiceIndex?: boolean
   optional?: boolean
   conditions?: Record<string, number>
   minCost?: Partial<Resource>
@@ -151,12 +156,33 @@ export type ComplexCost = {
   bonuses?: Bonus[]
 }
 
+export type CostAttribution = {
+  saved?: PaymentResourceMap
+  paid?: PaymentResourceMap
+}
+
+export type CostAttributionBySource = Record<string, CostAttribution>
+
+export type CardCostCandidateMetadata = {
+  originalFeeIndex: number
+  sources: string[]
+  costAttribution?: CostAttributionBySource
+}
+
+export type CardCostCandidate = CardCostCandidateMetadata & {
+  resources: PaymentResourceMap
+}
+
+export type ActionCostAttribution = {
+  sourceCard: string
+  costs: Partial<Resource>
+}
+
 export type PaymentSolution = {
   resourcesPaid: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
-  preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
@@ -318,6 +344,7 @@ export type FutureMeeple = {
   actionId: string | null
   resources: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
+  actionContext?: Record<string, unknown>
 }
 
 export type FutureMeepleSourceSummary = {
@@ -341,6 +368,7 @@ export type FutureMeepleRequest =
       startRound: number
       count: number
       resources: FutureMeepleResourceMap
+      actionContext?: Record<string, unknown>
     }
   | {
       cardId: string
@@ -350,6 +378,7 @@ export type FutureMeepleRequest =
         round: number
         resources?: FutureMeepleResourceMap
         roomType?: FutureMeepleRoomType
+        actionContext?: Record<string, unknown>
       }[]
     }
 
@@ -472,6 +501,9 @@ export type ActionExecutionContext = {
   player: PlayerState
   space: ActionSpace
   costs?: Partial<Resource>
+  costTrades?: Trade[]
+  costBonuses?: Bonus[]
+  costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>

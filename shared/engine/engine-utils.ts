@@ -35,6 +35,7 @@ import {
   type ActivateCardActionNode,
   type ActivateCardActionParams,
 } from './activation-action'
+import { applyComputeCostResults } from './compute-cost-results'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -826,6 +827,11 @@ export function maybeBuildChoiceCandidates(
       ...(executionContext.params ?? {}),
       selectedOption: value,
     }
+    const selectedCostResults = int.hooks.computeCosts({
+      ...executionContext,
+      actionId,
+    })
+    applyComputeCostResults(executionContext, selectedCostResults)
     return action.resolveChoice({ ...executionContext, eventSink }, value, undefined)
   }
   return {
@@ -842,7 +848,7 @@ export function buildChoiceExecutionContext(
     space: ActionExecutionContext['space']
     emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   },
-  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null,
+  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
     state: context.state,
@@ -850,6 +856,9 @@ export function buildChoiceExecutionContext(
     space: context.space,
     params: base?.params,
     costs: base?.costs,
+    costTrades: base?.costTrades,
+    costBonuses: base?.costBonuses,
+    costAttribution: base?.costAttribution,
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
@@ -966,6 +975,9 @@ export function applyInteractionRequest(
     ownerNodeId: string | null
     params: ActionExecutionContext['params']
     costs: ActionExecutionContext['costs']
+    costTrades?: ActionExecutionContext['costTrades']
+    costBonuses?: ActionExecutionContext['costBonuses']
+    costAttribution?: ActionExecutionContext['costAttribution']
     sourceCard: string | undefined
     actionContext: Record<string, unknown> | undefined
     /** Optional ActionDef-declared actionContext patch (typically extracted
@@ -1000,6 +1012,9 @@ export function applyInteractionRequest(
     contextSnapshot: {
       params: args.params,
       costs: args.costs,
+      costTrades: args.costTrades,
+      costBonuses: args.costBonuses,
+      costAttribution: args.costAttribution,
       sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
       actionContext: mergedActionContext,
     },

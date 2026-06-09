@@ -159,7 +159,15 @@ describe('D82_HuntingTrophy listeners', () => {
 
     expect(costListener.handler(
       makeContext(player, 'farm-redevelopment', 'fence', 'computeCosts'),
-    )?.costs).toEqual({ wood: -3 })
+    )?.trades).toEqual([
+      {
+        from: {},
+        to: { wood: 1 },
+        max: 3,
+        scope: 'action',
+        sourceId: CARD_ID,
+      },
+    ])
 
     const result = doableListener.handler(
       makeContext(player, 'farm-redevelopment', 'fence', 'isDoable', { doable: false }),

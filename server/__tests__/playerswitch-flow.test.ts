@@ -337,6 +337,146 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resp.interaction.toPlayerIndex).toBe(0)
   })
 
+  it('chained target player choices confirm each owner transition and return to the frame owner', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    state.players = state.players.slice(0, 3)
+    state.currentPlayerIndex = 0
+    session.loadState(state)
+    const p2 = state.players[1]!
+    const p3 = state.players[2]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      children: [
+        {
+          type: 'xor',
+          targetPlayerId: p2.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestChainSwitch', choiceLabelKey: 'p2-sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestChainSwitch', choiceLabelKey: 'p2-food' },
+          ],
+        },
+        {
+          type: 'xor',
+          targetPlayerId: p3.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'TestChainSwitch', choiceLabelKey: 'p3-wood' },
+            { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: 'TestChainSwitch', choiceLabelKey: 'p3-clay' },
+          ],
+        },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    let resp = session.getState()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+
+    resp = session.resolveChoice(1, resp.interaction.options![0]!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(2)
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(2)
+
+    resp = session.resolveChoice(2, resp.interaction.options![0]!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(2)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
+  })
+
+  it('dynamic target flow triggered by the switched player can switch to a third player and back', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    state.players = state.players.slice(0, 3)
+    state.currentPlayerIndex = 0
+    session.loadState(state)
+    const p2 = state.players[1]!
+    const p3 = state.players[2]!
+    const p3SheepBefore = p3.resources.sheep
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-third-player-targeted-pending',
+      nameKey: 'test.triggerThirdPlayerTargetedPending',
+      descriptionKey: 'test.triggerThirdPlayerTargetedPending',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'xor',
+          targetPlayerId: p3.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'DynamicThirdPlayerTarget', choiceLabelKey: 'p3-sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'DynamicThirdPlayerTarget', choiceLabelKey: 'p3-food' },
+          ],
+        },
+      }),
+    }
+    ;(session as unknown as { registry: { register: (action: ActionDefinition) => void } })
+      .registry.register(triggerAction)
+
+    const flow: ActionFlow = {
+      type: 'xor',
+      targetPlayerId: p2.id,
+      children: [
+        { type: 'leaf', actionId: triggerAction.id, sourceCard: 'DynamicSecondPlayerTrigger', choiceLabelKey: 'trigger-p3' },
+        { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'DynamicSecondPlayerTrigger', choiceLabelKey: 'p2-wood' },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    let resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+
+    const trigger = resp.interaction.options?.find((option) => option.labelKey === 'trigger-p3')
+    expect(trigger).toBeDefined()
+    resp = session.resolveChoice(1, trigger!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(2)
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(2)
+
+    const p3Choice = resp.interaction.options?.find((option) => option.labelKey === 'p3-sheep')
+    expect(p3Choice).toBeDefined()
+    resp = session.resolveChoice(2, p3Choice!.value)
+    expect(resp.state.players[2]!.resources.sheep).toBe(p3SheepBefore + 1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(2)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
+  })
+
   it('confirmed target player switch exposes no undo before the target acts', () => {
     const session = setupSession()
     const state = session.getState().state

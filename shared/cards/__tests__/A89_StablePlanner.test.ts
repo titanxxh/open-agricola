@@ -115,7 +115,7 @@ describe('A89_StablePlanner', () => {
     expect(flow.children).toHaveLength(1)
   })
 
-  it('accepted prefix writes target rounds and queues stable future meeples', () => {
+  it('accepted prefix queues stable future meeples', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 2
@@ -124,46 +124,17 @@ describe('A89_StablePlanner', () => {
 
     executeLeaf(flow.children[1]!, state, player)
 
-    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toEqual([5, 8])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toBeUndefined()
     expect(state.futureMeeples.map((entry) => entry.round)).toEqual([5, 8])
     expect(state.futureMeeples.map((entry) => entry.resources)).toEqual([
       { stable: 1 },
       { stable: 1 },
     ])
+    expect(getAvailableStableSupplyCount(state, player)).toBe(2)
   })
 
-  it('onRoundStart offers free stable at target round and releases reserve before choice', () => {
-    const player = createPlayer()
-    const state = createState(player)
-    player.stableTiles = [
-      { row: 0, col: 0 },
-      { row: 0, col: 1 },
-    ]
-    player.cardStates = { [CARD_ID]: { extraData: { targetRounds: [5, 8] } } }
-    state.round = 5
+  it('does not expose a card-local onRoundStart flow', () => {
     const effect = getCardEffect(CARD_ID)
-    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toEqual([8])
-    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
-    expect(flow).toBeTruthy()
-    expect((flow as { type: string }).type).toBe('seq')
-    const leaf = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]!
-    expect(leaf.type).toBe('leaf')
-    if (leaf.type !== 'leaf') return
-    expect(leaf.actionId).toBe('stables')
-    expect(leaf.actionContext?.max).toBe(1)
-    expect(leaf.actionContext?.exactCost).toEqual({ max: 1 })
-    expect(leaf.actionContext?.costOverride).toBeUndefined()
-  })
-
-  it('onRoundStart returns nothing on non-target round', () => {
-    const player = createPlayer()
-    const state = createState(player)
-    player.cardStates = { [CARD_ID]: { extraData: { targetRounds: [5] } } }
-    state.round = 4
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeFalsy()
+    expect(effect!.onRoundStart).toBeUndefined()
   })
 })

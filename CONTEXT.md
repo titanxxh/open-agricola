@@ -112,9 +112,25 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**ComputeCardCosts**:
+购买 major / minor improvement 时对当前卡牌成本候选执行的卡牌成本变形语义。它包括拥有 `computeCosts.improvement` listener 的卡，也包括先选支付路径再把该路径送入同一成本变形语义的卡。
+_Avoid_: 建房、翻修、围栏等非卡牌购买成本
+
 **Cost Candidate（成本候选行）**:
 一次支付中可选的 exact fee 候选，例如“付 2 wood”或“付 1 food”。它表示可选成本本身，不表示把一种资源兑换成另一种资源。
 _Avoid_: Trade、资源兑换、支付替换器
+
+**Cost Candidate List（成本候选列表）**:
+购买卡牌时当前可支付成本候选行的集合。ComputeCardCosts 读取并返回这个列表；卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
+_Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
+
+**Payment Path（支付路径）**:
+玩家在多个基础成本候选之间选择的路径身份；它可以影响后续卡牌效果，且不等同于最终实际支付掉的资源明细。
+_Avoid_: PaymentSolution、实际扣减资源、Trade
+
+**Cost Attribution（成本归因）**:
+卡牌改变成本后，用于卡牌统计展示的 saved / paid 归因。它描述“这张卡让成本少付或额外多付了什么”，不表示这张卡拥有整笔支付，也不表示一次真实资源移动。
+_Avoid_: Payment Path、resource.paid、整笔行动支付归属
 
 **Scoring Reserve**:
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。

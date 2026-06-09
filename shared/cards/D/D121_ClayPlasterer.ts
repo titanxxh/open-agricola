@@ -2,6 +2,11 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
+import {
+  selectedRenovationTarget,
+  sourcedMandatoryBonus,
+} from '../helpers/renovation-cost'
 
 const CARD_ID = 'D121_ClayPlasterer'
 /**
@@ -22,8 +27,7 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType !== 'clay') return
-    // Base cost: 5 clay + 2 reed → discount to 3 clay + 2 reed
-    return { costs: { clay: -2 } }
+    return { trades: [constructUnitDiscountTrade(CARD_ID, { clay: 2 })] }
   },
 }
 
@@ -33,15 +37,12 @@ const renovationCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only applies when renovating wood → clay (current house is wood)
     if (context.player.houseType !== 'wood') return
-    // Base renovation cost: { clay: rooms, reed: 1 }
-    // D121 makes it exactly 1 clay + 1 reed regardless of room count
-    // So discount clay by (rooms - 1)
+    if (selectedRenovationTarget(context) !== 'clay') return
     const rooms = context.player.rooms
     const clayDiscount = rooms - 1
     if (clayDiscount <= 0) return
-    return { costs: { clay: -clayDiscount } }
+    return { bonuses: [sourcedMandatoryBonus(CARD_ID, { clay: clayDiscount })] }
   },
 }
 

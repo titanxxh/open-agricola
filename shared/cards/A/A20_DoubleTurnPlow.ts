@@ -1,23 +1,9 @@
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
-const computeCostsListener: CardListenerRegistration = {
-  id: 'A20-double-turn-plow-compute-costs',
-  cardIds: [CARD_ID],
-  phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.cardId !== CARD_ID) return
-    if (context.state.round <= 3) return
-    return { costs: { food: 1 } }
-  },
-}
-
 const cardImpl = {
-  listeners: [computeCostsListener],
+  getBaseCosts: ({ state }) => [{ grain: 1, food: state.round > 3 ? 1 : 0 }],
   effect: {
   id: CARD_ID,
   onBuy: () => ({

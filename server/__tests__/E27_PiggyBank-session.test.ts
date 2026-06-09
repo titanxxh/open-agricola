@@ -165,12 +165,17 @@ describe('E27_PiggyBank session', () => {
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
+      cardId: 'Major_Joinery',
     } as CardListenerContext
 
-    const result = executeCardListener(costListener!, context)
-    expect(result).toBeDefined()
-    expect(result!.costs).toBeDefined()
-    expect(result!.costs!.wood).toBe(-99)
+    const result = costListener!.computeCardCostCandidates!(context, [
+      { resources: { wood: 2, stone: 2 }, originalFeeIndex: 0, sources: [] },
+    ])
+    expect(result).toContainEqual({
+      resources: {},
+      originalFeeIndex: 0,
+      sources: [CARD_ID],
+    })
   })
 
   it('computeCosts listener returns nothing when card is not flagged', () => {

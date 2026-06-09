@@ -81,6 +81,7 @@ const paymentResourceKeys = new Set<string>(PAYMENT_RESOURCE_KEYS)
 
 const futureMeepleResourceKeys = new Set([
   ...REAL_RESOURCE_KEYS,
+  'field',
   'stable',
 ])
 

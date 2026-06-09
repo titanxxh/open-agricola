@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState, ComplexCost } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, CardCostCandidateMetadata, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState, ComplexCost } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
@@ -18,6 +18,7 @@ import { activateCardEffect } from './internal/activate-card-effect'
 import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
+import { recordCardCostAttribution } from '../../cards/helpers/card-state'
 import { buildInternalPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
 import {
   cardEffectHandChangedEvent,
@@ -28,8 +29,8 @@ import {
   buildMinorImprovementOptions,
   buildPlayableMinorOptions,
   canAffordInjectedImprovement,
-  getMajorImprovementPreviewCost,
-  getMinorImprovementPreviewCost,
+  getMajorImprovementPreviewCostDetailed,
+  getMinorImprovementPreviewCostDetailed,
   getPlayedCardsForCost,
   getPositiveResourceLog,
   isMajorImprovementPlayable,
@@ -319,12 +320,14 @@ const resolveImprovementPayment = (
   failure: ActionExecutionResult,
   playedCards?: string[],
   improvementId?: string,
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>,
 ):
   | ActionExecutionResult
   | {
       type: 'selected'
       resourcesPaid: PaymentResourceMap
       feeIndex?: number
+      originalFeeIndex?: number
       returnedCardId?: string
     } => {
   const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
@@ -342,16 +345,27 @@ const resolveImprovementPayment = (
     optionValuePrefix,
     includeReturnedCard,
     failure,
+    {
+      extraSourcesForSolution: (solution) =>
+        solution.feeIndex === undefined
+          ? []
+          : candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+    },
   )
   if (resolved.type !== 'selected') {
     return resolved
   }
+  const metadata = resolved.solution.feeIndex === undefined
+    ? undefined
+    : candidateMetadataByFeeIndex?.[resolved.solution.feeIndex]
 
   const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
+  recordCardCostAttribution(player, metadata?.costAttribution)
   return {
     type: 'selected',
     resourcesPaid: resolved.solution.resourcesPaid,
     feeIndex: resolved.solution.feeIndex,
+    originalFeeIndex: metadata?.originalFeeIndex,
     returnedCardId,
   }
 }
@@ -371,7 +385,13 @@ const playMajorImprovement = (
     return { type: 'fail', errorKey: 'log.improvementFail' }
   }
 
-  const cost = getMajorImprovementPreviewCost(state, player, improvementId, actionCardId) ?? {}
+  const previewCost = getMajorImprovementPreviewCostDetailed(
+    state,
+    player,
+    improvementId,
+    actionCardId,
+  )
+  const cost = previewCost?.cost ?? {}
   const resolvedPayment = resolveImprovementPayment(
     state,
     state.players.indexOf(player),
@@ -384,6 +404,7 @@ const playMajorImprovement = (
     { type: 'fail', errorKey: 'log.improvementFail' },
     getPlayedCardsForCost(player, cost),
     improvementId,
+    previewCost?.candidateMetadataByFeeIndex,
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
@@ -391,6 +412,7 @@ const playMajorImprovement = (
   const paymentInfo: PaymentInfo = {
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
+    originalFeeIndex: resolvedPayment.originalFeeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
   }
   return finalizeMajorImprovementPurchase(
@@ -430,10 +452,16 @@ export const playMinorImprovement = (
     return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
   const targetImprovement: ResolvedMinorImprovement = improvement
-  const modifiedCost = getMinorImprovementPreviewCost(state, player, improvementId, actionCardId)
-  if (!modifiedCost) {
+  const previewCost = getMinorImprovementPreviewCostDetailed(
+    state,
+    player,
+    improvementId,
+    actionCardId,
+  )
+  if (!previewCost) {
     return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
+  const modifiedCost = previewCost.cost
 
   const resolvedPayment = resolveImprovementPayment(
     state,
@@ -447,6 +475,7 @@ export const playMinorImprovement = (
     { type: 'fail', errorKey: 'log.minorImprovementFail' },
     getPlayedCardsForCost(player, modifiedCost),
     improvementId,
+    previewCost.candidateMetadataByFeeIndex,
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
@@ -454,6 +483,7 @@ export const playMinorImprovement = (
   const paymentInfo: PaymentInfo = {
     resourcesPaid: resolvedPayment.resourcesPaid,
     feeIndex: resolvedPayment.feeIndex,
+    originalFeeIndex: resolvedPayment.originalFeeIndex,
     returnedCardId: resolvedPayment.returnedCardId,
   }
   return finalizeMinorImprovementPurchase(
@@ -554,19 +584,21 @@ const buildImprovementInternalChildren = (
     }
   }
   const previewCost = kind === 'major'
-    ? getMajorImprovementPreviewCost(state, player, id, actionCardId)
-    : getMinorImprovementPreviewCost(state, player, id, actionCardId)
+    ? getMajorImprovementPreviewCostDetailed(state, player, id, actionCardId)
+    : getMinorImprovementPreviewCostDetailed(state, player, id, actionCardId)
   if (!previewCost) return null
+  const cost = previewCost.cost
   const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
-  const includeReturnedCard = PaymentSolver.isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const includeReturnedCard = PaymentSolver.isComplexCost(cost) && !!cost.cards?.list?.length
   const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
-  const playedCards = getPlayedCardsForCost(player, previewCost)
+  const playedCards = getPlayedCardsForCost(player, cost)
   const payParams: PayChildOptions = {
-    cost: previewCost,
+    cost,
     costType,
     optionPrefix,
     includeReturnedCard,
     playedCards,
+    candidateMetadataByFeeIndex: previewCost.candidateMetadataByFeeIndex,
   }
   const payActionContext: Record<string, unknown> = {
     costType,

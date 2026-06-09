@@ -533,11 +533,16 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 
-- `fees: Partial<Resource>[]` —— per-action 总固定费用。Renovation 的 `computeCosts` 总成本 delta（D154_ChimneySweep `{stone:-2}`、D121_ClayPlasterer `{clay:-(rooms-1)}`、D81_RoofLadder `{reed:-1}`）写入 `fees[0]`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
+- `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 BGA `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 BGA `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
 - `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态。
+- typed flat fencing / stables 支付若传入单一 `{fee:{wood:N}}`，enumerate 会在套用 costType modifiers 前规范化为单位成本：fencing 为 `{unitFee:{wood:1}, nb:N}`，stables 为 `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`。这样 A16/C56 这类 BGA `addCost` per-unit alternative 仍能先生成 cost row，再被 D88 这类 bonus choice 继续替换。
+- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
+- `Bonus.capDiscountAtCost` —— 只用于“移除当前 cost 中某资源”的显式语义；普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
+- `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，供 E123 这类 after-pay 卡牌消费；D88 这类无状态 replacement choice 可显式关闭，避免同一支付结果因选择顺序不同重复展示。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
+
+**Card-purchase ComputeCardCosts candidate pipeline**：major / minor improvement 购买成本在进入 payment solver 前先规范化成 Cost Candidate List，再让 `computeCardCostCandidates` listener 按顺序 mutate 当前 candidates。默认顺序是稳定 listener id；仅本 pipeline 局部读取 `CardListenerRegistration.order`（高值先执行）处理 BGA 中 fixed-price 必须先于普通折扣的冲突，不改变普通 before/after trigger listener 结算。append 类 helper 保留原候选，replacement 类 helper 只替换实际被折扣改变的候选；折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution，支付选定后由 improvement payment glue 写入 option `sourceCards` 和 Card Resource Stats。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
@@ -550,7 +555,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 | scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
 | `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A28_ForestSchool（lessons cost）、A88_HedgeKeeper（fencing 全部 3 段一次换）、E60_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | 每个 unit cost row，按 `order` 有序展开 | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、D15_ClaySupports（每间房 wood-for-{clay,reed}）、B145_BrushwoodCollector construct 分支（每间房 wood-for-reed）|
+| `unit` | 每个 unit cost row，按 `order` 有序展开 | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A16_RammedClay（每段 fence clay-for-wood）、C56_FeedFence（至多一座 stable clay-for-wood）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
 
@@ -559,10 +564,11 @@ scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit
 - `validateComplexCost(cost)` —— dev 抛错 + prod 降级为 "no affordable solutions"。检查 `nb` 与 `cards` 互斥、`scope:'unit'` trade 必须配合 `nb`。
 - `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合。
 - `validateBonus(bonus)` —— 恰好一个 `discount` 或 `choices`、`choices` 非空。
+- typed cost payment solution 后处理会丢弃任何 `resourcesPaid` 出现负数的分支；BGA `addCost` alternative 不能表现为“多造资源再退款”的 surplus 组合。
 
-**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；负 delta（D154 等）在 enumerate baseFee 合并后 clamp。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
+**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；`trades` / `bonuses` 经 `executionContext.costTrades` / `costBonuses` 追加到本次 payment child。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
 
-D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。renovation 仍走 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
+D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。Renovation 的 mandatory 折扣走 `Bonus.optional=false`；B128_Plumber 等 target-sensitive listener 从 `params.selectedOption` 读取本次目标材质后返回 sourced mandatory bonus choices。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
@@ -593,7 +599,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, reserveResources?, sourceCard? }`。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, costAttribution?, reserveResources?, sourceCard? }`。`computeCosts` 返回的 `costs` / `trades` / `bonuses` 会通过 `applyComputeCostResults()` 进入本次 `executionContext.costs` / `costTrades` / `costBonuses`；construct / renovation payment 会把它们附加到 `ComplexCost` 后再枚举。farm-choice commit pass 使用 `collectFarmChoiceCostAdjustments()` 保留 farm-payload-aware `costs` / `trades` / `bonuses`，其中 fence settlement 会把 trades/bonuses 一并传给 typed payment。`costAttribution` 只服务 action-path `computeCosts` 的 Card Resource Stats 归因；listener 声明 source card 与成本 delta，host action 在真实执行后按 before/after 成本差和 clamp 写入 saved / paid，不表示整笔 action payment 属于该卡。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
@@ -613,7 +619,7 @@ Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` 
 6. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
 7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
    `occupation` 的手牌选项构建与 forged choice 校验也会用 `choice=<occupationId>` 跑选项级 `isDoable` card listener；这用于 B93 这类“打出后必须支付 onBuy 最低后续成本”的前置过滤。listener 返回的 `reserveResources` 会继续传入 occupation payment leaf，确保后续必付成本不能被职业付款选项提前花掉。
-8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
+8. 然后执行 `computeCosts`，把费用覆盖 / sourced trades / bonus choices 写入本次 `executionContext.costs` / `costTrades` / `costBonuses`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
 9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
 10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们的 trigger frame 在 host commit 后立即固定。`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 的 activation 真正执行前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
 11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
@@ -648,7 +654,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 ### 7.6 阶段型 Hook（按触发顺序）
 
 ```
-回合开始: onBeforeStartOfTurn → onRoundStart
+回合开始: onBeforeStartOfTurn → futureMeepleActions → onRoundStart
 工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
 回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
 回合结束: onRoundEnd → onAfterRoundEnd
@@ -672,7 +678,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
 
-阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
+阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`futureMeepleActions` 是 round-start 内部 stage：`FutureMeepleResourceMap.field/stable` 到期后先由 `applyFutureMeeples` 消费 token，再把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`；entry 可携带 `actionContext`，用于 D91 这类付费 plow。该 stage 完成后继续普通 `onRoundStart`，不重复 round-start 初始化。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
 
 ### 7.7 Listener activation purity + BGA 对齐
 
@@ -733,9 +739,9 @@ OA 对齐规则：
 
 5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
 
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
+- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
-- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
+- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。

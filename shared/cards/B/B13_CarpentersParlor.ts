@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
 const CARD_ID = 'B13_CarpentersParlor'
 /**
@@ -9,7 +10,7 @@ const CARD_ID = 'B13_CarpentersParlor'
  * (instead of the standard 5 wood + 2 reed).
  *
  * BGA reference: onPlayerComputeCostsConstruct sets cost to [WOOD => 2, REED => 2]
- * for roomWood type. Base is 5 wood + 2 reed, so discount is -3 wood.
+ * for roomWood type.
  */
 
 const constructCostListener: CardListenerRegistration = {
@@ -19,7 +20,7 @@ const constructCostListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType !== 'wood') return
-    return { costs: { wood: -3 } }
+    return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 3 })] }
   },
 }
 

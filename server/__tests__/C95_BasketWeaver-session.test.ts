@@ -7,6 +7,15 @@ import { occupations } from '../../shared/cards/_lookup'
 import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'C95_BasketWeaver'
 
+const hasPaidResources = (
+  option: { labelParams?: Record<string, unknown> },
+  expected: Record<string, number>,
+) => {
+  const actual = (option.labelParams?.resourcesPaid ?? {}) as Record<string, number>
+  const keys = new Set([...Object.keys(actual), ...Object.keys(expected)])
+  return [...keys].every((key) => (actual[key] ?? 0) === (expected[key] ?? 0))
+}
+
 // Catalog registration is handled by the parent agent; for local testing we
 // splice the card into the occupation registry if absent.
 if (!occupations.some((c) => c.id === CARD_ID)) {
@@ -61,6 +70,16 @@ describe('C95_BasketWeaver session', () => {
       )
       if (basket && !bought) {
         resp = session.resolveChoice(0, basket.value)
+        expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+        const paymentOptions = resp.interaction.options ?? []
+        expect(paymentOptions.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
+        const fixed = paymentOptions.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
+        expect(fixed?.labelParams.sourceCards).toEqual([CARD_ID])
+        expect(fixed?.effectPreview).toMatchObject({
+          resourcesPaid: { reed: 1, stone: 1 },
+          sourceCards: [CARD_ID],
+        })
+        resp = session.resolveChoice(0, fixed!.value)
         bought = true
         continue
       }

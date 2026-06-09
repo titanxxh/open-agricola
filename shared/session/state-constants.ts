@@ -156,6 +156,7 @@ export const applyFutureMeeples = (state: GameState) => {
     if (!player) return
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0
+      if (key === 'field' || key === 'stable') return
       player.resources[key as keyof Resource] += amount
     })
     if (entry.roomType && player.houseType === entry.roomType) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAllBuyableCombinations, resolveCardCostWithModifiers } from '../../shared/actions/payment/internal'
+import { computeAllBuyableCombinations, resolveCardCostWithModifiers, resolveCardCostWithModifiersDetailed } from '../../shared/actions/payment/internal'
 import { isComplexCost } from '../../shared/actions/payment/internal'
 import {
   collectComputeChoiceCandidates,
@@ -20,10 +20,9 @@ const findListener = (id: string) =>
 /**
  * C27 Blueprint — verify-only.
  *
- * BGA `Cards/C/C27_Blueprint.php::onPlayerComputeCardCosts` reduces stone by 1
- * for `Major_Joinery`, `Major_Pottery`, `Major_Basket` only. The listener in
- * `shared/cards/C/C27_Blueprint.ts` allow-lists exactly these three ids and
- * subtracts `stone: -1`. This test confirms the BGA-aligned cost path.
+ * BGA `Cards/C/C27_Blueprint.php::onPlayerComputeCardCosts` clones every
+ * matching stone cost trade for `Major_Joinery`, `Major_Pottery`,
+ * `Major_Basket` only. OA mirrors that with card-purchase cost candidates.
  */
 describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () => {
   const setup = () => {
@@ -40,25 +39,24 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
 
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
-  it.each(ALLOWED_MAJORS)('adds optional stone discount bonus for %s', (majorId) => {
+  it.each(ALLOWED_MAJORS)('adds sourced stone discount candidate for %s', (majorId) => {
     const { state, player } = setup()
     const baseCost = { wood: 2, stone: 2 }
-    const resolved = resolveCardCostWithModifiers(
+    const resolved = resolveCardCostWithModifiersDetailed(
       state,
       player,
       'improvement',
       majorId,
       baseCost,
     )
-    expect(isComplexCost(resolved)).toBe(true)
-    if (!isComplexCost(resolved)) return
-    expect(resolved.fee).toEqual(baseCost)
-    expect(resolved.bonuses).toEqual([{
-      discount: { stone: 1 },
-      optional: true,
-      sources: [CARD_ID],
-      preserveOriginal: true,
-    }])
+    expect(isComplexCost(resolved.cost)).toBe(true)
+    if (!isComplexCost(resolved.cost)) return
+    expect(resolved.cost.fees).toEqual([
+      baseCost,
+      { wood: 2, stone: 1 },
+    ])
+    expect(resolved.cost.bonuses).toBeUndefined()
+    expect(resolved.candidateMetadataByFeeIndex?.[1]?.sources).toEqual([CARD_ID])
   })
 
   it('preserves original and discounted payment paths for allowed majors', () => {
@@ -68,26 +66,27 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
       wood: 5,
       stone: 5,
     }
-    const resolved = resolveCardCostWithModifiers(
+    const resolved = resolveCardCostWithModifiersDetailed(
       state,
       player,
       'improvement',
       'Major_Joinery',
       { wood: 2, stone: 2 },
     )
-    expect(isComplexCost(resolved)).toBe(true)
-    if (!isComplexCost(resolved)) return
+    expect(isComplexCost(resolved.cost)).toBe(true)
+    if (!isComplexCost(resolved.cost)) return
 
-    const options = computeAllBuyableCombinations(player, resolved)
+    const options = computeAllBuyableCombinations(player, resolved.cost)
     expect(options.some((option) =>
       option.resourcesPaid.wood === 2 &&
       option.resourcesPaid.stone === 2 &&
-      !option.bonusUsed,
+      option.feeIndex === 0,
     )).toBe(true)
     expect(options.some((option) =>
       option.resourcesPaid.wood === 2 &&
       option.resourcesPaid.stone === 1 &&
-      option.bonusUsed === CARD_ID,
+      option.feeIndex === 1 &&
+      resolved.candidateMetadataByFeeIndex?.[option.feeIndex]?.sources.includes(CARD_ID),
     )).toBe(true)
   })
 
@@ -128,8 +127,8 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
  * improvements ... even when taking a Minor Improvement action" — is
  * implemented via a `computeChoiceCandidates` listener that injects the 3
  * allowed majors into the minor-improvement choice list (mirrors D131
- * CraftsmanshipPromoter pattern). Cost discount mechanism (BGA trade-clone
- * vs our straight stone:-1 override) is registered as §2.5 simplification.
+ * CraftsmanshipPromoter pattern). The cost discount is handled by the
+ * card-purchase candidate pipeline above.
  */
 describe('C27_Blueprint session — minor-improvement routing for 3 majors', () => {
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const

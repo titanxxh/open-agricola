@@ -45,18 +45,21 @@ describe('A143_Stonecutter session', () => {
 
   it('reduces Major improvement stone cost by 1', () => {
     const session = setup()
-    // Major_Basket base cost: 2 reed + 2 stone. With Stonecutter: 2 reed + 1 stone.
-    // With placeholder hands Major_Basket is the only affordable improvement
-    // (player has reed=2, stone=2, wood=clay=food=0 — no other major fits).
-    // `improvement-any` therefore auto-resolves the single option inside
-    // takeAction, and the payment leaf also auto-resolves because the
-    // typed-flat payment has exactly one solution.
-    const resp = session.takeAction(0, 'major-improvement')
+    let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    const option = resp.interaction.options?.find((entry) =>
+      Array.isArray(entry.labelParams.sourceCards)
+        && entry.labelParams.sourceCards.includes(CARD_ID),
+    )
+    expect(option).toBeDefined()
+
+    resp = session.resolveChoice(0, option!.value)
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
-    // Paid 2 reed + 1 stone (instead of 2 reed + 2 stone) -> 1 stone left.
     expect(after.resources.reed).toBe(0)
     expect(after.resources.stone).toBe(1)
   })

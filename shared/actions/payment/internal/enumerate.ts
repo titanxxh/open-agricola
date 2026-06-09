@@ -100,13 +100,6 @@ const hashSolution = (solution: PaymentSolution): number => {
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
   }
-  if (solution.preservedOriginalFor) {
-    for (const source of [...solution.preservedOriginalFor].sort()) {
-      for (const ch of source) {
-        h = ((h + ch.charCodeAt(0) * 29) * 31) >>> 0
-      }
-    }
-  }
   if (solution.bonusChoiceIndex) {
     const entries = Object.entries(solution.bonusChoiceIndex).sort(
       (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
@@ -123,6 +116,9 @@ const hashSolution = (solution: PaymentSolution): number => {
       h = ((h + ch.charCodeAt(0) * 19) * 31) >>> 0
     }
   }
+  if (solution.feeIndex !== undefined) {
+    h = ((h + (solution.feeIndex + 1) * 43) * 31) >>> 0
+  }
   return h
 }
 
@@ -138,65 +134,9 @@ const subtractResources = (
   return result
 }
 
-const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
-  const aBonusSources = (a.bonusUsed ?? '').split(',').filter(Boolean)
-  const bBonusSources = new Set((b.bonusUsed ?? '').split(',').filter(Boolean))
-  if (
-    aBonusSources.some((source) =>
-      b.preservedOriginalFor?.includes(source) && !bBonusSources.has(source),
-    )
-  ) {
-    return false
-  }
-
-  const aPaid = a.resourcesPaid
-  const bPaid = b.resourcesPaid
-  const allKeys = new Set([
-    ...(Object.keys(aPaid) as PaymentResourceKey[]),
-    ...(Object.keys(bPaid) as PaymentResourceKey[]),
-  ])
-
-  let hasStrictlyLess = false
-  for (const key of allKeys) {
-    const aVal = aPaid[key] ?? 0
-    const bVal = bPaid[key] ?? 0
-    if (aVal > bVal) return false
-    if (aVal < bVal) hasStrictlyLess = true
-  }
-
-  const aCard = a.cardUsed ? 1 : 0
-  const bCard = b.cardUsed ? 1 : 0
-  if (aCard > bCard) return false
-  if (aCard < bCard) hasStrictlyLess = true
-
-  return hasStrictlyLess
-}
-
 export const keepOnlyOptimals = (
   solutions: PaymentSolution[],
-): PaymentSolution[] => {
-  if (solutions.length <= 1) return solutions
-
-  const optimal: PaymentSolution[] = []
-  for (const candidate of solutions) {
-    let isDominated = false
-    for (const existing of optimal) {
-      if (dominates(existing, candidate)) {
-        isDominated = true
-        break
-      }
-    }
-    if (!isDominated) {
-      for (let i = optimal.length - 1; i >= 0; i--) {
-        if (dominates(candidate, optimal[i])) {
-          optimal.splice(i, 1)
-        }
-      }
-      optimal.push(candidate)
-    }
-  }
-  return optimal
-}
+): PaymentSolution[] => solutions
 
 const getPositiveResourceEntries = (solution: PaymentSolution) =>
   PAYMENT_RESOURCE_ORDER
@@ -266,14 +206,43 @@ export const sortPaymentSolutions = (
 const applyBonus = (
   cost: PaymentResourceMap,
   discount: Partial<Resource>,
+  capDiscountAtCost = false,
 ): PaymentResourceMap => {
   const result: PaymentResourceMap = { ...cost }
   const discountKeys = Object.keys(discount) as ResourceKey[]
   for (const key of discountKeys) {
     const discountAmount = discount[key] ?? 0
-    result[key] = Math.max(0, (result[key] ?? 0) - discountAmount)
+    if (discountAmount === 0) continue
+    const currentAmount = result[key] ?? 0
+    const nextAmount = capDiscountAtCost && discountAmount > 0
+      ? Math.max(0, currentAmount - discountAmount)
+      : currentAmount - discountAmount
+    if (nextAmount === 0) {
+      delete result[key]
+    } else {
+      result[key] = nextAmount
+    }
   }
   return result
+}
+
+const canApplyBonus = (
+  cost: PaymentResourceMap,
+  discount: Partial<Resource>,
+  capDiscountAtCost = false,
+): boolean => {
+  const discountKeys = Object.keys(discount) as ResourceKey[]
+  for (const key of discountKeys) {
+    const discountAmount = discount[key] ?? 0
+    if (discountAmount <= 0) continue
+    const currentAmount = cost[key] ?? 0
+    if (capDiscountAtCost) {
+      if (currentAmount <= 0) return false
+      continue
+    }
+    if (currentAmount - discountAmount < 0) return false
+  }
+  return true
 }
 
 const getMaxTradeTimesFromPartial = (
@@ -575,6 +544,49 @@ const hasSupplyTokenCost = (cost: ComplexCost): boolean => {
   return maps.some((map) => (map.fence ?? 0) > 0 || (map.stable ?? 0) > 0)
 }
 
+const normalizeTypedFlatUnitCost = (
+  cost: ComplexCost,
+  costType?: CostModifierType,
+): ComplexCost => {
+  if (
+    cost.nb !== undefined ||
+    cost.unitFee !== undefined ||
+    cost.fees !== undefined ||
+    cost.cards !== undefined ||
+    (costType !== 'fencing' && costType !== 'stables') ||
+    cost.fee === undefined
+  ) {
+    return cost
+  }
+
+  const positiveEntries = Object.entries(cost.fee)
+    .filter(([, value]) => typeof value === 'number' && value > 0)
+  if (
+    positiveEntries.length > 1 ||
+    (positiveEntries.length === 1 && positiveEntries[0]![0] !== 'wood')
+  ) {
+    return cost
+  }
+
+  const wood = cost.fee.wood ?? 0
+  if (!Number.isInteger(wood) || wood < 0) return cost
+
+  if (costType === 'fencing') {
+    const { fee: _fee, ...rest } = cost
+    return { ...rest, unitFee: { wood: 1 }, nb: wood }
+  }
+
+  const stableUnits = Math.floor(wood / 2)
+  const remainder = wood % 2
+  const { fee: _fee, ...rest } = cost
+  return {
+    ...rest,
+    ...(remainder > 0 ? { fee: { wood: remainder } } : {}),
+    unitFee: { wood: 2 },
+    nb: stableUnits,
+  }
+}
+
 export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
@@ -582,10 +594,11 @@ export const computeAllBuyableCombinations = (
   costType?: CostModifierType,
   state?: GameState,
 ): PaymentSolution[] => {
-  validateComplexCost(cost)
+  const normalizedCost = normalizeTypedFlatUnitCost(cost, costType)
+  validateComplexCost(normalizedCost)
   const effectiveCost = costType
-    ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
-    : cost
+    ? applyCostModifiers(normalizedCost, getModifiersForCostType(player, costType))
+    : normalizedCost
   validateComplexCost(effectiveCost)
 
   const canUseCache = !hasSupplyTokenCost(effectiveCost)
@@ -653,11 +666,10 @@ export const computeAllBuyableCombinations = (
         type BonusPath = {
           cost: PaymentResourceMap
           sources: string[]
-          preservedOriginalFor: string[]
           choiceIndices: Record<string, number>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], preservedOriginalFor: [], choiceIndices: {} },
+          { cost: baseFee, sources: [], choiceIndices: {} },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
@@ -666,26 +678,19 @@ export const computeAllBuyableCombinations = (
           }
 
           const expanded: BonusPath[] = []
-          const preserveSources = bonus.preserveOriginal
-            ? [...new Set([
-                ...(bonus.sources ?? []),
-                ...(bonus.choices ?? []).flatMap((choice) => choice.sources ?? []),
-              ])]
-            : []
           if (bonus.optional) {
             for (const path of bonusPaths) {
               expanded.push({
                 cost: path.cost,
                 sources: [...path.sources],
-                preservedOriginalFor: preserveSources.length > 0
-                  ? [...new Set([...path.preservedOriginalFor, ...preserveSources])]
-                  : [...path.preservedOriginalFor],
                 choiceIndices: { ...path.choiceIndices },
               })
             }
           }
           const rawCandidates: {
             discount: Partial<Resource>
+            capDiscountAtCost?: boolean
+            trackChoiceIndex?: boolean
             sources?: string[]
             conditions?: Record<string, number>
             minCost?: Partial<Resource>
@@ -694,6 +699,8 @@ export const computeAllBuyableCombinations = (
           }[] = bonus.choices
             ? bonus.choices.map((c, i) => ({
                 ...c,
+                capDiscountAtCost: c.capDiscountAtCost ?? bonus.capDiscountAtCost,
+                trackChoiceIndex: c.trackChoiceIndex ?? bonus.trackChoiceIndex,
                 minCost: c.minCost ?? bonus.minCost,
                 maxCost: c.maxCost ?? bonus.maxCost,
                 _origIndex: i,
@@ -701,6 +708,8 @@ export const computeAllBuyableCombinations = (
             : [
                 {
                   discount: bonus.discount!,
+                  capDiscountAtCost: bonus.capDiscountAtCost,
+                  trackChoiceIndex: bonus.trackChoiceIndex,
                   sources: bonus.sources,
                   minCost: bonus.minCost,
                   maxCost: bonus.maxCost,
@@ -720,7 +729,10 @@ export const computeAllBuyableCombinations = (
               if (!costBoundsSatisfied(path.cost, candidate.minCost, candidate.maxCost)) {
                 continue
               }
-              const nextCost = applyBonus(path.cost, candidate.discount)
+              if (!canApplyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)) {
+                continue
+              }
+              const nextCost = applyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)
               const combined = new Set([
                 ...path.sources,
                 ...(bonus.sources ?? []),
@@ -728,21 +740,20 @@ export const computeAllBuyableCombinations = (
               ])
               const nextSources = [...combined]
               const nextChoiceIndices =
-                isMultiChoice && bonusKey
+                isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
                   ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
                   : { ...path.choiceIndices }
               expanded.push({
                 cost: nextCost,
                 sources: nextSources,
-                preservedOriginalFor: [...path.preservedOriginalFor],
                 choiceIndices: nextChoiceIndices,
               })
             }
           }
-          bonusPaths = expanded
+          bonusPaths = expanded.length > 0 || bonus.optional ? expanded : bonusPaths
         }
 
-        for (const { cost: effectiveCostFee, sources, preservedOriginalFor, choiceIndices } of bonusPaths) {
+        for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           if (canCoverCost(tradeCombo.result, realCost) && canPaySupplyTokens(state, player, effectiveCostFee)) {
             const remaining = subtractResources(tradeCombo.result, realCost)
@@ -756,7 +767,6 @@ export const computeAllBuyableCombinations = (
               resourcesRemaining: remainingWithSupplyTokens as Partial<Resource>,
               tradesUsed,
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
-              preservedOriginalFor: preservedOriginalFor.length > 0 ? preservedOriginalFor : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
@@ -772,12 +782,8 @@ export const computeAllBuyableCombinations = (
 
   for (const sol of rawSolutions) {
     const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
-    const tradesActuallyUsed = sol.tradesUsed.filter((entry) => entry.times > 0)
-    const exemptFromNegativeFilter =
-      tradesActuallyUsed.length === 1 && tradesActuallyUsed[0]!.times === 1
     if (
       costType
-      && !exemptFromNegativeFilter
       && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)
     ) {
       continue
@@ -786,7 +792,6 @@ export const computeAllBuyableCombinations = (
       resourcesPaid,
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
-      preservedOriginalFor: sol.preservedOriginalFor,
       bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
     }

@@ -1,50 +1,7 @@
 import { defineOccupationCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../contract/types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import {
-  getRoomsBuiltThisAction,
-  readActionSnapshotToken,
-} from '../helpers/action-snapshot'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { CardImpl } from '../registry'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 
 const CARD_ID = 'A111_WallBuilder'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
-
-const queueFoodNextFour = (state: GameState, player: PlayerState) => {
-  const actionToken = readActionSnapshotToken(player)
-  if (actionToken === undefined) return
-  if (getRoomsBuiltThisAction(player) < 1) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
-
-  writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-  return queueFutureMeeplesFlow(state, {
-    cardId: CARD_ID,
-    playerId: player.id,
-    startRound: state.round + 1,
-    count: 4,
-    resources: { food: 1 },
-  })
-}
-
-const listener: CardListenerRegistration = {
-  id: 'A111-wall-builder-after-construct',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['construct'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const flow = queueFoodNextFour(context.state, context.player)
-    if (!flow) return
-    return { flow, sourceCard: CARD_ID }
-  },
-}
-
-const cardImpl = {
-  listeners: [listener],
-  reaches: [] as readonly string[],
-} satisfies CardImpl
 
 export const A111_WallBuilder = defineOccupationCard({
   meta: {
@@ -59,7 +16,25 @@ export const A111_WallBuilder = defineOccupationCard({
     cost: {},
     players: '1+',
   },
-  impl: cardImpl,
+  impl: {
+    listeners: [{
+      id: 'A111-wall-builder-after-construct',
+      cardIds: [CARD_ID],
+      phases: ['after'],
+      actions: ['construct'],
+      handler: (context) => ({
+        flow: futureMeeplesNode({
+          cardId: CARD_ID,
+          playerId: context.player.id,
+          startRound: context.state.round + 1,
+          count: 4,
+          resources: { food: 1 },
+        }),
+        sourceCard: CARD_ID,
+      }),
+    }],
+    reaches: [],
+  },
 })
 
 export const A111_WallBuilder_impl = A111_WallBuilder.impl

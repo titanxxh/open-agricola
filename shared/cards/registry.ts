@@ -14,15 +14,26 @@
 import type { CardListenerRegistration } from './card-listeners'
 import type { CardEffect } from './card-effects'
 import type { CardDefinition } from '../contract/cards'
-import type { CostModifier, GameState, PlayerState } from '../contract/types'
+import type { ComplexCost, CostModifier, GameState, PaymentResourceMap, PlayerState } from '../contract/types'
 
 export type PrerequisiteHandler = (player: PlayerState, state?: GameState) => boolean
+export type CardPurchaseBaseCostContext = {
+  state: GameState
+  player: PlayerState
+  cardId: string
+  actionId: 'improvement'
+  actionCardId?: string
+}
+export type CardPurchaseBaseCostHandler = (
+  context: CardPurchaseBaseCostContext,
+) => PaymentResourceMap | PaymentResourceMap[] | ComplexCost | null | undefined
 
 export type CardImpl = {
   listeners?: CardListenerRegistration[]
   effect?: CardEffect
   modifiers?: CostModifier[]
   prerequisiteCheck?: PrerequisiteHandler
+  getBaseCosts?: CardPurchaseBaseCostHandler
   reaches?: readonly string[]
 }
 
@@ -39,6 +50,7 @@ export class CardRegistry {
   private readonly effectsByCard = new Map<string, CardEffect>()
   private readonly modifiersByCard = new Map<string, CostModifier[]>()
   private readonly prereqChecksByCard = new Map<string, PrerequisiteHandler>()
+  private readonly baseCostHandlersByCard = new Map<string, CardPurchaseBaseCostHandler>()
 
   loadImpl(cardId: string, impl: CardImpl): void {
     if (impl.listeners && impl.listeners.length > 0) {
@@ -52,6 +64,9 @@ export class CardRegistry {
     }
     if (impl.prerequisiteCheck) {
       this.prereqChecksByCard.set(cardId, impl.prerequisiteCheck)
+    }
+    if (impl.getBaseCosts) {
+      this.baseCostHandlersByCard.set(cardId, impl.getBaseCosts)
     }
   }
 
@@ -143,6 +158,9 @@ export class CardRegistry {
     for (const [cardId, fn] of this.prereqChecksByCard) {
       copy.prereqChecksByCard.set(cardId, fn)
     }
+    for (const [cardId, fn] of this.baseCostHandlersByCard) {
+      copy.baseCostHandlersByCard.set(cardId, fn)
+    }
     return copy
   }
 
@@ -167,6 +185,7 @@ export class CardRegistry {
     this.effectsByCard.delete(cardId)
     this.modifiersByCard.delete(cardId)
     this.prereqChecksByCard.delete(cardId)
+    this.baseCostHandlersByCard.delete(cardId)
   }
 
   getListenersFor(cardId: string): CardListenerRegistration[] {
@@ -190,12 +209,17 @@ export class CardRegistry {
       this.listenersByCard.has(cardId) ||
       this.effectsByCard.has(cardId) ||
       this.modifiersByCard.has(cardId) ||
-      this.prereqChecksByCard.has(cardId)
+      this.prereqChecksByCard.has(cardId) ||
+      this.baseCostHandlersByCard.has(cardId)
     )
   }
 
   getPrerequisiteCheck(cardId: string): PrerequisiteHandler | undefined {
     return this.prereqChecksByCard.get(cardId)
+  }
+
+  getBaseCosts(cardId: string): CardPurchaseBaseCostHandler | undefined {
+    return this.baseCostHandlersByCard.get(cardId)
   }
 
   snapshot(): RegistrySnapshot {
@@ -204,6 +228,7 @@ export class CardRegistry {
       ...this.effectsByCard.keys(),
       ...this.modifiersByCard.keys(),
       ...this.prereqChecksByCard.keys(),
+      ...this.baseCostHandlersByCard.keys(),
     ])
     return {
       cardIds: Array.from(cardIds),

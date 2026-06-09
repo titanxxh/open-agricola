@@ -12,11 +12,13 @@
 
 import type {
   ActionExecutionResult,
+  Bonus,
   ComplexCost,
   ExactCost,
   PaymentSolution,
   PlayerState,
   Resource,
+  Trade,
 } from '../../../contract/types'
 import { getAllTilePositions, positionKey } from '../../../domain/farm'
 import { resolveCostPaymentSelection } from './payment-choice-result'
@@ -59,11 +61,31 @@ const resolveConstructUnitFee = (
   return resolveUnitCostWithDelta(defaultCost, exactCost, costDelta, 1)
 }
 
+export type ConstructCostAdjustments = {
+  trades?: Trade[]
+  bonuses?: Bonus[]
+}
+
+const appendConstructCostAdjustments = (
+  cost: ComplexCost,
+  adjustments?: ConstructCostAdjustments,
+): ComplexCost => {
+  const trades = adjustments?.trades ?? []
+  const bonuses = adjustments?.bonuses ?? []
+  if (trades.length === 0 && bonuses.length === 0) return cost
+  return {
+    ...cost,
+    trades: trades.length > 0 ? [...(cost.trades ?? []), ...trades] : cost.trades,
+    bonuses: bonuses.length > 0 ? [...(cost.bonuses ?? []), ...bonuses] : cost.bonuses,
+  }
+}
+
 export const buildConstructCost = (
   player: PlayerState,
   costs: Partial<Resource> | undefined,
   nb: number,
   actionContext?: Record<string, unknown>,
+  adjustments?: ConstructCostAdjustments,
 ): ComplexCost | null => {
   const costDelta = readConstructCostDelta(actionContext, costs)
   const unitFee = resolveConstructUnitFee(
@@ -73,7 +95,7 @@ export const buildConstructCost = (
     nb,
   )
   if (unitFee === null) return null
-  return { unitFee, nb }
+  return appendConstructCostAdjustments({ unitFee, nb }, adjustments)
 }
 
 const countAvailableRoomTiles = (player: PlayerState) => {
@@ -92,13 +114,14 @@ export const getMaxBuildableRooms = (
   player: PlayerState,
   costs?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
+  adjustments?: ConstructCostAdjustments,
 ): number => {
   const argMax = typeof actionContext?.maxRooms === 'number'
     ? Math.max(0, Math.floor(actionContext.maxRooms))
     : 99
   const structuralMax = Math.min(countAvailableRoomTiles(player), argMax)
   for (let nb = 1; nb <= structuralMax; nb += 1) {
-    const cost = buildConstructCost(player, costs, nb, actionContext)
+    const cost = buildConstructCost(player, costs, nb, actionContext, adjustments)
     if (!cost) return nb - 1
     if (!canPayCost(player, cost, 'construct')) return nb - 1
   }
@@ -125,8 +148,9 @@ export const resolveRoomPaymentSelection = (
   nb: number,
   paymentChoice?: string,
   actionContext?: Record<string, unknown>,
+  adjustments?: ConstructCostAdjustments,
 ): RoomPaymentSelectionResult => {
-  const cost = buildConstructCost(player, costs, nb, actionContext)
+  const cost = buildConstructCost(player, costs, nb, actionContext, adjustments)
   if (!cost) return ROOM_PAYMENT_FAILURE
   const resolved = resolveCostPaymentSelection(
     player,

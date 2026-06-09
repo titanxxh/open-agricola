@@ -12,7 +12,7 @@ const CARD_ID = 'B18_GrasslandHarrow'
 
 const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('B18_GrasslandHarrow onRoundStart (post 7b1 listener migration)', () => {
+describe('B18_GrasslandHarrow after-pay future field', () => {
   const setupState = (round: number, resources: Partial<Record<string, number>>) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -68,52 +68,26 @@ describe('B18_GrasslandHarrow onRoundStart (post 7b1 listener migration)', () =>
     })
     const result = fireAfterPay(state, player)
     expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-extra-data', key: 'targetRound', value: 7 } },
-        { type: 'leaf', actionId: 'future-meeples' },
-      ],
+      type: 'leaf',
+      actionId: 'future-meeples',
     })
     expect(state.futureMeeples.map((entry) => entry.round)).toEqual([7])
+    expect(state.futureMeeples.map((entry) => entry.resources)).toEqual([{ field: 1 }])
   })
 
-  it('onBuy is now a no-op (listener drives the future meeple)', () => {
-    const { state, player } = setupState(3, {
+  it('does not expose an onBuy flow', () => {
+    const { state } = setupState(3, {
       wood: 2, stone: 1, clay: 1, reed: 0, food: 0,
     })
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeUndefined()
+    expect(effect!.onBuy).toBeUndefined()
     expect(state.pendingFutureMeeples.length).toBe(0)
   })
 
-  it('onRoundStart offers optional plow at the target round (driven by listener-set targetRound)', () => {
-    const { state, player } = setupState(3, {
-      wood: 1, stone: 1, clay: 0, reed: 0, food: 0,
-    })
-    player.minorPlayed.push(CARD_ID)
-    fireAfterPay(state, player)
-    // target round = 3 + 2 = 5
-    state.round = 5
+  it('does not expose a card-local onRoundStart flow', () => {
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeDefined()
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).optional).toBe(true)
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0]!.actionId).toBe('plow')
-  })
-
-  it('onRoundStart returns nothing when it is not the target round', () => {
-    const { state, player } = setupState(3, {
-      wood: 1, stone: 0, clay: 0, reed: 0,
-    })
-    player.minorPlayed.push(CARD_ID)
-    fireAfterPay(state, player)
-    state.round = 6
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeUndefined()
+    expect(effect!.onRoundStart).toBeUndefined()
   })
 
 })

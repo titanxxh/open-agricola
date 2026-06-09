@@ -31,6 +31,7 @@ import type {
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import { A28_ForestSchool } from '../../../cards/A/A28_ForestSchool'
 import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.impl.modifiers![0] as TradeModifier
 
@@ -149,15 +150,14 @@ describe('keepOnlyOptimals', () => {
     expect(keepOnlyOptimals(solutions)).toEqual(solutions)
   })
 
-  it('removes dominated solutions', () => {
+  it('keeps dominated solutions', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 5 }, tradesUsed: [] },
       { resourcesPaid: { wood: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toHaveLength(1)
-    expect(optimal[0].resourcesPaid.wood).toBe(3)
+    expect(optimal).toEqual(solutions)
   })
 
   it('keeps solutions that are optimal in different resources', () => {
@@ -169,15 +169,14 @@ describe('keepOnlyOptimals', () => {
     expect(optimal).toHaveLength(2)
   })
 
-  it('removes solution dominated in all dimensions', () => {
+  it('keeps solution dominated in all dimensions', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 3, clay: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 2, clay: 2 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4, clay: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toHaveLength(1)
-    expect(optimal[0].resourcesPaid).toEqual({ wood: 2, clay: 2 })
+    expect(optimal).toEqual(solutions)
   })
 
   it('handles equal solutions', () => {
@@ -271,9 +270,7 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    // keepOnlyOptimals drops the dominated {5} path when {3} path exists.
-    expect(solutions.length).toBe(1)
-    expect(solutions[0]!.resourcesPaid.wood).toBe(3)
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([3, 5])
   })
 
   it('combines optional and mandatory bonuses', () => {
@@ -286,8 +283,7 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    expect(solutions.length).toBe(1)
-    expect(solutions[0]!.resourcesPaid.wood).toBe(2)
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([2, 4])
   })
 
   it('expands bonus.choices into alternative paths (optional: false = must pick one)', () => {
@@ -601,6 +597,32 @@ describe('payment choice ordering', () => {
         cardUsed: 'Major_StoneOven',
       },
     ])
+  })
+
+  it('merges extra payment sources into labels and effect previews', () => {
+    const result = buildPaymentChoiceResult([
+      { resourcesPaid: { wood: 1 }, tradesUsed: [], feeIndex: 0 },
+      { resourcesPaid: { food: 1 }, tradesUsed: [], feeIndex: 1 },
+    ], 'pay:test', false, {
+      extraSourcesForSolution: (solution) =>
+        solution.feeIndex === 1 ? ['HookCandidate'] : [],
+    })
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    const sourced = result.request.options.find((option) =>
+      Array.isArray(option.labelParams.sourceCards),
+    )
+    expect(sourced?.labelParams).toMatchObject({
+      resourcesPaid: { food: 1 },
+      sourceCards: ['HookCandidate'],
+    })
+    expect(sourced?.effectPreview).toMatchObject({
+      resourcesPaid: { food: 1 },
+      sourceCards: ['HookCandidate'],
+    })
   })
 })
 
@@ -961,6 +983,79 @@ describe('payAction', () => {
         ],
       },
     ])
+  })
+
+  it('does not attribute typed action payments to the source card by default', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const { result } = callPay(
+      player,
+      { cost: { wood: 2 }, costType: 'construct' },
+      { sourceCard: 'A128_RiparianBuilder' },
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'A128_RiparianBuilder')).toBeUndefined()
+  })
+
+  it('honors explicit source-card payment stat tracking for card-effect payments', () => {
+    const disabledPlayer = createMockPlayer({ food: 3 })
+    const disabled = callPay(
+      disabledPlayer,
+      { cost: { food: 1 }, trackSourceCardPaymentStats: false },
+      { sourceCard: 'B82_ValueAssets' },
+    )
+
+    expect(disabled.result.type).toBe('ok')
+    expect(readCardResourceStats(disabledPlayer, 'B82_ValueAssets')).toBeUndefined()
+
+    const enabledPlayer = createMockPlayer({ food: 3 })
+    const enabled = callPay(
+      enabledPlayer,
+      { cost: { food: 1 }, trackSourceCardPaymentStats: true },
+      { sourceCard: 'B82_ValueAssets' },
+    )
+
+    expect(enabled.result.type).toBe('ok')
+    expect(readCardResourceStats(enabledPlayer, 'B82_ValueAssets')?.paid).toEqual({ food: 1 })
+  })
+
+  it('records selected card-purchase candidate attribution without source-card PAID stats', () => {
+    const player = createMockPlayer({ wood: 3, food: 1 })
+    const cost: ComplexCost = {
+      fees: [
+        { wood: 3 },
+        { wood: 1, food: 1 },
+      ],
+    }
+    const { result } = callPay(
+      player,
+      {
+        cost,
+        costType: 'minor-improvement',
+        paymentChoice: '0',
+        candidateMetadataByFeeIndex: {
+          0: { originalFeeIndex: 0, sources: [] },
+          1: {
+            originalFeeIndex: 0,
+            sources: ['D117_WoodExpert'],
+            costAttribution: {
+              D117_WoodExpert: {
+                saved: { wood: 2 },
+                paid: { food: 1 },
+              },
+            },
+          },
+        },
+      },
+      { sourceCard: 'D20_TurnwrestPlow' },
+    )
+
+    expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, 'D117_WoodExpert')).toMatchObject({
+      saved: { wood: 2 },
+      paid: { food: 1 },
+    })
+    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')).toBeUndefined()
   })
 })
 

@@ -15,6 +15,7 @@
 import type {
   ActionAvailabilityContext,
   Bonus,
+  CardCostCandidateMetadata,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -23,26 +24,47 @@ import type {
   Resource,
   Trade,
 } from '../../../contract/types'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
+import { buildCardListenerContext, executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
 import { applyCostOverride, isComplexCost } from './affordability'
+import {
+  buildCandidateMetadataByFeeIndex,
+  cardCostCandidatesEqual,
+  dedupeCardCostCandidates,
+  normalizeCardCostCandidates,
+} from './card-cost-candidates'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
 import { buildCardCostListenerContext } from './hook-context'
 import { canAffordTypedFlatCost, payTypedFlatCost } from './typed-flat'
 
-export const resolveCardCostWithModifiers = (
+export type ResolvedCardCostWithMetadata = {
+  cost: PaymentResourceMap | ComplexCost
+  candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+}
+
+const orderCardCostListeners = <T extends { registration: { id: string; order?: number } }>(
+  entries: readonly T[],
+): T[] =>
+  [...entries].sort((left, right) =>
+    (right.registration.order ?? 0) - (left.registration.order ?? 0)
+    || left.registration.id.localeCompare(right.registration.id),
+  )
+
+export const resolveCardCostWithModifiersDetailed = (
   state: GameState,
   player: PlayerState,
   actionId: string,
   cardId: string,
   baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
-): PaymentResourceMap | ComplexCost => {
+): ResolvedCardCostWithMetadata => {
   const context = buildCardCostListenerContext(state, player, actionId)
-  const matched = getMatchingListeners(context)
+  const matched = orderCardCostListeners(getMatchingListeners(context))
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
   let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
+  let candidates = normalizeCardCostCandidates(baseCost)
+  let usedCandidatePipeline = false
 
   for (const entry of matched) {
     const listenerContext = {
@@ -50,9 +72,29 @@ export const resolveCardCostWithModifiers = (
       cardId,
       actionCardId,
     }
+    if (entry.registration.computeCardCostCandidates) {
+      const builtContext = buildCardListenerContext(
+        entry.registration,
+        listenerContext,
+        listenerOwnerOptions(entry),
+      )
+      const nextCandidates = dedupeCardCostCandidates(
+        entry.registration.computeCardCostCandidates(builtContext, candidates),
+      )
+      if (!cardCostCandidatesEqual(candidates, nextCandidates)) {
+        usedCandidatePipeline = true
+      }
+      candidates = nextCandidates
+    }
     const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
     if (result?.costs && !isComplexCost(baseCost)) {
       cost = applyCostOverride(cost, result.costs)
+      candidates = dedupeCardCostCandidates(
+        candidates.map((candidate) => ({
+          ...candidate,
+          resources: applyCostOverride(candidate.resources, result.costs!),
+        })),
+      )
     }
     if (result?.bonuses) {
       collectedBonuses.push(...result.bonuses)
@@ -62,9 +104,33 @@ export const resolveCardCostWithModifiers = (
     }
   }
 
+  if (usedCandidatePipeline) {
+    const complexCost: ComplexCost = {
+      ...(isComplexCost(baseCost) ? baseCost : {}),
+      fee: undefined,
+      fees: candidates.map((candidate) => ({ ...candidate.resources })),
+    }
+    if (collectedTrades.length > 0) {
+      complexCost.trades = [
+        ...(isComplexCost(baseCost) ? baseCost.trades ?? [] : []),
+        ...collectedTrades,
+      ]
+    }
+    if (collectedBonuses.length > 0) {
+      complexCost.bonuses = [
+        ...(isComplexCost(baseCost) ? baseCost.bonuses ?? [] : []),
+        ...collectedBonuses,
+      ]
+    }
+    return {
+      cost: complexCost,
+      candidateMetadataByFeeIndex: buildCandidateMetadataByFeeIndex(candidates),
+    }
+  }
+
   if (isComplexCost(baseCost)) {
     if (collectedBonuses.length === 0 && collectedTrades.length === 0) {
-      return baseCost
+      return { cost: baseCost }
     }
     const merged: ComplexCost = { ...baseCost }
     if (collectedTrades.length > 0) {
@@ -73,7 +139,7 @@ export const resolveCardCostWithModifiers = (
     if (collectedBonuses.length > 0) {
       merged.bonuses = [...(baseCost.bonuses ?? []), ...collectedBonuses]
     }
-    return merged
+    return { cost: merged }
   }
 
   if (collectedBonuses.length > 0 || collectedTrades.length > 0) {
@@ -86,11 +152,28 @@ export const resolveCardCostWithModifiers = (
     if (collectedTrades.length > 0) {
       complexCost.trades = collectedTrades
     }
-    return complexCost
+    return { cost: complexCost }
   }
 
-  return cost
+  return { cost }
 }
+
+export const resolveCardCostWithModifiers = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  cardId: string,
+  baseCost: PaymentResourceMap | ComplexCost,
+  actionCardId?: string,
+): PaymentResourceMap | ComplexCost =>
+  resolveCardCostWithModifiersDetailed(
+    state,
+    player,
+    actionId,
+    cardId,
+    baseCost,
+    actionCardId,
+  ).cost
 
 const resolveCardPreviewCost = (
   state: GameState,
@@ -111,6 +194,25 @@ const resolveCardPreviewCost = (
   )
 }
 
+const resolveCardPreviewCostDetailed = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  cardId: string,
+  baseCost: PaymentResourceMap | ComplexCost | null | undefined,
+  actionCardId?: string,
+): ResolvedCardCostWithMetadata | null => {
+  if (!baseCost) return null
+  return resolveCardCostWithModifiersDetailed(
+    state,
+    player,
+    actionId,
+    cardId,
+    baseCost,
+    actionCardId,
+  )
+}
+
 export const resolveCardPreviewCostByProvider = (
   state: GameState,
   player: PlayerState,
@@ -120,6 +222,23 @@ export const resolveCardPreviewCostByProvider = (
   actionCardId?: string,
 ) =>
   resolveCardPreviewCost(
+    state,
+    player,
+    actionId,
+    cardId,
+    getBaseCost(),
+    actionCardId,
+  )
+
+export const resolveCardPreviewCostDetailedByProvider = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  cardId: string,
+  getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
+  actionCardId?: string,
+) =>
+  resolveCardPreviewCostDetailed(
     state,
     player,
     actionId,

@@ -120,31 +120,41 @@ describe('D96_Furnisher', () => {
     expect(result).toBeUndefined()
   })
 
-  it('computeCosts reduces wood by 1 when actionCardId is D96_Furnisher', () => {
+  it('computeCardCostCandidates appends wood discount when actionCardId is D96_Furnisher', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     expect(listener).toBeDefined()
     const player = createPlayer()
 
-    const result = executeCardListener(listener, {
+    const result = listener.computeCardCostCandidates?.({
       state: createState(player), player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
       actionCardId: CARD_ID,
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext, [
+      { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
+    ])
 
-    expect(result).toBeDefined()
-    expect(result!.costs).toEqual({ wood: -1 })
+    expect(result).toEqual([
+      { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
+      {
+        resources: {},
+        originalFeeIndex: 0,
+        sources: [CARD_ID],
+        costAttribution: { [CARD_ID]: { saved: { wood: 1 } } },
+      },
+    ])
   })
 
-  it('computeCosts does not apply when actionCardId is different', () => {
+  it('computeCardCostCandidates does not apply when actionCardId is different', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     const player = createPlayer()
 
-    const result = executeCardListener(listener, {
+    const candidates = [{ resources: { wood: 1 }, originalFeeIndex: 0, sources: [] }]
+    const result = listener.computeCardCostCandidates?.({
       state: createState(player), player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
       actionCardId: 'improvement',
-    } as unknown as CardListenerContext)
+    } as unknown as CardListenerContext, candidates)
 
-    expect(result).toBeUndefined()
+    expect(result).toEqual(candidates)
   })
 })

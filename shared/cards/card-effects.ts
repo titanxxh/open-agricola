@@ -58,6 +58,7 @@ export type PastureCapacityModifier = {
 export type PaymentInfo = {
   resourcesPaid: PaymentResourceMap
   feeIndex?: number
+  originalFeeIndex?: number
   returnedCardId?: string
 }
 

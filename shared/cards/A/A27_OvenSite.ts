@@ -1,8 +1,9 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookPhase } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerHasCardCapability } from '../helpers/card-type'
+import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A27_OvenSite'
@@ -13,22 +14,16 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionCardId !== CARD_ID) return
-    if (!context.cardId) return
-    if (!OVEN_IDS.includes(context.cardId as (typeof OVEN_IDS)[number])) return
-
-    // Override base cost to exactly { clay: 1, stone: 1 }.
-    // Base costs: ClayOven = { clay: 3, stone: 1 }, StoneOven = { clay: 1, stone: 3 }.
-    // Delta makes both become clay:1, stone:1.
-    if (context.cardId === 'Major_ClayOven') {
-      // 3 clay + 1 stone → 1 clay + 1 stone
-      return { costs: { clay: -2 } }
-    }
-    if (context.cardId === 'Major_StoneOven') {
-      // 1 clay + 3 stone → 1 clay + 1 stone
-      return { costs: { stone: -2 } }
-    }
+  order: 100,
+  computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
+    if (context.actionCardId !== CARD_ID) return [...candidates]
+    if (!context.cardId) return [...candidates]
+    if (!OVEN_IDS.includes(context.cardId as (typeof OVEN_IDS)[number])) return [...candidates]
+    return candidates.map((candidate) => ({
+      resources: { clay: 1, stone: 1 },
+      originalFeeIndex: candidate.originalFeeIndex,
+      sources: [...candidate.sources, CARD_ID],
+    }))
   },
 }
 

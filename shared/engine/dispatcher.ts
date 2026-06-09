@@ -19,6 +19,7 @@ import {
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { canPayResources } from '../actions/payment/internal'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
+import { applyComputeCostResults } from './compute-cost-results'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]
@@ -72,19 +73,13 @@ export class HookDispatcher {
     if (preview.isStructurallyPossible && !preview.isStructurallyPossible(context)) {
       return false
     }
-    const previewResults = this.previewComputeCosts(context)
-    const costOverride = previewResults.reduce<Record<string, number>>((acc, entry) => {
-      if (!entry.costs) return acc
-      Object.entries(entry.costs).forEach(([key, value]) => {
-        if (typeof value !== 'number') return
-        acc[key] = (acc[key] ?? 0) + value
-      })
-      return acc
-    }, {})
+    const previewContext = { ...context }
+    applyComputeCostResults(previewContext, this.previewComputeCosts(context))
+    const costOverride = previewContext.costs ?? {}
     if (preview.canExecute) {
-      return preview.canExecute(context, costOverride)
+      return preview.canExecute(previewContext, costOverride)
     }
-    const previewCost = resolveActionPreviewCost(preview, context, costOverride)
+    const previewCost = resolveActionPreviewCost(preview, previewContext, costOverride)
     return canPayResources(context.player, previewCost)
   }
 

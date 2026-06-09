@@ -3,7 +3,6 @@ import type {
   ActionExecutionResult,
   ActionFlow,
   InternalActionChild,
-  PlayerState,
   ActionChoiceOption,
   InteractionRequest,
   Resource,
@@ -47,6 +46,7 @@ import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
+import { applyComputeCostResults } from './compute-cost-results'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -218,6 +218,7 @@ const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
   const paymentInfo: Record<string, unknown> = {}
   if (resourcesPaid !== undefined) paymentInfo.resourcesPaid = resourcesPaid
   if (extraData.feeIndex !== undefined) paymentInfo.feeIndex = extraData.feeIndex
+  if (extraData.originalFeeIndex !== undefined) paymentInfo.originalFeeIndex = extraData.originalFeeIndex
   if (extraData.returnedCardId !== undefined) paymentInfo.returnedCardId = extraData.returnedCardId
   return Object.keys(paymentInfo).length > 0 ? paymentInfo : result
 }
@@ -556,20 +557,7 @@ export function engineResolveChoice(
         ...currentEventReadContext(int),
         actionId,
       })
-      const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
-        (acc, entry) => {
-          if (!entry.costs) return acc
-          Object.entries(entry.costs).forEach(([key, value]) => {
-            if (typeof value !== 'number') return
-            const resourceKey = key as keyof PlayerState['resources']
-            acc[resourceKey] = (acc[resourceKey] ?? 0) + value
-          })
-          return acc
-        },
-        {},
-      )
-      executionContext.costs =
-        Object.keys(costOverride).length > 0 ? costOverride : undefined
+      applyComputeCostResults(executionContext, costResults)
       const eventFrame = int.events.beginFrame({
         actorPlayerId: executionContext.player.id,
         sourceActionId: actionId,
@@ -673,6 +661,9 @@ export function engineResolveChoice(
           ownerNodeId: node instanceof XorNode ? node.id : null,
           params: executionContext.params,
           costs: executionContext.costs,
+          costTrades: executionContext.costTrades,
+          costBonuses: executionContext.costBonuses,
+          costAttribution: executionContext.costAttribution,
           sourceCard: executionContext.sourceCard,
           actionContext: executionContext.actionContext,
           contextWritePatch,
@@ -891,20 +882,7 @@ export function engineResolveChoice(
       ...pendingEventReadContext(),
       actionId: committedActionId,
     })
-    const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
-      (acc, entry) => {
-        if (!entry.costs) return acc
-        Object.entries(entry.costs).forEach(([key, value]) => {
-          if (typeof value !== 'number') return
-          const resourceKey = key as keyof PlayerState['resources']
-          acc[resourceKey] = (acc[resourceKey] ?? 0) + value
-        })
-        return acc
-      },
-      {},
-    )
-    executionContext.costs =
-      Object.keys(costOverride).length > 0 ? costOverride : undefined
+    applyComputeCostResults(executionContext, costResults)
   }
   pendingHost?.clearPending()
   let result: ActionExecutionResult
@@ -1008,6 +986,9 @@ export function engineResolveChoice(
       preserveOwner: true,
       params: contextSnapshot?.params,
       costs: contextSnapshot?.costs,
+      costTrades: contextSnapshot?.costTrades,
+      costBonuses: contextSnapshot?.costBonuses,
+      costAttribution: contextSnapshot?.costAttribution,
       sourceCard: pendingEnvelope.sourceCard ?? contextSnapshot?.sourceCard,
       actionContext: contextSnapshot?.actionContext,
     })
@@ -1038,6 +1019,9 @@ export function engineResolveChoice(
       preserveOwner: true,
       params: executionContext.params,
       costs: executionContext.costs,
+      costTrades: executionContext.costTrades,
+      costBonuses: executionContext.costBonuses,
+      costAttribution: executionContext.costAttribution,
       sourceCard: executionContext.sourceCard,
       actionContext: executionContext.actionContext,
       contextWritePatch,
