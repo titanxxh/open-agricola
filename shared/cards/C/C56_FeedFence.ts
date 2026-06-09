@@ -31,7 +31,10 @@ const cardImpl = {
     appliesTo: ['stables'],
     from: { clay: 1 },
     to: { wood: 2 },
+    scope: 'unit',
     max: 1,
+    groupId: CARD_ID,
+    groupMax: 1,
   } as TradeModifier],
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -10,6 +10,19 @@ const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
   return out
 }
 
+const sources = (sol: PaymentSolution): string[] => {
+  const out = new Set<string>()
+  for (const entry of sol.tradesUsed) {
+    if (entry.times <= 0) continue
+    const source = entry.trade.sourceId ?? entry.trade.source
+    if (source) out.add(source)
+  }
+  for (const source of sol.bonusUsed?.split(',') ?? []) {
+    if (source) out.add(source)
+  }
+  return [...out].sort()
+}
+
 const baseTestPlayer = (overrides: Partial<Resource> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
   resources: {
@@ -55,6 +68,60 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       },
     )
     expect(nonZeroPaid(sols[0])).toEqual({ wood: 2 })
+  })
+
+  it('keeps exact free action-trade discounts but rejects surplus-producing trade combos', () => {
+    const free = computeAllBuyableCombinations(
+      baseTestPlayer({ grain: 1 }),
+      {
+        fee: { wood: 1 },
+        trades: [{ from: {}, to: { wood: 1 }, max: 1, scope: 'action' }],
+      },
+      undefined,
+      'fencing',
+    )
+    expect(free.map(nonZeroPaid)).toContainEqual({})
+
+    const combo = computeAllBuyableCombinations(
+      baseTestPlayer({ clay: 1, grain: 1 }),
+      {
+        fee: { wood: 1 },
+        trades: [{ from: { clay: 1 }, to: { wood: 1 }, max: 1, scope: 'action' }],
+        bonuses: [{ discount: { wood: 1, grain: -1 }, optional: true, sources: ['D88_Millwright'] }],
+      },
+      undefined,
+      'fencing',
+    )
+    expect(combo.some((sol) =>
+      Object.values(sol.resourcesPaid).some((amount) => (amount ?? 0) < 0),
+    )).toBe(false)
+    expect(combo.map(nonZeroPaid)).not.toContainEqual({ wood: -1, clay: 1, grain: 1 })
+    expect(combo.map(nonZeroPaid)).toContainEqual({ grain: 1 })
+  })
+
+  it('applies bonuses after typed unit cost alternatives', () => {
+    const combo = computeAllBuyableCombinations(
+      baseTestPlayer({ clay: 1, grain: 1 }),
+      {
+        fee: { wood: 1 },
+        trades: [{ from: { clay: 1 }, to: { wood: 1 }, scope: 'unit', sourceId: 'A16_RammedClay' }],
+        bonuses: [{
+          choices: [
+            { discount: { wood: 1, grain: -1 } },
+            { discount: { clay: 1, grain: -1 } },
+          ],
+          optional: true,
+          sources: ['D88_Millwright'],
+        }],
+      },
+      undefined,
+      'fencing',
+    )
+
+    expect(combo.some((sol) =>
+      JSON.stringify(nonZeroPaid(sol)) === JSON.stringify({ grain: 1 }) &&
+      JSON.stringify(sources(sol)) === JSON.stringify(['A16_RammedClay', 'D88_Millwright']),
+    )).toBe(true)
   })
 
   it('nb absent → unit-trade rejected by validateComplexCost (dev mode)', () => {
