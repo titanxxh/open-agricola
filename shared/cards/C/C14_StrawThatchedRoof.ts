@@ -10,8 +10,7 @@ const CARD_ID = 'C14_StrawThatchedRoof'
  * BGA reference: removes reed from construct and renovation costs.
  * Prerequisite: 3 Grain Fields.
  *
- * We model reed removal as a large discount (99 reed) since the bonus system
- * caps at available cost. This effectively removes all reed from the cost.
+ * We model reed removal as a large discount capped at the current reed cost.
  */
 
 export const C14_StrawThatchedRoof = defineMinorCard({
@@ -34,12 +33,14 @@ export const C14_StrawThatchedRoof = defineMinorCard({
           cardId: CARD_ID,
           appliesTo: ['construct'],
           discount: { reed: 99 },
+          capDiscountAtCost: true,
         },
         {
           type: 'bonus',
           cardId: CARD_ID,
           appliesTo: ['renovation'],
           discount: { reed: 99 },
+          capDiscountAtCost: true,
         },
       ] as BonusModifier[]),
   ],
