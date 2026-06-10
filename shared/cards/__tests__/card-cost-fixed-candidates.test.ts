@@ -435,4 +435,29 @@ describe('fixed card-purchase cost candidates', () => {
       { clay: 1 },
     ]))
   })
+
+  // PR #293 review: an optional transform that consumes the mandatory
+  // resource first (D117 wood-for-food over A75's mandatory wood discount)
+  // must not surface a duplicate row with inflated sources — the closure
+  // prunes superset-source rows, matching BGA's bonus attribution where the
+  // unapplied Lumber Mill contributes nothing to the woodless row.
+  it('A75+D117 emits a single woodless row attributed to D117 only', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.minorPlayed = ['A75_LumberMill']
+    player.occupationPlayed = ['D117_WoodExpert']
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { wood: 2 },
+    )
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { wood: 1 }, sources: ['A75_LumberMill'] },
+      { resources: { food: 1 }, sources: ['D117_WoodExpert'] },
+    ]))
+  })
 })

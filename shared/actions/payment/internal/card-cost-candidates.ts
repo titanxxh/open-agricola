@@ -189,6 +189,43 @@ export const discountCardCostCandidate = (
   )
 }
 
+const resourcesAndFeeKey = (candidate: CardCostCandidate) =>
+  JSON.stringify({
+    resources: PAYMENT_RESOURCE_KEYS
+      .filter((key) => candidate.resources[key] !== undefined)
+      .map((key) => [key, candidate.resources[key] ?? 0]),
+    originalFeeIndex: candidate.originalFeeIndex,
+  })
+
+const isProperSourceSuperset = (left: readonly string[], right: readonly string[]) =>
+  left.length > right.length && right.every((source) => left.includes(source))
+
+/**
+ * Drops candidates whose sources are a proper superset of another candidate
+ * with identical resources and fee identity. The closure can reach the same
+ * row through a chain where an optional transform consumed a mandatory
+ * transform's resource first ("bypass" path); BGA attributes such rows to
+ * the minimal contributing set, so the superset row is presentation noise
+ * (duplicate payment choice with inflated attribution).
+ */
+export const pruneSupersetSourceCandidates = (
+  candidates: readonly CardCostCandidate[],
+): CardCostCandidate[] => {
+  const byRow = new Map<string, CardCostCandidate[]>()
+  for (const candidate of candidates) {
+    const key = resourcesAndFeeKey(candidate)
+    const group = byRow.get(key) ?? []
+    group.push(candidate)
+    byRow.set(key, group)
+  }
+  return candidates.filter((candidate) => {
+    const group = byRow.get(resourcesAndFeeKey(candidate))!
+    return !group.some((other) =>
+      other !== candidate && isProperSourceSuperset(candidate.sources, other.sources),
+    )
+  })
+}
+
 export const buildCandidateMetadataByFeeIndex = (
   candidates: readonly CardCostCandidate[],
 ): Record<number, CardCostCandidateMetadata> => {
