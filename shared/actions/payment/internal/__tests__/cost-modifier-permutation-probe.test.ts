@@ -1,0 +1,203 @@
+/**
+ * Probe tests for cost modifier ordering sensitivity (#288, ADR 0004).
+ *
+ * Each `it.fails` case documents a real ordering dependency in the current
+ * implementation: the same modifier collection produces DIFFERENT candidate
+ * sets depending on array order / listener id naming. They are the executable
+ * proof that the numeric `order` workaround is load-bearing today.
+ *
+ * Lifecycle: when the candidate closure lands (#290 unit trades, #291
+ * card-purchase pipeline), these cases start passing and vitest will flag the
+ * `.fails` marker — remove the marker then to promote them into the
+ * permanent permutation property suite (#292).
+ */
+import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import type { Trade } from '../../../../contract/types'
+import { computeAllBuyableCombinations } from '../enumerate'
+import { resolveCardCostWithModifiersDetailed } from '../preview-cost'
+import { appendDiscountedCardCostCandidates } from '../card-cost-candidates'
+import {
+  getRegisteredCardListeners,
+  type CardListenerRegistration,
+} from '../../../../cards/card-listeners'
+import { CardRegistry } from '../../../../cards/registry'
+import {
+  setActiveCardRegistry,
+  requireActiveCardRegistry,
+} from '../../../../cards/active-registry'
+import {
+  createProbePlayer,
+  createProbeState,
+  distinctResults,
+  feeResourceSet,
+  runPermutations,
+  solutionPaidSet,
+  type ComplexCost,
+} from './permutation-harness'
+
+describe('unit-trade ordering probes (current impl applies trades in array/order sequence)', () => {
+  // Synthetic trades mirroring D15_ClaySupports (full row replacement: pay
+  // 1 wood instead of 3 clay + 1 reed) and B145_BrushwoodCollector
+  // (replaceUpTo: pay 1 wood instead of up to 2 reed). Today these cards
+  // need order:10 / order:20 to sequence correctly; the probes drop `order`
+  // to model the target authoring experience.
+  const rowReplacement: Trade = {
+    from: { wood: 1 },
+    to: { clay: 3, reed: 1 },
+    max: 1,
+    scope: 'unit',
+  }
+  const reedSwap: Trade = {
+    from: { wood: 1 },
+    to: { reed: 2 },
+    max: 1,
+    scope: 'unit',
+    replaceUpTo: true,
+  }
+
+  const computePaidSets = (trades: Trade[]) => {
+    const player = createProbePlayer({ wood: 10, clay: 10, reed: 10, stone: 10 })
+    const cost: ComplexCost = { unitFee: { clay: 5, reed: 2 }, nb: 1, trades }
+    return solutionPaidSet(computeAllBuyableCombinations(player, cost))
+  }
+
+  // Why order matters today: applying reedSwap first strips reed from the
+  // base row ({clay:5,reed:2} → {clay:5,wood:1}), so rowReplacement can no
+  // longer match its `to` requirement on that derived row, and the cheap
+  // combined row {clay:2,wood:2} is never generated. The reverse order finds
+  // it. The closure reaches both regardless of order.
+  it.fails('payment candidate set is invariant under unit-trade permutation (D15+B145 shape)', () => {
+    const runs = runPermutations([rowReplacement, reedSwap], computePaidSets)
+    expect(distinctResults(runs)).toHaveLength(1)
+  })
+
+  it('non-invariance witness: the two orders differ exactly on the combined row', () => {
+    const forward = computePaidSets([rowReplacement, reedSwap])
+    const backward = computePaidSets([reedSwap, rowReplacement])
+    const combinedRow = JSON.stringify([['clay', 2], ['wood', 2]])
+    expect(forward).toContain(combinedRow)
+    expect(backward).not.toContain(combinedRow)
+  })
+
+  // Three-trade chain (adds an A123_FrameBuilder-shaped wood→clay swap).
+  // Deeper chains compound the misses: every permutation that runs reedSwap
+  // before rowReplacement loses the rows derived through both.
+  const claySwap: Trade = {
+    from: { wood: 1 },
+    to: { clay: 2 },
+    max: 1,
+    scope: 'unit',
+  }
+
+  it.fails('payment candidate set is invariant under three unit-trade permutations (D15+B145+A123 shape)', () => {
+    const runs = runPermutations([rowReplacement, reedSwap, claySwap], computePaidSets)
+    expect(distinctResults(runs)).toHaveLength(1)
+  })
+})
+
+describe('card-purchase pipeline ordering probes (current impl folds listeners by order desc, then id)', () => {
+  let snapshot: CardListenerRegistration[] = []
+
+  beforeEach(() => {
+    snapshot = getRegisteredCardListeners()
+  })
+
+  afterEach(() => {
+    const fresh = new CardRegistry()
+    setActiveCardRegistry(fresh)
+    snapshot.forEach((listener) => fresh.registerListener(listener))
+  })
+
+  type SyntheticCardCostListener = {
+    cardId: string
+    computeCardCostCandidates: NonNullable<
+      CardListenerRegistration['computeCardCostCandidates']
+    >
+  }
+
+  // Registers the same synthetic modifiers under permuted listener ids
+  // (listener-a, listener-b, ...). Renaming a listener is semantically
+  // meaningless, so the resulting candidate set must not change — but the
+  // current pipeline folds in id order, so it does.
+  const computeFeeSets = (listeners: SyntheticCardCostListener[]) => {
+    // Re-seed a clean registry per run: computeFeeSets is called once per
+    // permutation and module-level listener registration would accumulate.
+    const fresh = new CardRegistry()
+    setActiveCardRegistry(fresh)
+    snapshot.forEach((listener) => fresh.registerListener(listener))
+
+    const player = createProbePlayer()
+    player.occupationPlayed = listeners.map((listener) => listener.cardId)
+    const state = createProbeState(player)
+    const registry = requireActiveCardRegistry('permutation-probe')
+    listeners.forEach((listener, index) => {
+      registry.registerListener({
+        id: `probe-listener-${String.fromCharCode(97 + index)}`,
+        cardIds: [listener.cardId],
+        phases: ['computeCosts'],
+        actions: ['improvement'],
+        handler: () => undefined,
+        computeCardCostCandidates: listener.computeCardCostCandidates,
+      })
+    })
+    const result = resolveCardCostWithModifiersDetailed(
+      state, player, 'improvement', 'Major_Test', { clay: 1, stone: 2 },
+    )
+    const cost = result.cost
+    const fees = typeof cost === 'object' && 'fees' in cost && cost.fees
+      ? cost.fees
+      : [cost as Record<string, number>]
+    return feeResourceSet(fees)
+  }
+
+  // Mirrors A27_OvenSite (fixed-price candidate, today order:100) plus
+  // A143_Stonecutter (stone discount derived from every candidate). When the
+  // discount listener happens to sort before the fixed-price listener, the
+  // fixed row is appended too late to be discounted and the cheapest
+  // candidate {clay:1} disappears.
+  const fixedPrice: SyntheticCardCostListener = {
+    cardId: 'ProbeFixed',
+    computeCardCostCandidates: (_context, candidates) => [
+      ...candidates,
+      { resources: { clay: 1, stone: 1 }, originalFeeIndex: 0, sources: ['ProbeFixed'] },
+    ],
+  }
+  const stoneDiscount: SyntheticCardCostListener = {
+    cardId: 'ProbeDiscount',
+    computeCardCostCandidates: (_context, candidates) =>
+      appendDiscountedCardCostCandidates(candidates, 'ProbeDiscount', { stone: 1 }),
+  }
+
+  it.fails('candidate set is invariant under listener naming permutation (fixed-price + discount shape)', () => {
+    const runs = runPermutations([fixedPrice, stoneDiscount], computeFeeSets)
+    expect(distinctResults(runs)).toHaveLength(1)
+  })
+
+  it('non-invariance witness: fixed row only gets discounted when fixed listener sorts first', () => {
+    const discounted = JSON.stringify([['clay', 1]])
+    expect(computeFeeSets([fixedPrice, stoneDiscount])).toContain(discounted)
+    expect(computeFeeSets([stoneDiscount, fixedPrice])).not.toContain(discounted)
+  })
+
+  // Mirrors D117_WoodExpert: derives new candidates from candidates produced
+  // by OTHER cost cards (sources non-empty). Today it only works because
+  // 'D117…' happens to sort after 'A143…' / 'C122…' lexicographically.
+  const deriveFromDiscounted: SyntheticCardCostListener = {
+    cardId: 'ProbeDerive',
+    computeCardCostCandidates: (_context, candidates) => [
+      ...candidates,
+      ...candidates
+        .filter((candidate) => candidate.sources.includes('ProbeDiscount'))
+        .map((candidate) => ({
+          ...candidate,
+          resources: { ...candidate.resources, clay: (candidate.resources.clay ?? 0) + 1 },
+          sources: [...candidate.sources, 'ProbeDerive'],
+        })),
+    ],
+  }
+
+  it.fails('candidate set is invariant under listener naming permutation (derive-from-derived shape)', () => {
+    const runs = runPermutations([stoneDiscount, deriveFromDiscounted], computeFeeSets)
+    expect(distinctResults(runs)).toHaveLength(1)
+  })
+})
