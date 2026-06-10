@@ -79,7 +79,6 @@ export const applyCostModifiers = (
         ...(tradeMod.groupId !== undefined ? { groupId: tradeMod.groupId } : {}),
         ...(tradeMod.groupMax !== undefined ? { groupMax: tradeMod.groupMax } : {}),
         ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
-        ...(tradeMod.order !== undefined ? { order: tradeMod.order } : {}),
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
       })

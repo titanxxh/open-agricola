@@ -43,6 +43,7 @@ import {
   validateBonus,
   validateComplexCost,
 } from './cost-modifiers'
+import { closeCandidates, type CandidateTransform } from './candidate-closure'
 import type { InternalSolution } from './types'
 
 const scaleResources = (r: PaymentResourceMap, n: number): PaymentResourceMap => {
@@ -419,30 +420,27 @@ const buildUnitCostOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
 ): UnitCostOption[] => {
-  const sortedTrades = [...unitTrades].sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
-  let options: UnitCostOption[] = [{ cost: normalizePositiveResources(unitFee), tradesUsed: [] }]
-
-  for (const trade of sortedTrades) {
-    const additions: UnitCostOption[] = []
-    for (const option of options) {
+  // Candidate closure (ADR 0004): unit trades are optional transforms, the
+  // reachable option set is order-independent by construction. Per-trade
+  // `max` and trade-group limits live in the apply guard, which reads the
+  // usage already encoded in the option's tradesUsed.
+  const base: UnitCostOption = { cost: normalizePositiveResources(unitFee), tradesUsed: [] }
+  if (unitTrades.length === 0) return [base]
+  const transforms: CandidateTransform<UnitCostOption>[] = unitTrades.map((trade, index) => ({
+    source: `${index}#${tradeSignature(trade)}`,
+    maxUses: Number.POSITIVE_INFINITY,
+    apply: (option) => {
       const maxPerUnit = Math.min(
         Math.max(0, Math.floor(trade.max ?? 1)),
         getRemainingTradeGroupUses(option.tradesUsed, trade),
       )
-      let currentCost = option.cost
-      let currentTrades = option.tradesUsed
-      for (let count = getTradeUsage(option.tradesUsed, trade); count < maxPerUnit; count += 1) {
-        const nextCost = applyUnitTradeToCost(currentCost, trade)
-        if (!nextCost) break
-        currentTrades = incrementTradeUsage(currentTrades, trade)
-        additions.push({ cost: nextCost, tradesUsed: currentTrades })
-        currentCost = nextCost
-      }
-    }
-    options = dedupeUnitCostOptions([...options, ...additions])
-  }
-
-  return options
+      if (getTradeUsage(option.tradesUsed, trade) >= maxPerUnit) return null
+      const nextCost = applyUnitTradeToCost(option.cost, trade)
+      if (!nextCost) return null
+      return { cost: nextCost, tradesUsed: incrementTradeUsage(option.tradesUsed, trade) }
+    },
+  }))
+  return closeCandidates([base], transforms, { key: unitCostOptionSignature })
 }
 
 const buildUnitTotalOptions = (
