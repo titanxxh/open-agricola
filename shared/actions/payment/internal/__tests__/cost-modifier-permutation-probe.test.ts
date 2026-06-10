@@ -1,15 +1,11 @@
 /**
- * Probe tests for cost modifier ordering sensitivity (#288, ADR 0004).
+ * Permutation-invariance property suite for cost modifiers (ADR 0004).
  *
- * Each `it.fails` case documents a real ordering dependency in the current
- * implementation: the same modifier collection produces DIFFERENT candidate
- * sets depending on array order / listener id naming. They are the executable
- * proof that the numeric `order` workaround is load-bearing today.
- *
- * Lifecycle: when the candidate closure lands (#290 unit trades, #291
- * card-purchase pipeline), these cases start passing and vitest will flag the
- * `.fails` marker — remove the marker then to promote them into the
- * permanent permutation property suite (#292).
+ * Born as `.fails` probes (#288) proving the numeric `order` workaround was
+ * load-bearing; promoted to permanent properties once the candidate closure
+ * landed (#290 unit trades, #291 card-purchase pipeline). Every case asserts
+ * the same contract: shuffling modifier registration order / listener naming
+ * never changes the resulting payment candidate set.
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import type { Trade } from '../../../../contract/types'
@@ -194,5 +190,55 @@ describe('card-purchase pipeline ordering probes (current impl folds listeners b
   it('candidate set is invariant under listener naming permutation (derive-from-derived shape)', () => {
     const runs = runPermutations([stoneDiscount, deriveFromDiscounted], computeFeeSets)
     expect(distinctResults(runs)).toHaveLength(1)
+  })
+})
+
+describe('real-card and bonus-stage permutation properties (#292)', () => {
+  let snapshot: CardListenerRegistration[] = []
+
+  beforeEach(() => {
+    snapshot = getRegisteredCardListeners()
+  })
+
+  afterEach(() => {
+    const fresh = new CardRegistry()
+    setActiveCardRegistry(fresh)
+    snapshot.forEach((listener) => fresh.registerListener(listener))
+  })
+
+  // Capped bonuses (E123 ResourceHoarder shape) evaluate in the enumerate
+  // stage AFTER all trades — a fixed pipeline stage, not a card ordering.
+  // Shuffling both the trades and bonuses arrays must not change the
+  // reachable payment set.
+  it('payment set is invariant under trade and capped-bonus array permutations', () => {
+    const player = createProbePlayer({ wood: 10, clay: 10, reed: 10, stone: 10, food: 10 })
+    const trades = [
+      { from: { food: 1 }, to: { stone: 1 }, max: 1 },
+      { from: { wood: 1 }, to: { clay: 2 }, max: 1 },
+    ]
+    const bonuses = [
+      {
+        optional: true,
+        capDiscountAtCost: true,
+        choices: [
+          { discount: { stone: 1 }, capDiscountAtCost: true },
+          { discount: { stone: 2 }, capDiscountAtCost: true },
+        ],
+        sources: ['ProbeHoarder'],
+      },
+      { discount: { clay: 1 }, optional: false, sources: ['ProbeDiscount'] },
+    ]
+    const compute = (orderedTrades: typeof trades, orderedBonuses: typeof bonuses) =>
+      solutionPaidSet(computeAllBuyableCombinations(player, {
+        fee: { clay: 2, stone: 2 },
+        trades: orderedTrades,
+        bonuses: orderedBonuses,
+      }))
+    const results = runPermutations(trades, (tradePerm) =>
+      runPermutations(bonuses, (bonusPerm) => compute(tradePerm, bonusPerm))
+        .map((run) => JSON.stringify(run.result)),
+    )
+    const flattened = results.flatMap((run) => run.result)
+    expect(new Set(flattened).size).toBe(1)
   })
 })
