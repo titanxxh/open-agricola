@@ -410,4 +410,29 @@ describe('fixed card-purchase cost candidates', () => {
       }),
     ])
   })
+
+  // ADR 0004 closure property on production impls: A27 (mandatory fixed
+  // price) + A143 (optional stone discount). Mandatory Saturation hides the
+  // printed oven row; only the fixed row and its discounted derivation
+  // surface, independent of which zone arrays the cards sit in.
+  it('A27+A143 surfaces only the saturated fixed-price rows', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.minorPlayed = ['A27_OvenSite']
+    player.occupationPlayed = ['A143_Stonecutter']
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_ClayOven',
+      { clay: 3 },
+      'A27_OvenSite',
+    )
+    expect(sortedJson(candidateOptions(result).map((row) => row.resources))).toEqual(sortedJson([
+      { clay: 1, stone: 1 },
+      { clay: 1 },
+    ]))
+  })
 })
