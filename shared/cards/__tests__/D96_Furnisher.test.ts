@@ -120,41 +120,39 @@ describe('D96_Furnisher', () => {
     expect(result).toBeUndefined()
   })
 
-  it('computeCardCostCandidates appends wood discount when actionCardId is D96_Furnisher', () => {
+  it('deriveCardCostCandidate derives a wood discount when actionCardId is D96_Furnisher', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     expect(listener).toBeDefined()
     const player = createPlayer()
 
-    const result = listener.computeCardCostCandidates?.({
+    const result = listener.deriveCardCostCandidate?.({
       state: createState(player), player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
       actionCardId: CARD_ID,
-    } as unknown as CardListenerContext, [
+    } as unknown as CardListenerContext,
       { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
-    ])
+    )
 
-    expect(result).toEqual([
-      { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
-      {
-        resources: {},
-        originalFeeIndex: 0,
-        sources: [CARD_ID],
-        costAttribution: { [CARD_ID]: { saved: { wood: 1 } } },
-      },
-    ])
+    expect(result).toEqual({
+      resources: {},
+      originalFeeIndex: 0,
+      sources: [CARD_ID],
+      costAttribution: { [CARD_ID]: { saved: { wood: 1 } } },
+    })
   })
 
-  it('computeCardCostCandidates does not apply when actionCardId is different', () => {
+  it('deriveCardCostCandidate does not apply when actionCardId is different', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     const player = createPlayer()
 
-    const candidates = [{ resources: { wood: 1 }, originalFeeIndex: 0, sources: [] }]
-    const result = listener.computeCardCostCandidates?.({
+    const result = listener.deriveCardCostCandidate?.({
       state: createState(player), player, space: createSpace('improvement'),
       actionId: 'improvement', phase: 'computeCosts',
       actionCardId: 'improvement',
-    } as unknown as CardListenerContext, candidates)
+    } as unknown as CardListenerContext,
+      { resources: { wood: 1 }, originalFeeIndex: 0, sources: [] },
+    )
 
-    expect(result).toEqual(candidates)
+    expect(result).toBeNull()
   })
 })

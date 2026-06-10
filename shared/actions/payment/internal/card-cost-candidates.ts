@@ -60,8 +60,13 @@ const candidateKey = (candidate: CardCostCandidate) =>
       .filter((key) => candidate.resources[key] !== undefined)
       .map((key) => [key, candidate.resources[key] ?? 0]),
     originalFeeIndex: candidate.originalFeeIndex,
-    sources: candidate.sources,
+    // Sources are an unordered contribution set: closure derivation chains
+    // may append the same cards in different orders.
+    sources: [...candidate.sources].sort(),
   })
+
+/** Dedupe key used by the candidate closure over card cost candidates. */
+export const cardCostCandidateClosureKey = candidateKey
 
 export const cardCostCandidatesEqual = (
   left: readonly CardCostCandidate[],
@@ -149,7 +154,11 @@ export const addCardCostCandidateAttribution = (
   }
 }
 
-const discountCardCostCandidate = (
+/**
+ * Single-candidate discount derivation (Candidate Closure transform body).
+ * Clamps at 0; returns null when nothing is actually saved.
+ */
+export const discountCardCostCandidate = (
   candidate: CardCostCandidate,
   source: string,
   discount: Partial<Resource>,
@@ -178,35 +187,6 @@ const discountCardCostCandidate = (
     source,
     { saved },
   )
-}
-
-const deriveDiscountedCardCostCandidates = (
-  candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
-): CardCostCandidate[] =>
-  candidates
-    .map((candidate) => discountCardCostCandidate(candidate, source, discount))
-    .filter((candidate): candidate is CardCostCandidate => Boolean(candidate))
-
-export const appendDiscountedCardCostCandidates = (
-  candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
-): CardCostCandidate[] => {
-  const derived = deriveDiscountedCardCostCandidates(candidates, source, discount)
-  return dedupeCardCostCandidates([...candidates, ...derived])
-}
-
-export const replaceWithDiscountedCardCostCandidates = (
-  candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
-): CardCostCandidate[] => {
-  const replaced = candidates.map((candidate) =>
-    discountCardCostCandidate(candidate, source, discount) ?? candidate,
-  )
-  return dedupeCardCostCandidates(replaced)
 }
 
 export const buildCandidateMetadataByFeeIndex = (

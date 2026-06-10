@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { replaceWithDiscountedCardCostCandidates } from '../../actions/payment/internal'
+import { discountCardCostCandidate } from '../../actions/payment/internal'
 
 const CARD_ID = 'A75_LumberMill'
 /**
@@ -14,8 +14,9 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  computeCardCostCandidates: (_context, candidates) =>
-    replaceWithDiscountedCardCostCandidates(candidates, CARD_ID, { wood: 1 }),
+  cardCostCandidateMandatory: true,
+  deriveCardCostCandidate: (_context, candidate) =>
+    discountCardCostCandidate(candidate, CARD_ID, { wood: 1 }),
 }
 
 const cardImpl = {

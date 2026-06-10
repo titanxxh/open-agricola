@@ -15,6 +15,7 @@
 import type {
   ActionAvailabilityContext,
   Bonus,
+  CardCostCandidate,
   CardCostCandidateMetadata,
   ComplexCost,
   CostModifierType,
@@ -26,8 +27,10 @@ import type {
 } from '../../../contract/types'
 import { buildCardListenerContext, executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
 import { applyCostOverride, isComplexCost } from './affordability'
+import { closeCandidates, type CandidateTransform } from './candidate-closure'
 import {
   buildCandidateMetadataByFeeIndex,
+  cardCostCandidateClosureKey,
   cardCostCandidatesEqual,
   dedupeCardCostCandidates,
   normalizeCardCostCandidates,
@@ -42,14 +45,6 @@ export type ResolvedCardCostWithMetadata = {
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
 }
 
-const orderCardCostListeners = <T extends { registration: { id: string; order?: number } }>(
-  entries: readonly T[],
-): T[] =>
-  [...entries].sort((left, right) =>
-    (right.registration.order ?? 0) - (left.registration.order ?? 0)
-    || left.registration.id.localeCompare(right.registration.id),
-  )
-
 export const resolveCardCostWithModifiersDetailed = (
   state: GameState,
   player: PlayerState,
@@ -59,9 +54,10 @@ export const resolveCardCostWithModifiersDetailed = (
   actionCardId?: string,
 ): ResolvedCardCostWithMetadata => {
   const context = buildCardCostListenerContext(state, player, actionId)
-  const matched = orderCardCostListeners(getMatchingListeners(context))
+  const matched = getMatchingListeners(context)
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
+  const transforms: CandidateTransform<CardCostCandidate>[] = []
   let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
   let candidates = normalizeCardCostCandidates(baseCost)
   let usedCandidatePipeline = false
@@ -72,22 +68,23 @@ export const resolveCardCostWithModifiersDetailed = (
       cardId,
       actionCardId,
     }
-    if (entry.registration.computeCardCostCandidates) {
+    const derive = entry.registration.deriveCardCostCandidate
+    if (derive) {
       const builtContext = buildCardListenerContext(
         entry.registration,
         listenerContext,
         listenerOwnerOptions(entry),
       )
-      const nextCandidates = dedupeCardCostCandidates(
-        entry.registration.computeCardCostCandidates(builtContext, candidates),
-      )
-      if (!cardCostCandidatesEqual(candidates, nextCandidates)) {
-        usedCandidatePipeline = true
-      }
-      candidates = nextCandidates
+      transforms.push({
+        source: entry.registration.id,
+        mandatory: entry.registration.cardCostCandidateMandatory === true,
+        apply: (candidate) => derive(builtContext, candidate),
+      })
     }
     const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
     if (result?.costs && !isComplexCost(baseCost)) {
+      // Flat base-cost deltas are additive (commutative); they adjust the
+      // base candidates before the closure derives from them.
       cost = applyCostOverride(cost, result.costs)
       candidates = dedupeCardCostCandidates(
         candidates.map((candidate) => ({
@@ -102,6 +99,18 @@ export const resolveCardCostWithModifiersDetailed = (
     if (result?.trades) {
       collectedTrades.push(...result.trades)
     }
+  }
+
+  if (transforms.length > 0) {
+    // Candidate Closure (ADR 0004): order-agnostic fixpoint over the card
+    // cost transforms — replaces the previous order-desc-then-id fold.
+    const closed = dedupeCardCostCandidates(
+      closeCandidates(candidates, transforms, { key: cardCostCandidateClosureKey }),
+    )
+    if (!cardCostCandidatesEqual(candidates, closed)) {
+      usedCandidatePipeline = true
+    }
+    candidates = closed
   }
 
   if (usedCandidatePipeline) {

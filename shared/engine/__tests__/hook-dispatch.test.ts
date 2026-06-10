@@ -329,68 +329,6 @@ describe('Hook dispatch merge order', () => {
   })
 })
 
-describe('Card listener order field', () => {
-  beforeEach(() => {
-    clearActionHooks()
-    setActiveCardRegistry(new CardRegistry())
-  })
-
-  it('card listeners execute in ascending order', () => {
-    const order: string[] = []
-    const player = createPlayer()
-    player.minorPlayed = ['card-A', 'card-B']
-
-    requireActiveCardRegistry('hook-dispatch').registerListener({
-      id: 'listener-high',
-      cardIds: ['card-B'],
-      actions: ['test-action'],
-      phases: ['after'],
-      order: 20,
-      handler: () => {
-        order.push('high')
-        return {}
-      },
-    })
-
-    requireActiveCardRegistry('hook-dispatch').registerListener({
-      id: 'listener-low',
-      cardIds: ['card-A'],
-      actions: ['test-action'],
-      phases: ['after'],
-      order: 10,
-      handler: () => {
-        order.push('low')
-        return {}
-      },
-    })
-
-    const action = createAction()
-    const registry = new ActionRegistry()
-    registry.register(action)
-    const state = {
-      round: 1, currentPlayerIndex: 0,
-      players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
-      gameSeed: 1, availableMajorImprovements: [],
-      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
-    } as GameState
-    const space = createSpace(action)
-
-    const engine = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
-      registry,
-      hooks: new HookDispatcher(),
-      log: new LogStore(),
-    })
-    let step = engine.proceed({ state, player, space })
-    while (step.type === 'ok') {
-      step = engine.proceed({ state, player, space })
-    }
-
-    expect(order).toEqual(['high', 'low'])
-  })
-})
-
 describe('Card listener scope filtering', () => {
   beforeEach(() => {
     clearActionHooks()

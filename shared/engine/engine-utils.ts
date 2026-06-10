@@ -300,8 +300,6 @@ export function buildPhaseTrailingNodes(
   const out: EngineNode[] = []
   for (const ownerId of orderedOwners) {
     const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => {
-      const orderDelta = (b.ml.registration.order ?? 0) - (a.ml.registration.order ?? 0)
-      if (orderDelta !== 0) return orderDelta
       const playOrderDelta = a.playOrderIndex - b.playOrderIndex
       if (playOrderDelta !== 0) return playOrderDelta
       return a.matchedIndex - b.matchedIndex
