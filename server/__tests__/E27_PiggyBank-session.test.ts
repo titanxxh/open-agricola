@@ -168,10 +168,10 @@ describe('E27_PiggyBank session', () => {
       cardId: 'Major_Joinery',
     } as CardListenerContext
 
-    const result = costListener!.computeCardCostCandidates!(context, [
+    const result = costListener!.deriveCardCostCandidate!(context,
       { resources: { wood: 2, stone: 2 }, originalFeeIndex: 0, sources: [] },
-    ])
-    expect(result).toContainEqual({
+    )
+    expect(result).toEqual({
       resources: {},
       originalFeeIndex: 0,
       sources: [CARD_ID],
