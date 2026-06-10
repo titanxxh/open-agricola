@@ -195,6 +195,30 @@ describe('closeCandidates', () => {
     expect(new Set(results).size).toBe(1)
   })
 
+  // D95 SiteManager shape: one candidate fans out into several derived rows
+  // (one per resource subset). A transform may return an array.
+  it('supports one-to-many transforms', () => {
+    const fanOut: CandidateTransform<Probe> = {
+      source: 'FanOut',
+      apply: (candidate) => {
+        const keys = Object.keys(candidate.resources).filter(
+          (resource) => (candidate.resources[resource] ?? 0) > 0,
+        )
+        if (keys.length === 0) return null
+        return keys.map((resource) => ({
+          resources: { ...candidate.resources, [resource]: (candidate.resources[resource] ?? 0) - 1, food: 1 },
+          sources: [...candidate.sources, 'FanOut'],
+        }))
+      },
+    }
+    const result = closeCandidates([probe({ clay: 2, stone: 1 })], [fanOut], { key })
+    expect(resourceSet(result)).toEqual(resourceSet([
+      probe({ clay: 2, stone: 1 }),
+      probe({ clay: 1, stone: 1, food: 1 }),
+      probe({ clay: 2, food: 1 }),
+    ]))
+  })
+
   it('reports a defensive warning when the closure exceeds the candidate limit', () => {
     const warnings: number[] = []
     closeCandidates(

@@ -22,34 +22,30 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  computeCardCostCandidates: (_context, candidates): CardCostCandidate[] => {
-    const derived = candidates
-      .filter((candidate) => candidate.resources.wood !== undefined)
-      .map((candidate) => {
-        const beforeWood = candidate.resources.wood ?? 0
-        const afterWood = Math.max(0, beforeWood - 2)
-        const resources = {
-          ...candidate.resources,
-          food: (candidate.resources.food ?? 0) + 1,
-        }
-        if (afterWood === 0) {
-          delete resources.wood
-        } else {
-          resources.wood = afterWood
-        }
-        return addCardCostCandidateAttribution(
-          {
-            ...candidate,
-            resources,
-          },
-          CARD_ID,
-          {
-            saved: { wood: beforeWood - afterWood },
-            paid: { food: 1 },
-          },
-        )
-      })
-    return [...candidates, ...derived]
+  deriveCardCostCandidate: (_context, candidate: CardCostCandidate) => {
+    if (candidate.resources.wood === undefined) return null
+    const beforeWood = candidate.resources.wood ?? 0
+    const afterWood = Math.max(0, beforeWood - 2)
+    const resources = {
+      ...candidate.resources,
+      food: (candidate.resources.food ?? 0) + 1,
+    }
+    if (afterWood === 0) {
+      delete resources.wood
+    } else {
+      resources.wood = afterWood
+    }
+    return addCardCostCandidateAttribution(
+      {
+        ...candidate,
+        resources,
+      },
+      CARD_ID,
+      {
+        saved: { wood: beforeWood - afterWood },
+        paid: { food: 1 },
+      },
+    )
   },
 }
 

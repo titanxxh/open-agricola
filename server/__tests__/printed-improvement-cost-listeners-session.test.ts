@@ -157,11 +157,16 @@ describe('printed improvement cost listeners', () => {
     )
 
     expect(isComplexCost(result?.cost)).toBe(true)
-    expect((result?.cost as ComplexCost).fees).toEqual([
-      { wood: 1 },
-      { clay: 1 },
-      { food: 1 },
-    ])
-    expect(result?.candidateMetadataByFeeIndex?.[2]?.sources).toEqual(['D117_WoodExpert'])
+    const fees = (result?.cost as ComplexCost).fees ?? []
+    const rows = fees.map((resources, index) => ({
+      resources,
+      sources: result?.candidateMetadataByFeeIndex?.[index]?.sources ?? [],
+    }))
+    const key = (row: unknown) => JSON.stringify(row)
+    expect([...rows].map(key).sort()).toEqual([
+      { resources: { wood: 1 }, sources: [] },
+      { resources: { clay: 1 }, sources: [] },
+      { resources: { food: 1 }, sources: ['D117_WoodExpert'] },
+    ].map(key).sort())
   })
 })

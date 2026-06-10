@@ -19,8 +19,11 @@ export type CandidateTransform<C> = {
   mandatory?: boolean
   /** Applications allowed per derivation chain. Default 1. */
   maxUses?: number
-  /** Returns the derived candidate, or null when not applicable. */
-  apply: (candidate: C) => C | null
+  /**
+   * Returns the derived candidate(s), or null when not applicable.
+   * Returning an array fans one candidate out into several derived rows.
+   */
+  apply: (candidate: C) => C | readonly C[] | null
 }
 
 export type CandidateClosureOptions<C> = {
@@ -87,10 +90,13 @@ export const closeCandidates = <C>(
       if (used >= (transform.maxUses ?? 1)) continue
       const derived = transform.apply(node.candidate)
       if (derived === null) continue
-      pushNode({
-        candidate: derived,
-        usesBySource: { ...node.usesBySource, [transform.source]: used + 1 },
-      })
+      const derivedList = Array.isArray(derived) ? derived : [derived as C]
+      for (const candidate of derivedList) {
+        pushNode({
+          candidate,
+          usesBySource: { ...node.usesBySource, [transform.source]: used + 1 },
+        })
+      }
     }
     // Mandatory Saturation: only emit candidates with no applicable
     // mandatory transform left; unsaturated nodes stay derivation-only.
@@ -98,7 +104,8 @@ export const closeCandidates = <C>(
       if (!transform.mandatory) return true
       const used = node.usesBySource[transform.source] ?? 0
       if (used >= (transform.maxUses ?? 1)) return true
-      return transform.apply(node.candidate) === null
+      const derived = transform.apply(node.candidate)
+      return derived === null || (Array.isArray(derived) && derived.length === 0)
     })
     if (!saturated) continue
     const candidateKey = options.key(node.candidate)

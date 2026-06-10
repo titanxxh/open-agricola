@@ -301,18 +301,23 @@ describe('fixed card-purchase cost candidates', () => {
       'C95_BasketWeaver',
     )
 
-    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+    // Candidate Closure (ADR 0004): fixed-price rows report their own card
+    // as the sole source instead of merging sources from whichever row they
+    // were derived from, so the multi-source attribution combos of the old
+    // ordered fold ({C95+E109} rows) no longer appear. The player-visible
+    // resource set is unchanged.
+    const sortSources = (rows: ReturnType<typeof candidateOptions>) =>
+      rows.map((row) => ({ ...row, sources: [...row.sources].sort() }))
+    expect(sortedJson(sortSources(candidateOptions(result)))).toEqual(sortedJson(sortSources([
       { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver'] },
       { resources: { reed: 1, stone: 1 }, sources: ['E109_BraidMaker'] },
-      { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver', 'E109_BraidMaker'] },
       { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver'] },
       { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'E109_BraidMaker'] },
-      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver', 'E109_BraidMaker'] },
       { resources: { reed: 2, stone: 1, food: 1 }, sources: ['A143_Stonecutter', 'D117_WoodExpert'] },
       { resources: { reed: 2, stone: 2, food: 1 }, sources: ['D117_WoodExpert'] },
       { resources: { wood: 2, reed: 2, stone: 1 }, sources: ['A143_Stonecutter'] },
       { resources: { wood: 2, reed: 2, stone: 2 }, sources: [] },
-    ]))
+    ])))
   })
 
   it('E27 appends a free major improvement payment candidate and keeps the original', () => {
@@ -352,21 +357,13 @@ describe('fixed card-purchase cost candidates', () => {
       'D95_SiteManager',
     )
 
-    expect(result.cost).toMatchObject({
-      fees: [
-        { wood: 2, stone: 2 },
-        { wood: 1, stone: 2, food: 1 },
-        { wood: 2, stone: 1, food: 1 },
-        { wood: 1, stone: 1, food: 2 },
-      ],
-    })
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { wood: 2, stone: 2 }, sources: [] },
+      { resources: { wood: 1, stone: 2, food: 1 }, sources: ['D95_SiteManager'] },
+      { resources: { wood: 2, stone: 1, food: 1 }, sources: ['D95_SiteManager'] },
+      { resources: { wood: 1, stone: 1, food: 2 }, sources: ['D95_SiteManager'] },
+    ]))
     expect('bonuses' in result.cost).toBe(false)
-    expect(result.candidateMetadataByFeeIndex).toEqual({
-      0: { originalFeeIndex: 0, sources: [] },
-      1: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-      2: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-      3: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-    })
   })
 
   it('B65 keeps the original path identity when a derived payment candidate is selected', () => {
@@ -375,18 +372,15 @@ describe('fixed card-purchase cost candidates', () => {
       cardIds: [HOOK_CARD],
       phases: ['computeCosts'],
       actions: ['improvement'],
-      computeCardCostCandidates: (context, candidates) => {
-        if (context.cardId !== 'B65_GrainDepot') return [...candidates]
-        return [
-          ...candidates,
-          ...candidates
-            .filter((candidate) => candidate.originalFeeIndex === 1)
-            .map((candidate) => ({
-              resources: {},
-              originalFeeIndex: candidate.originalFeeIndex,
-              sources: [...candidate.sources, HOOK_CARD],
-            })),
-        ]
+      deriveCardCostCandidate: (context, candidate) => {
+        if (context.cardId !== 'B65_GrainDepot') return null
+        if (candidate.originalFeeIndex !== 1) return null
+        if (candidate.sources.includes(HOOK_CARD)) return null
+        return {
+          resources: {},
+          originalFeeIndex: candidate.originalFeeIndex,
+          sources: [...candidate.sources, HOOK_CARD],
+        }
       },
     }
     requireActiveCardRegistry('card-cost-fixed-candidates').registerListener(hook)

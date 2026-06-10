@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { requireActiveCardRegistry } from '../../../cards/active-registry'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
-import { appendDiscountedCardCostCandidates } from '../../payment/internal'
+import { discountCardCostCandidate } from '../../payment/internal'
 import { playImprovement } from '../improvement'
 
 import '../../../cards/A/A53_Claypipe'
@@ -79,8 +79,8 @@ const registerCandidateListener = (discount: { clay: number }) => {
     phases: ['computeCosts'],
     actions: ['improvement'],
     handler: () => undefined,
-    computeCardCostCandidates: (_context, candidates) =>
-      appendDiscountedCardCostCandidates(candidates, SOURCE_CARD, discount),
+    deriveCardCostCandidate: (_context, candidate) =>
+      discountCardCostCandidate(candidate, SOURCE_CARD, discount),
   })
 }
 
