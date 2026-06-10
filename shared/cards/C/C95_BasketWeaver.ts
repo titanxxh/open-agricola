@@ -59,18 +59,15 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  order: 100,
-  computeCardCostCandidates: (context: CardListenerContext, candidates: readonly CardCostCandidate[]) => {
-    if (context.actionCardId !== CARD_ID) return [...candidates]
-    if (context.cardId !== TARGET_MAJOR) return [...candidates]
-    return [
-      ...candidates,
-      ...candidates.map((candidate) => ({
-        resources: { stone: 1, reed: 1 },
-        originalFeeIndex: candidate.originalFeeIndex,
-        sources: [...candidate.sources, CARD_ID],
-      })),
-    ]
+  deriveCardCostCandidate: (context: CardListenerContext, candidate: CardCostCandidate) => {
+    if (context.actionCardId !== CARD_ID) return null
+    if (context.cardId !== TARGET_MAJOR) return null
+    if (candidate.sources.includes(CARD_ID)) return null
+    return {
+      resources: { stone: 1, reed: 1 },
+      originalFeeIndex: candidate.originalFeeIndex,
+      sources: [CARD_ID],
+    }
   },
 }
 

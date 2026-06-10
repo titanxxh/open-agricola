@@ -89,6 +89,19 @@ describe('card-purchase cost candidate cards', () => {
       listener.phases?.includes('computeCosts') && listener.actions?.includes('improvement'),
     )
 
+  // Closure output order is traversal-defined; compare fees+metadata as a
+  // set of rows instead of a positional array.
+  const rowKey = (row: { resources: PaymentResourceMap; meta?: unknown }) =>
+    JSON.stringify({
+      resources: Object.entries(row.resources)
+        .filter(([, amount]) => amount !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      meta: row.meta,
+    })
+
+  const sortedRows = (rows: Array<{ resources: PaymentResourceMap; meta?: unknown }>) =>
+    [...rows].sort((a, b) => (rowKey(a) < rowKey(b) ? -1 : rowKey(a) > rowKey(b) ? 1 : 0))
+
   const expectFeesAndSources = (
     result: ReturnType<typeof resolveCardCostWithModifiersDetailed>,
     fees: NonNullable<ComplexCost['fees']>,
@@ -97,21 +110,21 @@ describe('card-purchase cost candidate cards', () => {
   ) => {
     expect(isComplexCost(result.cost)).toBe(true)
     const cost = result.cost as ComplexCost
-    expect(cost.fees).toEqual(fees)
     expect(cost.bonuses).toBeUndefined()
     expect(cost.trades).toBeUndefined()
-    expect(result.candidateMetadataByFeeIndex).toEqual(
-      Object.fromEntries(
-        fees.map((_, index) => [
-          index,
-          {
-            originalFeeIndex: index < 2 ? index : 0,
-            sources: sourcesByFeeIndex[index] ?? [],
-            ...(attributionByFeeIndex[index] ? { costAttribution: attributionByFeeIndex[index] } : {}),
-          },
-        ]),
-      ),
-    )
+    const expected = fees.map((resources, index) => ({
+      resources,
+      meta: {
+        originalFeeIndex: index < 2 ? index : 0,
+        sources: sourcesByFeeIndex[index] ?? [],
+        ...(attributionByFeeIndex[index] ? { costAttribution: attributionByFeeIndex[index] } : {}),
+      },
+    }))
+    const actual = (cost.fees ?? []).map((resources, index) => ({
+      resources,
+      meta: result.candidateMetadataByFeeIndex?.[index],
+    }))
+    expect(sortedRows(actual)).toEqual(sortedRows(expected))
   }
 
   it('keeps migrated card-purchase costs on candidate/base-cost APIs', () => {
@@ -134,7 +147,7 @@ describe('card-purchase cost candidate cards', () => {
       const listeners = computeCardPurchaseListeners(impl)
       expect(listeners.length, id).toBeGreaterThan(0)
       for (const listener of listeners) {
-        expect(listener.computeCardCostCandidates, id).toBeTypeOf('function')
+        expect(listener.deriveCardCostCandidate, id).toBeTypeOf('function')
         expect(listener.handler, id).toBeUndefined()
       }
     }
@@ -205,14 +218,18 @@ describe('card-purchase cost candidate cards', () => {
       { fees: [{ stone: 1 }, { stone: 3 }] },
     )
     expect(isComplexCost(major.cost)).toBe(true)
-    expect((major.cost as ComplexCost).fees).toEqual([
-      { stone: 1 },
-      { stone: 3 },
-      {},
-      { stone: 1 },
-    ])
-    expect(major.candidateMetadataByFeeIndex?.[2]?.sources).toEqual(['B95_MasterBricklayer'])
-    expect(major.candidateMetadataByFeeIndex?.[3]?.sources).toEqual(['B95_MasterBricklayer'])
+    const majorCost = major.cost as ComplexCost
+    const majorRows = (majorCost.fees ?? []).map((resources, index) => ({
+      resources,
+      sources: major.candidateMetadataByFeeIndex?.[index]?.sources ?? [],
+    }))
+    expect(sortedRows(majorRows.map(({ resources, sources }) => ({ resources, meta: sources }))))
+      .toEqual(sortedRows([
+        { resources: { stone: 1 }, meta: [] },
+        { resources: { stone: 3 }, meta: [] },
+        { resources: {}, meta: ['B95_MasterBricklayer'] },
+        { resources: { stone: 1 }, meta: ['B95_MasterBricklayer'] },
+      ]))
 
     const minor = resolveCardCostWithModifiersDetailed(
       state,
@@ -320,38 +337,49 @@ describe('card-purchase cost candidate cards', () => {
 
     expect(isComplexCost(result.cost)).toBe(true)
     const cost = result.cost as ComplexCost
-    expect(cost.fees).toEqual([
-      { wood: 1, clay: 1 },
-      { stone: 1 },
-      { wood: 3 },
-      { clay: 1, food: 1 },
-      { wood: 1, food: 1 },
-    ])
+    expect(sortedRows((cost.fees ?? []).map((resources) => ({ resources }))))
+      .toEqual(sortedRows([
+        { resources: { wood: 1, clay: 1 } },
+        { resources: { stone: 1 } },
+        { resources: { wood: 3 } },
+        { resources: { clay: 1, food: 1 } },
+        { resources: { wood: 1, food: 1 } },
+      ]))
     expect(cost.trades).toBeUndefined()
-    expect(result.candidateMetadataByFeeIndex).toEqual({
-      0: { originalFeeIndex: 0, sources: [] },
-      1: { originalFeeIndex: 1, sources: [] },
-      2: { originalFeeIndex: 2, sources: [] },
-      3: {
-        originalFeeIndex: 0,
-        sources: ['D117_WoodExpert'],
-        costAttribution: {
-          D117_WoodExpert: {
-            saved: { wood: 1 },
-            paid: { food: 1 },
+    const rows = (cost.fees ?? []).map((resources, index) => ({
+      resources,
+      meta: result.candidateMetadataByFeeIndex?.[index],
+    }))
+    expect(sortedRows(rows)).toEqual(sortedRows([
+      { resources: { wood: 1, clay: 1 }, meta: { originalFeeIndex: 0, sources: [] } },
+      { resources: { stone: 1 }, meta: { originalFeeIndex: 1, sources: [] } },
+      { resources: { wood: 3 }, meta: { originalFeeIndex: 2, sources: [] } },
+      {
+        resources: { clay: 1, food: 1 },
+        meta: {
+          originalFeeIndex: 0,
+          sources: ['D117_WoodExpert'],
+          costAttribution: {
+            D117_WoodExpert: {
+              saved: { wood: 1 },
+              paid: { food: 1 },
+            },
           },
         },
       },
-      4: {
-        originalFeeIndex: 2,
-        sources: ['D117_WoodExpert'],
-        costAttribution: {
-          D117_WoodExpert: {
-            saved: { wood: 2 },
-            paid: { food: 1 },
+      {
+        resources: { wood: 1, food: 1 },
+        meta: {
+          originalFeeIndex: 2,
+          sources: ['D117_WoodExpert'],
+          costAttribution: {
+            D117_WoodExpert: {
+              saved: { wood: 2 },
+              paid: { food: 1 },
+            },
           },
         },
       },
-    })
+    ]))
   })
 })

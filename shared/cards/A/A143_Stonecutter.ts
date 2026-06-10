@@ -3,7 +3,7 @@ import type { BonusModifier } from '../../contract/types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { appendDiscountedCardCostCandidates } from '../../actions/payment/internal'
+import { discountCardCostCandidate } from '../../actions/payment/internal'
 
 const CARD_ID = 'A143_Stonecutter'
 /**
@@ -21,8 +21,8 @@ const improvementCostListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  computeCardCostCandidates: (_context, candidates) =>
-    appendDiscountedCardCostCandidates(candidates, CARD_ID, { stone: 1 }),
+  deriveCardCostCandidate: (_context, candidate) =>
+    discountCardCostCandidate(candidate, CARD_ID, { stone: 1 }),
 }
 
 const cardImpl = {

@@ -15,7 +15,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import type { Trade } from '../../../../contract/types'
 import { computeAllBuyableCombinations } from '../enumerate'
 import { resolveCardCostWithModifiersDetailed } from '../preview-cost'
-import { appendDiscountedCardCostCandidates } from '../card-cost-candidates'
+import { discountCardCostCandidate } from '../card-cost-candidates'
 import {
   getRegisteredCardListeners,
   type CardListenerRegistration,
@@ -108,15 +108,15 @@ describe('card-purchase pipeline ordering probes (current impl folds listeners b
 
   type SyntheticCardCostListener = {
     cardId: string
-    computeCardCostCandidates: NonNullable<
-      CardListenerRegistration['computeCardCostCandidates']
+    mandatory?: boolean
+    deriveCardCostCandidate: NonNullable<
+      CardListenerRegistration['deriveCardCostCandidate']
     >
   }
 
   // Registers the same synthetic modifiers under permuted listener ids
   // (listener-a, listener-b, ...). Renaming a listener is semantically
-  // meaningless, so the resulting candidate set must not change — but the
-  // current pipeline folds in id order, so it does.
+  // meaningless, so the resulting candidate set must not change.
   const computeFeeSets = (listeners: SyntheticCardCostListener[]) => {
     // Re-seed a clean registry per run: computeFeeSets is called once per
     // permutation and module-level listener registration would accumulate.
@@ -135,7 +135,8 @@ describe('card-purchase pipeline ordering probes (current impl folds listeners b
         phases: ['computeCosts'],
         actions: ['improvement'],
         handler: () => undefined,
-        computeCardCostCandidates: listener.computeCardCostCandidates,
+        ...(listener.mandatory ? { cardCostCandidateMandatory: true } : {}),
+        deriveCardCostCandidate: listener.deriveCardCostCandidate,
       })
     })
     const result = resolveCardCostWithModifiersDetailed(
@@ -148,53 +149,49 @@ describe('card-purchase pipeline ordering probes (current impl folds listeners b
     return feeResourceSet(fees)
   }
 
-  // Mirrors A27_OvenSite (fixed-price candidate, today order:100) plus
-  // A143_Stonecutter (stone discount derived from every candidate). When the
-  // discount listener happens to sort before the fixed-price listener, the
-  // fixed row is appended too late to be discounted and the cheapest
-  // candidate {clay:1} disappears.
+  // Mirrors A27_OvenSite-shaped optional fixed price plus A143_Stonecutter
+  // (stone discount derived from every candidate). Under the closure the
+  // fixed row is always reachable for the discount, whatever the ids.
   const fixedPrice: SyntheticCardCostListener = {
     cardId: 'ProbeFixed',
-    computeCardCostCandidates: (_context, candidates) => [
-      ...candidates,
-      { resources: { clay: 1, stone: 1 }, originalFeeIndex: 0, sources: ['ProbeFixed'] },
-    ],
+    deriveCardCostCandidate: (_context, candidate) =>
+      candidate.sources.includes('ProbeFixed')
+        ? null
+        : { resources: { clay: 1, stone: 1 }, originalFeeIndex: candidate.originalFeeIndex, sources: ['ProbeFixed'] },
   }
   const stoneDiscount: SyntheticCardCostListener = {
     cardId: 'ProbeDiscount',
-    computeCardCostCandidates: (_context, candidates) =>
-      appendDiscountedCardCostCandidates(candidates, 'ProbeDiscount', { stone: 1 }),
+    deriveCardCostCandidate: (_context, candidate) =>
+      discountCardCostCandidate(candidate, 'ProbeDiscount', { stone: 1 }),
   }
 
-  it.fails('candidate set is invariant under listener naming permutation (fixed-price + discount shape)', () => {
+  it('candidate set is invariant under listener naming permutation (fixed-price + discount shape)', () => {
     const runs = runPermutations([fixedPrice, stoneDiscount], computeFeeSets)
     expect(distinctResults(runs)).toHaveLength(1)
   })
 
-  it('non-invariance witness: fixed row only gets discounted when fixed listener sorts first', () => {
+  it('every naming order lets the discount reach the fixed row', () => {
     const discounted = JSON.stringify([['clay', 1]])
     expect(computeFeeSets([fixedPrice, stoneDiscount])).toContain(discounted)
-    expect(computeFeeSets([stoneDiscount, fixedPrice])).not.toContain(discounted)
+    expect(computeFeeSets([stoneDiscount, fixedPrice])).toContain(discounted)
   })
 
   // Mirrors D117_WoodExpert: derives new candidates from candidates produced
-  // by OTHER cost cards (sources non-empty). Today it only works because
-  // 'D117…' happens to sort after 'A143…' / 'C122…' lexicographically.
+  // by OTHER cost cards (sources non-empty). The closure makes the derived
+  // rows reachable regardless of listener naming.
   const deriveFromDiscounted: SyntheticCardCostListener = {
     cardId: 'ProbeDerive',
-    computeCardCostCandidates: (_context, candidates) => [
-      ...candidates,
-      ...candidates
-        .filter((candidate) => candidate.sources.includes('ProbeDiscount'))
-        .map((candidate) => ({
-          ...candidate,
-          resources: { ...candidate.resources, clay: (candidate.resources.clay ?? 0) + 1 },
-          sources: [...candidate.sources, 'ProbeDerive'],
-        })),
-    ],
+    deriveCardCostCandidate: (_context, candidate) =>
+      candidate.sources.includes('ProbeDiscount')
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, clay: (candidate.resources.clay ?? 0) + 1 },
+            sources: [...candidate.sources, 'ProbeDerive'],
+          }
+        : null,
   }
 
-  it.fails('candidate set is invariant under listener naming permutation (derive-from-derived shape)', () => {
+  it('candidate set is invariant under listener naming permutation (derive-from-derived shape)', () => {
     const runs = runPermutations([stoneDiscount, deriveFromDiscounted], computeFeeSets)
     expect(distinctResults(runs)).toHaveLength(1)
   })
