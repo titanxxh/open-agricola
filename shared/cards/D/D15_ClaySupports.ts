@@ -36,7 +36,6 @@ export const D15_ClaySupports = defineMinorCard({
         // scope:'unit' applies this replacement to each clay-room cost row,
         // matching BGA's per-room `addCost`.
         scope: 'unit',
-        order: 10,
         from: { wood: 1 },
         to: { clay: 3, reed: 1 },
         conditions: { houseTypeClay: 1 },
