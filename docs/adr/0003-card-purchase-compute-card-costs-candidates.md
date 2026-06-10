@@ -1,6 +1,6 @@
 # 3. Card-purchase ComputeCardCosts candidate pipeline
 
-- Status: Accepted
+- Status: Accepted（第 4 条 order 逃生口已被 ADR 0004 取代）
 - Date: 2026-06-06
 
 ## Context

@@ -124,6 +124,14 @@ _Avoid_: Trade、资源兑换、支付替换器
 购买卡牌时当前可支付成本候选行的集合。ComputeCardCosts 读取并返回这个列表；卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
 _Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
 
+**Candidate Closure（候选闭包）**:
+对成本候选集合与一组卡牌成本转换求不动点：反复将每个未达使用上限的转换应用到每个候选，新候选去重后并入，直到不再产生新候选。结果与转换的注册顺序无关，等于所有应用顺序产物的并集。
+_Avoid_: topo 排序、数字 order 优先级、卡牌间偏序
+
+**Mandatory Saturation（强制饱和）**:
+候选闭包结果集的过滤规则：只保留不存在仍可应用的 mandatory 成本转换的候选；未饱和候选仅作为中间节点继续派生，不暴露给玩家。mandatory / optional 是每个成本转换的局部自描述语义（对照 BGA 卡面"costs less" vs "can pay instead"逐卡确定），不是卡牌间关系。
+_Avoid_: 卡牌执行顺序、Pareto 剪枝、domination
+
 **Payment Path（支付路径）**:
 玩家在多个基础成本候选之间选择的路径身份；它可以影响后续卡牌效果，且不等同于最终实际支付掉的资源明细。
 _Avoid_: PaymentSolution、实际扣减资源、Trade
