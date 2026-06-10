@@ -87,6 +87,23 @@ describe('unit-trade ordering probes (current impl applies trades in array/order
     const runs = runPermutations([rowReplacement, reedSwap, claySwap], computePaidSets)
     expect(distinctResults(runs)).toHaveLength(1)
   })
+
+  // PR #293 review: own-usage cap (max) and group allowance (groupMax) are
+  // independent guards — a max:2/groupMax:2 trade must reach both uses.
+  it('grouped unit trade with max 2 reaches its full usage', () => {
+    const grouped: Trade = {
+      from: { food: 1 },
+      to: { clay: 1 },
+      max: 2,
+      groupId: 'probe-group',
+      groupMax: 2,
+      scope: 'unit',
+    }
+    const player = createProbePlayer({ wood: 10, clay: 10, reed: 10, stone: 10, food: 10 })
+    const cost: ComplexCost = { unitFee: { clay: 3 }, nb: 1, trades: [grouped] }
+    const paid = solutionPaidSet(computeAllBuyableCombinations(player, cost))
+    expect(paid).toContain(JSON.stringify([['clay', 1], ['food', 2]]))
+  })
 })
 
 describe('card-purchase pipeline ordering probes (current impl folds listeners by order desc, then id)', () => {

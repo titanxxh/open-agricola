@@ -430,11 +430,13 @@ const buildUnitCostOptions = (
     source: `${index}#${tradeSignature(trade)}`,
     maxUses: Number.POSITIVE_INFINITY,
     apply: (option) => {
-      const maxPerUnit = Math.min(
-        Math.max(0, Math.floor(trade.max ?? 1)),
-        getRemainingTradeGroupUses(option.tradesUsed, trade),
-      )
-      if (getTradeUsage(option.tradesUsed, trade) >= maxPerUnit) return null
+      // Own-usage cap and group allowance are independent guards: comparing
+      // prior usage against the REMAINING group allowance would wrongly stop
+      // a max:2/groupMax:2 trade after one use.
+      if (getTradeUsage(option.tradesUsed, trade) >= Math.max(0, Math.floor(trade.max ?? 1))) {
+        return null
+      }
+      if (getRemainingTradeGroupUses(option.tradesUsed, trade) <= 0) return null
       const nextCost = applyUnitTradeToCost(option.cost, trade)
       if (!nextCost) return null
       return { cost: nextCost, tradesUsed: incrementTradeUsage(option.tradesUsed, trade) }
