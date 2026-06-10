@@ -12,7 +12,7 @@ const CARD_ID = 'A123_FrameBuilder'
  *   addBonusChoices([[wood:+1, clay:-2], [wood:+1, stone:-2]], source, optional:true)
  * which expresses "pick at most one of these exchanges per action".
  *
- * Construct: split into two ordered `scope:'unit'` TradeModifiers (one per
+ * Construct: split into two `scope:'unit'` TradeModifiers (one per
  * house type). The enumerator applies them to each room cost row, so each
  * room can use the matching replacement at most once by default.
  *
@@ -42,7 +42,6 @@ export const A123_FrameBuilder = defineOccupationCard({
           cardId: CARD_ID,
           appliesTo: ['construct'],
           scope: 'unit',
-          order: 30,
           from: { wood: 1 },
           to: { clay: 2 },
           conditions: { houseTypeClay: 1 },
@@ -52,7 +51,6 @@ export const A123_FrameBuilder = defineOccupationCard({
           cardId: CARD_ID,
           appliesTo: ['construct'],
           scope: 'unit',
-          order: 30,
           from: { wood: 1 },
           to: { stone: 2 },
           conditions: { houseTypeStone: 1 },

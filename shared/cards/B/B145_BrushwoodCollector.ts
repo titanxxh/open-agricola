@@ -40,7 +40,6 @@ export const B145_BrushwoodCollector = defineOccupationCard({
           // scope:'unit' applies this replacement to each room cost row, matching
           // BGA's per-room `addCost` alternative.
           scope: 'unit',
-          order: 20,
           replaceUpTo: true,
           from: { wood: 1 },
           to: { reed: 2 },

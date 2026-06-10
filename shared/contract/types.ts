@@ -61,7 +61,6 @@ export type Trade = {
   groupId?: string
   groupMax?: number
   replaceUpTo?: boolean
-  order?: number
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -118,7 +117,6 @@ export type TradeModifier = {
   groupId?: string
   groupMax?: number
   replaceUpTo?: boolean
-  order?: number
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /

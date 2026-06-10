@@ -61,22 +61,20 @@ describe('unit-trade ordering probes (current impl applies trades in array/order
     return solutionPaidSet(computeAllBuyableCombinations(player, cost))
   }
 
-  // Why order matters today: applying reedSwap first strips reed from the
-  // base row ({clay:5,reed:2} → {clay:5,wood:1}), so rowReplacement can no
-  // longer match its `to` requirement on that derived row, and the cheap
-  // combined row {clay:2,wood:2} is never generated. The reverse order finds
-  // it. The closure reaches both regardless of order.
-  it.fails('payment candidate set is invariant under unit-trade permutation (D15+B145 shape)', () => {
+  // Ordering hazard this guards: applying reedSwap first strips reed from
+  // the base row ({clay:5,reed:2} → {clay:5,wood:1}), so a sequential fold
+  // would never let rowReplacement match its `to` requirement on that
+  // derived row, losing the cheap combined row {clay:2,wood:2}. The closure
+  // reaches both regardless of order.
+  it('payment candidate set is invariant under unit-trade permutation (D15+B145 shape)', () => {
     const runs = runPermutations([rowReplacement, reedSwap], computePaidSets)
     expect(distinctResults(runs)).toHaveLength(1)
   })
 
-  it('non-invariance witness: the two orders differ exactly on the combined row', () => {
-    const forward = computePaidSets([rowReplacement, reedSwap])
-    const backward = computePaidSets([reedSwap, rowReplacement])
+  it('every order reaches the combined row', () => {
     const combinedRow = JSON.stringify([['clay', 2], ['wood', 2]])
-    expect(forward).toContain(combinedRow)
-    expect(backward).not.toContain(combinedRow)
+    expect(computePaidSets([rowReplacement, reedSwap])).toContain(combinedRow)
+    expect(computePaidSets([reedSwap, rowReplacement])).toContain(combinedRow)
   })
 
   // Three-trade chain (adds an A123_FrameBuilder-shaped wood→clay swap).
@@ -89,7 +87,7 @@ describe('unit-trade ordering probes (current impl applies trades in array/order
     scope: 'unit',
   }
 
-  it.fails('payment candidate set is invariant under three unit-trade permutations (D15+B145+A123 shape)', () => {
+  it('payment candidate set is invariant under three unit-trade permutations (D15+B145+A123 shape)', () => {
     const runs = runPermutations([rowReplacement, reedSwap, claySwap], computePaidSets)
     expect(distinctResults(runs)).toHaveLength(1)
   })
