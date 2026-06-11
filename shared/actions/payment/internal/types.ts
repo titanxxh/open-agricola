@@ -19,4 +19,5 @@ export type InternalSolution = {
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
+  feeIdentity?: number
 }

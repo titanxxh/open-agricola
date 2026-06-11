@@ -59,7 +59,7 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
     expect(resolved.candidateMetadataByFeeIndex?.[1]?.sources).toEqual([CARD_ID])
   })
 
-  it('preserves original and discounted payment paths for allowed majors', () => {
+  it('surfaces only the discounted payment path for allowed majors', () => {
     const { state, player } = setup()
     player.resources = {
       ...player.resources,
@@ -77,11 +77,12 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
     if (!isComplexCost(resolved.cost)) return
 
     const options = computeAllBuyableCombinations(player, resolved.cost)
+    // ADR 0004 amendment: the printed {wood:2, stone:2} row is strictly
+    // dominated by the discounted row and pruned from the payment options.
     expect(options.some((option) =>
       option.resourcesPaid.wood === 2 &&
-      option.resourcesPaid.stone === 2 &&
-      option.feeIndex === 0,
-    )).toBe(true)
+      option.resourcesPaid.stone === 2,
+    )).toBe(false)
     expect(options.some((option) =>
       option.resourcesPaid.wood === 2 &&
       option.resourcesPaid.stone === 1 &&

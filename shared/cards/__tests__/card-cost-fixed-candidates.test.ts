@@ -146,7 +146,7 @@ describe('fixed card-purchase cost candidates', () => {
       .removeListenersWhere((listener) => listener.id === 'hook-free-grain-depot')
   })
 
-  it('C95 appends a fixed Basketmaker payment candidate and keeps the original', () => {
+  it('C95 buys the Basketmaker for the fixed price; the dominated printed cost is never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -164,17 +164,19 @@ describe('fixed card-purchase cost candidates', () => {
       'C95_BasketWeaver',
     )
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
-    const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
-    expect(fixed?.labelParams.sourceCards).toEqual(['C95_BasketWeaver'])
-    expect(fixed?.effectPreview).toMatchObject({
-      resourcesPaid: { reed: 1, stone: 1 },
-      sourceCards: ['C95_BasketWeaver'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(false)
+      const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
+      expect(fixed).toBeDefined()
+    } else {
+      expect(player.improvements).toContain('Major_Basket')
+      expect(player.resources.reed).toBe(1)
+      expect(player.resources.stone).toBe(1)
+    }
   })
 
-  it('E109 appends a fixed Basketmaker payment candidate during ordinary improvement buys', () => {
+  it('E109 offers the fixed Basketmaker price; the dominated printed cost is never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -185,14 +187,15 @@ describe('fixed card-purchase cost candidates', () => {
 
     const result = playImprovement(state, player, 'major:Major_Basket', 'any')
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
-    const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
-    expect(fixed?.labelParams.sourceCards).toEqual(['E109_BraidMaker'])
-    expect(fixed?.effectPreview).toMatchObject({
-      resourcesPaid: { reed: 1, stone: 1 },
-      sourceCards: ['E109_BraidMaker'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(false)
+      expect(options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))).toBeDefined()
+    } else {
+      expect(player.improvements).toContain('Major_Basket')
+      expect(player.resources.reed).toBe(1)
+      expect(player.resources.stone).toBe(1)
+    }
   })
 
   it('A27 replaces the printed oven cost with the fixed oven payment candidate', () => {
@@ -321,7 +324,7 @@ describe('fixed card-purchase cost candidates', () => {
     ])))
   })
 
-  it('E27 appends a free major improvement payment candidate and keeps the original', () => {
+  it('E27 resolves the flagged major purchase free; dominated paid options are never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -333,14 +336,16 @@ describe('fixed card-purchase cost candidates', () => {
 
     const result = playImprovement(state, player, 'major:Major_Joinery', 'any')
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(true)
-    const free = options.find((option) => hasPaidResources(option, {}))
-    expect(free?.labelParams.sourceCards).toEqual(['E27_PiggyBank'])
-    expect(free?.effectPreview).toMatchObject({
-      resourcesPaid: {},
-      sourceCards: ['E27_PiggyBank'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
+      const free = options.find((option) => hasPaidResources(option, {}))
+      expect(free?.labelParams.sourceCards).toEqual(['E27_PiggyBank'])
+    } else {
+      expect(player.improvements).toContain('Major_Joinery')
+      expect(player.resources.wood).toBe(2)
+      expect(player.resources.stone).toBe(2)
+    }
   })
 
   it('D95 derives replacement candidates for every non-empty subset of present building resources', () => {

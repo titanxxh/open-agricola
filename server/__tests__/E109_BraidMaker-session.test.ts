@@ -136,9 +136,10 @@ describe('E109_BraidMaker session', () => {
 
   it('applies Basket discount when E109 is played (1 reed + 1 stone)', () => {
     const session = setup()
-    let resp = session.takeAction(0, 'major-improvement')
+    // ADR 0004 amendment: the dominated printed cost is pruned; the fixed
+    // price is the single payment and the purchase auto-resolves.
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    resp = choosePaymentByResources(session, resp, { reed: 1, stone: 1 })
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
@@ -148,7 +149,7 @@ describe('E109_BraidMaker session', () => {
     expect(after.resources.stone).toBe(2)
   })
 
-  it('offers E109 fixed price alongside A143 discounted printed Basket path', () => {
+  it('resolves the Basket purchase on the E109 fixed price over dominated A143/printed paths', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -177,25 +178,15 @@ describe('E109_BraidMaker session', () => {
     }
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'major-improvement')
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const stonecutterOption = resp.interaction.options?.find((option) =>
-      hasPaidResources(option, { reed: 2, stone: 1 }),
-    )
-    expect(stonecutterOption?.labelParams.sourceCards).toContain('A143_Stonecutter')
-    const braidMakerOption = resp.interaction.options?.find((option) =>
-      hasPaidResources(option, { reed: 1, stone: 1 }),
-    )
-    expect(braidMakerOption?.labelParams.sourceCards).toContain(CARD_ID)
 
-    resp = session.resolveChoice(0, braidMakerOption!.value)
-
+    // ADR 0004 amendment: A143 discounts E109's fixed {reed:1, stone:1} row
+    // down to {reed:1}, which strictly dominates every other path (printed,
+    // A143-on-printed, plain fixed); the purchase auto-resolves on it.
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
     expect(after.resources.reed).toBe(1)
-    expect(after.resources.stone).toBe(1)
+    expect(after.resources.stone).toBe(2)
   })
 })

@@ -119,6 +119,7 @@ export const resolveCardCostWithModifiersDetailed = (
       ...(isComplexCost(baseCost) ? baseCost : {}),
       fee: undefined,
       fees: candidates.map((candidate) => ({ ...candidate.resources })),
+      feeIdentities: candidates.map((candidate) => candidate.originalFeeIndex),
     }
     if (collectedTrades.length > 0) {
       complexCost.trades = [

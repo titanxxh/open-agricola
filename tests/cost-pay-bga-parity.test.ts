@@ -35,6 +35,8 @@ type BgaCost = {
 type PaymentOption = {
   resources: Record<string, number>
   sources: string[]
+  /** Expanded from a multi-choice bonus — exempt from dominance pruning. */
+  fromChoices?: boolean
 }
 
 type DiffKind = 'payment-diff' | 'source-diff'
@@ -411,6 +413,7 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
 
   for (const bonus of cost.bonuses ?? []) {
     if (!bgaConditionsPass(bonus.conditions, scenario)) continue
+    const isMultiChoice = Array.isArray(bonus.choices) && (bonus.choices as unknown[]).length > 1
     const choices = Array.isArray(bonus.choices) ? bonus.choices as Array<Record<string, unknown>> : [bonus]
     const old = options
     options = bonus.optional === true ? [...options] : []
@@ -418,14 +421,37 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
       for (const choice of choices) {
         if (!bgaConditionsPass(choice.conditions, scenario)) continue
         const applied = addCost(option, choice)
-        if (applied) options.push(applied)
+        if (applied) options.push(isMultiChoice ? { ...applied, fromChoices: true } : applied)
       }
     }
     options = uniqueSortedOptions(options)
   }
 
-  return uniqueSortedOptions(options)
+  return pruneDominatedOptions(uniqueSortedOptions(options))
 }
+
+// Mirror of the production keepOnlyOptimals (ADR 0004 amendment): BGA's Pay
+// layer prunes strictly dominated combinations before showing them, so the
+// structurally-expanded fixture options must be pruned the same way to stay
+// on the same comparison plane as OA's solver output. Choice expansions are
+// exempt, mirroring OA's bonusChoiceIndex exemption.
+const optionDominates = (a: PaymentOption, b: PaymentOption): boolean => {
+  if (a.fromChoices || b.fromChoices) return false
+  const keys = new Set([...Object.keys(a.resources), ...Object.keys(b.resources)])
+  let strictlyLess = false
+  for (const key of keys) {
+    const aVal = a.resources[key] ?? 0
+    const bVal = b.resources[key] ?? 0
+    if (aVal > bVal) return false
+    if (aVal < bVal) strictlyLess = true
+  }
+  return strictlyLess
+}
+
+const pruneDominatedOptions = (options: PaymentOption[]): PaymentOption[] =>
+  options.filter((candidate) =>
+    !options.some((other) => other !== candidate && optionDominates(other, candidate)),
+  )
 
 const mergeResourceDelta = (
   base: PaymentResourceMap,
