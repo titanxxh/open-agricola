@@ -84,24 +84,14 @@ const registerCandidateListener = (discount: { clay: number }) => {
   })
 }
 
-const expectSourcedPaymentOption = (result: ReturnType<typeof playImprovement>) => {
-  expect(result.type).toBe('request')
-  if (result.type !== 'request') return
-  expect(result.promptKey).toBe('prompt.selectPayment')
-  expect(result.request.kind).toBe('choice')
-  if (result.request.kind !== 'choice') return
-  const option = result.request.options.find((entry) =>
-    Array.isArray(entry.labelParams.sourceCards)
-      && entry.labelParams.sourceCards.includes(SOURCE_CARD),
-  )
-  expect(option?.labelParams).toMatchObject({
-    resourcesPaid: {},
-    sourceCards: [SOURCE_CARD],
-  })
-  expect(option?.effectPreview).toMatchObject({
-    resourcesPaid: {},
-    sourceCards: [SOURCE_CARD],
-  })
+// ADR 0004 amendment: the dominated printed cost is pruned, the sourced free
+// candidate is the single remaining option and the purchase auto-resolves.
+const expectAutoResolvedFreePayment = (
+  result: ReturnType<typeof playImprovement>,
+  player: PlayerState,
+) => {
+  expect(result.type).toBe('ok')
+  expect(readCardResourceStats(player, SOURCE_CARD)?.saved).toBeDefined()
 }
 
 describe('improvement card cost candidates', () => {
@@ -116,9 +106,11 @@ describe('improvement card cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
 
+    const clayBefore = player.resources.clay
     const result = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
 
-    expectSourcedPaymentOption(result)
+    expectAutoResolvedFreePayment(result, player)
+    expect(player.resources.clay).toBe(clayBefore)
   })
 
   it('runs minor improvement payment through candidate metadata', () => {
@@ -128,9 +120,11 @@ describe('improvement card cost candidates', () => {
     player.resources.clay = 1
     state.players = [player]
 
+    const clayBefore = player.resources.clay
     const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
 
-    expectSourcedPaymentOption(result)
+    expectAutoResolvedFreePayment(result, player)
+    expect(player.resources.clay).toBe(clayBefore)
   })
 
   it('records selected card-purchase candidate attribution on the source card', () => {
@@ -139,16 +133,7 @@ describe('improvement card cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
 
-    const request = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
-    expect(request.type).toBe('request')
-    if (request.type !== 'request' || request.request.kind !== 'choice') return
-    const option = request.request.options.find((entry) =>
-      Array.isArray(entry.labelParams.sourceCards)
-        && entry.labelParams.sourceCards.includes(SOURCE_CARD),
-    )
-    expect(option).toBeDefined()
-
-    const result = playImprovement(state, player, option!.value, 'any')
+    const result = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
 
     expect(result.type).toBe('ok')
     expect(readCardResourceStats(player, SOURCE_CARD)?.saved).toEqual({ clay: 2 })
@@ -212,26 +197,10 @@ describe('improvement card cost candidates', () => {
     player.occupationPlayed = ['D96_Furnisher', 'OtherOccupation']
     state.players = [player]
 
-    const request = playImprovement(
-      state,
-      player,
-      'minor:D20_TurnwrestPlow',
-      'any',
-      undefined,
-      'D96_Furnisher',
-    )
-    expect(request.type).toBe('request')
-    if (request.type !== 'request' || request.request.kind !== 'choice') return
-    const option = request.request.options.find((entry) =>
-      Array.isArray(entry.labelParams.sourceCards)
-        && entry.labelParams.sourceCards.includes('D96_Furnisher'),
-    )
-    expect(option).toBeDefined()
-
     const result = playImprovement(
       state,
       player,
-      option!.value,
+      'minor:D20_TurnwrestPlow',
       'any',
       undefined,
       'D96_Furnisher',

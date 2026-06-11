@@ -147,6 +147,13 @@ export type CostModifier = TradeModifier | BonusModifier
 export type ComplexCost = {
   fee?: PaymentResourceMap
   fees?: PaymentResourceMap[]
+  /**
+   * Payment-path identity per fees index (Cost Candidate originalFeeIndex).
+   * Solutions with different identities are never dominance-pruned against
+   * each other — the chosen path can drive later effects (B65). Omitted ⇒
+   * all rows share one identity.
+   */
+  feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
@@ -183,6 +190,8 @@ export type PaymentSolution = {
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
+  /** Payment-path identity from ComplexCost.feeIdentities (dominance-pruning scope). */
+  feeIdentity?: number
 }
 
 export type PaymentSource = 'reserve' | 'field' | 'card'

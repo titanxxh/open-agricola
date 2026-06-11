@@ -7,10 +7,119 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 1
-Payment differences: 1
+Differences: 5
+Payment differences: 5
 Source-only differences: 0
 Report-only artifacts: 0
+
+## E123 card-purchase top resource choices
+
+Kind: card-purchase
+Difference type: payment-diff
+
+BGA:
+```json
+[
+  {
+    "resources": {
+      "wood": 1,
+      "reed": 1
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  }
+]
+```
+
+OA:
+```json
+[
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "reed": 1,
+      "stone": 2
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "clay": 1,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "reed": 1
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 1,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 2,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 2,
+      "clay": 2,
+      "reed": 2,
+      "stone": 2
+    },
+    "sources": []
+  }
+]
+```
 
 ## combo card-purchase basket fixed price plus stone and wood modifiers
 
@@ -22,34 +131,6 @@ BGA:
 [
   {
     "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver",
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
       "reed": 1
     },
     "sources": [
@@ -75,45 +156,92 @@ BGA:
       "A143_Stonecutter",
       "E109_BraidMaker"
     ]
-  },
+  }
+]
+```
+
+OA:
+```json
+[
   {
     "resources": {
-      "reed": 2,
-      "stone": 1,
-      "food": 1
+      "reed": 1
     },
     "sources": [
       "A143_Stonecutter",
-      "D117_WoodExpert"
+      "C95_BasketWeaver"
     ]
-  },
+  }
+]
+```
+
+## E123 construct top resource choices
+
+Kind: construct
+Difference type: payment-diff
+
+BGA:
+```json
+[
   {
     "resources": {
-      "reed": 2,
-      "stone": 2,
-      "food": 1
+      "clay": 4,
+      "reed": 2
     },
     "sources": [
-      "D117_WoodExpert"
+      "E123_ResourceHoarder"
     ]
-  },
+  }
+]
+```
+
+OA:
+```json
+[
   {
     "resources": {
-      "wood": 2,
-      "reed": 2,
-      "stone": 1
+      "clay": 4,
+      "reed": 2
     },
     "sources": [
-      "A143_Stonecutter"
+      "E123_ResourceHoarder"
     ]
   },
   {
     "resources": {
-      "wood": 2,
-      "reed": 2,
-      "stone": 2
+      "clay": 5,
+      "reed": 2
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "clay": 5,
+      "reed": 2
     },
     "sources": []
+  }
+]
+```
+
+## B128 plumber renovation choices
+
+Kind: renovation
+Difference type: payment-diff
+
+BGA:
+```json
+[
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1
+    },
+    "sources": [
+      "B128_Plumber"
+    ]
   }
 ]
 ```
@@ -127,56 +255,255 @@ OA:
       "stone": 1
     },
     "sources": [
-      "C95_BasketWeaver"
+      "B128_Plumber"
     ]
   },
   {
     "resources": {
-      "reed": 1
+      "reed": 1,
+      "stone": 2
     },
     "sources": [
-      "A143_Stonecutter",
-      "C95_BasketWeaver"
+      "B128_Plumber"
+    ]
+  }
+]
+```
+
+## combo renovation trowel brushwood and millwright
+
+Kind: renovation
+Difference type: payment-diff
+
+BGA:
+```json
+[
+  {
+    "resources": {
+      "reed": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
     ]
   },
   {
     "resources": {
       "reed": 2,
       "stone": 1,
-      "food": 1
+      "food": 2,
+      "grain": 1
     },
     "sources": [
-      "A143_Stonecutter",
-      "D117_WoodExpert"
+      "D13_Trowel",
+      "D88_Millwright"
     ]
   },
   {
     "resources": {
       "reed": 2,
       "stone": 2,
-      "food": 1
+      "food": 2
     },
     "sources": [
-      "D117_WoodExpert"
+      "D13_Trowel"
     ]
   },
   {
     "resources": {
-      "wood": 2,
-      "reed": 2,
-      "stone": 1
+      "stone": 1,
+      "food": 2,
+      "grain": 2
     },
     "sources": [
-      "A143_Stonecutter"
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
     ]
   },
   {
     "resources": {
-      "wood": 2,
-      "reed": 2,
-      "stone": 2
+      "stone": 2,
+      "food": 2,
+      "grain": 1
     },
-    "sources": []
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 2,
+      "food": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel"
+    ]
+  }
+]
+```
+
+OA:
+```json
+[
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 2,
+      "stone": 2,
+      "food": 2
+    },
+    "sources": [
+      "D13_Trowel"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "stone": 2,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "food": 2,
+      "grain": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 1,
+      "food": 2,
+      "grain": 1
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel",
+      "D88_Millwright"
+    ]
+  },
+  {
+    "resources": {
+      "wood": 1,
+      "stone": 2,
+      "food": 2
+    },
+    "sources": [
+      "B145_BrushwoodCollector",
+      "D13_Trowel"
+    ]
   }
 ]
 ```

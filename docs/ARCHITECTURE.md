@@ -523,7 +523,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `shared/actions/payment/`：
 
-- `solver.ts` —— `computeAllBuyableCombinations` / `keepOnlyOptimals` / `sortPaymentSolutions`
+- `solver.ts` —— `computeAllBuyableCombinations` / `keepOnlyOptimals`（资源可行性过滤后的严格支配剪枝；豁免 feeIdentity / bonusChoiceIndex / card 支付，ADR 0004 Amendment）/ `sortPaymentSolutions`
 - `executor.ts` —— `payResources` / `executePaymentSolution`
 - `modifiers.ts` —— `computeCosts` hook 集成
 - `adapters/room.ts` —— 房间费用变体（每间房不同形状）
