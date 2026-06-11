@@ -132,29 +132,11 @@ OA:
   },
   {
     "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "E109_BraidMaker"
-    ]
-  },
-  {
-    "resources": {
       "reed": 1
     },
     "sources": [
       "A143_Stonecutter",
       "C95_BasketWeaver"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1
-    },
-    "sources": [
-      "A143_Stonecutter",
-      "E109_BraidMaker"
     ]
   },
   {
