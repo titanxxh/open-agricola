@@ -197,33 +197,37 @@ const resourcesAndFeeKey = (candidate: CardCostCandidate) =>
     originalFeeIndex: candidate.originalFeeIndex,
   })
 
-const isProperSourceSuperset = (left: readonly string[], right: readonly string[]) =>
-  left.length > right.length && right.every((source) => left.includes(source))
-
 /**
- * Drops candidates whose sources are a proper superset of another candidate
- * with identical resources and fee identity. The closure can reach the same
- * row through a chain where an optional transform consumed a mandatory
- * transform's resource first ("bypass" path); BGA attributes such rows to
- * the minimal contributing set, so the superset row is presentation noise
- * (duplicate payment choice with inflated attribution).
+ * Keeps exactly one representative per equivalent row (ADR 0004 amendment).
+ *
+ * The closure can reach the same resources + fee identity through several
+ * derivation chains that differ only by contributing sources (fixed-price
+ * twins like C95/E109, or "bypass" chains where an optional transform
+ * consumed a mandatory transform's resource first). Those rows are identical
+ * payment choices for the player; surfacing them all is presentation noise
+ * with multiplied attribution. Pick a deterministic representative: fewest
+ * sources first (closest to BGA's reference attribution), then normalized
+ * candidate key order.
  */
-export const pruneSupersetSourceCandidates = (
+export const dedupeEquivalentRowCandidates = (
   candidates: readonly CardCostCandidate[],
 ): CardCostCandidate[] => {
-  const byRow = new Map<string, CardCostCandidate[]>()
+  const representative = new Map<string, CardCostCandidate>()
   for (const candidate of candidates) {
     const key = resourcesAndFeeKey(candidate)
-    const group = byRow.get(key) ?? []
-    group.push(candidate)
-    byRow.set(key, group)
+    const current = representative.get(key)
+    if (
+      !current ||
+      candidate.sources.length < current.sources.length ||
+      (candidate.sources.length === current.sources.length &&
+        candidateKey(candidate) < candidateKey(current))
+    ) {
+      representative.set(key, candidate)
+    }
   }
-  return candidates.filter((candidate) => {
-    const group = byRow.get(resourcesAndFeeKey(candidate))!
-    return !group.some((other) =>
-      other !== candidate && isProperSourceSuperset(candidate.sources, other.sources),
-    )
-  })
+  return candidates.filter((candidate) =>
+    representative.get(resourcesAndFeeKey(candidate)) === candidate,
+  )
 }
 
 export const buildCandidateMetadataByFeeIndex = (

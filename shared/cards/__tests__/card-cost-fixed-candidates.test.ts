@@ -308,11 +308,12 @@ describe('fixed card-purchase cost candidates', () => {
     // resource set is unchanged.
     const sortSources = (rows: ReturnType<typeof candidateOptions>) =>
       rows.map((row) => ({ ...row, sources: [...row.sources].sort() }))
+    // ADR 0004 amendment: rows equivalent up to sources keep one
+    // deterministic representative (fewest sources, then key order), so the
+    // C95/E109 fixed-price twins and their discounted twins collapse.
     expect(sortedJson(sortSources(candidateOptions(result)))).toEqual(sortedJson(sortSources([
       { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver'] },
-      { resources: { reed: 1, stone: 1 }, sources: ['E109_BraidMaker'] },
       { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver'] },
-      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'E109_BraidMaker'] },
       { resources: { reed: 2, stone: 1, food: 1 }, sources: ['A143_Stonecutter', 'D117_WoodExpert'] },
       { resources: { reed: 2, stone: 2, food: 1 }, sources: ['D117_WoodExpert'] },
       { resources: { wood: 2, reed: 2, stone: 1 }, sources: ['A143_Stonecutter'] },
