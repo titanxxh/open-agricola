@@ -1,6 +1,6 @@
 # 3. Card-purchase ComputeCardCosts candidate pipeline
 
-- Status: Accepted（第 4 条 order 逃生口已被 ADR 0004 取代）
+- Status: Accepted（第 4 条 order 逃生口已被 ADR 0004 取代；第 7 条去重规则已被 ADR 0004 Amendment 修订）
 - Date: 2026-06-06
 
 ## Context
@@ -24,7 +24,7 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 4. Pipeline 不引入 BGA topo。多个 mutation 默认按稳定 listener id 顺序执行；发现 fixed-price 必须先于普通折扣的真实冲突后，pipeline 局部读取 `CardListenerRegistration.order` 作为单点优先级（高值先执行，再按 id 稳定排序），不影响普通 trigger listener 结算。
 5. 直改 candidate 的资源减少 clamp 到 0；如果候选本来没有该资源，则不派生对应折扣候选；折到 0 的资源从 candidate 资源 map 中省略。同一张卡不对自己刚追加的候选重复应用。
 6. Append / fixed-price 类卡牌追加新候选并保留原候选；replacement 类卡牌只替换被实际改变的候选，未受影响的基础候选保留。
-7. 候选只做完全重复去重，不做 domination / Pareto 剪枝。去重 key 包含资源、原始 `feeIndex` 和 `sources`。
+7. 候选只做完全重复去重，不做 domination / Pareto 剪枝。去重 key 包含资源、原始 `feeIndex` 和 `sources`。（已被 ADR 0004 Amendment 修订：输出层每个 resources + originalFeeIndex 组只保留一条代表行；Pareto / domination 剪枝的禁令不变。）
 8. Candidate metadata 包含 `sources`、原始 `feeIndex`，以及可选的 Cost Attribution。`feeIndex` 表示基础支付路径身份，不随后续资源变形改变；B65 使用它决定 2/3/4 个 future grain。Cost Attribution 只用于卡牌统计展示，不表示真实资源移动或整笔支付归属。
 9. 本 pipeline 不重做 bonus 机制。`D82_HuntingTrophy`、`E130_Overachiever`、`E123_ResourceHoarder` 等 bonus / bonusChoiceIndex 语义继续走现有 solver。
 10. UI 展示复用现有 payment option `sourceCards` 链路：后端把 candidate `sources` 合并进 payment option / effect preview 的 `sourceCards`，前端继续由 `InteractionBar` 展示卡名。hover stats 读取 Card Resource Stats；选定候选后才把 Cost Attribution 写入对应 source cards。

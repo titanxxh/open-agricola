@@ -43,6 +43,14 @@ OA 不愿引入 topo（ADR 0003 已拒），但落地过程中出现了两处数
 - 闭包最坏情况指数级；需保留防御性上限告警（实战远达不到）。
 - mandatory / optional 映射必须逐卡对照 BGA 卡面语义，映射错误会改变 auto-resolve / 弹选择框判定。
 
+## Amendment: representative row dedupe (2026-06-11)
+
+闭包可经多条派生链到达 resources + originalFeeIndex 相同、仅 sources 不同的等价行（fixed-price 双子 C95/E109，或 optional 先消耗 mandatory 资源的 bypass 链）。这些行对玩家是同一个支付选择，全部展示是噪音且归因成倍（实测 Basket 四卡场景出现 4 个等价的 1-reed 选项）。
+
+修订 ADR 0003 第 7 条：闭包 visited 仍用含 sources 的 key（保证遍历完整），但**输出层每个 resources + originalFeeIndex 组只保留一条确定性代表行**——sources 数最少优先（最贴近 BGA reference 归因），再按规范化 candidate key 字典序。原"删真超集行"规则是其特例，被此规则吸收。
+
+代价（接受）：未被选中链的卡牌不出现在该选项的 sources / hover 归因中（如 C95 与 E109 同场时固定价只归因 C95）。sources 并集方案被否决——C95/E109 是"二选一"促成关系，并集展示会误导为"共同作用"，且与 bypass 链的最小归因语义冲突。
+
 ## Alternatives considered
 
 - **BGA topo 排序**：拒（ADR 0003 已拒，维护负担）。

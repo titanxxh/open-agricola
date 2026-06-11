@@ -34,7 +34,7 @@ import {
   cardCostCandidatesEqual,
   dedupeCardCostCandidates,
   normalizeCardCostCandidates,
-  pruneSupersetSourceCandidates,
+  dedupeEquivalentRowCandidates,
 } from './card-cost-candidates'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
@@ -105,7 +105,7 @@ export const resolveCardCostWithModifiersDetailed = (
   if (transforms.length > 0) {
     // Candidate Closure (ADR 0004): order-agnostic fixpoint over the card
     // cost transforms — replaces the previous order-desc-then-id fold.
-    const closed = pruneSupersetSourceCandidates(dedupeCardCostCandidates(
+    const closed = dedupeEquivalentRowCandidates(dedupeCardCostCandidates(
       closeCandidates(candidates, transforms, { key: cardCostCandidateClosureKey }),
     ))
     if (!cardCostCandidatesEqual(candidates, closed)) {

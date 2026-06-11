@@ -288,7 +288,7 @@ describe('resolveCardCostWithModifiers', () => {
     ])
   })
 
-  it('keeps identical resource candidates when their sources differ', () => {
+  it('keeps one representative row when identical resource candidates differ only by sources', () => {
     const player = createPlayer()
     player.occupationPlayed = ['HookA', 'HookB']
     const state = createState(player)
@@ -313,6 +313,9 @@ describe('resolveCardCostWithModifiers', () => {
       { wood: 1 },
     )
     const cost = result.cost as ComplexCost
+    // ADR 0004 amendment: equivalent rows (same resources + originalFeeIndex)
+    // collapse to one deterministic representative — the player never sees
+    // duplicate payment options that differ only by attribution.
     expectRowsEqual(candidateRows(cost, result.candidateMetadataByFeeIndex), [
       { resources: { wood: 1 }, meta: { originalFeeIndex: 0, sources: [] } },
       {
@@ -323,17 +326,8 @@ describe('resolveCardCostWithModifiers', () => {
           costAttribution: { HookA: { saved: { wood: 1 } } },
         },
       },
-      {
-        resources: {},
-        meta: {
-          originalFeeIndex: 0,
-          sources: ['HookB'],
-          costAttribution: { HookB: { saved: { wood: 1 } } },
-        },
-      },
     ])
   })
-
   it('records actual saved attribution on discounted card-purchase candidates', () => {
     const player = createPlayer()
     player.occupationPlayed = ['HookDiscount']
