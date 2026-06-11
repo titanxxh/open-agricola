@@ -149,7 +149,7 @@ const paymentOptions = (player: PlayerState, cost: ComplexCost) =>
 
 const cases: ConstructCase[] = [
   {
-    name: 'A128 Riparian Builder keeps the original clay-room cost and adds a sourced discount',
+    name: 'A128 Riparian Builder offers the sourced alternative over the original clay-room cost and adds a sourced discount',
     cardId: 'A128_RiparianBuilder',
     houseType: 'clay',
     sourceCard: 'A128_RiparianBuilder',
@@ -157,7 +157,7 @@ const cases: ConstructCase[] = [
     expectedAlternative: { clay: 4, reed: 2 },
   },
   {
-    name: 'A149 House Artist keeps the original wood-room cost and adds a sourced reed discount',
+    name: 'A149 House Artist offers the sourced alternative over the original wood-room cost and adds a sourced reed discount',
     cardId: 'A149_HouseArtist',
     houseType: 'wood',
     sourceCard: 'A149_HouseArtist',
@@ -165,21 +165,21 @@ const cases: ConstructCase[] = [
     expectedAlternative: { wood: 5, reed: 1 },
   },
   {
-    name: 'B126 Carpenter keeps the original wood-room cost and adds a sourced fixed alternative',
+    name: 'B126 Carpenter offers the sourced alternative over the original wood-room cost and adds a sourced fixed alternative',
     cardId: 'B126_Carpenter',
     houseType: 'wood',
     expectedBase: { wood: 5, reed: 2 },
     expectedAlternative: { wood: 3, reed: 2 },
   },
   {
-    name: "B13 Carpenter's Parlor keeps the original wood-room cost and adds a sourced fixed alternative",
+    name: "B13 Carpenter's Parlor offers the sourced alternative over the original wood-room cost and adds a sourced fixed alternative",
     cardId: 'B13_CarpentersParlor',
     houseType: 'wood',
     expectedBase: { wood: 5, reed: 2 },
     expectedAlternative: { wood: 2, reed: 2 },
   },
   {
-    name: 'C128 Wooden Hut Extender keeps the original round-8 cost and adds a sourced alternative',
+    name: 'C128 Wooden Hut Extender offers the sourced alternative over the original round-8 cost and adds a sourced alternative',
     cardId: 'C128_WoodenHutExtender',
     houseType: 'wood',
     round: 8,
@@ -187,21 +187,21 @@ const cases: ConstructCase[] = [
     expectedAlternative: { wood: 3, reed: 1 },
   },
   {
-    name: "C88 Carpenter's Apprentice keeps the original wood-room cost and adds a sourced discount",
+    name: "C88 Carpenter's Apprentice offers the sourced alternative over the original wood-room cost and adds a sourced discount",
     cardId: 'C88_CarpentersApprentice',
     houseType: 'wood',
     expectedBase: { wood: 5, reed: 2 },
     expectedAlternative: { wood: 3, reed: 2 },
   },
   {
-    name: 'D121 Clay Plasterer keeps the original clay-room cost and adds a sourced fixed alternative',
+    name: 'D121 Clay Plasterer offers the sourced alternative over the original clay-room cost and adds a sourced fixed alternative',
     cardId: 'D121_ClayPlasterer',
     houseType: 'clay',
     expectedBase: { clay: 5, reed: 2 },
     expectedAlternative: { clay: 3, reed: 2 },
   },
   {
-    name: 'E150 Rock Beater keeps the original stone-room cost and adds a sourced discount',
+    name: 'E150 Rock Beater offers the sourced alternative over the original stone-room cost and adds a sourced discount',
     cardId: 'E150_RockBeater',
     houseType: 'stone',
     expectedBase: { stone: 5, reed: 2 },
@@ -216,7 +216,23 @@ describe('construct cost alternatives', () => {
     const results = collectCostResults(state, player, scenario.sourceCard)
     const options = paymentOptions(player, buildCost(player, results))
 
-    expect(options).toContainEqual({ resources: scenario.expectedBase, sources: [] })
+    // ADR 0004 amendment: the printed base row only survives when the
+    // alternative does not strictly dominate it (replacement-style trades
+    // stay Pareto-incomparable; pure discounts hide the base row, like BGA).
+    const keys = new Set([
+      ...Object.keys(scenario.expectedBase),
+      ...Object.keys(scenario.expectedAlternative),
+    ]) as Set<keyof PaymentResourceMap>
+    const altDominatesBase =
+      [...keys].every((key) =>
+        (scenario.expectedAlternative[key] ?? 0) <= (scenario.expectedBase[key] ?? 0)) &&
+      [...keys].some((key) =>
+        (scenario.expectedAlternative[key] ?? 0) < (scenario.expectedBase[key] ?? 0))
+    if (altDominatesBase) {
+      expect(options).not.toContainEqual({ resources: scenario.expectedBase, sources: [] })
+    } else {
+      expect(options).toContainEqual({ resources: scenario.expectedBase, sources: [] })
+    }
     expect(options).toContainEqual({
       resources: scenario.expectedAlternative,
       sources: [scenario.cardId],

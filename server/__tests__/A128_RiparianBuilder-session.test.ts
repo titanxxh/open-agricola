@@ -22,14 +22,17 @@ const chooseA128RoomPayment = (
   resp: ReturnType<GameSession['commitSelectionChoice']>,
 ) => {
   expect(resp.ok).toBe(true)
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') return resp
-  expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-  const paymentOption = resp.interaction.options?.find((option: ActionChoiceOption) =>
-    optionSourceCards(option).includes(CARD_ID),
-  )
-  expect(paymentOption).toBeDefined()
-  return session.resolveChoice(playerIndex, paymentOption!.value)
+  // ADR 0004 amendment: the dominated undiscounted room payment is pruned;
+  // the sourced discount is the single option and the payment auto-resolves
+  // straight into the next wait state.
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
+    const paymentOption = resp.interaction.options?.find((option: ActionChoiceOption) =>
+      optionSourceCards(option).includes(CARD_ID),
+    )
+    expect(paymentOption).toBeDefined()
+    return session.resolveChoice(playerIndex, paymentOption!.value)
+  }
+  return resp
 }
 
 describe('A128_RiparianBuilder session', () => {

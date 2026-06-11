@@ -135,9 +135,52 @@ const subtractResources = (
   return result
 }
 
+/**
+ * Dominance pruning over AFFORDABLE solutions (ADR 0004 amendment, restoring
+ * the BGA keepOnlyOptimals semantics dropped in b2b00d96): a solution paying
+ * >= another on every resource (and more on at least one) is never shown.
+ * BGA's optional-append cost model relies on this to make appended fixed
+ * prices and discounts behave as the printed card text (e.g. C95 "build the
+ * Basket for 1 stone and 1 reed").
+ *
+ * Exemptions (mirroring BGA isWorseThan):
+ * - different fee identities (B65 payment-path identity drives later effects)
+ * - solutions carrying a bonusChoiceIndex (E123 consumes the choice later)
+ * - card payments (never compared, like BGA's `card` combinations)
+ *
+ * Must run AFTER affordability filtering: pruning resource-blind would drop
+ * the only row a poorer player can actually pay.
+ */
+const solutionIdentity = (solution: PaymentSolution): number | undefined =>
+  solution.feeIdentity
+
+const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
+  if (a.cardUsed || b.cardUsed) return false
+  if (a.bonusChoiceIndex || b.bonusChoiceIndex) return false
+  if (solutionIdentity(a) !== solutionIdentity(b)) return false
+
+  const keys = new Set([
+    ...Object.keys(a.resourcesPaid),
+    ...Object.keys(b.resourcesPaid),
+  ] as PaymentResourceKey[])
+  let strictlyLess = false
+  for (const key of keys) {
+    const aVal = a.resourcesPaid[key] ?? 0
+    const bVal = b.resourcesPaid[key] ?? 0
+    if (aVal > bVal) return false
+    if (aVal < bVal) strictlyLess = true
+  }
+  return strictlyLess
+}
+
 export const keepOnlyOptimals = (
   solutions: PaymentSolution[],
-): PaymentSolution[] => solutions
+): PaymentSolution[] => {
+  if (solutions.length <= 1) return solutions
+  return solutions.filter(
+    (candidate) => !solutions.some((other) => other !== candidate && dominates(other, candidate)),
+  )
+}
 
 const getPositiveResourceEntries = (solution: PaymentSolution) =>
   PAYMENT_RESOURCE_ORDER
@@ -770,6 +813,7 @@ export const computeAllBuyableCombinations = (
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
+              feeIdentity: effectiveCost.feeIdentities?.[feeIdx],
             })
           }
         }
@@ -794,6 +838,7 @@ export const computeAllBuyableCombinations = (
       bonusUsed: sol.bonusUsed,
       bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
+      feeIdentity: sol.feeIdentity,
     }
 
     const hash = hashSolution(solution)
