@@ -138,7 +138,24 @@ const consumedPaymentSeqsFor = (events: readonly GameEvent[]): Set<number> => {
       if (payment) consumed.add(payment.seq)
     }
     if (event.type === 'farm.stableBuilt') {
-      const payment = paymentForEvent(events, event, 'stables')
+      // Stable payments are emitted AFTER farm.stableBuilt (the pay child
+      // runs in afterHostListeners) — find the nearest FOLLOWING stables
+      // payment, bounded by the next stableBuilt (mirrors the shared
+      // mapper's stablePaymentForEvent).
+      const nextStableBuiltSeq = events
+        .filter((candidate) =>
+          candidate.type === 'farm.stableBuilt' &&
+          candidate.seq > event.seq &&
+          candidate.actorPlayerId === event.actorPlayerId)
+        .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
+      const payment = events
+        .filter((candidate) =>
+          candidate.type === 'resource.paid' &&
+          candidate.seq > event.seq &&
+          candidate.seq < nextStableBuiltSeq &&
+          candidate.actorPlayerId === event.actorPlayerId &&
+          candidate.paymentFor === 'stables')
+        .sort((left, right) => left.seq - right.seq)[0]
       if (payment) consumed.add(payment.seq)
     }
   })
