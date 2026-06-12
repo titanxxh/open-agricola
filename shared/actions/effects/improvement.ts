@@ -8,7 +8,11 @@ import { getMinorImprovement } from '../../cards/registry-display'
 // migrate in S4 (preview-cost domain aggregation per Decision C).
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
-import { cardCostCandidateMetadataForFeeIndex, executePaymentSolution } from '../payment/internal'
+import {
+  canConsumePaymentResourceProviders,
+  cardCostCandidateMetadataForSolution,
+  executePaymentSolution,
+} from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
@@ -347,21 +351,30 @@ const resolveImprovementPayment = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        cardCostCandidateMetadataForFeeIndex(
+        cardCostCandidateMetadataForSolution(
           candidateMetadataByFeeIndex,
-          solution.feeIndex,
+          solution,
         )?.sources ?? [],
     },
   )
   if (resolved.type !== 'selected') {
     return resolved
   }
-  const metadata = cardCostCandidateMetadataForFeeIndex(
+  const metadata = cardCostCandidateMetadataForSolution(
     candidateMetadataByFeeIndex,
-    resolved.solution.feeIndex,
+    resolved.solution,
   )
+  const paymentResourceProviders = PaymentSolver.isComplexCost(cost)
+    ? cost.paymentResourceProviders
+    : undefined
 
-  const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
+  if (!canConsumePaymentResourceProviders(effectiveState, resolved.solution, paymentResourceProviders)) {
+    return failure
+  }
+  const returnedCardId = executePaymentSolution(player, resolved.solution, {
+    state: effectiveState,
+    paymentResourceProviders,
+  })
   recordCardCostAttribution(player, metadata?.costAttribution)
   return {
     type: 'selected',

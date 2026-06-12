@@ -7,6 +7,7 @@ import type {
   ActionExecutionResult,
   InternalActionChild,
   Bonus,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   PlayerState,
   Resource,
@@ -43,6 +44,7 @@ type PendingRenovation = {
 type RenovationCostAdjustments = {
   trades?: Trade[]
   bonuses?: Bonus[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
 }
 
 const readRenovationCostAdjustments = (
@@ -52,11 +54,15 @@ const readRenovationCostAdjustments = (
   const raw = context as {
     costTrades?: ActionExecutionContext['costTrades']
     costBonuses?: ActionExecutionContext['costBonuses']
+    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
   }
   const trades = raw.costTrades ?? []
   const bonuses = raw.costBonuses ?? []
-  if (trades.length === 0 && bonuses.length === 0) return undefined
-  return { trades, bonuses }
+  const paymentResourceProviders = raw.paymentResourceProviders ?? []
+  if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
+    return undefined
+  }
+  return { trades, bonuses, paymentResourceProviders }
 }
 
 const readPendingRenovation = (
@@ -99,11 +105,22 @@ const appendRenovationAdjustments = (
 ): ComplexCost => {
   const trades = costAdjustments?.trades ?? []
   const bonuses = costAdjustments?.bonuses ?? []
-  if (trades.length === 0 && bonuses.length === 0) return cost
+  const paymentResourceProviders = costAdjustments?.paymentResourceProviders ?? []
+  if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
+    return cost
+  }
   return {
     ...cost,
     ...(trades.length > 0 ? { trades: [...(cost.trades ?? []), ...trades] } : {}),
     ...(bonuses.length > 0 ? { bonuses: [...(cost.bonuses ?? []), ...bonuses] } : {}),
+    ...(paymentResourceProviders.length > 0
+      ? {
+          paymentResourceProviders: [
+            ...(cost.paymentResourceProviders ?? []),
+            ...paymentResourceProviders,
+          ],
+        }
+      : {}),
   }
 }
 

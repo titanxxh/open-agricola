@@ -6,6 +6,7 @@ import type {
   CostAttributionBySource,
   PaymentResourceKey,
   PaymentResourceMap,
+  PaymentSolution,
   Resource,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
@@ -251,3 +252,11 @@ export const cardCostCandidateMetadataForFeeIndex = (
   feeIndex: number | undefined,
 ): CardCostCandidateMetadata | undefined =>
   metadataByFeeIndex?.[feeIndex ?? 0]
+
+export const cardCostCandidateMetadataForSolution = (
+  metadataByFeeIndex: Record<number, CardCostCandidateMetadata> | undefined,
+  solution: PaymentSolution,
+): CardCostCandidateMetadata | undefined => {
+  if (solution.cardUsed) return undefined
+  return cardCostCandidateMetadataForFeeIndex(metadataByFeeIndex, solution.feeIndex)
+}

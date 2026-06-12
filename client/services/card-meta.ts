@@ -95,7 +95,7 @@ const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): Car
   category: card.category,
   desc: card.desc,
   cost: card.cost as Record<string, number> | undefined,
-  altCosts: card.altCosts,
+  altCosts: card.altCosts as Record<string, number>[] | undefined,
   exchanges: card.exchanges,
   players: card.players,
   prerequisite: card.prerequisite,

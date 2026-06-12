@@ -56,11 +56,15 @@ const readConstructCostAdjustments = (
   const raw = context as {
     costTrades?: ActionExecutionContext['costTrades']
     costBonuses?: ActionExecutionContext['costBonuses']
+    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
   }
   const trades = raw.costTrades ?? []
   const bonuses = raw.costBonuses ?? []
-  if (trades.length === 0 && bonuses.length === 0) return undefined
-  return { trades, bonuses }
+  const paymentResourceProviders = raw.paymentResourceProviders ?? []
+  if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
+    return undefined
+  }
+  return { trades, bonuses, paymentResourceProviders }
 }
 
 const constructCostPreview: ActionCostPreview = {

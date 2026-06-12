@@ -846,7 +846,7 @@ export function buildChoiceExecutionContext(
     space: ActionExecutionContext['space']
     emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   },
-  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
+  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
     state: context.state,
@@ -856,6 +856,7 @@ export function buildChoiceExecutionContext(
     costs: base?.costs,
     costTrades: base?.costTrades,
     costBonuses: base?.costBonuses,
+    paymentResourceProviders: base?.paymentResourceProviders,
     costAttribution: base?.costAttribution,
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
@@ -975,6 +976,7 @@ export function applyInteractionRequest(
     costs: ActionExecutionContext['costs']
     costTrades?: ActionExecutionContext['costTrades']
     costBonuses?: ActionExecutionContext['costBonuses']
+    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
     costAttribution?: ActionExecutionContext['costAttribution']
     sourceCard: string | undefined
     actionContext: Record<string, unknown> | undefined
@@ -1012,6 +1014,7 @@ export function applyInteractionRequest(
       costs: args.costs,
       costTrades: args.costTrades,
       costBonuses: args.costBonuses,
+      paymentResourceProviders: args.paymentResourceProviders,
       costAttribution: args.costAttribution,
       sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
       actionContext: mergedActionContext,

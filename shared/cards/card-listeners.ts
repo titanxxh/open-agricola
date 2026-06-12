@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -429,6 +429,7 @@ export type FarmChoiceCostAdjustments = {
   costs: Partial<Resource>
   trades: Trade[]
   bonuses: Bonus[]
+  paymentResourceProviders: CardProvidedPaymentResourceProvider[]
 }
 
 export const collectFarmChoiceCostAdjustments = (
@@ -448,7 +449,12 @@ export const collectFarmChoiceCostAdjustments = (
     transactionEvents: [],
     eventQuery: createEventQuery([]),
   }
-  const aggregated: FarmChoiceCostAdjustments = { costs: {}, trades: [], bonuses: [] }
+  const aggregated: FarmChoiceCostAdjustments = {
+    costs: {},
+    trades: [],
+    bonuses: [],
+    paymentResourceProviders: [],
+  }
   const merge = (costs?: Partial<Resource>) => {
     if (!costs) return
     for (const [key, value] of Object.entries(costs)) {
@@ -461,6 +467,9 @@ export const collectFarmChoiceCostAdjustments = (
     merge(result.costs)
     if (result.trades) aggregated.trades.push(...result.trades)
     if (result.bonuses) aggregated.bonuses.push(...result.bonuses)
+    if (result.paymentResourceProviders) {
+      aggregated.paymentResourceProviders.push(...result.paymentResourceProviders)
+    }
   }
   runActionHooks(ctx).forEach(mergeResult)
   for (const entry of getMatchingListeners(ctx)) {

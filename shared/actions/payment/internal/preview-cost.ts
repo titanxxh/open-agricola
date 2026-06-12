@@ -17,6 +17,7 @@ import type {
   Bonus,
   CardCostCandidate,
   CardCostCandidateMetadata,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -58,6 +59,7 @@ export const resolveCardCostWithModifiersDetailed = (
   const matched = getMatchingListeners(context)
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
+  const collectedPaymentResourceProviders: CardProvidedPaymentResourceProvider[] = []
   const transforms: CandidateTransform<CardCostCandidate>[] = []
   let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
   let candidates = normalizeCardCostCandidates(baseCost)
@@ -100,6 +102,9 @@ export const resolveCardCostWithModifiersDetailed = (
     if (result?.trades) {
       collectedTrades.push(...result.trades)
     }
+    if (result?.paymentResourceProviders) {
+      collectedPaymentResourceProviders.push(...result.paymentResourceProviders)
+    }
   }
 
   if (transforms.length > 0) {
@@ -133,6 +138,12 @@ export const resolveCardCostWithModifiersDetailed = (
         ...collectedBonuses,
       ]
     }
+    if (collectedPaymentResourceProviders.length > 0) {
+      complexCost.paymentResourceProviders = [
+        ...(isComplexCost(baseCost) ? baseCost.paymentResourceProviders ?? [] : []),
+        ...collectedPaymentResourceProviders,
+      ]
+    }
     return {
       cost: complexCost,
       candidateMetadataByFeeIndex: buildCandidateMetadataByFeeIndex(candidates),
@@ -140,7 +151,11 @@ export const resolveCardCostWithModifiersDetailed = (
   }
 
   if (isComplexCost(baseCost)) {
-    if (collectedBonuses.length === 0 && collectedTrades.length === 0) {
+    if (
+      collectedBonuses.length === 0 &&
+      collectedTrades.length === 0 &&
+      collectedPaymentResourceProviders.length === 0
+    ) {
       return { cost: baseCost }
     }
     const merged: ComplexCost = { ...baseCost }
@@ -150,10 +165,20 @@ export const resolveCardCostWithModifiersDetailed = (
     if (collectedBonuses.length > 0) {
       merged.bonuses = [...(baseCost.bonuses ?? []), ...collectedBonuses]
     }
+    if (collectedPaymentResourceProviders.length > 0) {
+      merged.paymentResourceProviders = [
+        ...(baseCost.paymentResourceProviders ?? []),
+        ...collectedPaymentResourceProviders,
+      ]
+    }
     return { cost: merged }
   }
 
-  if (collectedBonuses.length > 0 || collectedTrades.length > 0) {
+  if (
+    collectedBonuses.length > 0 ||
+    collectedTrades.length > 0 ||
+    collectedPaymentResourceProviders.length > 0
+  ) {
     const complexCost: ComplexCost = {
       fee: cost,
     }
@@ -162,6 +187,9 @@ export const resolveCardCostWithModifiersDetailed = (
     }
     if (collectedTrades.length > 0) {
       complexCost.trades = collectedTrades
+    }
+    if (collectedPaymentResourceProviders.length > 0) {
+      complexCost.paymentResourceProviders = collectedPaymentResourceProviders
     }
     return { cost: complexCost }
   }
@@ -331,7 +359,11 @@ const payCardPreviewCost = (
     state,
   )[0]
   if (!solution) return false
-  executePaymentSolution(player, solution, { costType, state })
+  executePaymentSolution(player, solution, {
+    costType,
+    state,
+    paymentResourceProviders: previewCost.paymentResourceProviders,
+  })
   return true
 }
 

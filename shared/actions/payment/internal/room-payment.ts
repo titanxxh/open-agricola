@@ -13,6 +13,7 @@
 import type {
   ActionExecutionResult,
   Bonus,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   ExactCost,
   PaymentSolution,
@@ -64,6 +65,7 @@ const resolveConstructUnitFee = (
 export type ConstructCostAdjustments = {
   trades?: Trade[]
   bonuses?: Bonus[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
 }
 
 const appendConstructCostAdjustments = (
@@ -72,11 +74,17 @@ const appendConstructCostAdjustments = (
 ): ComplexCost => {
   const trades = adjustments?.trades ?? []
   const bonuses = adjustments?.bonuses ?? []
-  if (trades.length === 0 && bonuses.length === 0) return cost
+  const paymentResourceProviders = adjustments?.paymentResourceProviders ?? []
+  if (trades.length === 0 && bonuses.length === 0 && paymentResourceProviders.length === 0) {
+    return cost
+  }
   return {
     ...cost,
     trades: trades.length > 0 ? [...(cost.trades ?? []), ...trades] : cost.trades,
     bonuses: bonuses.length > 0 ? [...(cost.bonuses ?? []), ...bonuses] : cost.bonuses,
+    paymentResourceProviders: paymentResourceProviders.length > 0
+      ? [...(cost.paymentResourceProviders ?? []), ...paymentResourceProviders]
+      : cost.paymentResourceProviders,
   }
 }
 

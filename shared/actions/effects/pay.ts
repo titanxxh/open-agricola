@@ -2,6 +2,7 @@ import type {
   ActionDefinition,
   ActionExecutionResult,
   CardCostCandidateMetadata,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -19,7 +20,8 @@ import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/help
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import {
-  cardCostCandidateMetadataForFeeIndex,
+  canConsumePaymentResourceProviders,
+  cardCostCandidateMetadataForSolution,
   executePaymentSolution,
   payResources,
   paySupplyTokens,
@@ -197,9 +199,9 @@ const resolvePayActionPaymentSelection = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        cardCostCandidateMetadataForFeeIndex(
+        cardCostCandidateMetadataForSolution(
           options.candidateMetadataByFeeIndex,
-          solution.feeIndex,
+          solution,
         )?.sources ?? [],
     },
   )
@@ -257,9 +259,13 @@ const buildSelectedResult = (
   eventSink?: EventSink,
   sourceActionId?: string,
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>,
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[],
   trackSourceCardPaymentStats = costType === undefined,
 ): ActionExecutionResult => {
-  executePaymentSolution(player, solution, { costType, state })
+  if (!canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)) {
+    return { type: 'fail', errorKey: 'log.payFail' }
+  }
+  executePaymentSolution(player, solution, { costType, state, paymentResourceProviders })
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
@@ -267,9 +273,9 @@ const buildSelectedResult = (
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
-  const metadata = cardCostCandidateMetadataForFeeIndex(
+  const metadata = cardCostCandidateMetadataForSolution(
     candidateMetadataByFeeIndex,
-    solution.feeIndex,
+    solution,
   )
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
@@ -292,9 +298,9 @@ const buildSelectedResult = (
   }
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
-    if (metadata) {
-      extraData.originalFeeIndex = metadata.originalFeeIndex
-    }
+  }
+  if (metadata) {
+    extraData.originalFeeIndex = metadata.originalFeeIndex
   }
   return {
     type: 'ok',
@@ -387,6 +393,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         p.candidateMetadataByFeeIndex,
+        p.cost.paymentResourceProviders,
         shouldTrackSourceCardPaymentStats(p),
       )
     }
@@ -423,6 +430,7 @@ export const payAction: ActionDefinition = {
           p.includeReturnedCard,
           eventSink,
           p.sourceActionId,
+          undefined,
           undefined,
           shouldTrackSourceCardPaymentStats(p),
         )
@@ -521,6 +529,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         undefined,
+        undefined,
         shouldTrackSourceCardPaymentStats(p),
       )
     }
@@ -572,6 +581,7 @@ export const payAction: ActionDefinition = {
       eventSink,
       p.sourceActionId,
       p.candidateMetadataByFeeIndex,
+      p.cost.paymentResourceProviders,
       shouldTrackSourceCardPaymentStats(p),
     )
   },

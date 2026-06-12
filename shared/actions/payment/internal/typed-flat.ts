@@ -88,7 +88,11 @@ export const payTypedFlatCost = (
     : { fee: cost }
   const solutions = computeAllBuyableCombinations(player, complex, undefined, costType, state)
   if (solutions.length === 0) return false
-  executePaymentSolution(player, solutions[0]!, { costType, state })
+  executePaymentSolution(player, solutions[0]!, {
+    costType,
+    state,
+    paymentResourceProviders: complex.paymentResourceProviders,
+  })
   return true
 }
 
@@ -113,7 +117,11 @@ export const payTypedFlatCostDetailed = (
   const solutions = computeAllBuyableCombinations(player, complex, undefined, costType, state)
   if (solutions.length === 0) return { ok: false }
   const solution = solutions[0]!
-  executePaymentSolution(player, solution, { costType, state })
+  executePaymentSolution(player, solution, {
+    costType,
+    state,
+    paymentResourceProviders: complex.paymentResourceProviders,
+  })
   return {
     ok: true,
     resourcesPaid: solution.resourcesPaid,
