@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import type { GameEvent } from '../../shared/contract/events'
 import '../../shared/cards/register-all'
 import '../../shared/cards/B/B155_ArtTeacher'
 
 const CARD_ID = 'B155_ArtTeacher'
 const TRAVELING_PLAYERS = 'traveling-players'
 const TP_PAYMENT_RESOURCE = 'B155_ArtTeacher:traveling-players-food'
+type ResourcePaidEvent = Extract<GameEvent, { type: 'resource.paid' }>
 
 const setupBase = (playerCount = 4) => {
   const session = new GameSession(undefined, undefined, { playerCount })
@@ -124,6 +126,14 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     expect(resp.state.players[0]!.occupationPlayed).toContain('A153_PigOwner')
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(tpFoodAfter(resp)).toBe(2)
+    const paidEvent = resp.state.events.find((event): event is ResourcePaidEvent =>
+      event.type === 'resource.paid' &&
+      (event.resources[TP_PAYMENT_RESOURCE] ?? 0) === 1,
+    )
+    expect(paidEvent).toBeDefined()
+    expect(paidEvent?.paymentSources).toEqual([
+      { from: { kind: 'actionSpace', spaceId: TRAVELING_PLAYERS }, resources: { food: 1 } },
+    ])
   })
 
   it('case 4b: selecting own-food payment preserves TP food and spends player food', () => {

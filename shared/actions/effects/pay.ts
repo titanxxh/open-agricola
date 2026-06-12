@@ -12,7 +12,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import type { EventSink, PaymentPurpose } from '../../contract/events'
+import type { EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
 import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -137,6 +137,32 @@ const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap =>
   return out
 }
 
+const buildPaymentSources = (
+  player: PlayerState,
+  resources: PaymentResourceMap,
+  providers: CardProvidedPaymentResourceProvider[] | undefined,
+): Array<{ from: ResourceLocation; resources: PaymentResourceMap }> => {
+  const remaining = positiveResources(resources)
+  const sources: Array<{ from: ResourceLocation; resources: PaymentResourceMap }> = []
+
+  for (const provider of providers ?? []) {
+    const amount = remaining[provider.key] ?? 0
+    if (amount <= 0) continue
+    delete remaining[provider.key]
+    if (provider.consume.type === 'actionSpace') {
+      sources.push({
+        from: { kind: 'actionSpace', spaceId: provider.consume.spaceId },
+        resources: { [provider.consume.resource]: amount },
+      })
+    }
+  }
+
+  if (Object.keys(remaining).length > 0) {
+    sources.unshift({ from: { kind: 'player', playerId: player.id }, resources: remaining })
+  }
+  return sources
+}
+
 const splitSourceIds = (csv: string | undefined): string[] =>
   csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : []
 
@@ -220,6 +246,7 @@ const emitPaidEvent = (
     returnedCardId?: string
     /** Cost Candidate sources of the selected row (rendered as log "via"). */
     candidateSources?: readonly string[]
+    paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   } = {},
 ) => {
   const paid = positiveResources(resources)
@@ -239,9 +266,7 @@ const emitPaidEvent = (
     resources: paid,
     to: { kind: 'supply' },
     paymentFor: paymentPurpose(costType),
-    paymentSources: [
-      { from: { kind: 'player', playerId: player.id }, resources: paid },
-    ],
+    paymentSources: buildPaymentSources(player, paid, provenance.paymentResourceProviders),
     ...(sourceCard ? { sourceCardId: sourceCard } : {}),
     ...(bonusSources.length > 0 ? { bonusSources } : {}),
     ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
@@ -282,6 +307,7 @@ const buildSelectedResult = (
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
     candidateSources: metadata?.sources,
+    paymentResourceProviders,
   })
   recordCardCostAttribution(player, metadata?.costAttribution)
   const extraData: Record<string, unknown> = {
