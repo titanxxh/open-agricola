@@ -156,10 +156,16 @@ const entryHasStandaloneLog = (
 ): boolean =>
   !!entry.event && eventsToLogEntries([entry.event], context).length > 0
 
+type ContextualLogEntries = {
+  map: Map<string, LogEntry>
+  /** Seqs of resource.paid events absorbed into a card.played/renovated/stable row. */
+  consumedPaymentSeqs: Set<number>
+}
+
 const buildContextualLogEntryMapForGroup = (
   entries: readonly ReplayTimelineEntry[],
   context: LogMapperContextInput,
-): Map<string, LogEntry> => {
+): ContextualLogEntries => {
   const eventEntries = entries.filter((entry): entry is ReplayTimelineEntry & { event: GameEvent } =>
     !!entry.event)
   const events = eventEntries.map((entry) => entry.event)
@@ -175,14 +181,15 @@ const buildContextualLogEntryMapForGroup = (
     const logEntry = logEntries[index]
     if (logEntry) map.set(entry.key, logEntry)
   })
-  return map
+  return { map, consumedPaymentSeqs }
 }
 
 const buildContextualLogEntryMap = (
   entries: readonly ReplayTimelineEntry[],
   context: LogMapperContextInput,
-): Map<string, LogEntry> => {
+): ContextualLogEntries => {
   const map = new Map<string, LogEntry>()
+  const consumedPaymentSeqs = new Set<number>()
   const groups = new Map<number, ReplayTimelineEntry[]>()
   entries
     .filter((entry) => !!entry.event)
@@ -190,11 +197,12 @@ const buildContextualLogEntryMap = (
       groups.set(entry.packetSeq, [...(groups.get(entry.packetSeq) ?? []), entry])
     })
   groups.forEach((groupEntries) => {
-    buildContextualLogEntryMapForGroup(groupEntries, context)
-      .forEach((logEntry, key) => map.set(key, logEntry))
+    const group = buildContextualLogEntryMapForGroup(groupEntries, context)
+    group.map.forEach((logEntry, key) => map.set(key, logEntry))
+    group.consumedPaymentSeqs.forEach((seq) => consumedPaymentSeqs.add(seq))
   })
 
-  return map
+  return { map, consumedPaymentSeqs }
 }
 
 const visibleReplayDerivedLogCounts = (
@@ -284,11 +292,16 @@ export const buildActionLogTimelineRows = ({
   actionNames,
 }: BuildActionLogTimelineRowsInput): ActionLogTimelineBucket[] => {
   const mapperContext = { playerNames, actionNames }
-  const contextualLogEntries = buildContextualLogEntryMap(entries, mapperContext)
+  const { map: contextualLogEntries, consumedPaymentSeqs } =
+    buildContextualLogEntryMap(entries, mapperContext)
   const eventRows: ActionLogTimelineRow[] = [...entries]
     .sort((left, right) =>
       right.packetSeq - left.packetSeq || right.packetLocalIndex - left.packetLocalIndex)
     .flatMap((entry): ActionLogTimelineRow[] => {
+      // A payment absorbed into its card.played/renovated/stable row must not
+      // fall through to the standalone single-event rendering — that would
+      // duplicate the payment as a "pays X for Y" line.
+      if (entry.event && consumedPaymentSeqs.has(entry.event.seq)) return []
       const { logEntry, label } = eventLabel(
         entry,
         locale,

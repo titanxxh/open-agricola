@@ -55,5 +55,8 @@ describe('A143_Stonecutter session', () => {
     expect(after.improvements).toContain('Major_Basket')
     expect(after.resources.reed).toBe(0)
     expect(after.resources.stone).toBe(1)
+
+    const entry = resp.state.log.find((row) => row.key === 'log.playImprovement')
+    expect(entry?.params?.bonusSources).toEqual([CARD_ID])
   })
 })

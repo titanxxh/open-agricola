@@ -309,7 +309,8 @@ describe('D95_SiteManager session', () => {
     expect((occEntry!.params as PlayOccupationParams | undefined)?.occupations).toContain(CARD_ID)
     expect(impEntry).toBeDefined()
     expect((impEntry!.params as PlayImprovementParams | undefined)?.improvements).toContain('Major_Fireplace1')
-    expect((impEntry!.params as PlayImprovementParams | undefined)?.bonusSources).toBeUndefined()
+    // Candidate sources now surface in the log as "via" attribution.
+    expect((impEntry!.params as PlayImprovementParams | undefined)?.bonusSources).toEqual([CARD_ID])
   })
 
   it('keeps occupation log cost scoped to the occupation step when a later improvement also spends resources', () => {
