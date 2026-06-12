@@ -39,7 +39,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
-| Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；带 sideEffect 的 trade 分支不参与支配剪枝，保留玩家是否消耗行动格 / 卡牌状态的选择权 | 全部 card-purchase / unit-trade cost 修改卡 |
+| Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
 | Candidate Closure：等价候选行（同 resources + originalFeeIndex、仅 sources 不同）只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment）；玩家不再看到仅归因不同的重复支付选项，未选中链的卡不进该选项 hover 归因 | 全部 card-purchase cost 修改卡（C95/E109 fixed-price 双子、A75/D117 bypass 链等） |
 
 ## 4. 简洁度审阅
@@ -113,6 +113,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换 + mandatory 标志，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；optional 折扣天然保留原候选，mandatory（BGA "costs less" / replace 语义）经饱和过滤隐藏未折扣行；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 improvement payment glue 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats。 |
 | Payment bonus choices / unit cost alternatives | `Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、A16、C56、D88 | 普通 bonus choice 必须在折扣后不产生负 cost；typed cost payment 不保留 `resourcesPaid` 为负的 surplus 分支。BGA `addCost` per-unit alternative 先用 `scope:'unit'` trade 生成 cost row，再允许 D88 这类 bonus choice 继续替换。只有“移除当前 cost 中某资源”这类卡牌显式设置 cap 时，折扣才按当前 cost 封顶。multi-choice 默认记录 `bonusChoiceIndex`，仅无状态 replacement choice 显式关闭以避免重复支付项。 |
+| Card-provided payment resources | `ComplexCost.paymentResourceProviders`、`PaymentSolution.paymentResourceCovers`、`B155_ArtTeacher`、ADR 0004 | 卡牌可在 `computeCosts` 内声明 payment-only 虚拟资源；provider 在卡牌内部定义可用量、覆盖比例和消费来源。虚拟资源不进入成本候选行或 `PlayerState.resources`，但会出现在 payment option / `resourcesPaid`，由 executor 消耗来源状态。 |
 | Candidate Closure（候选闭包，ADR 0004） | `candidate-closure.ts` `closeCandidates()`、`buildUnitCostOptions()` 闭包接入、`cost-modifier-permutation-probe.test.ts` | unit trade（D15/B145/A123 等）不再声明 `order`，`Trade.order` / `TradeModifier.order` 已删除；可达 cost row 集合由闭包求不动点产出，与修改器注册顺序无关；mandatory 饱和过滤保证强制折扣链任意序收敛；新增 cost 转换只声明局部语义（替换什么、mandatory 与否、maxUses），禁止重新引入任何顺序字段。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
@@ -715,7 +716,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B152_JuniorArtist` | 已对齐 |  |
 | `B153_Housemaster` | 已对齐 | 终局计分按 major identity 汇总真实 major 与 `alsoCountsAs: ['major']` 的 minor，不再保留 A60 单卡特判。 |
 | `B154_SheepKeeper` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
-| `B155_ArtTeacher` | 已对齐 |  |
+| `B155_ArtTeacher` | 已对齐 | 职业支付可用 Traveling Players 食物通过卡牌内部 `paymentResourceProviders` 表达；payment solution 记录 `B155_ArtTeacher:traveling-players-food`，执行时扣行动格食物，不再用 payment trade sideEffect。 |
 | `B156_StorehouseKeeper` | 已对齐 |  |
 | `B157_Salter` | 已对齐 |  |
 | `B158_DistrictManager` | 已对齐 |  |

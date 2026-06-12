@@ -6,24 +6,20 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B155_ArtTeacher'
 const TRAVELING_PLAYERS = 'traveling-players'
+const TRAVELING_PLAYERS_FOOD = `${CARD_ID}:traveling-players-food` as const
 
 /**
  * B155 Art Teacher (Occupation, 4+ players).
  *
  * BGA (B155_ArtTeacher.php):
  *   - onBuy → gain 1 wood + 1 reed.
- *   - onPlayerComputeCostsOccupation → derive alternative trades where 1..N
- *     food of the occupation cost can be paid as FOOD_TRAVEL (food on the
- *     Traveling Players accumulation space).
+ *   - onPlayerComputeCostsOccupation → occupation cost can use food from
+ *     the Traveling Players accumulation space.
  *
  * Implementation:
  *   - occupation after-listener (existing) triggers the wood+reed gain.
- *   - occupation computeCosts listener injects a Trade
- *     {from:{}, to:{food:1}, max:tpFood, sideEffect:drainSpace(traveling-players,
- *     food)}. The standard payment solver enumerates 0..tpFood uses, the
- *     player picks via selectPayment, and applyTradeSideEffect drains TP food
- *     equal to the chosen times. Covers any occupation cost entry (lessons /
- *     lessons-4 / anytime occupation cards) without a separate before listener.
+ *   - occupation computeCosts listener provides a card-scoped payment
+ *     resource backed by Traveling Players food.
  */
 
 const onBuyListener: CardListenerRegistration = {
@@ -48,18 +44,13 @@ const computeCostsListener: CardListenerRegistration = {
     if (tpFood <= 0) return
 
     return {
-      trades: [
+      paymentResourceProviders: [
         {
-          from: {},
-          to: { food: 1 },
-          max: tpFood,
-          source: 'B155',
-          sourceId: CARD_ID,
-          sideEffect: {
-            type: 'drainSpace',
-            spaceId: TRAVELING_PLAYERS,
-            resource: 'food',
-          },
+          key: TRAVELING_PLAYERS_FOOD,
+          sourceCard: CARD_ID,
+          available: tpFood,
+          covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+          consume: { type: 'actionSpace', spaceId: TRAVELING_PLAYERS, resource: 'food' },
         },
       ],
       sourceCard: CARD_ID,

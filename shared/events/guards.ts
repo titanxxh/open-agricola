@@ -1,4 +1,4 @@
-import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 
 export const assertPublicGameEvent = (event: unknown): void => {
   const visibility = (event as { visibility?: unknown } | null)?.visibility
@@ -224,10 +224,11 @@ const assertResourceMapForKeys = (
   value: unknown,
   path: string,
   allowedKeys: ReadonlySet<string>,
+  extraAllowed?: (key: string) => boolean,
 ): void => {
   const record = assertRecord(value, path)
   Object.entries(record).forEach(([key, entry]) => {
-    if (!allowedKeys.has(key)) {
+    if (!allowedKeys.has(key) && !extraAllowed?.(key)) {
       throw new Error(`GameEvent ${path} has unknown resource ${key}`)
     }
     assertFiniteNumberField(entry, `${path}.${key}`)
@@ -245,7 +246,7 @@ const assertResourceMapArray = (value: unknown, path: string): void => {
 }
 
 const assertPaymentResourceMap = (value: unknown, path: string): void => {
-  assertResourceMapForKeys(value, path, paymentResourceKeys)
+  assertResourceMapForKeys(value, path, paymentResourceKeys, isPaymentResourceKey)
 }
 
 const assertFutureMeepleResourceMap = (value: unknown, path: string): void =>

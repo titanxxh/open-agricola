@@ -1317,6 +1317,7 @@ export function engineProceed(
         costs: executionContext.costs,
         costTrades: executionContext.costTrades,
         costBonuses: executionContext.costBonuses,
+        paymentResourceProviders: executionContext.paymentResourceProviders,
         costAttribution: executionContext.costAttribution,
         sourceCard: executionContext.sourceCard ?? result.sourceCard,
         actionContext: executionContext.actionContext,

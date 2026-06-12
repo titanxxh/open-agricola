@@ -6,6 +6,7 @@ import '../../shared/cards/B/B155_ArtTeacher'
 
 const CARD_ID = 'B155_ArtTeacher'
 const TRAVELING_PLAYERS = 'traveling-players'
+const TP_PAYMENT_RESOURCE = 'B155_ArtTeacher:traveling-players-food'
 
 const setupBase = (playerCount = 4) => {
   const session = new GameSession(undefined, undefined, { playerCount })
@@ -54,7 +55,7 @@ describe('B155 ArtTeacher onBuy listener', () => {
   })
 })
 
-describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
+describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
   // Scenario template: player has B155 already played + 1 dummy occupation
   // played → next occupation costs 1 food via lessons. Hand contains another
   // playable occupation. Player food + TP food are configured per case.
@@ -70,10 +71,10 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
     return { session, player }
   }
 
-  it('case 2: TP food=3, player food=0 → trade auto-resolves, TP -1, occupation played', () => {
-    // computeCosts injects single trade {to:{food:1}, max:3, sideEffect}.
-    // computeAllBuyableCombinations enumerates 0..3 trade times; only the
-    // 1-trade-once solution covers the food:1 fee with player food=0.
+  it('case 2: TP food=3, player food=0 → TP payment auto-resolves, TP -1, occupation played', () => {
+    // computeCosts injects a Traveling Players-backed payment resource.
+    // computeAllBuyableCombinations enumerates provider usage; only the
+    // 1-TP-food solution covers the food:1 fee with player food=0.
     // The lessons + occupation chain completes without any prompt — the
     // single optimal solution is auto-applied by the engine.
     const { session } = setupSubsequent(3, 0)
@@ -84,11 +85,9 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('case 3: TP food=2, player food=0 → 1-trade solution drains exactly 1 TP food', () => {
-    // Cost=1 food, player has 0 food, TP=2. computeAllBuyableCombinations
-    // enumerates 0,1,2 trade times; only the 1-trade-once solution is buyable
-    // (the 2-times solution overpays). sideEffect.drainSpace fires with
-    // times=1, so TP food becomes 1.
+  it('case 3: TP food=2, player food=0 → TP payment drains exactly 1 TP food', () => {
+    // Cost=1 food, player has 0 food, TP=2. Only using 1 TP food is buyable
+    // (using 2 overpays). The provider consume path drains exactly 1 TP food.
     const { session } = setupSubsequent(2, 0)
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
@@ -97,31 +96,54 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('case 4: player food=2, TP food=3 → direct or TP-food payment stays consistent', () => {
-    // Player can pay {food:1} from supply OR via 1 B155 trade. Both produce
-    // resourcesPaid={food:1}, but the trade variant adds a sideEffect (drain TP).
-    // The engine may auto-apply a single path or ask the player to choose.
+  it('case 4: player food=2, TP food=3 → direct and TP-food payments are distinct choices', () => {
     const { session } = setupSubsequent(3, 2)
-    let resp = session.takeAction(0, 'lessons')
+    const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (
-      resp.interaction.stateId === 'wait'
-      && resp.interaction.promptKey === 'prompt.selectPayment'
-    ) {
-      const option = resp.interaction.options?.[0]
-      expect(option).toBeDefined()
-      resp = session.resolveChoice(0, option!.value)
-    }
-    expect(resp.state.players[0]!.occupationPlayed).toContain('A153_PigOwner')
-    // Either path is acceptable per BGA semantics — player optionally uses TP
-    // food. We just verify state consistency (player food + TP food) sums to
-    // the original (3+2)=5 minus the 1-food cost paid in some way.
-    const totalAfter =
-      resp.state.players[0]!.resources.food + tpFoodAfter(resp)
-    expect(totalAfter).toBe(2 + 3 - 1)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    const paidOptions = resp.interaction.options?.map((option) =>
+      option.labelParams?.resourcesPaid as Record<string, number> | undefined,
+    ) ?? []
+    expect(paidOptions.some((paid) => (paid?.food ?? 0) === 1)).toBe(true)
+    expect(paidOptions.some((paid) => (paid?.[TP_PAYMENT_RESOURCE] ?? 0) === 1)).toBe(true)
   })
 
-  it('case 5: TP food=0 → no B155 trade injected; player pays from own food', () => {
+  it('case 4a: selecting TP-food payment drains TP food and preserves player food', () => {
+    const { session } = setupSubsequent(3, 2)
+    const wait = session.takeAction(0, 'lessons')
+    expect(wait.ok).toBe(true)
+    expect(wait.interaction.stateId).toBe('wait')
+    const option = wait.interaction.options?.find((entry) =>
+      ((entry.labelParams?.resourcesPaid as Record<string, number> | undefined)?.[TP_PAYMENT_RESOURCE] ?? 0) === 1,
+    )
+    expect(option).toBeDefined()
+
+    const resp = session.resolveChoice(0, option!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A153_PigOwner')
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    expect(tpFoodAfter(resp)).toBe(2)
+  })
+
+  it('case 4b: selecting own-food payment preserves TP food and spends player food', () => {
+    const { session } = setupSubsequent(3, 2)
+    const wait = session.takeAction(0, 'lessons')
+    expect(wait.ok).toBe(true)
+    expect(wait.interaction.stateId).toBe('wait')
+    const option = wait.interaction.options?.find((entry) =>
+      ((entry.labelParams?.resourcesPaid as Record<string, number> | undefined)?.food ?? 0) === 1,
+    )
+    expect(option).toBeDefined()
+
+    const resp = session.resolveChoice(0, option!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A153_PigOwner')
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(tpFoodAfter(resp)).toBe(3)
+  })
+
+  it('case 5: TP food=0 → no B155 provider injected; player pays from own food', () => {
     const { session } = setupSubsequent(0, 1)
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)

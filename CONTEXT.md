@@ -112,6 +112,10 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**Card-Provided Payment Resource（卡牌提供的支付资源）**:
+由卡牌效果临时提供、只能用于支付管线的虚拟资源口径，例如用 Traveling Players 行动格上的食物支付职业成本。它有卡牌前缀稳定身份，不出现在成本候选行中，但会以自身身份出现在实际支付明细中；它可以声明自己能覆盖哪些成本资源，不表示玩家库存资源或通用资源类型。
+_Avoid_: Payment Source、PlayerState.resources、真实资源兑换、成本候选行资源
+
 **ComputeCardCosts**:
 购买 major / minor improvement 时对当前卡牌成本候选执行的卡牌成本变形语义。它包括拥有 `computeCosts.improvement` listener 的卡，也包括先选支付路径再把该路径送入同一成本变形语义的卡。
 _Avoid_: 建房、翻修、围栏等非卡牌购买成本

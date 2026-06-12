@@ -21,8 +21,10 @@ import {
   getAvailableStableSupplyCount,
   getOwnOrdinaryFenceReserveCount,
 } from '../../../domain/supply-tokens'
+import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 
 const SUPPLY_TOKEN_KEYS = new Set<SupplyTokenKey>(['fence', 'stable'])
+const REAL_RESOURCE_KEY_SET: ReadonlySet<string> = new Set(REAL_RESOURCE_KEYS)
 
 export const splitSupplyTokenCost = (cost: PaymentResourceMap) => {
   const resources: Partial<Resource> = {}
@@ -31,8 +33,10 @@ export const splitSupplyTokenCost = (cost: PaymentResourceMap) => {
     if (typeof value !== 'number' || value <= 0) continue
     if (SUPPLY_TOKEN_KEYS.has(key as SupplyTokenKey)) {
       supplyTokens[key as SupplyTokenKey] = value
-    } else {
+    } else if (REAL_RESOURCE_KEY_SET.has(key)) {
       resources[key as keyof Resource] = value
+    } else {
+      continue
     }
   }
   return { resources, supplyTokens }
@@ -110,6 +114,7 @@ export const isComplexCost = (
     'trades' in cost ||
     'cards' in cost ||
     'bonuses' in cost ||
+    'paymentResourceProviders' in cost ||
     'unitFee' in cost ||
     'nb' in cost
   )

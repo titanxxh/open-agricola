@@ -19,8 +19,9 @@ export type Resource = {
 export type SupplyTokenKey = 'fence' | 'stable'
 export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
 export type PaymentResource = Resource & Record<SupplyTokenKey, number>
-export type PaymentResourceMap = Partial<PaymentResource>
-export type PaymentResourceKey = keyof PaymentResource
+export type CardProvidedPaymentResourceKey = `${string}:${string}`
+export type PaymentResourceKey = keyof PaymentResource | CardProvidedPaymentResourceKey
+export type PaymentResourceMap = Partial<Record<PaymentResourceKey, number>>
 export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
@@ -43,6 +44,30 @@ export type PseudoResourceMap = {
 export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
+
+export type CardProvidedPaymentResourceCover = {
+  resource: ResourceKey
+  costAmount: number
+  paymentAmount: number
+}
+
+export type CardProvidedPaymentResourceConsume =
+  | { type: 'actionSpace'; spaceId: string; resource: ResourceKey }
+
+export type CardProvidedPaymentResourceProvider = {
+  key: CardProvidedPaymentResourceKey
+  sourceCard: string
+  available: number
+  covers: CardProvidedPaymentResourceCover[]
+  consume: CardProvidedPaymentResourceConsume
+}
+
+export type PaymentResourceCoverUsage = {
+  paymentResource: CardProvidedPaymentResourceKey
+  costResource: ResourceKey
+  paymentAmount: number
+  costAmount: number
+}
 
 export type ExactCost = Partial<Resource> & {
   max?: number
@@ -157,6 +182,7 @@ export type ComplexCost = {
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
 }
@@ -192,6 +218,7 @@ export type PaymentSolution = {
   feeIndex?: number
   /** Payment-path identity from ComplexCost.feeIdentities (dominance-pruning scope). */
   feeIdentity?: number
+  paymentResourceCovers?: PaymentResourceCoverUsage[]
 }
 
 export type PaymentSource = 'reserve' | 'field' | 'card'
@@ -510,6 +537,7 @@ export type ActionExecutionContext = {
   costs?: Partial<Resource>
   costTrades?: Trade[]
   costBonuses?: Bonus[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string

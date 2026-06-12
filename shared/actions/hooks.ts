@@ -65,6 +65,7 @@ export type ActionHookResult = {
   reserveResources?: Partial<Resource>
   trades?: import('../contract/types').Trade[]
   bonuses?: import('../contract/types').Bonus[]
+  paymentResourceProviders?: import('../contract/types').CardProvidedPaymentResourceProvider[]
   sourceCard?: string
   countCardUse?: boolean
   labelKey?: string
