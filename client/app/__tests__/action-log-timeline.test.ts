@@ -142,6 +142,40 @@ describe('buildActionLogTimelineRows', () => {
     expect(improvement?.logEntry?.params?.costResources).toEqual({ wood: 1 })
   })
 
+  it('suppresses the absorbed stable payment emitted AFTER farm.stableBuilt', () => {
+    const stableBuilt: GameEvent = {
+      schemaVersion: 1,
+      id: 'evt-stable',
+      seq: 5,
+      round: 2,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'farm.stableBuilt',
+      stables: [{ row: 0, col: 0 }],
+    } as unknown as GameEvent
+    const paid: GameEvent = {
+      ...paidEvent('evt-paid', 6),
+      paymentFor: 'stables',
+      sourceCardId: 'SomeCard',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(stableBuilt, 3, 0),
+        replayEntryForEvent(paid, 3, 1),
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const keys = rows.map((row) => row.logEntry?.key)
+    expect(keys).not.toContain('log.cardEffectPay')
+  })
+
   it('keeps absorbed payments out of canceled (undone) timeline rows too', () => {
     const paid: GameEvent = {
       ...paidEvent('evt-paid', 7),
