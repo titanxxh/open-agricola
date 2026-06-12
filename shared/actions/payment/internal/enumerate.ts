@@ -15,7 +15,9 @@
 import type {
   ComplexCost,
   CostModifierType,
+  CardProvidedPaymentResourceProvider,
   GameState,
+  PaymentResourceCoverUsage,
   PaymentResourceKey,
   PaymentResourceMap,
   PaymentSolution,
@@ -88,11 +90,40 @@ const PAYMENT_RESOURCE_ORDER: PaymentResourceKey[] = [
   'stable',
 ]
 
+const paymentResourceOrderIndex = (key: string): number => {
+  const index = PAYMENT_RESOURCE_ORDER.indexOf(key as PaymentResourceKey)
+  return index >= 0 ? index : PAYMENT_RESOURCE_ORDER.length
+}
+
+const comparePaymentResourceKey = (left: string, right: string): number => {
+  const orderDelta = paymentResourceOrderIndex(left) - paymentResourceOrderIndex(right)
+  if (orderDelta !== 0) return orderDelta
+  return left.localeCompare(right)
+}
+
+const sortedPaymentResourceEntries = (
+  resources: PaymentResourceMap,
+): [PaymentResourceKey, number][] =>
+  (Object.entries(resources) as [PaymentResourceKey, number | undefined][])
+    .filter(([, amount]) => typeof amount === 'number' && amount > 0)
+    .sort(([left], [right]) => comparePaymentResourceKey(left, right))
+    .map(([key, amount]) => [key, amount ?? 0])
+
+const stablePaymentResourceId = (key: string): number => {
+  const known = RESOURCE_ID[key]
+  if (known !== undefined) return known
+  let h = 0
+  for (const ch of key) {
+    h = ((h * 33) + ch.charCodeAt(0)) >>> 0
+  }
+  return PAYMENT_RESOURCE_ORDER.length + 1 + h
+}
+
 const hashSolution = (solution: PaymentSolution): number => {
   let h = 0
   const paid = solution.resourcesPaid
-  for (const [res, amount] of Object.entries(paid)) {
-    const resId = RESOURCE_ID[res] || 0
+  for (const [res, amount] of sortedPaymentResourceEntries(paid)) {
+    const resId = stablePaymentResourceId(res)
     h = ((h + resId * 17 + ((amount ?? 0) * 31)) * 31) >>> 0
   }
   for (const { trade, times } of solution.tradesUsed) {
@@ -119,6 +150,12 @@ const hashSolution = (solution: PaymentSolution): number => {
   }
   if (solution.feeIndex !== undefined) {
     h = ((h + (solution.feeIndex + 1) * 43) * 31) >>> 0
+  }
+  for (const cover of solution.paymentResourceCovers ?? []) {
+    for (const ch of `${cover.paymentResource}:${cover.costResource}`) {
+      h = ((h + ch.charCodeAt(0) * 47) * 31) >>> 0
+    }
+    h = ((h + cover.paymentAmount * 53 + cover.costAmount * 59) * 31) >>> 0
   }
   return h
 }
@@ -154,14 +191,10 @@ const subtractResources = (
 const solutionIdentity = (solution: PaymentSolution): number | undefined =>
   solution.feeIdentity
 
-const hasSideEffectingTrade = (solution: PaymentSolution): boolean =>
-  solution.tradesUsed.some((entry) => entry.times > 0 && !!entry.trade.sideEffect)
-
 const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
   if (a.cardUsed || b.cardUsed) return false
   if (a.bonusChoiceIndex || b.bonusChoiceIndex) return false
   if (solutionIdentity(a) !== solutionIdentity(b)) return false
-  if (hasSideEffectingTrade(a) || hasSideEffectingTrade(b)) return false
 
   const keys = new Set([
     ...Object.keys(a.resourcesPaid),
@@ -187,9 +220,7 @@ export const keepOnlyOptimals = (
 }
 
 const getPositiveResourceEntries = (solution: PaymentSolution) =>
-  PAYMENT_RESOURCE_ORDER
-    .map((key) => [key, solution.resourcesPaid[key] ?? 0] as const)
-    .filter(([, amount]) => amount > 0)
+  sortedPaymentResourceEntries(solution.resourcesPaid)
 
 const comparePositiveResourceEntries = (
   left: ReturnType<typeof getPositiveResourceEntries>,
@@ -202,7 +233,7 @@ const comparePositiveResourceEntries = (
     if (!a && !b) return 0
     if (!a) return -1
     if (!b) return 1
-    const keyCompare = PAYMENT_RESOURCE_ORDER.indexOf(a[0]) - PAYMENT_RESOURCE_ORDER.indexOf(b[0])
+    const keyCompare = comparePaymentResourceKey(a[0], b[0])
     if (keyCompare !== 0) return keyCompare
     if (a[1] !== b[1]) return a[1] - b[1]
   }
@@ -295,7 +326,7 @@ const canApplyBonus = (
 
 const getMaxTradeTimesFromPartial = (
   trade: Trade,
-  resources: Partial<Resource>,
+  resources: PaymentResourceMap,
 ): number => {
   const fromResources = trade.from
   const resourceKeys = Object.keys(fromResources) as ResourceKey[]
@@ -316,7 +347,7 @@ const getMaxTradeTimesFromPartial = (
 
 type TradeCombo = {
   tradesUsed: { trade: Trade; times: number }[]
-  result: Partial<Resource>
+  result: PaymentResourceMap
 }
 
 type UnitCostOption = {
@@ -334,9 +365,106 @@ const normalizePositiveResources = (resources: PaymentResourceMap): PaymentResou
   return out
 }
 
+type PaymentResourceCoverOption = {
+  remainingCost: PaymentResourceMap
+  resourcesPaid: PaymentResourceMap
+  covers: PaymentResourceCoverUsage[]
+}
+
+const addPaymentResource = (
+  resources: PaymentResourceMap,
+  key: PaymentResourceKey,
+  amount: number,
+): PaymentResourceMap => {
+  if (amount <= 0) return resources
+  return {
+    ...resources,
+    [key]: (resources[key] ?? 0) + amount,
+  }
+}
+
+const buildProviderCoverOptionsForProvider = (
+  base: PaymentResourceCoverOption,
+  provider: CardProvidedPaymentResourceProvider,
+): PaymentResourceCoverOption[] => {
+  const available = Math.max(0, Math.floor(provider.available))
+  if (available <= 0 || provider.covers.length === 0) return [base]
+
+  const out: PaymentResourceCoverOption[] = []
+  const walk = (
+    coverIndex: number,
+    remainingCost: PaymentResourceMap,
+    resourcesPaid: PaymentResourceMap,
+    covers: PaymentResourceCoverUsage[],
+    usedProviderAmount: number,
+  ) => {
+    if (coverIndex >= provider.covers.length) {
+      out.push({ remainingCost, resourcesPaid, covers })
+      return
+    }
+    const cover = provider.covers[coverIndex]!
+    const costNeed = remainingCost[cover.resource] ?? 0
+    const maxByCost = cover.costAmount > 0
+      ? Math.floor(costNeed / cover.costAmount)
+      : 0
+    const maxByProvider = cover.paymentAmount > 0
+      ? Math.floor((available - usedProviderAmount) / cover.paymentAmount)
+      : 0
+    const maxTimes = Math.max(0, Math.min(maxByCost, maxByProvider))
+    for (let times = 0; times <= maxTimes; times += 1) {
+      if (times === 0) {
+        walk(coverIndex + 1, remainingCost, resourcesPaid, covers, usedProviderAmount)
+        continue
+      }
+      const costAmount = cover.costAmount * times
+      const paymentAmount = cover.paymentAmount * times
+      const nextRemainingCost = { ...remainingCost }
+      const nextValue = (nextRemainingCost[cover.resource] ?? 0) - costAmount
+      if (nextValue > 0) {
+        nextRemainingCost[cover.resource] = nextValue
+      } else {
+        delete nextRemainingCost[cover.resource]
+      }
+      walk(
+        coverIndex + 1,
+        nextRemainingCost,
+        addPaymentResource(resourcesPaid, provider.key, paymentAmount),
+        [
+          ...covers,
+          {
+            paymentResource: provider.key,
+            costResource: cover.resource,
+            paymentAmount,
+            costAmount,
+          },
+        ],
+        usedProviderAmount + paymentAmount,
+      )
+    }
+  }
+
+  walk(0, base.remainingCost, base.resourcesPaid, base.covers, 0)
+  return out
+}
+
+const buildProviderCoverOptions = (
+  cost: PaymentResourceMap,
+  providers: CardProvidedPaymentResourceProvider[],
+): PaymentResourceCoverOption[] => {
+  let options: PaymentResourceCoverOption[] = [
+    { remainingCost: normalizePositiveResources(cost), resourcesPaid: {}, covers: [] },
+  ]
+  for (const provider of providers) {
+    options = options.flatMap((option) =>
+      buildProviderCoverOptionsForProvider(option, provider),
+    )
+  }
+  return options
+}
+
 const resourceSignature = (resources: PaymentResourceMap) =>
-  PAYMENT_RESOURCE_ORDER
-    .map((key) => `${key}:${resources[key] ?? 0}`)
+  sortedPaymentResourceEntries(resources)
+    .map(([key, value]) => `${key}:${value}`)
     .join('|')
 
 const tradeSignature = (trade: Trade) =>
@@ -527,7 +655,7 @@ const buildUnitTotalOptions = (
 
 const enumerateActionTradeCombos = (
   actionTrades: Trade[],
-  playerResources: Partial<Resource>,
+  playerResources: PaymentResourceMap,
 ): TradeCombo[] => {
   if (actionTrades.length === 0) {
     return [{ tradesUsed: [], result: { ...playerResources } }]
@@ -541,7 +669,7 @@ const enumerateActionTradeCombos = (
       getRemainingTradeGroupUses(combo.tradesUsed, firstTrade),
     )
     for (let t = 0; t <= maxTimes; t++) {
-      const afterTrade = convertResources(combo.result, firstTrade, t)
+      const afterTrade = convertResources(combo.result as Partial<Resource>, firstTrade, t) as PaymentResourceMap
       if (hasValidResources(afterTrade)) {
         results.push({
           tradesUsed: [...combo.tradesUsed, { trade: firstTrade, times: t }],
@@ -555,7 +683,7 @@ const enumerateActionTradeCombos = (
 
 export const generateTradeCombinations = (
   trades: Trade[],
-  playerResources: Partial<Resource>,
+  playerResources: PaymentResourceMap,
   _nb?: number,
 ): TradeCombo[] => {
   const actionTrades = trades.filter((t) => (t.scope ?? 'action') === 'action')
@@ -563,7 +691,7 @@ export const generateTradeCombinations = (
 }
 
 const canCoverCost = (
-  resources: Partial<Resource>,
+  resources: PaymentResourceMap,
   cost: Partial<Resource>,
 ): boolean => {
   const keys = Object.keys(cost) as ResourceKey[]
@@ -653,7 +781,15 @@ export const computeAllBuyableCombinations = (
   const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
 
-  const playerResources: PaymentResourceMap = { ...player.resources }
+  const paymentResourceProviders = effectiveCost.paymentResourceProviders ?? []
+  const providerResources: PaymentResourceMap = {}
+  for (const provider of paymentResourceProviders) {
+    const available = Math.max(0, Math.floor(provider.available))
+    if (available > 0) {
+      providerResources[provider.key] = (providerResources[provider.key] ?? 0) + available
+    }
+  }
+  const playerResources: PaymentResourceMap = { ...player.resources, ...providerResources }
   const rawSolutions: InternalSolution[] = []
   const nb = effectiveCost.nb
 
@@ -802,8 +938,17 @@ export const computeAllBuyableCombinations = (
 
         for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
-          if (canCoverCost(tradeCombo.result, realCost) && canPaySupplyTokens(state, player, effectiveCostFee)) {
-            const remaining = subtractResources(tradeCombo.result, realCost)
+          const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
+          for (const providerCover of providerCoverOptions) {
+            if (!canCoverCost(tradeCombo.result, providerCover.remainingCost)
+              || !canPaySupplyTokens(state, player, effectiveCostFee)) {
+              continue
+            }
+            const paidCost = mergePaymentResources(
+              providerCover.remainingCost,
+              providerCover.resourcesPaid,
+            )
+            const remaining = subtractResources(tradeCombo.result, paidCost)
             const remainingWithSupplyTokens = {
               ...remaining,
               ...Object.fromEntries(
@@ -811,13 +956,16 @@ export const computeAllBuyableCombinations = (
               ),
             } as PaymentResourceMap
             rawSolutions.push({
-              resourcesRemaining: remainingWithSupplyTokens as Partial<Resource>,
+              resourcesRemaining: remainingWithSupplyTokens,
               tradesUsed,
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
               feeIdentity: effectiveCost.feeIdentities?.[feeIdx],
+              paymentResourceCovers: providerCover.covers.length > 0
+                ? providerCover.covers
+                : undefined,
             })
           }
         }
@@ -843,6 +991,7 @@ export const computeAllBuyableCombinations = (
       bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
       feeIdentity: sol.feeIdentity,
+      paymentResourceCovers: sol.paymentResourceCovers,
     }
 
     const hash = hashSolution(solution)

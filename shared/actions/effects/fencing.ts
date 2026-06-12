@@ -596,7 +596,13 @@ const computeFenceCostAdjustment = (
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
-): { freeFences: number; extraWood: number; trades: Trade[]; bonuses: Bonus[] } => {
+): {
+  freeFences: number
+  extraWood: number
+  trades: Trade[]
+  bonuses: Bonus[]
+  paymentResourceProviders: ComplexCost['paymentResourceProviders']
+} => {
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
   const fenceOverride = collectFarmChoiceCostAdjustments(
     state,
@@ -611,16 +617,24 @@ const computeFenceCostAdjustment = (
     extraWood: Math.max(0, hookWood),
     trades: fenceOverride.trades,
     bonuses: fenceOverride.bonuses,
+    paymentResourceProviders: fenceOverride.paymentResourceProviders,
   }
 }
 
 const buildFencePaymentCost = (
   payableWoodCost: number,
-  adjustment: { trades: Trade[]; bonuses: Bonus[] },
+  adjustment: {
+    trades: Trade[]
+    bonuses: Bonus[]
+    paymentResourceProviders?: ComplexCost['paymentResourceProviders']
+  },
 ): ComplexCost => {
   const cost: ComplexCost = { fee: { wood: payableWoodCost } }
   if (adjustment.trades.length > 0) cost.trades = adjustment.trades
   if (adjustment.bonuses.length > 0) cost.bonuses = adjustment.bonuses
+  if ((adjustment.paymentResourceProviders?.length ?? 0) > 0) {
+    cost.paymentResourceProviders = adjustment.paymentResourceProviders
+  }
   return cost
 }
 

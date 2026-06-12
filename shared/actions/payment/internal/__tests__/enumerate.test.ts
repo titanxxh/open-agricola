@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { canPayCost, computeAllBuyableCombinations } from '../enumerate'
-import type { ComplexCost, PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
+import type {
+  ComplexCost,
+  PaymentResourceKey,
+  PaymentResourceMap,
+  PaymentSolution,
+  PlayerState,
+  Resource,
+  Trade,
+} from '../../../../contract/types'
 
-const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
-  const out: Partial<Resource> = {}
+const nonZeroPaid = (sol: PaymentSolution): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
   for (const [k, v] of Object.entries(sol.resourcesPaid)) {
-    if ((v ?? 0) !== 0) out[k as keyof Resource] = v
+    if ((v ?? 0) !== 0) out[k as PaymentResourceKey] = v
   }
   return out
 }
@@ -70,30 +78,28 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(nonZeroPaid(sols[0])).toEqual({ wood: 2 })
   })
 
-  it('keeps side-effecting trade paths even when they resource-dominate ordinary payment', () => {
-    const trade: Trade = {
-      from: {},
-      to: { food: 1 },
-      max: 1,
-      scope: 'action',
-      sourceId: 'B155_ArtTeacher',
-      sideEffect: { type: 'drainSpace', spaceId: 'traveling-players', resource: 'food' },
-    }
+  it('keeps card-provided payment resources distinct from own resources', () => {
+    const providerKey = 'B155_ArtTeacher:traveling-players-food'
     const sols = computeAllBuyableCombinations(
       baseTestPlayer({ food: 1 }),
       {
         fee: { food: 1 },
-        trades: [trade],
+        paymentResourceProviders: [
+          {
+            key: providerKey,
+            sourceCard: 'B155_ArtTeacher',
+            available: 1,
+            covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+            consume: { type: 'actionSpace', spaceId: 'traveling-players', resource: 'food' },
+          },
+        ],
       },
       undefined,
       'occupation',
     )
 
-    expect(sols.map(nonZeroPaid)).toContainEqual({})
+    expect(sols.map(nonZeroPaid)).toContainEqual({ [providerKey]: 1 })
     expect(sols.map(nonZeroPaid)).toContainEqual({ food: 1 })
-    expect(sols.some((sol) =>
-      sol.tradesUsed.some((entry) => entry.trade === trade && entry.times === 1),
-    )).toBe(true)
   })
 
   it('keeps exact free action-trade discounts but rejects surplus-producing trade combos', () => {

@@ -11,6 +11,7 @@
 
 import type {
   BonusModifier,
+  CardProvidedPaymentResourceProvider,
   CostModifierType,
   GameState,
   PaymentSolution,
@@ -20,6 +21,54 @@ import type {
 } from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
 import { payResources, paySupplyTokens } from './affordability'
+
+const providerAmountPaid = (
+  solution: PaymentSolution,
+  provider: CardProvidedPaymentResourceProvider,
+): number => solution.resourcesPaid[provider.key] ?? 0
+
+export const canConsumePaymentResourceProviders = (
+  state: GameState | undefined,
+  solution: PaymentSolution,
+  providers: CardProvidedPaymentResourceProvider[] | undefined,
+): boolean => {
+  const providerByKey = new Map((providers ?? []).map((provider) => [provider.key, provider]))
+  for (const key of Object.keys(solution.resourcesPaid)) {
+    if (!key.includes(':')) continue
+    const provider = providerByKey.get(key as CardProvidedPaymentResourceProvider['key'])
+    const amount = solution.resourcesPaid[key as CardProvidedPaymentResourceProvider['key']] ?? 0
+    if (amount <= 0) continue
+    if (!provider || !state) return false
+    if (providerAmountPaid(solution, provider) > Math.max(0, Math.floor(provider.available))) {
+      return false
+    }
+    if (provider.consume.type === 'actionSpace') {
+      const space = state.actionSpaces.find((entry) => entry.id === provider.consume.spaceId)
+      if ((space?.resources?.[provider.consume.resource] ?? 0) < amount) return false
+    }
+  }
+  return true
+}
+
+const consumePaymentResourceProviders = (
+  state: GameState | undefined,
+  solution: PaymentSolution,
+  providers: CardProvidedPaymentResourceProvider[] | undefined,
+): boolean => {
+  if (!canConsumePaymentResourceProviders(state, solution, providers)) return false
+  const providerByKey = new Map((providers ?? []).map((provider) => [provider.key, provider]))
+  for (const provider of providerByKey.values()) {
+    const amount = providerAmountPaid(solution, provider)
+    if (amount <= 0) continue
+    if (provider.consume.type === 'actionSpace') {
+      const space = state?.actionSpaces.find((entry) => entry.id === provider.consume.spaceId)
+      if (!space?.resources) return false
+      space.resources[provider.consume.resource] =
+        (space.resources[provider.consume.resource] ?? 0) - amount
+    }
+  }
+  return true
+}
 
 const buildBonusReductions = (
   player: PlayerState,
@@ -97,23 +146,18 @@ export const applyTradeSideEffect = (
 export const executePaymentSolution = (
   player: PlayerState,
   solution: PaymentSolution,
-  options: { trackStats?: boolean; costType?: CostModifierType; state?: GameState } = {},
+  options: {
+    trackStats?: boolean
+    costType?: CostModifierType
+    state?: GameState
+    paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
+  } = {},
 ): string | undefined => {
+  if (!consumePaymentResourceProviders(options.state, solution, options.paymentResourceProviders)) {
+    throw new Error('Cannot consume card-provided payment resource')
+  }
   payResources(player, solution.resourcesPaid)
   paySupplyTokens(player, solution.resourcesPaid)
-  if (options.state) {
-    for (const { trade, times } of solution.tradesUsed) {
-      if (trade.sideEffect && times > 0) {
-        applyTradeSideEffect(
-          options.state,
-          player,
-          trade.sideEffect,
-          times,
-          trade.sourceId ?? trade.source ?? 'unknown',
-        )
-      }
-    }
-  }
   if (solution.bonusUsed && player._activeActionBonusSources) {
     const seen = new Set(player._activeActionBonusSources)
     for (const source of solution.bonusUsed.split(',')) {
@@ -138,9 +182,9 @@ export const getCheapestSolution = (
 
   return solutions.reduce((cheapest, current) => {
     const cheapestTotal = Object.values(cheapest.resourcesPaid)
-      .reduce((sum, val) => sum + (val ?? 0), 0)
+      .reduce<number>((sum, val) => sum + (val ?? 0), 0)
     const currentTotal = Object.values(current.resourcesPaid)
-      .reduce((sum, val) => sum + (val ?? 0), 0)
+      .reduce<number>((sum, val) => sum + (val ?? 0), 0)
     return currentTotal < cheapestTotal ? current : cheapest
   })
 }

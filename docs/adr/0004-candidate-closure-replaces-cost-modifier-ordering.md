@@ -55,16 +55,23 @@ OA 不愿引入 topo（ADR 0003 已拒），但落地过程中出现了两处数
 
 定位 C95"不应出现 2 reed 选项"时确认：BGA 的 optional-append cost 模式依赖 Pay 层 `keepOnlyOptimals`（严格支配剪枝）才成立——append 保留的原价行与其折扣派生在 BGA 中被剪枝隐藏，玩家只见 optimal 集。OA 在 b2b00d96（清理 `preservedOriginalFor` 时）把剪枝清成 no-op stub，使原价行及其派生漏到 UI（optional 折扣事实上展示了玩家永远不该选的行）。
 
-恢复 solver 层 `keepOnlyOptimals` 真实实现：付出 ≥ 另一解的每项资源且至少一项严格更多的解被剪除。四个豁免（前三个对应 BGA `isWorseThan` 豁免集，第四个保护 OA 的 side-effect trade 选择权）：
+恢复 solver 层 `keepOnlyOptimals` 真实实现：付出 ≥ 另一解的每项资源且至少一项严格更多的解被剪除。三个永久豁免对应 BGA `isWorseThan` 豁免集：
 
 - **支付路径身份**（`ComplexCost.feeIdentities` → `PaymentSolution.feeIdentity`，来自候选 `originalFeeIndex`）：不同身份的解不互剪——身份驱动后续效果（B65 future grain 数量），玩家有权选更贵的路径换不同收益。
 - **bonusChoiceIndex**（E123）：选择索引被 after-pay 消费，不互剪。
 - **card 支付**：与资源支付不可比。
-- **带 sideEffect 的 trade 支付**：资源更优的 trade 分支可能会抽取行动格资源或写卡牌状态（如 B155），不能支配普通支付分支。
 
 约束：剪枝必须在**玩家资源可行性过滤之后**执行（solver 内），不能在候选层做——资源盲剪会删掉穷玩家唯一付得起的次优行。
 
 行为面变化（对齐 BGA）：大量"原价 + 折扣并存弹选择框"的交互收敛为单选项 auto-resolve；ADR 0003 §7 的"不做 domination / Pareto 剪枝"被本节推翻。parity fixture 比较层面同步：BGA 侧结构展开选项也应用同等剪枝（choices 展开行豁免）。
+
+### Amendment: payment-side trade side effects removed (2026-06-12)
+
+OA 曾把 B155 这类"用行动格资源支付成本"表达为 `Trade.sideEffect`，并在 dominance 中对带 side effect 的 trade 支付做保守豁免。这会把单卡支付语义混入通用 trade 执行路径。
+
+决策：payment solver 内删除 `trade.sideEffect` 支付执行机制。卡牌若要提供类似 `B155_ArtTeacher:traveling-players-food` 的虚拟支付资源，应在卡牌内部实现 provider；provider 动态声明可用量、能覆盖哪些成本资源、以及执行支付时如何消耗来源状态。`PaymentSolution.resourcesPaid` 保留虚拟资源自身的稳定 key，因此 dominance 只需按支付资源 key 比较：玩家库存 food 与 Traveling Players food 是不同支付资源，不互相支配。
+
+边界：虚拟支付资源不进入 `PlayerState.resources`，也不出现在成本候选行；成本需求仍写普通资源，支付方案记录实际消耗的虚拟资源 key。payment pipeline 只识别统一 provider 接口，不在核心路径写 B155 特例。`Trade.sideEffect` 继续仅用于 exchange action 这类资源兑换执行路径。
 
 ## Alternatives considered
 

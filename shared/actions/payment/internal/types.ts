@@ -11,13 +11,14 @@
  * the public API instead.
  */
 
-import type { Resource, Trade } from '../../../contract/types'
+import type { PaymentResourceCoverUsage, PaymentResourceMap, Trade } from '../../../contract/types'
 
 export type InternalSolution = {
-  resourcesRemaining: Partial<Resource>
+  resourcesRemaining: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
   feeIdentity?: number
+  paymentResourceCovers?: PaymentResourceCoverUsage[]
 }
