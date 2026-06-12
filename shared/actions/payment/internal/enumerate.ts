@@ -154,10 +154,14 @@ const subtractResources = (
 const solutionIdentity = (solution: PaymentSolution): number | undefined =>
   solution.feeIdentity
 
+const hasSideEffectingTrade = (solution: PaymentSolution): boolean =>
+  solution.tradesUsed.some((entry) => entry.times > 0 && !!entry.trade.sideEffect)
+
 const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
   if (a.cardUsed || b.cardUsed) return false
   if (a.bonusChoiceIndex || b.bonusChoiceIndex) return false
   if (solutionIdentity(a) !== solutionIdentity(b)) return false
+  if (hasSideEffectingTrade(a) || hasSideEffectingTrade(b)) return false
 
   const keys = new Set([
     ...Object.keys(a.resourcesPaid),

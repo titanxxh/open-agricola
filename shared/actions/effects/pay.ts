@@ -19,6 +19,7 @@ import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/help
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import {
+  cardCostCandidateMetadataForFeeIndex,
   executePaymentSolution,
   payResources,
   paySupplyTokens,
@@ -196,9 +197,10 @@ const resolvePayActionPaymentSelection = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        solution.feeIndex === undefined
-          ? []
-          : options.candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+        cardCostCandidateMetadataForFeeIndex(
+          options.candidateMetadataByFeeIndex,
+          solution.feeIndex,
+        )?.sources ?? [],
     },
   )
 }
@@ -265,9 +267,10 @@ const buildSelectedResult = (
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
-  const metadata = solution.feeIndex === undefined
-    ? undefined
-    : candidateMetadataByFeeIndex?.[solution.feeIndex]
+  const metadata = cardCostCandidateMetadataForFeeIndex(
+    candidateMetadataByFeeIndex,
+    solution.feeIndex,
+  )
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
     bonusChoiceIndex: solution.bonusChoiceIndex,

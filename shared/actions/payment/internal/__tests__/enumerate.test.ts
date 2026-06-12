@@ -70,6 +70,32 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(nonZeroPaid(sols[0])).toEqual({ wood: 2 })
   })
 
+  it('keeps side-effecting trade paths even when they resource-dominate ordinary payment', () => {
+    const trade: Trade = {
+      from: {},
+      to: { food: 1 },
+      max: 1,
+      scope: 'action',
+      sourceId: 'B155_ArtTeacher',
+      sideEffect: { type: 'drainSpace', spaceId: 'traveling-players', resource: 'food' },
+    }
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ food: 1 }),
+      {
+        fee: { food: 1 },
+        trades: [trade],
+      },
+      undefined,
+      'occupation',
+    )
+
+    expect(sols.map(nonZeroPaid)).toContainEqual({})
+    expect(sols.map(nonZeroPaid)).toContainEqual({ food: 1 })
+    expect(sols.some((sol) =>
+      sol.tradesUsed.some((entry) => entry.trade === trade && entry.times === 1),
+    )).toBe(true)
+  })
+
   it('keeps exact free action-trade discounts but rejects surplus-producing trade combos', () => {
     const free = computeAllBuyableCombinations(
       baseTestPlayer({ grain: 1 }),
