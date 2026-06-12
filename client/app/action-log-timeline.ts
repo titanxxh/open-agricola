@@ -175,8 +175,8 @@ const entryHasStandaloneLog = (
 
 type ContextualLogEntries = {
   map: Map<string, LogEntry>
-  /** Seqs of resource.paid events absorbed into a card.played/renovated/stable row. */
-  consumedPaymentSeqs: Set<number>
+  /** Replay entry keys for resource.paid events absorbed into a card.played/renovated/stable row. */
+  consumedPaymentKeys: Set<string>
 }
 
 const buildContextualLogEntryMapForGroup = (
@@ -187,10 +187,15 @@ const buildContextualLogEntryMapForGroup = (
     !!entry.event)
   const events = eventEntries.map((entry) => entry.event)
   const consumedPaymentSeqs = consumedPaymentSeqsFor(events)
+  const consumedPaymentKeys = new Set(
+    eventEntries
+      .filter((entry) => consumedPaymentSeqs.has(entry.event.seq))
+      .map((entry) => entry.key),
+  )
   const visibleEntries = [...eventEntries]
     .sort((left, right) => right.event.seq - left.event.seq)
     .filter((entry) =>
-      !consumedPaymentSeqs.has(entry.event.seq) &&
+      !consumedPaymentKeys.has(entry.key) &&
       entryHasStandaloneLog(entry, context))
   const logEntries = eventsToLogEntries(events, context)
   const map = new Map<string, LogEntry>()
@@ -198,7 +203,7 @@ const buildContextualLogEntryMapForGroup = (
     const logEntry = logEntries[index]
     if (logEntry) map.set(entry.key, logEntry)
   })
-  return { map, consumedPaymentSeqs }
+  return { map, consumedPaymentKeys }
 }
 
 const buildContextualLogEntryMap = (
@@ -206,7 +211,7 @@ const buildContextualLogEntryMap = (
   context: LogMapperContextInput,
 ): ContextualLogEntries => {
   const map = new Map<string, LogEntry>()
-  const consumedPaymentSeqs = new Set<number>()
+  const consumedPaymentKeys = new Set<string>()
   const groups = new Map<number, ReplayTimelineEntry[]>()
   entries
     .filter((entry) => !!entry.event)
@@ -216,10 +221,10 @@ const buildContextualLogEntryMap = (
   groups.forEach((groupEntries) => {
     const group = buildContextualLogEntryMapForGroup(groupEntries, context)
     group.map.forEach((logEntry, key) => map.set(key, logEntry))
-    group.consumedPaymentSeqs.forEach((seq) => consumedPaymentSeqs.add(seq))
+    group.consumedPaymentKeys.forEach((key) => consumedPaymentKeys.add(key))
   })
 
-  return { map, consumedPaymentSeqs }
+  return { map, consumedPaymentKeys }
 }
 
 const visibleReplayDerivedLogCounts = (
@@ -309,7 +314,7 @@ export const buildActionLogTimelineRows = ({
   actionNames,
 }: BuildActionLogTimelineRowsInput): ActionLogTimelineBucket[] => {
   const mapperContext = { playerNames, actionNames }
-  const { map: contextualLogEntries, consumedPaymentSeqs } =
+  const { map: contextualLogEntries, consumedPaymentKeys } =
     buildContextualLogEntryMap(entries, mapperContext)
   const eventRows: ActionLogTimelineRow[] = [...entries]
     .sort((left, right) =>
@@ -318,7 +323,7 @@ export const buildActionLogTimelineRows = ({
       // A payment absorbed into its card.played/renovated/stable row must not
       // fall through to the standalone single-event rendering — that would
       // duplicate the payment as a "pays X for Y" line.
-      if (entry.event && consumedPaymentSeqs.has(entry.event.seq)) return []
+      if (entry.event && consumedPaymentKeys.has(entry.key)) return []
       const { logEntry, label } = eventLabel(
         entry,
         locale,

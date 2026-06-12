@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A75_LumberMill } from '../../shared/cards/A/A75_LumberMill'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 const CARD_ID = 'A75_LumberMill'
 
@@ -77,5 +78,6 @@ describe('A75_LumberMill session', () => {
     expect(after.improvements).toContain('Major_Joinery')
     expect(after.resources.wood).toBe(0)
     expect(after.resources.stone).toBe(0)
+    expect(readCardResourceStats(after, CARD_ID)?.saved).toEqual({ wood: 1 })
   })
 })

@@ -8,7 +8,7 @@ import { getMinorImprovement } from '../../cards/registry-display'
 // migrate in S4 (preview-cost domain aggregation per Decision C).
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
-import { executePaymentSolution } from '../payment/internal'
+import { cardCostCandidateMetadataForFeeIndex, executePaymentSolution } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
@@ -347,17 +347,19 @@ const resolveImprovementPayment = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        solution.feeIndex === undefined
-          ? []
-          : candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+        cardCostCandidateMetadataForFeeIndex(
+          candidateMetadataByFeeIndex,
+          solution.feeIndex,
+        )?.sources ?? [],
     },
   )
   if (resolved.type !== 'selected') {
     return resolved
   }
-  const metadata = resolved.solution.feeIndex === undefined
-    ? undefined
-    : candidateMetadataByFeeIndex?.[resolved.solution.feeIndex]
+  const metadata = cardCostCandidateMetadataForFeeIndex(
+    candidateMetadataByFeeIndex,
+    resolved.solution.feeIndex,
+  )
 
   const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
   recordCardCostAttribution(player, metadata?.costAttribution)
