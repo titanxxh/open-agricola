@@ -205,6 +205,40 @@ describe('buildActionLogTimelineRows', () => {
     expect(keys).not.toContain('log.cardEffectPay')
   })
 
+  it('does not suppress same-seq payments from unrelated archive packets', () => {
+    const absorbedPaid: GameEvent = {
+      ...paidEvent('evt-paid-absorbed', 7),
+      paymentFor: 'major-improvement',
+      sourceCardId: 'Major_Basket',
+    } as GameEvent
+    const played: GameEvent = {
+      ...playedEvent('evt-played', 8),
+      cardId: 'Major_Basket',
+      cardType: 'major',
+    } as GameEvent
+    const standalonePaid: GameEvent = {
+      ...paidEvent('evt-paid-standalone', 7),
+      paymentFor: 'minor-improvement',
+      sourceCardId: 'A1_TestMinor',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(absorbedPaid, 3, 0),
+        replayEntryForEvent(played, 3, 1),
+        replayEntryForEvent(standalonePaid, 4, 0),
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const standalone = rows.find((row) => row.key === 'event:4:0:evt-paid-standalone:7')
+    expect(standalone?.logEntry?.key).toBe('log.cardEffectPay')
+  })
+
   it('builds replay event rows and keeps state log rows', () => {
     const stateLog: LogEntry[] = [
       { key: 'log.startGame' },

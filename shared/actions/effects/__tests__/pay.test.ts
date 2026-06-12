@@ -1119,6 +1119,35 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
     ])
   })
 
+  it('single candidate metadata contributes sources and attribution', () => {
+    const player = createMockPlayer({ wood: 1 })
+    const cost: ComplexCost = { fees: [{ wood: 1 }] }
+    const { result, capturedEvents } = callPay(player, {
+      cost,
+      costType: 'minor-improvement',
+      candidateMetadataByFeeIndex: {
+        0: {
+          originalFeeIndex: 0,
+          sources: ['A75_LumberMill'],
+          costAttribution: {
+            A75_LumberMill: { saved: { wood: 1 } },
+          },
+        },
+      },
+    })
+
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 1 },
+        paymentFor: 'minor-improvement',
+        bonusSources: ['A75_LumberMill'],
+      }),
+    ])
+    expect(readCardResourceStats(player, 'A75_LumberMill')?.saved).toEqual({ wood: 1 })
+  })
+
   it('typed-flat Partial<Resource>: event keeps bonusChoiceIndex provenance', () => {
     const player = createMockPlayer({ wood: 1, clay: 2 })
     player.activeModifiers = [

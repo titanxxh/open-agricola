@@ -245,3 +245,9 @@ export const buildCandidateMetadataByFeeIndex = (
   })
   return metadata
 }
+
+export const cardCostCandidateMetadataForFeeIndex = (
+  metadataByFeeIndex: Record<number, CardCostCandidateMetadata> | undefined,
+  feeIndex: number | undefined,
+): CardCostCandidateMetadata | undefined =>
+  metadataByFeeIndex?.[feeIndex ?? 0]
