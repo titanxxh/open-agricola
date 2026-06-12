@@ -214,10 +214,15 @@ const emitPaidEvent = (
     bonusUsed?: string
     bonusChoiceIndex?: Record<string, number>
     returnedCardId?: string
+    /** Cost Candidate sources of the selected row (rendered as log "via"). */
+    candidateSources?: readonly string[]
   } = {},
 ) => {
   const paid = positiveResources(resources)
-  const bonusSources = splitSourceIds(provenance.bonusUsed)
+  const bonusSources = [...new Set([
+    ...splitSourceIds(provenance.bonusUsed),
+    ...(provenance.candidateSources ?? []),
+  ])]
   if (
     Object.keys(paid).length === 0 &&
     bonusSources.length === 0 &&
@@ -260,14 +265,15 @@ const buildSelectedResult = (
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
+  const metadata = solution.feeIndex === undefined
+    ? undefined
+    : candidateMetadataByFeeIndex?.[solution.feeIndex]
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
+    candidateSources: metadata?.sources,
   })
-  const metadata = solution.feeIndex === undefined
-    ? undefined
-    : candidateMetadataByFeeIndex?.[solution.feeIndex]
   recordCardCostAttribution(player, metadata?.costAttribution)
   const extraData: Record<string, unknown> = {
     resourcesPaid,
