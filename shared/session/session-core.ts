@@ -1431,6 +1431,12 @@ export class GameCore {
     return this.engineStack.peekPendingEnvelope()?.pendingActionId
   }
 
+  private peekPendingSourceCard(): string | undefined {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const snapshot = pendingContextSnapshot(envelope)
+    return envelope?.sourceCard ?? snapshot?.sourceCard ?? choicesSourceCard(pendingEnvelopeChoices(envelope))
+  }
+
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
@@ -2149,6 +2155,7 @@ export class GameCore {
     result: ActionExecutionResult,
     detailPlayerId?: string,
     defaultPlayerId?: string,
+    sourceCard?: string,
   ) {
     if (result.type !== 'ok') return
     if (isInjectedAnytimeResult(result)) return
@@ -2161,6 +2168,7 @@ export class GameCore {
       }
       return
     }
+    if (sourceCard) return
     if (detailPlayerId && defaultPlayerId && detailPlayerId !== defaultPlayerId) return
     this.addPositiveResourceDetails('gains', result.resourcesGained)
     this.addPositiveResourceDetails('costs', result.resourcesPaid)
@@ -3389,6 +3397,7 @@ export class GameCore {
             const auto = autoOptions[0]
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
+            const resolvedSourceCard = this.peekPendingSourceCard()
             const result = frame.engine.resolveChoice(
               auto.value,
               this.buildEngineExecutionContext(player, space),
@@ -3398,7 +3407,7 @@ export class GameCore {
               this.pushNestedReturnPointForFrame(frame, effectivePlayerIndex)
             }
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
-              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
+              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id, resolvedSourceCard)
               this.flushLeafActionDetail(resolvedActionId, false)
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
@@ -3468,7 +3477,7 @@ export class GameCore {
         step.result.type === 'ok' &&
         !isInjectedAnytimeResult(step.result)
       ) {
-        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id)
+        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id, step.sourceCard)
         this.flushLeafActionDetail(step.actionId, false)
       }
 
@@ -3755,6 +3764,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
       this.flushLeafActionDetail(resolvedActionId, false)
     }
@@ -4281,6 +4291,7 @@ export class GameCore {
     const space = this.getSpaceById(this.activeSpaceId)
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
+    const pendingSourceCard = this.peekPendingSourceCard()
 
     const result = this.engine.resolveChoice(
       'confirm',
@@ -4292,6 +4303,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(updatedPlayer.id),
         updatedPlayer.id,
+        pendingSourceCard,
       )
     }
 
@@ -4328,6 +4340,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
+    const pendingSourceCard = this.peekPendingSourceCard()
     if (payload.cancel === true) {
       return this.respond(false, 'action cancel is not allowed')
     }
@@ -4385,6 +4398,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
     }
 
@@ -4418,6 +4432,7 @@ export class GameCore {
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+    const pendingSourceCard = this.peekPendingSourceCard()
     if (payload.cancel === true && (isFarmSelection || isGenericSelection)) {
       return this.respond(false, 'action cancel is not allowed')
     }
@@ -4465,6 +4480,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4523,6 +4539,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4564,6 +4581,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4619,6 +4637,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
     }
     this.flushEngineLog()

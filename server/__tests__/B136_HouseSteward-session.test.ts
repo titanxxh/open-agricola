@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
+import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 import { computeScores } from '../../shared/domain/scoring'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -46,6 +47,22 @@ describe('B136_HouseSteward session', () => {
 
     expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(resp.state.players[0]!.resources.wood).toBe(expectedWood)
+  })
+
+  it('logs onBuy wood as a card effect instead of a Lessons action gain', () => {
+    const session = setupSession(5)
+    const resp = playOccupation(session)
+
+    const cardEffectLog = resp.state.log.find(
+      (entry) => entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
+    )
+    expect(cardEffectLog?.params?.gain).toEqual({ wood: 4 })
+
+    const lessonsActionDetail = resp.state.log.find(
+      (entry) => entry.key === 'log.actionDetail' && entry.params?.action === 'actions.lessons.name',
+    )
+    const detailParts = lessonsActionDetail?.params?.detailParts as ActionDetailParts | undefined
+    expect(detailParts?.gains?.wood ?? 0).toBe(0)
   })
 
   it('awards the shared room-majority bonus to all tied leaders, even without the card', () => {
