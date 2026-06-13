@@ -197,6 +197,7 @@ const resolvePayActionPaymentSelection = (
     playedCards?: string[]
     reserveResources?: Partial<Resource>
     candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+    paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
   } = {},
 ):
   | ActionExecutionResult
@@ -229,6 +230,7 @@ const resolvePayActionPaymentSelection = (
           options.candidateMetadataByFeeIndex,
           solution,
         )?.sources ?? [],
+      paymentResourceProviders: options.paymentResourceProviders ?? cost.paymentResourceProviders,
     },
   )
 }
@@ -404,6 +406,7 @@ export const payAction: ActionDefinition = {
           playedCards: p.playedCards,
           reserveResources: p.reserveResources,
           candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
+          paymentResourceProviders: p.cost.paymentResourceProviders,
         },
       )
       if (selection.type !== 'selected') {
@@ -592,6 +595,7 @@ export const payAction: ActionDefinition = {
         playedCards: p.playedCards,
         reserveResources: p.reserveResources,
         candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
+        paymentResourceProviders: p.cost.paymentResourceProviders,
       },
     )
     if (selection.type !== 'selected') {

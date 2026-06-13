@@ -109,6 +109,11 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     ) ?? []
     expect(paidOptions.some((paid) => (paid?.food ?? 0) === 1)).toBe(true)
     expect(paidOptions.some((paid) => (paid?.[TP_PAYMENT_RESOURCE] ?? 0) === 1)).toBe(true)
+    const tpPaymentOption = resp.interaction.options?.find((option) =>
+      ((option.labelParams?.resourcesPaid as Record<string, number> | undefined)?.[TP_PAYMENT_RESOURCE] ?? 0) === 1,
+    )
+    expect(tpPaymentOption?.labelParams?.sourceCards).toEqual([CARD_ID])
+    expect(tpPaymentOption?.effectPreview).toMatchObject({ sourceCards: [CARD_ID] })
   })
 
   it('case 4a: selecting TP-food payment drains TP food and preserves player food', () => {

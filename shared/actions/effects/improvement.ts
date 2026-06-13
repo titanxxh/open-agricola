@@ -355,6 +355,9 @@ const resolveImprovementPayment = (
           candidateMetadataByFeeIndex,
           solution,
         )?.sources ?? [],
+      paymentResourceProviders: PaymentSolver.isComplexCost(cost)
+        ? cost.paymentResourceProviders
+        : undefined,
     },
   )
   if (resolved.type !== 'selected') {
