@@ -85,7 +85,7 @@ export type EngineStepResult =
   | { type: 'done' }
   | { type: 'blocked'; nodeId: string; actionId?: string; mandatory?: boolean }
   | { type: 'choice'; nodeId: string; choice: EngineChoice }
-  | { type: 'ok'; nodeId: string; actionId?: string; result: ActionExecutionResult }
+  | { type: 'ok'; nodeId: string; actionId?: string; sourceCard?: string; result: ActionExecutionResult }
 
 export type NodeStepResult =
   | { kind: 'continue' }

@@ -663,7 +663,7 @@ const executeDeferredHostAction = (
     recordDeferredHostResult(int, node, blockedResult)
     node.resolve(blockedResult)
     commitIfEngineComplete(int, context, blockedResult)
-    return { type: 'ok', nodeId: node.id, actionId: node.actionId, result: blockedResult }
+    return { type: 'ok', nodeId: node.id, actionId: node.actionId, sourceCard: node.sourceCard, result: blockedResult }
   }
   const actionContext = actionContextForNode(node, int)
   const executionContext: ActionExecutionContext = {
@@ -709,7 +709,7 @@ const executeDeferredHostAction = (
       const continuationNode = buildDeferredHostContinuationNode(int, node, result)
       node.resolve(result)
       int.tree.insertAfter(node.id, [...afterHostCommitNodes, continuationNode])
-      return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
+      return { type: 'ok', nodeId: node.id, actionId: node.actionId, sourceCard: executionContext.sourceCard, result }
     }
   }
   const eventReadContext = node.deferredHostTransactionEvents
@@ -826,7 +826,7 @@ const executeDeferredHostAction = (
   recordDeferredHostResult(int, node, result)
   node.resolve(result)
   commitIfEngineComplete(int, context, result)
-  return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
+  return { type: 'ok', nodeId: node.id, actionId: node.actionId, sourceCard: executionContext.sourceCard, result }
 }
 
 /**
@@ -1175,7 +1175,7 @@ export function engineProceed(
       clearEventLogDerivations(int)
       recordInternalChildResult(int, node, result)
       node.resolve(result)
-      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
+      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, sourceCard: executionContext.sourceCard, result }
     }
     if (result.type === 'ok' && (
       result.internalChildren?.beforeHostListeners?.length ||
@@ -1198,7 +1198,7 @@ export function engineProceed(
       )
       node.resolve(result)
       int.tree.insertAfter(node.id, [...beforeHostNodes, deferredHostNode])
-      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
+      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, sourceCard: executionContext.sourceCard, result }
     }
     const eventReadContext = currentEventReadContext(int, completedEvents)
     const triggerSnapshot = result.type === 'ok'
@@ -1445,7 +1445,7 @@ export function engineProceed(
     recordInternalChildResult(int, node, result)
     node.resolve(result)
     commitIfEngineComplete(int, context, result)
-    return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
+    return { type: 'ok', nodeId: node.id, actionId: replacedActionId, sourceCard: executionContext.sourceCard, result }
   }
   return { type: 'blocked', nodeId: node.id }
 }
