@@ -12,6 +12,7 @@
 
 import type {
   ActionExecutionResult,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -26,6 +27,7 @@ import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate
 const collectPaymentSolutionSources = (
   solution: PaymentSolution,
   extraSources: readonly string[] = [],
+  paymentResourceProviders: readonly CardProvidedPaymentResourceProvider[] = [],
 ): string[] => {
   const sources: string[] = []
   const seen = new Set<string>()
@@ -42,12 +44,16 @@ const collectPaymentSolutionSources = (
   solution.tradesUsed.forEach(({ trade }) => {
     if (trade.sourceId) add(trade.sourceId)
   })
+  paymentResourceProviders.forEach((provider) => {
+    if ((solution.resourcesPaid[provider.key] ?? 0) > 0) add(provider.sourceCard)
+  })
   extraSources.forEach(add)
   return sources
 }
 
 type PaymentChoiceResultOptions = {
   extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
+  paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
 }
 
 const describePaymentSolution = (
@@ -58,6 +64,7 @@ const describePaymentSolution = (
   const sourceCards = collectPaymentSolutionSources(
     solution,
     options.extraSourcesForSolution?.(solution) ?? [],
+    options.paymentResourceProviders,
   )
   return {
     resourcesPaid: solution.resourcesPaid,
@@ -74,6 +81,7 @@ const describePaymentEffectPreview = (
   const sourceCards = collectPaymentSolutionSources(
     solution,
     options.extraSourcesForSolution?.(solution) ?? [],
+    options.paymentResourceProviders,
   )
   return {
     kind: 'payment' as const,
@@ -187,6 +195,7 @@ type ResolveCostPaymentSelectionOptions = {
   state?: GameState
   reserveResources?: Partial<Resource>
   extraSourcesForSolution?: (solution: PaymentSolution) => readonly string[]
+  paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
 }
 
 export const resolveCostPaymentSelection = (
@@ -224,6 +233,7 @@ export const resolveCostPaymentSelection = (
     failure,
     {
       extraSourcesForSolution: options.extraSourcesForSolution,
+      paymentResourceProviders: options.paymentResourceProviders ?? normalizedCost.paymentResourceProviders,
     },
   )
 }
