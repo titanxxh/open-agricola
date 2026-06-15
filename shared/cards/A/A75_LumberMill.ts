@@ -14,7 +14,6 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  cardCostCandidateMandatory: true,
   deriveCardCostCandidate: (_context, candidate) =>
     discountCardCostCandidate(candidate, CARD_ID, { wood: 1 }),
 }

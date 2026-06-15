@@ -224,7 +224,7 @@ describe('fixed card-purchase cost candidates', () => {
     ])
   })
 
-  it('A75 mandatory discount does not preserve the original payment candidate', () => {
+  it('A75 discount preserves the original payment candidate at resolver level', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -238,12 +238,16 @@ describe('fixed card-purchase cost candidates', () => {
       { wood: 2, clay: 2, reed: 2, stone: 2 },
     )
 
-    expect(candidateOptions(result)).toEqual([
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      {
+        resources: { wood: 2, clay: 2, reed: 2, stone: 2 },
+        sources: [],
+      },
       {
         resources: { wood: 1, clay: 2, reed: 2, stone: 2 },
         sources: ['A75_LumberMill'],
       },
-    ])
+    ]))
   })
 
   it('E130 offers exactly one non-optional resource discount choice', () => {
@@ -442,12 +446,7 @@ describe('fixed card-purchase cost candidates', () => {
     ]))
   })
 
-  // PR #293 review: an optional transform that consumes the mandatory
-  // resource first (D117 wood-for-food over A75's mandatory wood discount)
-  // must not surface a duplicate row with inflated sources — the closure
-  // prunes superset-source rows, matching BGA's bonus attribution where the
-  // unapplied Lumber Mill contributes nothing to the woodless row.
-  it('A75+D117 emits a single woodless row attributed to D117 only', () => {
+  it('A75+D117 preserves the base, A75-discounted, and D117 wood-for-food candidates', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -462,6 +461,7 @@ describe('fixed card-purchase cost candidates', () => {
       { wood: 2 },
     )
     expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { wood: 2 }, sources: [] },
       { resources: { wood: 1 }, sources: ['A75_LumberMill'] },
       { resources: { food: 1 }, sources: ['D117_WoodExpert'] },
     ]))

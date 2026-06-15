@@ -66,6 +66,23 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'superPhase'"))).toBe(true)
   })
 
+  it('rejects computeExchanges for sandbox custom cards', () => {
+    const code = `
+      const CARD_IMPL = {
+        listeners: [
+          {
+            id: 'test-listener',
+            phases: ['computeExchanges'],
+            handler: (ctx) => {},
+          },
+        ],
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'computeExchanges'"))).toBe(true)
+  })
+
   it('accepts handHooks as a meta field', () => {
     const code = `
       const CARD_IMPL = {

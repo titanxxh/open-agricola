@@ -8,7 +8,8 @@
  *
  * Sources of truth this script reads:
  *   - shared/cards/card-effects.ts        → cardEffectHooks array
- *   - server/custom-code/engine.ts → isActionHookPhase + isCardListenerScope
+ *   - shared/custom-code/sandbox-listener-phases.ts → sandboxListenerPhases array
+ *   - server/custom-code/engine.ts → isCardListenerScope
  *   - shared/custom-code/ast-validator.ts → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
  *
  * Targets it cross-checks against:
@@ -31,6 +32,7 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 
 const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
+  sandboxListenerPhases: 'shared/custom-code/sandbox-listener-phases.ts',
   engine: 'server/custom-code/engine.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
   injectedHelpers: 'server/custom-code/injected-helpers.ts',
@@ -67,13 +69,12 @@ function extractCardEffectHooks(): string[] {
 }
 
 /**
- * Extract the `isActionHookPhase` whitelist literal from engine.ts.
- * Looks for: `[ 'before', 'during', ... ].includes(value)` near `isActionHookPhase`.
+ * Extract the `sandboxListenerPhases` array literal.
  */
 function extractActionHookPhases(): string[] {
-  const src = readFile(SOURCES.engine)
-  const m = src.match(/isActionHookPhase[\s\S]*?\[([\s\S]*?)\]\.includes/)
-  if (!m) throw new Error(`isActionHookPhase array not found in ${SOURCES.engine}`)
+  const src = readFile(SOURCES.sandboxListenerPhases)
+  const m = src.match(/export const sandboxListenerPhases\s*=\s*\[([\s\S]*?)\]\s*as const/)
+  if (!m) throw new Error(`sandboxListenerPhases array not found in ${SOURCES.sandboxListenerPhases}`)
   return parseStringArray(m[1])
 }
 
@@ -225,7 +226,7 @@ function main() {
   const reports: DriftReport[] = []
 
   reports.push(...checkBlock('card-effect-hooks', cardEffectHooks, `${SOURCES.cardEffects}:cardEffectHooks`))
-  reports.push(...checkBlock('action-hook-phases', actionHookPhases, `${SOURCES.engine}:isActionHookPhase`))
+  reports.push(...checkBlock('action-hook-phases', actionHookPhases, `${SOURCES.sandboxListenerPhases}:sandboxListenerPhases`))
   reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.engine}:isCardListenerScope`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
   reports.push(...checkBlock('denied-property-access', deniedPropertyAccess, `${SOURCES.astValidator}:DENIED_PROPERTY_ACCESS`))
@@ -262,7 +263,8 @@ function main() {
 
   console.log(`Sources:`)
   console.log(`  ${SOURCES.cardEffects}     (cardEffectHooks: ${cardEffectHooks.length})`)
-  console.log(`  ${SOURCES.engine}          (isActionHookPhase: ${actionHookPhases.length}, scopes: ${listenerScopes.length})`)
+  console.log(`  ${SOURCES.sandboxListenerPhases} (sandboxListenerPhases: ${actionHookPhases.length})`)
+  console.log(`  ${SOURCES.engine}          (scopes: ${listenerScopes.length})`)
   console.log(`  ${SOURCES.astValidator}    (denied: ${deniedIdentifiers.length} ids + ${deniedPropertyAccess.length} props)`)
   console.log()
 

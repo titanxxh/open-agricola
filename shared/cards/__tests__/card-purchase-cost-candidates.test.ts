@@ -176,8 +176,8 @@ describe('card-purchase cost candidate cards', () => {
         source: 'A75_LumberMill',
         target: 'Major_Test',
         base: { fees: [{ wood: 2 }, { stone: 1 }] },
-        fees: [{ wood: 1 }, { stone: 1 }],
-        attribution: { 0: { A75_LumberMill: { saved: { wood: 1 } } } },
+        fees: [{ wood: 2 }, { stone: 1 }, { wood: 1 }],
+        attribution: { 2: { A75_LumberMill: { saved: { wood: 1 } } } },
       },
       {
         playedZone: 'occupationPlayed',
@@ -199,8 +199,7 @@ describe('card-purchase cost candidate cards', () => {
         entry.target,
         entry.base,
       )
-      const sourceIndex = entry.source === 'A75_LumberMill' ? 0 : 2
-      expectFeesAndSources(result, entry.fees, { [sourceIndex]: [entry.source] }, entry.attribution)
+      expectFeesAndSources(result, entry.fees, { 2: [entry.source] }, entry.attribution)
     }
   })
 
