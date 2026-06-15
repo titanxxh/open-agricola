@@ -10,7 +10,7 @@
  */
 import ts from 'typescript'
 import { cardEffectHooks } from '../cards/card-effects'
-import { actionHookPhases } from '../actions/hooks'
+import { sandboxListenerPhases } from './sandbox-listener-phases'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
 
@@ -50,7 +50,7 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 ])
 
 /** Allowed values inside listener.phases arrays. */
-const ALLOWED_LISTENER_PHASES = new Set<string>(actionHookPhases)
+const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 
 export function validateCardCode(source: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
@@ -176,7 +176,7 @@ export function validateCardCode(source: string): ValidationResult {
 /**
  * Find the CARD_IMPL variable declaration in the source and validate:
  * 1. effect keys are in the cardEffectHooks whitelist (+ meta fields)
- * 2. listener phases are in the actionHookPhases whitelist
+ * 2. listener phases are in the sandbox listener phase whitelist
  */
 function validateCardImplHooksAndPhases(
   sourceFile: ts.SourceFile,
