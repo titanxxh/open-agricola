@@ -539,13 +539,14 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 经候选闭包作用在每个 unit cost row 上（无顺序字段，可达行集合与 trade 注册顺序无关）。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `paymentResourceProviders` —— 卡牌 / hook 提供的虚拟支付资源。provider 在卡牌内部声明稳定 key、可用量、可覆盖的真实成本资源以及执行时的消费来源；它不写入 `fee` / `fees` / `PlayerState.resources`，只在 `PaymentSolution.resourcesPaid` 中以自身 key 出现，并由 executor 消耗来源状态。
+- `paymentBudget` —— 对最终 `PaymentSolution.resourcesPaid` 的资源上限过滤。它不提供资源、不改变成本候选，也不提前限制几何/单位数量；必须在 trades / bonuses / paymentResourceProviders / cards 都生成最终支付方案后检查。
 - `Bonus.capDiscountAtCost` —— 只用于“移除当前 cost 中某资源”的显式语义；普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
 - `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，供 E123 这类 after-pay 卡牌消费；D88 这类无状态 replacement choice 可显式关闭，避免同一支付结果因选择顺序不同重复展示。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
 
 **Card-purchase ComputeCardCosts candidate pipeline（候选闭包，ADR 0004）**：major / minor improvement 购买成本在进入 payment solver 前先规范化成 Cost Candidate List，再对全部 `deriveCardCostCandidate` 转换求候选闭包（`candidate-closure.ts` `closeCandidates()`）：不动点枚举 + Mandatory Saturation 过滤，结果与 listener 注册顺序 / 命名无关（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）。卡牌只声明单候选转换（candidate → candidate(s) | null）和 `cardCostCandidateMandatory` 标志：optional（BGA "can pay instead"）天然保留原候选；mandatory（BGA "costs less" / 替换语义）经饱和过滤隐藏仍可被强制转换的行。fixed-price 卡是"不依赖输入的 optional / mandatory 转换"，闭包去重后只产出一行，无需任何先行声明。折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution（dedupe key 中 sources 视为无序集合）；闭包输出后每个 resources + originalFeeIndex 组只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment），支付选定后由 improvement payment glue 写入 option `sourceCards`、`resource.paid.bonusSources` 和 Card Resource Stats（单候选行默认使用 index 0 metadata）。
 
-**统一管线阶段顺序（固定领域规则，非卡牌偏序）**：基础候选（fee/fees/unitFee + getBaseCosts 动态候选）→ 候选闭包（card-purchase deriveCardCostCandidate / unit-trade 转换）→ action-scope trades 组合枚举 → bonuses（含 capped / choices，必须最后求值，因折扣以最终成本为上界）→ card-provided payment resources 覆盖成本 → cards → 资源可行性过滤 + Pareto + 排序。
+**统一管线阶段顺序（固定领域规则，非卡牌偏序）**：基础候选（fee/fees/unitFee + getBaseCosts 动态候选）→ 候选闭包（card-purchase deriveCardCostCandidate / unit-trade 转换）→ action-scope trades 组合枚举 → bonuses（含 capped / choices，必须最后求值，因折扣以最终成本为上界）→ card-provided payment resources 覆盖成本 → cards → 生成可支付方案 → paymentBudget 过滤最终实付资源 → Pareto + 排序。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
@@ -744,7 +745,7 @@ OA 对齐规则：
 
 - **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` / `paymentResourceProviders` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
-- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
+- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders/paymentBudget 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
@@ -753,13 +754,15 @@ farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fe
 
 `FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；borrowed fence 是 `type='fence'` 且 `source.kind='borrowed'` 的普通边界，不是新 segment type。
 
-fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`costPolicy`、`paymentBudget`、`cancelPolicy`、`preserveAnimalTotals`。
 
 `sourcePolicy: { kind: 'borrowed', donorCaps }` 表示本次 ordinary fence 的 token source、build limit 和 segment source 都由 donor caps 提供。提交 payload 必须用 `fenceSources: Record<edgeId, donorPlayerId>` 为每条新增普通 fence 指定 donor；后端按当前 donor reserve 重新截断 cap，再校验 source key 精确覆盖新增 ordinary edges、donor 不超 cap、不能指向行动玩家自己。成功后新 segment 写入 borrowed source，并通过 `supplyTokensConsumed.fence` 消耗 donor supply；donor 后续 `getOwnOrdinaryFenceReserveCount()` / own ordinary fencing max 会自然下降。`farm.fenceBuilt.fences` 必须带完整新 `FenceSegment[]`，包括 source owner。
 
 `segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 先做通用 policy 资源 / supply 可行性估算；在真实 state 中还会用 `validateFenceSelection()` 预检至少一个 legal fence commit，避免 confirm-only pending 无法完成。最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
 
 `fencePolicy.costPolicy` 只表达 BGA `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
+
+`fencePolicy.paymentBudget` 只限制最终实付资源，例如 B15 Carpenter's Bench 的“只能使用本次收集的 wood”。它不等同于 `segmentBounds.total.max`，因此合法 fence shape 不能按预算资源数提前裁剪；折扣、免费 fence、虚拟支付资源和 solver 选路完成后，才按 `PaymentSolution.resourcesPaid` 过滤。
 
 C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply，并由通用 protected-action guard 拒绝 direct cancel、保留动物总量。
 
