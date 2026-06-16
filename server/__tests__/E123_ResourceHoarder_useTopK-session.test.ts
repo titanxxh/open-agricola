@@ -13,6 +13,7 @@ import { EngineTree } from '../../shared/engine/tree'
 import '../../shared/cards/E/E123_ResourceHoarder'
 
 const CARD_ID = 'E123_ResourceHoarder'
+const C14_ID = 'C14_StrawThatchedRoof'
 
 const emptyResources = (): Resource => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -306,5 +307,68 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
         bonusChoiceIndex: { [CARD_ID]: 1 },
       }),
     ]))
+  })
+
+  it('C14 reed discount does not pop E123 reed when E123 is not used', () => {
+    const player = createPlayer({
+      resources: { ...emptyResources(), wood: 5 },
+      occupationPlayed: [CARD_ID],
+      minorPlayed: [C14_ID],
+      cardStates: { [CARD_ID]: { stack: ['reed'] } },
+    })
+    const state = mkState(player)
+    const cost: ComplexCost = {
+      fee: { wood: 5, reed: 2 },
+      bonuses: [
+        {
+          sources: [C14_ID],
+          optional: false,
+          discount: { reed: 99 },
+          capDiscountAtCost: true,
+        },
+        {
+          sources: [CARD_ID],
+          optional: true,
+          choices: [
+            { discount: {} },
+            { discount: { reed: 1 } },
+          ],
+        },
+      ],
+    }
+
+    const result = payWithEngine(state, player, cost, (options) => {
+      const option = options.find((entry) => {
+        const params = entry.labelParams as {
+          resourcesPaid?: Partial<Resource>
+          sourceCards?: string[]
+        }
+        return params.resourcesPaid?.wood === 5 &&
+          params.sourceCards?.length === 1 &&
+          params.sourceCards[0] === C14_ID
+      })
+      expect(option).toBeDefined()
+      return option!.value
+    })
+    expect(result.type).toBe('ok')
+    expect(state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 5 },
+        bonusSources: [C14_ID],
+      }),
+    ]))
+
+    const listener = findListener('E123-resource-hoarder-after-pay')
+    executeCardListener(listener, {
+      state,
+      player,
+      space: createSpace('construct'),
+      actionId: 'pay',
+      phase: 'after',
+      transactionEvents: state.events,
+    } as CardListenerContext)
+
+    expect(player.cardStates[CARD_ID]!.stack).toEqual(['reed'])
   })
 })

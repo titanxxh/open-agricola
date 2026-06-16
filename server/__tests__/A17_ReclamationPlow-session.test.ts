@@ -7,8 +7,10 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionExecutionResult } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A17_ReclamationPlow'
+import '../../shared/cards/A/A137_RiverineShepherd'
 
 const CARD_ID = 'A17_ReclamationPlow'
+const A137_ID = 'A137_RiverineShepherd'
 const LISTENER = A17_ReclamationPlow_impl.listeners[0]!
 
 const moved = (
@@ -111,5 +113,47 @@ describe('A17_ReclamationPlow session', () => {
     const result = executeCardListener(LISTENER, ctx)
 
     expect(result).toBeUndefined()
+  })
+
+  it('does not trigger from A137 feasibility on a non-animal Reed Bank action', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.occupationPlayed.push(A137_ID)
+    player.pastures = [
+      {
+        id: 'p1',
+        size: 4,
+        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
+        stables: 0,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+
+    const reedBank = state.actionSpaces.find((space) => space.id === 'reed-bank')!
+    reedBank.resources.reed = 2
+    const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')!
+    sheepMarket.resources.sheep = 1
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'reed-bank')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .not.toBe('ui.interactionReclamationPlow')
+
+    if (resp.interaction.stateId === 'wait') {
+      const skip = resp.interaction.options?.find((option) => option.value === '__skip__')
+      if (skip) resp = session.resolveChoice(0, skip.value)
+    }
+
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .not.toBe('ui.interactionReclamationPlow')
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.flagged).toBeFalsy()
   })
 })

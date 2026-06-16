@@ -10,6 +10,7 @@ import '../../shared/cards/C/C71_Slurry'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
 import '../../shared/cards/D/D99_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
+import '../../shared/cards/D/D167_PureBreeder'
 
 const chooseFirstOption = (session: GameSession, playerIndex: number) => {
   const interaction = session.getState().interaction
@@ -431,5 +432,46 @@ describe('stage hook flows', () => {
       col: 0,
       stacks: [{ kind: 'grain', remaining: 3 }],
     })
+  })
+
+  it('does not let D167 non-harvest breeding write D115 harvest breeding summary', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 1
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+    })
+
+    const player = state.players[0]!
+    player.occupationPlayed.push('D167_PureBreeder', 'D115_FodderPlanter')
+    player.resources.food = 10
+    player.resources.grain = 1
+    player.resources.sheep = 2
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
+    player.pastures = [
+      {
+        id: 'p1',
+        size: 3,
+        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }],
+        stables: 0,
+        animalType: 'sheep',
+        animalCount: 2,
+      },
+    ]
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionFlowSelect')
+
+    resp = chooseFirstOption(session, 0)
+
+    expect(resp.state.players[0]!.resources.sheep).toBe(3)
+    expect(resp.state.harvestBreedSummary).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(2)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
   })
 })
