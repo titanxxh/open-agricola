@@ -183,6 +183,7 @@ export type ComplexCost = {
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
+  paymentBudget?: PaymentResourceMap
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
 }

@@ -219,6 +219,18 @@ export const keepOnlyOptimals = (
   )
 }
 
+const withinPaymentBudget = (
+  solution: PaymentSolution,
+  budget: PaymentResourceMap | undefined,
+): boolean => {
+  if (!budget) return true
+  for (const [key, max] of Object.entries(budget)) {
+    if (typeof max !== 'number') continue
+    if ((solution.resourcesPaid[key as PaymentResourceKey] ?? 0) > max) return false
+  }
+  return true
+}
+
 const getPositiveResourceEntries = (solution: PaymentSolution) =>
   sortedPaymentResourceEntries(solution.resourcesPaid)
 
@@ -1040,7 +1052,10 @@ export const computeAllBuyableCombinations = (
     }
   }
 
-  const result = sortPaymentSolutions(keepOnlyOptimals(paymentSolutions))
+  const budgetedSolutions = paymentSolutions.filter((solution) =>
+    withinPaymentBudget(solution, effectiveCost.paymentBudget),
+  )
+  const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
   if (canUseCache) solutionCache.set(cacheKey, result)
   return result
 }
