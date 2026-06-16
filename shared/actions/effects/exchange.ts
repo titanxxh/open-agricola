@@ -33,6 +33,118 @@ import { exchangeToTrade } from './exchange-to-trade'
 export { dispatchTradeAppliedListener } from './trade-applied-listener'
 export { exchangeToTrade } from './exchange-to-trade'
 
+const ANIMAL_KEYS = ['sheep', 'boar', 'cattle'] as const
+type AnimalResourceKey = typeof ANIMAL_KEYS[number]
+type CardCounterAnimalSource = {
+  kind: 'cardCounter'
+  cardId?: string
+  counterKey: string
+}
+type AnimalPaymentPreference = {
+  animal: AnimalResourceKey
+  prefer?: CardCounterAnimalSource[]
+  avoid?: CardCounterAnimalSource[]
+}
+
+const isAnimalResourceKey = (key: ResourceKey): key is AnimalResourceKey =>
+  (ANIMAL_KEYS as readonly string[]).includes(key)
+
+const readAnimalPaymentPreference = (
+  actionContext: Record<string, unknown> | undefined,
+): AnimalPaymentPreference | undefined => {
+  const raw = actionContext?.animalPaymentPreference
+  if (!raw || typeof raw !== 'object') return undefined
+  const pref = raw as Partial<AnimalPaymentPreference>
+  if (pref.animal !== 'sheep' && pref.animal !== 'boar' && pref.animal !== 'cattle') return undefined
+  return pref as AnimalPaymentPreference
+}
+
+const readMaxTradeTimesBySourceId = (
+  actionContext: Record<string, unknown> | undefined,
+): Record<string, number> | undefined => {
+  const raw = actionContext?.maxTradeTimesBySourceId
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: Record<string, number> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue
+    out[key] = Math.max(0, Math.floor(value))
+  }
+  return out
+}
+
+const takeFromCardCounter = (
+  player: PlayerState,
+  source: CardCounterAnimalSource,
+  amount: number,
+): number => {
+  if (!source.cardId) {
+    let remaining = amount
+    for (const cardId of Object.keys(player.cardStates ?? {})) {
+      if (remaining <= 0) break
+      remaining -= takeFromCardCounter(player, { ...source, cardId }, remaining)
+    }
+    return amount - remaining
+  }
+  const counters = player.cardStates?.[source.cardId]?.counters
+  const current = counters?.[source.counterKey] ?? 0
+  if (!counters || current <= 0 || amount <= 0) return 0
+  const take = Math.min(current, amount)
+  counters[source.counterKey] = current - take
+  return take
+}
+
+const takeFromBoardAnimals = (
+  player: PlayerState,
+  animal: AnimalResourceKey,
+  amount: number,
+): number => {
+  let remaining = amount
+  for (const pasture of player.pastures ?? []) {
+    if (remaining <= 0) break
+    if (pasture.animalType !== animal) continue
+    const take = Math.min(pasture.animalCount, remaining)
+    pasture.animalCount -= take
+    remaining -= take
+    if (pasture.animalCount <= 0) pasture.animalType = null
+  }
+  if (remaining > 0 && player.houseAnimalType === animal && player.houseAnimalCount > 0) {
+    const take = Math.min(player.houseAnimalCount, remaining)
+    player.houseAnimalCount -= take
+    remaining -= take
+    if (player.houseAnimalCount <= 0) player.houseAnimalType = null
+  }
+  if (remaining > 0 && player.stableAnimals) {
+    for (const [key, value] of Object.entries(player.stableAnimals)) {
+      if (remaining <= 0) break
+      if (value !== animal) continue
+      player.stableAnimals[key] = null
+      remaining -= 1
+    }
+  }
+  return amount - remaining
+}
+
+const deductAnimalWithPreference = (
+  player: PlayerState,
+  animal: AnimalResourceKey,
+  amount: number,
+  preference: AnimalPaymentPreference,
+): void => {
+  let remaining = amount
+  for (const source of preference.prefer ?? []) {
+    if (remaining <= 0) break
+    remaining -= takeFromCardCounter(player, source, remaining)
+  }
+  if (remaining > 0) {
+    remaining -= takeFromBoardAnimals(player, animal, remaining)
+  }
+  for (const source of preference.avoid ?? []) {
+    if (remaining <= 0) break
+    remaining -= takeFromCardCounter(player, source, remaining)
+  }
+  player.resources[animal] = Math.max(0, (player.resources[animal] ?? 0) - amount)
+}
+
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
   Object.keys(resources).forEach((key) => {
@@ -253,12 +365,22 @@ export const applyTrade = (
   player: PlayerState,
   trade: Trade,
   times: number = 1,
+  animalPaymentPreference?: AnimalPaymentPreference,
 ): void => {
   // Deduct 'from' resources
   const fromKeys = Object.keys(trade.from) as ResourceKey[]
   for (const key of fromKeys) {
     const amount = (trade.from[key] ?? 0) * times
-    player.resources[key] -= amount
+    if (
+      amount > 0 &&
+      animalPaymentPreference &&
+      isAnimalResourceKey(key) &&
+      animalPaymentPreference.animal === key
+    ) {
+      deductAnimalWithPreference(player, key, amount, animalPaymentPreference)
+    } else {
+      player.resources[key] -= amount
+    }
   }
 
   // Add 'to' resources
@@ -394,8 +516,12 @@ const hasAffordableTradeForIds = (
   player: PlayerState,
   tradeIds: string[],
   _state?: GameState,
+  maxTradeTimesBySourceId?: Record<string, number>,
 ): boolean => {
   for (const trade of getExchangesByTradeIds(player, tradeIds)) {
+    const sourceId = trade.sourceId ?? trade.source
+    const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
+    if (contextMax !== undefined && contextMax <= 0) continue
     if (canAffordTrade(player, trade, 1)) return true
   }
   return false
@@ -436,6 +562,7 @@ const buildExchangeOptions = (
   player: PlayerState,
   tradeIds?: string[],
   state?: GameState,
+  maxTradeTimesBySourceId?: Record<string, number>,
 ): { options: ActionChoiceOption[]; trades: Trade[] } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
@@ -458,7 +585,10 @@ const buildExchangeOptions = (
   for (let i = 0; i < trades.length; i++) {
     const trade = trades[i]
     if (!canAffordTrade(player, trade, 1)) continue
-    const max = getMaxTradeTimes(player, trade)
+    const sourceId = trade.sourceId ?? trade.source
+    const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
+    const max = Math.min(getMaxTradeTimes(player, trade), contextMax ?? Infinity)
+    if (max <= 0) continue
     options.push({
       value: `trade:${i}:${max}`,
       labelKey: formatTradeLabel(trade),
@@ -474,13 +604,16 @@ const resolveExchangeChoice = (
   state: GameState,
   player: PlayerState,
   choice: string,
-  tradeIds?: string[],
+  actionContext?: Record<string, unknown>,
   eventSink?: EventSink,
 ): ActionExecutionResult => {
   if (choice === 'cancel') {
     return { type: 'ok' }
   }
-  const { trades } = buildExchangeOptions(player, tradeIds, state)
+  const tradeIds = actionContext?.tradeIds as string[] | undefined
+  const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
+  const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
+  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId)
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
@@ -493,10 +626,12 @@ const resolveExchangeChoice = (
       if (!Number.isFinite(index) || !Number.isFinite(count) || count <= 0) return
       const trade = trades[index]
       if (!trade) return
-      const max = getMaxTradeTimes(player, trade)
+      const sourceId = trade.sourceId ?? trade.source
+      const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
+      const max = Math.min(getMaxTradeTimes(player, trade), contextMax ?? Infinity)
       const times = Math.min(count, max)
       if (times > 0) {
-        applyTrade(player, trade, times)
+        applyTrade(player, trade, times, animalPaymentPreference)
         recordCookeryConversion(player, trade, times)
         if (trade.sideEffect) {
           applyTradeSideEffect(
@@ -530,9 +665,12 @@ const resolveExchangeChoice = (
     if (!trade) return { type: 'ok' }
     const count = parts[2] ? Number(parts[2]) : 1
     const max = getMaxTradeTimes(player, trade)
-    const times = Math.min(count, max)
+    const sourceId = trade.sourceId ?? trade.source
+    const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
+    const boundedMax = Math.min(max, contextMax ?? Infinity)
+    const times = Math.min(count, boundedMax)
     if (times > 0) {
-      applyTrade(player, trade, times)
+      applyTrade(player, trade, times, animalPaymentPreference)
       recordCookeryConversion(player, trade, times)
       if (trade.sideEffect) {
         applyTradeSideEffect(
@@ -576,8 +714,9 @@ export const anytimeExchangeAction: ActionDefinition = {
     const directTrade = readDirectTrade(ctx?.actionContext)
     if (directTrade) return canAffordTrade(player, directTrade, 1)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
+    const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(ctx?.actionContext)
     if (tradeIds && tradeIds.length > 0) {
-      return hasAffordableTradeForIds(player, tradeIds, state) || hasAffordableCookeryTrade(player, state)
+      return hasAffordableTradeForIds(player, tradeIds, state, maxTradeTimesBySourceId) || hasAffordableCookeryTrade(player, state)
     }
     return hasAffordableCookeryTrade(player, state)
   },
@@ -634,7 +773,8 @@ export const anytimeExchangeAction: ActionDefinition = {
       return { type: 'ok' as const, resourcesGained: gained, resourcesPaid: paid }
     }
     const filterIds = actionContext?.tradeIds as string[] | undefined
-    const { options: allOptions } = buildExchangeOptions(player, filterIds, state)
+    const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
+    const { options: allOptions } = buildExchangeOptions(player, filterIds, state, maxTradeTimesBySourceId)
     const filtered = filterIds && filterIds.length > 0
       ? allOptions.filter((opt) => {
           if (opt.value === 'cancel') return true
@@ -661,6 +801,6 @@ export const anytimeExchangeAction: ActionDefinition = {
     if (batch && batchPayload) {
       return resolveBatchExchange(state, player, batch, batchPayload, eventSink)
     }
-    return resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined, eventSink)
+    return resolveExchangeChoice(state, player, choice, actionContext, eventSink)
   },
 }
