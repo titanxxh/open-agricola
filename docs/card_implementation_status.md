@@ -891,7 +891,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C145_ForestReviewer` | 已对齐 |  |
 | `C146_WorkshopAssistant` | 已对齐 | onBuy 将 pair key 存入 `extraData.pairs` 并记录所选资源 pair 日志；其他玩家 renovation 后 owner 可 optional 取回一对，资源移动走标准 `gain`/`resource.moved` 语义并记录 used/gained；owner prompt 进入/返回行动玩家都经过确认玩家切换，且切换边界不暴露 undo；交互栏 pair 选择使用资源图标并替换 needed 参数；Played Cards 区从 `extraData.pairs` 渲染卡上资源 pair stack |
 | `C147_Cowherd` | 已对齐 |  |
-| `C148_MudWallower` | 已对齐 |  |
+| `C148_MudWallower` | 已对齐 | `held` counter 是卡上野猪的当前上限/数量口径；E53 这类动物兑换通过一次性 Animal Payment Preference 决定是否扣本牌 held，普通 action-space / B137 新获得野猪兑换不误扣本牌 held |
 | `C149_ResourceRecycler` | 已对齐 |  |
 | `C150_ParrotBreeder` | 已对齐 |  |
 | `C151_SowingDirector` | 已对齐 |  |
@@ -1156,7 +1156,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E50_WildGreens` | 已对齐 |  |
 | `E51_WhaleOil` | 已对齐 |  |
 | `E52_Cubbyhole` | 已对齐 |  |
-| `E53_BoarSpear` | 已对齐 |  |
+| `E53_BoarSpear` | 已对齐 | listener 只允许本次新获得的 boar 次数参与兑换；Animal Payment Preference 按来源 prefer / avoid C148 held，C148 来源扣 C148，本体 action-space / B137 来源优先扣新获得的非 C148 boar，decline 不改变来源 |
 | `E54_Contraband` | 已对齐 |  |
 | `E55_StoneWeir` | 已对齐 |  |
 | `E56_RomanPot` | 已对齐 |  |
