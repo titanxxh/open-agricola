@@ -54,20 +54,26 @@ describe('B15_CarpentersBench session', () => {
     ctx.result = { type: 'ok' }
 
     const result = executeCardListener(LISTENER, ctx)
+    const leaf = fenceLeaf(result?.flow)
 
-    expect(fenceLeaf(result?.flow)).toMatchObject({
+    expect(leaf).toMatchObject({
       actionId: 'fence',
       actionContext: {
         trueAction: false,
         fencePolicy: {
           allowedSegmentTypes: ['fence'],
-          segmentBounds: { total: { min: 1, max: 4 } },
+          segmentBounds: { total: { min: 1 } },
           newPastureBounds: { count: { min: 1, max: 1 } },
           costPolicy: { fence: { wood: 1 } },
+          paymentBudget: { wood: 3 },
           cancelPolicy: 'forbidCancel',
         },
       },
     })
+    const policy = leaf?.actionContext?.fencePolicy as {
+      segmentBounds?: { total?: { max?: number } }
+    }
+    expect(policy.segmentBounds?.total?.max).toBeUndefined()
   })
 
   it('does not trigger for supply/cardEffect wood even when result reports wood', () => {

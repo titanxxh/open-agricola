@@ -152,3 +152,32 @@ describe('typed-flat supply token selection', () => {
     expect(player.supplyTokensConsumed?.stable).toBeUndefined()
   })
 })
+
+describe('typed-flat payment budgets', () => {
+  it('rejects solutions whose final paid resource exceeds the budget', () => {
+    const sols = computeAllBuyableCombinations(
+      mkPlayer({ wood: 4 }, []),
+      { fee: { wood: 4 }, paymentBudget: { wood: 3 } },
+      undefined,
+      'fencing',
+    )
+
+    expect(sols).toHaveLength(0)
+  })
+
+  it('keeps solutions whose discounted final payment fits the budget', () => {
+    const sols = computeAllBuyableCombinations(
+      mkPlayer({ wood: 4 }, []),
+      {
+        fee: { wood: 4 },
+        bonuses: [{ discount: { wood: 1 }, sources: ['Test_Discount'] }],
+        paymentBudget: { wood: 3 },
+      },
+      undefined,
+      'fencing',
+    )
+
+    expect(sols).toHaveLength(1)
+    expect(sols[0]?.resourcesPaid.wood).toBe(3)
+  })
+})
