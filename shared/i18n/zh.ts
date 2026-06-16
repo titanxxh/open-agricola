@@ -584,6 +584,10 @@ export const zh = {
       description: '获得 {resources_desc}',
           name: '获得',
 },
+    receive: {
+      description: '接收 {resources_desc}',
+          name: '接收',
+},
     'move-farmer-to-space': {
       description: '将农夫移动到行动格',
           name: '移动农夫',

@@ -122,7 +122,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 自定义卡 runtime / frontend metadata 拆分 | `shared/cards/custom-registry.ts`、`shared/cards/custom-card-metadata.ts`、`client/services/card-meta.ts`、`scripts/__tests__/eslint-client-boundary.test.ts` | server / sandbox 只注册 impl、session context、effects、listeners、modifiers；main client 只注册 display metadata、art URL、O 编号，不 import custom runtime registry。 |
 | Card Source metadata / runtime 分离 | `shared/cards/card-source.ts`、`scripts/build-cards-manifest.ts`、`scripts/generate-register-all.ts`、`scripts/check-generated-cards-sync.ts`、`shared/cards/__tests__/card-source-representatives.test.ts` | Card Source 卡牌的运行时字段只放在 `impl`；manifest / generated catalog 只静态读取 `meta` 并输出 metadata 字面量；major runtime source 只在 `major/runtime.generated.ts` 进入后端实现路径；generated catalog 必须保持同步；workshop PR 生成必须基于已 fetch 的 upstream generated 文件 patch，不读部署机本地 cards tree；代表卡必须通过 production catalog / registry path 覆盖。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens` | fence、linked occupancy、special stable、stable count、token supply、行动格预留 marker 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
-| Future meeple action token | `FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的 `field` / `stable` future meeple 由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
+| Future meeple action token / Receive | `receive` internal action、`FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的普通资源按 player 合并为一次 `receive` transaction，保留每个 entry 的 `sourceCardId`，触发 Receive listener 而不隐式触发 Gain listener；`field` / `stable` 仍由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
 | Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；不要反查外卡 `cardStates` 或临时改 live resources。 |
 
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
@@ -248,6 +248,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `after.fence` | `A144_Sequestrator`, `A34_Loppers`, `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `D36_BreedRegistry`, `E103_Wolf`, `E118_KindlingGatherer`, `E53_BoarSpear` |
 | listener | `after.pop-card-stack` | `D36_BreedRegistry` |
+| listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B96_TreeFarmJoiner`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E53_BoarSpear` |
 | listener | `after.take-from-card` | `D36_BreedRegistry` |
 | listener | `immediatelyAfter.harvest-feed-conversion` | `D36_BreedRegistry` |
 | listener | `immediatelyAfter.future-meeple-resolved` | `D36_BreedRegistry` |
@@ -658,7 +659,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按可选 occupation 支付方案过滤，并通过 `reserveResources` 要求职业支付后仍有最低 2 个真实 food 支付 future schedule；`isDoable.lessons*` 在 B93 是唯一且不可支付的职业时 veto lessons action space，避免占格后无职业可打；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 | major-only stone 折扣走 `computeCardCostCandidates`，按当前房间数追加 sourced candidates；minor improvement 不产生 candidate pipeline 输出。 |
-| `B96_TreeFarmJoiner` | 已对齐 |  |
+| `B96_TreeFarmJoiner` | 已对齐 | future wood 到期走通用 Future Receive；卡内 `after.receive` listener 检查本卡来源 wood 后追加 optional `minor-improvement`，不在 round-start 核心路径写单卡分支。 |
 | `B97_Scholar` | 已对齐 |  |
 | `B98_OrganicFarmer` | 已对齐 |  |
 | `B99_Tutor` | 已对齐 |  |

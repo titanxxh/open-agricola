@@ -24,6 +24,7 @@ export const ALLOWED_EFFECT_FILES = [
   'plow.ts',
   'private-field-phase.ts',
   'reap.ts',
+  'receive.ts',
   'renovation.ts',
   'reorganize.ts',
   'sow.ts',
