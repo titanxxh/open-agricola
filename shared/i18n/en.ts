@@ -603,6 +603,10 @@ export const en = {
       description: 'Gain {resources_desc}',
           name: 'Gain',
 },
+    receive: {
+      description: 'Receive {resources_desc}',
+          name: 'Receive',
+},
     'move-farmer-to-space': {
       description: 'Move farmer to action space',
           name: 'Move Farmer',

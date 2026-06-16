@@ -2341,11 +2341,30 @@ export class GameCore {
   private buildFutureMeepleActionFlow() {
     const children: ActionFlow[] = []
     let firstPlayerIndex = -1
+    const receiveEntriesByPlayer = new Map<string, Array<{
+      cardId: string
+      round: number
+      resources: Partial<Resource>
+    }>>()
     for (const entry of this.state.futureMeeples) {
       if (entry.round !== this.state.round) continue
       const playerIndex = this.state.players.findIndex((player) => player.id === entry.playerId)
       if (playerIndex === -1) continue
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
+      const receiveResources: Partial<Resource> = {}
+      for (const key of resourceKeyList) {
+        const amount = entry.resources[key] ?? 0
+        if (amount > 0) receiveResources[key] = amount
+      }
+      if (Object.keys(receiveResources).length > 0) {
+        const receiveEntries = receiveEntriesByPlayer.get(entry.playerId) ?? []
+        receiveEntries.push({
+          cardId: entry.cardId,
+          round: entry.round,
+          resources: receiveResources,
+        })
+        receiveEntriesByPlayer.set(entry.playerId, receiveEntries)
+      }
       const actionContext = entry.actionContext ?? {}
       for (let i = 0; i < futureMeepleActionCount(entry, 'field'); i += 1) {
         children.push({
@@ -2373,6 +2392,16 @@ export class GameCore {
           }],
         })
       }
+    }
+    for (const [playerId, entries] of [...receiveEntriesByPlayer.entries()].reverse()) {
+      const playerIndex = this.state.players.findIndex((player) => player.id === playerId)
+      if (playerIndex === -1) continue
+      children.unshift({
+        type: 'leaf',
+        actionId: 'receive',
+        targetPlayerId: playerId,
+        params: { entries },
+      })
     }
     if (children.length === 0 || firstPlayerIndex === -1) return null
     return {
@@ -2963,7 +2992,7 @@ export class GameCore {
     })
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
-    applyFutureMeeples(this.state)
+    applyFutureMeeples(this.state, { skipResourceReceive: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
