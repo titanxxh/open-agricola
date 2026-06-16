@@ -116,6 +116,10 @@ _Avoid_: 每张卡手写支付分支
 由卡牌效果临时提供、只能用于支付管线的虚拟资源口径，例如用 Traveling Players 行动格上的食物支付职业成本。它有卡牌前缀稳定身份，不出现在成本候选行中，但会以自身身份出现在实际支付明细中；它可以声明自己能覆盖哪些成本资源，不表示玩家库存资源或通用资源类型。
 _Avoid_: Payment Source、PlayerState.resources、真实资源兑换、成本候选行资源
 
+**Payment Budget（支付预算）**:
+一次行动或卡牌子流程对最终实际支付资源施加的上限约束。它不提供资源、不改变成本候选，只在折扣和支付求解完成后限制该流程最多能支付多少普通资源。
+_Avoid_: Card-Provided Payment Resource、库存资源、成本折扣、段数上限
+
 **ComputeCardCosts**:
 购买 major / minor improvement 时对当前卡牌成本候选执行的卡牌成本变形语义。它包括拥有 `computeCosts.improvement` listener 的卡，也包括先选支付路径再把该路径送入同一成本变形语义的卡。
 _Avoid_: 建房、翻修、围栏等非卡牌购买成本
@@ -193,9 +197,17 @@ _Avoid_: 卡牌口径 Stable、动物容量、永久消耗的 supply token
 卡牌文本中“你拥有的 stable”“本次建造的 stable”“unfenced stable”使用的畜栏口径；包含普通畜栏和 Farm Hand stable 这类只参与卡牌统计的特殊畜栏。
 _Avoid_: 动物容量、牧场容量、可安置动物的 stable
 
+**Animal Payment Preference（动物支付偏好）**:
+动物支付或动物兑换在多个可扣减动物区之间选择来源的局部约束，用于表达“优先扣这张卡上的动物”或“尽量保留这张卡上的动物”。它不引入全局动物身份，只在一次支付解析中约束 aggregate 动物资源从哪些区域扣减。
+_Avoid_: 全局 animal id、普通资源支付顺序、动物容量规则
+
 **Internal Action**:
 不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
 _Avoid_: 玩家可直接选择的公开行动
+
+**Future Receive**:
+回合开始时玩家从 future meeple / round card 拿回先前放置资源的 receive 语义。它属于内部阶段流程，但对卡牌语义等同于一次 Receive，不等同于普通 Gain。
+_Avoid_: Gain、Action Space collect、round growth accumulation
 
 **Action Hook**:
 行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`during`、`after`、`anytime`。通常由卡牌注册。
