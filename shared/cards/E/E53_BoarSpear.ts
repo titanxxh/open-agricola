@@ -5,7 +5,7 @@ import { readCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
-import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
+import type { DraftGameEvent, ResourceExchangedEvent, ResourceMovedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E53_BoarSpear'
@@ -14,6 +14,7 @@ const TRACKED_ACTIONS = ['gain', 'collect', 'receive', 'exchange'] as const
 const USED_TOKEN_KEY = 'E53UsedActionToken'
 
 type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
+type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
 
 const isResourceExchangedEvent = (
   event: CardListenerContext['transactionEvents'][number],
@@ -37,6 +38,55 @@ const countObtainedBoar = (context: CardListenerContext): number => {
   const events = context.actionEvents ?? context.transactionEvents
   return sumResourceMovedToPlayer(events, 'boar', context.player.id) +
     sumResourceExchangedToPlayer(context, 'boar')
+}
+
+const isResourceMovedEvent = (
+  event: CardListenerContext['transactionEvents'][number],
+): event is QueryableResourceMovedEvent =>
+  event.type === 'resource.moved'
+
+const boarCounterSource = (
+  event: CardListenerContext['transactionEvents'][number],
+  playerId: string,
+): { kind: 'cardCounter'; cardId: string; counterKey: 'held' } | null => {
+  if (isResourceMovedEvent(event)) {
+    if ((event.resources.boar ?? 0) <= 0 || event.to.kind !== 'player' || event.to.playerId !== playerId) return null
+    const cardId = event.from.kind === 'card' ? event.from.cardId : event.sourceCardId
+    return cardId ? { kind: 'cardCounter', cardId, counterKey: 'held' } : null
+  }
+  if (!isResourceExchangedEvent(event)) return null
+  if ((event.gained.boar ?? 0) <= 0 || event.gainedTo.kind !== 'player' || event.gainedTo.playerId !== playerId) return null
+  return event.exchangeSource ? { kind: 'cardCounter', cardId: event.exchangeSource, counterKey: 'held' } : null
+}
+
+const isNonCardBoarMovedToPlayer = (
+  event: CardListenerContext['transactionEvents'][number],
+  playerId: string,
+): boolean =>
+  isResourceMovedEvent(event)
+    ? (event.resources.boar ?? 0) > 0 &&
+      event.to.kind === 'player' &&
+      event.to.playerId === playerId &&
+      !event.sourceCardId &&
+      event.from.kind !== 'card'
+    : isResourceExchangedEvent(event) &&
+      (event.gained.boar ?? 0) > 0 &&
+      event.gainedTo.kind === 'player' &&
+      event.gainedTo.playerId === playerId &&
+      !event.exchangeSource
+
+const animalPaymentPreference = (context: CardListenerContext) => {
+  const events = context.actionEvents ?? context.transactionEvents
+  if ((events ?? []).some((event) => isNonCardBoarMovedToPlayer(event, context.player.id))) {
+    return { animal: 'boar' as const, avoid: [{ kind: 'cardCounter' as const, counterKey: 'held' }] }
+  }
+  const sources = (events ?? [])
+    .map((event) => boarCounterSource(event, context.player.id))
+    .filter((source): source is { kind: 'cardCounter'; cardId: string; counterKey: 'held' } => source !== null)
+  if (sources.length > 0) {
+    return { animal: 'boar' as const, prefer: sources }
+  }
+  return undefined
 }
 
 const obtainListener: CardListenerRegistration = {
@@ -72,7 +122,11 @@ const obtainListener: CardListenerRegistration = {
             actionId: 'exchange',
             optional: true,
             sourceCard: CARD_ID,
-            actionContext: { tradeIds: ['E53_BoarSpear'] },
+            actionContext: {
+              tradeIds: ['E53_BoarSpear'],
+              maxTradeTimesBySourceId: { [CARD_ID]: obtainedBoar },
+              animalPaymentPreference: animalPaymentPreference(context),
+            },
             choiceLabelKey: 'cards.E53_BoarSpear.choice',
           },
         ],

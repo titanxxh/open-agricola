@@ -11,9 +11,13 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/E/E53_BoarSpear'
 import '../../shared/cards/E/E85_MasterTanner'
+import '../../shared/cards/C/C148_MudWallower'
+import '../../shared/cards/B/B137_Wholesaler'
 
 const CARD_ID = 'E53_BoarSpear'
 const E85_ID = 'E85_MasterTanner'
+const C148_ID = 'C148_MudWallower'
+const B137_ID = 'B137_Wholesaler'
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -85,6 +89,13 @@ const placeBoarInHouse = (zones: AnimalZone[]): AnimalZone[] =>
       ? { ...z, animalType: 'boar' as const, animalCount: Math.min(1, z.capacity) }
       : z,
   )
+
+const c148BoarZone = (animalCount: number) => ({
+  id: `card:${C148_ID}`,
+  zoneType: 'card',
+  animalType: 'boar',
+  animalCount,
+})
 
 const driveToCompletion = (
   session: GameSession,
@@ -203,6 +214,137 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     // boar stayed in house (1 placed) so player.resources.boar reflects boar-on-board after reorg
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('accepting action-space boar conversion preserves C148-held boar', () => {
+    const { session, state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.occupationPlayed.push(C148_ID)
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      [C148_ID]: { counters: { counter: 0, held: 1 } },
+    }
+    player.resources.boar = 1
+    const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
+    if (pigMarket) pigMarket.resources.boar = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'pig-market')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionAnimalReorg')
+
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: `card:${C148_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
+    resp = driveToCompletion(session, resp, /* acceptE53Trade */ true)
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(4)
+    expect(after.resources.boar).toBe(1)
+    expect(after.houseAnimalType).toBeNull()
+    expect(after.houseAnimalCount).toBe(0)
+    expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
+  })
+
+  it('accepting C148-provided boar conversion consumes C148-held boar', () => {
+    const { session, state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.occupationPlayed.push(C148_ID)
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      [C148_ID]: { counters: { counter: 3, held: 0 } },
+    }
+    const forest = state.actionSpaces.find((s) => s.id === 'forest')
+    if (forest) forest.resources.wood = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionAnimalReorg')
+
+    resp = session.resolveChoice(0, 'confirm', [
+      c148BoarZone(1),
+    ] as unknown as Record<string, unknown>)
+
+    resp = driveToCompletion(session, resp, /* acceptE53Trade */ true)
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(4)
+    expect(after.resources.boar).toBe(0)
+    expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(0)
+  })
+
+  it('declining action-space boar conversion leaves C148-held boar unchanged', () => {
+    const { session, state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.occupationPlayed.push(C148_ID)
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      [C148_ID]: { counters: { counter: 0, held: 1 } },
+    }
+    player.resources.boar = 1
+    const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
+    if (pigMarket) pigMarket.resources.boar = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'pig-market')
+    expect(resp.ok).toBe(true)
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      c148BoarZone(1),
+    ] as unknown as Record<string, unknown>)
+
+    resp = driveToCompletion(session, resp, /* acceptE53Trade */ false)
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(0)
+    expect(after.resources.boar).toBe(2)
+    expect(after.houseAnimalType).toBe('boar')
+    expect(after.houseAnimalCount).toBe(1)
+    expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
+  })
+
+  it('accepting B137-provided boar conversion preserves C148-held boar', () => {
+    const { session, state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.occupationPlayed.push(C148_ID, B137_ID)
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      [C148_ID]: { counters: { counter: 0, held: 1 } },
+      [B137_ID]: {
+        extraData: {
+          wholesaler: {
+            vegetableTaken: false,
+            boarTaken: false,
+            stoneTaken: false,
+            cattleTaken: false,
+          },
+        },
+      },
+    }
+    player.resources.boar = 1
+    const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
+    if (pigMarket) pigMarket.resources.boar = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'pig-market')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionAnimalReorg')
+
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      c148BoarZone(1),
+    ] as unknown as Record<string, unknown>)
+
+    resp = driveToCompletion(session, resp, /* acceptE53Trade */ true)
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(4)
+    expect(after.resources.boar).toBe(1)
+    expect(after.houseAnimalType).toBeNull()
+    expect(after.houseAnimalCount).toBe(0)
+    expect(after.cardStates?.[C148_ID]?.counters?.held).toBe(1)
   })
 
   it('per-action once via actionToken: same token does not re-trigger', () => {
