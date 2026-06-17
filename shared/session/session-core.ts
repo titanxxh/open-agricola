@@ -90,6 +90,7 @@ import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
+import { resolveDevCardIdInput } from '../cards/dev-card-id.ts'
 import * as setupPhase from './phases/setup.ts'
 import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
@@ -4739,9 +4740,10 @@ export class GameCore {
     this.state.actionSpaces = this.state.actionSpaces.filter(space => space.id !== cardId)
   }
 
-  devDrawCard(playerIndex: number, cardId: string): SessionResponse {
+  devDrawCard(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const cardId = resolveDevCardIdInput(cardIdInput)
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
@@ -4770,9 +4772,10 @@ export class GameCore {
     return this.respond(true, undefined, events)
   }
 
-  devPlayCard(playerIndex: number, cardId: string): SessionResponse {
+  devPlayCard(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const cardId = resolveDevCardIdInput(cardIdInput)
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
     for (const p of this.state.players) {
