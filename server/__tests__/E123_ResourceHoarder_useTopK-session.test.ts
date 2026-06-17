@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, ComplexCost, CostModifierType, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { payAction } from '../../shared/actions/effects/pay'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { Engine } from '../../shared/engine/engine'
 import { HookDispatcher } from '../../shared/engine/dispatcher'
 import { LogStore } from '../../shared/engine/log-store'
 import { ActionNode } from '../../shared/engine/nodes'
 import { ActionRegistry } from '../../shared/engine/registry'
 import { EngineTree } from '../../shared/engine/tree'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
 
 const CARD_ID = 'E123_ResourceHoarder'
+const C14_ID = 'C14_StrawThatchedRoof'
 
 const emptyResources = (): Resource => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -249,6 +253,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     })
 
     expect(result.type).toBe('ok')
+    expect(readCardResourceStats(player, CARD_ID)?.saved).toEqual({ wood: 1, clay: 1 })
     expect(state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',
@@ -306,5 +311,155 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
         bonusChoiceIndex: { [CARD_ID]: 1 },
       }),
     ]))
+  })
+
+  it('renovation with C14 and E123 top reed omits no-op E123 skip path', () => {
+    const player = createPlayer({
+      resources: { ...emptyResources(), clay: 2 },
+      occupationPlayed: [CARD_ID],
+      minorPlayed: [C14_ID],
+      cardStates: { [CARD_ID]: { stack: ['reed'] } },
+      activeModifiers: [{
+        type: 'bonus',
+        cardId: C14_ID,
+        appliesTo: ['renovation'],
+        discount: { reed: 99 },
+        capDiscountAtCost: true,
+      }],
+    })
+    const state = mkState(player)
+    const listener = findListener('E123-resource-hoarder-compute-costs')
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      space: createSpace('renovate-house'),
+      actionId: 'renovate-house',
+      phase: 'computeCosts',
+    } as CardListenerContext)
+    const cost: ComplexCost = {
+      fees: [{ reed: 1 }],
+      unitFee: { clay: 1 },
+      nb: 2,
+      bonuses: result?.bonuses,
+    }
+
+    payWithEngine(state, player, cost, (options) => {
+      const sourceSets = options.map((entry) =>
+        ((entry.labelParams as { sourceCards?: string[] } | undefined)?.sourceCards ?? []).join('+'),
+      )
+      expect(sourceSets).toEqual([
+        C14_ID,
+        CARD_ID,
+      ])
+      return options[0]!.value
+    }, 'renovation')
+  })
+
+  it('session renovation with E123 top reed pops only that reed once', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 6
+
+    const player = state.players[0]!
+    player.resources = { ...emptyResources(), clay: 2 }
+    player.houseType = 'wood'
+    player.rooms = 2
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    player.occupationPlayed = [CARD_ID]
+    player.minorPlayed = [C14_ID]
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.cardStates = { [CARD_ID]: { stack: ['stone', 'reed'] } }
+    player.activeModifiers = [{
+      type: 'bonus',
+      cardId: C14_ID,
+      appliesTo: ['renovation'],
+      discount: { reed: 99 },
+      capDiscountAtCost: true,
+    }]
+    setWorkersAtHome(state, player, 2)
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      resp = session.resolveChoice(0, 'clay')
+    }
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    const e123Option = resp.interaction.options?.find((option) => {
+      const params = option.labelParams as { sourceCards?: string[] } | undefined
+      return params?.sourceCards?.length === 1 && params.sourceCards[0] === CARD_ID
+    })
+    expect(e123Option).toBeDefined()
+
+    resp = session.resolveChoice(0, e123Option!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]!.stack).toEqual(['stone'])
+  })
+
+  it('C14 reed discount does not pop E123 reed when E123 is not used', () => {
+    const player = createPlayer({
+      resources: { ...emptyResources(), wood: 5 },
+      occupationPlayed: [CARD_ID],
+      minorPlayed: [C14_ID],
+      cardStates: { [CARD_ID]: { stack: ['reed'] } },
+    })
+    const state = mkState(player)
+    const cost: ComplexCost = {
+      fee: { wood: 5, reed: 2 },
+      bonuses: [
+        {
+          sources: [C14_ID],
+          optional: false,
+          discount: { reed: 99 },
+          capDiscountAtCost: true,
+        },
+        {
+          sources: [CARD_ID],
+          optional: true,
+          choices: [
+            { discount: {} },
+            { discount: { reed: 1 } },
+          ],
+        },
+      ],
+    }
+
+    const result = payWithEngine(state, player, cost, (options) => {
+      const option = options.find((entry) => {
+        const params = entry.labelParams as {
+          resourcesPaid?: Partial<Resource>
+          sourceCards?: string[]
+        }
+        return params.resourcesPaid?.wood === 5 &&
+          params.sourceCards?.length === 1 &&
+          params.sourceCards[0] === C14_ID
+      })
+      expect(option).toBeDefined()
+      return option!.value
+    })
+    expect(result.type).toBe('ok')
+    expect(state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 5 },
+        bonusSources: [C14_ID],
+      }),
+    ]))
+
+    const listener = findListener('E123-resource-hoarder-after-pay')
+    executeCardListener(listener, {
+      state,
+      player,
+      space: createSpace('construct'),
+      actionId: 'pay',
+      phase: 'after',
+      transactionEvents: state.events,
+    } as CardListenerContext)
+
+    expect(player.cardStates[CARD_ID]!.stack).toEqual(['reed'])
   })
 })

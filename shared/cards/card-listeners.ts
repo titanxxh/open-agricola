@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -46,11 +46,6 @@ export type CardListenerRegistration = {
   zones?: CardListenerZone[]
   mandatory?: boolean
   /**
-   * Narrow collector priority, currently used by the card-purchase cost
-   * candidate pipeline. Higher values execute earlier; default is 0.
-   */
-  order?: number
-  /**
    * Static dispatch grouping for trailing listener nodes.
    *
    * Default `serial` listeners are activated in play order without probing the
@@ -58,10 +53,22 @@ export type CardListenerRegistration = {
    * a trigger-select ParallelNode when two or more match.
    */
   dispatchMode?: CardListenerDispatchMode
-  computeCardCostCandidates?: (
+  /**
+   * Card-purchase cost candidate transform (Candidate Closure, ADR 0004).
+   * Receives one Cost Candidate and returns the derived candidate(s), or
+   * null when not applicable. The closure engine handles traversal, dedupe
+   * and per-card use limits — declaration order never matters.
+   */
+  deriveCardCostCandidate?: (
     context: CardListenerContext,
-    candidates: readonly CardCostCandidate[],
-  ) => CardCostCandidate[]
+    candidate: CardCostCandidate,
+  ) => CardCostCandidate | readonly CardCostCandidate[] | null
+  /**
+   * Mandatory Saturation flag for `deriveCardCostCandidate` (BGA "costs
+   * less" semantics): candidates this transform still applies to are not
+   * shown to the player; only saturated candidates surface.
+   */
+  cardCostCandidateMandatory?: boolean
   handler?: (context: CardListenerContext) => ActionHookResult | void
 }
 
@@ -422,6 +429,7 @@ export type FarmChoiceCostAdjustments = {
   costs: Partial<Resource>
   trades: Trade[]
   bonuses: Bonus[]
+  paymentResourceProviders: CardProvidedPaymentResourceProvider[]
 }
 
 export const collectFarmChoiceCostAdjustments = (
@@ -441,7 +449,12 @@ export const collectFarmChoiceCostAdjustments = (
     transactionEvents: [],
     eventQuery: createEventQuery([]),
   }
-  const aggregated: FarmChoiceCostAdjustments = { costs: {}, trades: [], bonuses: [] }
+  const aggregated: FarmChoiceCostAdjustments = {
+    costs: {},
+    trades: [],
+    bonuses: [],
+    paymentResourceProviders: [],
+  }
   const merge = (costs?: Partial<Resource>) => {
     if (!costs) return
     for (const [key, value] of Object.entries(costs)) {
@@ -454,6 +467,9 @@ export const collectFarmChoiceCostAdjustments = (
     merge(result.costs)
     if (result.trades) aggregated.trades.push(...result.trades)
     if (result.bonuses) aggregated.bonuses.push(...result.bonuses)
+    if (result.paymentResourceProviders) {
+      aggregated.paymentResourceProviders.push(...result.paymentResourceProviders)
+    }
   }
   runActionHooks(ctx).forEach(mergeResult)
   for (const entry of getMatchingListeners(ctx)) {

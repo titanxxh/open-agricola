@@ -20,12 +20,15 @@ export const applyComputeCostResults = (
   const costAttribution = costResults.flatMap((entry) => entry.costAttribution ?? [])
   const costTrades = costResults.flatMap((entry) => entry.trades ?? [])
   const costBonuses = costResults.flatMap((entry) => entry.bonuses ?? [])
+  const paymentResourceProviders = costResults.flatMap((entry) => entry.paymentResourceProviders ?? [])
   executionContext.costs =
     Object.keys(costOverride).length > 0 ? costOverride : undefined
   executionContext.costTrades =
     costTrades.length > 0 ? costTrades : undefined
   executionContext.costBonuses =
     costBonuses.length > 0 ? costBonuses : undefined
+  executionContext.paymentResourceProviders =
+    paymentResourceProviders.length > 0 ? paymentResourceProviders : undefined
   executionContext.costAttribution =
     costAttribution.length > 0 ? costAttribution : undefined
 }

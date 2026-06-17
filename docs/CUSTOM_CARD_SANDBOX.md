@@ -229,7 +229,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase
 
-`isActionHookPhase` 在挂载 listener 前把 `phases` 数组里不在白名单的项过滤掉。AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。
+`sandboxListenerPhases` 是 Workshop listener phase 白名单。挂载 listener 前会过滤不在白名单里的项；AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。
 
 
 
@@ -248,7 +248,33 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
-### 3.3 `scope` 取值
+### 3.3 费用机制边界
+
+Workshop 自定义卡只能通过 `computeCosts` listener 的 handler 返回值影响支付：
+
+- `costs`：简单费用 delta；负数表示折扣，正数表示额外费用。适合普通 action cost。
+- `trades`：支付替换候选，例如把一种资源换成另一种资源。适合“可以用 X 代替 Y”。
+- `bonuses`：折扣或折扣选项；用 `choices` 表达玩家选择，用 `optional` 表达是否可跳过。
+- `paymentResourceProviders`：payment-only 虚拟支付资源，适合“可以用行动格上的 food 支付 occupation cost”这类路径。它不写入 `costs` / `PlayerState.resources`，只在支付选项里作为特殊 payment resource 出现，并由 `consume` 消耗来源。
+
+`paymentResourceProviders` 形态示例：
+
+```ts
+return {
+  paymentResourceProviders: [{
+    key: `${CARD_ID}:traveling-players-food`,
+    sourceCard: CARD_ID,
+    available: context.state.actionSpaces.find(s => s.id === 'traveling-players')?.resources?.food ?? 0,
+    covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+    consume: { type: 'actionSpace', spaceId: 'traveling-players', resource: 'food' },
+  }],
+  sourceCard: CARD_ID,
+}
+```
+
+不要生成这些字段：`deriveCardCostCandidate`、`cardCostCandidateMandatory`、`getBaseCosts`、`modifiers`、`computeExchanges`。这些字段是官方卡内部 API，Workshop 不支持。其中 `deriveCardCostCandidate` / `getBaseCosts` 属于 major/minor improvement 购买成本候选管线，`computeExchanges` 属于运行时 exchange 注入机制；沙盒 manifest 不会完整注册这些字段。
+
+### 3.4 `scope` 取值
 
 `isCardListenerScope` 限制：
 
@@ -445,7 +471,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
         children: [
           payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
           gainLeaf(CARD_ID, { food: 3 }),
-          { type: 'leaf', actionId: 'flag-card', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: CARD_ID },
         ],
       },
       sourceCard: CARD_ID,

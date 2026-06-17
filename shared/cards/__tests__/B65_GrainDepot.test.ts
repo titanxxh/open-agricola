@@ -106,18 +106,15 @@ describe('B65 Grain Depot', () => {
       cardIds: [HOOK_CARD],
       phases: ['computeCosts'],
       actions: ['improvement'],
-      computeCardCostCandidates: (context, candidates) => {
-        if (context.cardId !== CARD_ID) return [...candidates]
-        return [
-          ...candidates,
-          ...candidates
-            .filter((candidate) => candidate.originalFeeIndex === 1)
-            .map((candidate) => ({
-              resources: {},
-              originalFeeIndex: candidate.originalFeeIndex,
-              sources: [...candidate.sources, HOOK_CARD],
-            })),
-        ]
+      deriveCardCostCandidate: (context, candidate) => {
+        if (context.cardId !== CARD_ID) return null
+        if (candidate.originalFeeIndex !== 1) return null
+        if (candidate.sources.includes(HOOK_CARD)) return null
+        return {
+          resources: {},
+          originalFeeIndex: candidate.originalFeeIndex,
+          sources: [...candidate.sources, HOOK_CARD],
+        }
       },
     }
     requireActiveCardRegistry('B65_GrainDepot.test').registerListener(hook)

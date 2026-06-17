@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { canPayCost, computeAllBuyableCombinations } from '../enumerate'
-import type { ComplexCost, PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
+import type {
+  ComplexCost,
+  PaymentResourceKey,
+  PaymentResourceMap,
+  PaymentSolution,
+  PlayerState,
+  Resource,
+  Trade,
+} from '../../../../contract/types'
 
-const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
-  const out: Partial<Resource> = {}
+const nonZeroPaid = (sol: PaymentSolution): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
   for (const [k, v] of Object.entries(sol.resourcesPaid)) {
-    if ((v ?? 0) !== 0) out[k as keyof Resource] = v
+    if ((v ?? 0) !== 0) out[k as PaymentResourceKey] = v
   }
   return out
 }
@@ -68,6 +76,30 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       },
     )
     expect(nonZeroPaid(sols[0])).toEqual({ wood: 2 })
+  })
+
+  it('keeps card-provided payment resources distinct from own resources', () => {
+    const providerKey = 'B155_ArtTeacher:traveling-players-food'
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ food: 1 }),
+      {
+        fee: { food: 1 },
+        paymentResourceProviders: [
+          {
+            key: providerKey,
+            sourceCard: 'B155_ArtTeacher',
+            available: 1,
+            covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+            consume: { type: 'actionSpace', spaceId: 'traveling-players', resource: 'food' },
+          },
+        ],
+      },
+      undefined,
+      'occupation',
+    )
+
+    expect(sols.map(nonZeroPaid)).toContainEqual({ [providerKey]: 1 })
+    expect(sols.map(nonZeroPaid)).toContainEqual({ food: 1 })
   })
 
   it('keeps exact free action-trade discounts but rejects surplus-producing trade combos', () => {
@@ -225,7 +257,10 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(sols2[0]?.resourcesPaid.wood).toBe(10)
   })
 
-  it('optional bonus keeps original and discounted paths', () => {
+  // ADR 0004 amendment: the undiscounted branch is strictly dominated by the
+  // discounted one and is pruned — matching BGA, where keepOnlyOptimals hides
+  // it and the player only ever sees the discounted payment.
+  it('optional bonus surfaces only the discounted path when it dominates', () => {
     const player = baseTestPlayer({ wood: 2, stone: 2 })
     const cost: ComplexCost = {
       fee: { wood: 2, stone: 2 },
@@ -241,11 +276,22 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(sols.some((s) => {
       const paid = nonZeroPaid(s)
       return paid.wood === 2 && paid.stone === 2 && !s.bonusUsed
-    })).toBe(true)
+    })).toBe(false)
     expect(sols.some((s) => {
       const paid = nonZeroPaid(s)
       return paid.wood === 2 && paid.stone === 1 && s.bonusUsed === 'C27_Blueprint'
     })).toBe(true)
+  })
+
+  it('optional bonus keeps the original path when the discount is unaffordable elsewhere', () => {
+    // Discounted branch needs reed the player lacks — the original branch
+    // must survive pruning because dominance only compares affordable rows.
+    const player = baseTestPlayer({ wood: 2, stone: 2 })
+    const cost: ComplexCost = {
+      fees: [{ wood: 2, stone: 2 }, { wood: 2, stone: 1, reed: 1 }],
+    }
+    const sols = computeAllBuyableCombinations(player, cost)
+    expect(sols.map(nonZeroPaid)).toContainEqual({ wood: 2, stone: 2 })
   })
 
   it('non-optional bonus choices prune choices that do not reduce the current cost', () => {
@@ -346,8 +392,9 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     const sols = computeAllBuyableCombinations(player, cost)
     const payments = sols.map(nonZeroPaid)
 
-    expect(payments).toContainEqual({ wood: 5, reed: 2 })
+    // Dominance pruning hides the undiscounted {wood:5, reed:2} branch.
     expect(payments).toContainEqual({ wood: 5 })
+    expect(payments).not.toContainEqual({ wood: 5, reed: 2 })
   })
 
   it('B145 renovation can replace 2 reed with 1 wood', () => {
@@ -413,5 +460,100 @@ describe('canPayCost — costType parameter', () => {
       baseTestPlayer({ wood: 15, reed: 6 }),
       { unitFee: { reed: 2, wood: 5 }, nb: 3 },
     )).toBe(true)
+  })
+})
+
+describe('keepOnlyOptimals — dominance pruning over affordable solutions (ADR 0004 amendment)', () => {
+  const player = (resources: Partial<Record<string, number>>): PlayerState =>
+    ({
+      id: 'p1',
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        ...resources,
+      },
+      activeModifiers: [],
+    }) as unknown as PlayerState
+
+  const paidSets = (solutions: PaymentSolution[]) =>
+    solutions
+      .map((solution) =>
+        Object.entries(solution.resourcesPaid)
+          .filter(([, amount]) => (amount ?? 0) > 0)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      )
+      .map((entries) => JSON.stringify(entries))
+      .sort()
+
+  it('drops solutions strictly dominated by a cheaper one', () => {
+    const cost: ComplexCost = { fees: [{ reed: 2, stone: 2 }, { reed: 1, stone: 1 }, { reed: 1 }] }
+    const solutions = computeAllBuyableCombinations(player({ reed: 5, stone: 5 }), cost)
+    expect(paidSets(solutions)).toEqual([JSON.stringify([['reed', 1]])])
+  })
+
+  it('keeps mutually non-dominated solutions', () => {
+    const cost: ComplexCost = { fees: [{ reed: 2 }, { stone: 1 }] }
+    const solutions = computeAllBuyableCombinations(player({ reed: 5, stone: 5 }), cost)
+    expect(paidSets(solutions)).toHaveLength(2)
+  })
+
+  it('keeps a dominated row when the dominating one is unaffordable', () => {
+    const cost: ComplexCost = { fees: [{ stone: 1 }, { reed: 1 }] }
+    const solutions = computeAllBuyableCombinations(player({ stone: 5 }), cost)
+    expect(paidSets(solutions)).toEqual([JSON.stringify([['stone', 1]])])
+  })
+
+  it('never prunes across different fee identities (B65 payment-path identity)', () => {
+    const cost: ComplexCost = {
+      fees: [{ grain: 1 }, {}],
+      feeIdentities: [0, 1],
+    }
+    const solutions = computeAllBuyableCombinations(player({ grain: 3 }), cost)
+    expect(paidSets(solutions)).toHaveLength(2)
+  })
+
+  it('prunes within the same fee identity', () => {
+    const cost: ComplexCost = {
+      fees: [{ grain: 1 }, {}],
+      feeIdentities: [1, 1],
+    }
+    const solutions = computeAllBuyableCombinations(player({ grain: 3 }), cost)
+    expect(paidSets(solutions)).toEqual([JSON.stringify([])])
+  })
+
+  it('prunes dominated tracked choices when the choice has no state side effect', () => {
+    const cost: ComplexCost = {
+      fee: { stone: 2 },
+      bonuses: [{
+        optional: true,
+        trackChoiceIndex: true,
+        choices: [
+          { discount: { stone: 1 }, capDiscountAtCost: true },
+          { discount: { stone: 2 }, capDiscountAtCost: true },
+        ],
+        sources: ['TEST_TRACKED_CHOICE'],
+      }],
+    }
+    const solutions = computeAllBuyableCombinations(player({ stone: 5 }), cost)
+    expect(paidSets(solutions)).toEqual([JSON.stringify([])])
+  })
+
+  it('never prunes tracked choices with state side effects (E123 shape)', () => {
+    const cost: ComplexCost = {
+      fee: { stone: 2 },
+      bonuses: [{
+        optional: true,
+        trackChoiceIndex: true,
+        choiceAffectsState: true,
+        choices: [
+          { discount: { stone: 1 }, capDiscountAtCost: true },
+          { discount: { stone: 2 }, capDiscountAtCost: true },
+        ],
+        sources: ['E123_ResourceHoarder'],
+      }],
+    }
+    const solutions = computeAllBuyableCombinations(player({ stone: 5 }), cost)
+    const withChoice = solutions.filter((solution) => solution.bonusChoiceIndex)
+    expect(withChoice.length).toBeGreaterThan(1)
   })
 })

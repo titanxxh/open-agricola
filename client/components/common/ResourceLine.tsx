@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import type { PaymentResourceKey, PaymentResourceMap } from '../../../shared/contract/types'
-import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
+import { PAYMENT_RESOURCE_KEYS, isCardProvidedPaymentResourceKey } from '../../../shared/contract/resource-keys'
 import { resourceKeyList } from '../../../shared/contract/state-constants'
 
 type ResourceLineMode = 'inventory' | 'payment'
@@ -20,6 +20,25 @@ const RESOURCE_ICON_CLASS: Partial<Record<PaymentResourceKey | 'bonusVp', string
   stable: 'barn',
 }
 
+const paymentResourceKeys = (resources: PaymentResourceMap): PaymentResourceKey[] => [
+  ...PAYMENT_RESOURCE_KEYS,
+  ...Object.keys(resources)
+    .filter(isCardProvidedPaymentResourceKey)
+    .filter((key) => (resources[key] ?? 0) > 0)
+    .sort(),
+]
+
+const iconClassForKey = (key: PaymentResourceKey | 'bonusVp'): string => {
+  const direct = RESOURCE_ICON_CLASS[key]
+  if (direct) return direct
+  if (key !== 'bonusVp' && isCardProvidedPaymentResourceKey(key)) {
+    const localId = key.split(':')[1] ?? ''
+    const representedResource = PAYMENT_RESOURCE_KEYS.find((paymentKey) => localId.includes(paymentKey))
+    return representedResource ? RESOURCE_ICON_CLASS[representedResource] ?? representedResource : 'bonusVp'
+  }
+  return key
+}
+
 export const ResourceLine = ({
   locale: _locale,
   resources,
@@ -29,7 +48,7 @@ export const ResourceLine = ({
   emptyLabel,
   className,
 }: Props) => {
-  const keys = mode === 'payment' ? PAYMENT_RESOURCE_KEYS : resourceKeyList
+  const keys = mode === 'payment' ? paymentResourceKeys(resources) : resourceKeyList
   const items: Array<{ key: PaymentResourceKey | 'bonusVp'; amount: number }> = keys
     .map((key) => ({ key, amount: resources[key] ?? 0 }))
     .filter(({ amount }) => !hideZero || amount > 0)
@@ -49,7 +68,7 @@ export const ResourceLine = ({
           data-resource={key}
           data-amount={amount}
         >
-          <span className={`res-icon res-icon-${RESOURCE_ICON_CLASS[key] ?? key}`} />
+          <span className={`res-icon res-icon-${iconClassForKey(key)}`} />
           <span className="resource-inline-amount">{amount}</span>
         </span>
       ))}

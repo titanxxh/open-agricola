@@ -45,6 +45,35 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     return session
   }
 
+  it('shows the newly held C148 boar in the card reorg zone', () => {
+    const session = setupWorkPhase({ boar: 1, held: 0 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.houseAnimalType = 'boar'
+    player.houseAnimalCount = 1
+    player.cardStates![CARD_ID]!.counters!.counter = 3
+    const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
+    if (reedBank) reedBank.resources.reed = 2
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'reed-bank')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionAnimalReorg')
+    const zones = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg'
+      ? resp.interaction.zones
+      : []
+    expect(zones).toContainEqual({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      animalType: 'boar',
+      animalCount: 1,
+      capacity: 1,
+      cardId: CARD_ID,
+    })
+  })
+
   it('reorg dragging boars out of C148 zone permanently lowers held cap', () => {
     // Start: held=3 (cap), boar=2 (all conceptually in C148 zone, none in pasture).
     // Player collects 1 boar from pig-market → boar=3, engine triggers animal-reorg.

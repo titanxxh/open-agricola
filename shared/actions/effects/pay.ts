@@ -2,6 +2,7 @@ import type {
   ActionDefinition,
   ActionExecutionResult,
   CardCostCandidateMetadata,
+  CardProvidedPaymentResourceProvider,
   ComplexCost,
   CostModifierType,
   GameState,
@@ -11,7 +12,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import type { EventSink, PaymentPurpose } from '../../contract/events'
+import type { EventSink, PaymentPurpose, ResourceLocation } from '../../contract/events'
 import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -19,6 +20,8 @@ import { addCardResourcePaid, recordCardCostAttribution } from '../../cards/help
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import {
+  canConsumePaymentResourceProviders,
+  cardCostCandidateMetadataForSolution,
   executePaymentSolution,
   payResources,
   paySupplyTokens,
@@ -134,6 +137,32 @@ const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap =>
   return out
 }
 
+const buildPaymentSources = (
+  player: PlayerState,
+  resources: PaymentResourceMap,
+  providers: CardProvidedPaymentResourceProvider[] | undefined,
+): Array<{ from: ResourceLocation; resources: PaymentResourceMap }> => {
+  const remaining = positiveResources(resources)
+  const sources: Array<{ from: ResourceLocation; resources: PaymentResourceMap }> = []
+
+  for (const provider of providers ?? []) {
+    const amount = remaining[provider.key] ?? 0
+    if (amount <= 0) continue
+    delete remaining[provider.key]
+    if (provider.consume.type === 'actionSpace') {
+      sources.push({
+        from: { kind: 'actionSpace', spaceId: provider.consume.spaceId },
+        resources: { [provider.consume.resource]: amount },
+      })
+    }
+  }
+
+  if (Object.keys(remaining).length > 0) {
+    sources.unshift({ from: { kind: 'player', playerId: player.id }, resources: remaining })
+  }
+  return sources
+}
+
 const splitSourceIds = (csv: string | undefined): string[] =>
   csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : []
 
@@ -168,6 +197,7 @@ const resolvePayActionPaymentSelection = (
     playedCards?: string[]
     reserveResources?: Partial<Resource>
     candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+    paymentResourceProviders?: readonly CardProvidedPaymentResourceProvider[]
   } = {},
 ):
   | ActionExecutionResult
@@ -196,9 +226,11 @@ const resolvePayActionPaymentSelection = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        solution.feeIndex === undefined
-          ? []
-          : options.candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+        cardCostCandidateMetadataForSolution(
+          options.candidateMetadataByFeeIndex,
+          solution,
+        )?.sources ?? [],
+      paymentResourceProviders: options.paymentResourceProviders ?? cost.paymentResourceProviders,
     },
   )
 }
@@ -214,10 +246,16 @@ const emitPaidEvent = (
     bonusUsed?: string
     bonusChoiceIndex?: Record<string, number>
     returnedCardId?: string
+    /** Cost Candidate sources of the selected row (rendered as log "via"). */
+    candidateSources?: readonly string[]
+    paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   } = {},
 ) => {
   const paid = positiveResources(resources)
-  const bonusSources = splitSourceIds(provenance.bonusUsed)
+  const bonusSources = [...new Set([
+    ...splitSourceIds(provenance.bonusUsed),
+    ...(provenance.candidateSources ?? []),
+  ])]
   if (
     Object.keys(paid).length === 0 &&
     bonusSources.length === 0 &&
@@ -230,9 +268,7 @@ const emitPaidEvent = (
     resources: paid,
     to: { kind: 'supply' },
     paymentFor: paymentPurpose(costType),
-    paymentSources: [
-      { from: { kind: 'player', playerId: player.id }, resources: paid },
-    ],
+    paymentSources: buildPaymentSources(player, paid, provenance.paymentResourceProviders),
     ...(sourceCard ? { sourceCardId: sourceCard } : {}),
     ...(bonusSources.length > 0 ? { bonusSources } : {}),
     ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
@@ -250,9 +286,13 @@ const buildSelectedResult = (
   eventSink?: EventSink,
   sourceActionId?: string,
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>,
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[],
   trackSourceCardPaymentStats = costType === undefined,
 ): ActionExecutionResult => {
-  executePaymentSolution(player, solution, { costType, state })
+  if (!canConsumePaymentResourceProviders(state, solution, paymentResourceProviders)) {
+    return { type: 'fail', errorKey: 'log.payFail' }
+  }
+  executePaymentSolution(player, solution, { costType, state, paymentResourceProviders })
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
@@ -260,14 +300,17 @@ const buildSelectedResult = (
   if (sourceCard && trackSourceCardPaymentStats) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
+  const metadata = cardCostCandidateMetadataForSolution(
+    candidateMetadataByFeeIndex,
+    solution,
+  )
   emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
+    candidateSources: metadata?.sources,
+    paymentResourceProviders,
   })
-  const metadata = solution.feeIndex === undefined
-    ? undefined
-    : candidateMetadataByFeeIndex?.[solution.feeIndex]
   recordCardCostAttribution(player, metadata?.costAttribution)
   const extraData: Record<string, unknown> = {
     resourcesPaid,
@@ -283,9 +326,9 @@ const buildSelectedResult = (
   }
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
-    if (metadata) {
-      extraData.originalFeeIndex = metadata.originalFeeIndex
-    }
+  }
+  if (metadata) {
+    extraData.originalFeeIndex = metadata.originalFeeIndex
   }
   return {
     type: 'ok',
@@ -363,6 +406,7 @@ export const payAction: ActionDefinition = {
           playedCards: p.playedCards,
           reserveResources: p.reserveResources,
           candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
+          paymentResourceProviders: p.cost.paymentResourceProviders,
         },
       )
       if (selection.type !== 'selected') {
@@ -378,6 +422,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         p.candidateMetadataByFeeIndex,
+        p.cost.paymentResourceProviders,
         shouldTrackSourceCardPaymentStats(p),
       )
     }
@@ -414,6 +459,7 @@ export const payAction: ActionDefinition = {
           p.includeReturnedCard,
           eventSink,
           p.sourceActionId,
+          undefined,
           undefined,
           shouldTrackSourceCardPaymentStats(p),
         )
@@ -512,6 +558,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         undefined,
+        undefined,
         shouldTrackSourceCardPaymentStats(p),
       )
     }
@@ -548,6 +595,7 @@ export const payAction: ActionDefinition = {
         playedCards: p.playedCards,
         reserveResources: p.reserveResources,
         candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
+        paymentResourceProviders: p.cost.paymentResourceProviders,
       },
     )
     if (selection.type !== 'selected') {
@@ -563,6 +611,7 @@ export const payAction: ActionDefinition = {
       eventSink,
       p.sourceActionId,
       p.candidateMetadataByFeeIndex,
+      p.cost.paymentResourceProviders,
       shouldTrackSourceCardPaymentStats(p),
     )
   },

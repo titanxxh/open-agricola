@@ -8,7 +8,11 @@ import { getMinorImprovement } from '../../cards/registry-display'
 // migrate in S4 (preview-cost domain aggregation per Decision C).
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
-import { executePaymentSolution } from '../payment/internal'
+import {
+  canConsumePaymentResourceProviders,
+  cardCostCandidateMetadataForSolution,
+  executePaymentSolution,
+} from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
@@ -347,19 +351,33 @@ const resolveImprovementPayment = (
     failure,
     {
       extraSourcesForSolution: (solution) =>
-        solution.feeIndex === undefined
-          ? []
-          : candidateMetadataByFeeIndex?.[solution.feeIndex]?.sources ?? [],
+        cardCostCandidateMetadataForSolution(
+          candidateMetadataByFeeIndex,
+          solution,
+        )?.sources ?? [],
+      paymentResourceProviders: PaymentSolver.isComplexCost(cost)
+        ? cost.paymentResourceProviders
+        : undefined,
     },
   )
   if (resolved.type !== 'selected') {
     return resolved
   }
-  const metadata = resolved.solution.feeIndex === undefined
-    ? undefined
-    : candidateMetadataByFeeIndex?.[resolved.solution.feeIndex]
+  const metadata = cardCostCandidateMetadataForSolution(
+    candidateMetadataByFeeIndex,
+    resolved.solution,
+  )
+  const paymentResourceProviders = PaymentSolver.isComplexCost(cost)
+    ? cost.paymentResourceProviders
+    : undefined
 
-  const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
+  if (!canConsumePaymentResourceProviders(effectiveState, resolved.solution, paymentResourceProviders)) {
+    return failure
+  }
+  const returnedCardId = executePaymentSolution(player, resolved.solution, {
+    state: effectiveState,
+    paymentResourceProviders,
+  })
   recordCardCostAttribution(player, metadata?.costAttribution)
   return {
     type: 'selected',

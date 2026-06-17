@@ -6,6 +6,7 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B15_CarpentersBench'
+import '../../shared/cards/E/E16_BriarHedge'
 
 const CARD_ID = 'B15_CarpentersBench'
 const LISTENER = B15_CarpentersBench_impl.listeners[0]!
@@ -54,20 +55,26 @@ describe('B15_CarpentersBench session', () => {
     ctx.result = { type: 'ok' }
 
     const result = executeCardListener(LISTENER, ctx)
+    const leaf = fenceLeaf(result?.flow)
 
-    expect(fenceLeaf(result?.flow)).toMatchObject({
+    expect(leaf).toMatchObject({
       actionId: 'fence',
       actionContext: {
         trueAction: false,
         fencePolicy: {
           allowedSegmentTypes: ['fence'],
-          segmentBounds: { total: { min: 1, max: 4 } },
+          segmentBounds: { total: { min: 1 } },
           newPastureBounds: { count: { min: 1, max: 1 } },
           costPolicy: { fence: { wood: 1 } },
+          paymentBudget: { wood: 3 },
           cancelPolicy: 'forbidCancel',
         },
       },
     })
+    const policy = leaf?.actionContext?.fencePolicy as {
+      segmentBounds?: { total?: { max?: number } }
+    }
+    expect(policy.segmentBounds?.total?.max).toBeUndefined()
   })
 
   it('does not trigger for supply/cardEffect wood even when result reports wood', () => {
@@ -95,5 +102,92 @@ describe('B15_CarpentersBench session', () => {
     const result = executeCardListener(LISTENER, ctx)
 
     expect(result).toBeUndefined()
+  })
+
+  it('does not apply a second B15 wood discount when E16 also discounts border fences', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.resources.wood = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
+    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 fence prompt')
+    expect(resp.interaction.promptParams).toEqual({
+      hintKey: 'ui.interactionCarpentersBenchFenceHint',
+    })
+
+    resp = session.commitSelectionChoice(0, {
+      edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(true)
+    const after = resp.state.players[0]!
+    expect(after.resources.wood).toBe(1)
+    expect(after.pastures).toHaveLength(1)
+    expect(after.fenceSegments).toHaveLength(6)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        actorPlayerId: player.id,
+        sourceCardId: CARD_ID,
+        resources: { wood: 2 },
+      }),
+    ]))
+  })
+
+  it('rejects a B15 pasture whose non-border fence cost exceeds the taken wood budget', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.resources.wood = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
+    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 fence prompt')
+
+    const invalid = session.commitSelectionChoice(0, {
+      edges: [
+        'H-0-2',
+        'H-0-3',
+        'H-0-4',
+        'H-2-2',
+        'H-2-3',
+        'H-2-4',
+        'V-0-2',
+        'V-1-2',
+        'V-0-5',
+        'V-1-5',
+      ],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(invalid.ok).toBe(false)
+    expect(invalid.error).toBe('NOT_ENOUGH_WOOD')
+    expect(invalid.state.players[0]!.fenceSegments).toHaveLength(0)
+    expect(invalid.interaction.promptKey).toBe('ui.interactionFenceSelect')
   })
 })

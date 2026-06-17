@@ -65,7 +65,7 @@ const woodMoved = (
 })
 
 describe('B15_CarpentersBench', () => {
-  it('triggers after collecting wood from a wood space, max=n+1 with benchWood=n', () => {
+  it('triggers after collecting wood from a wood space with a paid wood budget', () => {
     const listener = findListener('B15-carpenters-bench-after-collect')
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -101,12 +101,18 @@ describe('B15_CarpentersBench', () => {
       trueAction: false,
       fencePolicy: {
         allowedSegmentTypes: ['fence'],
-        segmentBounds: { total: { min: 1, max: 4 } },
+        segmentBounds: { total: { min: 1 } },
         newPastureBounds: { count: { min: 1, max: 1 } },
         costPolicy: { fence: { wood: 1 } },
+        paymentBudget: { wood: 3 },
         cancelPolicy: 'forbidCancel',
+        promptHintKey: 'ui.interactionCarpentersBenchFenceHint',
       },
     })
+    const policy = fenceLeaf.actionContext?.fencePolicy as {
+      segmentBounds?: { total?: { max?: number } }
+    }
+    expect(policy.segmentBounds?.total?.max).toBeUndefined()
   })
 
   it('uses actually-collected wood, not gainPerRound', () => {
@@ -132,7 +138,7 @@ describe('B15_CarpentersBench', () => {
     const fenceLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect(fenceLeaf.actionContext).toMatchObject({
       fencePolicy: {
-        segmentBounds: { total: { min: 1, max: 2 } },
+        paymentBudget: { wood: 1 },
       },
     })
   })

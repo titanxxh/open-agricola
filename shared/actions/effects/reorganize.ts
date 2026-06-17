@@ -2,6 +2,7 @@ import type {
   ActionDefinition,
   ActionExecutionResult,
   GameState,
+  InteractionAnimalReorgZone,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -15,7 +16,8 @@ export type ReorganizeTrigger =
 
 export type ZoneAssignment = {
   id: string
-  zoneType: 'pasture' | 'house' | 'stable'
+  zoneType: InteractionAnimalReorgZone['zoneType']
+  cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
 }
@@ -112,9 +114,10 @@ export const reorganizeAction: ActionDefinition = {
     // period. Task 6/7 will rewire GameCore to consume zones from the
     // engineStack.peekInteraction()?.request, eliminating the duplicate compute.
     const idx = ctx.state.players.indexOf(ctx.player)
-    const zones = playerBoard(ctx.state, idx).animals.zones().map((zone) => ({
+    const zones: InteractionAnimalReorgZone[] = playerBoard(ctx.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
-      zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+      zoneType: zone.zoneType,
+      cardId: zone.cardId,
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
       animalCount: zone.animalCount ?? 0,
       capacity: zone.capacity,

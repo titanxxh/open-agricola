@@ -218,6 +218,7 @@ export const en = {
     interactionBuildFences: 'Build {count} fence(s)',
     interactionBuildPasture:
       'Build pasture: {size} cells · {fences} fences · {stables} stables · {wood} wood',
+    interactionCarpentersBenchFenceHint: "Carpenter's Bench can build exactly 1 new pasture here. Do not split the fence selection into 2 enclosures.",
     interactionFenceSelect: 'Select fences on the farm and confirm',
     interactionFenceConfirm: 'Confirm fences',
     interactionFenceCancel: 'Cancel',
@@ -245,8 +246,11 @@ export const en = {
     interactionFarmHandHint: 'Farm Hand stable selected',
     interactionSowSelectSubtitle: 'Selected {selected} fields',
     interactionOptionalAction: 'Optional action',
+    interactionOptionalActionWithChoice: 'Optional: {action}',
     interactionTriggeredByCard: 'Triggered by {card}',
     interactionOptionalSkip: 'Skip',
+    interactionOptionalSkipAction: 'Skip {action}',
+    interactionOptionalSkipCard: 'Do not use {card}',
     interactionFlowSelect: 'Choose an action',
     interactionUseAbility: 'Use ability',
   interactionUseGrowOffspring: 'Activate offspring (pay 1 food)',
@@ -602,6 +606,10 @@ export const en = {
     gain: {
       description: 'Gain {resources_desc}',
           name: 'Gain',
+},
+    receive: {
+      description: 'Receive {resources_desc}',
+          name: 'Receive',
 },
     'move-farmer-to-space': {
       description: 'Move farmer to action space',

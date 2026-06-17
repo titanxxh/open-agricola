@@ -8,6 +8,7 @@ import type {
   FenceSegment,
   FenceSegmentType,
   GameState,
+  PaymentResourceMap,
   PlayerState,
   Resource,
   Trade,
@@ -63,9 +64,11 @@ export type FenceActionPolicy = {
   segmentBounds?: FenceSegmentBounds
   newPastureBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
+  paymentBudget?: PaymentResourceMap
   pastureBounds?: FenceValidationOptions['pastureBounds']
   cancelPolicy?: 'allowCancel' | 'forbidCancel'
   preserveAnimalTotals?: boolean
+  promptHintKey?: string
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -92,6 +95,16 @@ const readFenceSourcePolicy = (value: unknown): FenceSourcePolicy | undefined =>
   return { kind: 'borrowed', donorCaps }
 }
 
+const readPaymentBudget = (value: unknown): PaymentResourceMap | undefined => {
+  if (!isRecord(value)) return undefined
+  const result: PaymentResourceMap = {}
+  for (const [key, amount] of Object.entries(value)) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) continue
+    result[key as keyof PaymentResourceMap] = amount
+  }
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
 export function readFenceActionPolicy(
   actionContext: Record<string, unknown> | undefined,
 ): FenceActionPolicy {
@@ -116,6 +129,7 @@ export function readFenceActionPolicy(
     costPolicy: isRecord(source.costPolicy)
       ? (source.costPolicy as FenceCostPolicy)
       : undefined,
+    paymentBudget: readPaymentBudget(source.paymentBudget),
     pastureBounds: isRecord(source.pastureBounds)
       ? (source.pastureBounds as FenceValidationOptions['pastureBounds'])
       : undefined,
@@ -128,6 +142,10 @@ export function readFenceActionPolicy(
       typeof source.preserveAnimalTotals === 'boolean'
         ? source.preserveAnimalTotals
         : undefined,
+    promptHintKey:
+      typeof source.promptHintKey === 'string'
+        ? source.promptHintKey
+        : undefined,
   }
 }
 
@@ -137,6 +155,7 @@ const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
   policy.segmentBounds !== undefined ||
   policy.newPastureBounds !== undefined ||
   policy.costPolicy !== undefined ||
+  policy.paymentBudget !== undefined ||
   policy.pastureBounds !== undefined ||
   policy.cancelPolicy !== undefined ||
   policy.preserveAnimalTotals !== undefined
@@ -146,6 +165,7 @@ const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.segmentBounds !== undefined ||
   policy.newPastureBounds !== undefined ||
   policy.costPolicy !== undefined ||
+  policy.paymentBudget !== undefined ||
   policy.pastureBounds !== undefined
 
 const borrowedPolicyWithCurrentCaps = (
@@ -312,7 +332,9 @@ const canStartWithFencePolicy = (
         payableFenceWoodCost +
         palisade * palisadeWoodCost +
         fixedWoodCost
-      if (canAffordTypedFlatCost(player, { wood: woodCost }, 'fencing')) {
+      const cost: ComplexCost = { fee: { wood: woodCost } }
+      if (policy.paymentBudget) cost.paymentBudget = policy.paymentBudget
+      if (canAffordTypedFlatCost(player, cost, 'fencing')) {
         return true
       }
     }
@@ -596,7 +618,13 @@ const computeFenceCostAdjustment = (
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
-): { freeFences: number; extraWood: number; trades: Trade[]; bonuses: Bonus[] } => {
+): {
+  freeFences: number
+  extraWood: number
+  trades: Trade[]
+  bonuses: Bonus[]
+  paymentResourceProviders: ComplexCost['paymentResourceProviders']
+} => {
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
   const fenceOverride = collectFarmChoiceCostAdjustments(
     state,
@@ -611,18 +639,34 @@ const computeFenceCostAdjustment = (
     extraWood: Math.max(0, hookWood),
     trades: fenceOverride.trades,
     bonuses: fenceOverride.bonuses,
+    paymentResourceProviders: fenceOverride.paymentResourceProviders,
   }
 }
 
 const buildFencePaymentCost = (
   payableWoodCost: number,
-  adjustment: { trades: Trade[]; bonuses: Bonus[] },
+  adjustment: {
+    trades: Trade[]
+    bonuses: Bonus[]
+    paymentResourceProviders?: ComplexCost['paymentResourceProviders']
+  },
+  policy: FenceActionPolicy,
 ): ComplexCost => {
   const cost: ComplexCost = { fee: { wood: payableWoodCost } }
   if (adjustment.trades.length > 0) cost.trades = adjustment.trades
   if (adjustment.bonuses.length > 0) cost.bonuses = adjustment.bonuses
+  if ((adjustment.paymentResourceProviders?.length ?? 0) > 0) {
+    cost.paymentResourceProviders = adjustment.paymentResourceProviders
+  }
+  if (policy.paymentBudget) cost.paymentBudget = policy.paymentBudget
   return cost
 }
+
+const canAffordFencePayment = (
+  player: PlayerState,
+  paymentCost: ComplexCost,
+): boolean =>
+  canAffordTypedFlatCost(player, paymentCost, 'fencing')
 
 const countBorrowedFenceSources = (
   policy: FenceActionPolicy,
@@ -682,7 +726,14 @@ const finalizeFence = (
   if (!validated.ok) {
     return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
   }
-  const paymentCost = buildFencePaymentCost(validated.payableWoodCost, costAdjustment)
+  const paymentCost = buildFencePaymentCost(
+    validated.payableWoodCost,
+    costAdjustment,
+    currentPolicy,
+  )
+  if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
+    return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
+  }
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     paymentCost,
@@ -786,6 +837,7 @@ export const fenceAction: ActionDefinition = {
   },
   execute: ({ state, player, space, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
+    const policy = readFenceActionPolicy(actionContext)
     const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', {
       spaceId: space.id,
       actionContext,
@@ -800,6 +852,7 @@ export const fenceAction: ActionDefinition = {
         ],
       },
       promptKey: 'ui.interactionFenceSelect',
+      promptParams: policy.promptHintKey ? { hintKey: policy.promptHintKey } : undefined,
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
@@ -887,7 +940,14 @@ export const fenceAction: ActionDefinition = {
       if (!validated.ok) {
         return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
       }
-      const paymentCost = buildFencePaymentCost(validated.payableWoodCost, costAdjustment)
+      const paymentCost = buildFencePaymentCost(
+        validated.payableWoodCost,
+        costAdjustment,
+        currentPolicy,
+      )
+      if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
+        return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
+      }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         paymentCost,

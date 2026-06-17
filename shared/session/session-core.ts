@@ -90,6 +90,7 @@ import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
+import { resolveDevCardIdInput } from '../cards/dev-card-id.ts'
 import * as setupPhase from './phases/setup.ts'
 import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
@@ -1431,6 +1432,12 @@ export class GameCore {
     return this.engineStack.peekPendingEnvelope()?.pendingActionId
   }
 
+  private peekPendingSourceCard(): string | undefined {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const snapshot = pendingContextSnapshot(envelope)
+    return envelope?.sourceCard ?? snapshot?.sourceCard ?? choicesSourceCard(pendingEnvelopeChoices(envelope))
+  }
+
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
@@ -1501,7 +1508,8 @@ export class GameCore {
     const idx = this.state.players.indexOf(player)
     return playerBoard(this.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
-      zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+      zoneType: zone.zoneType,
+      cardId: zone.cardId,
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
       animalCount: zone.animalCount ?? 0,
       capacity: zone.capacity,
@@ -2149,6 +2157,7 @@ export class GameCore {
     result: ActionExecutionResult,
     detailPlayerId?: string,
     defaultPlayerId?: string,
+    sourceCard?: string,
   ) {
     if (result.type !== 'ok') return
     if (isInjectedAnytimeResult(result)) return
@@ -2161,6 +2170,7 @@ export class GameCore {
       }
       return
     }
+    if (sourceCard) return
     if (detailPlayerId && defaultPlayerId && detailPlayerId !== defaultPlayerId) return
     this.addPositiveResourceDetails('gains', result.resourcesGained)
     this.addPositiveResourceDetails('costs', result.resourcesPaid)
@@ -2333,11 +2343,30 @@ export class GameCore {
   private buildFutureMeepleActionFlow() {
     const children: ActionFlow[] = []
     let firstPlayerIndex = -1
+    const receiveEntriesByPlayer = new Map<string, Array<{
+      cardId: string
+      round: number
+      resources: Partial<Resource>
+    }>>()
     for (const entry of this.state.futureMeeples) {
       if (entry.round !== this.state.round) continue
       const playerIndex = this.state.players.findIndex((player) => player.id === entry.playerId)
       if (playerIndex === -1) continue
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
+      const receiveResources: Partial<Resource> = {}
+      for (const key of resourceKeyList) {
+        const amount = entry.resources[key] ?? 0
+        if (amount > 0) receiveResources[key] = amount
+      }
+      if (Object.keys(receiveResources).length > 0) {
+        const receiveEntries = receiveEntriesByPlayer.get(entry.playerId) ?? []
+        receiveEntries.push({
+          cardId: entry.cardId,
+          round: entry.round,
+          resources: receiveResources,
+        })
+        receiveEntriesByPlayer.set(entry.playerId, receiveEntries)
+      }
       const actionContext = entry.actionContext ?? {}
       for (let i = 0; i < futureMeepleActionCount(entry, 'field'); i += 1) {
         children.push({
@@ -2365,6 +2394,16 @@ export class GameCore {
           }],
         })
       }
+    }
+    for (const [playerId, entries] of [...receiveEntriesByPlayer.entries()].reverse()) {
+      const playerIndex = this.state.players.findIndex((player) => player.id === playerId)
+      if (playerIndex === -1) continue
+      children.unshift({
+        type: 'leaf',
+        actionId: 'receive',
+        targetPlayerId: playerId,
+        params: { entries },
+      })
     }
     if (children.length === 0 || firstPlayerIndex === -1) return null
     return {
@@ -2955,7 +2994,7 @@ export class GameCore {
     })
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
-    applyFutureMeeples(this.state)
+    applyFutureMeeples(this.state, { skipResourceReceive: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
@@ -3389,6 +3428,7 @@ export class GameCore {
             const auto = autoOptions[0]
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
+            const resolvedSourceCard = this.peekPendingSourceCard()
             const result = frame.engine.resolveChoice(
               auto.value,
               this.buildEngineExecutionContext(player, space),
@@ -3398,7 +3438,7 @@ export class GameCore {
               this.pushNestedReturnPointForFrame(frame, effectivePlayerIndex)
             }
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
-              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
+              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id, resolvedSourceCard)
               this.flushLeafActionDetail(resolvedActionId, false)
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
@@ -3468,7 +3508,7 @@ export class GameCore {
         step.result.type === 'ok' &&
         !isInjectedAnytimeResult(step.result)
       ) {
-        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id)
+        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id, step.sourceCard)
         this.flushLeafActionDetail(step.actionId, false)
       }
 
@@ -3755,6 +3795,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
       this.flushLeafActionDetail(resolvedActionId, false)
     }
@@ -4281,6 +4322,7 @@ export class GameCore {
     const space = this.getSpaceById(this.activeSpaceId)
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
+    const pendingSourceCard = this.peekPendingSourceCard()
 
     const result = this.engine.resolveChoice(
       'confirm',
@@ -4292,6 +4334,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(updatedPlayer.id),
         updatedPlayer.id,
+        pendingSourceCard,
       )
     }
 
@@ -4328,6 +4371,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
+    const pendingSourceCard = this.peekPendingSourceCard()
     if (payload.cancel === true) {
       return this.respond(false, 'action cancel is not allowed')
     }
@@ -4385,6 +4429,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
     }
 
@@ -4418,6 +4463,7 @@ export class GameCore {
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+    const pendingSourceCard = this.peekPendingSourceCard()
     if (payload.cancel === true && (isFarmSelection || isGenericSelection)) {
       return this.respond(false, 'action cancel is not allowed')
     }
@@ -4465,6 +4511,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4523,6 +4570,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4564,6 +4612,7 @@ export class GameCore {
           result,
           this.currentFrameOwnerPlayerId(player.id),
           player.id,
+          pendingSourceCard,
         )
       }
       this.flushEngineLog()
@@ -4619,6 +4668,7 @@ export class GameCore {
         result,
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
+        pendingSourceCard,
       )
     }
     this.flushEngineLog()
@@ -4691,9 +4741,10 @@ export class GameCore {
     this.state.actionSpaces = this.state.actionSpaces.filter(space => space.id !== cardId)
   }
 
-  devDrawCard(playerIndex: number, cardId: string): SessionResponse {
+  devDrawCard(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const cardId = resolveDevCardIdInput(cardIdInput)
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
@@ -4722,9 +4773,10 @@ export class GameCore {
     return this.respond(true, undefined, events)
   }
 
-  devPlayCard(playerIndex: number, cardId: string): SessionResponse {
+  devPlayCard(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const cardId = resolveDevCardIdInput(cardIdInput)
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
     for (const p of this.state.players) {

@@ -284,6 +284,60 @@ const renderOptionContent = (
   )
 }
 
+const isSkipChoiceOption = (option: ActionChoiceOption) =>
+  option.value === '__skip__' || option.labelKey === 'ui.interactionOptionalSkip'
+
+const getOptionalActionName = (
+  locale: Locale,
+  option: ActionChoiceOption | undefined,
+): string | null => {
+  if (!option) return null
+  switch (option.effectPreview?.kind) {
+    case 'payment':
+      return translateCardText(locale, 'actions.pay.name')
+    case 'resourceExchange':
+      return t(locale, 'ui.interactionResourceExchange')
+    default:
+      break
+  }
+  if (option.descriptionPreview?.kind === 'action') {
+    return translateCardText(
+      locale,
+      option.descriptionPreview.labelKey,
+      option.descriptionPreview.labelParams as Record<string, string | number> | undefined,
+    )
+  }
+  return translateCardText(
+    locale,
+    option.labelKey,
+    option.labelParams as Record<string, string | number> | undefined,
+  )
+}
+
+const renderChoiceOptionContent = ({
+  locale,
+  option,
+  isOptionalActionPrompt,
+  optionalActionName,
+  triggerCardName,
+}: {
+  locale: Locale
+  option: ActionChoiceOption
+  isOptionalActionPrompt: boolean
+  optionalActionName: string | null
+  triggerCardName: string | null
+}): ReactNode => {
+  if (isOptionalActionPrompt && isSkipChoiceOption(option)) {
+    if (triggerCardName) {
+      return t(locale, 'ui.interactionOptionalSkipCard', { card: triggerCardName })
+    }
+    if (optionalActionName) {
+      return t(locale, 'ui.interactionOptionalSkipAction', { action: optionalActionName })
+    }
+  }
+  return renderOptionContent(locale, option)
+}
+
 function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
   locale: Locale
   options: ActionChoiceOption[]
@@ -505,6 +559,23 @@ export const InteractionBar = ({
     pendingChoice?.sourceCard
       ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
       : null
+  const promptHintKey =
+    typeof pendingChoice?.promptParams?.hintKey === 'string'
+      ? pendingChoice.promptParams.hintKey
+      : null
+  const isOptionalActionPrompt = pendingChoice?.promptKey === 'ui.interactionOptionalAction'
+  const optionalActionOption = isOptionalActionPrompt
+    ? visibleOptions.find((option) => !isSkipChoiceOption(option))
+    : undefined
+  const optionalActionName = getOptionalActionName(locale, optionalActionOption)
+  const interactionTitle =
+    isOptionalActionPrompt && optionalActionName
+      ? t(locale, 'ui.interactionOptionalActionWithChoice', { action: optionalActionName })
+      : t(
+          locale,
+          pendingChoice?.promptKey ?? 'ui.interactionChooseOne',
+          pendingChoice?.promptParams as Record<string, string | number> | undefined,
+        )
   const stableSelectedCount = pendingStableTilesLength + (pendingFarmHandSelected ? 1 : 0)
   const stableMaxLabel = pendingFarmHandSelected
     ? `${maxStableSelections}+`
@@ -630,15 +701,16 @@ export const InteractionBar = ({
           ) : pendingChoice && isInteractive ? (
             <>
               <div className="interaction-title">
-                {t(
-                  locale,
-                  pendingChoice.promptKey ?? 'ui.interactionChooseOne',
-                  pendingChoice.promptParams as Record<string, string | number> | undefined,
-                )}
+                {interactionTitle}
               </div>
               {triggerCardName ? (
                 <div className="interaction-subtitle">
                   {t(locale, 'ui.interactionTriggeredByCard', { card: triggerCardName })}
+                </div>
+              ) : null}
+              {promptHintKey ? (
+                <div className="interaction-rule-hint">
+                  {t(locale, promptHintKey)}
                 </div>
               ) : null}
               {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
@@ -805,7 +877,13 @@ export const InteractionBar = ({
                           resolveChoice(option.value)
                         }}
                       >
-                        {renderOptionContent(locale, option)}
+                        {renderChoiceOptionContent({
+                          locale,
+                          option,
+                          isOptionalActionPrompt,
+                          optionalActionName,
+                          triggerCardName,
+                        })}
                       </button>
                     )
                   })}

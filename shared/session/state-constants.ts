@@ -144,7 +144,10 @@ export const applyRoundGrowth = (state: GameState) => {
   })
 }
 
-export const applyFutureMeeples = (state: GameState) => {
+export const applyFutureMeeples = (
+  state: GameState,
+  options: { skipResourceReceive?: boolean } = {},
+) => {
   if (state.futureMeeples.length === 0) return
   const remaining: GameState['futureMeeples'] = []
   state.futureMeeples.forEach((entry) => {
@@ -157,6 +160,7 @@ export const applyFutureMeeples = (state: GameState) => {
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0
       if (key === 'field' || key === 'stable') return
+      if (options.skipResourceReceive) return
       player.resources[key as keyof Resource] += amount
     })
     if (entry.roomType && player.houseType === entry.roomType) {

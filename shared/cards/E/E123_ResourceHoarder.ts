@@ -65,6 +65,7 @@ const computeCostsListener: CardListenerRegistration = {
     const bonus: Bonus = {
       choices,
       optional: true,
+      choiceAffectsState: true,
       sources: [CARD_ID],
     }
     return { bonuses: [bonus] }
@@ -72,34 +73,23 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 /**
- * After paying for construct/improvement/renovate: remove the top resource from
- * stack ONLY when this card's bonus actually fired during the payment.
- *
- * 7b1 migration: dual-path listener.
- * - `actions: ['pay']` is the new path (improvement-any flow's pay leaf
- *   triggers it via the after phase). Reads `context.result.extraData.bonusUsed`
- *   from the pay leaf's transparent extra data.
- * - `actions: ['construct', 'renovate-house']` is the legacy path (those
- *   action definitions still call `executePaymentSolution` directly). Reads
- *   `player._activeActionBonusSources` populated by that helper.
- *
- * Both paths gate on "this card's BonusModifier.sources actually fired"
- * — the canonical signal that the discount was applied. Top-1 simplification
- * preserved here; full BGA use-top-k upgrade is deferred to Task 2.9.
+ * After paying for construct/improvement/renovate: remove top resources only
+ * from the canonical pay leaf event. The selected `bonusChoiceIndex` is the
+ * number of top items the player chose to use.
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['pay', 'construct', 'renovate-house'],
+  actions: ['pay'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     if (stack.length === 0) return
     const payment = context.eventQuery.find('resource.paid', (event) =>
       event.bonusSources?.includes(CARD_ID) === true,
     )
-    if (!payment && !context.player._activeActionBonusSources?.includes(CARD_ID)) return
-    const k = payment?.bonusChoiceIndex?.[CARD_ID] ?? 1
+    if (!payment) return
+    const k = payment.bonusChoiceIndex?.[CARD_ID] ?? 1
     if (k <= 0) return
 
     const popCount = Math.min(k, stack.length)

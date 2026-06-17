@@ -15,6 +15,16 @@ describe('ResourceLine supply tokens', () => {
     expect(html).toContain('res-icon-barn')
   })
 
+  it('renders card-provided payment resources', () => {
+    const html = renderToStaticMarkup(
+      <ResourceLine locale="en" mode="payment" resources={{ 'B155_ArtTeacher:traveling-players-food': 1 }} />,
+    )
+
+    expect(html).toContain('data-resource="B155_ArtTeacher:traveling-players-food"')
+    expect(html).toContain('res-icon-food')
+    expect(html).toContain('data-amount="1"')
+  })
+
   it('does not render supply-token keys in default inventory mode', () => {
     const html = renderToStaticMarkup(
       <ResourceLine locale="en" resources={{ fence: 1, stable: 1 }} />,

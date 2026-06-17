@@ -35,6 +35,8 @@ type BgaCost = {
 type PaymentOption = {
   resources: Record<string, number>
   sources: string[]
+  /** Expanded from a multi-choice bonus — exempt from dominance pruning. */
+  fromChoices?: boolean
 }
 
 type DiffKind = 'payment-diff' | 'source-diff'
@@ -42,6 +44,7 @@ type DiffKind = 'payment-diff' | 'source-diff'
 type ScenarioDiff = {
   name: string
   kind: Scenario['kind']
+  scenario: Scenario
   diffKind: DiffKind
   bga: PaymentOption[]
   oa: PaymentOption[]
@@ -66,6 +69,10 @@ type ScenarioBase = {
   spaceId?: string
   params?: Record<string, unknown>
   flaggedCards?: string[]
+  pendingFenceBonus?: {
+    sourceCard: string
+    freeFences: number
+  }
 }
 
 type CardPurchaseScenario = ScenarioBase & {
@@ -276,7 +283,7 @@ const actionScenarios: ActionScenario[] = [
   { name: 'E87 master renovator flagged choices', kind: 'renovation', cards: [play('E87_MasterRenovator')], houseType: 'wood', targetHouseType: 'stone', rooms: 3, round: 7 },
   { name: 'A16 rammed clay fence trade', kind: 'fencing', cards: [play('A16_RammedClay')] },
   { name: 'A88 hedge keeper free fences', kind: 'fencing', cards: [play('A88_HedgeKeeper')] },
-  { name: 'B15 carpenters bench constrained free fence', kind: 'fencing', cards: [play('B15_CarpentersBench')] },
+  { name: 'B15 carpenters bench constrained free fence', kind: 'fencing', cards: [play('B15_CarpentersBench')], pendingFenceBonus: { sourceCard: 'B15_CarpentersBench', freeFences: 1 } },
   { name: 'D82 farm redevelopment fence discount', kind: 'fencing', cards: [play('D82_HuntingTrophy')], spaceId: 'farm-redevelopment' },
   { name: 'D88 millwright fence bonuses', kind: 'fencing', cards: [play('D88_Millwright')] },
   { name: 'C56 feed fence stable clay alternative', kind: 'stables', cards: [play('C56_FeedFence')] },
@@ -288,6 +295,13 @@ const actionScenarios: ActionScenario[] = [
 ]
 
 const scenarios: Scenario[] = [...cardPurchaseScenarios, ...actionScenarios]
+
+const ACCEPTED_DIFF_REASONS: Record<string, string> = {
+  'E123 card-purchase top resource choices': 'Accepted: E123 top-k payment choices are stateful because after-pay consumes the selected count from the card stack; OA keeps the full stateful choice set instead of pruning by resources only.',
+  'combo card-purchase basket fixed price plus stone and wood modifiers': 'Accepted: the payable resources are equivalent; OA collapses equivalent fixed-price source-attribution rows that have no distinct payment consequence.',
+  'E123 construct top resource choices': 'Accepted: E123 use-top-k is stateful, so the no-use and use-resource paths may lead to different future card stack state even when one pays more resources.',
+  'E123 renovation top resource choices': 'Accepted: BGA records a k=0 Resource Hoarder choice source for the no-use branch; OA treats k=0 as no card effect and omits the source.',
+}
 
 type BgaPayload = {
   singleCardCaseCount: number
@@ -364,6 +378,7 @@ const compareOptions = (
   return [{
     name: scenario.name,
     kind: scenario.kind,
+    scenario,
     diffKind: paymentShapeKey(expected) === paymentShapeKey(actual) ? 'source-diff' : 'payment-diff',
     bga: expected,
     oa: actual,
@@ -411,6 +426,7 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
 
   for (const bonus of cost.bonuses ?? []) {
     if (!bgaConditionsPass(bonus.conditions, scenario)) continue
+    const isMultiChoice = Array.isArray(bonus.choices) && (bonus.choices as unknown[]).length > 1
     const choices = Array.isArray(bonus.choices) ? bonus.choices as Array<Record<string, unknown>> : [bonus]
     const old = options
     options = bonus.optional === true ? [...options] : []
@@ -418,14 +434,37 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
       for (const choice of choices) {
         if (!bgaConditionsPass(choice.conditions, scenario)) continue
         const applied = addCost(option, choice)
-        if (applied) options.push(applied)
+        if (applied) options.push(isMultiChoice ? { ...applied, fromChoices: true } : applied)
       }
     }
     options = uniqueSortedOptions(options)
   }
 
-  return uniqueSortedOptions(options)
+  return pruneDominatedOptions(uniqueSortedOptions(options))
 }
+
+// Mirror of the production keepOnlyOptimals (ADR 0004 amendment): BGA's Pay
+// layer prunes strictly dominated combinations before showing them, so the
+// structurally-expanded fixture options must be pruned the same way to stay
+// on the same comparison plane as OA's solver output. Choice expansions are
+// exempt, mirroring OA's bonusChoiceIndex exemption.
+const optionDominates = (a: PaymentOption, b: PaymentOption): boolean => {
+  if (a.fromChoices || b.fromChoices) return false
+  const keys = new Set([...Object.keys(a.resources), ...Object.keys(b.resources)])
+  let strictlyLess = false
+  for (const key of keys) {
+    const aVal = a.resources[key] ?? 0
+    const bVal = b.resources[key] ?? 0
+    if (aVal > bVal) return false
+    if (aVal < bVal) strictlyLess = true
+  }
+  return strictlyLess
+}
+
+const pruneDominatedOptions = (options: PaymentOption[]): PaymentOption[] =>
+  options.filter((candidate) =>
+    !options.some((other) => other !== candidate && optionDominates(other, candidate)),
+  )
 
 const mergeResourceDelta = (
   base: PaymentResourceMap,
@@ -438,6 +477,52 @@ const mergeResourceDelta = (
     out[resourceKey] = (out[resourceKey] ?? 0) + value
   }
   return out
+}
+
+const formatResourceMap = (resources: Record<string, unknown> | undefined): string => {
+  const normalized = stripResources(resources ?? {})
+  const known = new Set<string>(RESOURCE_KEYS)
+  const keys = [
+    ...RESOURCE_KEYS.filter((key) => normalized[key] !== undefined),
+    ...Object.keys(normalized).filter((key) => !known.has(key)).sort(),
+  ]
+  if (keys.length === 0) return '{}'
+  return `{${keys.map((key) => `${key}:${normalized[key]}`).join(', ')}}`
+}
+
+const formatBaseCost = (cost: PaymentResourceMap | ComplexCost): string => {
+  if (!isComplexCost(cost)) return formatResourceMap(cost)
+  if (cost.fees?.length === 1) return formatResourceMap(cost.fees[0])
+  if (cost.fee) return formatResourceMap(cost.fee)
+  return JSON.stringify(cost)
+}
+
+const describeCardPurchaseSubject = (scenario: CardPurchaseScenario): string => {
+  const cost = formatBaseCost(scenario.baseCost)
+  if (scenario.targetId === 'Major_Joinery') {
+    return `card-purchase generic major-cost fixture ${cost}`
+  }
+  return `card-purchase ${scenario.targetId} with fixture cost ${cost}`
+}
+
+const describePaymentSubject = (scenario: Scenario): string => {
+  const details: string[] = []
+  if (scenario.kind === 'card-purchase') {
+    details.push(describeCardPurchaseSubject(scenario))
+  } else if (scenario.kind === 'renovation') {
+    details.push(`renovate-house ${scenario.houseType ?? 'wood'} -> ${scenario.targetHouseType ?? 'clay'}, rooms=${scenario.rooms ?? 3}`)
+  } else if (scenario.kind === 'construct') {
+    details.push(`construct ${scenario.houseType ?? 'wood'} room(s), units=${scenario.units ?? 1}`)
+  } else if (scenario.kind === 'fencing') {
+    details.push(`fence, units=${scenario.units ?? 1}`)
+  } else {
+    details.push(`stables, units=${scenario.units ?? 1}`)
+  }
+  if (scenario.sourceCard) details.push(`source=${scenario.sourceCard}`)
+  if (scenario.actionCardId) details.push(`actionCard=${scenario.actionCardId}`)
+  if (scenario.spaceId) details.push(`space=${scenario.spaceId}`)
+  if (scenario.params) details.push(`params=${JSON.stringify(scenario.params)}`)
+  return details.join(', ')
 }
 
 const appendAdjustments = (cost: ComplexCost, adjustments: ActionAdjustments): ComplexCost => {
@@ -553,12 +638,24 @@ const actionCost = (
     }
     return appendAdjustments(cost, adjustments)
   }
+  const payableUnits = scenario.kind === 'fencing'
+    ? Math.max(0, units - (scenario.pendingFenceBonus?.freeFences ?? 0))
+    : units
+  if (payableUnits === 0 && Object.keys(adjustments.costs).length === 0) {
+    return appendAdjustments({ fee: {} }, adjustments)
+  }
   const base: ComplexCost = {
     fees: Object.keys(adjustments.costs).length > 0 ? [adjustments.costs] : undefined,
     unitFee: { wood: scenario.kind === 'stables' ? 2 : 1 },
-    nb: units,
+    nb: payableUnits,
   }
   return appendAdjustments(base, adjustments)
+}
+
+const actionExtraSources = (scenario: ActionScenario): string[] => {
+  if (scenario.kind !== 'fencing') return []
+  const usedFreeFences = Math.min(scenario.units ?? 1, scenario.pendingFenceBonus?.freeFences ?? 0)
+  return usedFreeFences > 0 && scenario.pendingFenceBonus ? [scenario.pendingFenceBonus.sourceCard] : []
 }
 
 const oaCardPurchaseOptions = (scenario: CardPurchaseScenario): PaymentOption[] => {
@@ -600,7 +697,8 @@ const oaActionOptions = (scenario: ActionScenario): PaymentOption[] => {
   const { player, state } = setupScenarioPlayer(scenario)
   const cost = actionCost(scenario, state, player)
   const solutions = computeAllBuyableCombinations(player, cost, undefined, costTypeFor(scenario.kind), state)
-  return uniqueSortedOptions(solutions.map((solution) => solutionToOption(solution)))
+  const extraSources = actionExtraSources(scenario)
+  return uniqueSortedOptions(solutions.map((solution) => solutionToOption(solution, extraSources)))
 }
 
 const oaOptions = (scenario: Scenario): PaymentOption[] =>
@@ -612,6 +710,8 @@ const renderReport = (
   diffs: ScenarioDiff[],
   covered: string[],
 ) => {
+  const acceptedDiffs = diffs.filter((diff) => ACCEPTED_DIFF_REASONS[diff.name])
+  const unresolvedDiffs = diffs.filter((diff) => !ACCEPTED_DIFF_REASONS[diff.name])
   const counts = scenarios.reduce<Record<string, number>>((acc, scenario) => {
     acc[scenario.kind] = (acc[scenario.kind] ?? 0) + 1
     return acc
@@ -633,15 +733,28 @@ const renderReport = (
     `Differences: ${diffs.length}`,
     `Payment differences: ${diffKindCounts['payment-diff']}`,
     `Source-only differences: ${diffKindCounts['source-diff']}`,
+    `Accepted differences: ${acceptedDiffs.length}`,
+    `Unresolved differences: ${unresolvedDiffs.length}`,
     'Report-only artifacts: 0',
     '',
   ]
-  if (diffs.length === 0) {
-    lines.push('No differences found in the compared scenarios.', '')
+  const pushDiff = (diff: ScenarioDiff, headingLevel = '###') => {
+    lines.push(`${headingLevel} ${diff.name}`, '', `Kind: ${diff.kind}`, `Paying for: ${describePaymentSubject(diff.scenario)}`, `Difference type: ${diff.diffKind}`)
+    const reason = ACCEPTED_DIFF_REASONS[diff.name]
+    if (reason) lines.push(`Accepted reason: ${reason}`)
+    lines.push('', 'BGA:', '```json', JSON.stringify(diff.bga, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
+  }
+  lines.push('## Accepted Differences', '')
+  if (acceptedDiffs.length === 0) {
+    lines.push('No accepted differences.', '')
   } else {
-    for (const diff of diffs) {
-      lines.push(`## ${diff.name}`, '', `Kind: ${diff.kind}`, `Difference type: ${diff.diffKind}`, '', 'BGA:', '```json', JSON.stringify(diff.bga, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
-    }
+    for (const diff of acceptedDiffs) pushDiff(diff)
+  }
+  lines.push('## Unresolved Differences', '')
+  if (unresolvedDiffs.length === 0) {
+    lines.push('No unresolved differences.', '')
+  } else {
+    for (const diff of unresolvedDiffs) pushDiff(diff)
   }
   mkdirSync(path.dirname(REPORT_PATH), { recursive: true })
   writeFileSync(REPORT_PATH, `${lines.join('\n')}\n`)
@@ -667,8 +780,16 @@ describe('BGA/OA cost-pay parity', () => {
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain(`Differences: ${diffs.length}`)
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Payment differences:')
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Source-only differences:')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Accepted differences: 4')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Unresolved differences: 0')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('## Accepted Differences')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('## Unresolved Differences')
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Report-only artifacts:')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Paying for: card-purchase generic major-cost fixture {wood:2, clay:2, reed:2, stone:2}')
+    expect(readFileSync(REPORT_PATH, 'utf8')).not.toContain('Major_Joinery')
+    expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Paying for: renovate-house wood -> stone, rooms=3')
     expect(diffs.map((diff) => diff.name)).not.toContain('B145 brushwood renovation reed replacement')
     expect(diffs.map((diff) => diff.name)).not.toContain('C14 straw roof removes renovation reed')
+    expect(diffs.map((diff) => diff.name)).not.toContain('B15 carpenters bench constrained free fence')
   })
 })

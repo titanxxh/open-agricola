@@ -138,13 +138,13 @@ describe('E123_ResourceHoarder session', () => {
     const listeners = getRegisteredCardListeners()
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')
     expect(afterPayListener).toBeDefined()
+    expect(afterPayListener!.actions).toEqual(['pay'])
 
     const player = createPlayer('p1', {
       occupationPlayed: [CARD_ID],
       cardStates: {
         [CARD_ID]: { stack: ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'] },
       },
-      _activeActionBonusSources: [CARD_ID],
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
@@ -156,8 +156,15 @@ describe('E123_ResourceHoarder session', () => {
     } as GameState
 
     const context: CardListenerContext = {
-      state, player, space: createSpace('construct'),
-      actionId: 'construct', phase: 'after',
+      state, player, space: createSpace('pay'),
+      actionId: 'pay', phase: 'after',
+      transactionEvents: [{
+        type: 'resource.paid',
+        resources: { clay: 1 },
+        paymentFor: 'construct',
+        bonusSources: [CARD_ID],
+        bonusChoiceIndex: { [CARD_ID]: 1 },
+      }],
     } as CardListenerContext
 
     executeCardListener(afterPayListener!, context)
@@ -228,7 +235,7 @@ describe('E123_ResourceHoarder session', () => {
     )
   })
 
-  it('after-pay listener pops only when E123 is in _activeActionBonusSources', () => {
+  it('after-pay listener ignores legacy construct _activeActionBonusSources path', () => {
     const listeners = getRegisteredCardListeners()
     const afterPayListener = listeners.find((l) => l.id === 'E123-resource-hoarder-after-pay')!
 
@@ -254,9 +261,8 @@ describe('E123_ResourceHoarder session', () => {
     } as CardListenerContext
 
     executeCardListener(afterPayListener, context)
-    // Top resource (clay) was popped because the bonus actually fired
     expect(player.cardStates[CARD_ID]!.stack).toEqual(
-      ['stone', 'clay', 'stone', 'reed', 'wood'],
+      ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'],
     )
   })
 
@@ -270,7 +276,6 @@ describe('E123_ResourceHoarder session', () => {
       cardStates: {
         [CARD_ID]: { stack: ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'] },
       },
-      _activeActionBonusSources: [CARD_ID],
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
@@ -281,9 +286,16 @@ describe('E123_ResourceHoarder session', () => {
       gameOver: false, workPhaseObtainedResources: {},
     } as GameState
 
-    const mkContext = (actionId: string, phase: string) => ({
+    const mkContext = (actionId: string, phase: string, bonusChoiceIndex?: number) => ({
       state, player, space: createSpace(actionId),
       actionId, phase,
+      transactionEvents: bonusChoiceIndex === undefined ? [] : [{
+        type: 'resource.paid',
+        resources: {},
+        paymentFor: 'construct',
+        bonusSources: [CARD_ID],
+        bonusChoiceIndex: { [CARD_ID]: bonusChoiceIndex },
+      }],
     } as CardListenerContext)
 
     // Top is clay (k=1 entry of N+1 choices)
@@ -291,14 +303,14 @@ describe('E123_ResourceHoarder session', () => {
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ clay: 1 })
 
     // Pop clay
-    executeCardListener(afterPayListener, mkContext('construct', 'after'))
+    executeCardListener(afterPayListener, mkContext('pay', 'after', 1))
 
     // Now top is wood
     result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ wood: 1 })
 
     // Pop wood
-    executeCardListener(afterPayListener, mkContext('construct', 'after'))
+    executeCardListener(afterPayListener, mkContext('pay', 'after', 1))
 
     // Now top is reed
     result = executeCardListener(costListener, mkContext('improvement', 'computeCosts'))

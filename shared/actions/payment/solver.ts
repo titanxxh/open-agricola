@@ -16,6 +16,7 @@ import {
 import { clearPaymentCache } from './internal/cache'
 import { computeAllBuyableCombinations } from './internal/enumerate'
 import {
+  canConsumePaymentResourceProviders,
   executePaymentSolution,
 } from './internal/execute'
 
@@ -77,7 +78,13 @@ const execute = (
     payResources(player, cost as Parameters<typeof payResources>[1])
     paySupplyTokens(player, cost as Parameters<typeof payResources>[1])
   } else {
-    executePaymentSolution(player, selected, { state })
+    if (!canConsumePaymentResourceProviders(state, selected, cost.paymentResourceProviders)) {
+      return { ok: false, reason: 'cannot-afford' }
+    }
+    executePaymentSolution(player, selected, {
+      state,
+      paymentResourceProviders: cost.paymentResourceProviders,
+    })
   }
   return { ok: true, state }
 }

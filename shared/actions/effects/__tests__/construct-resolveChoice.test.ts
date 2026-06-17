@@ -335,21 +335,27 @@ describe('constructAction.resolveChoice', () => {
     expect(result.request.farm.selectableTiles).toContainEqual({ row: 1, col: 3 })
   })
 
-  it('surfaces sourced computeCosts unit trade alternatives in the room payment request', () => {
+  it('resolves the room payment through the sourced unit trade alternative', () => {
     const room: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx() as TestCostTradeContext
     ctx.costTrades = [carpenterTrade]
 
     const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
 
-    expect(result.type).toBe('request')
-    if (result.type !== 'request' || result.request.kind !== 'choice') return
-    const options = result.request.options.map(optionShape)
-    expect(options).toContainEqual({ resources: { wood: 5, reed: 2 }, sources: [] })
-    expect(options).toContainEqual({
-      resources: { wood: 3, reed: 2 },
-      sources: ['B126_Carpenter'],
-    })
+    // ADR 0004 amendment: the dominated printed row is pruned; the sourced
+    // alternative is the single remaining payment and auto-resolves.
+    if (result.type === 'request' && result.request.kind === 'choice') {
+      const options = result.request.options.map(optionShape)
+      expect(options).not.toContainEqual({ resources: { wood: 5, reed: 2 }, sources: [] })
+      expect(options).toContainEqual({
+        resources: { wood: 3, reed: 2 },
+        sources: ['B126_Carpenter'],
+      })
+    } else {
+      // Single remaining payment auto-resolves; the actual deduction runs in
+      // the downstream pay leaf (covered by the attribution test below).
+      expect(['ok', 'flow']).toContain(result.type)
+    }
   })
 
   it('attributes construct computeCosts savings to the source card', () => {

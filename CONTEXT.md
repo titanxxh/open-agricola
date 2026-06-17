@@ -112,6 +112,14 @@ _Avoid_: UI 按钮定义
 统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
+**Card-Provided Payment Resource（卡牌提供的支付资源）**:
+由卡牌效果临时提供、只能用于支付管线的虚拟资源口径，例如用 Traveling Players 行动格上的食物支付职业成本。它有卡牌前缀稳定身份，不出现在成本候选行中，但会以自身身份出现在实际支付明细中；它可以声明自己能覆盖哪些成本资源，不表示玩家库存资源或通用资源类型。
+_Avoid_: Payment Source、PlayerState.resources、真实资源兑换、成本候选行资源
+
+**Payment Budget（支付预算）**:
+一次行动或卡牌子流程对最终实际支付资源施加的上限约束。它不提供资源、不改变成本候选，只在折扣和支付求解完成后限制该流程最多能支付多少普通资源。
+_Avoid_: Card-Provided Payment Resource、库存资源、成本折扣、段数上限
+
 **ComputeCardCosts**:
 购买 major / minor improvement 时对当前卡牌成本候选执行的卡牌成本变形语义。它包括拥有 `computeCosts.improvement` listener 的卡，也包括先选支付路径再把该路径送入同一成本变形语义的卡。
 _Avoid_: 建房、翻修、围栏等非卡牌购买成本
@@ -123,6 +131,14 @@ _Avoid_: Trade、资源兑换、支付替换器
 **Cost Candidate List（成本候选列表）**:
 购买卡牌时当前可支付成本候选行的集合。ComputeCardCosts 读取并返回这个列表；卡牌效果可以保留原候选、追加新候选、修改候选或替换候选。
 _Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
+
+**Candidate Closure（候选闭包）**:
+对成本候选集合与一组卡牌成本转换求不动点：反复将每个未达使用上限的转换应用到每个候选，新候选去重后并入，直到不再产生新候选。结果与转换的注册顺序无关，等于所有应用顺序产物的并集。
+_Avoid_: topo 排序、数字 order 优先级、卡牌间偏序
+
+**Mandatory Saturation（强制饱和）**:
+候选闭包结果集的过滤规则：只保留不存在仍可应用的 mandatory 成本转换的候选；未饱和候选仅作为中间节点继续派生，不暴露给玩家。mandatory / optional 是每个成本转换的局部自描述语义（对照 BGA 卡面"costs less" vs "can pay instead"逐卡确定），不是卡牌间关系。
+_Avoid_: 卡牌执行顺序、Pareto 剪枝、domination
 
 **Payment Path（支付路径）**:
 玩家在多个基础成本候选之间选择的路径身份；它可以影响后续卡牌效果，且不等同于最终实际支付掉的资源明细。
@@ -181,9 +197,17 @@ _Avoid_: 卡牌口径 Stable、动物容量、永久消耗的 supply token
 卡牌文本中“你拥有的 stable”“本次建造的 stable”“unfenced stable”使用的畜栏口径；包含普通畜栏和 Farm Hand stable 这类只参与卡牌统计的特殊畜栏。
 _Avoid_: 动物容量、牧场容量、可安置动物的 stable
 
+**Animal Payment Preference（动物支付偏好）**:
+动物支付或动物兑换在多个可扣减动物区之间选择来源的局部约束，用于表达“优先扣这张卡上的动物”或“尽量保留这张卡上的动物”。它不引入全局动物身份，只在一次支付解析中约束 aggregate 动物资源从哪些区域扣减。
+_Avoid_: 全局 animal id、普通资源支付顺序、动物容量规则
+
 **Internal Action**:
 不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
 _Avoid_: 玩家可直接选择的公开行动
+
+**Future Receive**:
+回合开始时玩家从 future meeple / round card 拿回先前放置资源的 receive 语义。它属于内部阶段流程，但对卡牌语义等同于一次 Receive，不等同于普通 Gain。
+_Avoid_: Gain、Action Space collect、round growth accumulation
 
 **Action Hook**:
 行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`during`、`after`、`anytime`。通常由卡牌注册。

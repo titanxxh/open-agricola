@@ -249,7 +249,6 @@ const cases: CostCase[] = [
     sourceCard: 'B128_Plumber',
     expected: [
       { resources: { reed: 1, stone: 1 }, sources: ['B128_Plumber'] },
-      { resources: { reed: 1, stone: 2 }, sources: ['B128_Plumber'] },
     ],
   },
   {
@@ -286,14 +285,15 @@ const cases: CostCase[] = [
     expected: [{ resources: { clay: 3 }, sources: ['D81_RoofLadder'] }],
   },
   {
-    name: 'Hunting Trophy keeps the original Farm Redevelopment fence cost and adds a sourced discount',
+    // ADR 0004 amendment: the undiscounted {wood:1} row is strictly
+    // dominated by the sourced free row and is pruned, matching BGA.
+    name: 'Hunting Trophy surfaces only the sourced Farm Redevelopment fence discount',
     cardId: 'D82_HuntingTrophy',
     zone: 'minorPlayed',
     kind: 'fencing',
     spaceId: 'farm-redevelopment',
     expected: [
       { resources: {}, sources: ['D82_HuntingTrophy'] },
-      { resources: { wood: 1 }, sources: [] },
     ],
   },
 ]

@@ -1,11 +1,11 @@
 import ivm from 'isolated-vm'
-import type { ActionHookPhase } from '../../shared/actions/hooks.ts'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from './compiler.ts'
 import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
+import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import type {
   CustomCodeEffectMetadata,
   CustomCodeEffectInvocation,
@@ -20,20 +20,6 @@ import { HELPERS_INJECTION_SOURCE } from './injected-helpers.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8
-
-const isActionHookPhase = (value: unknown): value is ActionHookPhase =>
-  typeof value === 'string' && [
-    'before',
-    'during',
-    'immediatelyAfter',
-    'after',
-    'computeCosts',
-    'computeArgs',
-    'computeReplace',
-    'isDoable',
-    'anytime',
-    'computeChoiceCandidates',
-  ].includes(value)
 
 const isCardListenerScope = (value: unknown): value is CardListenerScope =>
   value === 'player' || value === 'opponent' || value === 'any'
@@ -189,7 +175,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     )
     const listeners = parsed.listeners.map((l) => ({
       ...l,
-      phases: l.phases?.filter(isActionHookPhase),
+      phases: l.phases?.filter(isSandboxListenerPhase),
       scope: isCardListenerScope(l.scope) ? l.scope : undefined,
     }))
 

@@ -43,7 +43,6 @@ const costListener: CardListenerRegistration = {
     return {
       bonuses: [
         sourcedMandatoryBonusChoices(CARD_ID, [
-          { [target]: 1 },
           { [target]: 2 },
         ]),
       ],

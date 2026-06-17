@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../contract/types'
 import { playImprovement } from '../../actions/effects/improvement'
 import { getPlayedCardKeys } from '../../domain/player'
+import { computeScores } from '../../domain/scoring'
 import { getCardEffect } from '../card-effects'
 import { cardCountsAs, collectCardsAs } from '../helpers/card-type'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
@@ -123,6 +124,35 @@ describe('D60_LargePottery', () => {
       expect(state.availableMajorImprovements).toContain('Major_Pottery')
       expect(player.resources.clay).toBe(0)
       expect(player.resources.stone).toBe(0)
+    })
+
+    it('normal D60 purchase does not keep scoring Major_Pottery', () => {
+      const player = createPlayer()
+      player.minorHand = [CARD_ID]
+      player.improvements = ['Major_Pottery']
+      player.resources.clay = 4
+      player.resources.stone = 1
+
+      const state = createState(player)
+      const result = playImprovement(state, player, CARD_ID, 'minor')
+      expect(result.type).toBe('ok')
+
+      const [score] = computeScores(state)
+      const cards = score!.categories.find((category) => category.key === 'cards')
+      const cardBonus = score!.categories.find((category) => category.key === 'cardBonusVp')
+
+      expect(cards?.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cardId: CARD_ID, cardType: 'minor', score: 3 }),
+      ]))
+      expect(cards?.entries).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ cardId: 'Major_Pottery' }),
+      ]))
+      expect(cardBonus?.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cardId: CARD_ID, score: 1 }),
+      ]))
+      expect(cardBonus?.entries).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ cardId: 'Major_Pottery' }),
+      ]))
     })
   })
 

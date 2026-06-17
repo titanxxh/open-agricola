@@ -19,8 +19,9 @@ export type Resource = {
 export type SupplyTokenKey = 'fence' | 'stable'
 export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
 export type PaymentResource = Resource & Record<SupplyTokenKey, number>
-export type PaymentResourceMap = Partial<PaymentResource>
-export type PaymentResourceKey = keyof PaymentResource
+export type CardProvidedPaymentResourceKey = `${string}:${string}`
+export type PaymentResourceKey = keyof PaymentResource | CardProvidedPaymentResourceKey
+export type PaymentResourceMap = Partial<Record<PaymentResourceKey, number>>
 export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
@@ -44,6 +45,30 @@ export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
 
+export type CardProvidedPaymentResourceCover = {
+  resource: ResourceKey
+  costAmount: number
+  paymentAmount: number
+}
+
+export type CardProvidedPaymentResourceConsume =
+  | { type: 'actionSpace'; spaceId: string; resource: ResourceKey }
+
+export type CardProvidedPaymentResourceProvider = {
+  key: CardProvidedPaymentResourceKey
+  sourceCard: string
+  available: number
+  covers: CardProvidedPaymentResourceCover[]
+  consume: CardProvidedPaymentResourceConsume
+}
+
+export type PaymentResourceCoverUsage = {
+  paymentResource: CardProvidedPaymentResourceKey
+  costResource: ResourceKey
+  paymentAmount: number
+  costAmount: number
+}
+
 export type ExactCost = Partial<Resource> & {
   max?: number
 }
@@ -61,7 +86,6 @@ export type Trade = {
   groupId?: string
   groupMax?: number
   replaceUpTo?: boolean
-  order?: number
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -71,6 +95,7 @@ export type BonusChoice = {
   discount: Partial<Resource>
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -90,6 +115,7 @@ export type Bonus = {
   choices?: BonusChoice[]
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   optional?: boolean
   sources?: string[]
   /**
@@ -118,7 +144,6 @@ export type TradeModifier = {
   groupId?: string
   groupMax?: number
   replaceUpTo?: boolean
-  order?: number
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
@@ -138,6 +163,7 @@ export type BonusModifier = {
   choices?: BonusChoice[]
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   optional?: boolean
   conditions?: Record<string, number>
   minCost?: Partial<Resource>
@@ -149,9 +175,18 @@ export type CostModifier = TradeModifier | BonusModifier
 export type ComplexCost = {
   fee?: PaymentResourceMap
   fees?: PaymentResourceMap[]
+  /**
+   * Payment-path identity per fees index (Cost Candidate originalFeeIndex).
+   * Solutions with different identities are never dominance-pruned against
+   * each other — the chosen path can drive later effects (B65). Omitted ⇒
+   * all rows share one identity.
+   */
+  feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
+  paymentBudget?: PaymentResourceMap
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
 }
@@ -184,7 +219,12 @@ export type PaymentSolution = {
   cardUsed?: string
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
+  bonusChoiceAffectsState?: Record<string, boolean>
+  bonusReductions?: Record<string, PaymentResourceMap>
   feeIndex?: number
+  /** Payment-path identity from ComplexCost.feeIdentities (dominance-pruning scope). */
+  feeIdentity?: number
+  paymentResourceCovers?: PaymentResourceCoverUsage[]
 }
 
 export type PaymentSource = 'reserve' | 'field' | 'card'
@@ -503,6 +543,7 @@ export type ActionExecutionContext = {
   costs?: Partial<Resource>
   costTrades?: Trade[]
   costBonuses?: Bonus[]
+  paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   costAttribution?: ActionCostAttribution[]
   params?: Record<string, unknown>
   sourceCard?: string
@@ -870,7 +911,8 @@ export type AnytimeAction = {
 
 export type InteractionAnimalReorgZone = {
   id: string
-  zoneType: 'pasture' | 'house' | 'stable'
+  zoneType: 'pasture' | 'house' | 'stable' | 'card'
+  cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
   capacity: number

@@ -45,22 +45,18 @@ describe('A143_Stonecutter session', () => {
 
   it('reduces Major improvement stone cost by 1', () => {
     const session = setup()
-    let resp = session.takeAction(0, 'major-improvement')
+    // ADR 0004 amendment: the printed {reed:2, stone:2} row is strictly
+    // dominated by the A143-discounted {reed:2, stone:1} row and pruned;
+    // the purchase auto-resolves on the discounted payment.
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const option = resp.interaction.options?.find((entry) =>
-      Array.isArray(entry.labelParams.sourceCards)
-        && entry.labelParams.sourceCards.includes(CARD_ID),
-    )
-    expect(option).toBeDefined()
-
-    resp = session.resolveChoice(0, option!.value)
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
     expect(after.resources.reed).toBe(0)
     expect(after.resources.stone).toBe(1)
+
+    const entry = resp.state.log.find((row) => row.key === 'log.playImprovement')
+    expect(entry?.params?.bonusSources).toEqual([CARD_ID])
   })
 })

@@ -300,8 +300,6 @@ export function buildPhaseTrailingNodes(
   const out: EngineNode[] = []
   for (const ownerId of orderedOwners) {
     const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => {
-      const orderDelta = (b.ml.registration.order ?? 0) - (a.ml.registration.order ?? 0)
-      if (orderDelta !== 0) return orderDelta
       const playOrderDelta = a.playOrderIndex - b.playOrderIndex
       if (playOrderDelta !== 0) return playOrderDelta
       return a.matchedIndex - b.matchedIndex
@@ -606,6 +604,8 @@ const descriptionSeparatorForNode = (node: EngineNode): string => {
   return ''
 }
 
+const cardChoiceLabelKeyPattern = /^cards\.[^.]+\.choice$/
+
 export function getNodeDescriptionPreview(
   node: EngineNode,
   registry: ActionRegistry,
@@ -614,11 +614,17 @@ export function getNodeDescriptionPreview(
     const action = registry.get(node.actionId)
     if (!action) return undefined
     const specialEffectLabelKey = specialEffectDescriptionLabelKey(node)
-    if (!node.choiceLabelKey && specialEffectLabelKey === null) return undefined
+    const isCardChoiceLabel =
+      !!node.choiceLabelKey && cardChoiceLabelKeyPattern.test(node.choiceLabelKey)
+    const useChoiceLabelAsDescription =
+      !!node.choiceLabelKey && !isCardChoiceLabel
+    if (specialEffectLabelKey === null && !useChoiceLabelAsDescription) return undefined
     return {
       kind: 'action',
-      labelKey: node.choiceLabelKey ?? specialEffectLabelKey ?? action.nameKey,
-      labelParams: node.choiceLabelParams,
+      labelKey: useChoiceLabelAsDescription
+        ? node.choiceLabelKey!
+        : specialEffectLabelKey ?? (isCardChoiceLabel ? action.descriptionKey : action.nameKey),
+      labelParams: useChoiceLabelAsDescription ? node.choiceLabelParams : undefined,
       effectPreview: getActionEffectPreview(node),
     }
   }
@@ -848,7 +854,7 @@ export function buildChoiceExecutionContext(
     space: ActionExecutionContext['space']
     emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   },
-  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
+  base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
     state: context.state,
@@ -858,6 +864,7 @@ export function buildChoiceExecutionContext(
     costs: base?.costs,
     costTrades: base?.costTrades,
     costBonuses: base?.costBonuses,
+    paymentResourceProviders: base?.paymentResourceProviders,
     costAttribution: base?.costAttribution,
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
@@ -977,6 +984,7 @@ export function applyInteractionRequest(
     costs: ActionExecutionContext['costs']
     costTrades?: ActionExecutionContext['costTrades']
     costBonuses?: ActionExecutionContext['costBonuses']
+    paymentResourceProviders?: ActionExecutionContext['paymentResourceProviders']
     costAttribution?: ActionExecutionContext['costAttribution']
     sourceCard: string | undefined
     actionContext: Record<string, unknown> | undefined
@@ -1014,6 +1022,7 @@ export function applyInteractionRequest(
       costs: args.costs,
       costTrades: args.costTrades,
       costBonuses: args.costBonuses,
+      paymentResourceProviders: args.paymentResourceProviders,
       costAttribution: args.costAttribution,
       sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
       actionContext: mergedActionContext,

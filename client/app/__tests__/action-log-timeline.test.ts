@@ -111,6 +111,134 @@ const replayEntryForEvent = (
 })
 
 describe('buildActionLogTimelineRows', () => {
+  it('does not render an extra pays-for row for a payment absorbed by card.played', () => {
+    const paid: GameEvent = {
+      ...paidEvent('evt-paid', 7),
+      paymentFor: 'major-improvement',
+      sourceCardId: 'Major_Basket',
+    } as GameEvent
+    const played: GameEvent = {
+      ...playedEvent('evt-played', 8),
+      cardId: 'Major_Basket',
+      cardType: 'major',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(paid, 3, 0),
+        replayEntryForEvent(played, 3, 1),
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const keys = rows.map((row) => (row.kind === 'event' ? row.logEntry?.key : row.logEntry.key))
+    expect(keys).toContain('log.playImprovement')
+    expect(keys).not.toContain('log.cardEffectPay')
+    const improvement = rows.find((row) => row.logEntry?.key === 'log.playImprovement')
+    expect(improvement?.logEntry?.params?.costResources).toEqual({ wood: 1 })
+  })
+
+  it('suppresses the absorbed stable payment emitted AFTER farm.stableBuilt', () => {
+    const stableBuilt: GameEvent = {
+      schemaVersion: 1,
+      id: 'evt-stable',
+      seq: 5,
+      round: 2,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'farm.stableBuilt',
+      stables: [{ row: 0, col: 0 }],
+    } as unknown as GameEvent
+    const paid: GameEvent = {
+      ...paidEvent('evt-paid', 6),
+      paymentFor: 'stables',
+      sourceCardId: 'SomeCard',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(stableBuilt, 3, 0),
+        replayEntryForEvent(paid, 3, 1),
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const keys = rows.map((row) => row.logEntry?.key)
+    expect(keys).not.toContain('log.cardEffectPay')
+  })
+
+  it('keeps absorbed payments out of canceled (undone) timeline rows too', () => {
+    const paid: GameEvent = {
+      ...paidEvent('evt-paid', 7),
+      paymentFor: 'major-improvement',
+      sourceCardId: 'Major_Basket',
+    } as GameEvent
+    const played: GameEvent = {
+      ...playedEvent('evt-played', 8),
+      cardId: 'Major_Basket',
+      cardType: 'major',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        { ...replayEntryForEvent(paid, 3, 0), status: 'canceled' as const, replayable: false },
+        { ...replayEntryForEvent(played, 3, 1), status: 'canceled' as const, replayable: false },
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const keys = rows.map((row) => row.logEntry?.key)
+    expect(keys).toContain('log.playImprovement')
+    expect(keys).not.toContain('log.cardEffectPay')
+  })
+
+  it('does not suppress same-seq payments from unrelated archive packets', () => {
+    const absorbedPaid: GameEvent = {
+      ...paidEvent('evt-paid-absorbed', 7),
+      paymentFor: 'major-improvement',
+      sourceCardId: 'Major_Basket',
+    } as GameEvent
+    const played: GameEvent = {
+      ...playedEvent('evt-played', 8),
+      cardId: 'Major_Basket',
+      cardType: 'major',
+    } as GameEvent
+    const standalonePaid: GameEvent = {
+      ...paidEvent('evt-paid-standalone', 7),
+      paymentFor: 'minor-improvement',
+      sourceCardId: 'A1_TestMinor',
+    } as GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(absorbedPaid, 3, 0),
+        replayEntryForEvent(played, 3, 1),
+        replayEntryForEvent(standalonePaid, 4, 0),
+      ],
+      stateLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    const standalone = rows.find((row) => row.key === 'event:4:0:evt-paid-standalone:7')
+    expect(standalone?.logEntry?.key).toBe('log.cardEffectPay')
+  })
+
   it('builds replay event rows and keeps state log rows', () => {
     const stateLog: LogEntry[] = [
       { key: 'log.startGame' },

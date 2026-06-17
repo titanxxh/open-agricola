@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { validateFenceSelection } from '../../shared/domain/farmyard'
 import type { PlayerFarmState } from '../../shared/domain/farmyard'
+import type { PlayerState } from '../../shared/contract/types'
 import {
   getFenceCount,
   getPalisadeCount,
 } from '../../shared/actions/effects/fencing.ts'
+
+type AnimalAwareFarmState = PlayerFarmState &
+  Pick<PlayerState, 'houseAnimalType' | 'houseAnimalCount' | 'stableAnimals' | 'cardStates'>
 
 const createPlayer = (): PlayerFarmState => ({
   id: 'p1',
@@ -684,6 +688,110 @@ describe('validateFenceSelection — generic fence policy', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error.code).toBe('ANIMAL_CAPACITY_INSUFFICIENT')
+    }
+  })
+
+  it('does not duplicate a house animal into a new pasture', () => {
+    const player = createPlayer() as AnimalAwareFarmState
+    player.resources.boar = 1
+    player.houseAnimalType = 'boar'
+    player.houseAnimalCount = 1
+    player.stableAnimals = {}
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.player.pastures[0]?.animalType).toBeNull()
+      expect(result.player.pastures[0]?.animalCount).toBe(0)
+      expect(result.player.houseAnimalType).toBe('boar')
+      expect(result.player.houseAnimalCount).toBe(1)
+      expect(result.player.resources.boar).toBe(1)
+    }
+  })
+
+  it('does not duplicate a loose stable animal into a new pasture', () => {
+    const player = createPlayer() as AnimalAwareFarmState
+    player.resources.sheep = 1
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.stableTiles = [{ row: 2, col: 4 }]
+    player.stableAnimals = { '2-4': 'sheep' }
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.player.pastures[0]?.animalType).toBeNull()
+      expect(result.player.pastures[0]?.animalCount).toBe(0)
+      expect(result.player.stableAnimals['2-4']).toBe('sheep')
+      expect(result.player.resources.sheep).toBe(1)
+    }
+  })
+
+  it('does not duplicate an extraData-held card animal into a new pasture', () => {
+    const player = createPlayer() as AnimalAwareFarmState
+    player.resources.cattle = 1
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.stableAnimals = {}
+    player.cardStates = {
+      D148_DomesticianExpert: { extraData: { held: 1, animalType: 'cattle' } },
+    }
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.player.pastures[0]?.animalType).toBeNull()
+      expect(result.player.pastures[0]?.animalCount).toBe(0)
+      expect(result.player.cardStates.D148_DomesticianExpert?.extraData?.held).toBe(1)
+      expect(result.player.resources.cattle).toBe(1)
+    }
+  })
+
+  it('does not duplicate a C148-held boar into a new pasture', () => {
+    const player = createPlayer() as AnimalAwareFarmState
+    player.resources.boar = 1
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.stableAnimals = {}
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.player.pastures[0]?.animalType).toBeNull()
+      expect(result.player.pastures[0]?.animalCount).toBe(0)
+      expect(result.player.cardStates.C148_MudWallower?.counters?.held).toBe(1)
+      expect(result.player.resources.boar).toBe(1)
+    }
+  })
+
+  it('does not reserve more boars for C148 than are actually on the card', () => {
+    const player = createPlayer() as AnimalAwareFarmState
+    player.resources.boar = 2
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.stableAnimals = {}
+    player.pastures = [
+      { id: 'old-pasture', size: 1, tiles: [{ row: 2, col: 1 }], stables: 0, animalType: 'boar', animalCount: 1 },
+    ]
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 2 } },
+    }
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.player.pastures[0]?.animalType).toBe('boar')
+      expect(result.player.pastures[0]?.animalCount).toBe(1)
+      expect(result.player.cardStates.C148_MudWallower?.counters?.held).toBe(2)
+      expect(result.player.resources.boar).toBe(2)
     }
   })
 

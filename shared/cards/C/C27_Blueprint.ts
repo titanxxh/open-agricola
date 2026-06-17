@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { appendDiscountedCardCostCandidates } from '../../actions/payment/internal'
+import { discountCardCostCandidate } from '../../actions/payment/internal'
 
 const CARD_ID = 'C27_Blueprint'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
@@ -23,11 +23,11 @@ const computeCostsListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
-  computeCardCostCandidates: (context, candidates) => {
+  deriveCardCostCandidate: (context, candidate) => {
     if (!context.cardId || !ALLOWED_MAJORS.includes(context.cardId as typeof ALLOWED_MAJORS[number])) {
-      return [...candidates]
+      return null
     }
-    return appendDiscountedCardCostCandidates(candidates, CARD_ID, { stone: 1 })
+    return discountCardCostCandidate(candidate, CARD_ID, { stone: 1 })
   },
 }
 

@@ -161,6 +161,60 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'eastern-quarry':     [],
 }
 
+// Detailed icon-description shown inside the hover tooltip card body (BGA `tooltipDesc`).
+// More verbose than ACTION_ICON_DESC (adds [text] labels); falls back to ACTION_ICON_DESC
+// / gain display when an id is absent here.
+const ACTION_TOOLTIP_DESC: Record<string, string[]> = {
+  'fencing':              ['[Build fences]', '1<wood><arrow><fence-icon>'],
+  'grain-utilization':    ['[Sow]', '<sow>', '[and/or]', '[Bake bread]', '<bread>'],
+  'major-improvement':    ['[Build 1 major or play 1 minor improvement]', '1<major>/<minor>'],
+  'cultivation':          ['[Plow a field]', '<field>', '[and/or]', '[Sow]', '<sow>'],
+  'wish-children':        ['<child> [Growth with room only]', '[then]', '1<minor>'],
+  'urgent-wish-children': ['<child-free> [Growth without room]'],
+  'house-redevelopment':  ['[Renovation]', '<upgrade>', '[then]', '1<major>/<minor>'],
+  'farm-redevelopment':   ['[Renovation]', '<upgrade>', '[then]', '[Build fences]', '1<wood><arrow><fence-icon>'],
+}
+
+// Full rule text shown to the right of the tooltip card (BGA `tooltip`).
+// Falls back to the i18n short description when an id is absent here.
+const ACTION_TOOLTIP_TEXT: Record<string, string[]> = {
+  'fencing': [
+    'You can build any number of fences, paying 1 wood for each new fence you build.',
+    'You may fence a stable, or divide an existing pasture into several smaller ones by building fences on the fence spaces inside the pasture.',
+  ],
+  'sheep-market': ['Accumulate 1 sheep each turn.'],
+  'grain-utilization': [
+    'Sow: place 1 grain or vegetable from your supply onto an empty field, then add more from the supply (grain fields hold 3, vegetable fields hold 2).',
+    'Bake bread: turn grain from your supply (not from your fields) into food using a Fireplace, Cooking Hearth or other baking improvement.',
+  ],
+  'major-improvement': ['You can either build 1 major improvement or play 1 minor improvement.'],
+  'western-quarry': ['Accumulate 1 stone each turn.'],
+  'pig-market': ['Accumulate 1 wild boar each turn.'],
+  'vegetable-seeds': ['Gain 1 vegetable.'],
+  'eastern-quarry': ['Accumulate 1 stone each turn.'],
+  'cattle-market': ['Accumulate 1 cattle each turn.'],
+  'wish-children': [
+    'You can only grow your family here if you currently have more rooms than people, regardless of whether those people are still at home or on action spaces.',
+    'You may not skip the family growth only to play a minor improvement.',
+  ],
+  'urgent-wish-children': [
+    'The number of rooms in your house does not matter for this effect.',
+    'Note: if you grow your family here and build a single room later, you will not be able to use "Wish for Children".',
+    'The new room is immediately occupied by the person who did not have a room of their own yet.',
+  ],
+  'cultivation': [
+    'You can plow one field and then immediately sow grain or vegetables in all of your empty fields, including the one you just plowed.',
+  ],
+  'house-redevelopment': [
+    'You may only build a major improvement or play a minor improvement if you renovate first.',
+    'You are not allowed to renovate your house twice in a single action.',
+  ],
+  'farm-redevelopment': [
+    'You can only build fences if you renovate first.',
+    'You are not allowed to renovate twice in a single action.',
+  ],
+}
+
 function getIconLineClassName(actionId?: string): string {
   return actionId === 'resource-market'
     ? 'icon-line icon-line--resource-market'
@@ -253,6 +307,7 @@ type TooltipInfo = {
   title?: string
   description?: string
   spritePos?: string
+  action?: ActionSpace
   x: number
   y: number
 }
@@ -506,7 +561,7 @@ export const ActionBoard = ({
   const showTooltip = (e: MouseEvent, action: ActionSpace) => {
     const spritePos = ACTION_SPRITE[action.id]
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const tooltipW = 360
+    const tooltipW = spritePos ? 470 : 240
     const rightSpace = window.innerWidth - rect.right
     const x = rightSpace > tooltipW + 16 ? rect.right + 8 : rect.left - tooltipW - 8
     setTooltip({
@@ -515,6 +570,7 @@ export const ActionBoard = ({
       nameKey: action.nameKey,
       descKey: action.descriptionKey,
       spritePos,
+      action,
       x,
       y: rect.top,
     })
@@ -539,6 +595,19 @@ export const ActionBoard = ({
 
   const hasGainPerRound = (space: ActionSpace) =>
     Object.values(space.gainPerRound).some((v) => (v ?? 0) > 0)
+
+  const renderTooltipBody = (info: TooltipInfo): React.ReactNode => {
+    const id = info.actionId
+    if (!id) return null
+    const tipDesc = ACTION_TOOLTIP_DESC[id]
+    if (tipDesc?.length) return renderIconDesc(tipDesc, id)
+    const action = info.action
+    if (action && ACCUMULATE_DIR[id] && hasGainPerRound(action)) {
+      return renderGainDisplay(action)
+    }
+    if (ACTION_ICON_DESC[id]?.length) return renderIconDesc(ACTION_ICON_DESC[id], id)
+    return info.descKey ? t(locale, info.descKey) : null
+  }
 
   return (
     <section className="actions">
@@ -728,15 +797,29 @@ export const ActionBoard = ({
           className="round-action-tooltip"
           style={{ top: tooltip.y, left: tooltip.x }}
         >
-          {tooltip.kind === 'action' && tooltip.spritePos && (
-            <div className="tooltip-card-img" style={{ backgroundPosition: tooltip.spritePos }} />
+          {tooltip.kind === 'action' && tooltip.spritePos ? (
+            <>
+              <div
+                className="tooltip-action-card"
+                data-action-id={tooltip.actionId}
+              >
+                <h4 className="action-header">{t(locale, tooltip.nameKey!)}</h4>
+                <div className="action-desc">{renderTooltipBody(tooltip)}</div>
+              </div>
+              <div className="tooltip-text">
+                {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [t(locale, tooltip.descKey!)]).map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="tooltip-text">
+              <strong>{tooltip.kind === 'action' ? t(locale, tooltip.nameKey!) : tooltip.title}</strong>
+              {(tooltip.kind === 'action' || tooltip.description) && (
+                <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
+              )}
+            </div>
           )}
-          <div className="tooltip-text">
-            <strong>{tooltip.kind === 'action' ? t(locale, tooltip.nameKey!) : tooltip.title}</strong>
-            {(tooltip.kind === 'action' || tooltip.description) && (
-              <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
-            )}
-          </div>
         </div>
       )}
     </section>

@@ -259,6 +259,16 @@
   font-size: 13px;
   color: rgba(253, 246, 227, 0.8);
 }
+.interaction-rule-hint {
+  padding: 8px 10px;
+  border: 1px solid rgba(230, 183, 58, 0.45);
+  border-left: 4px solid #e6b73a;
+  border-radius: 6px;
+  background: rgba(230, 183, 58, 0.14);
+  color: #fdf6e3;
+  font-size: 13px;
+  font-weight: 700;
+}
 .interaction-actions {
   display: flex;
   gap: 8px;
@@ -1322,7 +1332,7 @@
   font-size: 14px;
   opacity: 0.5;
 }
-/* --- Round action hover tooltip (actions.jpg) --- */
+/* --- Round action hover tooltip (actions.jpg card + icon overlay, BGA-style) --- */
 .round-action-tooltip {
   position: fixed;
   z-index: 200;
@@ -1332,22 +1342,87 @@
   overflow: hidden;
   pointer-events: none;
   display: flex;
+  align-items: stretch;
 }
-.tooltip-card-img {
-  width: 180px;
-  height: 280px;
-  background-image: url('/bga-img/actions.jpg');
-  background-size: 500% 300%;
+/* Left: the action card itself, rendered the same way as the board — the
+   action_frame.png parchment card (title strip + yellow content area + frame),
+   with the title on the strip and the icon description centered in the content
+   area. Matches the on-board round-action card look. */
+.tooltip-action-card {
+  width: 232px;
+  height: 276px;
+  background-image: url('/bga-img/action_frame.png');
+  background-size: 100% 100%;
   background-repeat: no-repeat;
   flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 24px 18px;
 }
-.tooltip-text {
-  padding: 10px;
-  width: 180px;
+.tooltip-action-card .action-header {
+  flex-shrink: 0;
+  margin: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--agricola-font);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #2a1a00;
+}
+.tooltip-action-card .action-desc {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--agricola-font);
+  font-weight: bold;
+  font-size: 28px;
+  color: #2a1a00;
+  text-align: center;
+}
+.tooltip-action-card .action-desc .icon-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
   white-space: normal;
-  font-size: 12px;
-  color: #3a3a3a;
-  line-height: 1.45;
+}
+.tooltip-action-card .action-desc .icon-line .text {
+  font-family: var(--agricola-font);
+  font-size: 0.6em;
+  font-weight: normal;
+}
+.tooltip-action-card .action-desc .icon-line .res-icon {
+  font-size: inherit;
+}
+.tooltip-action-card .action-desc .gain-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tooltip-action-card .action-desc .gain-amount {
+  font-size: 30px;
+}
+.tooltip-action-card .action-desc .gain-res-icon {
+  font-size: 34px;
+}
+/* Right: full rule text (BGA `tooltip`). */
+.tooltip-text {
+  padding: 12px 14px;
+  width: 210px;
+  white-space: normal;
+  font-size: 12.5px;
+  color: #4a4032;
+  line-height: 1.5;
+  align-self: center;
 }
 .tooltip-text strong {
   display: block;
@@ -1357,8 +1432,11 @@
   margin-bottom: 4px;
 }
 .tooltip-text p {
-  margin: 0;
-  color: #555;
+  margin: 0 0 7px;
+  color: #5a5042;
+}
+.tooltip-text p:last-child {
+  margin-bottom: 0;
 }
 /* --- Harvest markers --- */
 .harvest-marker {
@@ -2198,6 +2276,11 @@
   max-width: 188px;
   min-width: 0;
 }
+.played-card-slot {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
 .played-card {
   background: #fff;
   border-radius: 10px;
@@ -2608,6 +2691,17 @@
   outline: 2px solid #8c6a2a;
   outline-offset: 4px;
   border-radius: 12px;
+}
+.played-card-reorg {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #d7c8a1;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+.played-card-reorg .pasture-count {
+  text-align: left;
 }
 .card-future-item {
   display: inline-flex;

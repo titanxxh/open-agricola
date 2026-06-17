@@ -828,6 +828,59 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(0)
   })
 
+  it('rejects final fence payments above the policy budget', () => {
+    const ctx = makeCtx({
+      actionContext: {
+        fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          newPastureBounds: { count: { min: 1, max: 1 } },
+          costPolicy: { fence: { wood: 1 } },
+          paymentBudget: { wood: 3 },
+        },
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result.type).toBe('fail')
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+    expect(ctx.player.resources.wood).toBe(4)
+  })
+
+  it('applies the fence payment budget after pending free fences reduce payment', () => {
+    const ctx = makeCtx({
+      actionContext: {
+        fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          newPastureBounds: { count: { min: 1, max: 1 } },
+          costPolicy: { fence: { wood: 1 } },
+          paymentBudget: { wood: 3 },
+        },
+      },
+    })
+    storePendingFenceBonus(ctx.player, {
+      sourceCard: 'TestFenceBonus',
+      counterKey: 'fences',
+      freeFences: 1,
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 3 })
+    expect(ctx.player.fenceSegments).toHaveLength(4)
+    expect(ctx.player.pastures).toHaveLength(1)
+  })
+
   it('rejects ordinary fences beyond dynamic reserve and build cap', () => {
     const existing = widePastureEdges.slice(0, 10)
     const build = widePastureEdges.slice(10)

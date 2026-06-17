@@ -146,7 +146,7 @@ describe('fixed card-purchase cost candidates', () => {
       .removeListenersWhere((listener) => listener.id === 'hook-free-grain-depot')
   })
 
-  it('C95 appends a fixed Basketmaker payment candidate and keeps the original', () => {
+  it('C95 buys the Basketmaker for the fixed price; the dominated printed cost is never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -164,17 +164,19 @@ describe('fixed card-purchase cost candidates', () => {
       'C95_BasketWeaver',
     )
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
-    const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
-    expect(fixed?.labelParams.sourceCards).toEqual(['C95_BasketWeaver'])
-    expect(fixed?.effectPreview).toMatchObject({
-      resourcesPaid: { reed: 1, stone: 1 },
-      sourceCards: ['C95_BasketWeaver'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(false)
+      const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
+      expect(fixed).toBeDefined()
+    } else {
+      expect(player.improvements).toContain('Major_Basket')
+      expect(player.resources.reed).toBe(1)
+      expect(player.resources.stone).toBe(1)
+    }
   })
 
-  it('E109 appends a fixed Basketmaker payment candidate during ordinary improvement buys', () => {
+  it('E109 offers the fixed Basketmaker price; the dominated printed cost is never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -185,14 +187,15 @@ describe('fixed card-purchase cost candidates', () => {
 
     const result = playImprovement(state, player, 'major:Major_Basket', 'any')
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
-    const fixed = options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
-    expect(fixed?.labelParams.sourceCards).toEqual(['E109_BraidMaker'])
-    expect(fixed?.effectPreview).toMatchObject({
-      resourcesPaid: { reed: 1, stone: 1 },
-      sourceCards: ['E109_BraidMaker'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(false)
+      expect(options.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))).toBeDefined()
+    } else {
+      expect(player.improvements).toContain('Major_Basket')
+      expect(player.resources.reed).toBe(1)
+      expect(player.resources.stone).toBe(1)
+    }
   })
 
   it('A27 replaces the printed oven cost with the fixed oven payment candidate', () => {
@@ -221,7 +224,7 @@ describe('fixed card-purchase cost candidates', () => {
     ])
   })
 
-  it('A75 mandatory discount does not preserve the original payment candidate', () => {
+  it('A75 discount preserves the original payment candidate at resolver level', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -235,12 +238,16 @@ describe('fixed card-purchase cost candidates', () => {
       { wood: 2, clay: 2, reed: 2, stone: 2 },
     )
 
-    expect(candidateOptions(result)).toEqual([
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      {
+        resources: { wood: 2, clay: 2, reed: 2, stone: 2 },
+        sources: [],
+      },
       {
         resources: { wood: 1, clay: 2, reed: 2, stone: 2 },
         sources: ['A75_LumberMill'],
       },
-    ])
+    ]))
   })
 
   it('E130 offers exactly one non-optional resource discount choice', () => {
@@ -301,21 +308,27 @@ describe('fixed card-purchase cost candidates', () => {
       'C95_BasketWeaver',
     )
 
-    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+    // Candidate Closure (ADR 0004): fixed-price rows report their own card
+    // as the sole source instead of merging sources from whichever row they
+    // were derived from, so the multi-source attribution combos of the old
+    // ordered fold ({C95+E109} rows) no longer appear. The player-visible
+    // resource set is unchanged.
+    const sortSources = (rows: ReturnType<typeof candidateOptions>) =>
+      rows.map((row) => ({ ...row, sources: [...row.sources].sort() }))
+    // ADR 0004 amendment: rows equivalent up to sources keep one
+    // deterministic representative (fewest sources, then key order), so the
+    // C95/E109 fixed-price twins and their discounted twins collapse.
+    expect(sortedJson(sortSources(candidateOptions(result)))).toEqual(sortedJson(sortSources([
       { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver'] },
-      { resources: { reed: 1, stone: 1 }, sources: ['E109_BraidMaker'] },
-      { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver', 'E109_BraidMaker'] },
       { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver'] },
-      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'E109_BraidMaker'] },
-      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver', 'E109_BraidMaker'] },
       { resources: { reed: 2, stone: 1, food: 1 }, sources: ['A143_Stonecutter', 'D117_WoodExpert'] },
       { resources: { reed: 2, stone: 2, food: 1 }, sources: ['D117_WoodExpert'] },
       { resources: { wood: 2, reed: 2, stone: 1 }, sources: ['A143_Stonecutter'] },
       { resources: { wood: 2, reed: 2, stone: 2 }, sources: [] },
-    ]))
+    ])))
   })
 
-  it('E27 appends a free major improvement payment candidate and keeps the original', () => {
+  it('E27 resolves the flagged major purchase free; dominated paid options are never offered', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
@@ -327,14 +340,16 @@ describe('fixed card-purchase cost candidates', () => {
 
     const result = playImprovement(state, player, 'major:Major_Joinery', 'any')
 
-    const options = expectPaymentRequest(result)
-    expect(options.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(true)
-    const free = options.find((option) => hasPaidResources(option, {}))
-    expect(free?.labelParams.sourceCards).toEqual(['E27_PiggyBank'])
-    expect(free?.effectPreview).toMatchObject({
-      resourcesPaid: {},
-      sourceCards: ['E27_PiggyBank'],
-    })
+    if (result.type === 'request') {
+      const options = expectPaymentRequest(result)
+      expect(options.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
+      const free = options.find((option) => hasPaidResources(option, {}))
+      expect(free?.labelParams.sourceCards).toEqual(['E27_PiggyBank'])
+    } else {
+      expect(player.improvements).toContain('Major_Joinery')
+      expect(player.resources.wood).toBe(2)
+      expect(player.resources.stone).toBe(2)
+    }
   })
 
   it('D95 derives replacement candidates for every non-empty subset of present building resources', () => {
@@ -352,21 +367,13 @@ describe('fixed card-purchase cost candidates', () => {
       'D95_SiteManager',
     )
 
-    expect(result.cost).toMatchObject({
-      fees: [
-        { wood: 2, stone: 2 },
-        { wood: 1, stone: 2, food: 1 },
-        { wood: 2, stone: 1, food: 1 },
-        { wood: 1, stone: 1, food: 2 },
-      ],
-    })
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { wood: 2, stone: 2 }, sources: [] },
+      { resources: { wood: 1, stone: 2, food: 1 }, sources: ['D95_SiteManager'] },
+      { resources: { wood: 2, stone: 1, food: 1 }, sources: ['D95_SiteManager'] },
+      { resources: { wood: 1, stone: 1, food: 2 }, sources: ['D95_SiteManager'] },
+    ]))
     expect('bonuses' in result.cost).toBe(false)
-    expect(result.candidateMetadataByFeeIndex).toEqual({
-      0: { originalFeeIndex: 0, sources: [] },
-      1: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-      2: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-      3: { originalFeeIndex: 0, sources: ['D95_SiteManager'] },
-    })
   })
 
   it('B65 keeps the original path identity when a derived payment candidate is selected', () => {
@@ -375,18 +382,15 @@ describe('fixed card-purchase cost candidates', () => {
       cardIds: [HOOK_CARD],
       phases: ['computeCosts'],
       actions: ['improvement'],
-      computeCardCostCandidates: (context, candidates) => {
-        if (context.cardId !== 'B65_GrainDepot') return [...candidates]
-        return [
-          ...candidates,
-          ...candidates
-            .filter((candidate) => candidate.originalFeeIndex === 1)
-            .map((candidate) => ({
-              resources: {},
-              originalFeeIndex: candidate.originalFeeIndex,
-              sources: [...candidate.sources, HOOK_CARD],
-            })),
-        ]
+      deriveCardCostCandidate: (context, candidate) => {
+        if (context.cardId !== 'B65_GrainDepot') return null
+        if (candidate.originalFeeIndex !== 1) return null
+        if (candidate.sources.includes(HOOK_CARD)) return null
+        return {
+          resources: {},
+          originalFeeIndex: candidate.originalFeeIndex,
+          sources: [...candidate.sources, HOOK_CARD],
+        }
       },
     }
     requireActiveCardRegistry('card-cost-fixed-candidates').registerListener(hook)
@@ -415,5 +419,51 @@ describe('fixed card-purchase cost candidates', () => {
         resources: { grain: 1 },
       }),
     ])
+  })
+
+  // ADR 0004 closure property on production impls: A27 (mandatory fixed
+  // price) + A143 (optional stone discount). Mandatory Saturation hides the
+  // printed oven row; only the fixed row and its discounted derivation
+  // surface, independent of which zone arrays the cards sit in.
+  it('A27+A143 surfaces only the saturated fixed-price rows', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.minorPlayed = ['A27_OvenSite']
+    player.occupationPlayed = ['A143_Stonecutter']
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_ClayOven',
+      { clay: 3 },
+      'A27_OvenSite',
+    )
+    expect(sortedJson(candidateOptions(result).map((row) => row.resources))).toEqual(sortedJson([
+      { clay: 1, stone: 1 },
+      { clay: 1 },
+    ]))
+  })
+
+  it('A75+D117 preserves the base, A75-discounted, and D117 wood-for-food candidates', () => {
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    player.minorPlayed = ['A75_LumberMill']
+    player.occupationPlayed = ['D117_WoodExpert']
+
+    const result = resolveCardCostWithModifiersDetailed(
+      state,
+      player,
+      'improvement',
+      'Major_Test',
+      { wood: 2 },
+    )
+    expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
+      { resources: { wood: 2 }, sources: [] },
+      { resources: { wood: 1 }, sources: ['A75_LumberMill'] },
+      { resources: { food: 1 }, sources: ['D117_WoodExpert'] },
+    ]))
   })
 })

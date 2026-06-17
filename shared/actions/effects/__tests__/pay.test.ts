@@ -150,14 +150,51 @@ describe('keepOnlyOptimals', () => {
     expect(keepOnlyOptimals(solutions)).toEqual(solutions)
   })
 
-  it('keeps dominated solutions', () => {
+  it('drops strictly dominated solutions (ADR 0004 amendment)', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 5 }, tradesUsed: [] },
       { resourcesPaid: { wood: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toEqual(solutions)
+    expect(optimal).toEqual([{ resourcesPaid: { wood: 3 }, tradesUsed: [] }])
+  })
+
+  it('never prunes across different fee identities', () => {
+    const solutions: PaymentSolution[] = [
+      { resourcesPaid: { wood: 5 }, tradesUsed: [], feeIdentity: 0 },
+      { resourcesPaid: { wood: 3 }, tradesUsed: [], feeIdentity: 1 },
+    ]
+    expect(keepOnlyOptimals(solutions)).toEqual(solutions)
+  })
+
+  it('prunes dominated solutions that only carry a tracked choice index', () => {
+    const solutions: PaymentSolution[] = [
+      { resourcesPaid: { wood: 5 }, tradesUsed: [], bonusChoiceIndex: { E123_ResourceHoarder: 1 } },
+      { resourcesPaid: { wood: 3 }, tradesUsed: [] },
+    ]
+    expect(keepOnlyOptimals(solutions)).toEqual([{ resourcesPaid: { wood: 3 }, tradesUsed: [] }])
+  })
+
+  it('never prunes solutions carrying a state-affecting bonus choice', () => {
+    const solutions: PaymentSolution[] = [
+      {
+        resourcesPaid: { wood: 5 },
+        tradesUsed: [],
+        bonusChoiceIndex: { E123_ResourceHoarder: 1 },
+        bonusChoiceAffectsState: { E123_ResourceHoarder: true },
+      },
+      { resourcesPaid: { wood: 3 }, tradesUsed: [] },
+    ]
+    expect(keepOnlyOptimals(solutions)).toHaveLength(2)
+  })
+
+  it('never prunes card payments', () => {
+    const solutions: PaymentSolution[] = [
+      { resourcesPaid: { wood: 5 }, tradesUsed: [], cardUsed: 'SomeCard' },
+      { resourcesPaid: { wood: 3 }, tradesUsed: [] },
+    ]
+    expect(keepOnlyOptimals(solutions)).toHaveLength(2)
   })
 
   it('keeps solutions that are optimal in different resources', () => {
@@ -169,14 +206,14 @@ describe('keepOnlyOptimals', () => {
     expect(optimal).toHaveLength(2)
   })
 
-  it('keeps solution dominated in all dimensions', () => {
+  it('drops solutions dominated in all dimensions', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 3, clay: 3 }, tradesUsed: [] },
       { resourcesPaid: { wood: 2, clay: 2 }, tradesUsed: [] },
       { resourcesPaid: { wood: 4, clay: 4 }, tradesUsed: [] },
     ]
     const optimal = keepOnlyOptimals(solutions)
-    expect(optimal).toEqual(solutions)
+    expect(optimal).toEqual([{ resourcesPaid: { wood: 2, clay: 2 }, tradesUsed: [] }])
   })
 
   it('handles equal solutions', () => {
@@ -270,7 +307,9 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([3, 5])
+    // Dominance pruning hides the skip path (strictly worse than using the
+    // discount) — matching BGA's keepOnlyOptimals.
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([3])
   })
 
   it('combines optional and mandatory bonuses', () => {
@@ -283,7 +322,7 @@ describe('computeAllBuyableCombinations', () => {
       ],
     }
     const solutions = computeAllBuyableCombinations(player, cost)
-    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([2, 4])
+    expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([2])
   })
 
   it('expands bonus.choices into alternative paths (optional: false = must pick one)', () => {
@@ -1093,6 +1132,35 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
     ])
   })
 
+  it('single candidate metadata contributes sources and attribution', () => {
+    const player = createMockPlayer({ wood: 1 })
+    const cost: ComplexCost = { fees: [{ wood: 1 }] }
+    const { result, capturedEvents } = callPay(player, {
+      cost,
+      costType: 'minor-improvement',
+      candidateMetadataByFeeIndex: {
+        0: {
+          originalFeeIndex: 0,
+          sources: ['A75_LumberMill'],
+          costAttribution: {
+            A75_LumberMill: { saved: { wood: 1 } },
+          },
+        },
+      },
+    })
+
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 1 },
+        paymentFor: 'minor-improvement',
+        bonusSources: ['A75_LumberMill'],
+      }),
+    ])
+    expect(readCardResourceStats(player, 'A75_LumberMill')?.saved).toEqual({ wood: 1 })
+  })
+
   it('typed-flat Partial<Resource>: event keeps bonusChoiceIndex provenance', () => {
     const player = createMockPlayer({ wood: 1, clay: 2 })
     player.activeModifiers = [
@@ -1232,6 +1300,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
       expect(extra?.bonusChoiceIndex?.['TestBonusCard']).toBe(0)
       expect(extra?.bonusUsed).toContain('TestBonusCard')
     }
+    expect(readCardResourceStats(player, 'TestBonusCard')?.saved).toEqual({ wood: 1 })
     expect(capturedEvents).toEqual([
       expect.objectContaining({
         type: 'resource.paid',

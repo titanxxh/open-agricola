@@ -212,6 +212,7 @@ export const zh = {
     interactionFencingChoice: '请选择圈地方案',
     interactionBuildFences: '建造 {count} 段围栏',
     interactionBuildPasture: '围成 {size} 格 · 围栏 {fences} · 畜栏 {stables} · 木材 {wood}',
+    interactionCarpentersBenchFenceHint: '木匠长凳只能围成 1 个新牧场，不能拆成 2 个圈地。',
     interactionFenceSelect: '在农场选择围栏位置后确认',
     interactionFenceConfirm: '确认围栏',
     interactionFenceCancel: '取消',
@@ -239,8 +240,11 @@ export const zh = {
     interactionFarmHandHint: '已选择帮工特殊畜栏位',
     interactionSowSelectSubtitle: '已选 {selected} 块田地',
     interactionOptionalAction: '可选动作',
+    interactionOptionalActionWithChoice: '可选：{action}',
     interactionTriggeredByCard: '由 {card} 触发',
     interactionOptionalSkip: '跳过',
+    interactionOptionalSkipAction: '跳过{action}',
+    interactionOptionalSkipCard: '不使用{card}',
     interactionFlowSelect: '请选择要执行的动作',
     interactionUseAbility: '使用能力',
   interactionUseGrowOffspring: '激活后代（付 1 食物）',
@@ -583,6 +587,10 @@ export const zh = {
     gain: {
       description: '获得 {resources_desc}',
           name: '获得',
+},
+    receive: {
+      description: '接收 {resources_desc}',
+          name: '接收',
 },
     'move-farmer-to-space': {
       description: '将农夫移动到行动格',

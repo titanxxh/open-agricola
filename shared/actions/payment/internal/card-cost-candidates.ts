@@ -6,6 +6,7 @@ import type {
   CostAttributionBySource,
   PaymentResourceKey,
   PaymentResourceMap,
+  PaymentSolution,
   Resource,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
@@ -60,8 +61,13 @@ const candidateKey = (candidate: CardCostCandidate) =>
       .filter((key) => candidate.resources[key] !== undefined)
       .map((key) => [key, candidate.resources[key] ?? 0]),
     originalFeeIndex: candidate.originalFeeIndex,
-    sources: candidate.sources,
+    // Sources are an unordered contribution set: closure derivation chains
+    // may append the same cards in different orders.
+    sources: [...candidate.sources].sort(),
   })
+
+/** Dedupe key used by the candidate closure over card cost candidates. */
+export const cardCostCandidateClosureKey = candidateKey
 
 export const cardCostCandidatesEqual = (
   left: readonly CardCostCandidate[],
@@ -149,7 +155,11 @@ export const addCardCostCandidateAttribution = (
   }
 }
 
-const discountCardCostCandidate = (
+/**
+ * Single-candidate discount derivation (Candidate Closure transform body).
+ * Clamps at 0; returns null when nothing is actually saved.
+ */
+export const discountCardCostCandidate = (
   candidate: CardCostCandidate,
   source: string,
   discount: Partial<Resource>,
@@ -180,33 +190,45 @@ const discountCardCostCandidate = (
   )
 }
 
-const deriveDiscountedCardCostCandidates = (
-  candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
-): CardCostCandidate[] =>
-  candidates
-    .map((candidate) => discountCardCostCandidate(candidate, source, discount))
-    .filter((candidate): candidate is CardCostCandidate => Boolean(candidate))
+const resourcesAndFeeKey = (candidate: CardCostCandidate) =>
+  JSON.stringify({
+    resources: PAYMENT_RESOURCE_KEYS
+      .filter((key) => candidate.resources[key] !== undefined)
+      .map((key) => [key, candidate.resources[key] ?? 0]),
+    originalFeeIndex: candidate.originalFeeIndex,
+  })
 
-export const appendDiscountedCardCostCandidates = (
+/**
+ * Keeps exactly one representative per equivalent row (ADR 0004 amendment).
+ *
+ * The closure can reach the same resources + fee identity through several
+ * derivation chains that differ only by contributing sources (fixed-price
+ * twins like C95/E109, or "bypass" chains where an optional transform
+ * consumed a mandatory transform's resource first). Those rows are identical
+ * payment choices for the player; surfacing them all is presentation noise
+ * with multiplied attribution. Pick a deterministic representative: fewest
+ * sources first (closest to BGA's reference attribution), then normalized
+ * candidate key order.
+ */
+export const dedupeEquivalentRowCandidates = (
   candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
 ): CardCostCandidate[] => {
-  const derived = deriveDiscountedCardCostCandidates(candidates, source, discount)
-  return dedupeCardCostCandidates([...candidates, ...derived])
-}
-
-export const replaceWithDiscountedCardCostCandidates = (
-  candidates: readonly CardCostCandidate[],
-  source: string,
-  discount: Partial<Resource>,
-): CardCostCandidate[] => {
-  const replaced = candidates.map((candidate) =>
-    discountCardCostCandidate(candidate, source, discount) ?? candidate,
+  const representative = new Map<string, CardCostCandidate>()
+  for (const candidate of candidates) {
+    const key = resourcesAndFeeKey(candidate)
+    const current = representative.get(key)
+    if (
+      !current ||
+      candidate.sources.length < current.sources.length ||
+      (candidate.sources.length === current.sources.length &&
+        candidateKey(candidate) < candidateKey(current))
+    ) {
+      representative.set(key, candidate)
+    }
+  }
+  return candidates.filter((candidate) =>
+    representative.get(resourcesAndFeeKey(candidate)) === candidate,
   )
-  return dedupeCardCostCandidates(replaced)
 }
 
 export const buildCandidateMetadataByFeeIndex = (
@@ -223,4 +245,18 @@ export const buildCandidateMetadataByFeeIndex = (
     }
   })
   return metadata
+}
+
+export const cardCostCandidateMetadataForFeeIndex = (
+  metadataByFeeIndex: Record<number, CardCostCandidateMetadata> | undefined,
+  feeIndex: number | undefined,
+): CardCostCandidateMetadata | undefined =>
+  metadataByFeeIndex?.[feeIndex ?? 0]
+
+export const cardCostCandidateMetadataForSolution = (
+  metadataByFeeIndex: Record<number, CardCostCandidateMetadata> | undefined,
+  solution: PaymentSolution,
+): CardCostCandidateMetadata | undefined => {
+  if (solution.cardUsed) return undefined
+  return cardCostCandidateMetadataForFeeIndex(metadataByFeeIndex, solution.feeIndex)
 }
