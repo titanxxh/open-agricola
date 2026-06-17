@@ -604,6 +604,8 @@ const descriptionSeparatorForNode = (node: EngineNode): string => {
   return ''
 }
 
+const cardChoiceLabelKeyPattern = /^cards\.[^.]+\.choice$/
+
 export function getNodeDescriptionPreview(
   node: EngineNode,
   registry: ActionRegistry,
@@ -612,11 +614,17 @@ export function getNodeDescriptionPreview(
     const action = registry.get(node.actionId)
     if (!action) return undefined
     const specialEffectLabelKey = specialEffectDescriptionLabelKey(node)
-    if (!node.choiceLabelKey && specialEffectLabelKey === null) return undefined
+    const isCardChoiceLabel =
+      !!node.choiceLabelKey && cardChoiceLabelKeyPattern.test(node.choiceLabelKey)
+    const useChoiceLabelAsDescription =
+      !!node.choiceLabelKey && !isCardChoiceLabel
+    if (specialEffectLabelKey === null && !useChoiceLabelAsDescription) return undefined
     return {
       kind: 'action',
-      labelKey: node.choiceLabelKey ?? specialEffectLabelKey ?? action.nameKey,
-      labelParams: node.choiceLabelParams,
+      labelKey: useChoiceLabelAsDescription
+        ? node.choiceLabelKey!
+        : specialEffectLabelKey ?? (isCardChoiceLabel ? action.descriptionKey : action.nameKey),
+      labelParams: useChoiceLabelAsDescription ? node.choiceLabelParams : undefined,
       effectPreview: getActionEffectPreview(node),
     }
   }

@@ -1223,12 +1223,82 @@ describe('InteractionBar', () => {
       />,
     )
 
-    expect(html).toContain('Optional action')
+    expect(html).not.toContain('Optional action')
+    expect(html).toContain('Optional: Exchange resources')
     expect(html).toContain('Triggered by')
     expect(html).toContain('Cabbage Buyer')
+    expect(html).toContain('Do not use')
     expect(html).toContain('Exchange resources')
     expect(html).toContain('data-resource=\"food\"')
     expect(html).toContain('data-resource=\"vegetable\"')
+  })
+
+  it('renders card optional choice keys through flow descriptions', () => {
+    const triggeredChoice: PendingChoice = {
+      promptKey: 'ui.interactionOptionalAction',
+      options: [
+        {
+          value: 'action-e53-exchange',
+          labelKey: 'cards.E53_BoarSpear.choice',
+          descriptionPreview: {
+            kind: 'action',
+            labelKey: 'actions.exchange.description',
+          },
+        },
+        { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
+      ],
+      playerIndex: 0,
+      spaceId: 'pig-market',
+      sourceCard: 'E53_BoarSpear',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={triggeredChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).not.toContain('cards.E53_BoarSpear.choice')
+    expect(html).toContain('Optional: Exchange resources')
+    expect(html).toContain('Triggered by')
+    expect(html).toContain('Boar Spear')
+    expect(html).toContain('Do not use')
   })
 
   it('renders payment previews with concrete cost main text and pay-resources subtitle', () => {

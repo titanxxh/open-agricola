@@ -1836,6 +1836,50 @@ describe('Engine flow nodes', () => {
     ])
   })
 
+  it('optional action descriptions ignore custom choice labels', () => {
+    const registry = new ActionRegistry()
+    const exchangeLikeAction: ActionDefinition = {
+      id: 'test-e53-exchange',
+      nameKey: 'actions.exchange.name',
+      descriptionKey: 'actions.exchange.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    registry.register(exchangeLikeAction)
+    const optional = new ActionNode(
+      'e53-exchange',
+      'test-e53-exchange',
+      'E53_BoarSpear',
+      undefined,
+      'cards.E53_BoarSpear.choice',
+    )
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const first = engine.proceed({
+      state: createState(),
+      player: createPlayer(),
+      space: createSpace(exchangeLikeAction),
+    })
+
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    const accept = first.choice.options.find((option) => option.value === 'e53-exchange')
+    expect(accept?.labelKey).toBe('cards.E53_BoarSpear.choice')
+    expect(accept?.descriptionPreview).toMatchObject({
+      kind: 'action',
+      labelKey: 'actions.exchange.description',
+    })
+  })
+
   it('renders special-effect steps with semantic descriptions', () => {
     const placeFarmerAction: ActionDefinition = {
       id: 'place-farmer',
