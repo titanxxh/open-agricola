@@ -53,7 +53,8 @@ const executeSpecialEffectLeaves = (
 
 type AnimalZone = {
   id: string
-  zoneType: 'pasture' | 'house' | 'stable'
+  zoneType: 'pasture' | 'house' | 'stable' | 'card'
+  cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
   capacity: number

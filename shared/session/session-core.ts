@@ -1508,7 +1508,8 @@ export class GameCore {
     const idx = this.state.players.indexOf(player)
     return playerBoard(this.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
-      zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+      zoneType: zone.zoneType,
+      cardId: zone.cardId,
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
       animalCount: zone.animalCount ?? 0,
       capacity: zone.capacity,

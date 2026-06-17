@@ -1287,6 +1287,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
       expect(extra?.bonusChoiceIndex?.['TestBonusCard']).toBe(0)
       expect(extra?.bonusUsed).toContain('TestBonusCard')
     }
+    expect(readCardResourceStats(player, 'TestBonusCard')?.saved).toEqual({ wood: 1 })
     expect(capturedEvents).toEqual([
       expect.objectContaining({
         type: 'resource.paid',

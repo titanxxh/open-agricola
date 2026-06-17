@@ -169,7 +169,10 @@ export const executePaymentSolution = (
     }
   }
   if (options.trackStats !== false) {
-    const bonusReductions = buildBonusReductions(player, solution, options.costType)
+    const bonusReductions =
+      solution.bonusReductions && Object.keys(solution.bonusReductions).length > 0
+        ? solution.bonusReductions
+        : buildBonusReductions(player, solution, options.costType)
     recordPaymentStats(player, solution, bonusReductions)
   }
   return solution.cardUsed

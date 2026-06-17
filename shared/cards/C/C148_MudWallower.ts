@@ -163,13 +163,14 @@ const cardImpl = {
   onComputeAnimalZones: (player, zones, _state) => {
     const held = player.cardStates?.[CARD_ID]?.counters?.held ?? 0
     if (held <= 0) return
+    const pigsInC148 = computePigsInC148(player)
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',
       cardId: CARD_ID,
       capacity: held,
       animalType: 'boar',
-      animalCount: 0,
+      animalCount: pigsInC148,
     })
   },
   /**

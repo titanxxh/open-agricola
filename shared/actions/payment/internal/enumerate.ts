@@ -143,6 +143,20 @@ const hashSolution = (solution: PaymentSolution): number => {
       h = ((h + (v + 1) * 41) * 31) >>> 0
     }
   }
+  if (solution.bonusReductions) {
+    const entries = Object.entries(solution.bonusReductions).sort(
+      (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+    )
+    for (const [source, reduction] of entries) {
+      for (const ch of source) {
+        h = ((h + ch.charCodeAt(0) * 61) * 31) >>> 0
+      }
+      for (const [res, amount] of sortedPaymentResourceEntries(reduction)) {
+        const resId = stablePaymentResourceId(res)
+        h = ((h + resId * 67 + amount * 71) * 31) >>> 0
+      }
+    }
+  }
   if (solution.cardUsed) {
     for (const ch of solution.cardUsed) {
       h = ((h + ch.charCodeAt(0) * 19) * 31) >>> 0
@@ -170,6 +184,44 @@ const subtractResources = (
     result[key] = (result[key] ?? 0) - (b[key] ?? 0)
   }
   return result
+}
+
+const collectCostReduction = (
+  before: PaymentResourceMap,
+  after: PaymentResourceMap,
+): PaymentResourceMap => {
+  const result: PaymentResourceMap = {}
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)] as PaymentResourceKey[])
+  for (const key of keys) {
+    const saved = (before[key] ?? 0) - (after[key] ?? 0)
+    if (saved > 0) result[key] = saved
+  }
+  return result
+}
+
+const cloneBonusReductions = (
+  reductions: Record<string, PaymentResourceMap>,
+): Record<string, PaymentResourceMap> =>
+  Object.fromEntries(
+    Object.entries(reductions).map(([source, resources]) => [source, { ...resources }]),
+  )
+
+const mergeBonusReductions = (
+  current: Record<string, PaymentResourceMap>,
+  sources: readonly string[],
+  reduction: PaymentResourceMap,
+): Record<string, PaymentResourceMap> => {
+  const next = cloneBonusReductions(current)
+  const sourceSet = new Set(sources.filter((source) => source.trim().length > 0))
+  if (sourceSet.size === 0 || Object.keys(reduction).length === 0) return next
+  for (const source of sourceSet) {
+    const entry = { ...(next[source] ?? {}) }
+    for (const [key, amount] of Object.entries(reduction) as [PaymentResourceKey, number][]) {
+      entry[key] = (entry[key] ?? 0) + amount
+    }
+    next[source] = entry
+  }
+  return next
 }
 
 /**
@@ -862,9 +914,10 @@ export const computeAllBuyableCombinations = (
           cost: PaymentResourceMap
           sources: string[]
           choiceIndices: Record<string, number>
+          bonusReductions: Record<string, PaymentResourceMap>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], choiceIndices: {} },
+          { cost: baseFee, sources: [], choiceIndices: {}, bonusReductions: {} },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
@@ -879,6 +932,7 @@ export const computeAllBuyableCombinations = (
                 cost: path.cost,
                 sources: [...path.sources],
                 choiceIndices: { ...path.choiceIndices },
+                bonusReductions: cloneBonusReductions(path.bonusReductions),
               })
             }
           }
@@ -928,27 +982,38 @@ export const computeAllBuyableCombinations = (
                 continue
               }
               const nextCost = applyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)
+              const costChanged = resourceSignature(path.cost) !== resourceSignature(nextCost)
+              const reduction = collectCostReduction(path.cost, nextCost)
+              const appliedSources = [...new Set([
+                ...(bonus.sources ?? []),
+                ...(candidate.sources ?? []),
+              ])]
               const combined = new Set([
                 ...path.sources,
                 ...(bonus.sources ?? []),
                 ...(candidate.sources ?? []),
               ])
-              const nextSources = [...combined]
+              const nextSources = costChanged ? [...combined] : [...path.sources]
               const nextChoiceIndices =
-                isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
+                costChanged && isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
                   ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
                   : { ...path.choiceIndices }
               expanded.push({
                 cost: nextCost,
                 sources: nextSources,
                 choiceIndices: nextChoiceIndices,
+                bonusReductions: mergeBonusReductions(
+                  path.bonusReductions,
+                  costChanged ? appliedSources : [],
+                  reduction,
+                ),
               })
             }
           }
           bonusPaths = expanded.length > 0 || bonus.optional ? expanded : bonusPaths
         }
 
-        for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
+        for (const { cost: effectiveCostFee, sources, choiceIndices, bonusReductions } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
           for (const providerCover of providerCoverOptions) {
@@ -973,6 +1038,8 @@ export const computeAllBuyableCombinations = (
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
+              bonusReductions:
+                Object.keys(bonusReductions).length > 0 ? bonusReductions : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
               feeIdentity: effectiveCost.feeIdentities?.[feeIdx],
               paymentResourceCovers: providerCover.covers.length > 0
@@ -1001,6 +1068,7 @@ export const computeAllBuyableCombinations = (
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
       bonusChoiceIndex: sol.bonusChoiceIndex,
+      bonusReductions: sol.bonusReductions,
       feeIndex: sol.feeIndex,
       feeIdentity: sol.feeIdentity,
       paymentResourceCovers: sol.paymentResourceCovers,

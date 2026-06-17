@@ -4,6 +4,7 @@ import type {
   ActionFlow,
   GameState,
   HarvestBreedSummary,
+  InteractionAnimalReorgZone,
   PlayerState,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
@@ -82,9 +83,10 @@ export const breedAction: ActionDefinition = {
     }
     const buildReorgRequest = (): ActionExecutionResult => {
       const idx = state.players.indexOf(player)
-      const zones = playerBoard(state, idx).animals.zones().map((zone) => ({
+      const zones: InteractionAnimalReorgZone[] = playerBoard(state, idx).animals.zones().map((zone) => ({
         id: zone.id,
-        zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+        zoneType: zone.zoneType,
+        cardId: zone.cardId,
         animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
         animalCount: zone.animalCount ?? 0,
         capacity: zone.capacity,

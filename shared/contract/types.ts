@@ -216,6 +216,7 @@ export type PaymentSolution = {
   cardUsed?: string
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
+  bonusReductions?: Record<string, PaymentResourceMap>
   feeIndex?: number
   /** Payment-path identity from ComplexCost.feeIdentities (dominance-pruning scope). */
   feeIdentity?: number
@@ -906,7 +907,8 @@ export type AnytimeAction = {
 
 export type InteractionAnimalReorgZone = {
   id: string
-  zoneType: 'pasture' | 'house' | 'stable'
+  zoneType: 'pasture' | 'house' | 'stable' | 'card'
+  cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
   capacity: number

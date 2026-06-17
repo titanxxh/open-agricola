@@ -27,6 +27,7 @@ beforeAll(async () => {
     A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
     B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
     C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
+    C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
   }
@@ -173,6 +174,35 @@ describe('FarmBoard', () => {
     expect(html).toContain('>0/15<')
     expect(html).toContain('>0/4<')
     expect(html).not.toContain('res-compact-label')
+  })
+
+  it('renders reorg controls for card animal zones', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['occupation:C148_MudWallower'],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0 },
+          cardDisplayMap: new Map([
+            [
+              'C148_MudWallower',
+              {
+                animalType: 'boar',
+                animalCount: 1,
+                capacity: 1,
+                zoneId: 'card:C148_MudWallower',
+              },
+            ],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('played-card-reorg')
+    expect(html).toContain('res-icon-boar')
+    expect(html).toContain('>1<span')
   })
 
   it('keeps compact panel icon values grouped with accessible labels and the animation anchor', () => {
