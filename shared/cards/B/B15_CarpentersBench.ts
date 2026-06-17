@@ -1,5 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import type { BonusModifier } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
@@ -53,6 +52,7 @@ const afterCollectListener: CardListenerRegistration = {
                 costPolicy: { fence: { wood: 1 } },
                 paymentBudget: { wood: n },
                 cancelPolicy: 'forbidCancel',
+                promptHintKey: 'ui.interactionCarpentersBenchFenceHint',
               },
             },
           },
@@ -65,12 +65,6 @@ const afterCollectListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [afterCollectListener],
-  modifiers: [{
-    type: 'bonus',
-    cardId: 'B15_CarpentersBench',
-    appliesTo: ['fencing'],
-    discount: { wood: 1 },
-  } as BonusModifier],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -259,6 +259,16 @@
   font-size: 13px;
   color: rgba(253, 246, 227, 0.8);
 }
+.interaction-rule-hint {
+  padding: 8px 10px;
+  border: 1px solid rgba(230, 183, 58, 0.45);
+  border-left: 4px solid #e6b73a;
+  border-radius: 6px;
+  background: rgba(230, 183, 58, 0.14);
+  color: #fdf6e3;
+  font-size: 13px;
+  font-weight: 700;
+}
 .interaction-actions {
   display: flex;
   gap: 8px;

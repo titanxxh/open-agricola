@@ -1510,6 +1510,62 @@ describe('InteractionBar', () => {
     expect(html).not.toContain('fence-mode-toggle')
   })
 
+  it('shows the Carpenter Bench pasture limit during its fence selection', () => {
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      promptParams: { hintKey: 'ui.interactionCarpentersBenchFenceHint' },
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'forest',
+      sourceCard: 'B15_CarpentersBench',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="zh"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText="选择的围栏必须恰好围出要求数量的新牧场"
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('木匠长凳只能围成 1 个新牧场')
+    expect(html).toContain('不能拆成 2 个圈地')
+  })
+
   it('renders disabled options greyed-out with disabled attribute and choice-option-disabled class', () => {
     const disabledChoice: PendingChoice = {
       promptKey: 'ui.interactionChooseOne',

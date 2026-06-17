@@ -505,6 +505,10 @@ export const InteractionBar = ({
     pendingChoice?.sourceCard
       ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
       : null
+  const promptHintKey =
+    typeof pendingChoice?.promptParams?.hintKey === 'string'
+      ? pendingChoice.promptParams.hintKey
+      : null
   const stableSelectedCount = pendingStableTilesLength + (pendingFarmHandSelected ? 1 : 0)
   const stableMaxLabel = pendingFarmHandSelected
     ? `${maxStableSelections}+`
@@ -639,6 +643,11 @@ export const InteractionBar = ({
               {triggerCardName ? (
                 <div className="interaction-subtitle">
                   {t(locale, 'ui.interactionTriggeredByCard', { card: triggerCardName })}
+                </div>
+              ) : null}
+              {promptHintKey ? (
+                <div className="interaction-rule-hint">
+                  {t(locale, promptHintKey)}
                 </div>
               ) : null}
               {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (

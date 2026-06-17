@@ -6,6 +6,7 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B15_CarpentersBench'
+import '../../shared/cards/E/E16_BriarHedge'
 
 const CARD_ID = 'B15_CarpentersBench'
 const LISTENER = B15_CarpentersBench_impl.listeners[0]!
@@ -101,5 +102,49 @@ describe('B15_CarpentersBench session', () => {
     const result = executeCardListener(LISTENER, ctx)
 
     expect(result).toBeUndefined()
+  })
+
+  it('does not apply a second B15 wood discount when E16 also discounts border fences', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.resources.wood = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
+    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 fence prompt')
+    expect(resp.interaction.promptParams).toEqual({
+      hintKey: 'ui.interactionCarpentersBenchFenceHint',
+    })
+
+    resp = session.commitSelectionChoice(0, {
+      edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(true)
+    const after = resp.state.players[0]!
+    expect(after.resources.wood).toBe(1)
+    expect(after.pastures).toHaveLength(1)
+    expect(after.fenceSegments).toHaveLength(6)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        actorPlayerId: player.id,
+        sourceCardId: CARD_ID,
+        resources: { wood: 2 },
+      }),
+    ]))
   })
 })

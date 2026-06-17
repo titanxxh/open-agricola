@@ -218,6 +218,7 @@ export const en = {
     interactionBuildFences: 'Build {count} fence(s)',
     interactionBuildPasture:
       'Build pasture: {size} cells · {fences} fences · {stables} stables · {wood} wood',
+    interactionCarpentersBenchFenceHint: "Carpenter's Bench can build exactly 1 new pasture here. Do not split the fence selection into 2 enclosures.",
     interactionFenceSelect: 'Select fences on the farm and confirm',
     interactionFenceConfirm: 'Confirm fences',
     interactionFenceCancel: 'Cancel',
