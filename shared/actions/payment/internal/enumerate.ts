@@ -143,6 +143,17 @@ const hashSolution = (solution: PaymentSolution): number => {
       h = ((h + (v + 1) * 41) * 31) >>> 0
     }
   }
+  if (solution.bonusChoiceAffectsState) {
+    const entries = Object.entries(solution.bonusChoiceAffectsState).sort(
+      (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+    )
+    for (const [k, v] of entries) {
+      for (const ch of k) {
+        h = ((h + ch.charCodeAt(0) * 29) * 31) >>> 0
+      }
+      h = ((h + (v ? 43 : 0)) * 31) >>> 0
+    }
+  }
   if (solution.bonusReductions) {
     const entries = Object.entries(solution.bonusReductions).sort(
       (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
@@ -234,7 +245,7 @@ const mergeBonusReductions = (
  *
  * Exemptions (mirroring BGA isWorseThan):
  * - different fee identities (B65 payment-path identity drives later effects)
- * - solutions carrying a bonusChoiceIndex (E123 consumes the choice later)
+ * - choices whose identity is consumed later for state side effects (E123)
  * - card payments (never compared, like BGA's `card` combinations)
  *
  * Must run AFTER affordability filtering: pruning resource-blind would drop
@@ -243,9 +254,12 @@ const mergeBonusReductions = (
 const solutionIdentity = (solution: PaymentSolution): number | undefined =>
   solution.feeIdentity
 
+const hasStatefulBonusChoice = (solution: PaymentSolution): boolean =>
+  Object.values(solution.bonusChoiceAffectsState ?? {}).some(Boolean)
+
 const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
   if (a.cardUsed || b.cardUsed) return false
-  if (a.bonusChoiceIndex || b.bonusChoiceIndex) return false
+  if (hasStatefulBonusChoice(a) || hasStatefulBonusChoice(b)) return false
   if (solutionIdentity(a) !== solutionIdentity(b)) return false
 
   const keys = new Set([
@@ -914,10 +928,11 @@ export const computeAllBuyableCombinations = (
           cost: PaymentResourceMap
           sources: string[]
           choiceIndices: Record<string, number>
+          choiceAffectsState: Record<string, boolean>
           bonusReductions: Record<string, PaymentResourceMap>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], choiceIndices: {}, bonusReductions: {} },
+          { cost: baseFee, sources: [], choiceIndices: {}, choiceAffectsState: {}, bonusReductions: {} },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
@@ -932,6 +947,7 @@ export const computeAllBuyableCombinations = (
                 cost: path.cost,
                 sources: [...path.sources],
                 choiceIndices: { ...path.choiceIndices },
+                choiceAffectsState: { ...path.choiceAffectsState },
                 bonusReductions: cloneBonusReductions(path.bonusReductions),
               })
             }
@@ -940,6 +956,7 @@ export const computeAllBuyableCombinations = (
             discount: Partial<Resource>
             capDiscountAtCost?: boolean
             trackChoiceIndex?: boolean
+            choiceAffectsState?: boolean
             sources?: string[]
             conditions?: Record<string, number>
             minCost?: Partial<Resource>
@@ -950,6 +967,7 @@ export const computeAllBuyableCombinations = (
                 ...c,
                 capDiscountAtCost: c.capDiscountAtCost ?? bonus.capDiscountAtCost,
                 trackChoiceIndex: c.trackChoiceIndex ?? bonus.trackChoiceIndex,
+                choiceAffectsState: c.choiceAffectsState ?? bonus.choiceAffectsState,
                 minCost: c.minCost ?? bonus.minCost,
                 maxCost: c.maxCost ?? bonus.maxCost,
                 _origIndex: i,
@@ -959,6 +977,7 @@ export const computeAllBuyableCombinations = (
                   discount: bonus.discount!,
                   capDiscountAtCost: bonus.capDiscountAtCost,
                   trackChoiceIndex: bonus.trackChoiceIndex,
+                  choiceAffectsState: bonus.choiceAffectsState,
                   sources: bonus.sources,
                   minCost: bonus.minCost,
                   maxCost: bonus.maxCost,
@@ -998,10 +1017,15 @@ export const computeAllBuyableCombinations = (
                 costChanged && isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
                   ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
                   : { ...path.choiceIndices }
+              const nextChoiceAffectsState =
+                costChanged && isMultiChoice && bonusKey && candidate.choiceAffectsState === true
+                  ? { ...path.choiceAffectsState, [bonusKey]: true }
+                  : { ...path.choiceAffectsState }
               expanded.push({
                 cost: nextCost,
                 sources: nextSources,
                 choiceIndices: nextChoiceIndices,
+                choiceAffectsState: nextChoiceAffectsState,
                 bonusReductions: mergeBonusReductions(
                   path.bonusReductions,
                   costChanged ? appliedSources : [],
@@ -1013,7 +1037,7 @@ export const computeAllBuyableCombinations = (
           bonusPaths = expanded.length > 0 || bonus.optional ? expanded : bonusPaths
         }
 
-        for (const { cost: effectiveCostFee, sources, choiceIndices, bonusReductions } of bonusPaths) {
+        for (const { cost: effectiveCostFee, sources, choiceIndices, choiceAffectsState, bonusReductions } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           const providerCoverOptions = buildProviderCoverOptions(realCost, paymentResourceProviders)
           for (const providerCover of providerCoverOptions) {
@@ -1038,6 +1062,8 @@ export const computeAllBuyableCombinations = (
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
+              bonusChoiceAffectsState:
+                Object.keys(choiceAffectsState).length > 0 ? choiceAffectsState : undefined,
               bonusReductions:
                 Object.keys(bonusReductions).length > 0 ? bonusReductions : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
@@ -1068,6 +1094,7 @@ export const computeAllBuyableCombinations = (
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
       bonusChoiceIndex: sol.bonusChoiceIndex,
+      bonusChoiceAffectsState: sol.bonusChoiceAffectsState,
       bonusReductions: sol.bonusReductions,
       feeIndex: sol.feeIndex,
       feeIdentity: sol.feeIdentity,

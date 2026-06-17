@@ -521,12 +521,30 @@ describe('keepOnlyOptimals — dominance pruning over affordable solutions (ADR 
     expect(paidSets(solutions)).toEqual([JSON.stringify([])])
   })
 
-  it('never prunes solutions carrying a bonusChoiceIndex (E123 shape)', () => {
+  it('prunes dominated tracked choices when the choice has no state side effect', () => {
     const cost: ComplexCost = {
       fee: { stone: 2 },
       bonuses: [{
         optional: true,
         trackChoiceIndex: true,
+        choices: [
+          { discount: { stone: 1 }, capDiscountAtCost: true },
+          { discount: { stone: 2 }, capDiscountAtCost: true },
+        ],
+        sources: ['TEST_TRACKED_CHOICE'],
+      }],
+    }
+    const solutions = computeAllBuyableCombinations(player({ stone: 5 }), cost)
+    expect(paidSets(solutions)).toEqual([JSON.stringify([])])
+  })
+
+  it('never prunes tracked choices with state side effects (E123 shape)', () => {
+    const cost: ComplexCost = {
+      fee: { stone: 2 },
+      bonuses: [{
+        optional: true,
+        trackChoiceIndex: true,
+        choiceAffectsState: true,
         choices: [
           { discount: { stone: 1 }, capDiscountAtCost: true },
           { discount: { stone: 2 }, capDiscountAtCost: true },

@@ -89,6 +89,7 @@ export const applyCostModifiers = (
         choices: bonusMod.choices,
         ...(bonusMod.capDiscountAtCost ? { capDiscountAtCost: true } : {}),
         ...(bonusMod.trackChoiceIndex === false ? { trackChoiceIndex: false } : {}),
+        ...(bonusMod.choiceAffectsState ? { choiceAffectsState: true } : {}),
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
         ...(bonusMod.minCost ? { minCost: bonusMod.minCost } : {}),

@@ -65,6 +65,7 @@ const computeCostsListener: CardListenerRegistration = {
     const bonus: Bonus = {
       choices,
       optional: true,
+      choiceAffectsState: true,
       sources: [CARD_ID],
     }
     return { bonuses: [bonus] }

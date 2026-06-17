@@ -112,7 +112,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 improvement payment glue 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats。 |
-| Payment bonus choices / unit cost alternatives | `Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、A16、C56、D88 | 普通 bonus choice 必须在折扣后不产生负 cost；typed cost payment 不保留 `resourcesPaid` 为负的 surplus 分支。BGA `addCost` per-unit alternative 先用 `scope:'unit'` trade 生成 cost row，再允许 D88 这类 bonus choice 继续替换。只有“移除当前 cost 中某资源”这类卡牌显式设置 cap 时，折扣才按当前 cost 封顶。multi-choice 默认记录 `bonusChoiceIndex`，仅无状态 replacement choice 显式关闭以避免重复支付项。 |
+| Payment bonus choices / unit cost alternatives | `Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、`Bonus.choiceAffectsState`、A16、C56、D88 | 普通 bonus choice 必须在折扣后不产生负 cost；typed cost payment 不保留 `resourcesPaid` 为负的 surplus 分支。BGA `addCost` per-unit alternative 先用 `scope:'unit'` trade 生成 cost row，再允许 D88 这类 bonus choice 继续替换。只有“移除当前 cost 中某资源”这类卡牌显式设置 cap 时，折扣才按当前 cost 封顶。`bonusChoiceIndex` 只表示玩家选了第几个 choice；只有 `choiceAffectsState` 标记的 choice identity 会被 after-pay 等 listener 消费并改变状态时，payment dominance 才禁止互剪。B145/D88 这类无状态 replacement choice 不设置该标记。 |
 | Card-provided payment resources | `ComplexCost.paymentResourceProviders`、`PaymentSolution.paymentResourceCovers`、`B155_ArtTeacher`、ADR 0004 | 卡牌可在 `computeCosts` 内声明 payment-only 虚拟资源；provider 在卡牌内部定义可用量、覆盖比例和消费来源。虚拟资源不进入成本候选行或 `PlayerState.resources`，但会出现在 payment option / `resourcesPaid`；使用 provider 的 payment option 必须把 provider `sourceCard` 合入 `sourceCards` 以区分卡牌效果路径，并由 executor 消耗来源状态。 |
 | Payment budgets | `ComplexCost.paymentBudget`、`fencePolicy.paymentBudget`、`B15_CarpentersBench` | 对最终 `PaymentSolution.resourcesPaid` 做资源上限过滤；不提供资源、不改变 cost row、不作为 `segmentBounds`。fencing 中用于 B15 这类“只能使用本次资源”的规则，必须在 free fence / computeCosts / payment solver 之后检查，禁止用 collected+1 段数上限替代。 |
 | Candidate Closure（候选闭包，ADR 0004） | `candidate-closure.ts` `closeCandidates()`、`buildUnitCostOptions()` 闭包接入、`cost-modifier-permutation-probe.test.ts` | unit trade（D15/B145/A123 等）不再声明 `order`，`Trade.order` / `TradeModifier.order` 已删除；可达 cost row 集合由闭包求不动点产出，与修改器注册顺序无关；mandatory 饱和过滤保证强制折扣链任意序收敛；新增 cost 转换只声明局部语义（替换什么、mandatory 与否、maxUses），禁止重新引入任何顺序字段。 |
@@ -691,7 +691,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B125_EstateWorker` | 已对齐 |  |
 | `B126_Carpenter` | 已对齐 | 固定 3 building-resource + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `B127_Seducer` | 已对齐 |  |
-| `B128_Plumber` | 已对齐 | Major Improvement 后 optional `renovate-house` leaf 以 `sourceCard` 触发；翻修 cost listener 读取 `params.selectedOption` 的目标材质，提供 mandatory sourced 1/2 个目标资源折扣 choices。 |
+| `B128_Plumber` | 已对齐 | Major Improvement 后 optional `renovate-house` leaf 以 `sourceCard` 触发；翻修 cost listener 读取 `params.selectedOption` 的目标材质，只提供 mandatory sourced 2 个目标资源折扣。 |
 | `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 且 owner 自己未在 r13 时才注入 allow-occupied；3p 任一邻座占且 owner 自己未在 r13 时注入；round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
@@ -708,7 +708,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B142_Greengrocer` | 已对齐 |  |
 | `B143_ClayWarden` | 已对齐 |  |
 | `B144_Collier` | 已对齐 |  |
-| `B145_BrushwoodCollector` | 已对齐 |  |
+| `B145_BrushwoodCollector` | 已对齐 | renovation replacement 是无状态 cost alternative，不设置 `choiceAffectsState`；与 D88 等折扣组合时可被 payment dominance pruning 去掉严格劣势支付项。 |
 | `B146_Illusionist` | 已对齐 |  |
 | `B147_Huntsman` | 已对齐 |  |
 | `B148_PetBroker` | 已对齐 |  |
@@ -1011,7 +1011,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D85_Reader` | 已对齐 |  |
 | `D86_SheepAgent` | 已对齐 | 容量扣除通过 `animalHolder` metadata + occupation identity 过滤；D86 自身仍计入容量，minor animal-holder 不扣容量。 |
 | `D87_MasterBuilder` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
-| `D88_Millwright` | 已对齐 | 用两个 sequential optional `BonusModifier.choices` 表达最多 2 次 building-resource→grain replacement；在 A16/C56 这类 unit cost alternative 之后应用，保留 BGA 组合来源；`trackChoiceIndex:false` 避免 wood/reed 替换顺序不同但支付相同的重复项。 |
+| `D88_Millwright` | 已对齐 | 用两个 sequential optional `BonusModifier.choices` 表达最多 2 次 building-resource→grain replacement；在 A16/C56 这类 unit cost alternative 之后应用，保留 BGA 组合来源；无状态 replacement 不设置 `choiceAffectsState`，可被 payment dominance pruning 合并。 |
 | `D89_Stablehand` | 已对齐 |  |
 | `D90_PlowMaker` | 已对齐 |  |
 | `D91_Plowman` | 已对齐 |  |
@@ -1226,7 +1226,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 已对齐 | after-pay 仅监听 `pay` leaf，并读取 `resource.paid` 的 bonusSources / bonusChoiceIndex 决定弹出 top k；动态 `Bonus.choices` 支付会把实际 reduction 写入 `PaymentSolution.bonusReductions`，hover stats 可显示本牌 saved 资源；payment solver 不再把无实际 cost 变化的 `k=0` skip 记录为本牌生效路径，避免和 C14 等 reed discount 叠出重复选项；C14 与 E123 top reed 都可作为玩家可选支付路径 |
+| `E123_ResourceHoarder` | 已对齐 | after-pay 仅监听 `pay` leaf，并读取 `resource.paid` 的 bonusSources / bonusChoiceIndex 决定弹出 top k；本牌的 `Bonus.choices` 设置 `choiceAffectsState:true`，因此使用不同 top-k 的支付路径不会被 dominance pruning 互剪。动态支付会把实际 reduction 写入 `PaymentSolution.bonusReductions`，hover stats 可显示本牌 saved 资源；payment solver 不再把无实际 cost 变化的 `k=0` skip 记录为本牌生效路径，避免和 C14 等 reed discount 叠出重复选项；C14 与 E123 top reed 都可作为玩家可选支付路径 |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |
