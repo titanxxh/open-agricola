@@ -212,6 +212,7 @@ export const zh = {
     interactionFencingChoice: '请选择圈地方案',
     interactionBuildFences: '建造 {count} 段围栏',
     interactionBuildPasture: '围成 {size} 格 · 围栏 {fences} · 畜栏 {stables} · 木材 {wood}',
+    interactionCarpentersBenchFenceHint: '木匠长凳只能围成 1 个新牧场，不能拆成 2 个圈地。',
     interactionFenceSelect: '在农场选择围栏位置后确认',
     interactionFenceConfirm: '确认围栏',
     interactionFenceCancel: '取消',

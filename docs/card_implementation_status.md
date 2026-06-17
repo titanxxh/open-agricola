@@ -578,7 +578,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B12_Stockyard` | 已对齐 |  |
 | `B13_CarpentersParlor` | 已对齐 | 木房固定 2 wood + 2 reed 建房成本走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 候选。 |
 | `B14_Hawktower` | 已对齐 |  |
-| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、恰好 1 个新牧场、1 段免费，并用 `paymentBudget: { wood: collectedWood }` 限制最终实付普通 wood；不再用 `collectedWood + 1` 段数上限裁剪合法形状。 |
+| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、恰好 1 个新牧场、1 段免费，并用 `paymentBudget: { wood: collectedWood }` 限制最终实付普通 wood；通过 `fencePolicy.promptHintKey` 给前端提示“只能 1 个新牧场”；不注册全局 `fencing` 折扣，避免和 E16/C16 等 `computeCosts.fence` 再次叠加；不再用 `collectedWood + 1` 段数上限裁剪合法形状。 |
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
 | `B17_ForestPlow` | 已对齐 |  |
 | `B18_GrasslandHarrow` | 已对齐 |  |

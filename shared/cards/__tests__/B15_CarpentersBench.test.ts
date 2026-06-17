@@ -106,6 +106,7 @@ describe('B15_CarpentersBench', () => {
         costPolicy: { fence: { wood: 1 } },
         paymentBudget: { wood: 3 },
         cancelPolicy: 'forbidCancel',
+        promptHintKey: 'ui.interactionCarpentersBenchFenceHint',
       },
     })
     const policy = fenceLeaf.actionContext?.fencePolicy as {

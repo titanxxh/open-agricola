@@ -68,6 +68,7 @@ export type FenceActionPolicy = {
   pastureBounds?: FenceValidationOptions['pastureBounds']
   cancelPolicy?: 'allowCancel' | 'forbidCancel'
   preserveAnimalTotals?: boolean
+  promptHintKey?: string
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -140,6 +141,10 @@ export function readFenceActionPolicy(
     preserveAnimalTotals:
       typeof source.preserveAnimalTotals === 'boolean'
         ? source.preserveAnimalTotals
+        : undefined,
+    promptHintKey:
+      typeof source.promptHintKey === 'string'
+        ? source.promptHintKey
         : undefined,
   }
 }
@@ -823,6 +828,7 @@ export const fenceAction: ActionDefinition = {
   },
   execute: ({ state, player, space, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
+    const policy = readFenceActionPolicy(actionContext)
     const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', {
       spaceId: space.id,
       actionContext,
@@ -837,6 +843,7 @@ export const fenceAction: ActionDefinition = {
         ],
       },
       promptKey: 'ui.interactionFenceSelect',
+      promptParams: policy.promptHintKey ? { hintKey: policy.promptHintKey } : undefined,
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
