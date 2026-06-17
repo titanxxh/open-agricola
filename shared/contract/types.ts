@@ -95,6 +95,7 @@ export type BonusChoice = {
   discount: Partial<Resource>
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -114,6 +115,7 @@ export type Bonus = {
   choices?: BonusChoice[]
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   optional?: boolean
   sources?: string[]
   /**
@@ -161,6 +163,7 @@ export type BonusModifier = {
   choices?: BonusChoice[]
   capDiscountAtCost?: boolean
   trackChoiceIndex?: boolean
+  choiceAffectsState?: boolean
   optional?: boolean
   conditions?: Record<string, number>
   minCost?: Partial<Resource>
@@ -216,6 +219,7 @@ export type PaymentSolution = {
   cardUsed?: string
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
+  bonusChoiceAffectsState?: Record<string, boolean>
   bonusReductions?: Record<string, PaymentResourceMap>
   feeIndex?: number
   /** Payment-path identity from ComplexCost.feeIdentities (dominance-pruning scope). */

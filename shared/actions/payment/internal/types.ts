@@ -18,6 +18,7 @@ export type InternalSolution = {
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
+  bonusChoiceAffectsState?: Record<string, boolean>
   bonusReductions?: Record<string, PaymentResourceMap>
   feeIndex?: number
   feeIdentity?: number

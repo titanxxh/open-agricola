@@ -7,15 +7,21 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 7
-Payment differences: 7
+Differences: 4
+Payment differences: 4
 Source-only differences: 0
+Accepted differences: 4
+Unresolved differences: 0
 Report-only artifacts: 0
 
-## E123 card-purchase top resource choices
+## Accepted Differences
+
+### E123 card-purchase top resource choices
 
 Kind: card-purchase
+Paying for: card-purchase generic major-cost fixture {wood:2, clay:2, reed:2, stone:2}
 Difference type: payment-diff
+Accepted reason: Accepted: E123 top-k payment choices are stateful because after-pay consumes the selected count from the card stack; OA keeps the full stateful choice set instead of pruning by resources only.
 
 BGA:
 ```json
@@ -110,10 +116,12 @@ OA:
 ]
 ```
 
-## combo card-purchase basket fixed price plus stone and wood modifiers
+### combo card-purchase basket fixed price plus stone and wood modifiers
 
 Kind: card-purchase
+Paying for: card-purchase Major_Basket with fixture cost {wood:2, reed:2, stone:2}, actionCard=C95_BasketWeaver
 Difference type: payment-diff
+Accepted reason: Accepted: the payable resources are equivalent; OA collapses equivalent fixed-price source-attribution rows that have no distinct payment consequence.
 
 BGA:
 ```json
@@ -164,10 +172,12 @@ OA:
 ]
 ```
 
-## E123 construct top resource choices
+### E123 construct top resource choices
 
 Kind: construct
+Paying for: construct clay room(s), units=1
 Difference type: payment-diff
+Accepted reason: Accepted: E123 use-top-k is stateful, so the no-use and use-resource paths may lead to different future card stack state even when one pays more resources.
 
 BGA:
 ```json
@@ -206,54 +216,12 @@ OA:
 ]
 ```
 
-## B128 plumber renovation choices
+### E123 renovation top resource choices
 
 Kind: renovation
+Paying for: renovate-house wood -> stone, rooms=3
 Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "B128_Plumber"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1
-    },
-    "sources": [
-      "B128_Plumber"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2
-    },
-    "sources": [
-      "B128_Plumber"
-    ]
-  }
-]
-```
-
-## E123 renovation top resource choices
-
-Kind: renovation
-Difference type: payment-diff
+Accepted reason: Accepted: BGA records a k=0 Resource Hoarder choice source for the no-use branch; OA treats k=0 as no card effect and omits the source.
 
 BGA:
 ```json
@@ -290,270 +258,7 @@ OA:
 ]
 ```
 
-## B15 carpenters bench constrained free fence
+## Unresolved Differences
 
-Kind: fencing
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {},
-    "sources": [
-      "B15_CarpentersBench"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "wood": 1
-    },
-    "sources": []
-  }
-]
-```
-
-## combo renovation trowel brushwood and millwright
-
-Kind: renovation
-Difference type: payment-diff
-
-BGA:
-```json
-[
-  {
-    "resources": {
-      "reed": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 2,
-      "food": 2
-    },
-    "sources": [
-      "D13_Trowel"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 2,
-      "food": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel"
-    ]
-  }
-]
-```
-
-OA:
-```json
-[
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 1,
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "reed": 2,
-      "stone": 2,
-      "food": 2
-    },
-    "sources": [
-      "D13_Trowel"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "stone": 2,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "food": 2,
-      "grain": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 1,
-      "food": 2,
-      "grain": 1
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel",
-      "D88_Millwright"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 1,
-      "stone": 2,
-      "food": 2
-    },
-    "sources": [
-      "B145_BrushwoodCollector",
-      "D13_Trowel"
-    ]
-  }
-]
-```
+No unresolved differences.
 

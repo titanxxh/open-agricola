@@ -249,7 +249,6 @@ const cases: CostCase[] = [
     sourceCard: 'B128_Plumber',
     expected: [
       { resources: { reed: 1, stone: 1 }, sources: ['B128_Plumber'] },
-      { resources: { reed: 1, stone: 2 }, sources: ['B128_Plumber'] },
     ],
   },
   {

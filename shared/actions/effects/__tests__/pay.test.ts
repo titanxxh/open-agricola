@@ -168,9 +168,22 @@ describe('keepOnlyOptimals', () => {
     expect(keepOnlyOptimals(solutions)).toEqual(solutions)
   })
 
-  it('never prunes solutions carrying a bonusChoiceIndex', () => {
+  it('prunes dominated solutions that only carry a tracked choice index', () => {
     const solutions: PaymentSolution[] = [
       { resourcesPaid: { wood: 5 }, tradesUsed: [], bonusChoiceIndex: { E123_ResourceHoarder: 1 } },
+      { resourcesPaid: { wood: 3 }, tradesUsed: [] },
+    ]
+    expect(keepOnlyOptimals(solutions)).toEqual([{ resourcesPaid: { wood: 3 }, tradesUsed: [] }])
+  })
+
+  it('never prunes solutions carrying a state-affecting bonus choice', () => {
+    const solutions: PaymentSolution[] = [
+      {
+        resourcesPaid: { wood: 5 },
+        tradesUsed: [],
+        bonusChoiceIndex: { E123_ResourceHoarder: 1 },
+        bonusChoiceAffectsState: { E123_ResourceHoarder: true },
+      },
       { resourcesPaid: { wood: 3 }, tradesUsed: [] },
     ]
     expect(keepOnlyOptimals(solutions)).toHaveLength(2)
