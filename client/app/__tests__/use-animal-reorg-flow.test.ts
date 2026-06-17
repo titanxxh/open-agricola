@@ -3,6 +3,7 @@ import type { GameState, PlayerState, Resource } from '../../../shared/contract/
 import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
+  buildCardDisplayMap,
   buildPastureDisplayMap,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
@@ -74,6 +75,7 @@ const animalReorgState = (): AnimalReorgState => ({
     { id: 'pasture-2', zoneType: 'pasture', animalType: null, animalCount: 0, capacity: 4 },
     { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 3, capacity: 1 },
     { id: 'stable:1-1', zoneType: 'stable', animalType: 'cattle', animalCount: 1, capacity: 1 },
+    { id: 'card:C148_MudWallower', zoneType: 'card', animalType: 'boar', animalCount: 1, capacity: 1, cardId: 'C148_MudWallower' },
   ],
 })
 
@@ -144,6 +146,16 @@ describe('use-animal-reorg-flow helpers', () => {
   it('builds stable display from reorg draft zones while reorganizing', () => {
     const display = buildStableDisplayMap(player(), animalReorgState())
     expect(display.get('1-1')).toEqual({ animalType: 'cattle', animalCount: 1 })
+  })
+
+  it('builds card display from reorg draft zones while reorganizing', () => {
+    const display = buildCardDisplayMap(animalReorgState())
+    expect(display.get('C148_MudWallower')).toEqual({
+      animalType: 'boar',
+      animalCount: 1,
+      capacity: 1,
+      zoneId: 'card:C148_MudWallower',
+    })
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

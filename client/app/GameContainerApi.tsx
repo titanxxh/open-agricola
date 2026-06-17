@@ -63,6 +63,7 @@ import {
 } from './game-container-helpers'
 import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
+  buildCardDisplayMap,
   buildPastureDisplayMap,
   buildStableDisplayMap,
   shouldShowAnimalDiscardPrompt,
@@ -1359,6 +1360,9 @@ export const GameContainerApi = () => {
   const stableDisplayMap = useMemo(() => {
     return buildStableDisplayMap(displayPlayer, animalReorg)
   }, [displayPlayer, animalReorg])
+  const cardDisplayMap = useMemo(() => {
+    return buildCardDisplayMap(animalReorg)
+  }, [animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
@@ -2124,7 +2128,7 @@ export const GameContainerApi = () => {
               positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-              stableDisplayMap={stableDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
               hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
               fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}

@@ -7,8 +7,8 @@ Compared construct scenarios: 18
 Compared renovation scenarios: 15
 Compared fencing scenarios: 6
 Compared stables scenarios: 3
-Differences: 5
-Payment differences: 5
+Differences: 7
+Payment differences: 7
 Source-only differences: 0
 Report-only artifacts: 0
 
@@ -91,17 +91,6 @@ OA:
     "resources": {
       "wood": 2,
       "clay": 1,
-      "reed": 2,
-      "stone": 2
-    },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "wood": 2,
-      "clay": 2,
       "reed": 2,
       "stone": 2
     },
@@ -212,15 +201,6 @@ OA:
       "clay": 5,
       "reed": 2
     },
-    "sources": [
-      "E123_ResourceHoarder"
-    ]
-  },
-  {
-    "resources": {
-      "clay": 5,
-      "reed": 2
-    },
     "sources": []
   }
 ]
@@ -266,6 +246,75 @@ OA:
     "sources": [
       "B128_Plumber"
     ]
+  }
+]
+```
+
+## E123 renovation top resource choices
+
+Kind: renovation
+Difference type: payment-diff
+
+BGA:
+```json
+[
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3
+    },
+    "sources": [
+      "E123_ResourceHoarder"
+    ]
+  },
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3
+    },
+    "sources": []
+  }
+]
+```
+
+OA:
+```json
+[
+  {
+    "resources": {
+      "reed": 1,
+      "stone": 3
+    },
+    "sources": []
+  }
+]
+```
+
+## B15 carpenters bench constrained free fence
+
+Kind: fencing
+Difference type: payment-diff
+
+BGA:
+```json
+[
+  {
+    "resources": {},
+    "sources": [
+      "B15_CarpentersBench"
+    ]
+  }
+]
+```
+
+OA:
+```json
+[
+  {
+    "resources": {
+      "wood": 1
+    },
+    "sources": []
   }
 ]
 ```

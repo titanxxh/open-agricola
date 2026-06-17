@@ -123,7 +123,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Card Source metadata / runtime 分离 | `shared/cards/card-source.ts`、`scripts/build-cards-manifest.ts`、`scripts/generate-register-all.ts`、`scripts/check-generated-cards-sync.ts`、`shared/cards/__tests__/card-source-representatives.test.ts` | Card Source 卡牌的运行时字段只放在 `impl`；manifest / generated catalog 只静态读取 `meta` 并输出 metadata 字面量；major runtime source 只在 `major/runtime.generated.ts` 进入后端实现路径；generated catalog 必须保持同步；workshop PR 生成必须基于已 fetch 的 upstream generated 文件 patch，不读部署机本地 cards tree；代表卡必须通过 production catalog / registry path 覆盖。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens` | fence、linked occupancy、special stable、stable count、token supply、行动格预留 marker 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
 | Future meeple action token / Receive | `receive` internal action、`FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的普通资源按 player 合并为一次 `receive` transaction，保留每个 entry 的 `sourceCardId`，触发 Receive listener 而不隐式触发 Gain listener；`field` / `stable` 仍由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
-| Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；不要反查外卡 `cardStates` 或临时改 live resources。 |
+| Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house / card animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；animal reorg 交互保留 card zone / `cardId`，不要反查外卡 `cardStates` 或临时改 live resources。 |
 
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
@@ -891,7 +891,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C145_ForestReviewer` | 已对齐 |  |
 | `C146_WorkshopAssistant` | 已对齐 | onBuy 将 pair key 存入 `extraData.pairs` 并记录所选资源 pair 日志；其他玩家 renovation 后 owner 可 optional 取回一对，资源移动走标准 `gain`/`resource.moved` 语义并记录 used/gained；owner prompt 进入/返回行动玩家都经过确认玩家切换，且切换边界不暴露 undo；交互栏 pair 选择使用资源图标并替换 needed 参数；Played Cards 区从 `extraData.pairs` 渲染卡上资源 pair stack |
 | `C147_Cowherd` | 已对齐 |  |
-| `C148_MudWallower` | 已对齐 | `held` counter 是卡上野猪的当前上限/数量口径；E53 这类动物兑换通过一次性 Animal Payment Preference 决定是否扣本牌 held，普通 action-space / B137 新获得野猪兑换不误扣本牌 held |
+| `C148_MudWallower` | 已对齐 | `held` counter 是卡上野猪的当前上限/数量口径；animal reorg 的 `card:C148_MudWallower` zone 展示真实卡上野猪数并在前端 played-card 区可调整；E53 这类动物兑换通过一次性 Animal Payment Preference 决定是否扣本牌 held，普通 action-space / B137 新获得野猪兑换不误扣本牌 held |
 | `C149_ResourceRecycler` | 已对齐 |  |
 | `C150_ParrotBreeder` | 已对齐 |  |
 | `C151_SowingDirector` | 已对齐 |  |
@@ -1226,7 +1226,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 已对齐 | after-pay 优先读取 `resource.paid` 的 bonusSources / bonusChoiceIndex，并保留旧 `_activeActionBonusSources` 直接监听路径 |
+| `E123_ResourceHoarder` | 已对齐 | after-pay 仅监听 `pay` leaf，并读取 `resource.paid` 的 bonusSources / bonusChoiceIndex 决定弹出 top k；动态 `Bonus.choices` 支付会把实际 reduction 写入 `PaymentSolution.bonusReductions`，hover stats 可显示本牌 saved 资源；payment solver 不再把无实际 cost 变化的 `k=0` skip 记录为本牌生效路径，避免和 C14 等 reed discount 叠出重复选项；C14 与 E123 top reed 都可作为玩家可选支付路径 |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |

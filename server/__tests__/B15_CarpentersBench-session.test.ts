@@ -147,4 +147,47 @@ describe('B15_CarpentersBench session', () => {
       }),
     ]))
   })
+
+  it('rejects a B15 pasture whose non-border fence cost exceeds the taken wood budget', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.resources.wood = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
+    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 fence prompt')
+
+    const invalid = session.commitSelectionChoice(0, {
+      edges: [
+        'H-0-2',
+        'H-0-3',
+        'H-0-4',
+        'H-2-2',
+        'H-2-3',
+        'H-2-4',
+        'V-0-2',
+        'V-1-2',
+        'V-0-5',
+        'V-1-5',
+      ],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(invalid.ok).toBe(false)
+    expect(invalid.error).toBe('NOT_ENOUGH_WOOD')
+    expect(invalid.state.players[0]!.fenceSegments).toHaveLength(0)
+    expect(invalid.interaction.promptKey).toBe('ui.interactionFenceSelect')
+  })
 })

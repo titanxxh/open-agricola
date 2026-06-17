@@ -662,6 +662,12 @@ const buildFencePaymentCost = (
   return cost
 }
 
+const canAffordFencePayment = (
+  player: PlayerState,
+  paymentCost: ComplexCost,
+): boolean =>
+  canAffordTypedFlatCost(player, paymentCost, 'fencing')
+
 const countBorrowedFenceSources = (
   policy: FenceActionPolicy,
   newFenceEdges: string[],
@@ -725,6 +731,9 @@ const finalizeFence = (
     costAdjustment,
     currentPolicy,
   )
+  if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
+    return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
+  }
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     paymentCost,
@@ -936,6 +945,9 @@ export const fenceAction: ActionDefinition = {
         costAdjustment,
         currentPolicy,
       )
+      if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
+        return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
+      }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         paymentCost,

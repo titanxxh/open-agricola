@@ -2276,6 +2276,11 @@
   max-width: 188px;
   min-width: 0;
 }
+.played-card-slot {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
 .played-card {
   background: #fff;
   border-radius: 10px;
@@ -2686,6 +2691,17 @@
   outline: 2px solid #8c6a2a;
   outline-offset: 4px;
   border-radius: 12px;
+}
+.played-card-reorg {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #d7c8a1;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+.played-card-reorg .pasture-count {
+  text-align: left;
 }
 .card-future-item {
   display: inline-flex;

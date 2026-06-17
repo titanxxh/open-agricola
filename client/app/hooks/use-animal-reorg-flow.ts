@@ -105,6 +105,24 @@ export const buildStableDisplayMap = (
   return map
 }
 
+export const buildCardDisplayMap = (
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  animalReorg?.zones
+    .filter((zone) => zone.zoneType === 'card')
+    .forEach((zone) => {
+      const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
+      map.set(cardId, {
+        animalType: zone.animalType,
+        animalCount: zone.animalCount,
+        capacity: zone.capacity,
+        zoneId: zone.id,
+      })
+    })
+  return map
+}
+
 const getReorgFenceExtraWood = (promptKey: string | undefined, spaceId: string) =>
   promptKey === 'ui.interactionFenceSelect' && spaceId === 'farm-redevelopment' ? 1 : 0
 

@@ -27,6 +27,12 @@ import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
+type CardAnimalDisplay = {
+  animalType: AnimalType | null
+  animalCount: number
+  capacity: number
+  zoneId: string
+}
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
 
@@ -283,6 +289,7 @@ export type FarmBoardProps = {
     string,
     { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
   >
+  cardDisplayMap?: Map<string, CardAnimalDisplay>
   isReorgActive: boolean
   reorgRemaining: { sheep: number; boar: number; cattle: number } | null
   hasReorgOverflow: boolean
@@ -595,6 +602,7 @@ export const FarmBoard = ({
   pastureCapacityMap,
   houseDisplay,
   stableDisplayMap,
+  cardDisplayMap = new Map(),
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
@@ -1250,23 +1258,70 @@ export const FarmBoard = ({
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
           )
           const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
+          const cardDisplay = cardDisplayMap.get(rawId)
 
           return (
-            <PlayedCardStats
-              key={`played-${index}`}
-              locale={locale}
-              rawId={rawId}
-              cardType={cardType}
-              cardInfobox={cardInfobox}
-              devMode={devMode}
-              futureEntries={futureEntries}
-              displayCounters={displayCounters}
-              resourceStats={resourceStats}
-              stack={cardStack}
-              cardStacks={cardStacks}
-              heldWorkerId={heldWorkerId}
-              playerColor={displayPlayer.color}
-            />
+            <div key={`played-${index}`} className="played-card-slot">
+              <PlayedCardStats
+                locale={locale}
+                rawId={rawId}
+                cardType={cardType}
+                cardInfobox={cardInfobox}
+                devMode={devMode}
+                futureEntries={futureEntries}
+                displayCounters={displayCounters}
+                resourceStats={resourceStats}
+                stack={cardStack}
+                cardStacks={cardStacks}
+                heldWorkerId={heldWorkerId}
+                playerColor={displayPlayer.color}
+              />
+              {isReorgActive && cardDisplay ? (
+                <div className="played-card-reorg">
+                  <AnimalCount
+                    count={cardDisplay.animalCount}
+                    animalType={cardDisplay.animalType}
+                    capacity={cardDisplay.capacity}
+                  />
+                  <div className="pasture-controls">
+                    {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      const count =
+                        cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0
+                      const canDecrease =
+                        cardDisplay.animalType === animalType && count > 0
+                      const canIncrease =
+                        (reorgRemaining?.[animalType] ?? 0) > 0 &&
+                        cardDisplay.capacity > 0 &&
+                        (cardDisplay.animalType !== animalType || count < cardDisplay.capacity)
+                      return (
+                        <div key={animalType} className="pasture-control-row">
+                          <span className="pasture-control-label">
+                            {t(locale, `resources.${animalType}`)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              adjustReorgAnimal(cardDisplay.zoneId, animalType, -1)
+                            }
+                            disabled={!isInteractive || !canDecrease}
+                          >
+                            -
+                          </button>
+                          <span className="pasture-control-value">{count}</span>
+                          <button
+                            onClick={() =>
+                              adjustReorgAnimal(cardDisplay.zoneId, animalType, 1)
+                            }
+                            disabled={!isInteractive || !canIncrease}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           )
         })}
       </div>
