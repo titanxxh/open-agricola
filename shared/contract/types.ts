@@ -46,6 +46,22 @@ export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
 
+export type OrdinaryCardType = 'occupation' | 'minor'
+
+export type OrdinaryCardDecks = {
+  occupation: string[]
+  minor: string[]
+}
+
+export type OrdinaryCardDrawChoice = {
+  id: string
+  playerId: string
+  cardType: OrdinaryCardType
+  candidates: string[]
+  sourceCard?: string
+  sourceActionId?: string
+}
+
 export type CardProvidedPaymentResourceCover = {
   resource: ResourceKey
   costAmount: number
@@ -518,6 +534,9 @@ export type GameState = {
   /** When true, community-deck cards are included in the deal pool. */
   enableCommunityDeck: boolean
   enableParentCards: boolean
+  ordinaryCardDecks: OrdinaryCardDecks
+  ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
+  nextOrdinaryCardDrawChoiceSeq: number
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
