@@ -233,6 +233,10 @@ _Avoid_: 把单卡规则扩散到主路径
 Card Source 的 `meta` 部分，包含可序列化、前端可见、无运行时行为的卡牌定义字段，如 id、名称、描述、成本、类型、前置条件、reward、`cardField`。
 _Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局部状态
 
+**Parent Card Definition**:
+Parent Cards 扩展的独立结构化数据定义，描述 mother / father parent card 的卡号、规则原文、逻辑头像引用、逻辑卡背引用、mother 小数分值、mother 轮次奖励、father 任务条件和三档奖励；father 条件与奖励同时保留原文和机器可读结构。mother 小数分直接按规则印刷的小数存储。它只描述可验证数据，不执行规则。它不属于 `shared/cards` 的 Card Source / Card Definition / Card Display / Card Impl 投影，也不进入普通手牌、已打出卡、cards-manifest 或常规卡牌注册表。
+_Avoid_: Card Definition、Card Source、MinorImprovement、Occupation、玩家手牌
+
 **Card Source**:
 单卡作者编辑的唯一源，包含卡牌的 `meta` 和 `impl`；构建和运行时必须从它投影出前端可读的 Card Display 和服务端可用的 Card Impl。
 _Avoid_: 让作者同时维护 display 文件和 impl 文件
