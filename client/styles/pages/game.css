@@ -3732,11 +3732,15 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   min-width: 160px;
 }
 .parent-card-tile {
+  position: relative;
   width: 88px;
   aspect-ratio: 700 / 1000;
   border-radius: 6px;
   background: #f6ead7;
   box-shadow: 0 2px 6px rgba(40, 24, 10, 0.16);
+}
+.parent-card-infobox {
+  font-size: 10px;
 }
 
 /* ══════════ PlayerTabs ══════════ */

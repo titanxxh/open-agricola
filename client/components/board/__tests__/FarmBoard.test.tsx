@@ -180,6 +180,9 @@ describe('FarmBoard', () => {
     const player = {
       ...createPlayer('p1', 'Player A', 'red'),
       parentCards: { mother: 'PR01', father: 'PS01' },
+      cardStates: {
+        PS01: { infobox: 'Completed' },
+      },
     } as PlayerState
 
     const html = renderToStaticMarkup(
@@ -191,6 +194,7 @@ describe('FarmBoard', () => {
     expect(html).toContain('/assets/parents/cards/PR01.png')
     expect(html).toContain('data-card-id="PS01"')
     expect(html).toContain('/assets/parents/cards/PS01.png')
+    expect(html).toContain('Completed')
   })
 
   it('renders reorg controls for card animal zones', () => {

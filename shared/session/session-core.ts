@@ -1464,6 +1464,7 @@ export class GameCore {
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
+      if (action.idleOnly && this.engineStack.depth() > 0) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id },
         action,
