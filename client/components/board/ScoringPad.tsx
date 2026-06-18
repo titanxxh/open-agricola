@@ -39,6 +39,7 @@ const categoryOrder: ScoreCategoryResult['key'][] = [
   'stoneRooms',
   'farmers',
   'cards',
+  'parentCards',
   'cardBonusVp',
   'beggings',
 ]
@@ -57,6 +58,7 @@ const categoryLabelKey: Record<ScoreCategoryResult['key'], string> = {
   stoneRooms: 'ui.scoringStoneRooms',
   farmers: 'ui.scoringFarmers',
   cards: 'ui.scoringCards',
+  parentCards: 'ui.scoringParentCards',
   cardBonusVp: 'ui.scoringCardsBonus',
   beggings: 'ui.scoringBeggings',
 }
@@ -67,6 +69,7 @@ const formatScore = (value: number) =>
 type ScoringRow =
   | { id: string; type: 'category'; key: ScoreCategoryResult['key'] }
   | { id: string; type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation' }
+  | { id: string; type: 'parentCard'; cardId: string }
   | { id: string; type: 'cardBonus'; cardId: string; cardType?: 'major' | 'minor' | 'occupation' }
   | { id: string; type: 'total' }
 
@@ -111,8 +114,10 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   }))
 
   const cardRows: ScoringRow[] = []
+  const parentCardRows: ScoringRow[] = []
   const cardBonusRows: ScoringRow[] = []
   const cardMap = new Map<string, 'major' | 'minor' | 'occupation'>()
+  const parentCardIds = new Set<string>()
   const cardBonusMap = new Map<string, 'major' | 'minor' | 'occupation' | undefined>()
 
   scores.forEach((player) => {
@@ -120,6 +125,12 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     cardsCategory?.entries.forEach((entry) => {
       if (entry.type === 'card' && entry.score !== 0) {
         cardMap.set(entry.cardId, entry.cardType)
+      }
+    })
+    const parentCardsCategory = player.categories.find((item) => item.key === 'parentCards')
+    parentCardsCategory?.entries.forEach((entry) => {
+      if (entry.type === 'parentCard' && entry.score !== 0) {
+        parentCardIds.add(entry.cardId)
       }
     })
     const bonusCategory = player.categories.find((item) => item.key === 'cardBonusVp')
@@ -133,6 +144,9 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   Array.from(cardMap.entries()).forEach(([cardId, cardType]) => {
     cardRows.push({ id: `card-${cardId}`, type: 'card', cardId, cardType })
   })
+  Array.from(parentCardIds).forEach((cardId) => {
+    parentCardRows.push({ id: `parentCard-${cardId}`, type: 'parentCard', cardId })
+  })
   Array.from(cardBonusMap.entries()).forEach(([cardId, cardType]) => {
     cardBonusRows.push({ id: `cardBonus-${cardId}`, type: 'cardBonus', cardId, cardType })
   })
@@ -142,6 +156,9 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     rows.push(row)
     if (row.type === 'category' && row.key === 'cards') {
       rows.push(...cardRows)
+    }
+    if (row.type === 'category' && row.key === 'parentCards') {
+      rows.push(...parentCardRows)
     }
     if (row.type === 'category' && row.key === 'cardBonusVp') {
       rows.push(...cardBonusRows)
@@ -205,9 +222,11 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                   ? t(locale, categoryLabelKey[row.key])
                   : row.type === 'card'
                     ? renderCardChildLabel(locale, row.cardId, row.cardType)
-                    : row.type === 'cardBonus'
-                      ? renderCardChildLabel(locale, row.cardId, row.cardType, true)
-                      : t(locale, 'ui.scoringTotal')
+                    : row.type === 'parentCard'
+                      ? <span className="scoring-card-label">{'· '}{row.cardId}</span>
+                      : row.type === 'cardBonus'
+                        ? renderCardChildLabel(locale, row.cardId, row.cardType, true)
+                        : t(locale, 'ui.scoringTotal')
               return (
                 <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
                   <div className="scoring-cell scoring-label">{rowLabel}</div>
@@ -251,6 +270,24 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                       return (
                         <div key={`${row.id}-${player.playerId}`} className="scoring-cell">
                           <div className="scoring-cell-value">{score}</div>
+                        </div>
+                      )
+                    }
+                    if (row.type === 'parentCard') {
+                      const category = player.categories.find(
+                        (item) => item.key === 'parentCards',
+                      )
+                      const score = category?.entries.reduce(
+                        (sum, item) =>
+                          item.type === 'parentCard' && item.cardId === row.cardId && item.score !== 0
+                            ? sum + item.score
+                            : sum,
+                        0,
+                      )
+                      const formattedScore = score ? formatScore(score) : '0'
+                      return (
+                        <div key={`${row.id}-${player.playerId}`} className="scoring-cell">
+                          <div className="scoring-cell-value">{formattedScore}</div>
                         </div>
                       )
                     }

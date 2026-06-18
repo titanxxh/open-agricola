@@ -21,6 +21,7 @@ import {
   subtractScoringReserve,
   sumSelectedScoringReserve,
 } from './scoring-reserve.ts'
+import { getParentCardDefinition } from '../parents'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -40,6 +41,7 @@ type ScoreCategoryKey =
   | 'stoneRooms'
   | 'farmers'
   | 'cards'
+  | 'parentCards'
   | 'cardBonusVp'
   | 'beggings'
 
@@ -58,6 +60,7 @@ export type ScoreEntry =
       cardType?: 'major' | 'minor' | 'occupation'
       reserved?: Partial<Resource>
     }
+  | { type: 'parentCard'; cardId: string; score: number }
 
 export type ScoreCategoryResult = {
   key: ScoreCategoryKey
@@ -572,6 +575,27 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       total: cardsTotal,
       entries: cardEntries,
     })
+
+    const parentCardEntries: ScoreEntry[] = []
+    const selectedMotherCard = player.parentCards?.mother
+    const motherCard = selectedMotherCard
+      ? getParentCardDefinition(selectedMotherCard)
+      : undefined
+    if (motherCard?.kind === 'mother' && motherCard.score !== 0) {
+      parentCardEntries.push({
+        type: 'parentCard',
+        cardId: motherCard.id,
+        score: motherCard.score,
+      })
+    }
+    const parentCardsTotal = parentCardEntries.reduce((sum, entry) => sum + entry.score, 0)
+    if (parentCardEntries.length > 0) {
+      categories.push({
+        key: 'parentCards',
+        total: parentCardsTotal,
+        entries: parentCardEntries,
+      })
+    }
 
     let cardBonusVp = 0
     const cardBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []

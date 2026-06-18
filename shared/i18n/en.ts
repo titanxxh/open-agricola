@@ -168,6 +168,7 @@ export const en = {
     scoringStoneRooms: 'Stone rooms',
     scoringFarmers: 'Family members',
     scoringCards: 'Cards',
+    scoringParentCards: 'Parent Cards',
     scoringCardsBonus: 'Card bonus',
     scoringBeggings: 'Begging cards',
     scoringBonusDetail: '{count} {resource}',
