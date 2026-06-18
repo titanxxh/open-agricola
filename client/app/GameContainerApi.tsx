@@ -36,6 +36,7 @@ import { PublicEventResourceAnimations } from '../components/effects/PublicEvent
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
+import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import {
   buildBakeExchangeInfo,
   buildBakeBulkChoice,
@@ -1869,6 +1870,22 @@ export const GameContainerApi = () => {
       <PublicEventCardPassAnimation
         events={(state.events ?? []).filter((e): e is CardPassedEvent => e.type === 'card.passed')}
       />
+      {selfPlayer ? (
+        <OrdinaryCardDrawOverlay
+          state={state}
+          playerId={selfPlayer.id}
+          locale={locale}
+          onKeep={async (choiceId, keepCardId) => {
+            const playerIndex = state.players.findIndex((player) => player.id === selfPlayer.id)
+            if (playerIndex < 0) return
+            try {
+              await transport.ordinaryDrawKeep(playerIndex, choiceId, keepCardId)
+            } catch (e) {
+              console.error('ordinaryDrawKeep error', e)
+            }
+          }}
+        />
+      ) : null}
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
