@@ -109,6 +109,7 @@ export type InitialStateOptions = {
   draftPoolSize?: number
   /** When true, include community-deck cards in the deal pool. Default false. */
   enableCommunityDeck?: boolean
+  enableParentCards?: boolean
 }
 
 export const generateRoundActionOrder = (seed: number) => {
