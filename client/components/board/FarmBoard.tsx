@@ -568,13 +568,14 @@ const PlayedCardStats = ({
   )
 }
 
-const ParentCardTile = ({ id }: { id: ParentCardId }) => {
+const ParentCardTile = ({ id, infobox }: { id: ParentCardId; infobox?: string }) => {
   const def = getParentCardDefinition(id)
   if (!def) return null
   const { frontUrl } = resolveParentCardAssetUrls(def.assets)
   return (
     <div className="parent-card-tile" data-card-id={id}>
       <img className="parent-card-image" src={frontUrl} alt={`${def.kind} ${id}`} />
+      {infobox ? <div className="card-infobox parent-card-infobox">{infobox}</div> : null}
     </div>
   )
 }
@@ -1235,10 +1236,16 @@ export const FarmBoard = ({
       {displayPlayer.parentCards?.mother || displayPlayer.parentCards?.father ? (
         <div className="parent-cards-row">
           {displayPlayer.parentCards?.mother ? (
-            <ParentCardTile id={displayPlayer.parentCards.mother} />
+            <ParentCardTile
+              id={displayPlayer.parentCards.mother}
+              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.mother]?.infobox}
+            />
           ) : null}
           {displayPlayer.parentCards?.father ? (
-            <ParentCardTile id={displayPlayer.parentCards.father} />
+            <ParentCardTile
+              id={displayPlayer.parentCards.father}
+              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
+            />
           ) : null}
         </div>
       ) : null}
