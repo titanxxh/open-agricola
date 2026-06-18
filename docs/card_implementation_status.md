@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-06-09。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-06-18。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -15,8 +15,12 @@
 | 已接受 / 产品策略差异 | 41 |
 | 排除的 BGA legacy 或未实现行为目标 | 51 |
 | 本轮审计视为已对齐 | 796 |
+| Parent Cards 扩展结构化定义 | 24 / 24 |
+| Parent Cards gameplay 接入 | 未开始 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
+
+Parent Cards 扩展当前只完成 PR01-PR12 / PS01-PS12 的结构化数据、runtime portrait/back assets、资产解析和完整注册表校验。它不进入 A-E Card Source、cards-manifest、普通手牌或常规卡牌注册表；setup / draft / mother round gain / father quest / scoring / pending flow 仍未接入。
 
 审计规则：优先核对卡牌描述文本、custom description、cost、prerequisite、passing、职业/小改 metadata，以及游戏规则行为。BGA 平台/工坊字段如 `banned`、`implemented`、`isCorbariusOrDulcinaria`、`isArtifexOrBubulcus` 不作为对齐要求；如果它们影响产品策略，只记录为已接受差异或排除项，不记为实现 bug。
 
@@ -121,6 +125,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 卡牌能力 metadata 与实现边界 | `CardDefinition` runtime capability fields、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()`、`pnpm run check:card-impl-boundaries` | 跨卡身份 / 能力读 metadata/helper；生产 `shared/cards/A-E/*.ts` 不新增运行时外卡 id 分支，明确 allowlist 除外。 |
 | 自定义卡 runtime / frontend metadata 拆分 | `shared/cards/custom-registry.ts`、`shared/cards/custom-card-metadata.ts`、`client/services/card-meta.ts`、`scripts/__tests__/eslint-client-boundary.test.ts` | server / sandbox 只注册 impl、session context、effects、listeners、modifiers；main client 只注册 display metadata、art URL、O 编号，不 import custom runtime registry。 |
 | Card Source metadata / runtime 分离 | `shared/cards/card-source.ts`、`scripts/build-cards-manifest.ts`、`scripts/generate-register-all.ts`、`scripts/check-generated-cards-sync.ts`、`shared/cards/__tests__/card-source-representatives.test.ts` | Card Source 卡牌的运行时字段只放在 `impl`；manifest / generated catalog 只静态读取 `meta` 并输出 metadata 字面量；major runtime source 只在 `major/runtime.generated.ts` 进入后端实现路径；generated catalog 必须保持同步；workshop PR 生成必须基于已 fetch 的 upstream generated 文件 patch，不读部署机本地 cards tree；代表卡必须通过 production catalog / registry path 覆盖。 |
+| Parent Card Definition 数据边界 | `shared/parents/*`、`public/assets/parents/*`、`client/services/parent-assets.ts`、`shared/parents/__tests__/parent-cards-complete.test.ts` | Parent Cards 是扩展专用结构化数据和 runtime asset 引用，不属于 A-E Card Source / Card Definition / Card Impl 投影；后续 gameplay 接入必须另行设计 setup、draft、mother gain、father quest、scoring 和 pending flow，不在前端补规则裁定。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens` | fence、linked occupancy、special stable、stable count、token supply、行动格预留 marker 都走 source/type metadata 与 domain helper；不要在主路径恢复单卡 import 或卡牌 id 分支。 |
 | Future meeple action token / Receive | `receive` internal action、`FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的普通资源按 player 合并为一次 `receive` transaction，保留每个 entry 的 `sourceCardId`，触发 Receive listener 而不隐式触发 Gain listener；`field` / `stable` 仍由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
 | Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house / card animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；animal reorg 交互保留 card zone / `cardId`，不要反查外卡 `cardStates` 或临时改 live resources。 |
