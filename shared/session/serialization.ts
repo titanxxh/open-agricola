@@ -577,6 +577,21 @@ export const serializeStateForPlayer = (
           ),
         ),
       }
+  const filteredOrdinaryCardDecks = {
+    occupation: Array(base.ordinaryCardDecks.occupation.length).fill('?'),
+    minor: Array(base.ordinaryCardDecks.minor.length).fill('?'),
+  }
+  const filteredOrdinaryCardDrawChoices = Object.fromEntries(
+    Object.entries(base.ordinaryCardDrawChoices).map(([id, choice]) => [
+      id,
+      choice.playerId === viewerPlayerId
+        ? choice
+        : {
+            ...choice,
+            candidates: Array(choice.candidates.length).fill('?'),
+          },
+    ]),
+  )
   const filteredEvents = filterHiddenHandEvents(base.events, hiddenRefs, seqView)
   const filteredPublicEventArchive = filterHiddenHandArchive(base.publicEventArchive, hiddenRefs, seqView)
   return {
@@ -591,6 +606,8 @@ export const serializeStateForPlayer = (
     log: filterHiddenHandLog(base.log, hiddenCardIds),
     draft: filteredDraft,
     parentSelection: filterParentSelectionForPlayer(base.parentSelection, viewerPlayerId),
+    ordinaryCardDecks: filteredOrdinaryCardDecks,
+    ordinaryCardDrawChoices: filteredOrdinaryCardDrawChoices,
   }
 }
 

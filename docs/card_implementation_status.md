@@ -16,11 +16,11 @@
 | 排除的 BGA legacy 或未实现行为目标 | 51 |
 | 本轮审计视为已对齐 | 796 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
-| Parent Cards gameplay 接入 | setup / simultaneous selection 已接入 |
+| Parent Cards gameplay 接入 | setup / simultaneous selection / ordinary-card draw deck 基础设施已接入 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
-Parent Cards 扩展当前完成 PR01-PR12 / PS01-PS12 的结构化数据、runtime portrait/back assets、资产解析、完整注册表校验，以及可选开局设置和同时 mother/father 选择阶段。它不进入 A-E Card Source、cards-manifest、普通手牌或常规卡牌注册表；mother round gain、father quest、Parent Cards scoring、普通 Parent Card draw deck 仍未接入。
+Parent Cards 扩展当前完成 PR01-PR12 / PS01-PS12 的结构化数据、runtime portrait/back assets、资产解析、完整注册表校验、可选开局设置、同时 mother/father 选择阶段，以及供父亲卡奖励使用的普通 occupation/minor 后端抽牌牌堆与 draw-3-keep-1 私有选择基础设施。它不进入 A-E Card Source、cards-manifest、普通手牌或常规卡牌注册表；mother round gain、father quest、Parent Cards scoring 仍未接入。
 
 审计规则：优先核对卡牌描述文本、custom description、cost、prerequisite、passing、职业/小改 metadata，以及游戏规则行为。BGA 平台/工坊字段如 `banned`、`implemented`、`isCorbariusOrDulcinaria`、`isArtifexOrBubulcus` 不作为对齐要求；如果它们影响产品策略，只记录为已接受差异或排除项，不记为实现 bug。
 
