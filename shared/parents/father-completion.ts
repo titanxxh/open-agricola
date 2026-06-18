@@ -1,17 +1,20 @@
 import type { EventSink } from '../contract/events'
-import type { ActionChoiceOption, ActionDefinition, GameState, PlayerState, Resource } from '../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
 import { addCardResourceGained, ensureCardState, writeCardInfobox } from '../cards/helpers/card-state'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
 import { addResourcesFromCards } from '../session/stats'
 import { trackWorkPhaseBuildingResources } from '../session/work-phase-resources'
 import { gainResources } from '../actions/effects/gain'
+import { buildSowFarmInteraction } from '../domain/farmyard'
+import { startOrdinaryCardDrawChoice } from '../session/ordinary-card-draw'
 import { getParentCardDefinition } from './cards'
 import type { FatherParentCardId, FatherRequirement, FatherReward, FatherRewardEffect } from './types'
 
 export const COMPLETE_PARENT_FATHER_ACTION_ID = 'complete-parent-father'
 const COMPLETED_INFOBOX = 'Completed'
 const COMPLETED_TIER_KEY = 'fatherCompletedTier'
+const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}
@@ -142,23 +145,85 @@ const isSimpleFatherReward = (reward: FatherReward): boolean =>
 const isFatherCompleted = (player: PlayerState, fatherId: FatherParentCardId): boolean =>
   typeof player.cardStates?.[fatherId]?.extraData?.[COMPLETED_TIER_KEY] === 'number'
 
-export const satisfiedSimpleFatherRewards = (
-  state: GameState,
-  player: PlayerState,
-): FatherReward[] => {
-  if (!state.enableParentCards || state.phase !== 'playing' || state.roundPhase !== 'work') return []
-  const fatherId = player.parentCards.father
-  if (!fatherId || isFatherCompleted(player, fatherId)) return []
-  const definition = getParentCardDefinition(fatherId)
-  if (!definition || definition.kind !== 'father') return []
-  return definition.rewards.filter((reward) =>
-    isSimpleFatherReward(reward) &&
-    isFatherRequirementSatisfied(state, player, reward.requirement),
-  )
+type FatherCompletionOption = {
+  option: ActionChoiceOption
+  reward: FatherReward
 }
 
-const optionForReward = (fatherId: FatherParentCardId, reward: FatherReward): ActionChoiceOption => ({
-  value: `${fatherId}:${reward.tier}`,
+const singleManualKey = (reward: FatherReward): string | null =>
+  reward.effects.length === 1 && reward.effects[0]?.type === 'manual'
+    ? reward.effects[0].key
+    : null
+
+const houseMaterialReward = (reward: FatherReward): number | null => {
+  const match = singleManualKey(reward)?.match(/^gain-house-material-(\d+)$/)
+  return match ? Number(match[1]) : null
+}
+
+const drawTypesForReward = (reward: FatherReward): OrdinaryCardType[] | null => {
+  switch (singleManualKey(reward)) {
+    case 'draw-3-minor-improvements-keep-1':
+      return ['minor']
+    case 'draw-3-occupations-keep-1':
+      return ['occupation']
+    case 'draw-3-minor-improvements-and-3-occupations-keep-1-each':
+      return ['minor', 'occupation']
+    default:
+      return null
+  }
+}
+
+const chooseBuildingResourceCount = (reward: FatherReward): number | null => {
+  const match = singleManualKey(reward)?.match(/^choose-(\d+)-different-building-resources?$/)
+  return match ? Number(match[1]) : null
+}
+
+const sowFieldLimit = (reward: FatherReward): number | null => {
+  const match = singleManualKey(reward)?.match(/^sow-up-to-(\d+)-fields?-single-sow-action$/)
+  return match ? Number(match[1]) : null
+}
+
+const drawDecksAvailable = (state: GameState, reward: FatherReward): boolean => {
+  const drawTypes = drawTypesForReward(reward)
+  return drawTypes !== null && drawTypes.every((cardType) => state.ordinaryCardDecks[cardType].length >= 3)
+}
+
+const canResolveSowReward = (player: PlayerState, reward: FatherReward): boolean => {
+  const maxSelections = sowFieldLimit(reward)
+  if (maxSelections === null) return false
+  const farm = buildSowFarmInteraction(player, { maxSelections, minSelections: 1 })
+  return farm.farmType === 'sow' && farm.selectableFields.length > 0
+}
+
+const resourceCombinations = (count: number): string[][] => {
+  if (!Number.isInteger(count) || count <= 0 || count > BUILDING_RESOURCES.length) return []
+  const out: string[][] = []
+  const visit = (start: number, current: string[]) => {
+    if (current.length === count) {
+      out.push([...current])
+      return
+    }
+    for (let i = start; i < BUILDING_RESOURCES.length; i += 1) {
+      current.push(BUILDING_RESOURCES[i]!)
+      visit(i + 1, current)
+      current.pop()
+    }
+  }
+  visit(0, [])
+  return out
+}
+
+const isSupportedFatherReward = (state: GameState, player: PlayerState, reward: FatherReward): boolean => {
+  if (isSimpleFatherReward(reward)) return true
+  if (houseMaterialReward(reward) !== null) return true
+  if (drawTypesForReward(reward) !== null) return drawDecksAvailable(state, reward)
+  if (chooseBuildingResourceCount(reward) !== null) return true
+  if (sowFieldLimit(reward) !== null) return canResolveSowReward(player, reward)
+  return false
+}
+
+const optionForReward = (fatherId: FatherParentCardId, reward: FatherReward, suffix?: string): ActionChoiceOption => ({
+  value: suffix ? `${fatherId}:${reward.tier}:${suffix}` : `${fatherId}:${reward.tier}`,
   labelKey: 'ui.cards.parentFatherComplete.tier',
   labelParams: {
     tier: reward.tier,
@@ -167,6 +232,45 @@ const optionForReward = (fatherId: FatherParentCardId, reward: FatherReward): Ac
   },
   sourceCard: fatherId,
 })
+
+const optionsForReward = (
+  fatherId: FatherParentCardId,
+  reward: FatherReward,
+): FatherCompletionOption[] => {
+  const chooseCount = chooseBuildingResourceCount(reward)
+  if (chooseCount !== null) {
+    return resourceCombinations(chooseCount).map((resources) => ({
+      option: optionForReward(fatherId, reward, resources.join(',')),
+      reward,
+    }))
+  }
+  return [{ option: optionForReward(fatherId, reward), reward }]
+}
+
+export const satisfiedFatherCompletionOptions = (
+  state: GameState,
+  player: PlayerState,
+): FatherCompletionOption[] => {
+  if (!state.enableParentCards || state.phase !== 'playing' || state.roundPhase !== 'work') return []
+  const fatherId = player.parentCards.father
+  if (!fatherId || isFatherCompleted(player, fatherId)) return []
+  const definition = getParentCardDefinition(fatherId)
+  if (!definition || definition.kind !== 'father') return []
+  return definition.rewards
+    .filter((reward) =>
+      isSupportedFatherReward(state, player, reward) &&
+      isFatherRequirementSatisfied(state, player, reward.requirement),
+    )
+    .flatMap((reward) => optionsForReward(fatherId, reward))
+}
+
+export const satisfiedSimpleFatherRewards = (
+  state: GameState,
+  player: PlayerState,
+): FatherReward[] =>
+  satisfiedFatherCompletionOptions(state, player)
+    .map((entry) => entry.reward)
+    .filter((reward, index, rewards) => rewards.findIndex((candidate) => candidate.tier === reward.tier) === index)
 
 const emitGainEvent = (
   eventSink: EventSink | undefined,
@@ -226,6 +330,20 @@ const applyFatherReward = (
   return gained
 }
 
+const gainAndTrackFatherResources = (
+  state: GameState,
+  player: PlayerState,
+  fatherId: FatherParentCardId,
+  resources: Partial<Resource>,
+  eventSink: EventSink,
+): void => {
+  gainResources(player, resources)
+  emitGainEvent(eventSink, player, fatherId, resources)
+  addResourcesFromCards(player, resources)
+  addCardResourceGained(player, fatherId, resources)
+  trackWorkPhaseBuildingResources(state, player.id, resources)
+}
+
 const markFatherCompleted = (
   player: PlayerState,
   fatherId: FatherParentCardId,
@@ -252,6 +370,102 @@ const markFatherCompleted = (
   })
 }
 
+const completionMarkerFlow = (
+  fatherId: FatherParentCardId,
+  tier: FatherReward['tier'],
+): ActionFlow => ({
+  type: 'seq',
+  children: [
+    {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: fatherId,
+      params: { kind: 'set-extra-data', key: COMPLETED_TIER_KEY, value: tier },
+    },
+    {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: fatherId,
+      params: { kind: 'set-infobox', text: COMPLETED_INFOBOX },
+    },
+  ],
+})
+
+const applyComplexFatherReward = (
+  state: GameState,
+  player: PlayerState,
+  fatherId: FatherParentCardId,
+  reward: FatherReward,
+  choice: string,
+  eventSink: EventSink,
+): ActionExecutionResult | null => {
+  const houseMaterial = houseMaterialReward(reward)
+  if (houseMaterial !== null) {
+    gainAndTrackFatherResources(state, player, fatherId, { [player.houseType]: houseMaterial }, eventSink)
+    markFatherCompleted(player, fatherId, reward.tier, eventSink)
+    return { type: 'ok' }
+  }
+
+  const drawTypes = drawTypesForReward(reward)
+  if (drawTypes !== null) {
+    if (!drawTypes.every((cardType) => state.ordinaryCardDecks[cardType].length >= 3)) {
+      return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    }
+    for (const cardType of drawTypes) {
+      const started = startOrdinaryCardDrawChoice(state, {
+        playerId: player.id,
+        cardType,
+        count: 3,
+        sourceCard: fatherId,
+        sourceActionId: COMPLETE_PARENT_FATHER_ACTION_ID,
+      })
+      if (!started.ok) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    }
+    markFatherCompleted(player, fatherId, reward.tier, eventSink)
+    return { type: 'ok' }
+  }
+
+  const chooseCount = chooseBuildingResourceCount(reward)
+  if (chooseCount !== null) {
+    const resources = choice.split(':')[2]?.split(',').filter(Boolean) ?? []
+    if (
+      resources.length !== chooseCount ||
+      new Set(resources).size !== resources.length ||
+      !resources.every((resource): resource is typeof BUILDING_RESOURCES[number] =>
+        (BUILDING_RESOURCES as readonly string[]).includes(resource),
+      )
+    ) {
+      return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    }
+    const gained = Object.fromEntries(resources.map((resource) => [resource, 1])) as Partial<Resource>
+    gainAndTrackFatherResources(state, player, fatherId, gained, eventSink)
+    markFatherCompleted(player, fatherId, reward.tier, eventSink)
+    return { type: 'ok' }
+  }
+
+  const maxSelections = sowFieldLimit(reward)
+  if (maxSelections !== null) {
+    if (!canResolveSowReward(player, reward)) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    return {
+      type: 'flow',
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'sow',
+            sourceCard: fatherId,
+            actionContext: { maxSelections, minSelections: 1 },
+          },
+          completionMarkerFlow(fatherId, reward.tier),
+        ],
+      },
+    }
+  }
+
+  return null
+}
+
 export const completeParentFatherAction: ActionDefinition = {
   id: COMPLETE_PARENT_FATHER_ACTION_ID,
   nameKey: 'actions.complete-parent-father.name',
@@ -262,11 +476,11 @@ export const completeParentFatherAction: ActionDefinition = {
   idleOnly: true,
   canBeExecutedByPlayer: (state, player) =>
     state.currentPlayerIndex === state.players.indexOf(player) &&
-    satisfiedSimpleFatherRewards(state, player).length > 0,
+    satisfiedFatherCompletionOptions(state, player).length > 0,
   execute: ({ state, player }) => {
     const fatherId = player.parentCards.father
     if (!fatherId) return { type: 'fail', errorKey: 'log.actionUnavailable' }
-    const options = satisfiedSimpleFatherRewards(state, player).map((reward) => optionForReward(fatherId, reward))
+    const options = satisfiedFatherCompletionOptions(state, player).map((entry) => entry.option)
     if (options.length === 0) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     return {
       type: 'request',
@@ -283,12 +497,18 @@ export const completeParentFatherAction: ActionDefinition = {
     if (choiceFatherId !== fatherId || (tier !== 1 && tier !== 2 && tier !== 3)) {
       return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
-    const reward = satisfiedSimpleFatherRewards(state, player).find((candidate) => candidate.tier === tier)
-    if (!reward) return { type: 'fail', errorKey: 'log.actionUnavailable' }
-    if (applyFatherReward(state, player, fatherId, reward, eventSink) === null) {
+    const offered = satisfiedFatherCompletionOptions(state, player)
+    const selected = offered.find((entry) => entry.option.value === choice)
+    if (!selected || selected.reward.tier !== tier) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    const simple = applyFatherReward(state, player, fatherId, selected.reward, eventSink)
+    if (simple !== null) {
+      markFatherCompleted(player, fatherId, selected.reward.tier, eventSink)
+      return { type: 'ok' }
+    }
+    const complex = applyComplexFatherReward(state, player, fatherId, selected.reward, choice, eventSink)
+    if (complex === null) {
       return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
-    markFatherCompleted(player, fatherId, reward.tier, eventSink)
-    return { type: 'ok' }
+    return complex
   },
 }

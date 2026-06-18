@@ -279,6 +279,15 @@ function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   ctx.broadcaster.broadcastState(room, resp, 'anytime', msg.requestId)
 }
 
+function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'ordinaryDrawKeep' }>): void {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const resp = room.session.withCtx(() =>
+    room.session.resolveOrdinaryCardDrawChoice(ctx.currentPlayerIndex, msg.choiceId, msg.keepCardId),
+  )
+  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+}
+
 function handleRoundEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'roundEnd' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.performRoundEnd())
@@ -385,6 +394,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   action: handleAction,
   choice: handleChoice,
   anytime: handleAnytime,
+  ordinaryDrawKeep: handleOrdinaryDrawKeep,
   roundEnd: handleRoundEnd,
   commitSelection: handleCommitSelection,
   parentSubmit: handleParentSubmit,

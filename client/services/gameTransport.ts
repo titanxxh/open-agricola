@@ -36,6 +36,7 @@ export interface GameTransport {
     payload?: Record<string, unknown>,
   ): Promise<GameSyncPayload>
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
+  ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string): Promise<GameSyncPayload>
   commitSelection(playerIndex: number, payload: CommitSelectionPayload): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
@@ -145,6 +146,10 @@ export class HttpGameTransport implements GameTransport {
 
   takeAnytimeAction(playerIndex: number, actionId: string) {
     return this.send(() => post('/api/game/anytime', { playerIndex, actionId }))
+  }
+
+  ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string) {
+    return this.send(() => post('/api/game/ordinary-draw/keep', { playerIndex, choiceId, keepCardId }))
   }
 
   commitSelection(
@@ -363,6 +368,10 @@ export class WsGameTransport implements GameTransport {
 
   async takeAnytimeAction(_playerIndex: number, actionId: string): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'anytime', actionId })
+  }
+
+  async ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'ordinaryDrawKeep', playerIndex, choiceId, keepCardId })
   }
 
   async commitSelection(
