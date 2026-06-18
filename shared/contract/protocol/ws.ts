@@ -24,6 +24,7 @@ type ClientCommandBody =
   | { type: 'action'; spaceId: string }
   | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
+  | { type: 'ordinaryDrawKeep'; playerIndex: number; choiceId: string; keepCardId: string }
   | {
       type: 'commitSelection'
       playerIndex: number

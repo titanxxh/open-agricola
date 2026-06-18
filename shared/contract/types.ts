@@ -861,6 +861,7 @@ export type InteractionRequest =
               sourceCard?: string
               groupKey?: string
             }[]
+            minSelections?: number
             maxSelections?: number
           }
         | {
@@ -992,6 +993,7 @@ export type InteractionFarmSelection =
         sourceCard?: string
         groupKey?: string
       }[]
+      minSelections?: number
       maxSelections?: number
     }
 

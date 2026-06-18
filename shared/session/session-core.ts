@@ -166,6 +166,7 @@ import {
   buildMotherRoundRewardFlow,
   clearSettledMotherReservations,
 } from '../parents/mother-rewards'
+import { resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -3741,6 +3742,22 @@ export class GameCore {
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
     return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
+  }
+
+  resolveOrdinaryCardDrawChoice(
+    playerIndex: number,
+    choiceId: string,
+    keepCardId: string,
+  ): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    const result = resolveOrdinaryCardDrawChoice(this.state, {
+      playerId: player.id,
+      choiceId,
+      keepCardId,
+    })
+    if (!result.ok) return this.respond(false, result.error)
+    return this.respond(true, undefined, result.privateEvents)
   }
 
   private resolveEngineChoice(

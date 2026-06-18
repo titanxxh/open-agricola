@@ -215,6 +215,28 @@ describe('WsGameTransport request correlation', () => {
 
     transport.destroy()
   })
+
+  it('sends ordinaryDrawKeep with playerIndex, choiceId, and keepCardId', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const keepPromise = transport.ordinaryDrawKeep(1, 'ordinary-card-draw-7', 'minor-a')
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'ordinaryDrawKeep',
+      playerIndex: 1,
+      choiceId: 'ordinary-card-draw-7',
+      keepCardId: 'minor-a',
+    })
+    expect(socket.sent[0]?.requestId).toBeTypeOf('string')
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 11))
+    await expect(keepPromise).resolves.toMatchObject({ historyLength: 11 })
+
+    transport.destroy()
+  })
 })
 
 describe('HttpGameTransport parentSubmit', () => {
@@ -255,6 +277,53 @@ describe('HttpGameTransport parentSubmit', () => {
       expect(calls[0]?.init?.method).toBe('POST')
       const body = JSON.parse(String(calls[0]?.init?.body)) as unknown
       expect(body).toEqual({ playerIndex: 1, selection })
+      expect(payload).toEqual(fakePayload)
+
+      transport.destroy()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
+})
+
+describe('HttpGameTransport ordinaryDrawKeep', () => {
+  it('POSTs to /api/game/ordinary-draw/keep with playerIndex, choiceId, and keepCardId', async () => {
+    const fakePayload = {
+      state: serializeState(createInitialState(42), emptyCtx()),
+      pending: { type: 'none' },
+      interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+      scores: null,
+      historyLength: 12,
+      hasActionStartSnapshot: false,
+      ok: true,
+    }
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+    const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      return {
+        ok: true,
+        json: async () => fakePayload,
+      } as unknown as Response
+    })
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+    vi.stubGlobal('fetch', fakeFetch)
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    })
+
+    try {
+      const { HttpGameTransport } = await import('../gameTransport')
+      const transport = new HttpGameTransport()
+      const payload = await transport.ordinaryDrawKeep(0, 'ordinary-card-draw-2', 'occ-a')
+
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toMatch(/\/api\/game\/ordinary-draw\/keep$/)
+      expect(calls[0]?.init?.method).toBe('POST')
+      const body = JSON.parse(String(calls[0]?.init?.body)) as unknown
+      expect(body).toEqual({ playerIndex: 0, choiceId: 'ordinary-card-draw-2', keepCardId: 'occ-a' })
       expect(payload).toEqual(fakePayload)
 
       transport.destroy()
