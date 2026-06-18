@@ -22,7 +22,7 @@ import {
 } from '../cards/catalog'
 import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
-import type { ActionSpace, Field, GameState, PlayerState } from '../contract/types'
+import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
@@ -135,7 +135,59 @@ export const dealHands = (
     minorHands.push(shuffledMinor.slice(index * handSize, index * handSize + handSize))
     occupationHands.push(shuffledOccupation.slice(index * handSize, index * handSize + handSize))
   }
-  return { minorHands, occupationHands }
+  const dealtCount = playerCount * handSize
+  return {
+    minorHands,
+    occupationHands,
+    minorDeck: shuffledMinor.slice(dealtCount),
+    occupationDeck: shuffledOccupation.slice(dealtCount),
+  }
+}
+
+const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; minor: Set<string> } => {
+  const occupation = new Set<string>()
+  const minor = new Set<string>()
+  if (!draft) return { occupation, minor }
+  Object.values(draft.pools).forEach((pool) => {
+    pool.occ.forEach((id) => occupation.add(id))
+    pool.minor.forEach((id) => minor.add(id))
+  })
+  Object.values(draft.kept).forEach((pool) => {
+    pool.occ.forEach((id) => occupation.add(id))
+    pool.minor.forEach((id) => minor.add(id))
+  })
+  return { occupation, minor }
+}
+
+const createFallbackOrdinaryCardDecks = (
+  players: PlayerState[],
+  seed: number,
+  draft: GameState['draft'],
+  enableCommunityDeck: boolean,
+): OrdinaryCardDecks => {
+  const full = dealHands(players.length, seed, [], [], undefined, 0, enableCommunityDeck)
+  const draftIds = cardIdsInDraft(draft)
+  const dealtOccupation = new Set(players.flatMap((player) => player.occupationHand ?? []))
+  const dealtMinor = new Set(players.flatMap((player) => player.minorHand ?? []))
+  return {
+    occupation: full.occupationDeck.filter((id) => !dealtOccupation.has(id) && !draftIds.occupation.has(id)),
+    minor: full.minorDeck.filter((id) => !dealtMinor.has(id) && !draftIds.minor.has(id)),
+  }
+}
+
+const normalizeOrdinaryCardDecks = (
+  raw: GameState,
+  players: PlayerState[],
+  seed: number,
+): OrdinaryCardDecks => {
+  const decks = raw.ordinaryCardDecks
+  if (decks && Array.isArray(decks.occupation) && Array.isArray(decks.minor)) {
+    return {
+      occupation: decks.occupation.filter((id): id is string => typeof id === 'string'),
+      minor: decks.minor.filter((id): id is string => typeof id === 'string'),
+    }
+  }
+  return createFallbackOrdinaryCardDecks(players, seed, raw.draft ?? null, raw.enableCommunityDeck ?? false)
 }
 
 export const normalizeState = (raw: GameState): GameState => {
@@ -367,6 +419,7 @@ export const normalizeState = (raw: GameState): GameState => {
     raw.publicEventArchive,
     raw.nextPublicEventArchivePacketSeq,
   )
+  const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, seed)
   return {
     ...raw,
     players,
@@ -386,6 +439,9 @@ export const normalizeState = (raw: GameState): GameState => {
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
     enableParentCards: raw.enableParentCards ?? false,
+    ordinaryCardDecks,
+    ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
+    nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
     completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
 }
@@ -498,6 +554,7 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  let ordinaryCardDecks: OrdinaryCardDecks
 
   let phase: GameState['phase'] = 'playing'
   let draft: GameState['draft'] = null
@@ -526,8 +583,26 @@ export const createInitialState = (
         minor: draftDeal.minorHands[i] ?? [],
       }
     })
+    ordinaryCardDecks = {
+      occupation: draftDeal.occupationDeck,
+      minor: draftDeal.minorDeck,
+    }
     draft = initDraftState(seatOrder, hands, poolSize)
     phase = 'draft'
+  } else {
+    const deal = dealHands(
+      players.length,
+      gameSeed,
+      options.extraMinorIds ?? [],
+      options.extraOccupationIds ?? [],
+      options.deckIds,
+      7,
+      options.enableCommunityDeck ?? false,
+    )
+    ordinaryCardDecks = {
+      occupation: deal.occupationDeck,
+      minor: deal.minorDeck,
+    }
   }
 
   const initialEvents: GameEvent[] = [{
@@ -572,6 +647,9 @@ export const createInitialState = (
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
     enableParentCards: options.enableParentCards ?? false,
+    ordinaryCardDecks,
+    ordinaryCardDrawChoices: {},
+    nextOrdinaryCardDrawChoiceSeq: 1,
     workPhaseObtainedResources: {},
     completedFeedingPhases: 0,
   }
