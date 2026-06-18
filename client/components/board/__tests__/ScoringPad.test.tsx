@@ -266,6 +266,33 @@ describe('ScoringPad', () => {
     expect(oldMiserRow?.textContent).toContain('0')
   })
 
+  it('renders parent card fractional scores without integer coercion', () => {
+    const scores = [
+      {
+        playerId: 'p1',
+        playerName: 'Player 1',
+        total: -2.3,
+        categories: [
+          {
+            key: 'parentCards',
+            total: 0.7,
+            entries: [{ type: 'parentCard', cardId: 'PR10', score: 0.7 }],
+          },
+        ],
+      },
+    ] as unknown as PlayerScoreSummary[]
+    const { container } = render(
+      <ScoringPad locale="en" scores={scores} players={mockPlayers} onClose={() => {}} />,
+    )
+
+    expect(screen.getByText('Parent Cards')).toBeTruthy()
+    const parentRow = scoringRowContaining(container, 'Parent Cards')
+    expect(parentRow?.textContent).toContain('+0.7')
+    const pr10Row = scoringRowContaining(container, 'PR10')
+    expect(pr10Row?.textContent).toContain('+0.7')
+    expect(screen.getByText('-2.3')).toBeTruthy()
+  })
+
   it('uses the action log card reference affordance for card bonus child labels', () => {
     const { container } = render(
       <ScoringPad

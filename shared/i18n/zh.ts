@@ -163,6 +163,7 @@ export const zh = {
     scoringStoneRooms: '石屋',
     scoringFarmers: '家庭成员',
     scoringCards: '卡牌分',
+    scoringParentCards: '父母牌',
     scoringCardsBonus: '卡牌加分',
     scoringBeggings: '乞讨卡',
     scoringBonusDetail: '{count}{resource}',

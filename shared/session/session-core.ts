@@ -162,6 +162,10 @@ import {
   startParentSelectionIfNeeded,
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
+import {
+  buildMotherRoundRewardFlow,
+  clearSettledMotherReservations,
+} from '../parents/mother-rewards'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -349,6 +353,7 @@ type StageResumeState = {
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
     | 'futureMeepleActions'
+    | 'parentMotherRewards'
     | 'onReorganizeComplete'
   playerIndex: number
   cardIndex: number
@@ -3022,6 +3027,21 @@ export class GameCore {
   }
 
   private continueAfterFutureMeepleActions(): SessionResponse {
+    const motherRewardFlow = buildMotherRoundRewardFlow(this.state)
+    if (motherRewardFlow) {
+      this.startStageFlow(
+        motherRewardFlow.flow,
+        'parentMotherRewards',
+        motherRewardFlow.playerIndex,
+        0,
+      )
+      return this.respond()
+    }
+    return this.continueAfterParentMotherRewards()
+  }
+
+  private continueAfterParentMotherRewards(): SessionResponse {
+    clearSettledMotherReservations(this.state)
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -3085,6 +3105,9 @@ export class GameCore {
         return
       case 'futureMeepleActions':
         this.continueAfterFutureMeepleActions()
+        return
+      case 'parentMotherRewards':
+        this.continueAfterParentMotherRewards()
         return
       case 'onStartHarvestFeedingPhase':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
@@ -4302,7 +4325,7 @@ export class GameCore {
     const result = commitParentSelection(this.state, player.id, submission)
     if (!result.ok) return this.respond(false, result.error)
     if (this.state.phase === 'playing') {
-      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+      return this.continueAfterFutureMeepleActions()
     }
     return this.respond()
   }
