@@ -35,6 +35,7 @@ import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
+import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import {
   buildBakeExchangeInfo,
   buildBakeBulkChoice,
@@ -171,11 +172,13 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
+          const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
             customCardIds,
             enableCommunityDeck,
+            enableParentCards,
             ...(draftParams ?? {}),
           })
         })
@@ -1827,6 +1830,27 @@ export const GameContainerApi = () => {
               // State update arrives via onSnapshot subscription — no manual refresh.
             } catch (e) {
               console.error('draftSubmit error', e)
+            }
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (state.phase === 'parent-selection' && state.parentSelection) {
+    const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        {notificationStack}
+        <ParentSelectionOverlay
+          state={state}
+          meId={meId}
+          onSubmit={async (selection) => {
+            try {
+              await transport.parentSubmit(playerIndex, selection)
+            } catch (e) {
+              console.error('parentSubmit error', e)
             }
           }}
         />

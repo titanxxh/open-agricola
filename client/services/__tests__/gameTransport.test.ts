@@ -193,6 +193,76 @@ describe('WsGameTransport request correlation', () => {
 
     transport.destroy()
   })
+
+  it('sends parentSubmit with playerIndex and selection payload', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const selection = { mother: 'PR01', father: 'PS01' } as const
+    const submitPromise = transport.parentSubmit(0, selection)
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'parentSubmit',
+      playerIndex: 0,
+      selection,
+    })
+    expect(socket.sent[0]?.requestId).toBeTypeOf('string')
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 6))
+    await expect(submitPromise).resolves.toMatchObject({ historyLength: 6 })
+
+    transport.destroy()
+  })
+})
+
+describe('HttpGameTransport parentSubmit', () => {
+  it('POSTs to /api/game/parent-submit with playerIndex and selection', async () => {
+    const fakePayload = {
+      state: serializeState(createInitialState(42), emptyCtx()),
+      pending: { type: 'none' },
+      interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+      scores: null,
+      historyLength: 9,
+      hasActionStartSnapshot: false,
+      ok: true,
+    }
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+    const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      return {
+        ok: true,
+        json: async () => fakePayload,
+      } as unknown as Response
+    })
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+    vi.stubGlobal('fetch', fakeFetch)
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    })
+
+    try {
+      const { HttpGameTransport } = await import('../gameTransport')
+      const transport = new HttpGameTransport()
+      const selection = { mother: 'PR02', father: 'PS02' } as const
+      const payload = await transport.parentSubmit(1, selection)
+
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toMatch(/\/api\/game\/parent-submit$/)
+      expect(calls[0]?.init?.method).toBe('POST')
+      const body = JSON.parse(String(calls[0]?.init?.body)) as unknown
+      expect(body).toEqual({ playerIndex: 1, selection })
+      expect(payload).toEqual(fakePayload)
+
+      transport.destroy()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
 })
 
 describe('HttpGameTransport draftSubmit', () => {

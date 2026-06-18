@@ -14,6 +14,7 @@ import { emptyResources } from '../../../shared/contract/state-constants'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
+import { getParentCardDefinition, type ParentCardId } from '../../../shared/parents'
 import {
   getPlayerPanelSupplySummary,
   type PlayerPanelSupplySummary,
@@ -24,6 +25,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
+import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
@@ -562,6 +564,17 @@ const PlayedCardStats = ({
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+const ParentCardTile = ({ id }: { id: ParentCardId }) => {
+  const def = getParentCardDefinition(id)
+  if (!def) return null
+  const { frontUrl } = resolveParentCardAssetUrls(def.assets)
+  return (
+    <div className="parent-card-tile" data-card-id={id}>
+      <img className="parent-card-image" src={frontUrl} alt={`${def.kind} ${id}`} />
     </div>
   )
 }
@@ -1219,6 +1232,16 @@ export const FarmBoard = ({
     ) : null}
     <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
+      {displayPlayer.parentCards?.mother || displayPlayer.parentCards?.father ? (
+        <div className="parent-cards-row">
+          {displayPlayer.parentCards?.mother ? (
+            <ParentCardTile id={displayPlayer.parentCards.mother} />
+          ) : null}
+          {displayPlayer.parentCards?.father ? (
+            <ParentCardTile id={displayPlayer.parentCards.father} />
+          ) : null}
+        </div>
+      ) : null}
       <div className="played-row">
         {playedCards.map((cardId, index) => {
           const [kind, rawId] = cardId.includes(':')

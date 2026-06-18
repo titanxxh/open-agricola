@@ -3640,6 +3640,105 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-style: italic;
 }
 
+.parent-selection-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 32, 18, 0.72);
+  z-index: 40;
+  overflow: auto;
+  padding: 24px 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+.parent-selection-panel {
+  background: #fffaf0;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.parent-selection-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid #e6d7bf;
+  padding-bottom: 12px;
+}
+.parent-selection-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #3b2a10);
+}
+.parent-selection-status,
+.parent-selection-waiting {
+  font-size: 13px;
+  color: #7a5a3a;
+}
+.parent-selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.parent-selection-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #3b2a10;
+}
+.parent-selection-row,
+.parent-cards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.parent-choice-card {
+  width: clamp(132px, 24vw, 190px);
+  aspect-ratio: 700 / 1000;
+  border: 2px solid #d7c5aa;
+  border-radius: 8px;
+  background: #f6ead7;
+  padding: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 7px rgba(40, 24, 10, 0.14);
+}
+.parent-choice-card.is-selected {
+  border-color: #3f7c4b;
+  box-shadow: 0 0 0 3px rgba(63, 124, 75, 0.22);
+}
+.parent-choice-card__image,
+.parent-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
+}
+.parent-choice-card__fallback {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: #3b2a10;
+  font-weight: 700;
+}
+.parent-selection-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.parent-selection-confirm {
+  min-width: 160px;
+}
+.parent-card-tile {
+  width: 88px;
+  aspect-ratio: 700 / 1000;
+  border-radius: 6px;
+  background: #f6ead7;
+  box-shadow: 0 2px 6px rgba(40, 24, 10, 0.16);
+}
+
 /* ══════════ PlayerTabs ══════════ */
 .player-tabs {
   display: flex;

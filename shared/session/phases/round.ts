@@ -82,6 +82,7 @@ export const takeAction = (
   const state = core.state
   if (state.gameOver) return core.emitResponse(false, 'game is over')
   if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
   if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
   if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
   const player = state.players[playerIndex]
@@ -369,6 +370,7 @@ export const takeAnytimeAction = (
 ): SessionResponse => {
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
   if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (core.state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
 
   const engine = core.peekEngine()
   const activeOwner = core.readActivePlayerIndex() ?? (engine ? null : core.state.currentPlayerIndex)

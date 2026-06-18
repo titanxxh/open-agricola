@@ -16,5 +16,9 @@ export const PARENT_CARD_IDS = [
 ] as const satisfies readonly ParentCardId[]
 
 const PARENT_CARD_ID_SET = new Set<string>(PARENT_CARD_IDS)
+const MOTHER_PARENT_CARD_ID_SET = new Set<string>(MOTHER_PARENT_CARD_IDS)
+const FATHER_PARENT_CARD_ID_SET = new Set<string>(FATHER_PARENT_CARD_IDS)
 
 export const isParentCardId = (id: string): id is ParentCardId => PARENT_CARD_ID_SET.has(id)
+export const isMotherParentCardId = (id: string): id is MotherParentCardId => MOTHER_PARENT_CARD_ID_SET.has(id)
+export const isFatherParentCardId = (id: string): id is FatherParentCardId => FATHER_PARENT_CARD_ID_SET.has(id)
