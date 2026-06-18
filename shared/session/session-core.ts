@@ -18,6 +18,7 @@ import type {
   InteractionRequest,
   InteractionSelection,
   InteractionState,
+  ParentSelectionSubmission,
   PlayerState,
   Resource,
   ResourceBatchExchangePayload,
@@ -157,6 +158,10 @@ import {
   type AnytimePolicy,
   type AnytimePolicyInput,
 } from './anytime-policy'
+import {
+  startParentSelectionIfNeeded,
+  submitParentSelection as commitParentSelection,
+} from '../parents/selection'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -670,6 +675,7 @@ export class GameCore {
   /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
   applyDraftFinalize(): void {
     this.state = finalizeDraft(this.state)
+    startParentSelectionIfNeeded(this.state)
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
@@ -1787,7 +1793,8 @@ export class GameCore {
     // idle interaction. Otherwise let `buildInteraction()` derive the
     // wait/idle/gameover shape from the engine stack.
     const isDrafting = this.state.phase === 'draft' && this.state.draft != null
-    const interaction: InteractionState = isDrafting
+    const isParentSelecting = this.state.phase === 'parent-selection' && this.state.parentSelection != null
+    const interaction: InteractionState = isDrafting || isParentSelecting
       ? { stateId: 'idle', allowedCommands: [], anytimeActions: [] }
       : this.buildInteraction()
     const resp: SessionResponse = {
@@ -1801,7 +1808,7 @@ export class GameCore {
     }
     // Include backend-computed availability for the current player when
     // they're free to act (idle interaction, not gameover, not drafting).
-    if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting) {
+    if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting && !isParentSelecting) {
       const actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
       resp.actionAvailability = actionAvailability
       resp.cardAvailability = this.getCardAvailability(
@@ -4284,6 +4291,20 @@ export class GameCore {
   /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
     return draftPhase.submitDraftPick(this, playerId, pick)
+  }
+
+  submitParentSelection(
+    playerIndex: number,
+    submission: ParentSelectionSubmission,
+  ): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    const result = commitParentSelection(this.state, player.id, submission)
+    if (!result.ok) return this.respond(false, result.error)
+    if (this.state.phase === 'playing') {
+      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    }
+    return this.respond()
   }
 
   loadState(raw: unknown): SessionResponse {

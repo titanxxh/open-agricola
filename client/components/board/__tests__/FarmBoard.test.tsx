@@ -176,6 +176,23 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('res-compact-label')
   })
 
+  it('renders kept Parent Cards as public card images', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      parentCards: { mother: 'PR01', father: 'PS01' },
+    } as PlayerState
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('class="parent-cards-row"')
+    expect(html).toContain('data-card-id="PR01"')
+    expect(html).toContain('/assets/parents/cards/PR01.png')
+    expect(html).toContain('data-card-id="PS01"')
+    expect(html).toContain('/assets/parents/cards/PS01.png')
+  })
+
   it('renders reorg controls for card animal zones', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

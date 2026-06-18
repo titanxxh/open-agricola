@@ -26,6 +26,7 @@ import type { ActionSpace, Field, GameState, PlayerState } from '../contract/typ
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
+import { startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -242,6 +243,7 @@ export const normalizeState = (raw: GameState): GameState => {
           : createDefaultRoomTiles(player.rooms ?? 2),
       stableTiles: player.stableTiles ?? [],
       majorEffects: player.majorEffects ?? { wellRounds: 0 },
+      parentCards: player.parentCards ?? { mother: null, father: null },
       supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
@@ -375,6 +377,7 @@ export const normalizeState = (raw: GameState): GameState => {
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
+    parentSelection: raw.parentSelection ?? null,
     events,
     nextEventSeq,
     publicEventArchive: archiveState.publicEventArchive,
@@ -382,6 +385,7 @@ export const normalizeState = (raw: GameState): GameState => {
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
+    enableParentCards: raw.enableParentCards ?? false,
     completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
 }
@@ -466,6 +470,7 @@ const createInitialPlayers = (
       activeModifiers: [],
       cardStates: {},
       stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
+      parentCards: { mother: null, father: null },
       supplyTokensConsumed: {},
     }
     return player
@@ -540,6 +545,7 @@ export const createInitialState = (
     phase,
     roundPhase: 'work',
     draft,
+    parentSelection: null,
     currentPlayerIndex: 0,
     players,
     actionSpaces: createActionSpaces(options.playerCount ?? 2),
@@ -565,10 +571,12 @@ export const createInitialState = (
     pendingFutureMeeples: [],
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
+    enableParentCards: options.enableParentCards ?? false,
     workPhaseObtainedResources: {},
     completedFeedingPhases: 0,
   }
   applyRoundGrowth(initialState)
+  startParentSelectionIfNeeded(initialState)
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)
   return initialState
 }

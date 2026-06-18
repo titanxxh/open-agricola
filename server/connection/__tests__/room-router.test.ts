@@ -44,6 +44,27 @@ describe('handleCreateRoom', () => {
     dispatch(ctx, { type: 'createRoom', maxPlayers: 99 })
     expect(ctx.currentRoom!.maxPlayers).toBe(4)
   })
+
+  it('forwards enableParentCards into the created room session', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+
+    expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
+    expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
+
+  it('preserves enableParentCards when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
+    expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
 })
 
 describe('handleAction guard: no-room', () => {
@@ -94,6 +115,47 @@ describe('seat-binding guards', () => {
     dispatch(ctx, { type: 'draftSubmit', playerId: 'fake-id', pick: { occCardId: '', minorCardId: '' } })
     const errors = sentMessagesOf(ctx).filter((m) => m.type === 'error')
     expect(errors.some((e) => /seat mismatch/.test(String(e.error)))).toBe(true)
+  })
+
+  it('parentSubmit rejects foreign seat', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
+
+    dispatch(ctx, {
+      type: 'parentSubmit',
+      playerIndex: 1,
+      selection: {
+        mother: p1Candidates.mother[0],
+        father: p1Candidates.father[0],
+      },
+    } as never)
+
+    const errors = sentMessagesOf(ctx).filter((m) => m.type === 'error')
+    expect(errors.some((e) => /seat mismatch/.test(String(e.error)))).toBe(true)
+  })
+
+  it('parentSubmit routes own parent selection to the session', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
+
+    dispatch(ctx, {
+      type: 'parentSubmit',
+      playerIndex: 0,
+      selection: {
+        mother: p1Candidates.mother[0],
+        father: p1Candidates.father[0],
+      },
+    } as never)
+
+    expect(ctx.currentRoom!.session.state.parentSelection!.submissions.p1).toEqual({
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+    expect(sentTypesOf(ctx)).toContain('stateUpdate')
   })
 })
 

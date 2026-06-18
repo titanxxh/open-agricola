@@ -21,6 +21,7 @@ export type Room = {
   status: RoomStatus
   createdBy?: string
   customCardDbIds?: string[]
+  enableParentCards?: boolean
 }
 
 export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
@@ -46,6 +47,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
+  enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
   status: getRoomStatus(room),
   players: room.players
     .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
@@ -141,6 +143,7 @@ const createSessionFromSnapshot = (
   if (snapshot.serialized === null) {
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
+      enableParentCards: snapshot.meta.enableParentCards ?? false,
     })
   }
   try {
@@ -152,6 +155,7 @@ const createSessionFromSnapshot = (
     console.warn(`[room] rehydrate failed for ${snapshot.id}, starting fresh:`, err)
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
+      enableParentCards: snapshot.meta.enableParentCards ?? false,
     })
   }
 }
@@ -168,5 +172,5 @@ export const snapshotToRoom = (
   status: snapshot.meta.status,
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
+  enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
 })
-

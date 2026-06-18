@@ -1,6 +1,6 @@
 import type { StateUpdateEnvelope } from './game'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
-import type { Resource, ResourceBatchExchangePayload } from '../types'
+import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -30,6 +30,7 @@ type ClientCommandBody =
       payload: CommitSelectionPayload
     }
   | { type: 'roundEnd' }
+  | { type: 'parentSubmit'; playerIndex: number; selection: ParentSelectionSubmission }
   | { type: 'undoStep' }
   | { type: 'undoAction' }
   | { type: 'newGame'; seed?: number }
@@ -47,6 +48,8 @@ type ClientCommandBody =
       customCardIds?: string[]
       /** When true, include community-deck cards in the deal pool. Default false. */
       enableCommunityDeck?: boolean
+      /** When true, start the Parent Cards expansion selection phase before play. Default false. */
+      enableParentCards?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */

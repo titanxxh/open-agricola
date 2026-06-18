@@ -149,6 +149,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
+  const enableParentCards = (msg as Record<string, unknown>).enableParentCards === true
   const customCards = loadCustomCardsFromDb(customCardDbIds, ctx.currentUserId)
   const session = new GameSession(
     undefined,
@@ -156,6 +157,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     {
       playerCount: maxPlayers,
       enableCommunityDeck,
+      enableParentCards,
       ...(draftOptions.value
         ? {
             draftMode: draftOptions.value.draftMode,
@@ -173,6 +175,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     status: 'waiting',
     createdBy: ctx.currentUserId,
     customCardDbIds,
+    enableParentCards,
   }
   ctx.registry.set(room)
   ctx.currentRoom = room
@@ -289,6 +292,13 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
   ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
 }
 
+function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'parentSubmit' }>): void {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const resp = room.session.withCtx(() => room.session.submitParentSelection(ctx.currentPlayerIndex, msg.selection))
+  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+}
+
 function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoStep' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.undoStep())
@@ -304,11 +314,13 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   room.session = new GameSession(
     typeof msg.seed === 'number' ? msg.seed : undefined,
     customCards.length > 0 ? customCards : undefined,
-    { playerCount: room.maxPlayers },
+    { playerCount: room.maxPlayers, enableParentCards },
   )
+  room.enableParentCards = enableParentCards
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
 }
@@ -375,6 +387,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   anytime: handleAnytime,
   roundEnd: handleRoundEnd,
   commitSelection: handleCommitSelection,
+  parentSubmit: handleParentSubmit,
   undoStep: handleUndoStep,
   undoAction: handleUndoAction,
   newGame: handleNewGame,

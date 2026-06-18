@@ -1,0 +1,155 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
+import { serializeStateForPlayer } from '../../shared/session/serialization'
+
+describe('Parent Card selection setup', () => {
+  it('starts a simultaneous parent-selection phase with deterministic 2+2 candidates when enabled', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    const repeat = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+
+    expect(session.state.phase).toBe('parent-selection')
+    expect(session.state.parentSelection?.candidates.p1.mother).toHaveLength(2)
+    expect(session.state.parentSelection?.candidates.p1.father).toHaveLength(2)
+    expect(session.state.parentSelection?.candidates.p2.mother).toHaveLength(2)
+    expect(session.state.parentSelection?.candidates.p2.father).toHaveLength(2)
+    expect(session.state.parentSelection).toEqual(repeat.state.parentSelection)
+  })
+
+  it('keeps disabled games on the existing playing setup path', () => {
+    const session = new GameSession(308)
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.enableParentCards).toBe(false)
+    expect(session.state.parentSelection).toBeNull()
+    expect(session.submitParentSelection(0, {
+      mother: 'PR01',
+      father: 'PS01',
+    }).ok).toBe(false)
+    expect(session.state.players.map((player) => player.parentCards)).toEqual([
+      { mother: null, father: null },
+      { mother: null, father: null },
+    ])
+  })
+
+  it('waits for simultaneous draft finalization before parent selection', () => {
+    const directParentDeal = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never).state.parentSelection
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+      enableParentCards: true,
+    } as never)
+
+    expect(session.state.phase).toBe('draft')
+    while (session.state.phase === 'draft') {
+      for (const player of session.state.players) {
+        const pool = session.state.draft!.pools[player.id]
+        const resp = session.submitDraftPick(player.id, {
+          occCardId: pool.occ[0],
+          minorCardId: pool.minor[0],
+        })
+        expect(resp.ok).toBe(true)
+      }
+    }
+
+    expect(session.state.phase).toBe('parent-selection')
+    expect(session.state.parentSelection).toEqual(directParentDeal)
+    expect(session.state.players[0].occupationHand).toHaveLength(7)
+    expect(session.state.players[0].minorHand).toHaveLength(7)
+  })
+
+  it('requires each player to submit exactly one own mother and one own father candidate', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    const p1Candidates = session.state.parentSelection!.candidates.p1
+    const p2Candidates = session.state.parentSelection!.candidates.p2
+
+    expect(session.submitParentSelection(99, {
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })).toMatchObject({ ok: false, error: expect.stringContaining('invalid player') })
+
+    expect(session.submitParentSelection(0, {
+      mother: p2Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })).toMatchObject({ ok: false, error: expect.stringContaining('mother') })
+
+    const first = session.submitParentSelection(0, {
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+    expect(first.ok).toBe(true)
+    expect(session.submitParentSelection(0, {
+      mother: p1Candidates.mother[1],
+      father: p1Candidates.father[1],
+    })).toMatchObject({ ok: false, error: expect.stringContaining('already') })
+
+    expect(session.state.phase).toBe('parent-selection')
+    expect(session.submitParentSelection(1, {
+      mother: p2Candidates.mother[0],
+      father: p2Candidates.father[0],
+    }).ok).toBe(true)
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.parentSelection).toBeNull()
+    expect(session.state.players[0].parentCards).toEqual({
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+    expect(session.state.players[1].parentCards).toEqual({
+      mother: p2Candidates.mother[0],
+      father: p2Candidates.father[0],
+    })
+  })
+
+  it('masks unresolved parent candidates and submissions by viewer', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    const p1Candidates = session.state.parentSelection!.candidates.p1
+    session.submitParentSelection(0, {
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+
+    const p1View = serializeStateForPlayer(session.state, 'p1', {
+      engineStack: session.getEngineStack(),
+    })
+    const p2View = serializeStateForPlayer(session.state, 'p2', {
+      engineStack: session.getEngineStack(),
+    })
+    const spectatorView = serializeStateForPlayer(session.state, null, {
+      engineStack: session.getEngineStack(),
+    })
+
+    expect(p1View.parentSelection!.candidates.p1).toEqual(p1Candidates)
+    expect(p1View.parentSelection!.submissions.p1).toEqual({
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+    expect(p2View.parentSelection!.candidates.p1).toEqual({
+      mother: ['?', '?'],
+      father: ['?', '?'],
+    })
+    expect(p2View.parentSelection!.submissions.p1).toEqual({
+      mother: '?',
+      father: '?',
+    })
+    expect(spectatorView.parentSelection!.candidates.p1).toEqual({
+      mother: ['?', '?'],
+      father: ['?', '?'],
+    })
+  })
+})

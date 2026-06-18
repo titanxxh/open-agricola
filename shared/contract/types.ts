@@ -1,6 +1,7 @@
 import type { PromptKey } from './prompt-keys'
 import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
+import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 
 export type Resource = {
   wood: number
@@ -291,6 +292,7 @@ export type PlayerState = {
   activeModifiers: CostModifier[]
   cardStates: CardStates
   stats: PlayerStats
+  parentCards: PlayerParentCards
   supplyTokensConsumed?: SupplyTokenCounts
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
@@ -372,6 +374,26 @@ export type PlayerStats = {
 export type LogEntry = {
   key: string
   params?: Record<string, unknown>
+}
+
+export type PlayerParentCards = {
+  mother: MotherParentCardId | null
+  father: FatherParentCardId | null
+}
+
+export type ParentSelectionCandidates = {
+  mother: MotherParentCardId[]
+  father: FatherParentCardId[]
+}
+
+export type ParentSelectionSubmission = {
+  mother: MotherParentCardId
+  father: FatherParentCardId
+}
+
+export type ParentSelectionState = {
+  candidates: Record<string, ParentSelectionCandidates>
+  submissions: Record<string, ParentSelectionSubmission | null>
 }
 
 export type FutureMeepleRoomType = 'wood' | 'clay' | 'stone'
@@ -467,11 +489,12 @@ export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' |
 export type GameState = {
   round: number
   /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
-  phase: 'draft' | 'playing'
+  phase: 'draft' | 'parent-selection' | 'playing'
   /** Round sub-phase (preparation/work/returning-home/harvest/field/feeding/breeding). */
   roundPhase: RoundPhase
   /** Draft state when `phase === 'draft'`, otherwise null. */
   draft: import('../draft/types').DraftState | null
+  parentSelection: ParentSelectionState | null
   currentPlayerIndex: number
   players: PlayerState[]
   actionSpaces: ActionSpace[]
@@ -494,6 +517,7 @@ export type GameState = {
   gameOver: boolean
   /** When true, community-deck cards are included in the deal pool. */
   enableCommunityDeck: boolean
+  enableParentCards: boolean
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
