@@ -36,6 +36,7 @@ import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { specialEffectAction } from './effects/special-effect'
 import { privateFieldPhaseAction } from './effects/private-field-phase'
+import { completeParentFatherAction } from '../parents/father-completion'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -78,4 +79,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   activateCardEffectAction,
   specialEffectAction,
   privateFieldPhaseAction,
+  completeParentFatherAction,
 ]
