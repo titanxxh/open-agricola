@@ -154,8 +154,14 @@ describe('processSubmit', () => {
 
     expect(res.error).toBeUndefined()
     expect(res.draft.pendingPicks.p1).toEqual({ occ: 'p1_OCC_0', minor: 'p1_MIN_3' })
+    expect(res.draft.kept.p1).toEqual({ occ: ['p1_OCC_0'], minor: ['p1_MIN_3'] })
+    expect(res.draft.pools.p1.occ).not.toContain('p1_OCC_0')
+    expect(res.draft.pools.p1.minor).not.toContain('p1_MIN_3')
+    expect(res.draft.pools.p1.occ).toHaveLength(6)
+    expect(res.draft.pools.p1.minor).toHaveLength(6)
     // other player untouched
     expect(res.draft.pendingPicks.p2).toEqual({ occ: null, minor: null })
+    expect(res.draft.kept.p2).toEqual({ occ: [], minor: [] })
   })
 
   it('invalid occCardId (not in pool) returns error without mutating draft', () => {

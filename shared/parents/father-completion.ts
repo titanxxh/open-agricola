@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, ChoiceEffectPreview, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
 import { buildSowFarmInteraction } from '../domain/farmyard'
@@ -10,6 +10,7 @@ export const COMPLETE_PARENT_FATHER_ACTION_ID = 'complete-parent-father'
 const COMPLETED_INFOBOX = 'Completed'
 const COMPLETED_TIER_KEY = 'fatherCompletedTier'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+type BuildingResource = typeof BUILDING_RESOURCES[number]
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}
@@ -190,10 +191,10 @@ const canResolveSowReward = (player: PlayerState, reward: FatherReward): boolean
   return farm.farmType === 'sow' && farm.selectableFields.length > 0
 }
 
-const resourceCombinations = (count: number): string[][] => {
+const resourceCombinations = (count: number): BuildingResource[][] => {
   if (!Number.isInteger(count) || count <= 0 || count > BUILDING_RESOURCES.length) return []
-  const out: string[][] = []
-  const visit = (start: number, current: string[]) => {
+  const out: BuildingResource[][] = []
+  const visit = (start: number, current: BuildingResource[]) => {
     if (current.length === count) {
       out.push([...current])
       return
@@ -222,21 +223,81 @@ const optionForReward = (
   reward: FatherReward,
   suffix?: string,
   rewardLabel = reward.rewardText,
-): ActionChoiceOption => ({
-  value: suffix ? `${fatherId}:${reward.tier}:${suffix}` : `${fatherId}:${reward.tier}`,
-  labelKey: 'ui.cards.parentFatherComplete.tier',
-  labelParams: {
+  effectPreview?: ChoiceEffectPreview,
+  previewRewardLabel = rewardLabel,
+): ActionChoiceOption => {
+  const labelParams = {
     tier: reward.tier,
     requirement: reward.requirementText,
     reward: rewardLabel,
-  },
-  sourceCard: fatherId,
-})
+  }
+  const previewLabelParams = {
+    ...labelParams,
+    reward: previewRewardLabel,
+  }
+  return {
+    value: suffix ? `${fatherId}:${reward.tier}:${suffix}` : `${fatherId}:${reward.tier}`,
+    labelKey: 'ui.cards.parentFatherComplete.tier',
+    labelParams,
+    sourceCard: fatherId,
+    descriptionPreview: effectPreview
+      ? {
+          kind: 'action',
+          labelKey: 'ui.cards.parentFatherComplete.tier',
+          labelParams: previewLabelParams,
+          effectPreview,
+        }
+      : undefined,
+  }
+}
+
+const resourceGainPreview = (
+  resources: Partial<Resource>,
+  bonusVp = 0,
+): ChoiceEffectPreview | undefined => {
+  const resourcesGained = positiveResources(resources)
+  if (Object.keys(resourcesGained).length === 0 && bonusVp <= 0) return undefined
+  return {
+    kind: 'resourceExchange',
+    resourcesGained: Object.keys(resourcesGained).length > 0 ? resourcesGained : undefined,
+    bonusVp: bonusVp > 0 ? bonusVp : undefined,
+  }
+}
+
+const simpleRewardPreview = (reward: FatherReward): ChoiceEffectPreview | undefined => {
+  if (!isSimpleFatherReward(reward)) return undefined
+  const resources: Partial<Resource> = {}
+  let bonusVp = 0
+  for (const effect of reward.effects) {
+    if (effect.type === 'gain-resources') {
+      for (const [key, value] of Object.entries(positiveResources(effect.resources))) {
+        resources[key as keyof Resource] = (resources[key as keyof Resource] ?? 0) + value
+      }
+    } else if (effect.type === 'bonus-points') {
+      bonusVp += effect.amount
+    }
+  }
+  return resourceGainPreview(resources, bonusVp)
+}
 
 const optionsForReward = (
+  player: PlayerState,
   fatherId: FatherParentCardId,
   reward: FatherReward,
 ): FatherCompletionOption[] => {
+  const houseMaterial = houseMaterialReward(reward)
+  if (houseMaterial !== null) {
+    return [{
+      option: optionForReward(
+        fatherId,
+        reward,
+        undefined,
+        reward.rewardText,
+        resourceGainPreview({ [player.houseType]: houseMaterial }),
+      ),
+      reward,
+    }]
+  }
   const chooseCount = chooseBuildingResourceCount(reward)
   if (chooseCount !== null) {
     return resourceCombinations(chooseCount).map((resources) => ({
@@ -245,11 +306,13 @@ const optionsForReward = (
         reward,
         resources.join(','),
         `${reward.rewardText} (${resources.join(' + ')})`,
+        resourceGainPreview(Object.fromEntries(resources.map((resource) => [resource, 1])) as Partial<Resource>),
+        reward.rewardText,
       ),
       reward,
     }))
   }
-  return [{ option: optionForReward(fatherId, reward), reward }]
+  return [{ option: optionForReward(fatherId, reward, undefined, reward.rewardText, simpleRewardPreview(reward)), reward }]
 }
 
 export const satisfiedFatherCompletionOptions = (
@@ -266,7 +329,7 @@ export const satisfiedFatherCompletionOptions = (
       isSupportedFatherReward(state, player, reward) &&
       isFatherRequirementSatisfied(state, player, reward.requirement),
     )
-    .flatMap((reward) => optionsForReward(fatherId, reward))
+    .flatMap((reward) => optionsForReward(player, fatherId, reward))
 }
 
 export const satisfiedSimpleFatherRewards = (
