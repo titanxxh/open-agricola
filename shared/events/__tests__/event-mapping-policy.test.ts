@@ -45,6 +45,7 @@ const expectedPublicEventTypes = [
   'harvest.reapNothing',
   'harvest.reapSkipped',
   'harvest.started',
+  'parent.motherScheduled',
   'resource.accumulated',
   'resource.exchanged',
   'resource.moved',

@@ -768,6 +768,29 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps parent mother scheduled events to legacy log entries', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'parent-mother-scheduled',
+      seq: 1,
+      round: 1,
+      phase: 'work',
+      type: 'parent.motherScheduled',
+      visibility: 'public',
+      playerId: 'p1',
+      cardId: 'PR02',
+      targetRound: 12,
+      reward: 'field',
+    } satisfies GameEvent
+
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.parentMotherScheduled',
+        params: { player: 'Alice', cardId: 'PR02', round: 12, reward: 'field' },
+      },
+    ])
+  })
+
   it('maps card lifecycle events to newest-first log entries', () => {
     const base = {
       schemaVersion: 1,
