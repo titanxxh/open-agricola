@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { FatherParentCardId } from '../../shared/parents'
-import type { AnytimeAction, GameState, PlayerState } from '../../shared/contract/types'
+import { completeParentFatherAction } from '../../shared/parents/father-completion'
+import type { DraftGameEvent, EventSink } from '../../shared/contract/events'
+import type { ActionSpace, AnytimeAction, GameState, PlayerState } from '../../shared/contract/types'
 
 const ACTION_ID = 'complete-parent-father'
+
+const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    events.push(event)
+  },
+  emitMany: (nextEvents) => {
+    events.push(...nextEvents)
+  },
+})
 
 const setDeterministicHands = (state: GameState): void => {
   for (const player of state.players) {
@@ -48,6 +59,54 @@ const pasture = (
 })
 
 describe('Parent father completion session', () => {
+  it('compiles simple father rewards to existing gain and completion-marker actions', () => {
+    const session = setup('PS01', (player) => {
+      player.fields = [
+        { row: 1, col: 0, stacks: [] },
+        { row: 1, col: 1, stacks: [] },
+      ]
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+    const events: DraftGameEvent[] = []
+
+    const result = completeParentFatherAction.resolveChoice!({
+      state,
+      player,
+      space: { id: ACTION_ID } as ActionSpace,
+      eventSink: makeEventSink(events),
+    } as never, 'PS01:1')
+
+    expect(result.type).toBe('flow')
+    expect(player.resources.stone).toBe(0)
+    expect(player.cardStates.PS01).toBeUndefined()
+    expect(events).toEqual([])
+    if (result.type !== 'flow') throw new Error('expected father completion flow')
+    expect(result.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'PS01',
+          params: { stone: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'PS01',
+          params: { kind: 'set-extra-data', key: 'fatherCompletedTier', value: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'PS01',
+          params: { kind: 'set-infobox', text: 'Completed' },
+        },
+      ],
+    })
+  })
+
   it('completes a satisfied simple father tier once and marks the face-up parent card', () => {
     const session = setup('PS01', (player) => {
       player.fields = [

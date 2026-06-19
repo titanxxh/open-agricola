@@ -162,10 +162,6 @@ import {
   startParentSelectionIfNeeded,
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
-import {
-  buildMotherRoundRewardFlow,
-  clearSettledMotherReservations,
-} from '../parents/mother-rewards'
 import { resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 /**
@@ -354,7 +350,6 @@ type StageResumeState = {
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
     | 'futureMeepleActions'
-    | 'parentMotherRewards'
     | 'onReorganizeComplete'
   playerIndex: number
   cardIndex: number
@@ -3029,21 +3024,6 @@ export class GameCore {
   }
 
   private continueAfterFutureMeepleActions(): SessionResponse {
-    const motherRewardFlow = buildMotherRoundRewardFlow(this.state)
-    if (motherRewardFlow) {
-      this.startStageFlow(
-        motherRewardFlow.flow,
-        'parentMotherRewards',
-        motherRewardFlow.playerIndex,
-        0,
-      )
-      return this.respond()
-    }
-    return this.continueAfterParentMotherRewards()
-  }
-
-  private continueAfterParentMotherRewards(): SessionResponse {
-    clearSettledMotherReservations(this.state)
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -3059,6 +3039,40 @@ export class GameCore {
     this.history = []
     this.actionStartIndex = null
     return this.respond()
+  }
+
+  private continueCurrentFutureMeepleActions(): SessionResponse {
+    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
+    const futureResolvedEvents = this.state.futureMeeples
+      .filter((entry) =>
+        entry.round === this.state.round &&
+        this.state.players.some((player) => player.id === entry.playerId),
+      )
+      .map((entry) => ({
+        type: 'futureMeeple.resolved',
+        playerId: entry.playerId,
+        cardId: entry.cardId,
+        sourceCardId: entry.cardId,
+        round: entry.round,
+        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
+        ...(entry.roomType ? { roomType: entry.roomType } : {}),
+      }) as ImmediateEventDraft)
+    applyFutureMeeples(this.state, { skipResourceReceive: true })
+    if (futureResolvedEvents.length > 0) {
+      const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)
+      this.dispatchFutureMeepleResolvedListeners(committedEvents)
+    }
+    if (futureMeepleActionFlow) {
+      this.startStageFlow(
+        futureMeepleActionFlow.flow,
+        'futureMeepleActions',
+        futureMeepleActionFlow.playerIndex,
+        0,
+        0,
+      )
+      return this.respond()
+    }
+    return this.continueAfterFutureMeepleActions()
   }
 
   /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
@@ -3107,9 +3121,6 @@ export class GameCore {
         return
       case 'futureMeepleActions':
         this.continueAfterFutureMeepleActions()
-        return
-      case 'parentMotherRewards':
-        this.continueAfterParentMotherRewards()
         return
       case 'onStartHarvestFeedingPhase':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
@@ -4343,7 +4354,7 @@ export class GameCore {
     const result = commitParentSelection(this.state, player.id, submission)
     if (!result.ok) return this.respond(false, result.error)
     if (this.state.phase === 'playing') {
-      return this.continueAfterFutureMeepleActions()
+      return this.continueCurrentFutureMeepleActions()
     }
     return this.respond()
   }

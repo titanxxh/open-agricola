@@ -148,6 +148,45 @@ describe('Parent Card selection setup', () => {
     ]))
   })
 
+  it('queues selected mother rewards as real future meeples', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    session.state.parentSelection!.candidates.p1 = {
+      mother: ['PR02', 'PR04'],
+      father: ['PS01', 'PS03'],
+    }
+    session.state.parentSelection!.candidates.p2 = {
+      mother: ['PR05', 'PR06'],
+      father: ['PS02', 'PS04'],
+    }
+
+    expect(session.submitParentSelection(0, {
+      mother: 'PR02',
+      father: 'PS01',
+    }).ok).toBe(true)
+    const resp = session.submitParentSelection(1, {
+      mother: 'PR05',
+      father: 'PS02',
+    })
+
+    expect(resp.state.futureMeeples).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        cardId: 'PR02',
+        playerId: 'p1',
+        round: 12,
+        resources: { field: 1 },
+      }),
+      expect.objectContaining({
+        cardId: 'PR05',
+        playerId: 'p2',
+        round: 4,
+        resources: { sheep: 1 },
+      }),
+    ]))
+  })
+
   it('backfills missing mother schedule logs when a selected parent-card game is loaded', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
