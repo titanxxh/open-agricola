@@ -224,6 +224,11 @@ describe('Parent father completion session', () => {
       }),
     ])
     expect(minorCompleted.state.ordinaryCardDecks.minor).toEqual(['minor-d'])
+    expect(anytimeIds(minorCompleted)).toEqual([])
+    expect(minor.takeAction(0, 'forest')).toMatchObject({
+      ok: false,
+      error: 'ordinary card draw choice in progress',
+    })
 
     const minorChoice = Object.values(minorCompleted.state.ordinaryCardDrawChoices)[0]!
     const minorResolved = minor.resolveOrdinaryCardDrawChoice(0, minorChoice.id, 'minor-b')
@@ -280,6 +285,12 @@ describe('Parent father completion session', () => {
     expect(prompt.ok).toBe(true)
     expect(prompt.interaction.options?.map((option) => option.value)).toContain('PS04:2:wood,stone')
     expect(prompt.interaction.options?.map((option) => option.value)).not.toContain('PS04:2:wood,wood')
+    const rewardLabels = prompt.interaction.options
+      ?.filter((option) => option.value.startsWith('PS04:2:'))
+      .map((option) => option.labelParams?.reward)
+    expect(new Set(rewardLabels).size).toBe(rewardLabels?.length)
+    expect(prompt.interaction.options?.find((option) => option.value === 'PS04:2:wood,stone')?.labelParams?.reward)
+      .toContain('wood + stone')
 
     const invalid = session.resolveChoice(0, 'PS04:2:wood,wood')
     expect(invalid.ok).toBe(false)
