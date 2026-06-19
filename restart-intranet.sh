@@ -22,7 +22,7 @@ fi
 # Anchor persistent dev state (sqlite DB, JSON room snapshots, custom cards,
 # card art, BGA local images) to the MAIN repo even when we're running from
 # a worktree. Without this, each worktree gets its own ./data and ./output,
-# so dev2/dev3/dev4 game state diverges across worktrees.
+# so fixed dev room game state diverges across worktrees.
 #
 # Override: pass the env var explicitly to escape this anchor (e.g.
 #   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-intranet.sh
@@ -59,14 +59,14 @@ Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
                              [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
-fresh backend (tsx) and frontend (vite) bound to the LAN IP. Three persistent
-dev rooms (dev2 / dev3 / dev4) are created automatically; each survives
+fresh backend (tsx) and frontend (vite) bound to the LAN IP. Five persistent
+dev rooms (dev2 / dev3 / dev4 / dev5 / dev6) are created automatically; each survives
 backend restarts independently.
 
   --kill-only, --kill_only, -k   Only stop existing listeners; do not start
                                  backend or frontend. Skips the LAN-IP check.
-  --players N, -p N              Pick the dev room for N players (2/3/4).
-                                 Defaults to 4. Links for all three rooms are
+  --players N, -p N              Pick the dev room for N players (2/3/4/5/6).
+                                 Defaults to 4. Links for all fixed rooms are
                                  always printed; the selected one is marked.
   --parents                      Enable Parent Cards for fixed dev rooms.
   --draft                        Start fixed dev rooms in simultaneous draft
@@ -87,7 +87,7 @@ while [ $# -gt 0 ]; do
       ;;
     --players|-p)
       if [ $# -lt 2 ]; then
-        echo "Error: $1 requires a value (2, 3 or 4)."
+        echo "Error: $1 requires a value (2, 3, 4, 5 or 6)."
         exit 1
       fi
       PLAYERS="$2"
@@ -118,9 +118,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$PLAYERS" in
-  2|3|4) ;;
+  2|3|4|5|6) ;;
   *)
-    echo "Error: --players must be 2, 3, or 4 (got: $PLAYERS)"
+    echo "Error: --players must be 2, 3, 4, 5, or 6 (got: $PLAYERS)"
     exit 1
     ;;
 esac
@@ -235,7 +235,7 @@ const db = new Database(dbPath, { readonly: true, fileMustExist: true })
 try {
   const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
   if (!table) process.exit(0)
-  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4')").all()
+  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
   const missing = rows.filter((row) => {
     if (!row.state_json) return true
     try {
@@ -257,7 +257,7 @@ confirm_dev_room_reset() {
 
   echo ""
   echo "Reset required: $reason"
-  echo "This will delete persisted fixed dev rooms: dev2, dev3, dev4."
+  echo "This will delete persisted fixed dev rooms: dev2, dev3, dev4, dev5, dev6."
   printf "Type yes to reset and continue: "
   if ! read -r answer; then
     echo "Aborted."
@@ -287,14 +287,14 @@ try {
     console.log('  No rooms table found.')
     process.exit(0)
   }
-  const result = db.prepare("DELETE FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4')").run()
+  const result = db.prepare("DELETE FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").run()
   console.log(`  Removed ${result.changes} SQLite dev room row(s).`)
 } finally {
   db.close()
 }
 EOF
 
-  for room_id in dev2 dev3 dev4; do
+  for room_id in dev2 dev3 dev4 dev5 dev6; do
     rm -f "$PERSISTED_ROOMS_DIR/${room_id}.json"
   done
 }
@@ -306,7 +306,11 @@ start_and_wait() {
   shift 3
 
   : > "$log_file"
-  nohup "$@" > "$log_file" 2>&1 &
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" > "$log_file" 2>&1 &
+  else
+    nohup "$@" > "$log_file" 2>&1 &
+  fi
   local pid=$!
   echo "  PID: $pid"
 
@@ -370,7 +374,7 @@ if [ "$RESET_CONFIRMED" -eq 1 ]; then
   reset_persisted_dev_rooms
 fi
 
-echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4 persisted via SQLite)..."
+echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PERSIST_ROOMS=sqlite \
   ALLOW_ANONYMOUS_WS=true \
@@ -411,7 +415,7 @@ fi
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftMode=simultaneous&draftPoolSize=7"
 fi
-for n in 2 3 4; do
+for n in 2 3 4 5 6; do
   marker=""
   if [ "$PLAYERS" = "$n" ]; then
     marker="    <-- selected (--players $n)"
