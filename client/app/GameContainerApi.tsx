@@ -2,11 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, FutureMeeple, FutureMeepleResourceMap, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
-import { getParentCardDefinition, type MotherRoundGain } from '../../shared/parents'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
@@ -94,12 +93,6 @@ import {
 type RoundSlot = { round: number; action?: ActionSpace }
 
 const httpTransportSingleton = new HttpGameTransport()
-
-const parentMotherFutureResources = (gain: MotherRoundGain): FutureMeepleResourceMap => {
-  if (gain.type === 'field') return { field: 1 }
-  if (gain.type === 'stable') return { stable: 1 }
-  return { [gain.resource]: 1 }
-}
 
 /** Update browser URL to include room= so the link can be shared; same room id = same game. */
 const setRoomInUrl = (roomId: string) => {
@@ -1608,31 +1601,6 @@ export const GameContainerApi = () => {
     return rec
   }, [state])
 
-  const parentMotherFutureMeeples = useMemo<FutureMeeple[]>(() => {
-    if (!state?.enableParentCards) return []
-    return state.players.flatMap((player) => {
-      const mother = player.parentCards.mother
-      if (!mother) return []
-      const card = getParentCardDefinition(mother)
-      if (card?.kind !== 'mother') return []
-      const settled = player.cardStates?.[card.id]?.extraData?.motherRewardSettled === true
-      if (settled) return []
-      return [{
-        id: `parent-mother-${card.id}-${player.id}`,
-        round: card.round,
-        cardId: card.id,
-        playerId: player.id,
-        actionId: state.roundActionOrder[card.round - 1] ?? null,
-        resources: parentMotherFutureResources(card.gain),
-      }]
-    })
-  }, [state])
-
-  const displayedFutureMeeples = useMemo<FutureMeeple[]>(
-    () => state ? [...state.futureMeeples, ...parentMotherFutureMeeples] : [],
-    [parentMotherFutureMeeples, state],
-  )
-
   const scoreRows = useMemo(
     () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null),
     [state, scores, selfPlayer?.id],
@@ -2167,7 +2135,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={displayedFutureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
           </section>
         </div>
         <div className="game-layout__center">

@@ -1,11 +1,6 @@
-import type { EventSink } from '../contract/events'
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
-import { addCardResourceGained, ensureCardState, writeCardInfobox } from '../cards/helpers/card-state'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
-import { addResourcesFromCards } from '../session/stats'
-import { trackWorkPhaseBuildingResources } from '../session/work-phase-resources'
-import { gainResources } from '../actions/effects/gain'
 import { buildSowFarmInteraction } from '../domain/farmyard'
 import { startOrdinaryCardDrawChoice } from '../session/ordinary-card-draw'
 import { getParentCardDefinition } from './cards'
@@ -272,124 +267,83 @@ export const satisfiedSimpleFatherRewards = (
     .map((entry) => entry.reward)
     .filter((reward, index, rewards) => rewards.findIndex((candidate) => candidate.tier === reward.tier) === index)
 
-const emitGainEvent = (
-  eventSink: EventSink | undefined,
-  player: PlayerState,
+const completionMarkerSteps = (
+  fatherId: FatherParentCardId,
+  tier: FatherReward['tier'],
+): ActionFlow[] => [
+  {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: fatherId,
+    params: { kind: 'set-extra-data', key: COMPLETED_TIER_KEY, value: tier },
+  },
+  {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: fatherId,
+    params: { kind: 'set-infobox', text: COMPLETED_INFOBOX },
+  },
+]
+
+const gainFlow = (
   fatherId: FatherParentCardId,
   resources: Partial<Resource>,
-): void => {
+): ActionFlow | null => {
   const gained = positiveResources(resources)
-  if (Object.keys(gained).length === 0) return
-  eventSink?.emit<'resource.moved'>({
-    type: 'resource.moved',
-    resources: gained,
-    from: { kind: 'card', playerId: player.id, cardId: fatherId },
-    to: { kind: 'player', playerId: player.id },
-    reason: 'cardEffect',
-    sourceCardId: fatherId,
-  })
+  if (Object.keys(gained).length === 0) return null
+  return {
+    type: 'leaf',
+    actionId: 'gain',
+    sourceCard: fatherId,
+    params: gained,
+  }
 }
 
-const applyFatherReward = (
-  state: GameState,
-  player: PlayerState,
+const rewardEffectSteps = (
   fatherId: FatherParentCardId,
   reward: FatherReward,
-  eventSink: EventSink,
-): Partial<Resource> | null => {
-  const gained: Partial<Resource> = {}
+): ActionFlow[] | null => {
+  const children: ActionFlow[] = []
   for (const effect of reward.effects) {
     if (effect.type === 'gain-resources') {
-      gainResources(player, effect.resources)
-      for (const [key, value] of Object.entries(effect.resources)) {
-        if (typeof value === 'number' && value > 0) {
-          const resource = key as keyof Resource
-          gained[resource] = (gained[resource] ?? 0) + value
-        }
-      }
+      const flow = gainFlow(fatherId, effect.resources)
+      if (flow) children.push(flow)
     } else if (effect.type === 'bonus-points') {
-      const cardState = ensureCardState(player, fatherId)
-      cardState.counters = { ...(cardState.counters ?? {}) }
-      cardState.counters.bonusVp = (cardState.counters.bonusVp ?? 0) + effect.amount
-      eventSink.emit<'card.stateChanged'>({
-        type: 'card.stateChanged',
-        sourceCardId: fatherId,
-        cardId: fatherId,
-        key: 'bonusVp',
-        value: cardState.counters.bonusVp,
-        targetPlayerId: player.id,
-      })
+      if (effect.amount > 0) {
+        children.push({
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: fatherId,
+          params: { kind: 'increment-counter', key: 'bonusVp', amount: effect.amount },
+        })
+      }
     } else {
       return null
     }
   }
-  emitGainEvent(eventSink, player, fatherId, gained)
-  addResourcesFromCards(player, gained)
-  addCardResourceGained(player, fatherId, gained)
-  trackWorkPhaseBuildingResources(state, player.id, gained)
-  return gained
+  return children
 }
 
-const gainAndTrackFatherResources = (
-  state: GameState,
-  player: PlayerState,
+const completedRewardFlow = (
   fatherId: FatherParentCardId,
-  resources: Partial<Resource>,
-  eventSink: EventSink,
-): void => {
-  gainResources(player, resources)
-  emitGainEvent(eventSink, player, fatherId, resources)
-  addResourcesFromCards(player, resources)
-  addCardResourceGained(player, fatherId, resources)
-  trackWorkPhaseBuildingResources(state, player.id, resources)
-}
-
-const markFatherCompleted = (
-  player: PlayerState,
-  fatherId: FatherParentCardId,
-  tier: FatherReward['tier'],
-  eventSink: EventSink,
-): void => {
-  const cardState = ensureCardState(player, fatherId)
-  cardState.extraData = { ...(cardState.extraData ?? {}), [COMPLETED_TIER_KEY]: tier }
-  writeCardInfobox(player, fatherId, COMPLETED_INFOBOX)
-  eventSink.emit<'card.stateChanged'>({
-    type: 'card.stateChanged',
-    sourceCardId: fatherId,
-    cardId: fatherId,
-    key: COMPLETED_TIER_KEY,
-    value: tier,
-    targetPlayerId: player.id,
-  })
-  eventSink.emit<'card.infoboxChanged'>({
-    type: 'card.infoboxChanged',
-    sourceCardId: fatherId,
-    cardId: fatherId,
-    text: COMPLETED_INFOBOX,
-    targetPlayerId: player.id,
-  })
-}
-
-const completionMarkerFlow = (
-  fatherId: FatherParentCardId,
-  tier: FatherReward['tier'],
+  reward: FatherReward,
+  steps: ActionFlow[],
 ): ActionFlow => ({
   type: 'seq',
   children: [
-    {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: fatherId,
-      params: { kind: 'set-extra-data', key: COMPLETED_TIER_KEY, value: tier },
-    },
-    {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: fatherId,
-      params: { kind: 'set-infobox', text: COMPLETED_INFOBOX },
-    },
+    ...steps,
+    ...completionMarkerSteps(fatherId, reward.tier),
   ],
 })
+
+const simpleFatherRewardFlow = (
+  fatherId: FatherParentCardId,
+  reward: FatherReward,
+): ActionFlow | null => {
+  const steps = rewardEffectSteps(fatherId, reward)
+  if (!steps) return null
+  return completedRewardFlow(fatherId, reward, steps)
+}
 
 const applyComplexFatherReward = (
   state: GameState,
@@ -397,13 +351,12 @@ const applyComplexFatherReward = (
   fatherId: FatherParentCardId,
   reward: FatherReward,
   choice: string,
-  eventSink: EventSink,
 ): ActionExecutionResult | null => {
   const houseMaterial = houseMaterialReward(reward)
   if (houseMaterial !== null) {
-    gainAndTrackFatherResources(state, player, fatherId, { [player.houseType]: houseMaterial }, eventSink)
-    markFatherCompleted(player, fatherId, reward.tier, eventSink)
-    return { type: 'ok' }
+    const flow = gainFlow(fatherId, { [player.houseType]: houseMaterial })
+    if (!flow) return null
+    return { type: 'flow', flow: completedRewardFlow(fatherId, reward, [flow]) }
   }
 
   const drawTypes = drawTypesForReward(reward)
@@ -421,8 +374,7 @@ const applyComplexFatherReward = (
       })
       if (!started.ok) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
-    markFatherCompleted(player, fatherId, reward.tier, eventSink)
-    return { type: 'ok' }
+    return { type: 'flow', flow: completedRewardFlow(fatherId, reward, []) }
   }
 
   const chooseCount = chooseBuildingResourceCount(reward)
@@ -438,9 +390,9 @@ const applyComplexFatherReward = (
       return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
     const gained = Object.fromEntries(resources.map((resource) => [resource, 1])) as Partial<Resource>
-    gainAndTrackFatherResources(state, player, fatherId, gained, eventSink)
-    markFatherCompleted(player, fatherId, reward.tier, eventSink)
-    return { type: 'ok' }
+    const flow = gainFlow(fatherId, gained)
+    if (!flow) return null
+    return { type: 'flow', flow: completedRewardFlow(fatherId, reward, [flow]) }
   }
 
   const maxSelections = sowFieldLimit(reward)
@@ -455,9 +407,9 @@ const applyComplexFatherReward = (
             type: 'leaf',
             actionId: 'sow',
             sourceCard: fatherId,
-            actionContext: { maxSelections, minSelections: 1 },
+            actionContext: { maxSelections, minSelections: 1, trueAction: false },
           },
-          completionMarkerFlow(fatherId, reward.tier),
+          ...completionMarkerSteps(fatherId, reward.tier),
         ],
       },
     }
@@ -489,7 +441,7 @@ export const completeParentFatherAction: ActionDefinition = {
       sourceCard: fatherId,
     }
   },
-  resolveChoice: ({ state, player, eventSink }, choice) => {
+  resolveChoice: ({ state, player }, choice) => {
     const fatherId = player.parentCards.father
     if (!fatherId) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     const [choiceFatherId, tierText] = choice.split(':')
@@ -500,12 +452,9 @@ export const completeParentFatherAction: ActionDefinition = {
     const offered = satisfiedFatherCompletionOptions(state, player)
     const selected = offered.find((entry) => entry.option.value === choice)
     if (!selected || selected.reward.tier !== tier) return { type: 'fail', errorKey: 'log.actionUnavailable' }
-    const simple = applyFatherReward(state, player, fatherId, selected.reward, eventSink)
-    if (simple !== null) {
-      markFatherCompleted(player, fatherId, selected.reward.tier, eventSink)
-      return { type: 'ok' }
-    }
-    const complex = applyComplexFatherReward(state, player, fatherId, selected.reward, choice, eventSink)
+    const simple = simpleFatherRewardFlow(fatherId, selected.reward)
+    if (simple) return { type: 'flow', flow: simple }
+    const complex = applyComplexFatherReward(state, player, fatherId, selected.reward, choice)
     if (complex === null) {
       return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
