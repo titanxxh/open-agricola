@@ -11,6 +11,7 @@ import type {
   ChoiceDescriptionPreview,
   ChoiceEffectPreview,
   PaymentResourceMap,
+  PlayerState,
   Resource,
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
@@ -28,7 +29,7 @@ type BorrowedFenceSourceControls = {
   donors: {
     playerId: string
     name: string
-    color: 'red' | 'yellow' | 'blue' | 'black'
+    color: PlayerState['color']
     cap: number
     allocated: number
   }[]

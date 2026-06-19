@@ -74,9 +74,21 @@ describe('player-count action space filtering', () => {
   })
 
   it('all player counts have 14 round action slots', () => {
-    for (const pc of [2, 3, 4]) {
+    for (const pc of [2, 3, 4, 5, 6]) {
       const state = createInitialState(42, { playerCount: pc })
       expect(state.roundActionOrder).toHaveLength(14)
+    }
+  })
+
+  it('5P and 6P games keep the base common action spaces', () => {
+    for (const pc of [5, 6]) {
+      const state = createInitialState(42, { playerCount: pc })
+      const ids = commonActionIds(state.actionSpaces)
+        .filter((id) => !['sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
+          'wish-children', 'western-quarry', 'house-redevelopment',
+          'vegetable-seeds', 'pig-market', 'eastern-quarry', 'cattle-market',
+          'cultivation', 'urgent-wish-children', 'farm-redevelopment'].includes(id))
+      expect(ids.sort()).toEqual(BASE_10)
     }
   })
 

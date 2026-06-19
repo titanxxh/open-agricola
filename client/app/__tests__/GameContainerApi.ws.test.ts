@@ -14,6 +14,7 @@ import {
   getCurrentlySelectableRoomKeys,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
+  maxPlayersFromQuery,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
@@ -40,9 +41,20 @@ describe('GameContainerApi WS player identity', () => {
 
   it('allows dev mode only for fixed dev rooms or embedded sandbox', () => {
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev2&devMode=1')).toBe(true)
+    expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev5&devMode=1')).toBe(true)
+    expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev6&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&embedded=1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=abc123&devMode=1')).toBe(false)
     expect(isDevModeAllowedFromQuery('?page=game&devMode=1')).toBe(false)
+  })
+
+  it('parses websocket room maxPlayers from query as a 2-6 range', () => {
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=6')).toBe(6)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=5')).toBe(5)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=99')).toBe(6)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=1')).toBe(2)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=bogus')).toBe(2)
+    expect(maxPlayersFromQuery('?page=game&transport=ws')).toBe(2)
   })
 
   it('maps failed farm commits to local interaction error messages', () => {

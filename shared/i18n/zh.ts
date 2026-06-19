@@ -1213,6 +1213,8 @@ export const zh = {
     players2: '2 人',
     players3: '3 人',
     players4: '4 人',
+    players5: '5 人',
+    players6: '6 人',
     draftModeLabel: '选卡方式',
     draftModeNone: '随机发牌',
     draftModeSimultaneous: '轮抽',

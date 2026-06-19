@@ -7,7 +7,7 @@ export const farmland: ActionDefinition = {
   descriptionKey: 'actions.farmland.description',
   roundAvailable: 1,
   gainPerRound: {},
-  players: [2, 3, 4],
+  players: [2, 3, 4, 5, 6],
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

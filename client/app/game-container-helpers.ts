@@ -282,7 +282,13 @@ export const filterPublicFenceHighlightsForPlayer = (
 ): Set<string> =>
   new Set(targets.filter((target) => target.playerId === playerId).map((target) => target.edgeId))
 
-const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
+const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4', 'dev5', 'dev6'])
+
+export const maxPlayersFromQuery = (search: string): number => {
+  const raw = Number(new URLSearchParams(search).get('maxPlayers'))
+  if (!Number.isFinite(raw)) return 2
+  return Math.min(Math.max(2, Math.floor(raw)), 6)
+}
 
 export const isDevModeAllowedFromQuery = (search: string): boolean => {
   const params = new URLSearchParams(search)

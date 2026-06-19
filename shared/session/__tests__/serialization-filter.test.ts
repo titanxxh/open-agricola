@@ -3,7 +3,7 @@ import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
 import type { DraftState } from '../../draft/types'
 import { createInitialState } from '../state-bootstrap'
-import { serializeState, serializeStateForPlayer } from '../serialization'
+import { rehydrateState, serializeState, serializeStateForPlayer } from '../serialization'
 import { EngineStack } from '../../engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
@@ -52,6 +52,21 @@ function makeDraftState(): GameState {
 // ---------- tests ----------
 
 describe('serializeStateForPlayer', () => {
+  it('round-trips six players through serialize and rehydrate', () => {
+    const state = createInitialState(42, {
+      playerCount: 6,
+      playerNames: ['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'],
+    })
+
+    const serialized = serializeState(state, emptyCtx())
+    const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
+
+    expect(restored.players).toHaveLength(6)
+    expect(restored.players.map((player) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
+    expect(restored.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'])
+    expect(restored.players.map((player) => player.color)).toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])
+  })
+
   it('masks other player hands with ? of same length, preserves viewer hand', () => {
     const state = makePlayingState()
     const p1Occ = [...state.players[0].occupationHand]
