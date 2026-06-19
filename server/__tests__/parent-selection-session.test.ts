@@ -113,6 +113,104 @@ describe('Parent Card selection setup', () => {
     })
   })
 
+  it('logs selected mother card round rewards when parent selection completes', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    session.state.parentSelection!.candidates.p1 = {
+      mother: ['PR02', 'PR04'],
+      father: ['PS01', 'PS03'],
+    }
+    session.state.parentSelection!.candidates.p2 = {
+      mother: ['PR05', 'PR06'],
+      father: ['PS02', 'PS04'],
+    }
+
+    expect(session.submitParentSelection(0, {
+      mother: 'PR02',
+      father: 'PS01',
+    }).ok).toBe(true)
+    const resp = session.submitParentSelection(1, {
+      mother: 'PR05',
+      father: 'PS02',
+    })
+
+    expect(resp.state.log).toEqual(expect.arrayContaining([
+      {
+        key: 'log.parentMotherScheduled',
+        params: { player: 'PlayerA', cardId: 'PR02', round: 12, reward: 'field' },
+      },
+      {
+        key: 'log.parentMotherScheduled',
+        params: { player: 'PlayerB', cardId: 'PR05', round: 4, reward: 'sheep' },
+      },
+    ]))
+  })
+
+  it('backfills missing mother schedule logs when a selected parent-card game is loaded', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    session.state.parentSelection!.candidates.p1 = {
+      mother: ['PR02', 'PR04'],
+      father: ['PS01', 'PS03'],
+    }
+    session.state.parentSelection!.candidates.p2 = {
+      mother: ['PR05', 'PR06'],
+      father: ['PS02', 'PS04'],
+    }
+    session.submitParentSelection(0, {
+      mother: 'PR02',
+      father: 'PS01',
+    })
+    const selected = session.submitParentSelection(1, {
+      mother: 'PR05',
+      father: 'PS02',
+    }).state
+    const stale = {
+      ...selected,
+      log: selected.log.filter((entry) => entry.key !== 'log.parentMotherScheduled'),
+    }
+
+    const restored = session.loadState(stale).state
+    const logs = restored.log.filter((entry) => entry.key === 'log.parentMotherScheduled')
+    session.loadState(restored)
+
+    expect(logs).toHaveLength(2)
+    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(2)
+  })
+
+  it('auto-submits a player with only one mother and one father candidate left', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+    } as never)
+    const p1Candidates = session.state.parentSelection!.candidates.p1
+    session.state.parentSelection!.candidates.p2 = {
+      mother: ['PR03'],
+      father: ['PS03'],
+    }
+
+    const resp = session.submitParentSelection(0, {
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.phase).toBe('playing')
+    expect(resp.state.parentSelection).toBeNull()
+    expect(resp.state.players[0].parentCards).toEqual({
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
+    expect(resp.state.players[1].parentCards).toEqual({
+      mother: 'PR03',
+      father: 'PS03',
+    })
+  })
+
   it('masks unresolved parent candidates and submissions by viewer', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,

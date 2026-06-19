@@ -405,7 +405,7 @@ describe('WS broadcast per-viewer filter', () => {
     let p1State = initialP1.payload.state
     let p2State = initialP2.payload.state
 
-    for (let round = 1; round <= 7; round += 1) {
+    for (let round = 1; round <= 6; round += 1) {
       const p1RequestId = `draft-p1-r${round}`
       const p2RequestId = `draft-p2-r${round}`
       await submitDraftWs(p1, 'p1', p1State, p1RequestId)
@@ -438,8 +438,8 @@ describe('WS broadcast per-viewer filter', () => {
 
     const p1FinalEvent = p1State.players[0]!.occupationHand.concat(p1State.players[0]!.minorHand)
     const p2FinalEvent = p2State.players[1]!.occupationHand.concat(p2State.players[1]!.minorHand)
-    const p1FinalUpdate = p1.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r7')!
-    const p2FinalUpdate = p2.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r7')!
+    const p1FinalUpdate = p1.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r6')!
+    const p2FinalUpdate = p2.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r6')!
 
     expect(p1FinalUpdate.payload.privateEvents).toEqual([
       expect.objectContaining({

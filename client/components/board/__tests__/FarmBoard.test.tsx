@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+// @vitest-environment jsdom
+
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
@@ -43,6 +46,8 @@ afterAll(() => {
   __resetCardsManifestCache()
   vi.unstubAllGlobals()
 })
+
+afterEach(() => cleanup())
 
 const resources = (): Resource => ({
   wood: 0,
@@ -195,6 +200,48 @@ describe('FarmBoard', () => {
     expect(html).toContain('data-card-id="PS01"')
     expect(html).toContain('/assets/parents/cards/PS01.png')
     expect(html).toContain('Completed')
+  })
+
+  it('shows an enlarged horizontal Parent Card preview on hover', () => {
+    vi.useFakeTimers()
+    try {
+      const player = {
+        ...createPlayer('p1', 'Player A', 'red'),
+        parentCards: { mother: 'PR01', father: 'PS01' },
+      } as PlayerState
+
+      const { container, unmount } = render(
+        <FarmBoard {...createFarmBoardProps(player)} />,
+      )
+      const tile = container.querySelector('[data-card-id="PR01"]')
+      expect(tile).toBeTruthy()
+
+      fireEvent.pointerOver(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(251)
+      })
+
+      const preview = document.body.querySelector(
+        '.card-hover-preview.parent-card-hover-preview',
+      ) as HTMLElement | null
+      expect(preview).toBeTruthy()
+      expect(preview?.style.width).toBe('360px')
+      expect(preview?.querySelector('img')?.getAttribute('src')).toContain(
+        '/assets/parents/cards/PR01.png',
+      )
+
+      fireEvent.pointerOut(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(121)
+      })
+      expect(
+        document.body.querySelector('.card-hover-preview.parent-card-hover-preview'),
+      ).toBeNull()
+
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders reorg controls for card animal zones', () => {

@@ -23,6 +23,7 @@ import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
+import { CardWithCopy } from '../common/CardWithCopy'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { resolveParentCardAssetUrls } from '../../services/parent-assets'
@@ -37,6 +38,8 @@ type CardAnimalDisplay = {
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
+const PARENT_CARD_PREVIEW_WIDTH = 360
+const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 510) / 735)
 
 const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
   WC: ['wood', 'clay'],
@@ -568,15 +571,39 @@ const PlayedCardStats = ({
   )
 }
 
-const ParentCardTile = ({ id, infobox }: { id: ParentCardId; infobox?: string }) => {
+const ParentCardTile = ({
+  locale,
+  id,
+  infobox,
+}: {
+  locale: Locale
+  id: ParentCardId
+  infobox?: string
+}) => {
   const def = getParentCardDefinition(id)
   if (!def) return null
   const { frontUrl } = resolveParentCardAssetUrls(def.assets)
+  const alt = `${def.kind} ${id}`
   return (
-    <div className="parent-card-tile" data-card-id={id}>
-      <img className="parent-card-image" src={frontUrl} alt={`${def.kind} ${id}`} />
+    <CardWithCopy
+      locale={locale}
+      cardId={id}
+      className="parent-card-tile"
+      previewCard={
+        <img
+          className="parent-card-hover-preview-image"
+          src={frontUrl}
+          alt={`${alt} preview`}
+        />
+      }
+      previewWidth={PARENT_CARD_PREVIEW_WIDTH}
+      previewHeight={PARENT_CARD_PREVIEW_HEIGHT}
+      previewClassName="parent-card-hover-preview"
+      data-card-id={id}
+    >
+      <img className="parent-card-image" src={frontUrl} alt={alt} />
       {infobox ? <div className="card-infobox parent-card-infobox">{infobox}</div> : null}
-    </div>
+    </CardWithCopy>
   )
 }
 
@@ -1237,12 +1264,14 @@ export const FarmBoard = ({
         <div className="parent-cards-row">
           {displayPlayer.parentCards?.mother ? (
             <ParentCardTile
+              locale={locale}
               id={displayPlayer.parentCards.mother}
               infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.mother]?.infobox}
             />
           ) : null}
           {displayPlayer.parentCards?.father ? (
             <ParentCardTile
+              locale={locale}
               id={displayPlayer.parentCards.father}
               infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
             />

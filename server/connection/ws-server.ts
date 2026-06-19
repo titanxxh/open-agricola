@@ -6,8 +6,10 @@ import {
   FIXED_DEV_ROOMS,
   PLAYING_EMPTY_ROOM_TTL_MS,
   WAITING_EMPTY_ROOM_TTL_MS,
+  buildFixedDevRoomInitialStateOptions,
   emptyRoomTtlMs,
   isFixedDevRoom,
+  parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   snapshotToRoom,
   type Room,
@@ -36,13 +38,18 @@ const ensureFixedDevRooms = (
   persistence: RoomPersistence,
 ): void => {
   if (process.env.NODE_ENV === 'production') return
+  const startupOptions = parseFixedDevRoomStartupOptions()
   for (const { id, playerCount } of FIXED_DEV_ROOMS) {
     if (registry.has(id)) continue
     const snap = persistence.load(id)
     if (snap) {
       registry.set(snapshotToRoom(snap))
     } else {
-      const session = new GameSession(undefined, undefined, { playerCount })
+      const session = new GameSession(
+        undefined,
+        undefined,
+        buildFixedDevRoomInitialStateOptions(playerCount, startupOptions),
+      )
       registry.set({
         id,
         session,
@@ -50,6 +57,7 @@ const ensureFixedDevRooms = (
         maxPlayers: playerCount,
         version: 0,
         status: 'playing',
+        enableParentCards: session.state.enableParentCards,
       })
     }
   }
