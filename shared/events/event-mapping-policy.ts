@@ -258,6 +258,7 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent('future meeple resolution does not move resources now'),
     replay: 'replayable',
   },
+  'parent.motherScheduled': silentPublicCues(mapped()),
   'round.started': silentPublicCues(mapped()),
   'work.started': silentPublicCues(mapped()),
   'returnHome.started': silentPublicCues(mapped()),

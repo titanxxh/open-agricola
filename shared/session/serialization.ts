@@ -1,5 +1,6 @@
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
 import type { ActionSpace, CardStates, GameState, LogEntry, PlayerState } from '../contract/types'
+import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { PublicEventCancellation } from '../contract/protocol/game'
 import type { EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
@@ -24,14 +25,30 @@ export type SerializedPlayerState = PlayerState & {
   specialStables: BuiltSpecialStable[]
 }
 
+export type SerializedParentSelectionCandidates = {
+  mother: Array<MotherParentCardId | '?'>
+  father: Array<FatherParentCardId | '?'>
+}
+
+export type SerializedParentSelectionSubmission = {
+  mother: MotherParentCardId | '?'
+  father: FatherParentCardId | '?'
+}
+
+export type SerializedParentSelectionState = {
+  candidates: Record<string, SerializedParentSelectionCandidates>
+  submissions: Record<string, SerializedParentSelectionSubmission | null>
+}
+
 export type SerializedGameState = Omit<
   GameState,
-  'actionSpaces' | 'roundStartSnapshot' | 'players'
+  'actionSpaces' | 'roundStartSnapshot' | 'players' | 'parentSelection'
 > & {
   actionSpaces: SerializedActionSpace[]
   roundStartSnapshot: null
   engineStack: EngineStackCursor
   players: SerializedPlayerState[]
+  parentSelection: SerializedParentSelectionState | null
 }
 
 export type SerializeStateContext = {
@@ -321,6 +338,41 @@ const createHiddenHandVisibility = (
   return { base, hiddenCardIds, hiddenRefs, seqView }
 }
 
+const maskParentCandidates = (
+  candidates: SerializedParentSelectionCandidates,
+): SerializedParentSelectionCandidates => ({
+  mother: Array(candidates.mother.length).fill('?'),
+  father: Array(candidates.father.length).fill('?'),
+})
+
+const maskParentSubmission = (
+  submission: SerializedParentSelectionSubmission | null,
+): SerializedParentSelectionSubmission | null =>
+  submission
+    ? { mother: '?', father: '?' }
+    : null
+
+const filterParentSelectionForPlayer = (
+  parentSelection: SerializedParentSelectionState | null,
+  viewerPlayerId: string | null,
+): SerializedParentSelectionState | null => {
+  if (!parentSelection) return null
+  return {
+    candidates: Object.fromEntries(
+      Object.entries(parentSelection.candidates).map(([pid, candidates]) => [
+        pid,
+        pid === viewerPlayerId ? candidates : maskParentCandidates(candidates),
+      ]),
+    ),
+    submissions: Object.fromEntries(
+      Object.entries(parentSelection.submissions).map(([pid, submission]) => [
+        pid,
+        pid === viewerPlayerId ? submission : maskParentSubmission(submission),
+      ]),
+    ),
+  }
+}
+
 const remapEventSeq = (event: GameEvent, seqView: VisibleEventSeqView | null): GameEvent =>
   !seqView ? event : ({ ...event, seq: seqView.eventSeqByKey.get(gameEventRefKey(event)) ?? event.seq } as GameEvent)
 
@@ -468,10 +520,11 @@ export const filterPublicEventCancellationsForPlayer = (
  *     player other than the viewer.
  *   - `players[i].cardStates[cardId]` and card-state events for cards that
  *     are still hidden in another player's hand.
- *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`, and
- *     `draft.pendingPicks[pid]` for every player other than the viewer
- *     (public data like `draft.kept`, `draft.round`, `draft.seatOrder`
- *     is preserved verbatim).
+ *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`,
+ *     `draft.kept[pid]`, and `draft.pendingPicks[pid]` for every
+ *     player other than the viewer.
+ *   - unresolved `parentSelection.candidates[pid]` and submitted
+ *     parent choices for every player other than the viewer.
  *
  * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
  * view where every player's hand and pool is masked.
@@ -509,6 +562,19 @@ export const serializeStateForPlayer = (
                 ],
           ),
         ),
+        kept: Object.fromEntries(
+          Object.entries(base.draft.kept).map(([pid, pool]) =>
+            pid === viewerPlayerId
+              ? [pid, pool]
+              : [
+                  pid,
+                  {
+                    occ: Array(pool.occ.length).fill('?'),
+                    minor: Array(pool.minor.length).fill('?'),
+                  },
+                ],
+          ),
+        ),
         pendingPicks: Object.fromEntries(
           Object.entries(base.draft.pendingPicks).map(([pid, pick]) =>
             pid === viewerPlayerId
@@ -523,6 +589,21 @@ export const serializeStateForPlayer = (
           ),
         ),
       }
+  const filteredOrdinaryCardDecks = {
+    occupation: Array(base.ordinaryCardDecks.occupation.length).fill('?'),
+    minor: Array(base.ordinaryCardDecks.minor.length).fill('?'),
+  }
+  const filteredOrdinaryCardDrawChoices = Object.fromEntries(
+    Object.entries(base.ordinaryCardDrawChoices).map(([id, choice]) => [
+      id,
+      choice.playerId === viewerPlayerId
+        ? choice
+        : {
+            ...choice,
+            candidates: Array(choice.candidates.length).fill('?'),
+          },
+    ]),
+  )
   const filteredEvents = filterHiddenHandEvents(base.events, hiddenRefs, seqView)
   const filteredPublicEventArchive = filterHiddenHandArchive(base.publicEventArchive, hiddenRefs, seqView)
   return {
@@ -536,6 +617,9 @@ export const serializeStateForPlayer = (
     publicEventArchive: filteredPublicEventArchive,
     log: filterHiddenHandLog(base.log, hiddenCardIds),
     draft: filteredDraft,
+    parentSelection: filterParentSelectionForPlayer(base.parentSelection, viewerPlayerId),
+    ordinaryCardDecks: filteredOrdinaryCardDecks,
+    ordinaryCardDrawChoices: filteredOrdinaryCardDrawChoices,
   }
 }
 

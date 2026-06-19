@@ -52,6 +52,9 @@ const finalizeSow = (
   const maxSelections = typeof ctx.actionContext?.maxSelections === 'number'
     ? Math.max(0, Math.floor(ctx.actionContext.maxSelections as number))
     : undefined
+  const minSelections = typeof ctx.actionContext?.minSelections === 'number'
+    ? Math.max(0, Math.floor(ctx.actionContext.minSelections as number))
+    : undefined
   const excludedFields = Array.isArray(ctx.actionContext?.excludedFields)
     ? (ctx.actionContext.excludedFields as Array<{ row?: unknown; col?: unknown }>).filter(
         (field): field is { row: number; col: number } =>
@@ -88,6 +91,7 @@ const finalizeSow = (
     { fields: crops },
     {
       maxSelections,
+      minSelections,
       excludedFields,
       extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
       extraGroupKeys: extraGroupKeys.size > 0 ? extraGroupKeys : undefined,

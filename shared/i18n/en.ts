@@ -77,6 +77,10 @@ export const en = {
       bonusVp: 'Bonus VP',
     },
     cards: {
+      parentFatherComplete: {
+        prompt: 'Choose a father side quest reward',
+        tier: 'Tier {tier}: {requirement} -> {reward}',
+      },
       A136_DrudgeryReeve: {
         prompt: 'Choose how many sets of building resources to score',
         scoreSets: 'Score {sets} sets ({score} bonus VP)',
@@ -168,6 +172,7 @@ export const en = {
     scoringStoneRooms: 'Stone rooms',
     scoringFarmers: 'Family members',
     scoringCards: 'Cards',
+    scoringParentCards: 'Parent Cards',
     scoringCardsBonus: 'Card bonus',
     scoringBeggings: 'Begging cards',
     scoringBonusDetail: '{count} {resource}',
@@ -528,6 +533,7 @@ export const en = {
     'bonus-wood': { name: 'Bonus Wood', description: 'Gain 1 wood' },
     'bonus-food': { name: 'Bonus Food', description: 'Gain 1 food' },
     'bonus-grain': { name: 'Bonus Grain', description: 'Gain 1 grain' },
+    'complete-parent-father': { name: 'Complete Father', description: 'Complete a satisfied father side quest' },
     plow: { name: 'Plow', description: 'Plow 1 field' },
     sow: { name: 'Sow', description: 'Sow in empty fields' },
     'private-field-phase': { name: 'Private Field Phase', description: 'Reap your own fields without starting a Harvest' },
@@ -904,6 +910,9 @@ export const en = {
     resourceAccumulated: '{target} accumulates {resources}',
     actionExclusiveUseSet: '{player} reserves {action} via {cardId}',
     actionExclusiveUseCleared: "{player}'s reservation on {action} ends",
+    parentMotherScheduled: "{player}'s {cardId}: gains {reward} in round {round}",
+    parentMotherRewardField: 'Field',
+    parentMotherRewardStable: 'Stable',
     reorganizeDiscard: '{player} discards {resources}',
     gains: 'Gains {resources}',
     costs: 'Pays {resources}',

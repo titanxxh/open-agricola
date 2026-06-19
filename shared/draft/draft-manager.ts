@@ -6,8 +6,8 @@
  *
  * Lifecycle:
  *   initDraftState(...)            -> DraftState at round 1
- *   processSubmit(...)              -> records a player's pick this round
- *   tryAdvanceRound(...)            -> when all submitted, rotate pools + bump round
+ *   processSubmit(...)              -> records and keeps a player's pick this round
+ *   tryAdvanceRound(...)            -> when all submitted, rotate remaining pools + bump round
  *   finalizeDraft(gameState)        -> write kept hands back to players, clear phase
  */
 
@@ -56,18 +56,24 @@ export function processSubmit(
   if (!draft.pools[pid] || !draft.pendingPicks[pid]) {
     return { draft, error: `unknown player ${pid}` }
   }
+  if (draft.pendingPicks[pid].occ !== null || draft.pendingPicks[pid].minor !== null) {
+    return { draft, error: `already submitted this round` }
+  }
   if (!draft.pools[pid].occ.includes(pick.occCardId)) {
     return { draft, error: `occ card not in pool` }
   }
   if (!draft.pools[pid].minor.includes(pick.minorCardId)) {
     return { draft, error: `minor card not in pool` }
   }
-  if (draft.pendingPicks[pid].occ !== null || draft.pendingPicks[pid].minor !== null) {
-    return { draft, error: `already submitted this round` }
-  }
 
   const next = structuredClone(draft)
   next.pendingPicks[pid] = { occ: pick.occCardId, minor: pick.minorCardId }
+  next.kept[pid].occ.push(pick.occCardId)
+  next.kept[pid].minor.push(pick.minorCardId)
+  next.pools[pid] = {
+    occ: next.pools[pid].occ.filter((id) => id !== pick.occCardId),
+    minor: next.pools[pid].minor.filter((id) => id !== pick.minorCardId),
+  }
   return { draft: next }
 }
 
@@ -86,23 +92,7 @@ export function tryAdvanceRound(draft: DraftState): {
 
   const next = structuredClone(draft)
 
-  // 1. Append picks to kept.
-  for (const pid of next.seatOrder) {
-    const p = next.pendingPicks[pid]
-    next.kept[pid].occ.push(p.occ as string)
-    next.kept[pid].minor.push(p.minor as string)
-  }
-
-  // 2. Remove picks from each player's current pool BEFORE rotation.
-  for (const pid of next.seatOrder) {
-    const p = next.pendingPicks[pid]
-    next.pools[pid] = {
-      occ: next.pools[pid].occ.filter((id) => id !== p.occ),
-      minor: next.pools[pid].minor.filter((id) => id !== p.minor),
-    }
-  }
-
-  // 3. Clockwise rotation: seat[i]'s pool -> seat[(i+1) % n].
+  // 1. Clockwise rotation: seat[i]'s pool -> seat[(i+1) % n].
   const n = next.seatOrder.length
   const rotated: Record<string, DraftPool> = {}
   for (let i = 0; i < n; i++) {
@@ -112,16 +102,35 @@ export function tryAdvanceRound(draft: DraftState): {
   }
   next.pools = rotated
 
-  // 4. Advance round.
+  // 2. Advance round.
   next.round += 1
 
-  // 5. Reset pendingPicks for the new round.
+  // 3. Reset pendingPicks for the new round.
   for (const pid of next.seatOrder) {
     next.pendingPicks[pid] = { occ: null, minor: null }
   }
 
-  const finished = next.round > next.totalRounds
+  const autoFinished = autoKeepFinalSingleCardPools(next)
+  const finished = autoFinished || next.round > next.totalRounds
   return { draft: next, advanced: true, finished }
+}
+
+function autoKeepFinalSingleCardPools(draft: DraftState): boolean {
+  if (draft.round !== draft.totalRounds) return false
+  const allPoolsAreSingleCard = draft.seatOrder.every((pid) => {
+    const pool = draft.pools[pid]
+    return pool?.occ.length === 1 && pool.minor.length === 1
+  })
+  if (!allPoolsAreSingleCard) return false
+
+  for (const pid of draft.seatOrder) {
+    const pool = draft.pools[pid]
+    draft.kept[pid].occ.push(pool.occ[0])
+    draft.kept[pid].minor.push(pool.minor[0])
+    draft.pools[pid] = { occ: [], minor: [] }
+  }
+  draft.round += 1
+  return true
 }
 
 /**

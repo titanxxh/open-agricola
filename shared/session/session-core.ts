@@ -18,6 +18,7 @@ import type {
   InteractionRequest,
   InteractionSelection,
   InteractionState,
+  ParentSelectionSubmission,
   PlayerState,
   Resource,
   ResourceBatchExchangePayload,
@@ -157,6 +158,11 @@ import {
   type AnytimePolicy,
   type AnytimePolicyInput,
 } from './anytime-policy'
+import {
+  startParentSelectionIfNeeded,
+  submitParentSelection as commitParentSelection,
+} from '../parents/selection'
+import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -670,6 +676,7 @@ export class GameCore {
   /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
   applyDraftFinalize(): void {
     this.state = finalizeDraft(this.state)
+    startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
@@ -695,6 +702,7 @@ export class GameCore {
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
   private sessionCardContext: SessionCardContext | null = null
+  private readonly parentSelectionSeed: number | undefined
   private readonly registerCustomCardImpl: (data: CustomCardData) => void
   private readonly cardRegistry: CardRegistry
   readonly cardWarnings: string[] = []
@@ -702,6 +710,7 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
+    this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
       // the server-side executor-backed registrar.
@@ -1439,6 +1448,7 @@ export class GameCore {
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+    if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
     const context = this.getActiveInteractionContext()
@@ -1453,6 +1463,7 @@ export class GameCore {
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
+      if (action.idleOnly && this.engineStack.depth() > 0) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id },
         action,
@@ -1538,9 +1549,11 @@ export class GameCore {
 
     if (!frame || !envelope) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
-      const baseCommands: InteractionCommand[] = anytimeActions.length > 0
-        ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
-        : ['takeAction', 'undoStep', 'undoAction']
+      const baseCommands: InteractionCommand[] = hasPendingOrdinaryCardDrawChoice(this.state)
+        ? ['undoStep', 'undoAction']
+        : anytimeActions.length > 0
+          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+          : ['takeAction', 'undoStep', 'undoAction']
       return {
         stateId: 'idle',
         allowedCommands: this.filterUndoCommands(baseCommands),
@@ -1787,7 +1800,8 @@ export class GameCore {
     // idle interaction. Otherwise let `buildInteraction()` derive the
     // wait/idle/gameover shape from the engine stack.
     const isDrafting = this.state.phase === 'draft' && this.state.draft != null
-    const interaction: InteractionState = isDrafting
+    const isParentSelecting = this.state.phase === 'parent-selection' && this.state.parentSelection != null
+    const interaction: InteractionState = isDrafting || isParentSelecting
       ? { stateId: 'idle', allowedCommands: [], anytimeActions: [] }
       : this.buildInteraction()
     const resp: SessionResponse = {
@@ -1801,7 +1815,7 @@ export class GameCore {
     }
     // Include backend-computed availability for the current player when
     // they're free to act (idle interaction, not gameover, not drafting).
-    if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting) {
+    if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting && !isParentSelecting) {
       const actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
       resp.actionAvailability = actionAvailability
       resp.cardAvailability = this.getCardAvailability(
@@ -3032,6 +3046,40 @@ export class GameCore {
     return this.respond()
   }
 
+  private continueCurrentFutureMeepleActions(): SessionResponse {
+    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
+    const futureResolvedEvents = this.state.futureMeeples
+      .filter((entry) =>
+        entry.round === this.state.round &&
+        this.state.players.some((player) => player.id === entry.playerId),
+      )
+      .map((entry) => ({
+        type: 'futureMeeple.resolved',
+        playerId: entry.playerId,
+        cardId: entry.cardId,
+        sourceCardId: entry.cardId,
+        round: entry.round,
+        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
+        ...(entry.roomType ? { roomType: entry.roomType } : {}),
+      }) as ImmediateEventDraft)
+    applyFutureMeeples(this.state, { skipResourceReceive: true })
+    if (futureResolvedEvents.length > 0) {
+      const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)
+      this.dispatchFutureMeepleResolvedListeners(committedEvents)
+    }
+    if (futureMeepleActionFlow) {
+      this.startStageFlow(
+        futureMeepleActionFlow.flow,
+        'futureMeepleActions',
+        futureMeepleActionFlow.playerIndex,
+        0,
+        0,
+      )
+      return this.respond()
+    }
+    return this.continueAfterFutureMeepleActions()
+  }
+
   /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
   private continueAfterReorganize_returningHome(_playerIndex: number): void {
     return roundPhase.continueAfterReorganizeReturningHome(this)
@@ -3712,6 +3760,22 @@ export class GameCore {
     return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
   }
 
+  resolveOrdinaryCardDrawChoice(
+    playerIndex: number,
+    choiceId: string,
+    keepCardId: string,
+  ): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    const result = resolveOrdinaryCardDrawChoice(this.state, {
+      playerId: player.id,
+      choiceId,
+      keepCardId,
+    })
+    if (!result.ok) return this.respond(false, result.error)
+    return this.respond(true, undefined, result.privateEvents)
+  }
+
   private resolveEngineChoice(
     playerIndex: number,
     value: string,
@@ -4284,6 +4348,20 @@ export class GameCore {
   /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
     return draftPhase.submitDraftPick(this, playerId, pick)
+  }
+
+  submitParentSelection(
+    playerIndex: number,
+    submission: ParentSelectionSubmission,
+  ): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+    const result = commitParentSelection(this.state, player.id, submission)
+    if (!result.ok) return this.respond(false, result.error)
+    if (this.state.phase === 'playing') {
+      return this.continueCurrentFutureMeepleActions()
+    }
+    return this.respond()
   }
 
   loadState(raw: unknown): SessionResponse {

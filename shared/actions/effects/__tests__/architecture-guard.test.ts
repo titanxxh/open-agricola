@@ -55,6 +55,7 @@ describe('effects architecture guard', () => {
       'breed',
       'build-farmhand-room',
       'collect',
+      'complete-parent-father',
       'construct',
       'emit-choice',
       'exchange',

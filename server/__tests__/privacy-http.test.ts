@@ -397,8 +397,8 @@ describe('HTTP privacy + seat binding', () => {
           round: 1,
           totalRounds: 7,
           picked: pick,
-          poolCounts: { occ: 7, minor: 7 },
-          keptCounts: { occ: 0, minor: 0 },
+          poolCounts: { occ: 6, minor: 6 },
+          keptCounts: { occ: 1, minor: 1 },
           advanced: false,
           finished: false,
         },
@@ -439,7 +439,7 @@ describe('HTTP privacy + seat binding', () => {
       setSession(session)
       let finalSubmitData: ReturnType<typeof JSON.parse> | null = null
 
-      for (let round = 1; round <= 7; round += 1) {
+      for (let round = 1; round <= 6; round += 1) {
         const p2State = session.getState().state
         const p2Pick = {
           occCardId: p2State.draft!.pools.p2.occ[0]!,
@@ -473,7 +473,7 @@ describe('HTTP privacy + seat binding', () => {
           p1Res,
         )
         expect(p1Res.statusCode).toBe(200)
-        if (round === 7) finalSubmitData = JSON.parse(p1Res.body)
+        if (round === 6) finalSubmitData = JSON.parse(p1Res.body)
       }
 
       expect(finalSubmitData).not.toBeNull()

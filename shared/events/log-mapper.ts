@@ -22,6 +22,7 @@ import type {
   FarmStableBuiltEvent,
   GameEvent,
   HarvestPhaseStartedEvent,
+  ParentMotherScheduledEvent,
   ResourceAccumulatedEvent,
   ResourcePaidEvent,
   ResourceMovedEvent,
@@ -570,6 +571,19 @@ const mapActionDetailLogged = (
 ): LogEntry =>
   actionDetailLog(ctx, event.playerId, event.actionId, event.detailParts)
 
+const mapParentMotherScheduled = (
+  event: ParentMotherScheduledEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.parentMotherScheduled',
+  params: {
+    player: playerName(ctx, event.playerId),
+    cardId: event.cardId,
+    round: event.targetRound,
+    reward: event.reward,
+  },
+})
+
 export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] => {
   const consumedPaymentSeqs = new Set<number>()
   return [...events]
@@ -717,6 +731,10 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'futureMeeple.resolved') {
         return [mapFutureMeepleResolved(event, ctx)]
+      }
+
+      if (event.type === 'parent.motherScheduled') {
+        return [mapParentMotherScheduled(event, ctx)]
       }
 
       if (event.type === 'game.started') {

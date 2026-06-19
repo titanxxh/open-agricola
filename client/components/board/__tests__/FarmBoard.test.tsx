@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+// @vitest-environment jsdom
+
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
@@ -43,6 +46,8 @@ afterAll(() => {
   __resetCardsManifestCache()
   vi.unstubAllGlobals()
 })
+
+afterEach(() => cleanup())
 
 const resources = (): Resource => ({
   wood: 0,
@@ -174,6 +179,124 @@ describe('FarmBoard', () => {
     expect(html).toContain('>0/15<')
     expect(html).toContain('>0/4<')
     expect(html).not.toContain('res-compact-label')
+  })
+
+  it('renders kept Parent Cards as public card images', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      parentCards: { mother: 'PR01', father: 'PS01' },
+      cardStates: {
+        PS01: { infobox: 'Completed' },
+      },
+    } as PlayerState
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('class="parent-cards-row"')
+    expect(html).toContain('data-card-id="PR01"')
+    expect(html).toContain('/assets/parents/cards/PR01.png')
+    expect(html).toContain('data-card-id="PS01"')
+    expect(html).toContain('/assets/parents/cards/PS01.png')
+    expect(html).toContain('Completed')
+  })
+
+  it('shows an enlarged horizontal Parent Card preview on hover', () => {
+    vi.useFakeTimers()
+    try {
+      const player = {
+        ...createPlayer('p1', 'Player A', 'red'),
+        parentCards: { mother: 'PR01', father: 'PS01' },
+      } as PlayerState
+
+      const { container, unmount } = render(
+        <FarmBoard {...createFarmBoardProps(player)} />,
+      )
+      const tile = container.querySelector('[data-card-id="PR01"]')
+      expect(tile).toBeTruthy()
+
+      fireEvent.pointerOver(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(251)
+      })
+
+      const preview = document.body.querySelector(
+        '.card-hover-preview.parent-card-hover-preview',
+      ) as HTMLElement | null
+      expect(preview).toBeTruthy()
+      expect(preview?.style.width).toBe('360px')
+      expect(preview?.querySelector('img')?.getAttribute('src')).toContain(
+        '/assets/parents/cards/PR01.png',
+      )
+
+      fireEvent.pointerOut(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(121)
+      })
+      expect(
+        document.body.querySelector('.card-hover-preview.parent-card-hover-preview'),
+      ).toBeNull()
+
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows the Parent Card id in dev-mode hover previews', () => {
+    vi.useFakeTimers()
+    try {
+      const player = {
+        ...createPlayer('p1', 'Player A', 'red'),
+        parentCards: { mother: 'PR01', father: 'PS01' },
+      } as PlayerState
+
+      const { container, unmount } = render(
+        <FarmBoard {...createFarmBoardProps(player, { devMode: true })} />,
+      )
+      const tile = container.querySelector('[data-card-id="PR01"]')
+      expect(tile).toBeTruthy()
+
+      fireEvent.pointerOver(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(251)
+      })
+
+      expect(document.body.querySelector('.card-hover-preview-id')?.textContent).toBe('PR01')
+
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets the active pending player choose a minor improvement from hand when the turn cursor has advanced', () => {
+    const activePlayer = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      minorHand: ['B34_SpecialFood'],
+    }
+    const turnPlayer = createPlayer('p2', 'Player B', 'blue')
+    const resolveChoice = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(activePlayer, {
+          players: [activePlayer, turnPlayer],
+          currentPlayer: turnPlayer,
+          displayPlayer: activePlayer,
+          isSelectingMinor: true,
+          isSelectingImprovementAny: true,
+          selectableMinorIds: new Set(['B34_SpecialFood']),
+          resolveChoice,
+        })}
+        activePlayerId={activePlayer.id}
+      />,
+    )
+
+    fireEvent.click(container.querySelector('[data-id="B34_SpecialFood"]')!)
+
+    expect(resolveChoice).toHaveBeenCalledWith('minor:B34_SpecialFood')
   })
 
   it('renders reorg controls for card animal zones', () => {

@@ -195,6 +195,8 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 type SowValidationOptions = {
   /** Selection cap, counted by LOGICAL GROUP (extra-field same groupKey merges to 1). */
   maxSelections?: number
+  /** Minimum selected logical fields. Defaults to 1 to preserve ordinary sow validation. */
+  minSelections?: number
   excludedFields?: FarmTilePosition[]
   /** Extra sowable fields keyed by position, with their allowed crops. */
   extraAllowedCrops?: Map<string, SowSelection['crop'][]>
@@ -714,6 +716,12 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     usedGroups.size > Math.max(0, Math.floor(options.maxSelections))
   ) {
     return { ok: false, error: { code: 'INVALID_POSITION' } }
+  }
+  const minSelections = typeof options.minSelections === 'number'
+    ? Math.max(0, Math.floor(options.minSelections))
+    : 1
+  if (usedGroups.size < minSelections) {
+    return { ok: false, error: { code: 'NO_SELECTION' } }
   }
   for (const crop of ALL_CROPS) {
     if (cropCount[crop] > (normalized.resources?.[crop] ?? 0)) {
@@ -1676,7 +1684,11 @@ export const buildSowFarmInteraction = (
     rawMaxSelections === undefined
       ? undefined
       : Math.min(rawMaxSelections, selectableFields.length)
-  return { farmType: 'sow', selectableFields, maxSelections }
+  const minSelections =
+    typeof actionContext?.minSelections === 'number'
+      ? Math.max(0, Math.floor(actionContext.minSelections))
+      : undefined
+  return { farmType: 'sow', selectableFields, minSelections, maxSelections }
 }
 
 export const buildFarmPositionSelectionInteraction = (

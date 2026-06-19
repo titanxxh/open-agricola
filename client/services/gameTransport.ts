@@ -1,7 +1,7 @@
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
-import type { Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
+import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
 
 export type ValidateResult = {
   valid: boolean
@@ -36,6 +36,7 @@ export interface GameTransport {
     payload?: Record<string, unknown>,
   ): Promise<GameSyncPayload>
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
+  ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string): Promise<GameSyncPayload>
   commitSelection(playerIndex: number, payload: CommitSelectionPayload): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
@@ -57,6 +58,7 @@ export interface GameTransport {
   devPlayCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
   draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload>
+  parentSubmit(playerIndex: number, selection: ParentSelectionSubmission): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
   onSnapshot(cb: SnapshotListener): () => void
   destroy(): void
@@ -146,6 +148,10 @@ export class HttpGameTransport implements GameTransport {
     return this.send(() => post('/api/game/anytime', { playerIndex, actionId }))
   }
 
+  ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string) {
+    return this.send(() => post('/api/game/ordinary-draw/keep', { playerIndex, choiceId, keepCardId }))
+  }
+
   commitSelection(
     playerIndex: number,
     payload: CommitSelectionPayload,
@@ -207,6 +213,10 @@ export class HttpGameTransport implements GameTransport {
 
   draftSubmit(playerId: string, pick: DraftPickPayload) {
     return this.send(() => post('/api/game/draft-submit', { playerId, pick }))
+  }
+
+  parentSubmit(playerIndex: number, selection: ParentSelectionSubmission) {
+    return this.send(() => post('/api/game/parent-submit', { playerIndex, selection }))
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
@@ -360,6 +370,10 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'anytime', actionId })
   }
 
+  async ordinaryDrawKeep(playerIndex: number, choiceId: string, keepCardId: string): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'ordinaryDrawKeep', playerIndex, choiceId, keepCardId })
+  }
+
   async commitSelection(
     playerIndex: number,
     payload: CommitSelectionPayload,
@@ -425,6 +439,10 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'draftSubmit', playerId, pick })
   }
 
+  async parentSubmit(playerIndex: number, selection: ParentSelectionSubmission): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'parentSubmit', playerIndex, selection })
+  }
+
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
     const resp = await fetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
@@ -439,7 +457,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.listeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
   sendRoomCommand(type: 'joinRoom', opts: { roomId: string; name?: string; requestedPlayerIndex?: number }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {

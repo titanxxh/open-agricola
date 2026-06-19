@@ -37,6 +37,7 @@ export function LobbyPage() {
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
+  const [enableParentCards, setEnableParentCards] = useState(false)
   const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
   const fetchRooms = useCallback(async () => {
@@ -73,6 +74,9 @@ export function LobbyPage() {
     }
     if (enableCommunityDeck) {
       params.enableCommunityDeck = 'true'
+    }
+    if (enableParentCards) {
+      params.enableParentCards = 'true'
     }
     setPage('game', params)
   }
@@ -261,6 +265,14 @@ export function LobbyPage() {
                   </span>
                 </label>
               )}
+              <label className="community-deck-toggle">
+                <input
+                  type="checkbox"
+                  checked={enableParentCards}
+                  onChange={(e) => setEnableParentCards(e.target.checked)}
+                />
+                <span>启用 Parent Cards 扩展</span>
+              </label>
               <div className="player-select-actions">
                 <button type="button" className="btn-primary" onClick={handleCreateGame}>
                   {t('platform.createGame')}

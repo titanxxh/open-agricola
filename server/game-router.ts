@@ -296,6 +296,27 @@ export const handleGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/ordinary-draw/keep') {
+    const body = JSON.parse(await readBody(req)) as {
+      playerIndex?: number
+      choiceId?: string
+      keepCardId?: string
+    }
+    if (
+      typeof body.playerIndex !== 'number' ||
+      typeof body.choiceId !== 'string' ||
+      typeof body.keepCardId !== 'string'
+    ) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
+    const { resp, result } = callAndRespond(req, s =>
+      s.resolveOrdinaryCardDrawChoice(body.playerIndex!, body.choiceId!, body.keepCardId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/feed') {
     const body = JSON.parse(await readBody(req)) as { playerIndex?: number; selections?: unknown[] }
     if (typeof body.playerIndex !== 'number' || !Array.isArray(body.selections)) {
@@ -330,6 +351,24 @@ export const handleGameRoute = async (
         body.playerIndex!,
         payload,
       ))
+    sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/parent-submit') {
+    const body = JSON.parse(await readBody(req)) as {
+      playerIndex?: number
+      selection?: unknown
+    }
+    if (typeof body.playerIndex !== 'number' || typeof body.selection !== 'object' || body.selection === null) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
+    const { resp, result } = callAndRespond(req, s => s.submitParentSelection(
+      body.playerIndex!,
+      body.selection as Parameters<GameSession['submitParentSelection']>[1],
+    ))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }

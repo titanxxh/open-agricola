@@ -2,6 +2,7 @@ import type { WebSocket } from 'ws'
 import { GameSession } from './authoritative-session.ts'
 import type { RoomMeta, RoomSnapshot, RoomStatus } from './persistence/room-persistence.ts'
 import { rehydrateState } from '../../shared/session/serialization.ts'
+import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
 
@@ -21,6 +22,7 @@ export type Room = {
   status: RoomStatus
   createdBy?: string
   customCardDbIds?: string[]
+  enableParentCards?: boolean
 }
 
 export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
@@ -32,6 +34,43 @@ export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }>
 export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(FIXED_DEV_ROOMS.map((r) => r.id))
 
 export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.has(roomId)
+
+export type FixedDevRoomStartupOptions = {
+  enableParentCards?: boolean
+  draftMode?: 'simultaneous'
+  draftPoolSize?: number
+}
+
+export const parseFixedDevRoomStartupOptions = (
+  env: Record<string, string | undefined> = process.env,
+): FixedDevRoomStartupOptions => {
+  const options: FixedDevRoomStartupOptions = {}
+  if (env.DEV_ENABLE_PARENT_CARDS === 'true' || env.DEV_ENABLE_PARENT_CARDS === '1') {
+    options.enableParentCards = true
+  }
+  if (env.DEV_DRAFT_MODE === 'simultaneous') {
+    const rawPoolSize = Number(env.DEV_DRAFT_POOL_SIZE)
+    options.draftMode = 'simultaneous'
+    options.draftPoolSize = Number.isInteger(rawPoolSize) && rawPoolSize >= 7 && rawPoolSize <= 10
+      ? rawPoolSize
+      : 7
+  }
+  return options
+}
+
+export const buildFixedDevRoomInitialStateOptions = (
+  playerCount: number,
+  startupOptions: FixedDevRoomStartupOptions = {},
+): InitialStateOptions => ({
+  playerCount,
+  ...(startupOptions.enableParentCards ? { enableParentCards: true } : {}),
+  ...(startupOptions.draftMode === 'simultaneous'
+    ? {
+        draftMode: 'simultaneous' as const,
+        draftPoolSize: startupOptions.draftPoolSize ?? 7,
+      }
+    : {}),
+})
 
 export const WAITING_EMPTY_ROOM_TTL_MS = 30 * 60 * 1000
 export const PLAYING_EMPTY_ROOM_TTL_MS = 24 * 60 * 60 * 1000
@@ -46,6 +85,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
+  enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
   status: getRoomStatus(room),
   players: room.players
     .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
@@ -141,6 +181,7 @@ const createSessionFromSnapshot = (
   if (snapshot.serialized === null) {
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
+      enableParentCards: snapshot.meta.enableParentCards ?? false,
     })
   }
   try {
@@ -152,6 +193,7 @@ const createSessionFromSnapshot = (
     console.warn(`[room] rehydrate failed for ${snapshot.id}, starting fresh:`, err)
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
+      enableParentCards: snapshot.meta.enableParentCards ?? false,
     })
   }
 }
@@ -168,5 +210,5 @@ export const snapshotToRoom = (
   status: snapshot.meta.status,
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
+  enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
 })
-

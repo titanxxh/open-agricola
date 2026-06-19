@@ -33,6 +33,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'draftMode',
   'draftPoolSize',
   'enableCommunityDeck',
+  'enableParentCards',
   'customCards',
   'embedded',
   'devMode',

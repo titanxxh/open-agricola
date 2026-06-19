@@ -77,6 +77,10 @@ export const zh = {
       bonusVp: '额外得分',
     },
     cards: {
+      parentFatherComplete: {
+        prompt: '选择父亲支线奖励',
+        tier: '第 {tier} 档：{requirement} -> {reward}',
+      },
       A136_DrudgeryReeve: {
         prompt: '选择要计分的建材套数',
         scoreSets: '计分 {sets} 套（{score} 额外分）',
@@ -163,6 +167,7 @@ export const zh = {
     scoringStoneRooms: '石屋',
     scoringFarmers: '家庭成员',
     scoringCards: '卡牌分',
+    scoringParentCards: '父母牌',
     scoringCardsBonus: '卡牌加分',
     scoringBeggings: '乞讨卡',
     scoringBonusDetail: '{count}{resource}',
@@ -509,6 +514,7 @@ export const zh = {
     'bonus-wood': { name: '额外木材', description: '获得 1 木材' },
     'bonus-food': { name: '额外食物', description: '获得 1 食物' },
     'bonus-grain': { name: '额外谷物', description: '获得 1 谷物' },
+    'complete-parent-father': { name: '完成父亲牌', description: '完成一个已满足的父亲支线任务' },
     plow: { name: '开垦', description: '开垦 1 块田地' },
     sow: { name: '播种', description: '在空田播种作物' },
     'private-field-phase': { name: '私人田地阶段', description: '收获自己的田地，不开始收获阶段' },
@@ -885,6 +891,9 @@ export const zh = {
     resourceAccumulated: '{target} 累积 {resources}',
     actionExclusiveUseSet: '{player} 通过 {cardId} 预定 {action}',
     actionExclusiveUseCleared: '{player} 对 {action} 的预定结束',
+    parentMotherScheduled: '{player} 的 {cardId}：第 {round} 回合获得 {reward}',
+    parentMotherRewardField: '田地',
+    parentMotherRewardStable: '畜栏',
     reorganizeDiscard: '{player} 丢弃 {resources}',
     gains: '获得 {resources}',
     costs: '支付 {resources}',

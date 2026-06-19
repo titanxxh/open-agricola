@@ -22,10 +22,11 @@ import {
 } from '../cards/catalog'
 import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
-import type { ActionSpace, Field, GameState, PlayerState } from '../contract/types'
+import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
+import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -134,7 +135,68 @@ export const dealHands = (
     minorHands.push(shuffledMinor.slice(index * handSize, index * handSize + handSize))
     occupationHands.push(shuffledOccupation.slice(index * handSize, index * handSize + handSize))
   }
-  return { minorHands, occupationHands }
+  const dealtCount = playerCount * handSize
+  return {
+    minorHands,
+    occupationHands,
+    minorDeck: shuffledMinor.slice(dealtCount),
+    occupationDeck: shuffledOccupation.slice(dealtCount),
+  }
+}
+
+const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; minor: Set<string> } => {
+  const occupation = new Set<string>()
+  const minor = new Set<string>()
+  if (!draft) return { occupation, minor }
+  Object.values(draft.pools).forEach((pool) => {
+    pool.occ.forEach((id) => occupation.add(id))
+    pool.minor.forEach((id) => minor.add(id))
+  })
+  Object.values(draft.kept).forEach((pool) => {
+    pool.occ.forEach((id) => occupation.add(id))
+    pool.minor.forEach((id) => minor.add(id))
+  })
+  return { occupation, minor }
+}
+
+const createFallbackOrdinaryCardDecks = (
+  players: PlayerState[],
+  seed: number,
+  draft: GameState['draft'],
+  enableCommunityDeck: boolean,
+  options: Pick<InitialStateOptions, 'extraMinorIds' | 'extraOccupationIds' | 'deckIds'> = {},
+): OrdinaryCardDecks => {
+  const full = dealHands(
+    players.length,
+    seed,
+    options.extraMinorIds ?? [],
+    options.extraOccupationIds ?? [],
+    options.deckIds,
+    0,
+    enableCommunityDeck,
+  )
+  const draftIds = cardIdsInDraft(draft)
+  const dealtOccupation = new Set(players.flatMap((player) => player.occupationHand ?? []))
+  const dealtMinor = new Set(players.flatMap((player) => player.minorHand ?? []))
+  return {
+    occupation: full.occupationDeck.filter((id) => !dealtOccupation.has(id) && !draftIds.occupation.has(id)),
+    minor: full.minorDeck.filter((id) => !dealtMinor.has(id) && !draftIds.minor.has(id)),
+  }
+}
+
+const normalizeOrdinaryCardDecks = (
+  raw: GameState,
+  players: PlayerState[],
+  seed: number,
+): OrdinaryCardDecks => {
+  const decks = raw.ordinaryCardDecks
+  if (decks && Array.isArray(decks.occupation) && Array.isArray(decks.minor)) {
+    return {
+      occupation: decks.occupation.filter((id): id is string => typeof id === 'string'),
+      minor: decks.minor.filter((id): id is string => typeof id === 'string'),
+    }
+  }
+  return createFallbackOrdinaryCardDecks(players, seed, raw.draft ?? null, raw.enableCommunityDeck ?? false)
 }
 
 export const normalizeState = (raw: GameState): GameState => {
@@ -242,6 +304,7 @@ export const normalizeState = (raw: GameState): GameState => {
           : createDefaultRoomTiles(player.rooms ?? 2),
       stableTiles: player.stableTiles ?? [],
       majorEffects: player.majorEffects ?? { wellRounds: 0 },
+      parentCards: player.parentCards ?? { mother: null, father: null },
       supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
@@ -365,7 +428,8 @@ export const normalizeState = (raw: GameState): GameState => {
     raw.publicEventArchive,
     raw.nextPublicEventArchivePacketSeq,
   )
-  return {
+  const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, createSeed())
+  const normalizedState: GameState = {
     ...raw,
     players,
     actionSpaces,
@@ -375,6 +439,7 @@ export const normalizeState = (raw: GameState): GameState => {
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
+    parentSelection: raw.parentSelection ?? null,
     events,
     nextEventSeq,
     publicEventArchive: archiveState.publicEventArchive,
@@ -382,8 +447,14 @@ export const normalizeState = (raw: GameState): GameState => {
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
+    enableParentCards: raw.enableParentCards ?? false,
+    ordinaryCardDecks,
+    ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
+    nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
     completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
+  ensureParentMotherScheduleLogs(normalizedState)
+  return normalizedState
 }
 
 export const cloneState = (state: GameState): GameState => {
@@ -466,6 +537,7 @@ const createInitialPlayers = (
       activeModifiers: [],
       cardStates: {},
       stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
+      parentCards: { mother: null, father: null },
       supplyTokensConsumed: {},
     }
     return player
@@ -493,6 +565,15 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  const ordinaryCardDeckSeed =
+    typeof options.ordinaryCardDeckSeed === 'number' && Number.isFinite(options.ordinaryCardDeckSeed)
+      ? Math.floor(options.ordinaryCardDeckSeed)
+      : createSeed()
+  const parentSelectionSeed =
+    typeof options.parentSelectionSeed === 'number' && Number.isFinite(options.parentSelectionSeed)
+      ? Math.floor(options.parentSelectionSeed)
+      : createSeed()
+  let ordinaryCardDecks: OrdinaryCardDecks
 
   let phase: GameState['phase'] = 'playing'
   let draft: GameState['draft'] = null
@@ -522,7 +603,22 @@ export const createInitialState = (
       }
     })
     draft = initDraftState(seatOrder, hands, poolSize)
+    ordinaryCardDecks = createFallbackOrdinaryCardDecks(
+      players,
+      ordinaryCardDeckSeed,
+      draft,
+      options.enableCommunityDeck ?? false,
+      options,
+    )
     phase = 'draft'
+  } else {
+    ordinaryCardDecks = createFallbackOrdinaryCardDecks(
+      players,
+      ordinaryCardDeckSeed,
+      null,
+      options.enableCommunityDeck ?? false,
+      options,
+    )
   }
 
   const initialEvents: GameEvent[] = [{
@@ -540,6 +636,7 @@ export const createInitialState = (
     phase,
     roundPhase: 'work',
     draft,
+    parentSelection: null,
     currentPlayerIndex: 0,
     players,
     actionSpaces: createActionSpaces(options.playerCount ?? 2),
@@ -565,10 +662,15 @@ export const createInitialState = (
     pendingFutureMeeples: [],
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
+    enableParentCards: options.enableParentCards ?? false,
+    ordinaryCardDecks,
+    ordinaryCardDrawChoices: {},
+    nextOrdinaryCardDrawChoiceSeq: 1,
     workPhaseObtainedResources: {},
     completedFeedingPhases: 0,
   }
   applyRoundGrowth(initialState)
+  startParentSelectionIfNeeded(initialState, parentSelectionSeed)
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)
   return initialState
 }

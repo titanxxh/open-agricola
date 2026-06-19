@@ -14,6 +14,7 @@ import { emptyResources } from '../../../shared/contract/state-constants'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
+import { getParentCardDefinition, type ParentCardId } from '../../../shared/parents'
 import {
   getPlayerPanelSupplySummary,
   type PlayerPanelSupplySummary,
@@ -22,8 +23,10 @@ import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
+import { CardWithCopy } from '../common/CardWithCopy'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
+import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
@@ -35,6 +38,8 @@ type CardAnimalDisplay = {
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
+const PARENT_CARD_PREVIEW_WIDTH = 360
+const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 510) / 735)
 
 const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
   WC: ['wood', 'clay'],
@@ -251,6 +256,7 @@ export type FarmBoardProps = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  activePlayerId?: string
   playerPanelSummary?: PlayerPanelSupplySummary
   devMode: boolean
   currentStartPlayerId: string
@@ -566,11 +572,51 @@ const PlayedCardStats = ({
   )
 }
 
+const ParentCardTile = ({
+  locale,
+  id,
+  infobox,
+  devMode,
+}: {
+  locale: Locale
+  id: ParentCardId
+  infobox?: string
+  devMode: boolean
+}) => {
+  const def = getParentCardDefinition(id)
+  if (!def) return null
+  const { frontUrl } = resolveParentCardAssetUrls(def.assets)
+  const alt = `${def.kind} ${id}`
+  return (
+    <CardWithCopy
+      locale={locale}
+      cardId={id}
+      devMode={devMode}
+      className="parent-card-tile"
+      previewCard={
+        <img
+          className="parent-card-hover-preview-image"
+          src={frontUrl}
+          alt={`${alt} preview`}
+        />
+      }
+      previewWidth={PARENT_CARD_PREVIEW_WIDTH}
+      previewHeight={PARENT_CARD_PREVIEW_HEIGHT}
+      previewClassName="parent-card-hover-preview"
+      data-card-id={id}
+    >
+      <img className="parent-card-image" src={frontUrl} alt={alt} />
+      {infobox ? <div className="card-infobox parent-card-infobox">{infobox}</div> : null}
+    </CardWithCopy>
+  )
+}
+
 export const FarmBoard = ({
   locale,
   players,
   currentPlayer,
   displayPlayer,
+  activePlayerId,
   playerPanelSummary,
   currentStartPlayerId,
   nextStartPlayerId,
@@ -634,7 +680,8 @@ export const FarmBoard = ({
   highlightedFarmTileKeys = new Set<string>(),
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
-  const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+  const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
+  const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
   const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
   const compactLabels = locale === 'zh'
@@ -1219,6 +1266,26 @@ export const FarmBoard = ({
     ) : null}
     <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
+      {displayPlayer.parentCards?.mother || displayPlayer.parentCards?.father ? (
+        <div className="parent-cards-row">
+          {displayPlayer.parentCards?.mother ? (
+            <ParentCardTile
+              locale={locale}
+              id={displayPlayer.parentCards.mother}
+              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.mother]?.infobox}
+              devMode={devMode}
+            />
+          ) : null}
+          {displayPlayer.parentCards?.father ? (
+            <ParentCardTile
+              locale={locale}
+              id={displayPlayer.parentCards.father}
+              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
+              devMode={devMode}
+            />
+          ) : null}
+        </div>
+      ) : null}
       <div className="played-row">
         {playedCards.map((cardId, index) => {
           const [kind, rawId] = cardId.includes(':')
@@ -1328,7 +1395,7 @@ export const FarmBoard = ({
     </div>
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === currentPlayer.id || devMode ? (
+      {displayPlayer.id === activeFarmPlayerId || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation">
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>

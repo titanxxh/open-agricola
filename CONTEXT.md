@@ -233,6 +233,26 @@ _Avoid_: 把单卡规则扩散到主路径
 Card Source 的 `meta` 部分，包含可序列化、前端可见、无运行时行为的卡牌定义字段，如 id、名称、描述、成本、类型、前置条件、reward、`cardField`。
 _Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局部状态
 
+**Parent Card Definition**:
+Parent Cards 扩展的独立结构化数据定义，描述 mother / father parent card 的卡号、规则原文、逻辑头像引用、逻辑卡背引用、mother 小数分值、mother 轮次奖励、father 任务条件和三档奖励；father 条件与奖励同时保留原文和机器可读结构。mother 小数分直接按规则印刷的小数存储。它只描述可验证数据，不执行规则。它不属于 `shared/cards` 的 Card Source / Card Definition / Card Display / Card Impl 投影，也不进入普通手牌、已打出卡、cards-manifest 或常规卡牌注册表。
+_Avoid_: Card Definition、Card Source、MinorImprovement、Occupation、玩家手牌
+
+**Parent Cards**:
+Consul Dirigens 的父母牌小扩展；启用时所有入座玩家各保留 1 张 mother parent card 和 1 张 father parent card，并把保留的父母牌作为公开的玩家侧边牌参与游戏。它不是让子变体，也不是普通 A-E / community 卡牌来源。
+_Avoid_: ordinary card deck、community deck、handicapping、让子
+
+**Parent Card Selection**:
+Parent Cards 启用后的开局私有选牌阶段：每位玩家从自己的 mother / father 候选中各保留 1 张，未保留候选不公开，最终保留牌公开。
+_Avoid_: ordinary card draft、玩家手牌、弃牌
+
+**Mother Parent Card**:
+Parent Cards 中提供轮次奖励和小数终局分的保留牌；其分值按卡面小数直接进入终局总分。
+_Avoid_: printed VP、Card Bonus VP
+
+**Father Parent Card**:
+Parent Cards 中提供一次性 side quest 的保留牌；玩家选择一个已满足档位完成后，只获得该档奖励，并以公开完成标记表示完成。
+_Avoid_: flipped face-down card、repeatable achievement
+
 **Card Source**:
 单卡作者编辑的唯一源，包含卡牌的 `meta` 和 `impl`；构建和运行时必须从它投影出前端可读的 Card Display 和服务端可用的 Card Impl。
 _Avoid_: 让作者同时维护 display 文件和 impl 文件

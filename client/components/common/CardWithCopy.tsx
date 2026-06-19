@@ -12,7 +12,11 @@ type Props = {
   devMode?: boolean
   enablePreview?: boolean
   previewCard?: ReactNode
+  previewWidth?: number
+  previewHeight?: number
+  previewClassName?: string
   'data-card-anchor'?: string
+  'data-card-id'?: string
 }
 
 const SHOW_DELAY_MS = 250
@@ -30,7 +34,11 @@ export const CardWithCopy = ({
   devMode = false,
   enablePreview = true,
   previewCard,
+  previewWidth,
+  previewHeight,
+  previewClassName,
   'data-card-anchor': dataCardAnchor,
+  'data-card-id': dataCardId,
 }: Props) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const showTimerRef = useRef<number | null>(null)
@@ -118,7 +126,7 @@ export const CardWithCopy = ({
 
   const handleCardEnter = (e: React.PointerEvent) => {
     if (!enablePreview || !previewCard) return
-    if (e.pointerType !== 'mouse') return
+    if (e.pointerType && e.pointerType !== 'mouse') return
     stateRef.current.card = true
     clearHideTimer()
     if (anchor) return
@@ -200,6 +208,7 @@ export const CardWithCopy = ({
         onPointerCancel={handlePointerUp}
         aria-disabled={disabled}
         data-card-anchor={dataCardAnchor}
+        data-card-id={dataCardId}
       >
         {children}
       </div>
@@ -210,6 +219,9 @@ export const CardWithCopy = ({
           devMode={devMode}
           anchor={anchor}
           card={previewCard}
+          width={previewWidth}
+          height={previewHeight}
+          className={previewClassName}
           onPreviewEnter={handlePreviewEnter}
           onPreviewLeave={handlePreviewLeave}
         />

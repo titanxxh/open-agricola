@@ -29,6 +29,13 @@ const workerDestinationLabel = (locale: Locale, destination: string): string => 
   return destination
 }
 
+const parentMotherRewardLabel = (locale: Locale, reward: string): string => {
+  if (reward === 'field') return t(locale, 'log.parentMotherRewardField')
+  if (reward === 'stable') return t(locale, 'log.parentMotherRewardStable')
+  const resourceLabel = t(locale, `resources.${reward}`)
+  return resourceLabel === `resources.${reward}` ? reward : resourceLabel
+}
+
 const resolveAccumulationTarget = (
   locale: Locale,
   params: Record<string, unknown>,
@@ -341,6 +348,9 @@ export const prepareLogEntry = (
   }
   if (params && entry.key === 'log.workerReturned' && typeof params.destination === 'string') {
     params.destination = workerDestinationLabel(locale, params.destination)
+  }
+  if (params && entry.key === 'log.parentMotherScheduled' && typeof params.reward === 'string') {
+    params.reward = parentMotherRewardLabel(locale, params.reward)
   }
   if (
     params &&

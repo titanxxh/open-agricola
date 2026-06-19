@@ -35,6 +35,8 @@ import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
+import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
+import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import {
   buildBakeExchangeInfo,
   buildBakeBulkChoice,
@@ -171,11 +173,13 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
+          const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
             customCardIds,
             enableCommunityDeck,
+            enableParentCards,
             ...(draftParams ?? {}),
           })
         })
@@ -1834,6 +1838,28 @@ export const GameContainerApi = () => {
     )
   }
 
+  if (state.phase === 'parent-selection' && state.parentSelection) {
+    const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        {notificationStack}
+        <ParentSelectionOverlay
+          state={state}
+          meId={meId}
+          locale={locale}
+          onSubmit={async (selection) => {
+            try {
+              await transport.parentSubmit(playerIndex, selection)
+            } catch (e) {
+              console.error('parentSubmit error', e)
+            }
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {notificationStack}
@@ -1845,6 +1871,22 @@ export const GameContainerApi = () => {
       <PublicEventCardPassAnimation
         events={(state.events ?? []).filter((e): e is CardPassedEvent => e.type === 'card.passed')}
       />
+      {selfPlayer ? (
+        <OrdinaryCardDrawOverlay
+          state={state}
+          playerId={selfPlayer.id}
+          locale={locale}
+          onKeep={async (choiceId, keepCardId) => {
+            const playerIndex = state.players.findIndex((player) => player.id === selfPlayer.id)
+            if (playerIndex < 0) return
+            try {
+              await transport.ordinaryDrawKeep(playerIndex, choiceId, keepCardId)
+            } catch (e) {
+              console.error('ordinaryDrawKeep error', e)
+            }
+          }}
+        />
+      ) : null}
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -2114,6 +2156,7 @@ export const GameContainerApi = () => {
           />
           <section className="board-panel board-farm">
             <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
+              activePlayerId={activePlayer?.id}
               currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
