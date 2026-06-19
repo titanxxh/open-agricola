@@ -7,7 +7,7 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addWorkerRef, removeWorkerRef } from '../../domain/space'
+import { addLinkedSpaceBlocks, addWorkerRef, clearLinkedSpaceBlocksForWorker, removeWorkerRef } from '../../domain/space'
 import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/player'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
@@ -35,6 +35,7 @@ const placeFarmer = (
     return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   }
   addWorkerRef(space, player.id, worker.id)
+  addLinkedSpaceBlocks(state, space, player.id, worker.id)
   recordRoundPlacement(player, space.id, worker.id)
   return { type: 'ok', workerId: worker.id }
 }
@@ -92,7 +93,9 @@ export const placeFarmerAction: ActionDefinition = {
 
       if (!isWorkerless && fromSpace) {
         removeWorkerRef(fromSpace, player.id, workerId!)
+        clearLinkedSpaceBlocksForWorker(state, player.id, workerId!)
         addWorkerRef(targetSpace, player.id, workerId!)
+        addLinkedSpaceBlocks(state, targetSpace, player.id, workerId!)
         recordRoundPlacement(player, targetSpace.id, workerId!)
         incPlacedFarmers(player)
         eventSink?.emit<'worker.placed'>({

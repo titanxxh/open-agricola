@@ -1,5 +1,5 @@
 import type { GameState, PlayerState } from '../../contract/types'
-import { removeWorkerRef } from '../../domain/space'
+import { clearLinkedSpaceBlocksForWorker, removeWorkerRef } from '../../domain/space'
 import { holdWorkerOnCard } from './card-held-workers'
 
 type RecallOptions = {
@@ -33,6 +33,7 @@ export const recallWorkerById = (
   if (!space) return false
   const removed = removeWorkerRef(space, player.id, workerId)
   if (!removed) return false
+  clearLinkedSpaceBlocksForWorker(state, player.id, removed.workerId)
   if (options?.targetCardHold) {
     holdWorkerOnCard(player, options.targetCardHold, removed.workerId)
   }
