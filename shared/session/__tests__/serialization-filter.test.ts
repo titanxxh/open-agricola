@@ -135,7 +135,7 @@ describe('serializeStateForPlayer', () => {
     expect(draft.pools.p2.minor).toEqual(Array(p2PoolMinor.length).fill('?'))
   })
 
-  it('preserves draft.kept, draft.round, draft.seatOrder and masks submitted non-viewer pendingPicks', () => {
+  it('masks non-viewer draft.kept and submitted pendingPicks', () => {
     const state = makeDraftState()
     state.draft!.pendingPicks.p1 = {
       occ: state.draft!.pools.p1.occ[0]!,
@@ -144,6 +144,14 @@ describe('serializeStateForPlayer', () => {
     state.draft!.pendingPicks.p2 = {
       occ: state.draft!.pools.p2.occ[0]!,
       minor: state.draft!.pools.p2.minor[0]!,
+    }
+    state.draft!.kept.p1 = {
+      occ: [state.draft!.pools.p1.occ[0]!, state.draft!.pools.p1.occ[1]!],
+      minor: [state.draft!.pools.p1.minor[0]!],
+    }
+    state.draft!.kept.p2 = {
+      occ: [state.draft!.pools.p2.occ[0]!],
+      minor: [state.draft!.pools.p2.minor[0]!, state.draft!.pools.p2.minor[1]!],
     }
     const raw = serializeState(state, emptyCtx())
     const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
@@ -155,7 +163,10 @@ describe('serializeStateForPlayer', () => {
     const r = raw.draft as DraftState
     const f = filtered.draft as DraftState
     const s = spectator.draft as DraftState
-    expect(f.kept).toEqual(r.kept)
+    expect(f.kept.p1).toEqual(r.kept.p1)
+    expect(f.kept.p2).toEqual({ occ: ['?'], minor: ['?', '?'] })
+    expect(s.kept.p1).toEqual({ occ: ['?', '?'], minor: ['?'] })
+    expect(s.kept.p2).toEqual({ occ: ['?'], minor: ['?', '?'] })
     expect(f.pendingPicks.p1).toEqual(r.pendingPicks.p1)
     expect(f.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
     expect(s.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
