@@ -33,3 +33,22 @@ export const Major_Pottery = defineMajorCard({
     },
   },
 })
+
+export const Major_Pottery2 = defineMajorCard({
+  meta: {
+  id: 'Major_Pottery2',
+  name: 'Pottery',
+  deck: 'major',
+  number: 17,
+  cost: { clay: 2, stone: 2 },
+  vp: 2,
+  extraVp: true,
+  waresSalesmanGains: [{ clay: 1, reed: 1 }],
+  desc: [
+    '[Harvest]',
+    '<CLAY> <ARROW-1X> 2<FOOD>',
+    '[Scoring]',
+    '3/5/7<CLAY> <ARROW-1X> 1/2/3<SCORE>',
+  ],
+},
+})

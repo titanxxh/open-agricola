@@ -14,6 +14,7 @@ import {
   executePaymentSolution,
 } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
+import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
@@ -138,9 +139,7 @@ const applyMajorImprovementPurchase = (
     player.improvements.push(improvementId)
   }
   incMajorBuilt(player)
-  state.availableMajorImprovements = state.availableMajorImprovements.filter(
-    (id) => id !== improvementId,
-  )
+  takeMajorImprovementFromSupply(state, improvementId)
 }
 
 type ApplyMinorResult =

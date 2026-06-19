@@ -32,3 +32,22 @@ export const Major_Basket = defineMajorCard({
     },
   },
 })
+
+export const Major_Basket2 = defineMajorCard({
+  meta: {
+  id: 'Major_Basket2',
+  name: 'Basketmaker',
+  deck: 'major',
+  number: 18,
+  cost: { reed: 2, stone: 2 },
+  vp: 2,
+  extraVp: true,
+  waresSalesmanGains: [{ reed: 2 }],
+  desc: [
+    '[Harvest]',
+    '<REED> <ARROW-1X> 3<FOOD>',
+    '[Scoring]',
+    '2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>',
+  ],
+},
+})

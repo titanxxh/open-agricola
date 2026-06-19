@@ -502,6 +502,13 @@ export type HarvestBreedSummary = {
 
 export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' | 'field' | 'feeding' | 'breeding'
 
+export type MajorSupplyStack = {
+  stackId?: string
+  familyId: string
+  visibleId: string | null
+  cardIds: string[]
+}
+
 export type GameState = {
   round: number
   /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
@@ -528,6 +535,7 @@ export type GameState = {
    * GameSession.pushHistory reads, honors, and clears this flag. */
   pendingUndoBoundary?: boolean
   availableMajorImprovements: string[]
+  majorImprovementSupply?: MajorSupplyStack[]
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
