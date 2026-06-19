@@ -108,6 +108,34 @@ describe('computeScores', () => {
     )
   })
 
+  it('scores duplicate six-player workshops independently by concrete major id', () => {
+    const player = createPlayer()
+    player.improvements = [
+      'Major_Joinery',
+      'Major_Joinery2',
+      'Major_Pottery',
+      'Major_Pottery2',
+      'Major_Basket',
+      'Major_Basket2',
+    ]
+    player.resources.wood = 7
+    player.resources.clay = 7
+    player.resources.reed = 5
+
+    const [result] = computeScores(createState(player))
+    const cardBonusVp = result.categories.find((item) => item.key === 'cardBonusVp')
+
+    expect(cardBonusVp?.total).toBe(18)
+    expect(cardBonusVp?.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cardId: 'Major_Joinery', score: 3 }),
+      expect.objectContaining({ cardId: 'Major_Joinery2', score: 3 }),
+      expect.objectContaining({ cardId: 'Major_Pottery', score: 3 }),
+      expect.objectContaining({ cardId: 'Major_Pottery2', score: 3 }),
+      expect.objectContaining({ cardId: 'Major_Basket', score: 3 }),
+      expect.objectContaining({ cardId: 'Major_Basket2', score: 3 }),
+    ]))
+  })
+
   it('scores Soldier from wood and stone pairs', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']

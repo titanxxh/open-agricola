@@ -77,4 +77,14 @@ describe('bake exchange UI helpers', () => {
     expect(info.E63_IronOven).toEqual({ food: 6, max: 1 })
     expect(info.NotABakeSource).toBeUndefined()
   })
+
+  it('builds bake info for duplicate six-player oven ids', () => {
+    const info = buildBakeExchangeInfo(
+      ['Major_ClayOven2', 'Major_StoneOven2'],
+      () => undefined,
+    )
+
+    expect(info.Major_ClayOven2).toEqual({ food: 5, max: 1 })
+    expect(info.Major_StoneOven2).toEqual({ food: 4, max: 2 })
+  })
 })
