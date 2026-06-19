@@ -226,8 +226,16 @@ const getOccupationCost = (
 const getLessonsCost = (player: PlayerState, spaceId: string) => {
   const isLessons4 = spaceId === 'lessons-4'
   const isLessons3 = spaceId === 'lessons-3'
+  const isLessons56TwoFood = spaceId === 'lessons-56-2f'
+  const isLessons56Variable = spaceId === 'lessons-56-variable'
   const base = isLessons3
     ? 2
+    : isLessons56TwoFood
+      ? 2
+      : isLessons56Variable
+        ? player.occupationPlayed.length <= 1
+          ? 1
+          : 2
     : isLessons4
       ? player.occupationPlayed.length <= 1
         ? 1

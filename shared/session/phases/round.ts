@@ -13,7 +13,7 @@
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { smallestAvailableWorker, workersAvailable } from '../../domain/player.ts'
-import { addWorkerRef, isSpaceOccupied } from '../../domain/space.ts'
+import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
   canUseExclusiveSpace,
   computeAllowedPlacementSpaces,
@@ -95,7 +95,11 @@ export const takeAction = (
   }
   const space = state.actionSpaces.find((s) => s.id === spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
+  if (isSpaceBlocked(space)) return core.emitResponse(false, 'space unavailable')
   if (!canUseExclusiveSpace(space, player, state)) {
+    return core.emitResponse(false, 'space unavailable')
+  }
+  if (space.strictCanExecute && !space.canBeExecutedByPlayer(state, player)) {
     return core.emitResponse(false, 'space unavailable')
   }
   if (isSpaceOccupied(space)) {
@@ -118,6 +122,7 @@ export const takeAction = (
   const worker = smallestAvailableWorker(state, player)
   if (worker) {
     addWorkerRef(space, player.id, worker.id)
+    addLinkedSpaceBlocks(state, space, player.id, worker.id)
     appendImmediateEvents(state, [{
       type: 'worker.placed',
       workerId: worker.id,

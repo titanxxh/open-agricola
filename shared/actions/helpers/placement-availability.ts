@@ -1,6 +1,6 @@
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContextInput } from '../../cards/card-listeners'
-import { isSpaceOccupied } from '../../domain/space'
+import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
@@ -53,6 +53,7 @@ export function computeAllowedPlacementSpaces(
   const base: AllowedPlacement[] = state.actionSpaces
     .filter((s) => {
       if (!canEnterSpace(s, player, state)) return false
+      if (isSpaceBlocked(s)) return false
       return !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player)
     })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
@@ -101,6 +102,7 @@ export function computeAllowedPlacementSpaces(
       const space = state.actionSpaces.find(s => s.id === spaceId)
       if (!space) continue
       if (!canEnterSpace(space, player, state)) continue
+      if (isSpaceBlocked(space)) continue
       if (!space.canBeExecutedByPlayer(state, player)) continue
       extra.push({ spaceId, allowOccupied: true, option: opt })
     }

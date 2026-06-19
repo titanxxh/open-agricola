@@ -35,6 +35,24 @@ import { urgentWishChildren } from '../cards/action/round-urgent-wish-children'
 import { vegetableSeeds } from '../cards/action/round-vegetable-seeds'
 import { westernQuarry } from '../cards/action/round-western-quarry'
 import { wishChildren } from '../cards/action/round-wish-children'
+import {
+  animalMarket56,
+  copse56,
+  corral6,
+  farmSupplies6,
+  grove56,
+  hollow56,
+  houseBuilding56,
+  improvement6,
+  lessons56TwoFood,
+  lessons56Variable,
+  modestWishChildren56,
+  resourceMarket56,
+  resourceTrade6,
+  riverbankForest56,
+  sideJob6,
+  travelingPlayers56,
+} from '../cards/action/expansion-56'
 
 const emptyResources: Resource = {
   wood: 0,
@@ -84,6 +102,22 @@ const baseActionDefinitions: ActionDefinition[] = [
   vegetableSeeds,
   resourceMarket,
   resourceMarket4,
+  lessons56TwoFood,
+  copse56,
+  lessons56Variable,
+  modestWishChildren56,
+  houseBuilding56,
+  travelingPlayers56,
+  riverbankForest56,
+  grove56,
+  hollow56,
+  resourceMarket56,
+  animalMarket56,
+  farmSupplies6,
+  resourceTrade6,
+  corral6,
+  sideJob6,
+  improvement6,
 ]
 
 const actionDefinitionLookup = new Map(
@@ -116,4 +150,5 @@ export const createActionSpaces = (playerCount?: number): ActionSpace[] =>
       ...action,
       resources: { ...emptyResources },
       takenBy: [],
+      blockedBy: [],
     }))
