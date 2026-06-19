@@ -104,6 +104,10 @@ _Avoid_: 在 effect 文件里堆叠多卡特例
 棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
 _Avoid_: ActionDefinition、ActionNode
 
+**Blocked Action Space（被封锁行动格）**:
+因 linked action space 规则在本轮暂时不可进入的行动格。它不是 occupied，没有实际工人在该格上，也不应被卡牌或行动逻辑当作占用工人读取。
+_Avoid_: occupied Action Space、synthetic linked occupancy、phantom worker
+
 **ActionDefinition**:
 一个行动的规则定义，包含可执行性、费用预览、执行函数、选择解析和可选 inner flow。
 _Avoid_: UI 按钮定义
@@ -156,6 +160,10 @@ _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
 由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
 统一 score category 是 `cardBonusVp`，不保留旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` shape。
 _Avoid_: Improvement bonus、card state bonus、printed VP
+
+**Major Improvement Supply Stack**:
+主要设施供应区中同一类主要设施的实体卡叠放口径；只有当前可见的顶层实体卡可被购买，被覆盖的实体卡仍属于供应但不可直接选择。
+_Avoid_: flat available major list、把 covered card 当作可购买卡、duplicate major alias
 
 **Supply Token**:
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
