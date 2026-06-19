@@ -3,6 +3,7 @@ import type {
   ParentSelectionState,
   ParentSelectionSubmission,
 } from '../contract/types'
+import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append'
 import { createRng, shuffleWithRng } from '../utils/rng'
 import {
   FATHER_PARENT_CARD_IDS,
@@ -81,7 +82,7 @@ export const ensureParentMotherScheduleLogs = (state: GameState): void => {
       .map((entry) => entry.params?.cardId)
       .filter((cardId): cardId is string => typeof cardId === 'string'),
   )
-  const missing = state.players.flatMap((player) => {
+  const missing: ImmediateEventDraft[] = state.players.flatMap((player) => {
     const mother = player.parentCards.mother
     if (!mother) return []
     const card = getParentCardDefinition(mother)
@@ -89,16 +90,15 @@ export const ensureParentMotherScheduleLogs = (state: GameState): void => {
     if (card?.kind !== 'mother' || !reward) return []
     if (existingCardIds.has(card.id)) return []
     return [{
-      key: 'log.parentMotherScheduled',
-      params: {
-        player: player.name,
-        cardId: card.id,
-        round: card.round,
-        reward,
-      },
+      type: 'parent.motherScheduled',
+      actorPlayerId: player.id,
+      playerId: player.id,
+      cardId: card.id,
+      targetRound: card.round,
+      reward,
     }]
   })
-  state.log.unshift(...missing)
+  appendImmediateEvents(state, missing)
 }
 
 const completeParentSelectionIfReady = (state: GameState): void => {

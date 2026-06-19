@@ -146,6 +146,22 @@ describe('Parent Card selection setup', () => {
         params: { player: 'PlayerB', cardId: 'PR05', round: 4, reward: 'sheep' },
       },
     ]))
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'parent.motherScheduled',
+        playerId: 'p1',
+        cardId: 'PR02',
+        targetRound: 12,
+        reward: 'field',
+      }),
+      expect.objectContaining({
+        type: 'parent.motherScheduled',
+        playerId: 'p2',
+        cardId: 'PR05',
+        targetRound: 4,
+        reward: 'sheep',
+      }),
+    ]))
   })
 
   it('queues selected mother rewards as real future meeples', () => {
