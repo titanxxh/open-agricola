@@ -520,10 +520,9 @@ export const filterPublicEventCancellationsForPlayer = (
  *     player other than the viewer.
  *   - `players[i].cardStates[cardId]` and card-state events for cards that
  *     are still hidden in another player's hand.
- *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`, and
- *     `draft.pendingPicks[pid]` for every player other than the viewer
- *     (public data like `draft.kept`, `draft.round`, `draft.seatOrder`
- *     is preserved verbatim).
+ *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`,
+ *     `draft.kept[pid]`, and `draft.pendingPicks[pid]` for every
+ *     player other than the viewer.
  *   - unresolved `parentSelection.candidates[pid]` and submitted
  *     parent choices for every player other than the viewer.
  *
@@ -552,6 +551,19 @@ export const serializeStateForPlayer = (
         ...base.draft,
         pools: Object.fromEntries(
           Object.entries(base.draft.pools).map(([pid, pool]) =>
+            pid === viewerPlayerId
+              ? [pid, pool]
+              : [
+                  pid,
+                  {
+                    occ: Array(pool.occ.length).fill('?'),
+                    minor: Array(pool.minor.length).fill('?'),
+                  },
+                ],
+          ),
+        ),
+        kept: Object.fromEntries(
+          Object.entries(base.draft.kept).map(([pid, pool]) =>
             pid === viewerPlayerId
               ? [pid, pool]
               : [
