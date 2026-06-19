@@ -10,6 +10,7 @@ import {
   isFatherParentCardId,
   isMotherParentCardId,
 } from './ids'
+import { getParentCardDefinition } from './cards'
 import type { FatherParentCardId, MotherParentCardId } from './types'
 import { reserveSelectedMotherRewards } from './mother-rewards'
 
@@ -48,11 +49,62 @@ export const startParentSelectionIfNeeded = (state: GameState): void => {
     state.gameSeed,
   )
   state.phase = 'parent-selection'
+  completeParentSelectionIfReady(state)
+}
+
+const autoSubmitForcedParentSelections = (state: GameState): void => {
+  const selection = state.parentSelection
+  if (!selection) return
+  state.players.forEach((player) => {
+    if (selection.submissions[player.id]) return
+    const candidates = selection.candidates[player.id]
+    const mother = candidates?.mother[0]
+    const father = candidates?.father[0]
+    if (candidates?.mother.length !== 1 || candidates.father.length !== 1) return
+    if (!isMotherParentCardId(mother) || !isFatherParentCardId(father)) return
+    selection.submissions[player.id] = { mother, father }
+  })
+}
+
+const motherRewardLogValue = (mother: MotherParentCardId): string | null => {
+  const card = getParentCardDefinition(mother)
+  if (card?.kind !== 'mother') return null
+  if (card.gain.type === 'resource') return card.gain.resource
+  return card.gain.type
+}
+
+export const ensureParentMotherScheduleLogs = (state: GameState): void => {
+  if (!state.enableParentCards || state.phase !== 'playing') return
+  const existingCardIds = new Set(
+    state.log
+      .filter((entry) => entry.key === 'log.parentMotherScheduled')
+      .map((entry) => entry.params?.cardId)
+      .filter((cardId): cardId is string => typeof cardId === 'string'),
+  )
+  const missing = state.players.flatMap((player) => {
+    const mother = player.parentCards.mother
+    if (!mother) return []
+    const card = getParentCardDefinition(mother)
+    const reward = motherRewardLogValue(mother)
+    if (card?.kind !== 'mother' || !reward) return []
+    if (existingCardIds.has(card.id)) return []
+    return [{
+      key: 'log.parentMotherScheduled',
+      params: {
+        player: player.name,
+        cardId: card.id,
+        round: card.round,
+        reward,
+      },
+    }]
+  })
+  state.log.unshift(...missing)
 }
 
 const completeParentSelectionIfReady = (state: GameState): void => {
   const selection = state.parentSelection
   if (!selection) return
+  autoSubmitForcedParentSelections(state)
   const submissions = state.players.map((player) => selection.submissions[player.id])
   if (submissions.some((submission) => submission === null)) return
   state.players.forEach((player) => {
@@ -66,6 +118,7 @@ const completeParentSelectionIfReady = (state: GameState): void => {
   state.parentSelection = null
   state.phase = 'playing'
   reserveSelectedMotherRewards(state)
+  ensureParentMotherScheduleLogs(state)
 }
 
 export const submitParentSelection = (

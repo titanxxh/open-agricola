@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   FIXED_DEV_ROOMS,
   FIXED_DEV_ROOM_IDS,
+  buildFixedDevRoomInitialStateOptions,
+  parseFixedDevRoomStartupOptions,
   isFixedDevRoom,
   removePlayerFromRoom,
   resolveJoinRequestPlayerIndex,
@@ -134,6 +136,48 @@ describe('room-manager seat assignment', () => {
     }
     expect(isFixedDevRoom('dev')).toBe(false)
     expect(isFixedDevRoom('abc123')).toBe(false)
+  })
+
+  it('builds parent-card fixed dev room options without draft unless requested', () => {
+    const startup = parseFixedDevRoomStartupOptions({
+      DEV_ENABLE_PARENT_CARDS: 'true',
+    })
+
+    expect(startup).toEqual({ enableParentCards: true })
+    expect(buildFixedDevRoomInitialStateOptions(2, startup)).toEqual({
+      playerCount: 2,
+      enableParentCards: true,
+    })
+  })
+
+  it('builds parent-card draft fixed dev room options when draft is requested', () => {
+    const startup = parseFixedDevRoomStartupOptions({
+      DEV_ENABLE_PARENT_CARDS: 'true',
+      DEV_DRAFT_MODE: 'simultaneous',
+      DEV_DRAFT_POOL_SIZE: '8',
+    })
+
+    expect(startup).toEqual({
+      enableParentCards: true,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
+    expect(buildFixedDevRoomInitialStateOptions(3, startup)).toEqual({
+      playerCount: 3,
+      enableParentCards: true,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
+  })
+
+  it('defaults fixed dev draft pool size to 7 when the env value is invalid', () => {
+    expect(parseFixedDevRoomStartupOptions({
+      DEV_DRAFT_MODE: 'simultaneous',
+      DEV_DRAFT_POOL_SIZE: 'bogus',
+    })).toEqual({
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
   })
 
   it('keeps empty non-dev rooms joinable after disconnect', () => {

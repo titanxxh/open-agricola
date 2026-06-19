@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   GameState,
   ParentSelectionCandidates,
   ParentSelectionState,
   ParentSelectionSubmission,
 } from '../../../shared/contract/types'
+import type { Locale } from '../../../shared/i18n'
 import type { FatherParentCardId, MotherParentCardId, ParentCardId } from '../../../shared/parents'
 import { getParentCardDefinition } from '../../../shared/parents'
 import { resolveParentCardAssetUrls } from '../../services/parent-assets'
+import { DraftHistoryPanel } from '../draft/DraftHistoryPanel'
 
 type VisibleParentId = ParentCardId | '?'
 
@@ -30,6 +32,9 @@ const visibleMotherIds = (ids: readonly VisibleParentId[] | undefined): MotherPa
 
 const visibleFatherIds = (ids: readonly VisibleParentId[] | undefined): FatherParentCardId[] =>
   (ids ?? []).filter(isVisibleParentId) as FatherParentCardId[]
+
+const visibleOrdinaryCardIds = (ids: readonly string[] | undefined): string[] =>
+  (ids ?? []).filter((id) => id !== '?')
 
 export function computeParentSelectionViewModel(
   parentSelection: ParentSelectionState,
@@ -66,6 +71,7 @@ export function canSubmitParentSelection(
 interface Props {
   state: GameState
   meId: string
+  locale?: Locale
   onSubmit: (selection: ParentSelectionSubmission) => void | Promise<void>
 }
 
@@ -101,21 +107,26 @@ function ParentChoiceCard({
   )
 }
 
-export function ParentSelectionOverlay({ state, meId, onSubmit }: Props) {
-  if (state.phase !== 'parent-selection' || !state.parentSelection) return null
-
+function ActiveParentSelectionOverlay({
+  state,
+  meId,
+  locale,
+  onSubmit,
+}: Required<Props>) {
   const [selMother, setSelMother] = useState<MotherParentCardId | null>(null)
   const [selFather, setSelFather] = useState<FatherParentCardId | null>(null)
   const vm = useMemo(
     () => computeParentSelectionViewModel(state.parentSelection!, meId),
     [meId, state.parentSelection],
   )
+  const draftedCards = useMemo(() => {
+    const me = state.players.find((player) => player.id === meId)
+    return {
+      occ: visibleOrdinaryCardIds(me?.occupationHand),
+      minor: visibleOrdinaryCardIds(me?.minorHand),
+    }
+  }, [meId, state.players])
   const canSubmit = canSubmitParentSelection(vm, selMother, selFather)
-
-  useEffect(() => {
-    setSelMother(null)
-    setSelFather(null)
-  }, [meId, state.gameSeed])
 
   const handleConfirm = () => {
     if (!canSubmit || selMother === null || selFather === null) return
@@ -178,7 +189,31 @@ export function ParentSelectionOverlay({ state, meId, onSubmit }: Props) {
             Waiting for your private Parent Cards candidates.
           </div>
         )}
+        {draftedCards.occ.length > 0 || draftedCards.minor.length > 0 ? (
+          <section className="parent-selection-section parent-selection-drafted" data-section="drafted">
+            <h3 className="parent-selection-section-title">Already drafted</h3>
+            <DraftHistoryPanel
+              occIds={draftedCards.occ}
+              minorIds={draftedCards.minor}
+              locale={locale}
+            />
+          </section>
+        ) : null}
       </div>
     </div>
+  )
+}
+
+export function ParentSelectionOverlay({ state, meId, locale = 'en', onSubmit }: Props) {
+  if (state.phase !== 'parent-selection' || !state.parentSelection) return null
+
+  return (
+    <ActiveParentSelectionOverlay
+      key={`${meId}:${state.gameSeed}`}
+      state={state}
+      meId={meId}
+      locale={locale}
+      onSubmit={onSubmit}
+    />
   )
 }

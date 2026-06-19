@@ -83,10 +83,10 @@ describe('GameSession — draft mode setup', () => {
 })
 
 describe('GameSession.submitDraftPick — happy paths', () => {
-  it('runs a full 7-round 2-player draft and transitions to phase=playing', () => {
+  it('runs a full 7-card 2-player draft and transitions to phase=playing', () => {
     const session = makeDraftSession(2, 7)
 
-    for (let round = 1; round <= 7; round += 1) {
+    for (let round = 1; round <= 6; round += 1) {
       const before = session.getState().state
       expect(before.phase).toBe('draft')
       expect(before.draft!.round).toBe(round)
@@ -139,6 +139,28 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     expect(r2.state.draft!.round).toBe(2)
   })
 
+  it('auto-finalizes a 7-card draft after six submitted rounds', () => {
+    const session = makeDraftSession(2, 7)
+
+    for (let round = 1; round <= 6; round += 1) {
+      expect(session.getState().state.phase).toBe('draft')
+      expect(session.getState().state.draft!.round).toBe(round)
+      for (const pid of ['p1', 'p2']) {
+        const pick = firstPick(session, pid)
+        const resp = session.submitDraftPick(pid, pick)
+        expect(resp.ok).toBe(true)
+      }
+    }
+
+    const final = session.getState().state
+    expect(final.phase).toBe('playing')
+    expect(final.draft).toBeNull()
+    for (const player of final.players) {
+      expect(player.occupationHand).toHaveLength(7)
+      expect(player.minorHand).toHaveLength(7)
+    }
+  })
+
   it('trims the draft hand to 7 cards when poolSize=8 (passthrough card discarded)', () => {
     const session = makeDraftSession(2, 8)
     // With poolSize=8, each round all players pick and pass; after 7 rounds
@@ -162,14 +184,14 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     }
   })
 
-  it('runs a full 7-round 3-player draft with clockwise rotation', () => {
+  it('runs a full 7-card 3-player draft with clockwise rotation', () => {
     const session = makeDraftSession(3, 7)
     const initial = session.getState().state
     expect(initial.draft!.seatOrder).toEqual(['p1', 'p2', 'p3'])
     // Capture p1's initial occ pool to verify rotation direction after round 1.
     const p1InitialOcc = [...initial.draft!.pools.p1.occ]
 
-    for (let round = 1; round <= 7; round += 1) {
+    for (let round = 1; round <= 6; round += 1) {
       for (const pid of ['p1', 'p2', 'p3']) {
         const pick = firstPick(session, pid)
         const resp = session.submitDraftPick(pid, pick)
@@ -295,7 +317,7 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     expect(revived.getState().state.phase).toBe('draft')
     expect(revived.getState().state.draft).not.toBeNull()
 
-    for (let round = 2; round <= 7; round += 1) {
+    for (let round = 2; round <= 6; round += 1) {
       const pa = firstPick(revived, 'p1')
       const pb = firstPick(revived, 'p2')
       const ra = revived.submitDraftPick('p1', pa)

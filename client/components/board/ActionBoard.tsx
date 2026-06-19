@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/contract/types'
+import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
 import { RESERVED_ACTION_SPACES_KEY } from '../../../shared/cards/helpers/card-state'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
@@ -318,6 +318,19 @@ type SpaceFarmerMarker = {
   isNewbornOnly: boolean
 }
 
+const FUTURE_RESOURCE_ICON_CLASS: Partial<Record<keyof FutureMeepleResourceMap, string>> = {
+  stable: 'barn',
+}
+
+const getFutureResourceIconClass = (resource: keyof FutureMeepleResourceMap): string =>
+  FUTURE_RESOURCE_ICON_CLASS[resource] ?? resource
+
+const getFutureResourceLabel = (locale: Locale, resource: keyof FutureMeepleResourceMap): string => {
+  if (resource === 'field') return t(locale, 'log.parentMotherRewardField')
+  if (resource === 'stable') return t(locale, 'log.parentMotherRewardStable')
+  return t(locale, `resources.${resource}`)
+}
+
 const getBoardPlayerCount = (players: PlayerState[]): 2 | 3 | 4 => {
   const count = players.length
   if (count >= 4) return 4
@@ -426,10 +439,14 @@ export const ActionBoard = ({
     [players],
   )
 
-  const buildStackItems = (action: ActionSpace) => {
-    const items: { resource: keyof Resource; amount: number; player?: PlayerState }[] = []
+  const buildStackItems = (
+    action: ActionSpace | undefined,
+    options: { round?: number; includeActionResources?: boolean } = {},
+  ) => {
+    const { round, includeActionResources = true } = options
+    const items: { resource: keyof FutureMeepleResourceMap; amount: number; player?: PlayerState }[] = []
     const seen = new Map<string, number>()
-    const add = (resource: keyof Resource, amount: number, player?: PlayerState) => {
+    const add = (resource: keyof FutureMeepleResourceMap, amount: number, player?: PlayerState) => {
       if (amount <= 0) return
       const key = `${player?.id ?? 'none'}:${resource}`
       const idx = seen.get(key)
@@ -437,43 +454,53 @@ export const ActionBoard = ({
       seen.set(key, items.length)
       items.push({ resource, amount, player })
     }
-    for (const [k, v] of Object.entries(action.resources)) {
-      if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0)
+    if (action && includeActionResources) {
+      for (const [k, v] of Object.entries(action.resources)) {
+        if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0)
+      }
     }
     for (const fm of futureMeeples) {
-      if (fm.actionId !== action.id) continue
+      const matchesAction = !!action && fm.actionId === action.id
+      const matchesRound = round !== undefined && fm.round === round && (!action || fm.actionId === null || fm.actionId === action.id)
+      if (!matchesAction && !matchesRound) continue
       const owner = playerById.get(fm.playerId)
       for (const [k, v] of Object.entries(fm.resources)) {
-        if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0, owner)
+        if ((v ?? 0) > 0) add(k as keyof FutureMeepleResourceMap, v ?? 0, owner)
       }
     }
     return items
   }
 
-  const renderResourceHolder = (space: ActionSpace, isRound = false) => {
-    const items = buildStackItems(space)
+  const renderResourceHolder = (
+    space: ActionSpace | undefined,
+    isRound = false,
+    options: { round?: number; includeActionResources?: boolean } = {},
+  ) => {
+    const items = buildStackItems(space, options)
     if (!items.length) return null
     const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
-    const offset: React.CSSProperties = resourceOffsets[space.id]
+    const offset: React.CSSProperties = space ? resourceOffsets[space.id]
       ?? (isRound ? { bottom: 6, right: 30 } : {})
+      : (isRound ? { bottom: 6, right: 30 } : {})
     return (
       <div className="resource-holder" data-n={totalCount} style={offset}>
-        {items.flatMap((item) =>
-          Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
+        {items.flatMap((item) => {
+          const label = getFutureResourceLabel(locale, item.resource)
+          return Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
             <span
               key={`${item.player?.id ?? 'none'}-${item.resource}-${i}`}
-              className={`res-icon res-icon-${item.resource}`}
-              title={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
-              aria-label={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
+              className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
+              title={item.player ? `${item.player.name}: ${label}` : undefined}
+              aria-label={item.player ? `${item.player.name}: ${label}` : undefined}
               data-owner-player={item.player?.id}
-              data-owner-label={item.player ? `${item.player.name}: ${t(locale, `resources.${item.resource}`)}` : undefined}
+              data-owner-label={item.player ? `${item.player.name}: ${label}` : undefined}
               onMouseEnter={(e) => {
                 if (!item.player) return
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                 setTooltip({
                   kind: 'resource',
                   title: item.player.name,
-                  description: t(locale, `resources.${item.resource}`),
+                  description: label,
                   x: rect.right + 8,
                   y: rect.top - 8,
                 })
@@ -481,7 +508,7 @@ export const ActionBoard = ({
               onMouseLeave={hideTooltip}
             />
           ))
-        )}
+        })}
       </div>
     )
   }
@@ -707,16 +734,19 @@ export const ActionBoard = ({
                       </div>
                       <div className="action-footer" />
                     </button>
-                    {renderResourceHolder(action, true)}
+                    {renderResourceHolder(action, true, { round: slot.round })}
                     {renderFarmerHolder(action)}
                     {renderExclusiveUseMarker(action)}
                   </div>
                 ) : (
-                  <div className="turn-number-placeholder">
-                    <span className="turn-stage">{STAGE_LABELS[getStage(slot.round)] ?? ''}</span>
-                    <span className="turn-round">{slot.round}</span>
-                    <span className="turn-q">?</span>
-                  </div>
+                  <>
+                    <div className="turn-number-placeholder">
+                      <span className="turn-stage">{STAGE_LABELS[getStage(slot.round)] ?? ''}</span>
+                      <span className="turn-round">{slot.round}</span>
+                      <span className="turn-q">?</span>
+                    </div>
+                    {renderResourceHolder(action, true, { round: slot.round, includeActionResources: false })}
+                  </>
                 )}
               </div>
             )
