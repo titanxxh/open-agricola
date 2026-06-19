@@ -4,7 +4,7 @@ import type {
   ParentSelectionSubmission,
 } from '../contract/types'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append'
-import { createRng, shuffleWithRng } from '../utils/rng'
+import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import {
   FATHER_PARENT_CARD_IDS,
   MOTHER_PARENT_CARD_IDS,
@@ -39,15 +39,16 @@ export const createParentSelectionState = (
   return { candidates, submissions }
 }
 
-export const startParentSelectionIfNeeded = (state: GameState): void => {
+export const startParentSelectionIfNeeded = (state: GameState, seed?: number): void => {
   if (!state.enableParentCards || state.parentSelection || state.phase !== 'playing') return
   const alreadySelected = state.players.every(
     (player) => player.parentCards.mother && player.parentCards.father,
   )
   if (alreadySelected) return
+  const selectionSeed = typeof seed === 'number' && Number.isFinite(seed) ? Math.floor(seed) : createSeed()
   state.parentSelection = createParentSelectionState(
     state.players.map((player) => player.id),
-    state.gameSeed,
+    selectionSeed,
   )
   state.phase = 'parent-selection'
   completeParentSelectionIfReady(state)

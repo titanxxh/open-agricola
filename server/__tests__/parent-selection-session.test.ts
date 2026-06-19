@@ -3,14 +3,21 @@ import { GameSession } from '../game/authoritative-session'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 
 describe('Parent Card selection setup', () => {
-  it('starts a simultaneous parent-selection phase with deterministic 2+2 candidates when enabled', () => {
+  it('starts a simultaneous parent-selection phase with private 2+2 candidates when enabled', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
+      parentSelectionSeed: 9001,
     } as never)
     const repeat = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
+      parentSelectionSeed: 9001,
+    } as never)
+    const privateSeedChanged = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      parentSelectionSeed: 9002,
     } as never)
 
     expect(session.state.phase).toBe('parent-selection')
@@ -19,6 +26,8 @@ describe('Parent Card selection setup', () => {
     expect(session.state.parentSelection?.candidates.p2.mother).toHaveLength(2)
     expect(session.state.parentSelection?.candidates.p2.father).toHaveLength(2)
     expect(session.state.parentSelection).toEqual(repeat.state.parentSelection)
+    expect(session.state.gameSeed).toBe(privateSeedChanged.state.gameSeed)
+    expect(session.state.parentSelection).not.toEqual(privateSeedChanged.state.parentSelection)
   })
 
   it('keeps disabled games on the existing playing setup path', () => {
@@ -41,12 +50,14 @@ describe('Parent Card selection setup', () => {
     const directParentDeal = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
+      parentSelectionSeed: 9001,
     } as never).state.parentSelection
     const session = new GameSession(308, undefined, {
       playerCount: 2,
       draftMode: 'simultaneous',
       draftPoolSize: 7,
       enableParentCards: true,
+      parentSelectionSeed: 9001,
     } as never)
 
     expect(session.state.phase).toBe('draft')

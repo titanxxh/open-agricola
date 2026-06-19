@@ -25,6 +25,7 @@ import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from 
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
+import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -83,6 +84,9 @@ export const takeAction = (
   if (state.gameOver) return core.emitResponse(false, 'game is over')
   if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
   if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
+  if (hasPendingOrdinaryCardDrawChoice(state)) {
+    return core.emitResponse(false, 'ordinary card draw choice in progress')
+  }
   if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
   if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
   const player = state.players[playerIndex]
@@ -371,6 +375,9 @@ export const takeAnytimeAction = (
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
   if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
   if (core.state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
+  if (hasPendingOrdinaryCardDrawChoice(core.state)) {
+    return core.emitResponse(false, 'ordinary card draw choice in progress')
+  }
 
   const engine = core.peekEngine()
   const activeOwner = core.readActivePlayerIndex() ?? (engine ? null : core.state.currentPlayerIndex)

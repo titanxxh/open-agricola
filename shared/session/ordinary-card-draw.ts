@@ -57,6 +57,9 @@ export const startOrdinaryCardDrawChoice = (
   return { ok: true, choice }
 }
 
+export const hasPendingOrdinaryCardDrawChoice = (state: GameState): boolean =>
+  Object.keys(state.ordinaryCardDrawChoices ?? {}).length > 0
+
 export const resolveOrdinaryCardDrawChoice = (
   state: GameState,
   input: ResolveOrdinaryCardDrawChoiceInput,

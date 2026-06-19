@@ -217,13 +217,18 @@ const isSupportedFatherReward = (state: GameState, player: PlayerState, reward: 
   return false
 }
 
-const optionForReward = (fatherId: FatherParentCardId, reward: FatherReward, suffix?: string): ActionChoiceOption => ({
+const optionForReward = (
+  fatherId: FatherParentCardId,
+  reward: FatherReward,
+  suffix?: string,
+  rewardLabel = reward.rewardText,
+): ActionChoiceOption => ({
   value: suffix ? `${fatherId}:${reward.tier}:${suffix}` : `${fatherId}:${reward.tier}`,
   labelKey: 'ui.cards.parentFatherComplete.tier',
   labelParams: {
     tier: reward.tier,
     requirement: reward.requirementText,
-    reward: reward.rewardText,
+    reward: rewardLabel,
   },
   sourceCard: fatherId,
 })
@@ -235,7 +240,12 @@ const optionsForReward = (
   const chooseCount = chooseBuildingResourceCount(reward)
   if (chooseCount !== null) {
     return resourceCombinations(chooseCount).map((resources) => ({
-      option: optionForReward(fatherId, reward, resources.join(',')),
+      option: optionForReward(
+        fatherId,
+        reward,
+        resources.join(','),
+        `${reward.rewardText} (${resources.join(' + ')})`,
+      ),
       reward,
     }))
   }
