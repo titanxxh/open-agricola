@@ -1,6 +1,21 @@
 import { defineMajorCard } from '../card-source'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 import { scoreByResourceTiers } from './helpers'
+import type { BonusScoringContext } from '../card-effects'
+import type { GameState, PlayerState } from '../../contract/types'
+
+const buildBasketImpl = (cardId: string) => ({
+  effect: {
+    id: cardId,
+    onHarvest: createSingleHarvestExchange('reed', { food: 3 }, { sourceId: cardId }),
+    computeBonusScore: (_state: GameState, player: PlayerState, _ctx: BonusScoringContext) =>
+      scoreByResourceTiers(player.resources.reed ?? 0, [
+        { min: 5, score: 3 },
+        { min: 4, max: 4, score: 2 },
+        { min: 2, max: 3, score: 1 },
+      ]),
+  },
+})
 
 export const Major_Basket = defineMajorCard({
   meta: {
@@ -19,18 +34,7 @@ export const Major_Basket = defineMajorCard({
     '2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>',
   ],
 },
-  impl: {
-    effect: {
-      id: 'Major_Basket',
-      onHarvest: createSingleHarvestExchange('reed', { food: 3 }),
-      computeBonusScore: (_state, player) =>
-        scoreByResourceTiers(player.resources.reed ?? 0, [
-          { min: 5, score: 3 },
-          { min: 4, max: 4, score: 2 },
-          { min: 2, max: 3, score: 1 },
-        ]),
-    },
-  },
+  impl: buildBasketImpl('Major_Basket'),
 })
 
 export const Major_Basket2 = defineMajorCard({
@@ -50,4 +54,5 @@ export const Major_Basket2 = defineMajorCard({
     '2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>',
   ],
 },
+  impl: buildBasketImpl('Major_Basket2'),
 })

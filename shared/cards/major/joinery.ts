@@ -1,6 +1,21 @@
 import { defineMajorCard } from '../card-source'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
 import { scoreByResourceTiers } from './helpers'
+import type { BonusScoringContext } from '../card-effects'
+import type { GameState, PlayerState } from '../../contract/types'
+
+const buildJoineryImpl = (cardId: string) => ({
+  effect: {
+    id: cardId,
+    onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: cardId }),
+    computeBonusScore: (_state: GameState, player: PlayerState, _ctx: BonusScoringContext) =>
+      scoreByResourceTiers(player.resources.wood ?? 0, [
+        { min: 7, score: 3 },
+        { min: 5, max: 6, score: 2 },
+        { min: 3, max: 4, score: 1 },
+      ]),
+  },
+})
 
 export const Major_Joinery = defineMajorCard({
   meta: {
@@ -19,18 +34,7 @@ export const Major_Joinery = defineMajorCard({
     '3/5/7<WOOD> <ARROW-1X> 1/2/3<SCORE>',
   ],
 },
-  impl: {
-    effect: {
-      id: 'Major_Joinery',
-      onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: 'Major_Joinery' }),
-      computeBonusScore: (_state, player) =>
-        scoreByResourceTiers(player.resources.wood ?? 0, [
-          { min: 7, score: 3 },
-          { min: 5, max: 6, score: 2 },
-          { min: 3, max: 4, score: 1 },
-        ]),
-    },
-  },
+  impl: buildJoineryImpl('Major_Joinery'),
 })
 
 export const Major_Joinery2 = defineMajorCard({
@@ -50,4 +54,5 @@ export const Major_Joinery2 = defineMajorCard({
     '3/5/7<WOOD> <ARROW-1X> 1/2/3<SCORE>',
   ],
 },
+  impl: buildJoineryImpl('Major_Joinery2'),
 })

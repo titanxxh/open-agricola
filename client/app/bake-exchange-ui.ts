@@ -9,10 +9,14 @@ export type BakeExchangeMeta = {
 export const majorBakeExchangeInfo: Record<string, BakeExchangeInfo> = {
   Major_Fireplace1: { food: 2, max: Number.POSITIVE_INFINITY },
   Major_Fireplace2: { food: 2, max: Number.POSITIVE_INFINITY },
+  Major_Fireplace3: { food: 2, max: Number.POSITIVE_INFINITY },
   Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
   Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
+  Major_CookingHearth3: { food: 3, max: Number.POSITIVE_INFINITY },
   Major_ClayOven: { food: 5, max: 1 },
+  Major_ClayOven2: { food: 5, max: 1 },
   Major_StoneOven: { food: 4, max: 2 },
+  Major_StoneOven2: { food: 4, max: 2 },
 }
 
 export const getBakeExchangeInfo = (

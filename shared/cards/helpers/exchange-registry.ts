@@ -11,10 +11,14 @@ export type BakeRate = {
 const majorBakeTable: Record<string, { rate: number; max: number; labelKey: string }> = {
   Major_Fireplace1: { rate: 2, max: Infinity, labelKey: 'ui.interactionBakeBreadFireplace' },
   Major_Fireplace2: { rate: 2, max: Infinity, labelKey: 'ui.interactionBakeBreadFireplace' },
+  Major_Fireplace3: { rate: 2, max: Infinity, labelKey: 'ui.interactionBakeBreadFireplace' },
   Major_CookingHearth1: { rate: 3, max: Infinity, labelKey: 'ui.interactionBakeBreadCookingHearth' },
   Major_CookingHearth2: { rate: 3, max: Infinity, labelKey: 'ui.interactionBakeBreadCookingHearth' },
+  Major_CookingHearth3: { rate: 3, max: Infinity, labelKey: 'ui.interactionBakeBreadCookingHearth' },
   Major_ClayOven: { rate: 5, max: 1, labelKey: 'ui.interactionBakeBreadClayOven' },
+  Major_ClayOven2: { rate: 5, max: 1, labelKey: 'ui.interactionBakeBreadClayOven' },
   Major_StoneOven: { rate: 4, max: 2, labelKey: 'ui.interactionBakeBreadStoneOven' },
+  Major_StoneOven2: { rate: 4, max: 2, labelKey: 'ui.interactionBakeBreadStoneOven' },
 }
 
 export const getPlayerBakeRates = (player: PlayerState): BakeRate[] => {
