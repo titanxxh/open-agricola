@@ -12,7 +12,7 @@ import {
 } from './ids'
 import { getParentCardDefinition } from './cards'
 import type { FatherParentCardId, MotherParentCardId } from './types'
-import { reserveSelectedMotherRewards } from './mother-rewards'
+import { queueSelectedMotherRewards } from './mother-rewards'
 
 const dealParentIds = <T extends string>(
   ids: readonly T[],
@@ -117,7 +117,7 @@ const completeParentSelectionIfReady = (state: GameState): void => {
   })
   state.parentSelection = null
   state.phase = 'playing'
-  reserveSelectedMotherRewards(state)
+  queueSelectedMotherRewards(state)
   ensureParentMotherScheduleLogs(state)
 }
 

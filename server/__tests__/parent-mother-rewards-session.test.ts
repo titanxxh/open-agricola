@@ -96,7 +96,16 @@ describe('Parent Cards mother rewards', () => {
   it('uses a backend farm-select to place PR02 free fields', () => {
     const { session } = setupParentSession(['PR02', 'PR10'])
 
-    const prompt = startRound(session, 12)
+    const optional = startRound(session, 12)
+
+    expect(optional.interaction.stateId).toBe('wait')
+    expect(optional.interaction.stateId === 'wait' ? optional.interaction.promptKey : undefined)
+      .toBe('ui.interactionOptionalAction')
+    if (optional.interaction.stateId !== 'wait') throw new Error('expected optional future action')
+    const accept = optional.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    const prompt = session.resolveChoice(0, accept!.value)
 
     expect(prompt.interaction.stateId).toBe('wait')
     if (prompt.interaction.stateId !== 'wait') throw new Error('expected farm-select')
@@ -115,14 +124,31 @@ describe('Parent Cards mother rewards', () => {
     expect(repeated.interaction.stateId).toBe('idle')
   })
 
-  it('reserves PR01 stable supply immediately and places the free stable through backend selection', () => {
+  it('reserves PR01 stable supply through future meeples and places the free stable through backend selection', () => {
     const { session } = setupParentSession(['PR01', 'PR10'])
     const selected = session.getState().state
 
-    expect(selected.players[0]!.supplyTokensConsumed?.stable).toBe(1)
+    expect(selected.futureMeeples).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        cardId: 'PR01',
+        playerId: 'p1',
+        round: 2,
+        resources: { stable: 1 },
+      }),
+    ]))
+    expect(selected.players[0]!.supplyTokensConsumed?.stable ?? 0).toBe(0)
     expect(getAvailableStableSupplyCount(selected, selected.players[0]!)).toBe(3)
 
-    const prompt = startRound(session, 2)
+    const optional = startRound(session, 2)
+
+    expect(optional.interaction.stateId).toBe('wait')
+    expect(optional.interaction.stateId === 'wait' ? optional.interaction.promptKey : undefined)
+      .toBe('ui.interactionOptionalAction')
+    if (optional.interaction.stateId !== 'wait') throw new Error('expected optional future action')
+    const accept = optional.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    const prompt = session.resolveChoice(0, accept!.value)
 
     expect(prompt.interaction.stateId).toBe('wait')
     if (prompt.interaction.stateId !== 'wait') throw new Error('expected farm-select')
