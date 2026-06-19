@@ -147,7 +147,7 @@ import {
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
-import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
+import { clearAllLinkedSpaceBlocks, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import {
   canEnterSpace,
@@ -2075,6 +2075,7 @@ export class GameCore {
     const snapshot = cloneState(state)
     // workers return home at round start — just clear action space occupancy.
     snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
+    clearAllLinkedSpaceBlocks(snapshot)
     snapshot.roundStartSnapshot = null
     return snapshot
   }
@@ -4241,6 +4242,7 @@ export class GameCore {
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
+    clearAllLinkedSpaceBlocks(this.state)
     // Release any workers that cards were holding (e.g. C22_BasketChair).
     for (const p of this.state.players) {
       const cardStates = p.cardStates ?? {}
@@ -4892,6 +4894,7 @@ export class GameCore {
     if (!space) return this.respond(false, 'space not found')
     if (!playerId) {
       space.takenBy = []
+      space.blockedBy = []
     } else {
       const player = this.state.players.find((p) => p.id === playerId)
       const worker = player ? smallestAvailableWorker(this.state, player) : null

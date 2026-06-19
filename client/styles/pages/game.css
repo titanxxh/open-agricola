@@ -937,6 +937,19 @@
     url('/bga-img/left_4p.png') 0px 0 / 156px auto no-repeat,
     url('/bga-img/background.jpg');
 }
+.action-board.action-board--5p {
+  background:
+    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
+    url('/bga-img/left_4p.png') 0px 0 / 156px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
+.action-board.action-board--6p {
+  background:
+    url('/bga-img/central.png') 300px 0 / 830px auto no-repeat,
+    url('/bga-img/left_4p.png') 130px 0 / 156px auto no-repeat,
+    url('/bga-img/left_3p.png') 0px 0 / 120px auto no-repeat,
+    url('/bga-img/background.jpg');
+}
 .action-board::before {
   content: none;
 }
@@ -969,6 +982,26 @@
 }
 .action-card-holder.exclusive-locked .action-card {
   filter: saturate(70%) brightness(0.92);
+}
+.action-card-holder.blocked .action-card {
+  filter: grayscale(90%) brightness(0.72);
+  opacity: 0.7;
+}
+.action-space-lock {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(30, 30, 30, 0.86);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  z-index: 24;
+  pointer-events: none;
 }
 /* --- Action card (3-section frame) --- */
 .action-card {

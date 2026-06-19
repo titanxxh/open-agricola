@@ -1,4 +1,4 @@
-import type { ActionSpace, WorkerRef } from '../contract/types'
+import type { ActionSpace, BlockedActionSpaceRef, GameState, WorkerRef } from '../contract/types'
 
 /**
  * Coerce a deserialized or test-fixture `takenBy` into a `WorkerRef[]`.
@@ -18,6 +18,62 @@ export const normalizeTakenBy = (value: unknown): WorkerRef[] => {
 
 export const isSpaceOccupied = (s: ActionSpace): boolean =>
   s.takenBy.length > 0
+
+export const normalizeBlockedBy = (value: unknown): BlockedActionSpaceRef[] => {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry): BlockedActionSpaceRef[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const ref = entry as Partial<BlockedActionSpaceRef>
+    if (
+      typeof ref.playerId !== 'string' ||
+      typeof ref.workerId !== 'string' ||
+      typeof ref.sourceSpaceId !== 'string'
+    ) {
+      return []
+    }
+    return [{ playerId: ref.playerId, workerId: ref.workerId, sourceSpaceId: ref.sourceSpaceId }]
+  })
+}
+
+export const isSpaceBlocked = (s: ActionSpace): boolean =>
+  (s.blockedBy?.length ?? 0) > 0
+
+export const addLinkedSpaceBlocks = (
+  state: GameState,
+  sourceSpace: ActionSpace,
+  playerId: string,
+  workerId: string,
+): void => {
+  if (!sourceSpace.linkedGroupId) return
+  for (const space of state.actionSpaces) {
+    if (space.id === sourceSpace.id) continue
+    if (space.linkedGroupId !== sourceSpace.linkedGroupId) continue
+    space.blockedBy = [
+      ...(space.blockedBy ?? []).filter((block) =>
+        block.playerId !== playerId || block.workerId !== workerId,
+      ),
+      { playerId, workerId, sourceSpaceId: sourceSpace.id },
+    ]
+  }
+}
+
+export const clearLinkedSpaceBlocksForWorker = (
+  state: GameState,
+  playerId: string,
+  workerId: string,
+): void => {
+  for (const space of state.actionSpaces) {
+    space.blockedBy = (space.blockedBy ?? []).filter((block) =>
+      block.playerId !== playerId || block.workerId !== workerId,
+    )
+  }
+}
+
+export const clearAllLinkedSpaceBlocks = (state: GameState): void => {
+  for (const space of state.actionSpaces) {
+    space.blockedBy = []
+  }
+}
 
 export const spaceOccupantCount = (s: ActionSpace): number =>
   s.takenBy.length

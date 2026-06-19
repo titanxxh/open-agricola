@@ -30,7 +30,7 @@ import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
 import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeTakenBy } from '../domain/space'
+import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
 import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
@@ -221,6 +221,7 @@ export const normalizeState = (raw: GameState): GameState => {
       ...space,
       resources: stored?.resources ?? space.resources,
       takenBy: normalizeTakenBy(stored?.takenBy),
+      blockedBy: normalizeBlockedBy(stored?.blockedBy),
       exclusiveUse: stored?.exclusiveUse,
     }
   })
@@ -231,6 +232,7 @@ export const normalizeState = (raw: GameState): GameState => {
     if (stored) {
       pas.resources = stored.resources ?? pas.resources
       pas.takenBy = normalizeTakenBy(stored.takenBy)
+      pas.blockedBy = normalizeBlockedBy(stored.blockedBy)
       pas.exclusiveUse = stored.exclusiveUse
     }
     actionSpaces.push(pas)
@@ -245,6 +247,7 @@ export const normalizeState = (raw: GameState): GameState => {
     actionSpaces.push({
       ...stored,
       takenBy: normalizeTakenBy(stored.takenBy),
+      blockedBy: normalizeBlockedBy(stored.blockedBy),
     } as ActionSpace)
   }
   const inDraftPhase = raw.phase === 'draft' && raw.draft != null

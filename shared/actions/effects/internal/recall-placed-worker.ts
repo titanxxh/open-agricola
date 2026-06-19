@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionSpace } from '../../../contract/types'
 import { getRoundPlacementDetails } from '../../../cards/helpers/round-placement'
-import { removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
+import { clearLinkedSpaceBlocksForWorker, removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
 import { holdWorkerOnCard } from '../../../cards/helpers/card-held-workers'
 import { recallWorkerById } from '../../../cards/helpers/recall-worker'
 import { setCardFlag } from '../../../cards/helpers/card-state'
@@ -83,6 +83,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
 
     const applyRelocation = (space: ActionSpace, workerId: string | undefined) => {
       const removed = removeWorkerRef(space, player.id, workerId)
+      if (removed) {
+        clearLinkedSpaceBlocksForWorker(state, player.id, removed.workerId)
+      }
       if (removed && targetCardHold) {
         holdWorkerOnCard(player, targetCardHold, removed.workerId)
       }
@@ -137,6 +140,9 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find((e) => e.spaceId === target.id)
     const removed = removeWorkerRef(target, player.id, entry?.workerId)
+    if (removed) {
+      clearLinkedSpaceBlocksForWorker(state, player.id, removed.workerId)
+    }
     if (removed && p.targetCardHold) {
       holdWorkerOnCard(player, p.targetCardHold, removed.workerId)
     }
