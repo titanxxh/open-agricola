@@ -127,9 +127,27 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('restores six-player waiting rooms without serialized state', () => {
+    const room = snapshotToRoom({
+      id: 'waiting6',
+      serialized: null,
+      meta: {
+        createdBy: null,
+        maxPlayers: 6,
+        customCardDbIds: [],
+        status: 'waiting',
+        players: [],
+      },
+      updatedAt: 0,
+    })
+
+    expect(room.maxPlayers).toBe(6)
+    expect(room.session.state.players).toHaveLength(6)
+  })
+
   it('exposes one persistent dev room per supported player count', () => {
-    expect(FIXED_DEV_ROOMS.map((r) => r.id)).toEqual(['dev2', 'dev3', 'dev4'])
-    expect(FIXED_DEV_ROOMS.map((r) => r.playerCount)).toEqual([2, 3, 4])
+    expect(FIXED_DEV_ROOMS.map((r) => r.id)).toEqual(['dev2', 'dev3', 'dev4', 'dev5', 'dev6'])
+    expect(FIXED_DEV_ROOMS.map((r) => r.playerCount)).toEqual([2, 3, 4, 5, 6])
     for (const { id } of FIXED_DEV_ROOMS) {
       expect(FIXED_DEV_ROOM_IDS.has(id)).toBe(true)
       expect(isFixedDevRoom(id)).toBe(true)

@@ -6,5 +6,5 @@ export const dayLaborer = createGainAction({
   descriptionKey: 'actions.day-laborer.description',
   roundAvailable: 1,
   gain: { food: 2 },
-  players: [2, 3, 4],
+  players: [2, 3, 4, 5, 6],
 })

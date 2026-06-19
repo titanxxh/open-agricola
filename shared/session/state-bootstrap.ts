@@ -484,7 +484,7 @@ const createInitialPlayers = (
     draftMode,
     enableCommunityDeck = false,
   } = options
-  const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
+  const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
   // In draft mode, leave hands empty — createInitialState will seed state.draft
   // with per-player pools separately, and finalizeDraft will populate hands later.
   const dealtHands =
@@ -501,6 +501,8 @@ const createInitialPlayers = (
     { id: 'p2', name: 'PlayerB', color: 'blue', startPlayer: false },
     { id: 'p3', name: 'PlayerC', color: 'black', startPlayer: false },
     { id: 'p4', name: 'PlayerD', color: 'yellow', startPlayer: false },
+    { id: 'p5', name: 'PlayerE', color: 'green', startPlayer: false },
+    { id: 'p6', name: 'PlayerF', color: 'purple', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => {
     const player: PlayerState = {
@@ -639,7 +641,7 @@ export const createInitialState = (
     parentSelection: null,
     currentPlayerIndex: 0,
     players,
-    actionSpaces: createActionSpaces(options.playerCount ?? 2),
+    actionSpaces: createActionSpaces(players.length),
     log: eventsToLogEntries(initialEvents, { playerNames }),
     events: initialEvents,
     nextEventSeq: 2,

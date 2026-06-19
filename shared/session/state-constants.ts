@@ -90,7 +90,7 @@ const roundStageActions: Record<number, string[]> = {
 
 export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
 export type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
-export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD'] as const
+export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'] as const
 
 export type InitialStateOptions = {
   playerCount?: number
@@ -132,6 +132,8 @@ export const defaultPlayerColors: PlayerState['color'][] = [
   'yellow',
   'blue',
   'black',
+  'green',
+  'purple',
 ]
 
 export const applyRoundGrowth = (state: GameState) => {

@@ -349,6 +349,8 @@
 .borrowed-fence-source-option[data-player-color="yellow"] .borrowed-fence-source-dot { background: #d6b332; }
 .borrowed-fence-source-option[data-player-color="blue"] .borrowed-fence-source-dot { background: #3f6ee8; }
 .borrowed-fence-source-option[data-player-color="black"] .borrowed-fence-source-dot { background: #1f2937; }
+.borrowed-fence-source-option[data-player-color="green"] .borrowed-fence-source-dot { background: #168a4a; }
+.borrowed-fence-source-option[data-player-color="purple"] .borrowed-fence-source-dot { background: #7c3aed; }
 .borrowed-fence-source-count {
   color: rgba(253, 246, 227, 0.75);
 }
@@ -457,6 +459,8 @@
 .lazybones-stable-marker[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
 .lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+.lazybones-stable-marker[data-player-color="green"] { border: 2px solid #168a4a; }
+.lazybones-stable-marker[data-player-color="purple"] { border: 2px solid #7c3aed; }
 .action-exclusive-use {
   position: absolute;
   top: 4px;
@@ -480,6 +484,8 @@
 .action-exclusive-use[data-player-color="yellow"] { border-left: 3px solid #d6b332; }
 .action-exclusive-use[data-player-color="blue"] { border-left: 3px solid #3f6ee8; }
 .action-exclusive-use[data-player-color="black"] { border-left: 3px solid #1f2937; }
+.action-exclusive-use[data-player-color="green"] { border-left: 3px solid #168a4a; }
+.action-exclusive-use[data-player-color="purple"] { border-left: 3px solid #7c3aed; }
 .player-action-card-owner {
   font-size: 11px;
   font-weight: 600;
@@ -2226,6 +2232,18 @@
 .farm-fence-h.selected[data-player-color="black"]::before,
 .farm-fence-v.selected[data-player-color="black"]::before {
   background: #1f2937;
+}
+.farm-fence-h.active[data-player-color="green"]::before,
+.farm-fence-v.active[data-player-color="green"]::before,
+.farm-fence-h.selected[data-player-color="green"]::before,
+.farm-fence-v.selected[data-player-color="green"]::before {
+  background: #168a4a;
+}
+.farm-fence-h.active[data-player-color="purple"]::before,
+.farm-fence-v.active[data-player-color="purple"]::before,
+.farm-fence-h.selected[data-player-color="purple"]::before,
+.farm-fence-v.selected[data-player-color="purple"]::before {
+  background: #7c3aed;
 }
 /* Wood Palisade visual distinction (B30). */
 .farm-fence-h.active.palisade::before,
