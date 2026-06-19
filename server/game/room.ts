@@ -29,6 +29,8 @@ export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }>
   { id: 'dev2', playerCount: 2 },
   { id: 'dev3', playerCount: 3 },
   { id: 'dev4', playerCount: 4 },
+  { id: 'dev5', playerCount: 5 },
+  { id: 'dev6', playerCount: 6 },
 ]
 
 export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(FIXED_DEV_ROOMS.map((r) => r.id))

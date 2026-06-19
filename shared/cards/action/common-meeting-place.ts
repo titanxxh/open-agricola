@@ -7,7 +7,7 @@ export const meetingPlace: ActionDefinition = {
   descriptionKey: 'actions.meeting-place.description',
   roundAvailable: 1,
   gainPerRound: {},
-  players: [2, 3, 4],
+  players: [2, 3, 4, 5, 6],
   canBeExecutedByPlayer: () => true,
   execute: () => ({ type: 'ok' }),
   flow: {

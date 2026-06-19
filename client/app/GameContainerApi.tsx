@@ -55,6 +55,7 @@ import {
   getCurrentlySelectableRoomKeys,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
+  maxPlayersFromQuery,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
@@ -169,8 +170,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const searchParams = new URLSearchParams(window.location.search)
           const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          const maxPlayersParam = searchParams.get('maxPlayers')
-          const maxPlayers = maxPlayersParam ? Math.min(Math.max(2, Number(maxPlayersParam)), 4) : 2
+          const maxPlayers = maxPlayersFromQuery(window.location.search)
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
           const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
@@ -1589,13 +1589,13 @@ export const GameContainerApi = () => {
   }), [displayPlayer?.resources, pendingSowSelections])
   const futureCardResources = useMemo(() => {
     if (!state) return {}
-    const rec: Record<string, { playerId: string; name: string; color: 'red' | 'yellow' | 'blue' | 'black'; resources: Partial<Resource> }[]> = {}
+    const rec: Record<string, { playerId: string; name: string; color: PlayerState['color']; resources: Partial<Resource> }[]> = {}
     state.futureMeeples.forEach((fm) => {
       if (fm.round > state.round) {
         const key = fm.actionId ?? fm.cardId
         if (!rec[key]) rec[key] = []
         const player = state.players.find((p) => p.id === fm.playerId)
-        rec[key].push({ playerId: fm.playerId, name: player?.name ?? '', color: (player?.color ?? 'red') as 'red' | 'yellow' | 'blue' | 'black', resources: fm.resources })
+        rec[key].push({ playerId: fm.playerId, name: player?.name ?? '', color: player?.color ?? 'red', resources: fm.resources })
       }
     })
     return rec

@@ -116,6 +116,18 @@ describe('HTTP privacy + seat binding', () => {
       }
     })
 
+    it('POST /api/game/new-sandbox accepts six-player sandbox setup', async () => {
+      const req = mockReq('POST', '/api/game/new-sandbox', { seed: 42, playerCount: 6 })
+      const res = mockRes()
+
+      await handleGameRoute(req, res)
+
+      expect(res.statusCode).toBe(200)
+      const data = JSON.parse(res.body)
+      expect(data.state.players).toHaveLength(6)
+      expect(data.state.players.map((player: { id: string }) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
+    })
+
     it('accepts any playerIndex without seat guard (multi-seat dev flow)', async () => {
       // p1 takes the first free space
       const state0Res = mockRes()

@@ -1233,6 +1233,8 @@ export const en = {
     players2: '2 Players',
     players3: '3 Players',
     players4: '4 Players',
+    players5: '5 Players',
+    players6: '6 Players',
     draftModeLabel: 'Card draft',
     draftModeNone: 'Random hand',
     draftModeSimultaneous: 'Simultaneous draft',

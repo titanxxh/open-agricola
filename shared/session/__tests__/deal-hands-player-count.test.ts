@@ -6,6 +6,7 @@ import { MinorImprovement } from '../../cards/registry-display'
 import { registerAdHocMinorImprovement } from '../../cards/registry-runtime'
 
 const FOUR_PLUS_ID = '__TEST_DEAL_FOURPLUS__'
+const FIVE_PLUS_ID = '__TEST_DEAL_FIVEPLUS__'
 const NO_RESTRICTION_ID = '__TEST_DEAL_NORESTRICT__'
 
 registerAdHocMinorImprovement(
@@ -27,8 +28,18 @@ registerAdHocMinorImprovement(
     desc: ['test'],
   }),
 )
+registerAdHocMinorImprovement(
+  new MinorImprovement({
+    id: FIVE_PLUS_ID,
+    name: 'TestFivePlus',
+    deck: 'TEST',
+    number: 9003,
+    desc: ['test'],
+    players: '5+',
+  }),
+)
 
-const playerCounts = [1, 2, 3, 4] as const
+const playerCounts = [1, 2, 3, 4, 5, 6] as const
 
 describe('dealHands — player-count filter (built-in pool)', () => {
   for (const playerCount of playerCounts) {
@@ -82,8 +93,22 @@ describe('dealHands — player-count filter (extra IDs)', () => {
     expect(appeared).toBe(true)
   })
 
+  it('keeps a 5+ extra minor id eligible only at 5p and above', () => {
+    for (const pc of [4, 5, 6]) {
+      let appeared = false
+      for (let seed = 1; seed <= 30; seed += 1) {
+        const { minorHands } = dealHands(pc, seed, [FIVE_PLUS_ID], [])
+        if (minorHands.some((h) => h.includes(FIVE_PLUS_ID))) {
+          appeared = true
+          break
+        }
+      }
+      expect(appeared, `playerCount=${pc}`).toBe(pc >= 5)
+    }
+  })
+
   it('keeps an unrestricted extra minor id at any player count', () => {
-    for (const pc of [1, 2, 3, 4]) {
+    for (const pc of [1, 2, 3, 4, 5, 6]) {
       let appeared = false
       for (let seed = 1; seed <= 100; seed += 1) {
         const { minorHands } = dealHands(pc, seed, [NO_RESTRICTION_ID], [])

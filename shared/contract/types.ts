@@ -283,7 +283,7 @@ export type FenceSegment = { edge: string; type: FenceSegmentType; source?: Fenc
 export type PlayerState = {
   id: string
   name: string
-  color: 'red' | 'yellow' | 'blue' | 'black'
+  color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
   workers: Worker[]
   rooms: number

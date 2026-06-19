@@ -142,7 +142,9 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
     ? (msg as Record<string, unknown>).maxPlayers as number
     : 2
-  const maxPlayers = Math.min(Math.max(2, rawMaxPlayers), 4)
+  const maxPlayers = Number.isFinite(rawMaxPlayers)
+    ? Math.min(Math.max(2, Math.floor(rawMaxPlayers)), 6)
+    : 2
   const customCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
     ? (msg as Record<string, unknown>).customCardIds as string[]
     : []

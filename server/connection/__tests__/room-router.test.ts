@@ -38,11 +38,29 @@ describe('handleCreateRoom', () => {
     expect(sentTypesOf(ctx)).toContain('roomCreated')
   })
 
-  it('clamps maxPlayers to [2, 4]', () => {
+  it('clamps maxPlayers to [2, 6]', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 99 })
-    expect(ctx.currentRoom!.maxPlayers).toBe(4)
+    expect(ctx.currentRoom!.maxPlayers).toBe(6)
+
+    const lowCtx = newCtx()
+    lowCtx.currentUserId = 'u1'
+    dispatch(lowCtx, { type: 'createRoom', maxPlayers: 1 })
+    expect(lowCtx.currentRoom!.maxPlayers).toBe(2)
+  })
+
+  it('creates a six-player room session and announces six seats', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 6, name: 'host' })
+
+    expect(ctx.currentRoom!.maxPlayers).toBe(6)
+    expect(ctx.currentRoom!.session.state.players).toHaveLength(6)
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'roomCreated',
+      maxPlayers: 6,
+    }))
   })
 
   it('forwards enableParentCards into the created room session', () => {
@@ -64,6 +82,18 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
     expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
+
+  it('preserves six seats when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 6 })
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.maxPlayers).toBe(6)
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.players).toHaveLength(6)
   })
 })
 
