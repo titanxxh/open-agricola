@@ -113,6 +113,17 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts parent mother scheduled events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'parent.motherScheduled',
+      playerId: 'p1',
+      cardId: 'PR02',
+      targetRound: 12,
+      reward: 'field',
+    })).not.toThrow()
+  })
+
   it('accepts fence-built provenance metadata', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,

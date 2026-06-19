@@ -63,6 +63,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'futureMeeple.queued': ['playerId', 'cardId', 'entries', 'sourceSummary'],
   'futureMeeple.removed': ['playerId', 'cardId', 'rounds'],
   'futureMeeple.resolved': ['playerId', 'cardId', 'round', 'resources', 'roomType'],
+  'parent.motherScheduled': ['playerId', 'cardId', 'targetRound', 'reward'],
   'round.started': ['round'],
   'work.started': [],
   'returnHome.started': [],
@@ -600,6 +601,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertFiniteNumberField(event.round, 'round')
       if (event.resources !== undefined) assertFutureMeepleResourceMap(event.resources, 'resources')
       assertOptionalStringField(event.roomType, 'roomType')
+      return
+    case 'parent.motherScheduled':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
+      assertFiniteNumberField(event.targetRound, 'targetRound')
+      assertStringField(event.reward, 'reward')
       return
     case 'round.started':
       assertFiniteNumberField(event.round, 'round')

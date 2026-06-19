@@ -307,6 +307,13 @@ export type FutureMeepleResolvedEvent = GameEventBase<'futureMeeple.resolved'> &
   roomType?: FutureMeepleRoomType
 }
 
+export type ParentMotherScheduledEvent = GameEventBase<'parent.motherScheduled'> & {
+  playerId: string
+  cardId: string
+  targetRound: number
+  reward: string
+}
+
 export type RoundStartedEvent = GameEventBase<'round.started'> & {
   round: number
 }
@@ -376,6 +383,7 @@ export type GameEvent =
   | FutureMeepleQueuedEvent
   | FutureMeepleRemovedEvent
   | FutureMeepleResolvedEvent
+  | ParentMotherScheduledEvent
   | FarmSownEvent
   | FarmCropAddedEvent
   | FarmCropRemovedEvent
