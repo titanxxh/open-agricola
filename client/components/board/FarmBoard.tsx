@@ -256,6 +256,7 @@ export type FarmBoardProps = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  activePlayerId?: string
   playerPanelSummary?: PlayerPanelSupplySummary
   devMode: boolean
   currentStartPlayerId: string
@@ -575,10 +576,12 @@ const ParentCardTile = ({
   locale,
   id,
   infobox,
+  devMode,
 }: {
   locale: Locale
   id: ParentCardId
   infobox?: string
+  devMode: boolean
 }) => {
   const def = getParentCardDefinition(id)
   if (!def) return null
@@ -588,6 +591,7 @@ const ParentCardTile = ({
     <CardWithCopy
       locale={locale}
       cardId={id}
+      devMode={devMode}
       className="parent-card-tile"
       previewCard={
         <img
@@ -612,6 +616,7 @@ export const FarmBoard = ({
   players,
   currentPlayer,
   displayPlayer,
+  activePlayerId,
   playerPanelSummary,
   currentStartPlayerId,
   nextStartPlayerId,
@@ -675,7 +680,8 @@ export const FarmBoard = ({
   highlightedFarmTileKeys = new Set<string>(),
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
-  const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
+  const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
+  const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
   const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
   const compactLabels = locale === 'zh'
@@ -1267,6 +1273,7 @@ export const FarmBoard = ({
               locale={locale}
               id={displayPlayer.parentCards.mother}
               infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.mother]?.infobox}
+              devMode={devMode}
             />
           ) : null}
           {displayPlayer.parentCards?.father ? (
@@ -1274,6 +1281,7 @@ export const FarmBoard = ({
               locale={locale}
               id={displayPlayer.parentCards.father}
               infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
+              devMode={devMode}
             />
           ) : null}
         </div>
@@ -1387,7 +1395,7 @@ export const FarmBoard = ({
     </div>
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === currentPlayer.id || devMode ? (
+      {displayPlayer.id === activeFarmPlayerId || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation">
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>

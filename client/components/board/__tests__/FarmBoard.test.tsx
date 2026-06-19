@@ -244,6 +244,61 @@ describe('FarmBoard', () => {
     }
   })
 
+  it('shows the Parent Card id in dev-mode hover previews', () => {
+    vi.useFakeTimers()
+    try {
+      const player = {
+        ...createPlayer('p1', 'Player A', 'red'),
+        parentCards: { mother: 'PR01', father: 'PS01' },
+      } as PlayerState
+
+      const { container, unmount } = render(
+        <FarmBoard {...createFarmBoardProps(player, { devMode: true })} />,
+      )
+      const tile = container.querySelector('[data-card-id="PR01"]')
+      expect(tile).toBeTruthy()
+
+      fireEvent.pointerOver(tile!, { pointerType: 'mouse' })
+      act(() => {
+        vi.advanceTimersByTime(251)
+      })
+
+      expect(document.body.querySelector('.card-hover-preview-id')?.textContent).toBe('PR01')
+
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets the active pending player choose a minor improvement from hand when the turn cursor has advanced', () => {
+    const activePlayer = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      minorHand: ['B34_SpecialFood'],
+    }
+    const turnPlayer = createPlayer('p2', 'Player B', 'blue')
+    const resolveChoice = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(activePlayer, {
+          players: [activePlayer, turnPlayer],
+          currentPlayer: turnPlayer,
+          displayPlayer: activePlayer,
+          isSelectingMinor: true,
+          isSelectingImprovementAny: true,
+          selectableMinorIds: new Set(['B34_SpecialFood']),
+          resolveChoice,
+        })}
+        activePlayerId={activePlayer.id}
+      />,
+    )
+
+    fireEvent.click(container.querySelector('[data-id="B34_SpecialFood"]')!)
+
+    expect(resolveChoice).toHaveBeenCalledWith('minor:B34_SpecialFood')
+  })
+
   it('renders reorg controls for card animal zones', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
