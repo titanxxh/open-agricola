@@ -291,6 +291,17 @@ describe('Parent father completion session', () => {
     expect(new Set(rewardLabels).size).toBe(rewardLabels?.length)
     expect(prompt.interaction.options?.find((option) => option.value === 'PS04:2:wood,stone')?.labelParams?.reward)
       .toContain('wood + stone')
+    expect(prompt.interaction.options?.find((option) => option.value === 'PS04:2:wood,stone')?.descriptionPreview)
+      .toMatchObject({
+        kind: 'action',
+        labelParams: {
+          reward: 'If you do, you immediately get 2 different building resources of your choice.',
+        },
+        effectPreview: {
+          kind: 'resourceExchange',
+          resourcesGained: { wood: 1, stone: 1 },
+        },
+      })
 
     const invalid = session.resolveChoice(0, 'PS04:2:wood,wood')
     expect(invalid.ok).toBe(false)

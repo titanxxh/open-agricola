@@ -2156,6 +2156,7 @@ export const GameContainerApi = () => {
           />
           <section className="board-panel board-farm">
             <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
+              activePlayerId={activePlayer?.id}
               currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}

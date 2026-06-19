@@ -1524,6 +1524,86 @@ describe('InteractionBar', () => {
     expect(html).toContain('data-resource=\"reed\"')
   })
 
+  it('renders parent resource choice options with resource icons and tier text', () => {
+    const parentChoice: PendingChoice = {
+      promptKey: 'ui.cards.parentFatherComplete.prompt',
+      options: [
+        {
+          value: 'PS04:2:wood,stone',
+          labelKey: 'ui.cards.parentFatherComplete.tier',
+          labelParams: {
+            tier: 2,
+            requirement: 'If you have at least 4 boar',
+            reward: 'Choose 2 different building resources (wood + stone)',
+          },
+          sourceCard: 'PS04',
+          descriptionPreview: {
+            kind: 'action',
+            labelKey: 'ui.cards.parentFatherComplete.tier',
+            labelParams: {
+              tier: 2,
+              requirement: 'If you have at least 4 boar',
+              reward: 'Choose 2 different building resources',
+            },
+            effectPreview: {
+              kind: 'resourceExchange',
+              resourcesGained: { wood: 1, stone: 1 },
+            },
+          },
+        },
+      ],
+      playerIndex: 0,
+      spaceId: 'complete-parent-father',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={parentChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('Tier 2')
+    expect(html).not.toContain('wood + stone')
+    expect(html).toContain('data-resource=\"wood\"')
+    expect(html).toContain('data-resource=\"stone\"')
+  })
+
   it('hides fence/palisade mode toggle when player has not played B30 Wood Palisades', () => {
     const fencePendingChoice: PendingChoice = {
       promptKey: 'ui.interactionFenceSelect',
