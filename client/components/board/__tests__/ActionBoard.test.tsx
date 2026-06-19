@@ -295,6 +295,52 @@ describe('ActionBoard', () => {
     expect(html).toContain('data-owner-player="p1"')
   })
 
+  it('shows future meeple resources on unrevealed round placeholders', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    const sheepMarket = createAction('sheep-market', 'actions.sheep-market.name')
+    const futureMeeples: FutureMeeple[] = [
+      {
+        id: 'fm-sheep',
+        cardId: 'PR05',
+        playerId: 'p2',
+        round: 4,
+        actionId: 'sheep-market',
+        resources: { sheep: 1 },
+      },
+      {
+        id: 'fm-field',
+        cardId: 'PR02',
+        playerId: 'p1',
+        round: 12,
+        actionId: null,
+        resources: { field: 1 },
+      },
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 4, action: sheepMarket }, { round: 12 }]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={futureMeeples}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('turn-number-placeholder')
+    expect(html).toContain('title="PlayerB: Sheep"')
+    expect(html).toContain('data-owner-player="p2"')
+    expect(html).toContain('res-icon-sheep')
+    expect(html).toContain('title="PlayerA: Field"')
+    expect(html).toContain('res-icon-field')
+  })
+
   it('renders exclusive-use round slot as locked for non-owner before its normal round', () => {
     const owner = createPlayer('p1', 'Alice', 'red')
     const viewer = createPlayer('p2', 'Bob', 'blue')

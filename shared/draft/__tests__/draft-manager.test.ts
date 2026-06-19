@@ -339,9 +339,9 @@ describe('tryAdvanceRound', () => {
     expect(r2.draft.kept.p2.minor).toEqual(['p2_MIN_0', r2p2MinorPick])
   })
 
-  it('round=totalRounds with all submitted marks finished and round becomes totalRounds+1', () => {
+  it('round=totalRounds with all submitted marks finished for larger pools', () => {
     const pids = ['p1', 'p2']
-    let cur = initDraftState(pids, makeHands(pids, 7), 7)
+    let cur = initDraftState(pids, makeHands(pids, 8), 8)
     let finished = false
     let advanceResult: ReturnType<typeof tryAdvanceRound> | null = null
     // Run 7 rounds
@@ -366,6 +366,25 @@ describe('tryAdvanceRound', () => {
     expect(cur.kept.p1.minor).toHaveLength(7)
     expect(cur.kept.p2.occ).toHaveLength(7)
     expect(cur.kept.p2.minor).toHaveLength(7)
+  })
+
+  it('auto-keeps the final single-card pool instead of requiring one more submit', () => {
+    const pids = ['p1', 'p2']
+    let cur = initDraftState(pids, makeHands(pids, 7), 7)
+
+    for (let r = 0; r < 6; r++) {
+      cur = tryAdvanceRound(submitFirstForAll(cur)).draft
+    }
+
+    expect(cur.round).toBe(8)
+    expect(cur.kept.p1.occ).toHaveLength(7)
+    expect(cur.kept.p1.minor).toHaveLength(7)
+    expect(cur.kept.p2.occ).toHaveLength(7)
+    expect(cur.kept.p2.minor).toHaveLength(7)
+    expect(cur.pools.p1.occ).toEqual([])
+    expect(cur.pools.p1.minor).toEqual([])
+    expect(cur.pools.p2.occ).toEqual([])
+    expect(cur.pools.p2.minor).toEqual([])
   })
 
   it('does not mutate the input draft when advancing', () => {

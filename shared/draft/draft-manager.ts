@@ -120,8 +120,27 @@ export function tryAdvanceRound(draft: DraftState): {
     next.pendingPicks[pid] = { occ: null, minor: null }
   }
 
-  const finished = next.round > next.totalRounds
+  const autoFinished = autoKeepFinalSingleCardPools(next)
+  const finished = autoFinished || next.round > next.totalRounds
   return { draft: next, advanced: true, finished }
+}
+
+function autoKeepFinalSingleCardPools(draft: DraftState): boolean {
+  if (draft.round !== draft.totalRounds) return false
+  const allPoolsAreSingleCard = draft.seatOrder.every((pid) => {
+    const pool = draft.pools[pid]
+    return pool?.occ.length === 1 && pool.minor.length === 1
+  })
+  if (!allPoolsAreSingleCard) return false
+
+  for (const pid of draft.seatOrder) {
+    const pool = draft.pools[pid]
+    draft.kept[pid].occ.push(pool.occ[0])
+    draft.kept[pid].minor.push(pool.minor[0])
+    draft.pools[pid] = { occ: [], minor: [] }
+  }
+  draft.round += 1
+  return true
 }
 
 /**

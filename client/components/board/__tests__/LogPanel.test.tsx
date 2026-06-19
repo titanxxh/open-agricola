@@ -85,6 +85,35 @@ describe('LogPanel', () => {
     expect(html).toContain('data-amount="1"')
   })
 
+  it('renders parent mother scheduled logs with localized rewards', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.parentMotherScheduled',
+        params: {
+          player: '玩家B',
+          cardId: 'PR05',
+          round: 4,
+          reward: 'sheep',
+        },
+      },
+      {
+        key: 'log.parentMotherScheduled',
+        params: {
+          player: '玩家A',
+          cardId: 'PR02',
+          round: 12,
+          reward: 'field',
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="zh" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('玩家B 的 PR05：第 4 回合获得 羊')
+    expect(text).toContain('玩家A 的 PR02：第 12 回合获得 田地')
+  })
+
   it('renders bake bread source from action or card context', () => {
     const log: GameState['log'] = [
       {

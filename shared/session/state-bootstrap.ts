@@ -26,7 +26,7 @@ import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } fr
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
-import { startParentSelectionIfNeeded } from '../parents/selection'
+import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -420,7 +420,7 @@ export const normalizeState = (raw: GameState): GameState => {
     raw.nextPublicEventArchivePacketSeq,
   )
   const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, seed)
-  return {
+  const normalizedState: GameState = {
     ...raw,
     players,
     actionSpaces,
@@ -444,6 +444,8 @@ export const normalizeState = (raw: GameState): GameState => {
     nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
     completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
+  ensureParentMotherScheduleLogs(normalizedState)
+  return normalizedState
 }
 
 export const cloneState = (state: GameState): GameState => {

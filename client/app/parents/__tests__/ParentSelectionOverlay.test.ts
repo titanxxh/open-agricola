@@ -1,10 +1,20 @@
-import { describe, expect, test } from 'vitest'
+// @vitest-environment jsdom
+
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createElement } from 'react'
+
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test } from 'vitest'
 import {
   canSubmitParentSelection,
   computeParentSelectionViewModel,
+  ParentSelectionOverlay,
   type ParentSelectionViewModel,
 } from '../ParentSelectionOverlay'
-import type { ParentSelectionState } from '../../../../shared/contract/types'
+import type { GameState, ParentSelectionState } from '../../../../shared/contract/types'
+
+afterEach(() => cleanup())
 
 const mkParentSelection = (overrides: Partial<ParentSelectionState> = {}): ParentSelectionState => ({
   candidates: {
@@ -64,5 +74,45 @@ describe('canSubmitParentSelection', () => {
       },
     }), 'p1')
     expect(canSubmitParentSelection(vm, 'PR02', 'PS02')).toBe(false)
+  })
+})
+
+describe('ParentSelectionOverlay', () => {
+  test('shows the local player already drafted occupation and minor cards', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          {
+            id: 'p1',
+            occupationHand: ['A102_Grocer', 'A105_BarrowPusher'],
+            minorHand: ['B34_SpecialFood'],
+          },
+          {
+            id: 'p2',
+            occupationHand: ['?'],
+            minorHand: ['?'],
+          },
+        ],
+      } as GameState,
+      meId: 'p1',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('heading', { name: 'Already drafted' })).toBeInTheDocument()
+    expect(screen.getByText('Kept occupations (2)')).toBeInTheDocument()
+    expect(screen.getByText('Kept minor improvements (1)')).toBeInTheDocument()
+  })
+})
+
+describe('parent card CSS', () => {
+  test('renders parent cards with the horizontal full-card ratio', () => {
+    const cssPath = join(process.cwd(), 'client/styles/pages/game.css')
+    const css = readFileSync(cssPath, 'utf-8')
+
+    expect(css).toMatch(/\.parent-choice-card\s*\{[^}]*aspect-ratio:\s*735\s*\/\s*510/s)
+    expect(css).toMatch(/\.parent-card-tile\s*\{[^}]*aspect-ratio:\s*735\s*\/\s*510/s)
   })
 })
