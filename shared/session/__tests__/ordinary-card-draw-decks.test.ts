@@ -12,6 +12,27 @@ import {
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 describe('ordinary card draw decks', () => {
+  it('uses a private draw-deck seed without changing public game setup', () => {
+    const first = createInitialState(42, {
+      playerCount: 2,
+      ordinaryCardDeckSeed: 1001,
+    })
+    const second = createInitialState(42, {
+      playerCount: 2,
+      ordinaryCardDeckSeed: 1002,
+    })
+
+    expect(first.gameSeed).toBe(second.gameSeed)
+    expect(first.roundActionOrder).toEqual(second.roundActionOrder)
+    expect(first.players.map((player) => player.occupationHand)).toEqual(
+      second.players.map((player) => player.occupationHand),
+    )
+    expect(first.players.map((player) => player.minorHand)).toEqual(
+      second.players.map((player) => player.minorHand),
+    )
+    expect(first.ordinaryCardDecks).not.toEqual(second.ordinaryCardDecks)
+  })
+
   it('seeds non-draft draw decks without cards already dealt to player hands', () => {
     const state = createInitialState(42, { playerCount: 2 })
     const dealt = new Set(state.players.flatMap((player) => [

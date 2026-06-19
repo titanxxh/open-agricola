@@ -162,7 +162,7 @@ import {
   startParentSelectionIfNeeded,
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
-import { resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
+import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -676,7 +676,7 @@ export class GameCore {
   /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
   applyDraftFinalize(): void {
     this.state = finalizeDraft(this.state)
-    startParentSelectionIfNeeded(this.state)
+    startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
@@ -702,6 +702,7 @@ export class GameCore {
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
   private sessionCardContext: SessionCardContext | null = null
+  private readonly parentSelectionSeed: number | undefined
   private readonly registerCustomCardImpl: (data: CustomCardData) => void
   private readonly cardRegistry: CardRegistry
   readonly cardWarnings: string[] = []
@@ -709,6 +710,7 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
+    this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
       // the server-side executor-backed registrar.
@@ -1446,6 +1448,7 @@ export class GameCore {
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+    if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
     const context = this.getActiveInteractionContext()
@@ -1546,9 +1549,11 @@ export class GameCore {
 
     if (!frame || !envelope) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
-      const baseCommands: InteractionCommand[] = anytimeActions.length > 0
-        ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
-        : ['takeAction', 'undoStep', 'undoAction']
+      const baseCommands: InteractionCommand[] = hasPendingOrdinaryCardDrawChoice(this.state)
+        ? ['undoStep', 'undoAction']
+        : anytimeActions.length > 0
+          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+          : ['takeAction', 'undoStep', 'undoAction']
       return {
         stateId: 'idle',
         allowedCommands: this.filterUndoCommands(baseCommands),
