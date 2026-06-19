@@ -116,6 +116,7 @@ import { getAssignedAnimalCount } from '../domain/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
+import { returnMajorImprovementToSupply, takeMajorImprovementFromSupply } from '../cards/major/supply.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
@@ -4830,9 +4831,7 @@ export class GameCore {
     }
     this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
-      if (!this.state.availableMajorImprovements.includes(cardId)) {
-        this.state.availableMajorImprovements.push(cardId)
-      }
+      returnMajorImprovementToSupply(this.state, cardId)
     } else if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
@@ -4863,7 +4862,7 @@ export class GameCore {
     this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
       player.improvements.push(cardId)
-      this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
+      takeMajorImprovementFromSupply(this.state, cardId)
     } else if (isOccupation) {
       player.occupationPlayed.push(cardId)
     } else {

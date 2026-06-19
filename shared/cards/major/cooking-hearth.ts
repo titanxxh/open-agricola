@@ -15,7 +15,7 @@ const cookingHearth1: CardSourceMetaInput = {
   isCookery: true,
   isBaking: true,
   cookingHearthIdentity: true,
-  returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
+  returnCards: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'],
   desc: [
     '[Anytime]',
     '<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>',
@@ -43,7 +43,7 @@ export const Major_CookingHearth2 = defineMajorCard({
   number: 4,
   cost: {
     fee: { clay: 5 },
-    cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2'] },
+    cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'] },
   },
   exchanges: [
     { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth2', triggers: ['anytime'] },
@@ -51,6 +51,25 @@ export const Major_CookingHearth2 = defineMajorCard({
     { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth2', triggers: ['anytime'] },
     { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2', triggers: ['anytime'] },
     { from: { grain: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth2', triggers: ['bake-bread'] },
+  ],
+} satisfies CardSourceMetaInput,
+})
+
+export const Major_CookingHearth3 = defineMajorCard({
+  meta: {
+  ...cookingHearth1,
+  id: 'Major_CookingHearth3',
+  number: 12,
+  cost: {
+    fee: { clay: 5 },
+    cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'] },
+  },
+  exchanges: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_CookingHearth3', triggers: ['anytime'] },
+    { from: { boar: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth3', triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 4 }, sourceId: 'Major_CookingHearth3', triggers: ['anytime'] },
+    { from: { vegetable: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth3', triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 3 }, sourceId: 'Major_CookingHearth3', triggers: ['bake-bread'] },
   ],
 } satisfies CardSourceMetaInput,
 })

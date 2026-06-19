@@ -67,14 +67,22 @@ const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   const positions: Record<string, { x: string; y: string }> = {
     Major_Fireplace1: { x: '0%', y: '0%' },
     Major_Fireplace2: { x: '25%', y: '0%' },
+    Major_Fireplace3: { x: '25%', y: '0%' },
     Major_CookingHearth1: { x: '50%', y: '0%' },
     Major_CookingHearth2: { x: '75%', y: '0%' },
+    Major_CookingHearth3: { x: '75%', y: '0%' },
     Major_ClayOven: { x: '100%', y: '0%' },
+    Major_ClayOven2: { x: '100%', y: '0%' },
     Major_StoneOven: { x: '0%', y: '100%' },
+    Major_StoneOven2: { x: '0%', y: '100%' },
     Major_Joinery: { x: '25%', y: '100%' },
+    Major_Joinery2: { x: '25%', y: '100%' },
     Major_Pottery: { x: '50%', y: '100%' },
+    Major_Pottery2: { x: '50%', y: '100%' },
     Major_Basket: { x: '75%', y: '100%' },
+    Major_Basket2: { x: '75%', y: '100%' },
     Major_Well: { x: '100%', y: '100%' },
+    Major_Well2: { x: '100%', y: '100%' },
   }
   return positions[cardId] || { x: '0%', y: '0%' }
 }

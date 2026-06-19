@@ -15,6 +15,12 @@ import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../cards/major'
 import {
+  createMajorImprovementSupply,
+  getVisibleMajorImprovementIds,
+  normalizeMajorImprovementSupply,
+  standardMajorImprovementIds,
+} from '../cards/major/supply'
+import {
   implementedMinorImprovementCards,
   implementedOccupationCards,
   implementedCommunityMinors,
@@ -395,10 +401,16 @@ export const normalizeState = (raw: GameState): GameState => {
   const takenImprovements = new Set(
     players.flatMap((player) => player.improvements),
   )
+  const majorImprovementSupply = normalizeMajorImprovementSupply(
+    (raw as { majorImprovementSupply?: unknown }).majorImprovementSupply,
+    takenImprovements,
+  )
+  const visibleMajorImprovements = getVisibleMajorImprovementIds(majorImprovementSupply)
   const availableMajorImprovements = (
-    raw.availableMajorImprovements?.length
+    visibleMajorImprovements ??
+    (raw.availableMajorImprovements?.length
       ? raw.availableMajorImprovements
-      : [...majorImprovementIds]
+      : [...standardMajorImprovementIds])
   ).filter(
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
@@ -436,6 +448,7 @@ export const normalizeState = (raw: GameState): GameState => {
     gameSeed: seed,
     roundActionOrder,
     availableMajorImprovements,
+    majorImprovementSupply,
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
@@ -633,6 +646,7 @@ export const createInitialState = (
     visibility: 'public',
   }]
   const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
+  const majorImprovementSupply = createMajorImprovementSupply(players.length)
   const initialState: GameState = {
     round: 1,
     phase,
@@ -659,7 +673,8 @@ export const createInitialState = (
     roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,
-    availableMajorImprovements: [...majorImprovementIds],
+    availableMajorImprovements: getVisibleMajorImprovementIds(majorImprovementSupply) ?? [...standardMajorImprovementIds],
+    majorImprovementSupply,
     futureMeeples: [],
     pendingFutureMeeples: [],
     gameOver: false,
