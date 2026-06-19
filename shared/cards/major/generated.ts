@@ -203,6 +203,21 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       "<GRAIN> <ARROW-1X> 5<FOOD>",
       "[When you build it, you can Bake immediately]"
     ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "sourceId": "Major_ClayOven",
+        "max": 1,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
     "kind": "major"
   },
   {
@@ -222,6 +237,21 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       "[__Bake Bread__ action:]",
       "<GRAIN> <ARROW-2X> 4<FOOD>",
       "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_StoneOven",
+        "max": 2,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -526,10 +556,27 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": false,
+    "isBaking": true,
+    "ovenIdentity": true,
     "desc": [
       "[__Bake Bread__ action:]",
       "<GRAIN> <ARROW-1X> 5<FOOD>",
       "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "sourceId": "Major_ClayOven2",
+        "max": 1,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -544,10 +591,27 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 3,
     "extraVp": false,
+    "isBaking": true,
+    "ovenIdentity": true,
     "desc": [
       "[__Bake Bread__ action:]",
       "<GRAIN> <ARROW-2X> 4<FOOD>",
       "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_StoneOven2",
+        "max": 2,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -587,6 +651,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": true,
+    "potteryIdentity": true,
     "waresSalesmanGains": [
       {
         "clay": 1,

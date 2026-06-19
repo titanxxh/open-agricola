@@ -38,6 +38,15 @@ describe('getPlayerBakeRates', () => {
     expect(rates[0]).toMatchObject({ cardId: 'Major_ClayOven', rate: 5, max: 1 })
   })
 
+  it('returns duplicate Major oven bake rates from concrete improvement ids', () => {
+    const player = createPlayer({ improvements: ['Major_ClayOven2', 'Major_StoneOven2'] })
+    const rates = getPlayerBakeRates(player)
+    expect(rates).toEqual([
+      expect.objectContaining({ cardId: 'Major_ClayOven2', rate: 5, max: 1 }),
+      expect.objectContaining({ cardId: 'Major_StoneOven2', rate: 4, max: 2 }),
+    ])
+  })
+
   it('returns Minor bake rates from minorPlayed', () => {
     const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
     const rates = getPlayerBakeRates(player)
@@ -135,5 +144,25 @@ describe('bakeBread with Minor oven', () => {
     expect(player.resources.grain).toBe(2)
     expect(player.resources.food).toBe(5)
     expect(events).toMatchObject([{ type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 5 } }])
+  })
+
+  it('duplicate Major oven bakes with its own exchange source', () => {
+    const player = createPlayer({ improvements: ['Major_StoneOven2'] })
+    const events: unknown[] = []
+    const result = bakeBread(player, 'Major_StoneOven2', 2, { sourceCard: 'Major_StoneOven2' }, {
+      emit: (event) => events.push(event),
+      emitMany: (items) => events.push(...items),
+    })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(player.resources.grain).toBe(1)
+    expect(player.resources.food).toBe(8)
+    expect(events).toMatchObject([{
+      type: 'resource.exchanged',
+      paid: { grain: 2 },
+      gained: { food: 8 },
+      exchangeSource: 'Major_StoneOven2',
+      sourceCardId: 'Major_StoneOven2',
+    }])
   })
 })

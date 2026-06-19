@@ -86,4 +86,19 @@ describe('cookery exchange metadata-driven helpers', () => {
     const cattle = trades.find((t) => t.from.cattle === 1)
     expect(cattle?.to.food).toBe(4)
   })
+
+  it('six-player duplicate Fireplace and Cooking Hearth expose concrete exchange source ids', () => {
+    const player = createMockPlayer({
+      improvements: ['Major_Fireplace3', 'Major_CookingHearth3'],
+    })
+    const anytime = getExchangesInWindow(player, 'anytime')
+    const bake = getExchangesInWindow(player, 'bake-bread')
+
+    expect(anytime.filter((trade) => trade.sourceId === 'Major_Fireplace3')).toHaveLength(4)
+    expect(anytime.filter((trade) => trade.sourceId === 'Major_CookingHearth3')).toHaveLength(4)
+    expect(bake).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'Major_Fireplace3', from: { grain: 1 }, to: { food: 2 } }),
+      expect.objectContaining({ sourceId: 'Major_CookingHearth3', from: { grain: 1 }, to: { food: 3 } }),
+    ]))
+  })
 })
