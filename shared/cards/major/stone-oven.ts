@@ -29,3 +29,20 @@ export const Major_StoneOven = defineMajorCard({
     },
   },
 })
+
+export const Major_StoneOven2 = defineMajorCard({
+  meta: {
+  id: 'Major_StoneOven2',
+  name: 'Stone Oven',
+  deck: 'major',
+  number: 15,
+  cost: { clay: 1, stone: 3 },
+  vp: 3,
+  extraVp: false,
+  desc: [
+    '[__Bake Bread__ action:]',
+    '<GRAIN> <ARROW-2X> 4<FOOD>',
+    '[When you build it, you can Bake immediately]',
+  ],
+},
+})

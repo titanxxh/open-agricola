@@ -28,6 +28,7 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
+import { swapMajorImprovementWithSupply } from '../../cards/major/supply'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { consumePendingExtraTurns } from '../../cards/card-effects'
@@ -286,10 +287,7 @@ export const specialEffectAction: ActionDefinition = {
         if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
         if (target.improvements.includes(p.to)) return { type: 'ok' }
         target.improvements[playerIndex] = p.to
-        board.splice(boardIndex, 1)
-        if (!board.includes(p.from)) {
-          board.splice(boardIndex, 0, p.from)
-        }
+        swapMajorImprovementWithSupply(state, p.from, p.to)
         eventSink?.emit<'card.swappedWithBoard'>({
           type: 'card.swappedWithBoard',
           sourceCardId: sourceCard,

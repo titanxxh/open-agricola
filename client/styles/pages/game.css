@@ -2474,6 +2474,25 @@
   flex: 0 1 calc(33.333% - 10px);
   max-width: 188px;
 }
+.major-card-wrapper {
+  position: relative;
+}
+.major-stack-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #2f4f4f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
 .major-card {
   background: #fff4e5;
   border-radius: 10px;

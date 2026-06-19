@@ -32,3 +32,22 @@ export const Major_Joinery = defineMajorCard({
     },
   },
 })
+
+export const Major_Joinery2 = defineMajorCard({
+  meta: {
+  id: 'Major_Joinery2',
+  name: 'Joinery',
+  deck: 'major',
+  number: 16,
+  cost: { wood: 2, stone: 2 },
+  vp: 2,
+  extraVp: true,
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
+  desc: [
+    '[Harvest]',
+    '<WOOD> <ARROW-1X> 2<FOOD>',
+    '[Scoring]',
+    '3/5/7<WOOD> <ARROW-1X> 1/2/3<SCORE>',
+  ],
+},
+})

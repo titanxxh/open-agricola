@@ -13,6 +13,7 @@ import {
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 import { getActiveCardRegistry } from '../../cards/active-registry'
+import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 export type { ResolvedMinorImprovement }
@@ -58,9 +59,7 @@ export const listAvailableMajors = (state: GameState): string[] => [
 export const listMinorHand = (player: PlayerState): string[] => [...player.minorHand]
 
 export const removeMajorFromPool = (state: GameState, improvementId: string): void => {
-  state.availableMajorImprovements = state.availableMajorImprovements.filter(
-    (id) => id !== improvementId,
-  )
+  takeMajorImprovementFromSupply(state, improvementId)
 }
 
 export const removeMinorFromHand = (player: PlayerState, improvementId: string): void => {
