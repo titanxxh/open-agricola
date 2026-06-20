@@ -13,8 +13,8 @@
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
 | 已接受 / 产品策略差异 | 41 |
-| 排除的 BGA legacy 或未实现行为目标 | 44 |
-| 本轮审计视为已对齐 | 803 |
+| 排除的 BGA legacy 或未实现行为目标 | 37 |
+| 本轮审计视为已对齐 | 810 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
 | 6 人 Major Improvement supply / behavior | 标准 10 张 + duplicate concrete id 8 张；6 人局通过 stack-aware supply 只暴露当前 top，2-5 人仍使用标准 flat supply；duplicate Well / oven / cookery / workshop 行为按具体 id 独立结算 |
@@ -248,7 +248,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | handHooks | `onBeforeStartOfTurn` | `E96_Elder` |
 | listener | `after.*` | `E47_SyrupTap` |
 | listener | `after.bake-bread` | `A30_BakingSheet`, `A63_DutchWindmill`, `C61_BeerStein`, `E57_CheeseFondue` |
-| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E53_BoarSpear`, `E77_Mattock` |
+| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A175_HollowGardener`, `A179_MountainShepherd`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B174_RiverbankGardener`, `B180_GameTeaser`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C177_MountainHiker`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D174_LoessGardener`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E53_BoarSpear`, `E77_Mattock` |
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A40_PottersYard`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E103_Wolf`, `E53_BoarSpear`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
@@ -262,7 +262,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E144_WaresSalesman`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
 | listener | `after.occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E144_WaresSalesman`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
 | listener | `after.pay` | `B18_GrasslandHarrow`, `C116_FurnitureMaker`, `C148_MudWallower`, `D74_RoyalWood`, `E122_Cottar`, `E123_ResourceHoarder`, `E128_Saddler`, `E54_Contraband` |
-| listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E82_Profiteering`, `E95_Miller` |
+| listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C176_Cleanacre`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E82_Profiteering`, `E95_Miller` |
 | listener | `after.plow` | `A105_BarrowPusher`, `A144_Sequestrator`, `A17_ReclamationPlow`, `A40_PottersYard`, `B159_LieutenantGeneral`, `C80_RockyTerrain`, `D104_Cultivator`, `E164_MountainPlowman` |
 | listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E53_BoarSpear` |
 | listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C146_WorkshopAssistant`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
@@ -565,11 +565,11 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A172_BoatPainter` | 已对齐 | 5+ 产品扩展实现：work phase return home 前，Fishing 与 Traveling Players（含 5-6 扩展格）均被占用时，选择 1 grain 或 2 food。 |
 | `A173_ClayThief` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A174_MasterHora` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `A175_HollowGardener` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A175_HollowGardener` | 已对齐 | 5+ 产品扩展实现：after collect 读取 Hollow（含 hollow-56）实际 clay provenance，3-5 clay 给 grain，6+ clay 给 vegetable。 |
 | `A176_Wheelmaker` | 已对齐 | 5+ 产品扩展实现：onBuy 要求已有另一个职业，且自身 wood 严格大于其他玩家合计 wood，低于 15 时补到 15。 |
 | `A177_Middleman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A178_CarpentersBoy` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `A179_MountainShepherd` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A179_MountainShepherd` | 已对齐 | 5+ 产品扩展实现：使用任一 Quarry 后获得 1 sheep。 |
 | `A180_AnimalBrander` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B1_UpscaleLifestyle` | 已对齐 | 即时翻修子行动使用当前 `renovate-house` action id。 |
 | `B2_MiniPasture` | 已对齐 | BGA `formatCost([WOOD => 0])` / `miniPasture` 通过 nested `fencePolicy` 表达免费 fence、最多 4 段总 fence、恰好 1 个 1 格新牧场，不走 `fencing` wrapper 丢 params。 |
@@ -744,13 +744,13 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B171_GreenhouseBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B172_CattleCaregiver` | 已对齐 | 5+ 产品扩展实现：round start 按合法动物区域统计拥有 cattle 的玩家，3/4/5+ 人分别给 1/2/3 food。 |
 | `B173_Sweeper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `B174_RiverbankGardener` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B174_RiverbankGardener` | 已对齐 | 5+ 产品扩展实现：Riverbank Forest collect 后额外获得 1 vegetable。 |
 | `B175_FieldOverseer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B176_VillageIdiot` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B177_StoneClawer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B180_GameTeaser` | 已对齐 | 5+ 产品扩展实现：只统计从 food accumulation space 本身移动的 food，1/2/3 food 分别给 cattle/boar/sheep，4+ 不触发。 |
 | `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy` |
 | `C2_Stable` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达免费 stable。 |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -926,8 +926,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C173_TopOuter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C174_StoneCustodian` | 已对齐 | 5+ 产品扩展实现：work phase return home 前统计有 stone 的 stone accumulation space，1 个给 1 grain，2+ 个给 1 vegetable。 |
 | `C175_VillageTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C176_Cleanacre` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C177_MountainHiker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `C176_Cleanacre` | 已对齐 | 5+ 产品扩展实现：Farmland/Cultivation/Farming Supplies 顶层行动完成后给 2 clay；Farming Supplies 多分支每次行动只触发一次。 |
+| `C177_MountainHiker` | 已对齐 | 5+ 产品扩展实现：5-6 extension accumulation space collect 后可选付 1 food 买 1 stone；不含 instant-gain extension spaces。 |
 | `C178_OnSiteReverend` | 已对齐 | 5+ 产品扩展实现：harvest start 强制选择 1 个 building resource。 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
@@ -1104,7 +1104,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D171_SeniorTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D172_PutcherMaker` | 已对齐 | 5+ 产品扩展实现：metadata-driven anytime exchange，1 reed -> 2 food，无每次上限。 |
 | `D173_TownClerk` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D174_LoessGardener` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `D174_LoessGardener` | 已对齐 | 5+ 产品扩展实现：Clay Pit collect 后可选付 1 food 买 1 vegetable。 |
 | `D175_Countryman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D176_Woodshacker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D177_Graduate` | 已对齐 | 5+ 产品扩展实现：onBuy 可支付 1 food；支付成功后获得 2 stone + 2 reed，不能支付则不触发奖励。 |
