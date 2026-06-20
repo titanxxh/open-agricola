@@ -112,7 +112,14 @@ import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, workersAvailable } from '../domain/player.ts'
-import { getAssignedAnimalCount } from '../domain/animals.ts'
+import { getAssignedAnimalsByType } from '../domain/animals.ts'
+import {
+  ANIMAL_KEYS,
+  createAnimalCounts,
+  readAnimalHolderCounts,
+  sumAnimalCounts,
+} from '../domain/animal-holder-state.ts'
+import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -1154,8 +1161,36 @@ export class GameCore {
     return p.resources.sheep + p.resources.boar + p.resources.cattle
   }
 
+  private getAssignedAnimalCountForPending(p: PlayerState) {
+    const assigned = { ...getAssignedAnimalsByType(p) }
+    const idx = this.state.players.indexOf(p)
+    if (idx < 0) {
+      return assigned.sheep + assigned.boar + assigned.cattle
+    }
+    const visibleByCardId = new Map<string, ReturnType<typeof createAnimalCounts>>()
+    for (const zone of playerBoard(this.state, idx).animals.zones()) {
+      if (zone.zoneType !== 'card' || !zone.cardId) continue
+      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts()
+      const zoneCounts = readAnimalCountsForZoneAssignment(zone)
+      for (const key of ANIMAL_KEYS) {
+        counts[key] += zoneCounts[key]
+      }
+      visibleByCardId.set(zone.cardId, counts)
+    }
+    for (const [cardId, cardState] of Object.entries(p.cardStates ?? {})) {
+      if (typeof cardState?.counters?.held === 'number') continue
+      const stored = readAnimalHolderCounts(cardState?.extraData)
+      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts()
+      if (sumAnimalCounts(stored) <= 0 && sumAnimalCounts(visible) <= 0) continue
+      for (const key of ANIMAL_KEYS) {
+        assigned[key] += visible[key] - stored[key]
+      }
+    }
+    return assigned.sheep + assigned.boar + assigned.cattle
+  }
+
   private hasPendingAnimals(p: PlayerState) {
-    return this.getAnimalCount(p) > getAssignedAnimalCount(p)
+    return this.getAnimalCount(p) > this.getAssignedAnimalCountForPending(p)
   }
 
   private getHarvestPlayerIndices() {
