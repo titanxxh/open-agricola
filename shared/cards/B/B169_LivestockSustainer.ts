@@ -5,6 +5,11 @@ import type { GameState, PlayerState } from '../../contract/types'
 
 const CARD_ID = 'B169_LivestockSustainer'
 const MAX_CAPACITY = 8
+const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
+type AnimalType = (typeof ANIMAL_TYPES)[number]
+
+const isAnimalType = (value: unknown): value is AnimalType =>
+  ANIMAL_TYPES.includes(value as AnimalType)
 
 const countOtherPlayerMajors = (player: PlayerState, state: GameState) => {
   const players = Array.isArray(state.players) ? state.players : [player]
@@ -15,19 +20,34 @@ const countOtherPlayerMajors = (player: PlayerState, state: GameState) => {
   return Math.min(count, MAX_CAPACITY)
 }
 
+const readHeldAnimals = (player: PlayerState, capacity: number) => {
+  const extra = player.cardStates?.[CARD_ID]?.extraData as
+    | { held?: unknown; animalType?: unknown }
+    | undefined
+  if (!isAnimalType(extra?.animalType)) return { animalType: null, animalCount: 0 }
+  if (typeof extra.held !== 'number' || !Number.isFinite(extra.held)) {
+    return { animalType: null, animalCount: 0 }
+  }
+  const animalCount = Math.min(capacity, Math.max(0, Math.floor(extra.held)))
+  return animalCount > 0
+    ? { animalType: extra.animalType, animalCount }
+    : { animalType: null, animalCount: 0 }
+}
+
 const cardImpl = {
   effect: {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, state) => {
       const capacity = countOtherPlayerMajors(player, state)
       if (capacity <= 0) return
+      const held = readHeldAnimals(player, capacity)
       zones.push({
         id: `card:${CARD_ID}`,
         zoneType: 'card',
         cardId: CARD_ID,
         capacity,
-        animalType: null,
-        animalCount: 0,
+        animalType: held.animalType,
+        animalCount: held.animalCount,
       })
     },
     getInvalidAnimals: () => [],

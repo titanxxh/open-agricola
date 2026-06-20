@@ -1,5 +1,5 @@
 export const HOLLOW_SPACE_IDS = ['hollow', 'hollow-4', 'hollow-56'] as const
-export const WOOD_ACCUMULATION_SPACE_IDS = ['forest', 'copse', 'grove', 'copse-56', 'grove-56'] as const
+export const WOOD_ACCUMULATION_SPACE_IDS = ['forest', 'copse', 'grove', 'copse-56', 'riverbank-forest-56', 'grove-56'] as const
 export const TRAVELING_PLAYERS_SPACE_IDS = ['traveling-players', 'traveling-players-56'] as const
 export const EXTENSION_56_ACCUMULATION_SPACE_IDS = ['copse-56', 'traveling-players-56', 'riverbank-forest-56', 'grove-56', 'hollow-56'] as const
 

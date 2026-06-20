@@ -59,6 +59,31 @@ export const applyReorganizeMutate = (
     })
   player.stableAnimals = stable
 
+  const cardZones = computed.filter((z) => z.zoneType === 'card' && z.cardId)
+  for (const zone of cardZones) {
+    const cardId = zone.cardId!
+    const existing = player.cardStates?.[cardId]
+    if (typeof existing?.counters?.held === 'number') continue
+    const assigned = zones.find((z) => z.zoneType === 'card' && z.id === zone.id)
+    const count = assigned?.animalType
+      ? Math.max(0, Math.min(cap(zone.id), assigned.animalCount))
+      : 0
+    const animalType = count > 0 ? assigned?.animalType ?? null : null
+    if (!animalType && !existing?.extraData) continue
+    player.cardStates ??= {}
+    const nextState = { ...(player.cardStates[cardId] ?? {}) }
+    const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
+    if (animalType) {
+      extraData.held = count
+      extraData.animalType = animalType
+    } else {
+      delete extraData.held
+      delete extraData.animalType
+    }
+    nextState.extraData = extraData
+    player.cardStates[cardId] = nextState
+  }
+
   player.resources.sheep = totals.sheep
   player.resources.boar = totals.boar
   player.resources.cattle = totals.cattle

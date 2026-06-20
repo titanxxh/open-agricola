@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { plowAction } from '../../actions/effects/plow'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 import { sumActionSpaceMovedToTriggerPlayerFromSpace } from '../helpers/event-provenance'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
@@ -15,9 +16,12 @@ const listener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
-    if ((context.ownerPlayer?.resources.food ?? 0) < 1) return
+    const owner = context.ownerPlayer
+    if (!owner) return
+    if ((owner.resources.food ?? 0) < 1) return
     const woodTaken = sumActionSpaceMovedToTriggerPlayerFromSpace(context, 'wood')
     if (woodTaken < 4) return
+    if (!plowAction.canBeExecutedByPlayer(context.state, owner)) return
     return {
       ...payThenActionFlow({
         cardId: CARD_ID,
