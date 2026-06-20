@@ -251,6 +251,7 @@ import { B165_GameProvider } from './B/B165_GameProvider'
 import { B166_CattleFeeder } from './B/B166_CattleFeeder'
 import { B167_StableSergeant } from './B/B167_StableSergeant'
 import { B168_PastureMaster } from './B/B168_PastureMaster'
+import { B169_LivestockSustainer } from './B/B169_LivestockSustainer'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
 import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
@@ -1116,6 +1117,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B166_CattleFeeder': B166_CattleFeeder.impl,
   'B167_StableSergeant': B167_StableSergeant.impl,
   'B168_PastureMaster': B168_PastureMaster.impl,
+  'B169_LivestockSustainer': B169_LivestockSustainer.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
   'B174_RiverbankGardener': B174_RiverbankGardener.impl,
