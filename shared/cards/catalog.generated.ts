@@ -9293,6 +9293,19 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "5+",
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
     "kind": "occupation"
   },
   {
