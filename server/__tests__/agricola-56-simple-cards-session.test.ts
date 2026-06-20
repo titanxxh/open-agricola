@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { D172_PutcherMaker } from '../../shared/cards/D/D172_PutcherMaker'
 import { computeAnimalZones, getTotalAnimalCapacity } from '../../shared/domain/animal-zones'
+import { getAssignedAnimalsByType } from '../../shared/domain/animals'
 import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -318,6 +319,65 @@ describe('Agricola 5-6 simple occupation cards', () => {
       animalCount: 1,
       capacity: 1,
     })
+  })
+
+  it('B169 Livestock Sustainer preserves mixed animal types on its card zone', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    session.loadState(state)
+
+    let resp = session.devSetResources(0, { sheep: 1, boar: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'boar', animalCount: 1 },
+      ],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
+      animalCounts: { sheep: 1, boar: 1 },
+    })
+    expect(getLivestockSustainerZone(session)).toMatchObject({
+      animalType: null,
+      animalCount: 2,
+      capacity: 2,
+    })
+    expect(getAssignedAnimalsByType(resp.state.players[0]!)).toMatchObject({
+      sheep: 1,
+      boar: 1,
+    })
+  })
+
+  it('B169 Livestock Sustainer discards stored animals when capacity drops to zero', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1']
+    session.loadState(state)
+
+    let resp = session.devSetResources(0, { sheep: 1 })
+    expect(resp.ok).toBe(true)
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
+      ],
+    })
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+
+    const updatedState = session.getState().state
+    updatedState.players[1]!.improvements = []
+    session.loadState(updatedState)
+
+    expect(getLivestockSustainerZone(session)).toBeUndefined()
+    const owner = session.getState().state.players[0]!
+    expect(owner.resources.sheep).toBe(0)
+    expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toEqual({})
   })
 
   it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
@@ -745,6 +805,26 @@ describe('Agricola 5-6 simple occupation cards', () => {
     givePastureCattle(session, 2)
     const state = session.getState().state
     state.players[3]!.resources.cattle = 1
+    session.loadState(state)
+    const updatedState = session.getState().state
+    const player = updatedState.players[0]!
+
+    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+
+    expect(flow).toMatchObject({ type: 'leaf', params: { food: 1 } })
+  })
+
+  it('B172 Cattle Caregiver counts cattle stored on animal-holder cards', () => {
+    const session = setupRoundStartHookSession('B172_CattleCaregiver', 5)
+    givePastureCattle(session, 0)
+    givePastureCattle(session, 1)
+    const state = session.getState().state
+    state.players[2]!.occupationPlayed.push('B169_LivestockSustainer')
+    state.players[2]!.resources.cattle = 1
+    state.players[2]!.cardStates = {
+      B169_LivestockSustainer: { extraData: { animalCounts: { cattle: 1 } } },
+    }
+    state.players[3]!.improvements = ['Major_Fireplace1']
     session.loadState(state)
     const updatedState = session.getState().state
     const player = updatedState.players[0]!
