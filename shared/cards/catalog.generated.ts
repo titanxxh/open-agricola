@@ -3776,6 +3776,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "5+",
+    "animalHolder": true,
     "kind": "occupation"
   },
   {
