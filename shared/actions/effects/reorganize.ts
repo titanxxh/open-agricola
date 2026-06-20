@@ -71,6 +71,11 @@ export const applyReorganizeMutate = (
   player.stableAnimals = stable
 
   const cardZonesById = new Map<string, typeof computed>()
+  const keyedCardZoneIds = new Set(
+    computed
+      .filter((z) => z.zoneType === 'card' && z.cardId)
+      .map((zone) => zone.id),
+  )
   computed
     .filter((z) => z.zoneType === 'card' && z.cardId)
     .forEach((zone) => {
@@ -121,7 +126,7 @@ export const applyReorganizeMutate = (
 
   const totals = createAnimalCounts()
   zones
-    .filter((zone) => zone.zoneType !== 'card')
+    .filter((zone) => zone.zoneType !== 'card' || !keyedCardZoneIds.has(zone.id))
     .forEach((zone) => addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone)))
   for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts)
   player.resources.sheep = totals.sheep
