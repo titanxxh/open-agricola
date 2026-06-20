@@ -147,7 +147,7 @@ import {
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
-import { clearAllLinkedSpaceBlocks, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
+import { clearAllLinkedSpaceBlocks, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import {
   canEnterSpace,
@@ -3620,6 +3620,7 @@ export class GameCore {
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     if (!canEnterSpace(space, player, this.state)) return false
     if (workersAvailable(this.state, player) <= 0) return false
+    if (isSpaceBlocked(space)) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
       if (!allowed.some(a => a.spaceId === space.id)) return false

@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'B108_OvenFiringBoy'
 /**
@@ -13,15 +14,13 @@ const CARD_ID = 'B108_OvenFiringBoy'
  * In open-agricola: listen for place-farmer on forest/copse/grove,
  * return optional bake-bread leaf.
  */
-const WOOD_SPACES = ['forest', 'copse', 'grove']
-
 const listener: CardListenerRegistration = {
   id: 'B108-oven-firing-boy-after-place-farmer',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !WOOD_SPACES.includes(context.space.id)) return
+    if (!isWoodAccumulationSpaceId(context.space?.id)) return
     return {
       flow: {
         type: 'leaf',

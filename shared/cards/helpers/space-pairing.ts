@@ -1,8 +1,9 @@
 import type { GameState } from '../../contract/types'
 
 const BASE_TO_VARIANTS: Record<string, string[]> = {
-  hollow: ['hollow-4'],
-  lessons: ['lessons-4'],
+  hollow: ['hollow-4', 'hollow-56'],
+  lessons: ['lessons-4', 'lessons-56-2f', 'lessons-56-variable'],
+  grove: ['grove-56'],
 }
 
 export const pairedSpaceIdFor = (

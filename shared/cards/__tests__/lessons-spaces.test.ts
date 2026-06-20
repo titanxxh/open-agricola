@@ -3,13 +3,15 @@ import { LESSONS_SPACE_IDS, isLessonsSpaceId } from '../helpers/lessons-spaces'
 
 describe('lessons-spaces helper', () => {
   it('contains the real lessons action-space ids', () => {
-    expect(LESSONS_SPACE_IDS).toEqual(['lessons', 'lessons-3', 'lessons-4'])
+    expect(LESSONS_SPACE_IDS).toEqual(['lessons', 'lessons-3', 'lessons-4', 'lessons-56-2f', 'lessons-56-variable'])
   })
 
   it('matches real lessons spaces and rejects stale ids', () => {
     expect(isLessonsSpaceId('lessons')).toBe(true)
     expect(isLessonsSpaceId('lessons-3')).toBe(true)
     expect(isLessonsSpaceId('lessons-4')).toBe(true)
+    expect(isLessonsSpaceId('lessons-56-2f')).toBe(true)
+    expect(isLessonsSpaceId('lessons-56-variable')).toBe(true)
     expect(isLessonsSpaceId('lessons-2')).toBe(false)
     expect(isLessonsSpaceId('day-laborer')).toBe(false)
     expect(isLessonsSpaceId(undefined)).toBe(false)

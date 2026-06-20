@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { findTravelingPlayersSpace } from '../helpers/action-space-categories'
 
 const CARD_ID = 'C159_FishermansFriend'
 
@@ -8,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onRoundStart: (state, _player) => {
-    const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
+    const travelingPlayers = findTravelingPlayersSpace(state.actionSpaces)
     const fishing = state.actionSpaces.find((s) => s.id === 'fishing')
     const tpFood = travelingPlayers?.resources?.food ?? 0
     const fishFood = fishing?.resources?.food ?? 0

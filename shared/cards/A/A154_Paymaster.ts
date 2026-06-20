@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A154_Paymaster'
 /**
@@ -15,8 +16,6 @@ const CARD_ID = 'A154_Paymaster'
  *
  * Uses gain with recipientPlayerId to give grain to the opponent, then bonus-vp for owner.
  */
-const FOOD_ACCUMULATION_SPACES = new Set(['fishing', 'traveling-players'])
-
 const listener: CardListenerRegistration = {
   id: 'A154-paymaster-opponent-food-accumulation',
   cardIds: [CARD_ID],
@@ -25,7 +24,7 @@ const listener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (!spaceId || !FOOD_ACCUMULATION_SPACES.has(spaceId)) return
+    if (spaceId !== 'fishing' && !isTravelingPlayersSpaceId(spaceId)) return
 
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
 

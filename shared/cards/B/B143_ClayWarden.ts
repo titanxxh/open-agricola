@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isHollowSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'B143_ClayWarden'
 /**
@@ -11,8 +12,6 @@ const CARD_ID = 'B143_ClayWarden'
  * gets 1 clay (plus extra per player count). Fires for both the 3P
  * `hollow` space and the 4P `hollow-4` space.
  */
-const HOLLOW_SPACES = new Set(['hollow', 'hollow-4'])
-
 const listener: CardListenerRegistration = {
   id: 'B143-clay-warden-opponent-hollow',
   cardIds: [CARD_ID],
@@ -20,7 +19,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!HOLLOW_SPACES.has(context.space?.id ?? '')) return
+    if (!isHollowSpaceId(context.space?.id)) return
     const playerCount = context.state.players?.length ?? 2
     const gain: { clay: number; food?: number } = { clay: 1 }
     if (playerCount === 3) gain.clay = 2

@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A116_WoodCutter'
 /**
@@ -11,15 +12,13 @@ const CARD_ID = 'A116_WoodCutter'
  *
  * BGA reference: A_116_WoodCutter.php
  */
-const WOOD_SPACES = ['forest', 'copse', 'grove']
-
 const listener: CardListenerRegistration = {
   id: 'A116-wood-cutter-after-wood',
   cardIds: [CARD_ID],
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !WOOD_SPACES.includes(context.space.id)) return
+    if (!isWoodAccumulationSpaceId(context.space?.id)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
