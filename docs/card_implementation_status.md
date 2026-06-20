@@ -130,7 +130,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Parent Card Definition 数据边界 | `shared/parents/*`、`public/assets/parents/*`、`client/services/parent-assets.ts`、`client/app/parents/*`、`shared/parents/__tests__/parent-cards-complete.test.ts`、`shared/parents/selection.ts`、`shared/parents/mother-rewards.ts`、`shared/parents/father-completion.ts`、`shared/session/ordinary-card-draw.ts`、`shared/domain/scoring.ts` | Parent Cards 是扩展专用结构化数据和 runtime asset 引用，不属于 A-E Card Source / Card Definition / Card Impl 投影；setup / simultaneous mother+father selection、唯一 mother/father 后端自动提交、mother round gain 排入真实 `state.futureMeeples`、开局 mother schedule log 通过 `parent.motherScheduled` public event 派生、ActionBoard round slot future token、`parentCards` scoring、father simple/complex side quest 完成、奖励、draw keep-one transport + UI、ordinary draw pending action gate、sow completion marker、father resource choice structured preview 已由后端权威接入；候选与普通抽牌牌堆必须使用非公开 seed，不在前端补规则裁定。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、`ActionSpace.blockedBy`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens`、action-space category helpers | fence、linked occupancy、5/6 linked action-space blocking、special stable、stable count、token supply、行动格预留 marker 都走 source/type metadata 与 domain helper；公共基础 action definition 的 player-count filter 覆盖 2-6，5/6 专属行动格单独建模；Lessons / Hollow / wood accumulation / Traveling Players 这类跨人数 action-space 语义走共享 category helper，并覆盖 5/6 变体；确实需要 direct-click 硬拒绝的 action space 用通用 `strictCanExecute` opt-in，不要在主路径恢复单卡 import 或卡牌 id 分支。 |
 | Future meeple action token / Receive | `receive` internal action、`FutureMeepleResourceMap.field/stable`、`FutureMeeple.actionContext`、`futureMeepleActions` stage resume | round space 到期的普通资源按 player 合并为一次 `receive` transaction，保留每个 entry 的 `sourceCardId`，触发 Receive listener 而不隐式触发 Gain listener；`field` / `stable` 仍由通用 round-start path 转成 optional `plow` / 免费 `stables` action；卡牌应排 future token，不再写卡内 targetRound + onRoundStart 状态机。 |
-| Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house / card animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；animal reorg 交互保留 card zone / `cardId`，不要反查外卡 `cardStates` 或临时改 live resources。 |
+| Harvest / animal 通用扩展点 | `private-field-phase`、`HarvestReapSummary.harvestCountApplications`、`computeHarvestSelectionThreshold()`、`computeHarvestFeedingRequirement()`、`getHarvestOutcome()`、`getBreedThreshold()`、`computePastureCapacityModifiers()`、house / card animal zone helpers | 收获、繁殖、喂食、动物容量规则读 summary / modifier / helper；animal reorg 交互保留 card zone / `cardId`，通用 reorg 对 animal-holder card zone 写回 `cardStates[cardId].extraData.{held,animalType}`，`counters.held` 型卡牌仍由卡内 listener 管理。 |
 
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
@@ -739,7 +739,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B166_CattleFeeder` | 已对齐 |  |
 | `B167_StableSergeant` | 已对齐 |  |
 | `B168_PastureMaster` | 已对齐 |  |
-| `B169_LivestockSustainer` | 已对齐 | 5+ 产品扩展实现：按其他玩家当前 major identity 数量提供混养 animal-holder card zone，含 `alsoCountsAs: ['major']` 的 minor，不计 owner 自己的 major，容量上限 8，major 离场后动态缩容。 |
+| `B169_LivestockSustainer` | 已对齐 | 5+ 产品扩展实现：按其他玩家当前 major identity 数量提供混养 animal-holder card zone，含 `alsoCountsAs: ['major']` 的 minor，不计 owner 自己的 major，容量上限 8，major 离场后动态缩容；animal reorg 后从通用 card-zone `extraData` 恢复已放置动物。 |
 | `B170_CorralBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B171_GreenhouseBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B172_CattleCaregiver` | 已对齐 | 5+ 产品扩展实现：round start 按合法动物区域统计拥有 cattle 的玩家，3/4/5+ 人分别给 1/2/3 food。 |
@@ -1099,7 +1099,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D166_StableMilker` | 已对齐 |  |
 | `D167_PureBreeder` | 已对齐 |  |
 | `D168_Stockman` | 已对齐 | #186 第 2/3/4 座畜栏序数定位（`nAfter`）改用 `getStableCountForCards`（含 B85，对齐 BGA `countStablesForCards`）；本次建造数仍走 `getStableTilesBuiltThisAction`（归 #185） |
-| `D169_Plowsmith` | 已对齐 | 5+ 产品扩展实现：opponent 从 wood accumulation space 本身拿走至少 4 wood 后，可选付 1 food 立即 plow 1 field；非累积来源或低于阈值不触发。 |
+| `D169_Plowsmith` | 已对齐 | 5+ 产品扩展实现：opponent 从 wood accumulation space 本身拿走至少 4 wood 后，可选付 1 food 立即 plow 1 field；含 5/6 Riverbank Forest，非累积来源、低于阈值或 owner 无合法 plow tile 不触发。 |
 | `D170_FoldBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D171_SeniorTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D172_PutcherMaker` | 已对齐 | 5+ 产品扩展实现：metadata-driven anytime exchange，1 reed -> 2 food，无每次上限。 |
@@ -1107,7 +1107,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D174_LoessGardener` | 已对齐 | 5+ 产品扩展实现：Clay Pit collect 后可选付 1 food 买 1 vegetable。 |
 | `D175_Countryman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D176_Woodshacker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D177_Graduate` | 已对齐 | 5+ 产品扩展实现：onBuy 可支付 1 food；支付成功后获得 2 stone + 2 reed，不能支付则不触发奖励。 |
+| `D177_Graduate` | 已对齐 | 5+ 产品扩展实现：onBuy 有 1 food 时强制支付 1 food；支付成功后获得 2 stone + 2 reed，不能支付则不触发奖励。 |
 | `D178_SubstituteTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D179_Bullcatcher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D180_PartTimeWorker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |

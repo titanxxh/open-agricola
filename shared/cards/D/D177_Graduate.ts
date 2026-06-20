@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { payGainFlow } from '../helpers/pay-gain-node'
+import { payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D177_Graduate'
@@ -8,7 +8,7 @@ const cardImpl = {
     id: CARD_ID,
     onBuy: (_state, player) => {
       if ((player.resources.food ?? 0) < 1) return
-      return payGainFlow({
+      return payThenGainActionFlow({
         cardId: CARD_ID,
         cost: { food: 1 },
         gain: { stone: 2, reed: 2 },
