@@ -28,6 +28,7 @@ import {
   buildOwnedFlowNode,
   buildFlowNode,
   effectiveOwnerPlayerId,
+  enforceCompositeContinuationMandatory,
   pendingEnvelopeFromHostNode,
   snapshotCompositeEmit,
 } from './engine-utils'
@@ -414,6 +415,9 @@ export class Engine {
     const internals = this._internals()
     const flowNodes = flows.map((flow) => buildFlowNode(internals, flow, ownerPlayerId))
     const nextUnresolved = this.tree.nextUnresolved()
+    if (ctx && nextUnresolved) {
+      enforceCompositeContinuationMandatory(nextUnresolved)
+    }
     if (nextUnresolved) {
       this.tree.insertBefore(nextUnresolved.id, flowNodes)
     } else {
