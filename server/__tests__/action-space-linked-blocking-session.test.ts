@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import type { ActionDefinition, ActionSpace, Resource } from '../../shared/contract/types'
 import { getAdHocAction, registerAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
+import { rehydrateState, serializeState } from '../../shared/session/serialization'
 
 const RECALL_LINKED_TEST_ACTION_ID = 'card_test_recall_linked_block'
 
@@ -84,9 +85,22 @@ describe('5/6 linked action-space blocking', () => {
       session.getState().state.players[1]!,
     )
     expect(allowed.map((entry) => entry.spaceId)).not.toContain('lessons-56-2f')
+    expect(session.getActionAvailability(1)['lessons-56-2f']).toBe(false)
 
     const resp = session.takeAction(1, 'lessons-56-2f')
     expect(resp.ok).toBe(false)
+  })
+
+  it('preserves linked blocks across serialization rehydrate', () => {
+    const session = setup()
+    session.takeAction(0, 'copse-56')
+
+    const serialized = serializeState(session.getState().state, { engineStack: session.getEngineStack() })
+    const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
+
+    expect(restored.actionSpaces.find((candidate) => candidate.id === 'lessons-56-2f')?.blockedBy).toEqual([
+      { playerId: 'p1', workerId: '1', sourceSpaceId: 'copse-56' },
+    ])
   })
 
   it('clears linked blocks when workers return home', () => {

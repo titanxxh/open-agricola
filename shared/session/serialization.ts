@@ -7,7 +7,7 @@ import { createActionSpaces } from '../actions'
 import { normalizeState } from '../session/state-bootstrap'
 import { getCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeTakenBy } from '../domain/space'
+import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
 
 export type SerializedActionSpace = Omit<
@@ -666,6 +666,7 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
       ...template,
       resources: saved?.resources ?? template.resources,
       takenBy: normalizeTakenBy(saved?.takenBy),
+      blockedBy: normalizeBlockedBy(saved?.blockedBy),
       exclusiveUse: saved?.exclusiveUse,
     }
   })
@@ -676,6 +677,7 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
     if (saved) {
       pas.resources = saved.resources ?? pas.resources
       pas.takenBy = normalizeTakenBy(saved.takenBy)
+      pas.blockedBy = normalizeBlockedBy(saved.blockedBy)
       pas.exclusiveUse = saved.exclusiveUse
     }
     restored.actionSpaces.push(pas)

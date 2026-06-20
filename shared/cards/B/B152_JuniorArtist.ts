@@ -8,7 +8,7 @@ import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-a
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B152_JuniorArtist'
-const CANDIDATE_TARGETS = ['lessons-4', 'lessons', 'traveling-players'] as const
+const CANDIDATE_TARGETS = ['lessons-4', 'lessons', 'lessons-56-2f', 'lessons-56-variable', 'traveling-players', 'traveling-players-56'] as const
 
 const listener: CardListenerRegistration = {
   id: 'B152-junior-artist-after-place-farmer',

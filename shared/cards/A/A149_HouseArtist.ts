@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { constructUnitDiscountTrade } from '../helpers/construct-cost'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A149_HouseArtist'
 const triggerListener: CardListenerRegistration = {
@@ -11,7 +12,7 @@ const triggerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'traveling-players') return
+    if (!isTravelingPlayersSpaceId(context.space?.id)) return
     return {
       flow: {
         type: 'leaf',

@@ -3,9 +3,9 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { findTravelingPlayersSpace, TRAVELING_PLAYERS_SPACE_IDS } from '../helpers/action-space-categories'
 
 const CARD_ID = 'B155_ArtTeacher'
-const TRAVELING_PLAYERS = 'traveling-players'
 const TRAVELING_PLAYERS_FOOD = `${CARD_ID}:traveling-players-food` as const
 
 /**
@@ -39,7 +39,7 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['occupation'],
   phases: ['computeCosts' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const tp = context.state.actionSpaces.find((s) => s.id === TRAVELING_PLAYERS)
+    const tp = findTravelingPlayersSpace(context.state.actionSpaces)
     const tpFood = tp?.resources?.food ?? 0
     if (tpFood <= 0) return
 
@@ -50,7 +50,7 @@ const computeCostsListener: CardListenerRegistration = {
           sourceCard: CARD_ID,
           available: tpFood,
           covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
-          consume: { type: 'actionSpace', spaceId: TRAVELING_PLAYERS, resource: 'food' },
+          consume: { type: 'actionSpace', spaceId: tp!.id, resource: 'food' },
         },
       ],
       sourceCard: CARD_ID,
@@ -60,7 +60,7 @@ const computeCostsListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [onBuyListener, computeCostsListener],
-  reaches: [TRAVELING_PLAYERS] as readonly string[],
+  reaches: TRAVELING_PLAYERS_SPACE_IDS,
 } satisfies CardImpl
 
 export const B155_ArtTeacher = defineOccupationCard({

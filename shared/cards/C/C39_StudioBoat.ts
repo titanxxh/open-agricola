@@ -5,6 +5,7 @@ import { incCounter } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'C39_StudioBoat'
 registerPlayerActionSpace({
@@ -49,7 +50,7 @@ const travelingPlayersOwnerVp: CardListenerRegistration = {
     // context.space is the action space the farmer was placed on (resolved
     // from the engine's activeSpaceId). Only fire on the global Traveling
     // Players accumulation space, which exists only in 4-player games.
-    if (context.space?.id !== 'traveling-players') return
+    if (!isTravelingPlayersSpaceId(context.space?.id)) return
     return {
       flow: {
         type: 'leaf',

@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'E131_MarketMaster'
 const listener: CardListenerRegistration = {
@@ -11,7 +12,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'traveling-players') return
+    if (!isTravelingPlayersSpaceId(context.space?.id)) return
     // Only triggers when placing the last person
     if (workersAvailable(context.state, context.player) > 0) return
     return {

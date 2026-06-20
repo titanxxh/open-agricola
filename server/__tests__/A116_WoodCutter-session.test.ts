@@ -56,6 +56,29 @@ describe('A116_WoodCutter session', () => {
     expect(after.players[0]!.resources.wood).toBe(2 + 1)
   })
 
+  it.each(['copse-56', 'grove-56'])('gains 1 extra wood when using %s', (spaceId) => {
+    const session = new GameSession(undefined, undefined, { playerCount: 5 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    player.occupationHand.push('A116_WoodCutter')
+    setWorkersAtHome(state, player, 2)
+    player.resources.wood = 0
+
+    const space = state.actionSpaces.find((s) => s.id === spaceId)
+    expect(space).toBeDefined()
+    space!.resources.wood = 2
+
+    session.loadState(state)
+    session.devPlayCard(0, 'A116_WoodCutter')
+
+    const resp = session.takeAction(0, spaceId)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(3)
+  })
+
   it('does not trigger on non-wood spaces', () => {
     const session = setup()
 

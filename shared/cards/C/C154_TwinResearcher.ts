@@ -27,15 +27,19 @@ const CARD_ID = 'C154_TwinResearcher'
 type ResourceKey = 'wood' | 'clay' | 'food' | 'stone'
 
 const PAIRS: Record<string, { resource: ResourceKey; partners: string[] }> = {
-  forest: { resource: 'wood', partners: ['grove', 'copse', 'copse-add'] },
-  grove: { resource: 'wood', partners: ['forest', 'copse', 'copse-add'] },
-  copse: { resource: 'wood', partners: ['forest', 'grove', 'copse-add'] },
-  'copse-add': { resource: 'wood', partners: ['forest', 'grove', 'copse'] },
-  'clay-pit': { resource: 'clay', partners: ['hollow', 'hollow-4'] },
-  hollow: { resource: 'clay', partners: ['clay-pit', 'hollow-4'] },
-  'hollow-4': { resource: 'clay', partners: ['clay-pit', 'hollow'] },
-  fishing: { resource: 'food', partners: ['traveling-players'] },
+  forest: { resource: 'wood', partners: ['grove', 'copse', 'copse-add', 'grove-56', 'copse-56'] },
+  grove: { resource: 'wood', partners: ['forest', 'copse', 'copse-add', 'grove-56', 'copse-56'] },
+  copse: { resource: 'wood', partners: ['forest', 'grove', 'copse-add', 'grove-56', 'copse-56'] },
+  'copse-add': { resource: 'wood', partners: ['forest', 'grove', 'copse', 'grove-56', 'copse-56'] },
+  'grove-56': { resource: 'wood', partners: ['forest', 'grove', 'copse', 'copse-add', 'copse-56'] },
+  'copse-56': { resource: 'wood', partners: ['forest', 'grove', 'copse', 'copse-add', 'grove-56'] },
+  'clay-pit': { resource: 'clay', partners: ['hollow', 'hollow-4', 'hollow-56'] },
+  hollow: { resource: 'clay', partners: ['clay-pit', 'hollow-4', 'hollow-56'] },
+  'hollow-4': { resource: 'clay', partners: ['clay-pit', 'hollow', 'hollow-56'] },
+  'hollow-56': { resource: 'clay', partners: ['clay-pit', 'hollow', 'hollow-4'] },
+  fishing: { resource: 'food', partners: ['traveling-players', 'traveling-players-56'] },
   'traveling-players': { resource: 'food', partners: ['fishing'] },
+  'traveling-players-56': { resource: 'food', partners: ['fishing'] },
   'eastern-quarry': { resource: 'stone', partners: ['western-quarry'] },
   'western-quarry': { resource: 'stone', partners: ['eastern-quarry'] },
 }
