@@ -81,7 +81,9 @@ import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
 import { A172_BoatPainter } from './A/A172_BoatPainter'
+import { A175_HollowGardener } from './A/A175_HollowGardener'
 import { A176_Wheelmaker } from './A/A176_Wheelmaker'
+import { A179_MountainShepherd } from './A/A179_MountainShepherd'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
 import { A19_Handplow } from './A/A19_Handplow'
 import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
@@ -250,7 +252,9 @@ import { B167_StableSergeant } from './B/B167_StableSergeant'
 import { B168_PastureMaster } from './B/B168_PastureMaster'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
+import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
+import { B180_GameTeaser } from './B/B180_GameTeaser'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
 import { B20_ChainFloat } from './B/B20_ChainFloat'
@@ -416,6 +420,8 @@ import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
 import { C174_StoneCustodian } from './C/C174_StoneCustodian'
+import { C176_Cleanacre } from './C/C176_Cleanacre'
+import { C177_MountainHiker } from './C/C177_MountainHiker'
 import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C18_RollOverPlow } from './C/C18_RollOverPlow'
 import { C19_SwingPlow } from './C/C19_SwingPlow'
@@ -583,6 +589,7 @@ import { D166_StableMilker } from './D/D166_StableMilker'
 import { D167_PureBreeder } from './D/D167_PureBreeder'
 import { D168_Stockman } from './D/D168_Stockman'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
+import { D174_LoessGardener } from './D/D174_LoessGardener'
 import { D177_Graduate } from './D/D177_Graduate'
 import { D18_SteamPlow } from './D/D18_SteamPlow'
 import { D19_PulverizerPlow } from './D/D19_PulverizerPlow'
@@ -935,7 +942,9 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
   'A172_BoatPainter': A172_BoatPainter.impl,
+  'A175_HollowGardener': A175_HollowGardener.impl,
   'A176_Wheelmaker': A176_Wheelmaker.impl,
+  'A179_MountainShepherd': A179_MountainShepherd.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
   'A19_Handplow': A19_Handplow.impl,
   'A2_ShiftingCultivation': A2_ShiftingCultivation.impl,
@@ -1104,7 +1113,9 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B168_PastureMaster': B168_PastureMaster.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
+  'B174_RiverbankGardener': B174_RiverbankGardener.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
+  'B180_GameTeaser': B180_GameTeaser.impl,
   'B19_MoldboardPlow': B19_MoldboardPlow.impl,
   'B2_MiniPasture': B2_MiniPasture.impl,
   'B20_ChainFloat': B20_ChainFloat.impl,
@@ -1270,6 +1281,8 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
   'C174_StoneCustodian': C174_StoneCustodian.impl,
+  'C176_Cleanacre': C176_Cleanacre.impl,
+  'C177_MountainHiker': C177_MountainHiker.impl,
   'C178_OnSiteReverend': C178_OnSiteReverend.impl,
   'C18_RollOverPlow': C18_RollOverPlow.impl,
   'C19_SwingPlow': C19_SwingPlow.impl,
@@ -1437,6 +1450,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D167_PureBreeder': D167_PureBreeder.impl,
   'D168_Stockman': D168_Stockman.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
+  'D174_LoessGardener': D174_LoessGardener.impl,
   'D177_Graduate': D177_Graduate.impl,
   'D18_SteamPlow': D18_SteamPlow.impl,
   'D19_PulverizerPlow': D19_PulverizerPlow.impl,

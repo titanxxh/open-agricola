@@ -95,6 +95,18 @@ export const sumActionSpaceMovedToTriggerPlayer = (
     (context.triggerPlayer ?? context.player).id,
   )
 
+export const sumActionSpaceMovedToTriggerPlayerFromSpace = (
+  context: CardListenerContext,
+  resource: keyof Resource,
+  spaceId: string | undefined = context.space?.id,
+): number =>
+  sumResourceMovedToPlayer(
+    context.actionEvents ?? context.transactionEvents,
+    resource,
+    (context.triggerPlayer ?? context.player).id,
+    (event) => event.from.kind === 'actionSpace' && event.from.spaceId === spaceId,
+  )
+
 export const sumResourcePaid = (
   events: readonly QueryableGameEvent[] | undefined,
   resource: keyof Resource,
