@@ -12,8 +12,8 @@
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
-| 已接受 / 产品策略差异 | 41 |
-| 排除的 BGA legacy 或未实现行为目标 | 32 |
+| 已接受 / 产品策略差异 | 42 |
+| 排除的 BGA legacy 或未实现行为目标 | 31 |
 | 本轮审计视为已对齐 | 815 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
@@ -41,7 +41,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
-| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
+| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A174_MasterHora`, `D25_WitchesDanceFloor` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 | Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
@@ -564,7 +564,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A171_Sidekick` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A172_BoatPainter` | 已对齐 | 5+ 产品扩展实现：work phase return home 前，Fishing 与 Traveling Players（含 5-6 扩展格）均被占用时，选择 1 grain 或 2 food。 |
 | `A173_ClayThief` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `A174_MasterHora` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A174_MasterHora` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner 在六个 5/6 灰色农夫 linked extension spaces 放人前，可选 1 food -> 1 vegetable；若 before flow 后宿主行动异常不可执行，进入 engine-blocked undo-only 状态。 |
 | `A175_HollowGardener` | 已对齐 | 5+ 产品扩展实现：after collect 读取 Hollow（含 hollow-56）实际 clay provenance，3-5 clay 给 grain，6+ clay 给 vegetable。 |
 | `A176_Wheelmaker` | 已对齐 | 5+ 产品扩展实现：onBuy 要求已有另一个职业，且自身 wood 严格大于其他玩家合计 wood，低于 15 时补到 15。 |
 | `A177_Middleman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |

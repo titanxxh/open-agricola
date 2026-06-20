@@ -81,6 +81,7 @@ import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
 import { A172_BoatPainter } from './A/A172_BoatPainter'
+import { A174_MasterHora } from './A/A174_MasterHora'
 import { A175_HollowGardener } from './A/A175_HollowGardener'
 import { A176_Wheelmaker } from './A/A176_Wheelmaker'
 import { A178_CarpentersBoy } from './A/A178_CarpentersBoy'
@@ -947,6 +948,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
   'A172_BoatPainter': A172_BoatPainter.impl,
+  'A174_MasterHora': A174_MasterHora.impl,
   'A175_HollowGardener': A175_HollowGardener.impl,
   'A176_Wheelmaker': A176_Wheelmaker.impl,
   'A178_CarpentersBoy': A178_CarpentersBoy.impl,
