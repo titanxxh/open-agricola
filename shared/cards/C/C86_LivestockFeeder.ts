@@ -18,6 +18,7 @@ const cardImpl = {
       capacity: grain,
       animalType: null,
       animalCount: 0,
+      allowedAnimalType: null,
     })
   },
   /**

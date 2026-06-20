@@ -901,6 +901,25 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(flow).toMatchObject({ type: 'leaf', params: { food: 1 } })
   })
 
+  it('B172 Cattle Caregiver ignores stale cattle when only a non-cattle card zone remains visible', () => {
+    const session = setupRoundStartHookSession('B172_CattleCaregiver', 5)
+    givePastureCattle(session, 0)
+    givePastureCattle(session, 1)
+    const state = session.getState().state
+    state.players[2]!.occupationPlayed.push('B169_LivestockSustainer', 'B148_PetBroker')
+    state.players[2]!.resources.cattle = 1
+    state.players[2]!.cardStates = {
+      B169_LivestockSustainer: { extraData: { animalCounts: { cattle: 1 } } },
+    }
+    session.loadState(state)
+    const updatedState = session.getState().state
+    const player = updatedState.players[0]!
+
+    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+
+    expect(flow).toBeNull()
+  })
+
   it('A172 Boat Painter offers grain or food when Fishing and 5-6 Traveling Players are occupied', () => {
     const session = setupWorkPhaseHookSession('A172_BoatPainter', 5)
     occupySpace(session, 'fishing')

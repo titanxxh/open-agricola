@@ -1,7 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { computeAnimalZones } from '../../domain/animal-zones'
-import { getAssignedAnimalsByType } from '../../domain/animals'
+import { computeAnimalZones, readAnimalCountsForZoneAssignment } from '../../domain/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B172_CattleCaregiver'
@@ -9,13 +8,9 @@ const hasLegallyHeldCattle = (
   state: Parameters<typeof computeAnimalZones>[1],
   player: Parameters<typeof computeAnimalZones>[0],
 ) => {
-  const zones = computeAnimalZones(player, state)
-  if (zones.some((zone) =>
-    zone.animalType === 'cattle' && (zone.animalCount ?? 0) > 0 && zone.capacity > 0)) {
-    return true
-  }
-  if (getAssignedAnimalsByType(player).cattle <= 0) return false
-  return zones.some((zone) => zone.zoneType === 'card' && zone.capacity > 0)
+  return computeAnimalZones(player, state).some((zone) =>
+    zone.capacity > 0 && readAnimalCountsForZoneAssignment(zone).cattle > 0,
+  )
 }
 
 const cardImpl = {
