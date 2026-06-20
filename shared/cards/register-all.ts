@@ -80,6 +80,7 @@ import { A166_Haydryer } from './A/A166_Haydryer'
 import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
+import { A176_Wheelmaker } from './A/A176_Wheelmaker'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
 import { A19_Handplow } from './A/A19_Handplow'
 import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
@@ -412,6 +413,7 @@ import { C166_CattleWhisperer } from './C/C166_CattleWhisperer'
 import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
+import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C18_RollOverPlow } from './C/C18_RollOverPlow'
 import { C19_SwingPlow } from './C/C19_SwingPlow'
 import { C2_Stable } from './C/C2_Stable'
@@ -578,6 +580,7 @@ import { D166_StableMilker } from './D/D166_StableMilker'
 import { D167_PureBreeder } from './D/D167_PureBreeder'
 import { D168_Stockman } from './D/D168_Stockman'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
+import { D177_Graduate } from './D/D177_Graduate'
 import { D18_SteamPlow } from './D/D18_SteamPlow'
 import { D19_PulverizerPlow } from './D/D19_PulverizerPlow'
 import { D2_DwellingPlan } from './D/D2_DwellingPlan'
@@ -928,6 +931,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A167_BreederBuyer': A167_BreederBuyer.impl,
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
+  'A176_Wheelmaker': A176_Wheelmaker.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
   'A19_Handplow': A19_Handplow.impl,
   'A2_ShiftingCultivation': A2_ShiftingCultivation.impl,
@@ -1260,6 +1264,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C167_CattleBuyer': C167_CattleBuyer.impl,
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
+  'C178_OnSiteReverend': C178_OnSiteReverend.impl,
   'C18_RollOverPlow': C18_RollOverPlow.impl,
   'C19_SwingPlow': C19_SwingPlow.impl,
   'C2_Stable': C2_Stable.impl,
@@ -1426,6 +1431,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D167_PureBreeder': D167_PureBreeder.impl,
   'D168_Stockman': D168_Stockman.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
+  'D177_Graduate': D177_Graduate.impl,
   'D18_SteamPlow': D18_SteamPlow.impl,
   'D19_PulverizerPlow': D19_PulverizerPlow.impl,
   'D2_DwellingPlan': D2_DwellingPlan.impl,
