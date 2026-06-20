@@ -17,6 +17,7 @@ import {
   resolveUnitCostWithDelta,
 } from '../actions/payment/internal'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
+import { ANIMAL_KEYS, readAnimalHolderCounts } from './animal-holder-state.ts'
 import {
   computeExtraSowableFields,
   collectLockedFarmTileKeys,
@@ -470,9 +471,6 @@ const getPastureCapacityLocal = (pasture: Pasture) =>
 
 const animalTypes = ['sheep', 'boar', 'cattle'] as const
 
-const isFarmAnimalType = (value: unknown): value is FarmAnimalType =>
-  value === 'sheep' || value === 'boar' || value === 'cattle'
-
 const countPastureAnimals = (player: PlayerFarmAnimalState) => {
   const totals: Record<FarmAnimalType, number> = { sheep: 0, boar: 0, cattle: 0 }
   for (const pasture of player.pastures ?? []) {
@@ -491,13 +489,8 @@ const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
     if (animal) totals[animal] += 1
   })
   Object.values(player.cardStates ?? {}).forEach((cardState) => {
-    const extraData = cardState?.extraData as
-      | { held?: unknown; animalType?: unknown }
-      | undefined
-    if (!extraData || !isFarmAnimalType(extraData.animalType)) return
-    const held = extraData.held
-    if (typeof held !== 'number' || !Number.isFinite(held) || held <= 0) return
-    totals[extraData.animalType] += Math.floor(held)
+    const counts = readAnimalHolderCounts(cardState?.extraData)
+    for (const key of ANIMAL_KEYS) totals[key] += counts[key]
   })
   const c148Held = player.cardStates?.C148_MudWallower?.counters?.held ?? 0
   if (c148Held > 0) {

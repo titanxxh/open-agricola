@@ -7,6 +7,14 @@ import type {
   Resource,
 } from '../../contract/types'
 import { playerBoard } from '../../domain'
+import {
+  ANIMAL_KEYS,
+  clampAnimalCountsToCapacity,
+  createAnimalCounts,
+  readAnimalHolderCounts,
+  sumAnimalCounts,
+  writeAnimalHolderCounts,
+} from '../../domain/animal-holder-state'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -20,6 +28,7 @@ export type ZoneAssignment = {
   cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
+  animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
 }
 
 export const applyReorganizeMutate = (
@@ -29,7 +38,12 @@ export const applyReorganizeMutate = (
 ): void => {
   const totals = zones.reduce(
     (acc, z) => {
-      if (z.animalType) acc[z.animalType] += z.animalCount
+      const counts = readAnimalHolderCounts(z)
+      if (sumAnimalCounts(counts) > 0) {
+        for (const key of ANIMAL_KEYS) acc[key] += counts[key]
+      } else if (z.animalType) {
+        acc[z.animalType] += z.animalCount
+      }
       return acc
     },
     { sheep: 0, boar: 0, cattle: 0 },
@@ -59,27 +73,38 @@ export const applyReorganizeMutate = (
     })
   player.stableAnimals = stable
 
-  const cardZones = computed.filter((z) => z.zoneType === 'card' && z.cardId)
-  for (const zone of cardZones) {
-    const cardId = zone.cardId!
+  const cardZonesById = new Map<string, typeof computed>()
+  computed
+    .filter((z) => z.zoneType === 'card' && z.cardId)
+    .forEach((zone) => {
+      const group = cardZonesById.get(zone.cardId!) ?? []
+      group.push(zone)
+      cardZonesById.set(zone.cardId!, group)
+    })
+  for (const [cardId, cardZones] of cardZonesById) {
     const existing = player.cardStates?.[cardId]
     if (typeof existing?.counters?.held === 'number') continue
-    const assigned = zones.find((z) => z.zoneType === 'card' && z.id === zone.id)
-    const count = assigned?.animalType
-      ? Math.max(0, Math.min(cap(zone.id), assigned.animalCount))
-      : 0
-    const animalType = count > 0 ? assigned?.animalType ?? null : null
-    if (!animalType && !existing?.extraData) continue
+    const zoneIds = new Set(cardZones.map((zone) => zone.id))
+    const assignedCounts = createAnimalCounts()
+    zones
+      .filter((z) => z.zoneType === 'card' && zoneIds.has(z.id))
+      .forEach((assigned) => {
+        const perType = readAnimalHolderCounts(assigned)
+        if (sumAnimalCounts(perType) > 0) {
+          for (const key of ANIMAL_KEYS) assignedCounts[key] += perType[key]
+          return
+        }
+        if (assigned.animalType && assigned.animalCount > 0) {
+          assignedCounts[assigned.animalType] += assigned.animalCount
+        }
+      })
+    const capacity = Math.max(...cardZones.map((zone) => cap(zone.id)), 0)
+    const { counts } = clampAnimalCountsToCapacity(assignedCounts, capacity)
+    if (sumAnimalCounts(counts) <= 0 && !existing?.extraData) continue
     player.cardStates ??= {}
     const nextState = { ...(player.cardStates[cardId] ?? {}) }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
-    if (animalType) {
-      extraData.held = count
-      extraData.animalType = animalType
-    } else {
-      delete extraData.held
-      delete extraData.animalType
-    }
+    writeAnimalHolderCounts(extraData, counts)
     nextState.extraData = extraData
     player.cardStates[cardId] = nextState
   }

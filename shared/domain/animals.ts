@@ -1,11 +1,15 @@
 import type { PlayerState } from '../contract/types'
 import type { AnimalKey } from '../contract/animals'
+import {
+  ANIMAL_KEYS,
+  createAnimalCounts,
+  isAnimalKey,
+  readAnimalHolderCounts,
+  writeAnimalHolderCounts,
+} from './animal-holder-state'
 export type { AnimalKey }
 
-const ZERO: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0 }
-
-const isAnimalKey = (s: unknown): s is AnimalKey =>
-  s === 'sheep' || s === 'boar' || s === 'cattle'
+const ZERO: Record<AnimalKey, number> = createAnimalCounts()
 
 /**
  * Count animals placed on a player's board (pasture + house + stable + animal-holder cards).
@@ -14,8 +18,9 @@ const isAnimalKey = (s: unknown): s is AnimalKey =>
  *
  * Equivalent to BGA `countAnimalsOnBoard()` semantically.
  *
- * Animal-holder cards report their held animals via
- *   `cardStates[cardId].extraData = { held: number, animalType: AnimalKey }`.
+ * Animal-holder cards report held animals via
+ *   `cardStates[cardId].extraData.animalCounts`, or legacy single-type
+ *   `{ held: number, animalType: AnimalKey }`.
  *
  * Note: cards using `cardStates[cardId].counters.held` (e.g. C148_MudWallower)
  * are intentionally NOT counted here — that counter encodes permanent capacity,
@@ -38,13 +43,8 @@ export const getAssignedAnimalsByType = (player: PlayerState): Record<AnimalKey,
     if (animal && isAnimalKey(animal)) result[animal] += 1
   }
   for (const state of Object.values(player.cardStates ?? {})) {
-    const extra = state?.extraData as { held?: unknown; animalType?: unknown } | undefined
-    if (!extra) continue
-    const animalType = extra.animalType
-    if (!isAnimalKey(animalType)) continue
-    const held = extra.held
-    if (typeof held !== 'number' || !Number.isFinite(held) || held <= 0) continue
-    result[animalType] += held
+    const counts = readAnimalHolderCounts(state?.extraData)
+    for (const key of ANIMAL_KEYS) result[key] += counts[key]
   }
   return result
 }
@@ -98,14 +98,17 @@ export const subtractAnimalsFromBoard = (
         remaining -= 1
       }
     }
-    // 4. animal-holder cards (cardStates extraData.held)
+    // 4. animal-holder cards
     if (remaining > 0) {
       for (const state of Object.values(player.cardStates ?? {})) {
         if (remaining <= 0) break
-        const extra = state?.extraData as { held?: number; animalType?: string } | undefined
-        if (!extra || extra.animalType !== type) continue
-        const take = Math.min(extra.held ?? 0, remaining)
-        extra.held = (extra.held ?? 0) - take
+        const extra = state?.extraData as Record<string, unknown> | undefined
+        if (!extra) continue
+        const counts = readAnimalHolderCounts(extra)
+        const take = Math.min(counts[type], remaining)
+        if (take <= 0) continue
+        counts[type] -= take
+        writeAnimalHolderCounts(extra, counts)
         remaining -= take
       }
     }

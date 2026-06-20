@@ -2,14 +2,18 @@ import { defineOccupationCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import type { GameState, PlayerState } from '../../contract/types'
+import {
+  ANIMAL_KEYS,
+  clampAnimalCountsToCapacity,
+  readAnimalHolderCounts,
+  subtractAnimalCountsFromResources,
+  sumAnimalCounts,
+  writeAnimalHolderCounts,
+  type AnimalCounts,
+} from '../../domain/animal-holder-state'
 
 const CARD_ID = 'B169_LivestockSustainer'
 const MAX_CAPACITY = 8
-const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
-type AnimalType = (typeof ANIMAL_TYPES)[number]
-
-const isAnimalType = (value: unknown): value is AnimalType =>
-  ANIMAL_TYPES.includes(value as AnimalType)
 
 const countOtherPlayerMajors = (player: PlayerState, state: GameState) => {
   const players = Array.isArray(state.players) ? state.players : [player]
@@ -20,18 +24,27 @@ const countOtherPlayerMajors = (player: PlayerState, state: GameState) => {
   return Math.min(count, MAX_CAPACITY)
 }
 
-const readHeldAnimals = (player: PlayerState, capacity: number) => {
-  const extra = player.cardStates?.[CARD_ID]?.extraData as
-    | { held?: unknown; animalType?: unknown }
-    | undefined
-  if (!isAnimalType(extra?.animalType)) return { animalType: null, animalCount: 0 }
-  if (typeof extra.held !== 'number' || !Number.isFinite(extra.held)) {
-    return { animalType: null, animalCount: 0 }
+const singleAnimalType = (counts: AnimalCounts) => {
+  const occupiedTypes = ANIMAL_KEYS.filter((key) => counts[key] > 0)
+  return occupiedTypes.length === 1 ? occupiedTypes[0]! : null
+}
+
+const syncHeldAnimals = (player: PlayerState, capacity: number) => {
+  const existing = player.cardStates?.[CARD_ID]
+  const existingExtra = existing?.extraData as Record<string, unknown> | undefined
+  const held = readAnimalHolderCounts(existingExtra)
+  if (sumAnimalCounts(held) <= 0 && !existingExtra) return held
+  const { counts, discarded } = clampAnimalCountsToCapacity(held, capacity)
+  if (sumAnimalCounts(discarded) > 0) {
+    subtractAnimalCountsFromResources(player, discarded)
   }
-  const animalCount = Math.min(capacity, Math.max(0, Math.floor(extra.held)))
-  return animalCount > 0
-    ? { animalType: extra.animalType, animalCount }
-    : { animalType: null, animalCount: 0 }
+  player.cardStates ??= {}
+  const nextState = { ...(player.cardStates[CARD_ID] ?? {}) }
+  const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
+  writeAnimalHolderCounts(extraData, counts)
+  nextState.extraData = extraData
+  player.cardStates[CARD_ID] = nextState
+  return counts
 }
 
 const cardImpl = {
@@ -39,15 +52,15 @@ const cardImpl = {
     id: CARD_ID,
     onComputeAnimalZones: (player, zones, state) => {
       const capacity = countOtherPlayerMajors(player, state)
+      const held = syncHeldAnimals(player, capacity)
       if (capacity <= 0) return
-      const held = readHeldAnimals(player, capacity)
       zones.push({
         id: `card:${CARD_ID}`,
         zoneType: 'card',
         cardId: CARD_ID,
         capacity,
-        animalType: held.animalType,
-        animalCount: held.animalCount,
+        animalType: singleAnimalType(held),
+        animalCount: sumAnimalCounts(held),
       })
     },
     getInvalidAnimals: () => [],
