@@ -80,6 +80,7 @@ import { A166_Haydryer } from './A/A166_Haydryer'
 import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
+import { A172_BoatPainter } from './A/A172_BoatPainter'
 import { A176_Wheelmaker } from './A/A176_Wheelmaker'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
 import { A19_Handplow } from './A/A19_Handplow'
@@ -248,6 +249,7 @@ import { B166_CattleFeeder } from './B/B166_CattleFeeder'
 import { B167_StableSergeant } from './B/B167_StableSergeant'
 import { B168_PastureMaster } from './B/B168_PastureMaster'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
+import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
@@ -413,6 +415,7 @@ import { C166_CattleWhisperer } from './C/C166_CattleWhisperer'
 import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
+import { C174_StoneCustodian } from './C/C174_StoneCustodian'
 import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C18_RollOverPlow } from './C/C18_RollOverPlow'
 import { C19_SwingPlow } from './C/C19_SwingPlow'
@@ -931,6 +934,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A167_BreederBuyer': A167_BreederBuyer.impl,
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
+  'A172_BoatPainter': A172_BoatPainter.impl,
   'A176_Wheelmaker': A176_Wheelmaker.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
   'A19_Handplow': A19_Handplow.impl,
@@ -1099,6 +1103,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B167_StableSergeant': B167_StableSergeant.impl,
   'B168_PastureMaster': B168_PastureMaster.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
+  'B172_CattleCaregiver': B172_CattleCaregiver.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
   'B19_MoldboardPlow': B19_MoldboardPlow.impl,
   'B2_MiniPasture': B2_MiniPasture.impl,
@@ -1264,6 +1269,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C167_CattleBuyer': C167_CattleBuyer.impl,
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
+  'C174_StoneCustodian': C174_StoneCustodian.impl,
   'C178_OnSiteReverend': C178_OnSiteReverend.impl,
   'C18_RollOverPlow': C18_RollOverPlow.impl,
   'C19_SwingPlow': C19_SwingPlow.impl,
