@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { D172_PutcherMaker } from '../../shared/cards/D/D172_PutcherMaker'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const setupLessonsSession = (cardId: string, food = 10) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
@@ -88,6 +89,41 @@ const setupActionRewardSession = (cardId: string, playerCount = 6, food = 0) => 
   return session
 }
 
+const setupFarmEventSession = (cardId: string, currentPlayerIndex = 0, ownerFood = 0) => {
+  const session = new GameSession(undefined, undefined, { playerCount: 6 })
+  const state = session.getState().state
+  state.currentPlayerIndex = currentPlayerIndex
+  state.round = 14
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    setWorkersAtHome(state, player, 2)
+  }
+  const owner = state.players[0]!
+  owner.occupationPlayed.push(cardId)
+  owner.resources.food = ownerFood
+  session.loadState(state)
+  return session
+}
+
+const confirmPlayerSwitches = (
+  session: GameSession,
+  response: ReturnType<GameSession['takeAction']>,
+) => {
+  let resp = response
+  while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+    resp = confirmPlayerSwitch(session)
+  }
+  return resp
+}
+
+const fenceEdgesForTile = (row: number, col: number) => [
+  `H-${row}-${col}`,
+  `H-${row + 1}-${col}`,
+  `V-${row}-${col}`,
+  `V-${row}-${col + 1}`,
+]
+
 const givePastureCattle = (session: GameSession, playerIndex: number) => {
   const state = session.getState().state
   const player = state.players[playerIndex]!
@@ -145,6 +181,135 @@ const completeFirstPlowSelection = (session: GameSession, playerIndex = 0) => {
 }
 
 describe('Agricola 5-6 simple occupation cards', () => {
+  it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
+    const session = setupFarmEventSession('A178_CarpentersBoy', 1)
+    const state = session.getState().state
+    const opponent = state.players[1]!
+    opponent.resources.wood = 10
+    opponent.resources.reed = 4
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'house-building-56')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    const rooms = resp.interaction.farm.selectableTiles.slice(0, 2)
+    expect(rooms).toHaveLength(2)
+
+    resp = session.commitSelectionChoice(1, { rooms })
+    expect(resp.ok).toBe(true)
+    resp = confirmPlayerSwitches(session, resp)
+
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
+    expect(resp.state.players[1]!.rooms).toBe(4)
+  })
+
+  it("A178 Carpenter's Boy ignores the owner's own room builds", () => {
+    const session = setupFarmEventSession('A178_CarpentersBoy', 0)
+    const state = session.getState().state
+    const owner = state.players[0]!
+    owner.resources.wood = 5
+    owner.resources.reed = 2
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-building-56')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const room = resp.interaction.farm.selectableTiles[0]
+    expect(room).toBeDefined()
+
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('B177 Stone Clawer gives one stone after each successful plow leaf', () => {
+    const session = setupFarmEventSession('B177_StoneClawer')
+
+    let resp = session.takeAction(0, 'farmland')
+    expect(resp.ok).toBe(true)
+    resp = completeFirstPlowSelection(session)
+
+    expect(resp.state.players[0]!.fields).toHaveLength(1)
+    expect(resp.state.players[0]!.resources.stone).toBe(1)
+  })
+
+  it('C179 Bovine Pioneer gives at most one cattle when fencing creates new pastures', () => {
+    const session = setupFarmEventSession('C179_BovinePioneer')
+    const state = session.getState().state
+    state.players[0]!.resources.wood = 8
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('fence')
+
+    resp = session.commitSelectionChoice(0, {
+      edges: [
+        ...fenceEdgesForTile(1, 1),
+        ...fenceEdgesForTile(1, 3),
+      ],
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.players[0]!.pastures).toHaveLength(2)
+    expect(resp.state.players[0]!.resources.cattle).toBe(1)
+  })
+
+  it('D169 Plowsmith can pay food to plow after an opponent takes 4 wood from accumulation', () => {
+    const session = setupFarmEventSession('D169_Plowsmith', 1, 1)
+    setActionSpaceResources(session, 'forest', { wood: 4 })
+
+    let resp = session.takeAction(1, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    }
+
+    resp = confirmPlayerSwitches(session, resp)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+    resp = completeFirstPlowSelection(session)
+
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.fields).toHaveLength(1)
+    expect(resp.state.players[1]!.resources.wood).toBe(4)
+  })
+
+  it('D169 Plowsmith ignores owner, sub-threshold, and non-accumulation wood takes', () => {
+    const ownerUse = setupFarmEventSession('D169_Plowsmith', 0, 1)
+    setActionSpaceResources(ownerUse, 'forest', { wood: 4 })
+    let resp = ownerUse.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toHaveLength(0)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+
+    const smallTake = setupFarmEventSession('D169_Plowsmith', 1, 1)
+    setActionSpaceResources(smallTake, 'forest', { wood: 3 })
+    resp = smallTake.takeAction(1, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toHaveLength(0)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+
+    const instantGain = setupFarmEventSession('D169_Plowsmith', 1, 1)
+    resp = instantGain.takeAction(1, 'resource-market-56')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toHaveLength(0)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+  })
+
   it.each([
     ['hollow-56', 6, { vegetable: 1, grain: 0 }],
     ['hollow-56', 3, { grain: 1, vegetable: 0 }],
