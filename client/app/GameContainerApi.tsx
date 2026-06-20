@@ -124,6 +124,9 @@ const zoneAnimalCounts = (zone: AnimalReorgState['zones'][number]) => {
   return counts
 }
 
+const cardZoneAllowsMixedAnimals = (zone: AnimalReorgState['zones'][number]) =>
+  zone.zoneType === 'card' && zone.allowedAnimalType === null
+
 const addAnimalCounts = (
   target: Record<ReorgAnimalType, number>,
   counts: Partial<Record<ReorgAnimalType, number>>,
@@ -1583,7 +1586,7 @@ export const GameContainerApi = () => {
         const remaining = available[animalType] - baseTotals[animalType]
         if (remaining <= 0) return prev
 
-        if (current.zoneType === 'card') {
+        if (cardZoneAllowsMixedAnimals(current)) {
           const nextCounts = { ...currentCounts }
           if (animalCountsTotal(nextCounts) >= capacity) return prev
           nextCounts[animalType] += 1
@@ -1609,8 +1612,9 @@ export const GameContainerApi = () => {
 
         const zones = prev.zones.map((zone) => {
           if (zone.id !== zoneId) return zone
+          const { animalCounts: _animalCounts, ...rest } = zone
           return {
-            ...zone,
+            ...rest,
             animalType,
             animalCount: nextCount,
           }
@@ -1618,7 +1622,7 @@ export const GameContainerApi = () => {
         return { ...prev, zones, confirmDiscard: false }
       }
 
-      if (current.zoneType === 'card') {
+      if (cardZoneAllowsMixedAnimals(current)) {
         const currentCounts = zoneAnimalCounts(current)
         if (currentCounts[animalType] <= 0) return prev
         const nextCounts = { ...currentCounts, [animalType]: currentCounts[animalType] - 1 }
@@ -1641,8 +1645,9 @@ export const GameContainerApi = () => {
       const nextCount = Math.max(0, current.animalCount - 1)
       const zones = prev.zones.map((zone) => {
         if (zone.id !== zoneId) return zone
+        const { animalCounts: _animalCounts, ...rest } = zone
         return {
-          ...zone,
+          ...rest,
           animalType: nextCount > 0 ? animalType : null,
           animalCount: nextCount,
         }
