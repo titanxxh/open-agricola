@@ -416,6 +416,37 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toEqual({})
   })
 
+  it('B169 Livestock Sustainer reports pending animals when capacity shrinks below stored animals', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    session.loadState(state)
+
+    let resp = session.devSetResources(0, { sheep: 1, boar: 1 })
+    expect(resp.ok).toBe(true)
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'boar', animalCount: 1 },
+      ],
+    })
+    expect(resp.ok).toBe(true)
+
+    const updatedState = session.getState().state
+    updatedState.players[1]!.improvements = ['Major_Fireplace1']
+    session.loadState(updatedState)
+
+    const owner = session.getState().state.players[0]!
+    expect(getLivestockSustainerZone(session)).toMatchObject({
+      animalCount: 1,
+      capacity: 1,
+    })
+    expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
+      animalCounts: { sheep: 1, boar: 1 },
+    })
+    expect(session.hasPendingAnimalsCheck(owner)).toBe(true)
+  })
+
   it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
     const session = setupFarmEventSession('A178_CarpentersBoy', 1)
     const state = session.getState().state
