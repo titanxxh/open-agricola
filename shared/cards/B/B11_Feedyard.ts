@@ -18,6 +18,7 @@ const cardImpl = {
         capacity: pastureCount,
         animalType: null,
         animalCount: 0,
+        allowedAnimalType: null,
       })
     },
     /**

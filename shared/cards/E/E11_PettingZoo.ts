@@ -23,6 +23,7 @@ const cardImpl = {
       capacity: player.rooms,
       animalType: null,
       animalCount: 0,
+      allowedAnimalType: null,
     })
   },
   /**

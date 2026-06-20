@@ -111,6 +111,22 @@ const fixedAnimalTypeForZone = (zone: AnimalZone): AnimalType | null => {
   return null
 }
 
+const allowsMixedAnimalTypes = (zone: AnimalZone): boolean =>
+  'allowedAnimalType' in zone && zone.allowedAnimalType == null
+
+const preferredSingleAnimalType = (
+  value: unknown,
+  counts: Partial<Record<AnimalType, number>>,
+): AnimalType | null => {
+  const assignment = value && typeof value === 'object'
+    ? value as { animalType?: unknown }
+    : undefined
+  if (isAnimalKey(assignment?.animalType) && (counts[assignment.animalType] ?? 0) > 0) {
+    return assignment.animalType
+  }
+  return singleAnimalType(counts) ?? ANIMAL_KEYS.find((key) => (counts[key] ?? 0) > 0) ?? null
+}
+
 const applyAnimalCountsToZone = (
   zone: AnimalZone,
   counts: Partial<Record<AnimalType, number>>,
@@ -118,7 +134,8 @@ const applyAnimalCountsToZone = (
 ) => {
   const compact = compactAnimalCounts(counts)
   const total = sumAnimalCounts(compact)
-  zone.allowedAnimalType = fixedAnimalType
+  if (fixedAnimalType || 'allowedAnimalType' in zone) zone.allowedAnimalType = fixedAnimalType
+  else delete zone.allowedAnimalType
   zone.animalCount = total
   if (total <= 0) {
     delete zone.animalCounts
@@ -145,6 +162,11 @@ export const normalizeAnimalCountsForZone = (
   if (fixedType) {
     for (const key of ANIMAL_KEYS) {
       if (key !== fixedType) raw[key] = 0
+    }
+  } else if (!allowsMixedAnimalTypes(zone)) {
+    const type = preferredSingleAnimalType(value, raw)
+    for (const key of ANIMAL_KEYS) {
+      if (key !== type) raw[key] = 0
     }
   }
   let counts = clampAnimalCountsToCapacity(raw, zone.capacity).counts

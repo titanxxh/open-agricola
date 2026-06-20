@@ -6,6 +6,8 @@ import type {
   GameState,
   PlayerState,
 } from '../../../contract/types'
+import '../../../cards/B/B12_Stockyard'
+import '../../../cards/C/C148_MudWallower'
 
 const dummySpace: ActionSpace = {
   id: '__subflow:reorganize',
@@ -130,5 +132,59 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.pastures[0]!.animalCount).toBe(2)
     expect(ctx.player.pastures[0]!.animalType).toBe('sheep')
     expect(ctx.player.resources.sheep).toBe(2)
+  })
+
+  it('normalizes mixed animalCounts on same-type unkeyed card zones', () => {
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: ['B12_Stockyard'],
+        resources: { sheep: 1, boar: 1 } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: 'card:B12_Stockyard',
+        zoneType: 'card',
+        animalType: 'boar',
+        animalCount: 2,
+        animalCounts: { sheep: 1, boar: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(0)
+    expect(ctx.player.resources.boar).toBe(1)
+  })
+
+  it('normalizes counters-held card zones before adding them to totals', () => {
+    const ctx = makeCtx({
+      player: {
+        occupationPlayed: ['C148_MudWallower'],
+        resources: { sheep: 1 } as never,
+        cardStates: {
+          C148_MudWallower: { counters: { counter: 0, held: 1 } },
+        } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: 'card:C148_MudWallower',
+        zoneType: 'card',
+        cardId: 'C148_MudWallower',
+        animalType: 'sheep',
+        animalCount: 1,
+        animalCounts: { sheep: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(0)
+    expect(ctx.player.resources.boar).toBe(0)
   })
 })
