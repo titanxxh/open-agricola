@@ -8,13 +8,27 @@ import { getCardMeta } from '../../services/card-meta'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
-const BOARD_W_6P = 1130
+const BOARD_W_5P = 1190
+const BOARD_W_6P = 1370
 const BOARD_H = 795
 
 type Pos = { top: number; left: number; width: number; height: number; size: 's' | 'std' }
 
+type LinkedActionConnector = {
+  groupId: string
+  fromId: string
+  toId: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  midX: number
+  midY: number
+}
+
 const SIDE_PANEL_OFFSET = 170
-const SIX_PLAYER_RAIL_OFFSET = 130
+const SHARED_EXTENSION_OFFSET = 360
+const SIX_PLAYER_RAIL_OFFSET = 180
 
 const SIDE_ACTIONS: Record<string, Pos> = {
   'copse':             { top: 18,  left: 5,   width: 60,  height: 83,  size: 's' },
@@ -53,26 +67,48 @@ const SIDE_ACTION_OVERRIDES: Record<number, Partial<Record<string, Partial<Pos>>
 }
 
 const EXPANSION_56_ACTIONS: Record<string, Pos> = {
-  'lessons-56-2f':           { top: 18,  left: 5,  width: 115, height: 74, size: 'std' },
-  'copse-56':                { top: 102, left: 5,  width: 60,  height: 84, size: 's' },
-  'lessons-56-variable':     { top: 196, left: 5,  width: 115, height: 74, size: 'std' },
-  'modest-wish-children-56': { top: 280, left: 5,  width: 115, height: 74, size: 'std' },
-  'house-building-56':       { top: 364, left: 5,  width: 115, height: 86, size: 'std' },
-  'traveling-players-56':    { top: 460, left: 54, width: 65,  height: 84, size: 's' },
-  'riverbank-forest-56':     { top: 554, left: 5,  width: 60,  height: 84, size: 's' },
-  'grove-56':                { top: 648, left: 54, width: 60,  height: 84, size: 's' },
-  'hollow-56':               { top: 102, left: 95, width: 60,  height: 84, size: 's' },
-  'resource-market-56':      { top: 554, left: 45, width: 110, height: 65, size: 'std' },
-  'animal-market-56':        { top: 648, left: 5,  width: 115, height: 74, size: 'std' },
+  'lessons-56-2f':           { top: 18,  left: 24,  width: 115, height: 94,  size: 'std' },
+  'copse-56':                { top: 18,  left: 256, width: 60,  height: 83,  size: 's' },
+  'riverbank-forest-56':     { top: 140, left: 112, width: 60,  height: 110, size: 's' },
+  'grove-56':                { top: 146, left: 254, width: 60,  height: 86,  size: 's' },
+  'lessons-56-variable':     { top: 296, left: 24,  width: 115, height: 94,  size: 'std' },
+  'modest-wish-children-56': { top: 296, left: 206, width: 115, height: 94,  size: 'std' },
+  'animal-market-56':        { top: 430, left: 24,  width: 115, height: 134, size: 'std' },
+  'resource-market-56':      { top: 432, left: 192, width: 110, height: 65,  size: 'std' },
+  'hollow-56':               { top: 532, left: 230, width: 60,  height: 86,  size: 's' },
+  'house-building-56':       { top: 662, left: 24,  width: 115, height: 134, size: 'std' },
+  'traveling-players-56':    { top: 672, left: 244, width: 65,  height: 84,  size: 's' },
 }
 
 const SIX_ONLY_ACTIONS: Record<string, Pos> = {
-  'farm-supplies-6':  { top: 28,  left: 5, width: 115, height: 74, size: 'std' },
-  'resource-trade-6': { top: 114, left: 5, width: 115, height: 74, size: 'std' },
-  'corral-6':         { top: 200, left: 5, width: 115, height: 74, size: 'std' },
-  'side-job-6':       { top: 286, left: 5, width: 115, height: 74, size: 'std' },
-  'improvement-6':    { top: 372, left: 5, width: 115, height: 74, size: 'std' },
+  'farm-supplies-6':  { top: 18,  left: 52, width: 115, height: 94, size: 'std' },
+  'resource-trade-6': { top: 138, left: 52, width: 115, height: 94, size: 'std' },
+  'corral-6':         { top: 258, left: 52, width: 115, height: 74, size: 'std' },
+  'side-job-6':       { top: 358, left: 52, width: 115, height: 94, size: 'std' },
+  'improvement-6':    { top: 478, left: 52, width: 115, height: 94, size: 'std' },
 }
+
+const SHARED_EXTENSION_PATCHES = [
+  'patch-copse',
+  'patch-grove',
+  'patch-riverbank',
+  'patch-resource',
+  'patch-hollow',
+  'patch-travelers',
+  'patch-lessons-a',
+  'patch-lessons-b',
+  'patch-wish',
+  'patch-animal',
+  'patch-house',
+] as const
+
+const SIX_EXTENSION_PATCHES = [
+  'six-farming',
+  'six-building',
+  'six-corral',
+  'six-side-job',
+  'six-improvement',
+] as const
 
 type SlotPos = { top: number; left: number }
 
@@ -118,7 +154,7 @@ const ACCUMULATE_DIR: Record<string, 'left' | 'right' | 'bottom'> = {
   'hollow-56': 'right',
   'copse': 'right',
   'copse-56': 'right',
-  'riverbank-forest-56': 'right',
+  'riverbank-forest-56': 'left',
   'sheep-market': 'bottom',
   'western-quarry': 'bottom',
   'eastern-quarry': 'bottom',
@@ -140,7 +176,7 @@ const RESOURCE_OFFSET: Partial<Record<string, React.CSSProperties>> = {
   'traveling-players-56': { left: -54, bottom: 1 },
   'copse':             { left: 87, bottom: 5 },
   'copse-56':           { left: 87, bottom: 5 },
-  'riverbank-forest-56': { left: 87, bottom: 5 },
+  'riverbank-forest-56': { left: -54, bottom: 5 },
 }
 
 const RESOURCE_OFFSET_OVERRIDES: Record<number, Partial<Record<string, React.CSSProperties>>> = {
@@ -183,7 +219,7 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'modest-wish-children-56': ['<child>'],
   'house-building-56':  ['5<wood>2<reed><arrow><room-wood>', '5<clay>2<reed><arrow><room-clay>', '5<stone>2<reed><arrow><room-stone>'],
   'resource-market-56': ['+1<reed>+1<wood>+1<stone>'],
-  'animal-market-56':   ['1<sheep>+1<food>', '/', '1<pig>', '/', '[Pay] 1<food> 1<cattle>'],
+  'animal-market-56':   ['1<sheep>+1<food>', '/', '1<pig>', '/', '+1<cattle>-1<food>'],
   'farm-supplies-6':    ['[Pay] 1<food><arrow><field>', '[and/or]', '[Pay] 1<food><arrow>1<grain>'],
   'resource-trade-6':   ['+1<food>', '+1<reed>/<stone>', '+1<wood>/<clay>'],
   'corral-6':           ['+1<sheep>/<pig>/<cattle>'],
@@ -261,6 +297,7 @@ const ACTION_TOOLTIP_TEXT: Record<string, string[]> = {
 }
 
 function getIconLineClassName(actionId?: string): string {
+  if (actionId === 'animal-market-56') return 'icon-line icon-line--animal-market'
   return actionId === 'resource-market'
     ? 'icon-line icon-line--resource-market'
     : 'icon-line'
@@ -387,7 +424,8 @@ const getBoardPlayerCount = (players: PlayerState[]): 2 | 3 | 4 | 5 | 6 => {
 
 const getBoardOffset = (playerCount: 2 | 3 | 4 | 5 | 6) => {
   if (playerCount === 2) return 0
-  if (playerCount === 6) return SIDE_PANEL_OFFSET + SIX_PLAYER_RAIL_OFFSET
+  if (playerCount === 5) return SHARED_EXTENSION_OFFSET
+  if (playerCount === 6) return SHARED_EXTENSION_OFFSET + SIX_PLAYER_RAIL_OFFSET
   return SIDE_PANEL_OFFSET
 }
 
@@ -408,6 +446,66 @@ const shiftPositions = (positions: Record<string, Pos>, leftOffset: number): Rec
       shiftPos(pos, leftOffset),
     ]),
   ) as Record<string, Pos>
+
+const centerOfPos = (pos: Pos) => ({
+  x: pos.left + pos.width / 2,
+  y: pos.top + pos.height / 2,
+})
+
+const getLinkedConnector = (
+  groupId: string,
+  first: ActionSpace,
+  second: ActionSpace,
+  positions: Record<string, Pos>,
+): LinkedActionConnector | null => {
+  const firstPos = positions[first.id]
+  const secondPos = positions[second.id]
+  if (!firstPos || !secondPos) return null
+
+  const firstCenter = centerOfPos(firstPos)
+  const secondCenter = centerOfPos(secondPos)
+  const horizontal = Math.abs(firstCenter.x - secondCenter.x) >= Math.abs(firstCenter.y - secondCenter.y)
+  const [from, fromPos, fromCenter, to, toPos, toCenter] = horizontal
+    ? firstCenter.x <= secondCenter.x
+      ? [first, firstPos, firstCenter, second, secondPos, secondCenter]
+      : [second, secondPos, secondCenter, first, firstPos, firstCenter]
+    : firstCenter.y <= secondCenter.y
+      ? [first, firstPos, firstCenter, second, secondPos, secondCenter]
+      : [second, secondPos, secondCenter, first, firstPos, firstCenter]
+
+  const x1 = horizontal ? fromPos.left + fromPos.width : fromCenter.x
+  const y1 = horizontal ? fromCenter.y : fromPos.top + fromPos.height
+  const x2 = horizontal ? toPos.left : toCenter.x
+  const y2 = horizontal ? toCenter.y : toPos.top
+
+  return {
+    groupId,
+    fromId: from.id,
+    toId: to.id,
+    x1,
+    y1,
+    x2,
+    y2,
+    midX: (x1 + x2) / 2,
+    midY: (y1 + y2) / 2,
+  }
+}
+
+const getLinkedActionConnectors = (
+  spaces: ActionSpace[],
+  positions: Record<string, Pos>,
+): LinkedActionConnector[] => {
+  const byGroup = new Map<string, ActionSpace[]>()
+  for (const space of spaces) {
+    if (!space.linkedGroupId || !positions[space.id]) continue
+    byGroup.set(space.linkedGroupId, [...(byGroup.get(space.linkedGroupId) ?? []), space])
+  }
+  return Array.from(byGroup.entries()).flatMap(([groupId, group]) => {
+    if (group.length !== 2) return []
+    const connector = getLinkedConnector(groupId, group[0]!, group[1]!, positions)
+    return connector ? [connector] : []
+  })
+}
 
 const getBasePositions = (playerCount: 2 | 3 | 4 | 5 | 6): Record<string, Pos> => {
   const leftOffset = getBoardOffset(playerCount)
@@ -476,11 +574,21 @@ export const ActionBoard = ({
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
   const playerCount = getBoardPlayerCount(players)
   const boardClassName = `action-board action-board--${playerCount}p`
-  const boardWidth = playerCount === 2 ? BOARD_W_2P : playerCount === 6 ? BOARD_W_6P : BOARD_W_WITH_SIDE
+  const boardWidth = playerCount === 2
+    ? BOARD_W_2P
+    : playerCount === 5
+      ? BOARD_W_5P
+      : playerCount === 6
+        ? BOARD_W_6P
+        : BOARD_W_WITH_SIDE
   const basePositions = useMemo(() => getBasePositions(playerCount), [playerCount])
   const resourceOffsets = useMemo(() => getResourceOffsets(playerCount), [playerCount])
   const roundPositions = useMemo(() => getRoundPositions(playerCount), [playerCount])
   const harvestPositions = useMemo(() => getHarvestPositions(playerCount), [playerCount])
+  const linkedActionConnectors = useMemo(
+    () => getLinkedActionConnectors(baseActions, basePositions),
+    [baseActions, basePositions],
+  )
 
   const updateScale = useCallback(() => {
     const el = wrapperRef.current
@@ -706,6 +814,59 @@ export const ActionBoard = ({
   const hasGainPerRound = (space: ActionSpace) =>
     Object.values(space.gainPerRound).some((v) => (v ?? 0) > 0)
 
+  const renderExtensionScenery = () => {
+    if (playerCount < 5) return null
+    return (
+      <>
+        {playerCount === 6 && (
+          <div className="action-board-extension action-board-extension--six" aria-hidden="true">
+            {SIX_EXTENSION_PATCHES.map((patch) => (
+              <div key={patch} className={`action-board-patch action-board-patch--${patch}`} />
+            ))}
+          </div>
+        )}
+        <div className="action-board-extension action-board-extension--shared" aria-hidden="true">
+          {SHARED_EXTENSION_PATCHES.map((patch) => (
+            <div key={patch} className={`action-board-patch action-board-patch--${patch}`} />
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  const renderLinkedActionMarkers = () => {
+    if (linkedActionConnectors.length === 0) return null
+    return (
+      <svg className="linked-action-markers" aria-hidden="true" focusable="false">
+        {linkedActionConnectors.map((connector) => (
+          <g
+            key={connector.groupId}
+            data-linked-group-id={connector.groupId}
+            data-linked-from-id={connector.fromId}
+            data-linked-to-id={connector.toId}
+          >
+            <line
+              className="linked-action-line linked-action-line--shadow"
+              x1={connector.x1}
+              y1={connector.y1}
+              x2={connector.x2}
+              y2={connector.y2}
+            />
+            <line
+              className="linked-action-line"
+              x1={connector.x1}
+              y1={connector.y1}
+              x2={connector.x2}
+              y2={connector.y2}
+            />
+            <circle className="linked-action-node" cx={connector.midX} cy={connector.midY} r="11" />
+            <text className="linked-action-symbol" x={connector.midX} y={connector.midY}>↔</text>
+          </g>
+        ))}
+      </svg>
+    )
+  }
+
   const renderTooltipBody = (info: TooltipInfo): React.ReactNode => {
     const id = info.actionId
     if (!id) return null
@@ -724,6 +885,8 @@ export const ActionBoard = ({
       <h2>{t(locale, 'ui.actionArea')}</h2>
       <div className="action-board-wrapper" ref={wrapperRef} style={{ height: BOARD_H * scale }}>
         <div className={boardClassName} style={{ transform: `scale(${scale})`, width: boardWidth, height: BOARD_H }}>
+          {renderExtensionScenery()}
+          {renderLinkedActionMarkers()}
 
           {baseActions.map((space) => {
             const pos = basePositions[space.id]
