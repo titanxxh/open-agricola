@@ -33,6 +33,7 @@ type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
 type CardAnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
+  animalCounts?: Partial<Record<AnimalType, number>>
   capacity: number
   zoneId: string
 }
@@ -62,7 +63,7 @@ const AnimalCount = ({
   if (!animalType) {
     return (
       <span className="pasture-count">
-        0/{capacity}
+        {count}/{capacity}
       </span>
     )
   }
@@ -1352,14 +1353,21 @@ export const FarmBoard = ({
                   />
                   <div className="pasture-controls">
                     {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      const cardAnimalCounts = cardDisplay.animalCounts ?? {}
                       const count =
-                        cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0
+                        cardAnimalCounts[animalType] ??
+                        (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)
+                      const totalCount =
+                        (cardAnimalCounts.sheep ?? 0) +
+                        (cardAnimalCounts.boar ?? 0) +
+                        (cardAnimalCounts.cattle ?? 0) ||
+                        cardDisplay.animalCount
                       const canDecrease =
-                        cardDisplay.animalType === animalType && count > 0
+                        count > 0
                       const canIncrease =
                         (reorgRemaining?.[animalType] ?? 0) > 0 &&
                         cardDisplay.capacity > 0 &&
-                        (cardDisplay.animalType !== animalType || count < cardDisplay.capacity)
+                        totalCount < cardDisplay.capacity
                       return (
                         <div key={animalType} className="pasture-control-row">
                           <span className="pasture-control-label">

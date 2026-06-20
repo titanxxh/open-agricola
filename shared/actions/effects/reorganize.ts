@@ -8,8 +8,11 @@ import type {
 } from '../../contract/types'
 import { playerBoard } from '../../domain'
 import {
+  normalizeAnimalCountsForZone,
+  readAnimalCountsForZoneAssignment,
+} from '../../domain/animal-zones'
+import {
   ANIMAL_KEYS,
-  clampAnimalCountsToCapacity,
   createAnimalCounts,
   readAnimalHolderCounts,
   sumAnimalCounts,
@@ -31,24 +34,18 @@ export type ZoneAssignment = {
   animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
 }
 
+const addAnimalCounts = (
+  target: ReturnType<typeof createAnimalCounts>,
+  counts: Partial<Record<'sheep' | 'boar' | 'cattle', number>>,
+) => {
+  for (const key of ANIMAL_KEYS) target[key] += Math.max(0, counts[key] ?? 0)
+}
+
 export const applyReorganizeMutate = (
   state: GameState,
   player: PlayerState,
   zones: ZoneAssignment[],
 ): void => {
-  const totals = zones.reduce(
-    (acc, z) => {
-      const counts = readAnimalHolderCounts(z)
-      if (sumAnimalCounts(counts) > 0) {
-        for (const key of ANIMAL_KEYS) acc[key] += counts[key]
-      } else if (z.animalType) {
-        acc[z.animalType] += z.animalCount
-      }
-      return acc
-    },
-    { sheep: 0, boar: 0, cattle: 0 },
-  )
-
   const idx = state.players.indexOf(player)
   const computed = playerBoard(state, idx).animals.zones()
   const cap = (id: string) => computed.find((z) => z.id === id)?.capacity ?? 0
@@ -81,25 +78,28 @@ export const applyReorganizeMutate = (
       group.push(zone)
       cardZonesById.set(zone.cardId!, group)
     })
+  const cardCountsById = new Map<string, ReturnType<typeof createAnimalCounts>>()
   for (const [cardId, cardZones] of cardZonesById) {
     const existing = player.cardStates?.[cardId]
-    if (typeof existing?.counters?.held === 'number') continue
     const zoneIds = new Set(cardZones.map((zone) => zone.id))
     const assignedCounts = createAnimalCounts()
     zones
       .filter((z) => z.zoneType === 'card' && zoneIds.has(z.id))
       .forEach((assigned) => {
-        const perType = readAnimalHolderCounts(assigned)
-        if (sumAnimalCounts(perType) > 0) {
-          for (const key of ANIMAL_KEYS) assignedCounts[key] += perType[key]
-          return
-        }
-        if (assigned.animalType && assigned.animalCount > 0) {
-          assignedCounts[assigned.animalType] += assigned.animalCount
-        }
+        addAnimalCounts(assignedCounts, readAnimalCountsForZoneAssignment(assigned))
       })
-    const capacity = Math.max(...cardZones.map((zone) => cap(zone.id)), 0)
-    const { counts } = clampAnimalCountsToCapacity(assignedCounts, capacity)
+    if (typeof existing?.counters?.held === 'number') {
+      cardCountsById.set(cardId, assignedCounts)
+      continue
+    }
+    const baseZone = {
+      ...cardZones[0]!,
+      capacity: Math.max(...cardZones.map((zone) => cap(zone.id)), 0),
+    }
+    const counts = normalizeAnimalCountsForZone(state, player, baseZone, {
+      animalCounts: assignedCounts,
+    })
+    cardCountsById.set(cardId, counts)
     if (sumAnimalCounts(counts) <= 0 && !existing?.extraData) continue
     player.cardStates ??= {}
     const nextState = { ...(player.cardStates[cardId] ?? {}) }
@@ -108,7 +108,22 @@ export const applyReorganizeMutate = (
     nextState.extraData = extraData
     player.cardStates[cardId] = nextState
   }
+  for (const [cardId, existing] of Object.entries(player.cardStates ?? {})) {
+    if (cardZonesById.has(cardId)) continue
+    if (typeof existing?.counters?.held === 'number') continue
+    if (sumAnimalCounts(readAnimalHolderCounts(existing?.extraData)) <= 0) continue
+    const nextState = { ...existing }
+    const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
+    writeAnimalHolderCounts(extraData, createAnimalCounts())
+    nextState.extraData = extraData
+    player.cardStates![cardId] = nextState
+  }
 
+  const totals = createAnimalCounts()
+  zones
+    .filter((zone) => zone.zoneType !== 'card')
+    .forEach((zone) => addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone)))
+  for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts)
   player.resources.sheep = totals.sheep
   player.resources.boar = totals.boar
   player.resources.cattle = totals.cattle
@@ -170,6 +185,7 @@ export const reorganizeAction: ActionDefinition = {
       cardId: zone.cardId,
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
       animalCount: zone.animalCount ?? 0,
+      ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       capacity: zone.capacity,
     }))
     return {

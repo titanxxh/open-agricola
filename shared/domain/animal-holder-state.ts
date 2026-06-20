@@ -1,5 +1,4 @@
 import type { AnimalKey } from '../contract/animals'
-import type { PlayerState } from '../contract/types'
 
 export const ANIMAL_KEYS = ['sheep', 'boar', 'cattle'] as const
 
@@ -17,6 +16,24 @@ const readPositiveInt = (value: unknown) =>
 
 export const sumAnimalCounts = (counts: Partial<Record<AnimalKey, number>>): number =>
   ANIMAL_KEYS.reduce((sum, key) => sum + Math.max(0, counts[key] ?? 0), 0)
+
+export const compactAnimalCounts = (
+  counts: Partial<Record<AnimalKey, number>>,
+): Partial<Record<AnimalKey, number>> => {
+  const compact: Partial<Record<AnimalKey, number>> = {}
+  for (const key of ANIMAL_KEYS) {
+    const amount = Math.max(0, Math.floor(counts[key] ?? 0))
+    if (amount > 0) compact[key] = amount
+  }
+  return compact
+}
+
+export const singleAnimalType = (
+  counts: Partial<Record<AnimalKey, number>>,
+): AnimalKey | null => {
+  const occupiedTypes = ANIMAL_KEYS.filter((key) => (counts[key] ?? 0) > 0)
+  return occupiedTypes.length === 1 ? occupiedTypes[0]! : null
+}
 
 export const readAnimalHolderCounts = (value: unknown): AnimalCounts => {
   const counts = createAnimalCounts()
@@ -43,11 +60,7 @@ export const writeAnimalHolderCounts = (
   extraData: Record<string, unknown>,
   counts: Partial<Record<AnimalKey, number>>,
 ): void => {
-  const compact: Partial<Record<AnimalKey, number>> = {}
-  for (const key of ANIMAL_KEYS) {
-    const amount = Math.max(0, Math.floor(counts[key] ?? 0))
-    if (amount > 0) compact[key] = amount
-  }
+  const compact = compactAnimalCounts(counts)
   if (Object.keys(compact).length === 0) {
     delete extraData.animalCounts
     delete extraData.held
@@ -81,15 +94,4 @@ export const clampAnimalCountsToCapacity = (
     remaining -= kept
   }
   return { counts: clamped, discarded }
-}
-
-export const subtractAnimalCountsFromResources = (
-  player: PlayerState,
-  counts: Partial<Record<AnimalKey, number>>,
-): void => {
-  for (const key of ANIMAL_KEYS) {
-    const amount = Math.max(0, counts[key] ?? 0)
-    if (amount <= 0) continue
-    player.resources[key] = Math.max(0, (player.resources[key] ?? 0) - amount)
-  }
 }
