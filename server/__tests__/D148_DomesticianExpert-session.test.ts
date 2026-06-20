@@ -63,6 +63,45 @@ describe('D148_DomesticianExpert session', () => {
     expect(cardZone!.animalType).toBe('sheep')
   })
 
+  it('rejects non-sheep assignments after it already contains sheep', () => {
+    const session = setup([{ row: 0, col: 0 }, { row: 1, col: 0 }])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.sheep = 1
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      D148_DomesticianExpert: { extraData: { held: 1, animalType: 'sheep' } },
+    }
+    session.loadState(state)
+
+    let resp = session.devSetResources(0, { sheep: 1, boar: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        {
+          id: 'card:D148_DomesticianExpert',
+          zoneType: 'card',
+          cardId: 'D148_DomesticianExpert',
+          animalType: null,
+          animalCount: 2,
+          animalCounts: { sheep: 1, boar: 1 },
+        },
+      ],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+    expect(resp.state.players[0]!.resources.boar).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.D148_DomesticianExpert?.extraData).toMatchObject({
+      held: 1,
+      animalType: 'sheep',
+    })
+  })
+
   it('default 2 rooms are adjacent — zone exists', () => {
     // Use default room tiles (no override)
     const session = setup()
