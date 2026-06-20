@@ -15,6 +15,7 @@ type AnimalType = 'sheep' | 'boar' | 'cattle'
 type AnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
+  animalCounts?: Partial<Record<AnimalType, number>>
 }
 
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
@@ -116,6 +117,7 @@ export const buildCardDisplayMap = (
       map.set(cardId, {
         animalType: zone.animalType,
         animalCount: zone.animalCount,
+        animalCounts: zone.animalCounts,
         capacity: zone.capacity,
         zoneId: zone.id,
       })

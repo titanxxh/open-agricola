@@ -66,4 +66,32 @@ describe('C12_CattleFarm session', () => {
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(4)
   })
+
+  it('rejects non-cattle assignments submitted for its card zone', () => {
+    const session = setup(1)
+
+    let resp = session.devSetResources(0, { sheep: 1, cattle: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        {
+          id: 'card:C12_CattleFarm',
+          zoneType: 'card',
+          cardId: 'C12_CattleFarm',
+          animalType: 'sheep',
+          animalCount: 1,
+          animalCounts: { sheep: 1 },
+        },
+      ],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.sheep).toBe(0)
+    expect(resp.state.players[0]!.resources.cattle).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.C12_CattleFarm?.extraData ?? {}).toEqual({})
+  })
 })

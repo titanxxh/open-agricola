@@ -353,9 +353,29 @@ describe('Agricola 5-6 simple occupation cards', () => {
       sheep: 1,
       boar: 1,
     })
+
+    resp = session.devSetResources(0, { sheep: 1, boar: 1, cattle: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    const cardZone = resp.interaction.request.zones.find((zone) => zone.id === 'card:B169_LivestockSustainer')
+    expect(cardZone).toMatchObject({
+      animalType: null,
+      animalCount: 2,
+      animalCounts: { sheep: 1, boar: 1 },
+    })
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: resp.interaction.request.zones,
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
+      animalCounts: { sheep: 1, boar: 1 },
+    })
   })
 
-  it('B169 Livestock Sustainer discards stored animals when capacity drops to zero', () => {
+  it('B169 Livestock Sustainer leaves capacity changes side-effect free until reorganization clears unavailable storage', () => {
     const session = setupLivestockSustainerSession()
     const state = session.getState().state
     state.players[1]!.improvements = ['Major_Fireplace1']
@@ -375,8 +395,24 @@ describe('Agricola 5-6 simple occupation cards', () => {
     session.loadState(updatedState)
 
     expect(getLivestockSustainerZone(session)).toBeUndefined()
-    const owner = session.getState().state.players[0]!
+    let owner = session.getState().state.players[0]!
+    expect(owner.resources.sheep).toBe(1)
+    expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
+      held: 1,
+      animalType: 'sheep',
+    })
+
+    resp = session.devSetResources(0, { sheep: 1, boar: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.interaction.request.zones.find((zone) => zone.id === 'card:B169_LivestockSustainer')).toBeUndefined()
+
+    resp = session.resolveChoice(0, 'confirm', { zones: [] })
+    owner = resp.state.players[0]!
     expect(owner.resources.sheep).toBe(0)
+    expect(owner.resources.boar).toBe(0)
     expect(owner.cardStates?.B169_LivestockSustainer?.extraData).toEqual({})
   })
 
