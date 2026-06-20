@@ -7,6 +7,7 @@ import type {
   PlayerState,
 } from '../../../contract/types'
 import '../../../cards/B/B12_Stockyard'
+import '../../../cards/C/C11_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
 
 const dummySpace: ActionSpace = {
@@ -186,5 +187,32 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.sheep).toBe(0)
     expect(ctx.player.resources.boar).toBe(0)
+  })
+
+  it('filters invalid card animals before clamping capacity', () => {
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: ['C11_WildlifeReserve'],
+        resources: { sheep: 2, boar: 1, cattle: 1 } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: 'card:C11_WildlifeReserve',
+        zoneType: 'card',
+        cardId: 'C11_WildlifeReserve',
+        animalType: null,
+        animalCount: 4,
+        animalCounts: { sheep: 2, boar: 1, cattle: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(1)
+    expect(ctx.player.resources.boar).toBe(1)
+    expect(ctx.player.resources.cattle).toBe(1)
   })
 })

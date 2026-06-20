@@ -169,9 +169,9 @@ export const normalizeAnimalCountsForZone = (
       if (key !== type) raw[key] = 0
     }
   }
-  let counts = clampAnimalCountsToCapacity(raw, zone.capacity).counts
+  let counts = raw
   const total = sumAnimalCounts(counts)
-  if (total <= 0) return counts
+  if (total <= 0) return clampAnimalCountsToCapacity(counts, zone.capacity).counts
   const candidateZone: AnimalZone = {
     ...zone,
     animalType: singleAnimalType(counts) ?? fixedType,
