@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { D172_PutcherMaker } from '../../shared/cards/D/D172_PutcherMaker'
+import { computeAnimalZones, getTotalAnimalCapacity } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
@@ -106,6 +107,26 @@ const setupFarmEventSession = (cardId: string, currentPlayerIndex = 0, ownerFood
   return session
 }
 
+const setupLivestockSustainerSession = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 6 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 14
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  state.players[0]!.occupationPlayed.push('B169_LivestockSustainer')
+  session.loadState(state)
+  return session
+}
+
+const getLivestockSustainerZone = (session: GameSession) => {
+  const state = session.getState().state
+  const owner = state.players[0]!
+  return computeAnimalZones(owner, state).find((zone) => zone.id === 'card:B169_LivestockSustainer')
+}
+
 const confirmPlayerSwitches = (
   session: GameSession,
   response: ReturnType<GameSession['takeAction']>,
@@ -181,6 +202,90 @@ const completeFirstPlowSelection = (session: GameSession, playerIndex = 0) => {
 }
 
 describe('Agricola 5-6 simple occupation cards', () => {
+  it('B169 Livestock Sustainer counts other-player major improvements including alsoCountsAs major minors', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[0]!.improvements = ['Major_Well']
+    state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    state.players[2]!.minorPlayed = ['D60_LargePottery']
+    session.loadState(state)
+
+    const updatedState = session.getState().state
+    const owner = updatedState.players[0]!
+    const zone = getLivestockSustainerZone(session)
+
+    expect(zone).toMatchObject({
+      zoneType: 'card',
+      cardId: 'B169_LivestockSustainer',
+      capacity: 3,
+      animalType: null,
+      animalCount: 0,
+    })
+    expect(getTotalAnimalCapacity(owner, updatedState)).toBe(4)
+  })
+
+  it('B169 Livestock Sustainer recomputes capacity when opposing majors leave play', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery']
+    session.loadState(state)
+
+    expect(getLivestockSustainerZone(session)?.capacity).toBe(2)
+
+    const updatedState = session.getState().state
+    updatedState.players[1]!.improvements = ['Major_Fireplace1']
+    session.loadState(updatedState)
+
+    expect(getLivestockSustainerZone(session)?.capacity).toBe(1)
+
+    const finalState = session.getState().state
+    finalState.players[1]!.improvements = []
+    session.loadState(finalState)
+
+    expect(getLivestockSustainerZone(session)).toBeUndefined()
+  })
+
+  it('B169 Livestock Sustainer caps card capacity at 8', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = [
+      'Major_Fireplace1',
+      'Major_Fireplace2',
+      'Major_CookingHearth1',
+      'Major_CookingHearth2',
+      'Major_ClayOven',
+      'Major_StoneOven',
+      'Major_Well',
+      'Major_Joinery',
+      'Major_Pottery',
+      'Major_Basket',
+    ]
+    session.loadState(state)
+
+    expect(getLivestockSustainerZone(session)?.capacity).toBe(8)
+  })
+
+  it('B169 Livestock Sustainer allows mixed animal types on its card zone', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery', 'Major_Pottery']
+    session.loadState(state)
+
+    const updatedState = session.getState().state
+    const owner = updatedState.players[0]!
+    const zone = getLivestockSustainerZone(session)
+    expect(zone?.animalType).toBeNull()
+
+    const effect = getCardEffect('B169_LivestockSustainer')
+    const invalid = effect?.getInvalidAnimals?.(
+      owner,
+      zone!,
+      [{ type: 'sheep' }, { type: 'boar' }, { type: 'cattle' }],
+      updatedState,
+    )
+    expect(invalid).toEqual([])
+  })
+
   it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
     const session = setupFarmEventSession('A178_CarpentersBoy', 1)
     const state = session.getState().state
