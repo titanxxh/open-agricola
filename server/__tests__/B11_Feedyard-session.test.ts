@@ -106,9 +106,6 @@ describe('B11_Feedyard session', () => {
   })
 
   it('onEndHarvest grants only food for unused spots (capacity - assigned)', () => {
-    // We can't easily assign animals to a card zone without board logic,
-    // but BGA semantics say `n = capacity - animalCount`. With animalCount=0
-    // (default since we don't track card-zone assignments here), n = capacity.
     const session = setup({
       pastures: [
         { id: 'p1', size: 2, tiles: [{ row: 2, col: 2 }, { row: 2, col: 3 }], stables: 0, animalType: null, animalCount: 0 },
@@ -116,11 +113,21 @@ describe('B11_Feedyard session', () => {
     })
     const state = session.getState().state
     const player = state.players[0]!
+    player.resources.sheep = 1
+    player.cardStates = {
+      B11_Feedyard: { extraData: { animalCounts: { sheep: 1 } } },
+    }
+    session.loadState(state)
 
+    const zones = computeAnimalZones(player)
+    const cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    expect(cardZone).toMatchObject({
+      animalType: 'sheep',
+      animalCount: 1,
+      animalCounts: { sheep: 1 },
+    })
     const flow = runCardEffectHook(state, player, 'B11_Feedyard', 'onEndHarvest')
-    expect(flow).not.toBeNull()
-    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.params).toEqual({ food: 1 })
+    expect(flow).toBeNull()
   })
 
   it('onEndHarvest no flow when no pastures (no zone)', () => {
