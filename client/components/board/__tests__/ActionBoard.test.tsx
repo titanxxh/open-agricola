@@ -61,6 +61,18 @@ const createAction = (id: string, nameKey: string): ActionSpace => ({
   takenBy: [],
 })
 
+const expectActionStyle = (
+  html: string,
+  actionId: string,
+  fragments: string[],
+) => {
+  const match = html.match(new RegExp(`data-action-id="${actionId}" style="([^"]+)"`))
+  expect(match?.[1]).toBeDefined()
+  for (const fragment of fragments) {
+    expect(match![1]).toContain(fragment)
+  }
+}
+
 describe('ActionBoard', () => {
   it('marks highlighted action spaces', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
@@ -90,6 +102,8 @@ describe('ActionBoard', () => {
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
     const playerC = createPlayer('p3', 'PlayerC', 'yellow')
     const playerD = createPlayer('p4', 'PlayerD', 'black')
+    const playerE = createPlayer('p5', 'PlayerE', 'green')
+    const playerF = createPlayer('p6', 'PlayerF', 'purple')
 
     const html2p = renderToStaticMarkup(
       <ActionBoard
@@ -138,6 +152,38 @@ describe('ActionBoard', () => {
       />,
     )
     expect(html4p).toContain('class="action-board action-board--4p"')
+
+    const html5p = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB, playerC, playerD, playerE]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+    expect(html5p).toContain('class="action-board action-board--5p"')
+
+    const html6p = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB, playerC, playerD, playerE, playerF]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+    expect(html6p).toContain('class="action-board action-board--6p"')
   })
 
   it('uses BGA-matching 3p and 4p side-space positions', () => {
@@ -406,6 +452,279 @@ describe('ActionBoard', () => {
     fireEvent.click(forestButton)
     fireEvent.click(clayPitButton)
     expect(selected).toEqual(['forest'])
+  })
+
+  it('renders 5p shared expansion spaces on the board instead of the player-action row', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('lessons-56-2f', 'actions.lessons-56-2f.name'),
+          createAction('copse-56', 'actions.copse-56.name'),
+          createAction('hollow-56', 'actions.hollow-56.name'),
+          createAction('resource-market-56', 'actions.resource-market-56.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('action-board--5p')
+    expect(html).toContain('data-action-id="lessons-56-2f"')
+    expect(html).toContain('data-action-id="copse-56"')
+    expect(html).toContain('data-action-id="hollow-56"')
+    expect(html).toContain('data-action-id="resource-market-56"')
+    expect(html).not.toContain('player-action-cards-row')
+  })
+
+  it('renders 6p-only spaces on the 6p board', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+      createPlayer('p6', 'PlayerF', 'purple'),
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('farm-supplies-6', 'actions.farm-supplies-6.name'),
+          createAction('resource-trade-6', 'actions.resource-trade-6.name'),
+          createAction('corral-6', 'actions.corral-6.name'),
+          createAction('side-job-6', 'actions.side-job-6.name'),
+          createAction('improvement-6', 'actions.improvement-6.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('action-board--6p')
+    expect(html).toContain('data-action-id="farm-supplies-6"')
+    expect(html).toContain('data-action-id="resource-trade-6"')
+    expect(html).toContain('data-action-id="corral-6"')
+    expect(html).toContain('data-action-id="side-job-6"')
+    expect(html).toContain('data-action-id="improvement-6"')
+    expect(html).not.toContain('player-action-cards-row')
+  })
+
+  it('renders 5p animal market with compact icon lines that fit the original frame', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('animal-market-56', 'actions.animal-market-56.name')]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('data-action-id="animal-market-56"')
+    expect(html).toContain('icon-line icon-line--animal-market')
+    expect(html).not.toContain('<span class="text">Pay</span>')
+    expect(html).toContain('<span>+1</span><span class="res-icon res-icon-cattle"></span><span>-1</span><span class="res-icon res-icon-food"></span>')
+  })
+
+  it('keeps repeated 5p extension action frames the same size as matching original spaces', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('lessons-56-2f', 'actions.lessons-56-2f.name'),
+          createAction('copse-56', 'actions.copse-56.name'),
+          createAction('resource-market-56', 'actions.resource-market-56.name'),
+          createAction('hollow-56', 'actions.hollow-56.name'),
+          createAction('house-building-56', 'actions.house-building-56.name'),
+          createAction('farm-expansion', 'actions.farm-expansion.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('width:1190px')
+    expectActionStyle(html, 'lessons-56-2f', ['top:18px', 'left:24px', 'width:115px', 'height:94px'])
+    expectActionStyle(html, 'copse-56', ['top:18px', 'left:256px', 'width:60px', 'height:83px'])
+    expectActionStyle(html, 'resource-market-56', ['top:432px', 'left:192px', 'width:110px', 'height:65px'])
+    expectActionStyle(html, 'hollow-56', ['top:532px', 'left:230px', 'width:60px', 'height:86px'])
+    expectActionStyle(html, 'house-building-56', ['top:662px', 'left:24px', 'width:115px', 'height:134px'])
+    expectActionStyle(html, 'farm-expansion', ['top:-3px', 'left:390px'])
+  })
+
+  it('keeps 6p rail frames in original action-frame sizes without overlapping the central board', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+      createPlayer('p6', 'PlayerF', 'purple'),
+    ]
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('farm-supplies-6', 'actions.farm-supplies-6.name'),
+          createAction('resource-trade-6', 'actions.resource-trade-6.name'),
+          createAction('lessons-56-2f', 'actions.lessons-56-2f.name'),
+          createAction('hollow-56', 'actions.hollow-56.name'),
+          createAction('farm-expansion', 'actions.farm-expansion.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('width:1370px')
+    expect(html).not.toContain('action-board-base-outline')
+    expectActionStyle(html, 'farm-supplies-6', ['top:18px', 'left:52px', 'width:115px', 'height:94px'])
+    expectActionStyle(html, 'resource-trade-6', ['top:138px', 'left:52px', 'width:115px', 'height:94px'])
+    expectActionStyle(html, 'lessons-56-2f', ['top:18px', 'left:204px', 'width:115px', 'height:94px'])
+    expectActionStyle(html, 'hollow-56', ['top:532px', 'left:410px', 'width:60px', 'height:86px'])
+    expectActionStyle(html, 'farm-expansion', ['top:-3px', 'left:570px'])
+  })
+
+  it('renders visible linked action markers only when both paired spaces are on the board', () => {
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+    ]
+    const lessons = {
+      ...createAction('lessons-56-2f', 'actions.lessons-56-2f.name'),
+      linkedGroupId: 'lessons-copse-56',
+    }
+    const copse = {
+      ...createAction('copse-56', 'actions.copse-56.name'),
+      linkedGroupId: 'lessons-copse-56',
+    }
+    const animalMarket = {
+      ...createAction('animal-market-56', 'actions.animal-market-56.name'),
+      linkedGroupId: 'animal-resource-56',
+    }
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[lessons, copse, animalMarket]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('class="linked-action-markers"')
+    expect(html).toContain('data-linked-group-id="lessons-copse-56"')
+    expect(html).toContain('data-linked-from-id="lessons-56-2f"')
+    expect(html).toContain('data-linked-to-id="copse-56"')
+    expect(html).not.toContain('data-linked-group-id="animal-resource-56"')
+  })
+
+  it('renders blocked linked spaces as locked and non-clickable without a worker marker', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    const playerC = createPlayer('p3', 'PlayerC', 'yellow')
+    const playerD = createPlayer('p4', 'PlayerD', 'black')
+    const playerE = createPlayer('p5', 'PlayerE', 'green')
+    const blocked = {
+      ...createAction('copse-56', 'actions.copse-56.name'),
+      linkedGroupId: 'lessons-copse-56',
+      blockedBy: [{ playerId: 'p1', workerId: '1', sourceSpaceId: 'lessons-56-2f' }],
+    }
+    const selected: string[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+
+    render(
+      <ActionBoard
+        locale="en"
+        baseActions={[blocked]}
+        roundSlots={[]}
+        currentPlayer={playerB}
+        players={[playerA, playerB, playerC, playerD, playerE]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={(space) => selected.push(space.id)}
+        currentRound={1}
+        devMode={false}
+        actionSpaceSelectionActive={true}
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: /Copse/i })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAccessibleName(/blocked/i)
+    expect(button.closest('.action-card-holder')?.className).toContain('blocked')
+    expect(button.closest('.action-card-holder')?.querySelector('.action-space-lock')).not.toBeNull()
+    expect(button.closest('.action-card-holder')?.querySelector('.farmer-holder')).toBeNull()
+    fireEvent.click(button)
+    expect(selected).toEqual([])
   })
 
   it('removes the family-growth child marker when the newborn leaves the space', () => {

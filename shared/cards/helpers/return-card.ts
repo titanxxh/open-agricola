@@ -11,18 +11,17 @@
  */
 
 import type { GameState, PlayerState } from '../../contract/types'
+import { returnMajorImprovementToSupply } from '../major/supply'
 
 export const returnCardToBoard = (
   player: PlayerState,
   cardId: string,
-  state?: Pick<GameState, 'availableMajorImprovements'>,
+  state?: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
 ): void => {
   const improvementIndex = player.improvements.indexOf(cardId)
   if (improvementIndex > -1) {
     player.improvements.splice(improvementIndex, 1)
-    if (state && !state.availableMajorImprovements.includes(cardId)) {
-      state.availableMajorImprovements.push(cardId)
-    }
+    if (state) returnMajorImprovementToSupply(state, cardId)
   }
   const minorPlayedIndex = player.minorPlayed.indexOf(cardId)
   if (minorPlayedIndex > -1) {

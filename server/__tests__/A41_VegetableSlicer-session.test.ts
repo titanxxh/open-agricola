@@ -11,6 +11,8 @@ import '../../shared/cards/A/A41_VegetableSlicer'
 const CARD_ID = 'A41_VegetableSlicer'
 const FIREPLACE_ID = 'Major_Fireplace1'
 const COOKING_HEARTH_ID = 'Major_CookingHearth1'
+const FIREPLACE3_ID = 'Major_Fireplace3'
+const COOKING_HEARTH3_ID = 'Major_CookingHearth3'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -209,6 +211,36 @@ describe('A41_VegetableSlicer improvement listener', () => {
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
     expect(player.improvements).not.toContain(FIREPLACE_ID)
+    expect(hookResult?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { wood: 2, vegetable: 1 },
+    })
+  })
+
+  it('gains 2 wood and 1 vegetable when duplicate Fireplace becomes duplicate Cooking Hearth', () => {
+    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    player.minorPlayed = [CARD_ID]
+    player.improvements = [FIREPLACE3_ID]
+
+    const state = createState(player)
+    const actionEvents = [paidForImprovement(FIREPLACE3_ID), playedMajor(COOKING_HEARTH3_ID)]
+    const hookResult = executeCardListener(listener!, {
+      state,
+      player,
+      space: createSpace('improvement'),
+      actionId: 'improvement',
+      phase: 'after',
+      choice: `major:${COOKING_HEARTH3_ID}`,
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
+    } as unknown as CardListenerContext)
+
     expect(hookResult?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'gain',

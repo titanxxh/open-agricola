@@ -23,9 +23,10 @@ describe('pairedSpaceIdFor', () => {
     expect(pairedSpaceIdFor(state, 'lessons')).toEqual(['lessons', 'lessons-4'])
   })
 
-  it('grove: no variant in any player count', () => {
-    const state = makeState(['grove'])
-    expect(pairedSpaceIdFor(state, 'grove')).toEqual(['grove'])
+  it('5/6p: returns grove and hollow variants when present', () => {
+    const state = makeState(['grove', 'grove-56', 'hollow', 'hollow-56'])
+    expect(pairedSpaceIdFor(state, 'grove')).toEqual(['grove', 'grove-56'])
+    expect(pairedSpaceIdFor(state, 'hollow')).toEqual(['hollow', 'hollow-56'])
   })
 
   it('returns [base] when variant declared but absent from state', () => {

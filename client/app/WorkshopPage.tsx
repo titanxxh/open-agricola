@@ -62,6 +62,8 @@ const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
   deck_ids: ['A', 'B', 'C', 'D', 'E'],
 }
 
+export const SANDBOX_PLAYER_COUNTS = [2, 3, 4, 5, 6] as const
+
 type View = 'home' | 'sandbox' | 'editor' | 'detail'
 
 export function getWorkshopCardIdFromSearch(search: string): string | null {
@@ -900,7 +902,7 @@ function SandboxResetModal({
             <div className="ws-sandbox-config-group">
               <span className="ws-sandbox-config-label">{t('platform.sandboxPlayerCount')}</span>
               <div className="ws-sandbox-chip-row">
-                {[2, 3, 4].map((count) => (
+                {SANDBOX_PLAYER_COUNTS.map((count) => (
                   <button
                     key={count}
                     type="button"

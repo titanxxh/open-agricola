@@ -47,3 +47,19 @@ export const Major_Fireplace2 = defineMajorCard({
   ],
 } satisfies CardSourceMetaInput,
 })
+
+export const Major_Fireplace3 = defineMajorCard({
+  meta: {
+  ...fireplace1,
+  id: 'Major_Fireplace3',
+  number: 11,
+  cost: { clay: 3 },
+  exchanges: [
+    { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },
+    { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },
+    { from: { cattle: 1 }, to: { food: 3 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },
+    { from: { vegetable: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },
+    { from: { grain: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['bake-bread'] },
+  ],
+} satisfies CardSourceMetaInput,
+})

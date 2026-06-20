@@ -16,6 +16,26 @@ const BASE_10 = [
 
 const ONLY_3P = ['grove', 'hollow', 'resource-market', 'lessons-3']
 const ONLY_4P = ['grove', 'copse', 'hollow-4', 'resource-market-4', 'lessons-4', 'traveling-players']
+const SHARED_56 = [
+  'lessons-56-2f',
+  'copse-56',
+  'lessons-56-variable',
+  'modest-wish-children-56',
+  'house-building-56',
+  'traveling-players-56',
+  'riverbank-forest-56',
+  'grove-56',
+  'hollow-56',
+  'resource-market-56',
+  'animal-market-56',
+]
+const ONLY_6P = [
+  'farm-supplies-6',
+  'resource-trade-6',
+  'corral-6',
+  'side-job-6',
+  'improvement-6',
+]
 
 // ---- Action space filtering ----
 
@@ -74,15 +94,61 @@ describe('player-count action space filtering', () => {
   })
 
   it('all player counts have 14 round action slots', () => {
-    for (const pc of [2, 3, 4]) {
+    for (const pc of [2, 3, 4, 5, 6]) {
       const state = createInitialState(42, { playerCount: pc })
       expect(state.roundActionOrder).toHaveLength(14)
     }
   })
 
-  it('createActionSpaces() without playerCount returns all 33 definitions', () => {
+  it('5P and 6P games keep the base common action spaces', () => {
+    for (const pc of [5, 6]) {
+      const state = createInitialState(42, { playerCount: pc })
+      const ids = commonActionIds(state.actionSpaces)
+        .filter((id) => !['sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
+          'wish-children', 'western-quarry', 'house-redevelopment',
+          'vegetable-seeds', 'pig-market', 'eastern-quarry', 'cattle-market',
+          'cultivation', 'urgent-wish-children', 'farm-redevelopment',
+          ...SHARED_56, ...ONLY_6P].includes(id))
+      expect(ids.sort()).toEqual(BASE_10)
+    }
+  })
+
+  it('5P game includes shared 5/6 spaces and excludes 6-only spaces', () => {
+    const state = createInitialState(42, { playerCount: 5 })
+    const ids = state.actionSpaces.map((s) => s.id)
+    for (const id of SHARED_56) {
+      expect(ids).toContain(id)
+    }
+    for (const id of ONLY_6P) {
+      expect(ids).not.toContain(id)
+    }
+    expect(ids).toContain('farm-expansion')
+    expect(ids).toContain('house-building-56')
+  })
+
+  it('6P game includes shared 5/6 spaces and 6-only spaces', () => {
+    const state = createInitialState(42, { playerCount: 6 })
+    const ids = state.actionSpaces.map((s) => s.id)
+    for (const id of [...SHARED_56, ...ONLY_6P]) {
+      expect(ids).toContain(id)
+    }
+  })
+
+  it('5/6 linked spaces carry group metadata and empty blocked state', () => {
+    const state = createInitialState(42, { playerCount: 6 })
+    const byId = new Map(state.actionSpaces.map((space) => [space.id, space]))
+    expect(byId.get('lessons-56-2f')?.linkedGroupId).toBe('lessons-copse-56')
+    expect(byId.get('copse-56')?.linkedGroupId).toBe('lessons-copse-56')
+    expect(byId.get('lessons-56-variable')?.linkedGroupId).toBe('lessons-modest-children-56')
+    expect(byId.get('modest-wish-children-56')?.linkedGroupId).toBe('lessons-modest-children-56')
+    expect(byId.get('house-building-56')?.linkedGroupId).toBe('house-traveling-56')
+    expect(byId.get('traveling-players-56')?.linkedGroupId).toBe('house-traveling-56')
+    expect(byId.get('copse-56')?.blockedBy).toEqual([])
+  })
+
+  it('createActionSpaces() without playerCount returns all 49 definitions', () => {
     const all = createActionSpaces()
-    expect(all).toHaveLength(33)
+    expect(all).toHaveLength(49)
   })
 })
 

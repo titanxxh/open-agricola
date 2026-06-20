@@ -1,4 +1,4 @@
-export const LESSONS_SPACE_IDS = ['lessons', 'lessons-3', 'lessons-4'] as const
+export const LESSONS_SPACE_IDS = ['lessons', 'lessons-3', 'lessons-4', 'lessons-56-2f', 'lessons-56-variable'] as const
 
 export type LessonsSpaceId = typeof LESSONS_SPACE_IDS[number]
 

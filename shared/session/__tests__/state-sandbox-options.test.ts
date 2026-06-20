@@ -13,6 +13,20 @@ describe('sandbox initial state options', () => {
     expect(state.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD'])
   })
 
+  it('supports six stable sandbox players without changing the first four seats', () => {
+    const state = createInitialState(42, {
+      playerCount: 6,
+      playerNames: [...defaultSandboxPlayerNames],
+    })
+
+    expect(state.players).toHaveLength(6)
+    expect(state.players.map((player) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
+    expect(state.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'])
+    expect(state.players.map((player) => player.color)).toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])
+    expect(state.players.map((player) => player.startPlayer)).toEqual([true, false, false, false, false, false])
+    expect(state.players.every((player) => player.workers.slice(0, 2).every((worker) => worker.isActive))).toBe(true)
+  })
+
   it('filters dealt hands by selected default decks', () => {
     const state = createInitialState(42, {
       playerCount: 2,

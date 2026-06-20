@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'B138_ForestGuardian'
 /**
@@ -14,8 +15,6 @@ const CARD_ID = 'B138_ForestGuardian'
  * Wood accumulation spaces: forest, copse, grove.
  * Triggers on 'before' phase of 'collect' action when space has 5+ wood.
  */
-const WOOD_SPACES = new Set(['forest', 'copse', 'grove'])
-
 const onBuyListener: CardListenerRegistration = {
   id: 'B138-forest-guardian-onbuy',
   cardIds: [CARD_ID],
@@ -35,7 +34,7 @@ const collectListener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (!spaceId || !WOOD_SPACES.has(spaceId)) return
+    if (!isWoodAccumulationSpaceId(spaceId)) return
 
     // Check if 5+ wood on the space
     const woodOnSpace = context.space?.resources?.wood ?? 0

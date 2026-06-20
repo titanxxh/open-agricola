@@ -204,7 +204,7 @@ export function LobbyPage() {
             <div className="player-select-panel">
               <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
               <div className="player-select-options">
-                {([2, 3, 4] as const).map(n => (
+                {([2, 3, 4, 5, 6] as const).map(n => (
                   <button
                     key={n}
                     type="button"

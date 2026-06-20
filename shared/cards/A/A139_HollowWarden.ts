@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isHollowSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A139_HollowWarden'
 /**
@@ -42,15 +43,13 @@ const onBuyListener: CardListenerRegistration = {
   },
 }
 
-const HOLLOW_SPACES = new Set(['hollow', 'hollow-4'])
-
 const hollowListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-after-hollow',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!HOLLOW_SPACES.has(context.space?.id ?? '')) return
+    if (!isHollowSpaceId(context.space?.id)) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }

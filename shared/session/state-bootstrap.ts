@@ -15,6 +15,12 @@ import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../cards/major'
 import {
+  createMajorImprovementSupply,
+  getVisibleMajorImprovementIds,
+  normalizeMajorImprovementSupply,
+  standardMajorImprovementIds,
+} from '../cards/major/supply'
+import {
   implementedMinorImprovementCards,
   implementedOccupationCards,
   implementedCommunityMinors,
@@ -24,7 +30,7 @@ import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
 import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeTakenBy } from '../domain/space'
+import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
 import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
@@ -215,6 +221,7 @@ export const normalizeState = (raw: GameState): GameState => {
       ...space,
       resources: stored?.resources ?? space.resources,
       takenBy: normalizeTakenBy(stored?.takenBy),
+      blockedBy: normalizeBlockedBy(stored?.blockedBy),
       exclusiveUse: stored?.exclusiveUse,
     }
   })
@@ -225,6 +232,7 @@ export const normalizeState = (raw: GameState): GameState => {
     if (stored) {
       pas.resources = stored.resources ?? pas.resources
       pas.takenBy = normalizeTakenBy(stored.takenBy)
+      pas.blockedBy = normalizeBlockedBy(stored.blockedBy)
       pas.exclusiveUse = stored.exclusiveUse
     }
     actionSpaces.push(pas)
@@ -239,6 +247,7 @@ export const normalizeState = (raw: GameState): GameState => {
     actionSpaces.push({
       ...stored,
       takenBy: normalizeTakenBy(stored.takenBy),
+      blockedBy: normalizeBlockedBy(stored.blockedBy),
     } as ActionSpace)
   }
   const inDraftPhase = raw.phase === 'draft' && raw.draft != null
@@ -395,10 +404,16 @@ export const normalizeState = (raw: GameState): GameState => {
   const takenImprovements = new Set(
     players.flatMap((player) => player.improvements),
   )
+  const majorImprovementSupply = normalizeMajorImprovementSupply(
+    (raw as { majorImprovementSupply?: unknown }).majorImprovementSupply,
+    takenImprovements,
+  )
+  const visibleMajorImprovements = getVisibleMajorImprovementIds(majorImprovementSupply)
   const availableMajorImprovements = (
-    raw.availableMajorImprovements?.length
+    visibleMajorImprovements ??
+    (raw.availableMajorImprovements?.length
       ? raw.availableMajorImprovements
-      : [...majorImprovementIds]
+      : [...standardMajorImprovementIds])
   ).filter(
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
@@ -436,6 +451,7 @@ export const normalizeState = (raw: GameState): GameState => {
     gameSeed: seed,
     roundActionOrder,
     availableMajorImprovements,
+    majorImprovementSupply,
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
@@ -484,7 +500,7 @@ const createInitialPlayers = (
     draftMode,
     enableCommunityDeck = false,
   } = options
-  const count = Math.max(1, Math.min(4, Math.floor(playerCount)))
+  const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
   // In draft mode, leave hands empty — createInitialState will seed state.draft
   // with per-player pools separately, and finalizeDraft will populate hands later.
   const dealtHands =
@@ -501,6 +517,8 @@ const createInitialPlayers = (
     { id: 'p2', name: 'PlayerB', color: 'blue', startPlayer: false },
     { id: 'p3', name: 'PlayerC', color: 'black', startPlayer: false },
     { id: 'p4', name: 'PlayerD', color: 'yellow', startPlayer: false },
+    { id: 'p5', name: 'PlayerE', color: 'green', startPlayer: false },
+    { id: 'p6', name: 'PlayerF', color: 'purple', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => {
     const player: PlayerState = {
@@ -631,6 +649,7 @@ export const createInitialState = (
     visibility: 'public',
   }]
   const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
+  const majorImprovementSupply = createMajorImprovementSupply(players.length)
   const initialState: GameState = {
     round: 1,
     phase,
@@ -639,7 +658,7 @@ export const createInitialState = (
     parentSelection: null,
     currentPlayerIndex: 0,
     players,
-    actionSpaces: createActionSpaces(options.playerCount ?? 2),
+    actionSpaces: createActionSpaces(players.length),
     log: eventsToLogEntries(initialEvents, { playerNames }),
     events: initialEvents,
     nextEventSeq: 2,
@@ -657,7 +676,8 @@ export const createInitialState = (
     roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,
-    availableMajorImprovements: [...majorImprovementIds],
+    availableMajorImprovements: getVisibleMajorImprovementIds(majorImprovementSupply) ?? [...standardMajorImprovementIds],
+    majorImprovementSupply,
     futureMeeples: [],
     pendingFutureMeeples: [],
     gameOver: false,

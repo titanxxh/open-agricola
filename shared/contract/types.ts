@@ -274,6 +274,12 @@ export type WorkerRef = {
   }
 }
 
+export type BlockedActionSpaceRef = {
+  playerId: string
+  workerId: string
+  sourceSpaceId: string
+}
+
 export type FenceSegmentType = 'fence' | 'palisade'
 export type FenceSegmentSource =
   | { kind: 'own'; ownerPlayerId: string }
@@ -283,7 +289,7 @@ export type FenceSegment = { edge: string; type: FenceSegmentType; source?: Fenc
 export type PlayerState = {
   id: string
   name: string
-  color: 'red' | 'yellow' | 'blue' | 'black'
+  color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
   workers: Worker[]
   rooms: number
@@ -502,6 +508,13 @@ export type HarvestBreedSummary = {
 
 export type RoundPhase = 'preparation' | 'work' | 'returning-home' | 'harvest' | 'field' | 'feeding' | 'breeding'
 
+export type MajorSupplyStack = {
+  stackId?: string
+  familyId: string
+  visibleId: string | null
+  cardIds: string[]
+}
+
 export type GameState = {
   round: number
   /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
@@ -528,6 +541,7 @@ export type GameState = {
    * GameSession.pushHistory reads, honors, and clears this flag. */
   pendingUndoBoundary?: boolean
   availableMajorImprovements: string[]
+  majorImprovementSupply?: MajorSupplyStack[]
   futureMeeples: FutureMeeple[]
   pendingFutureMeeples: FutureMeepleRequest[]
   gameOver: boolean
@@ -739,6 +753,8 @@ export type ActionDefinition = {
   roundAvailable: number
   gainPerRound: Partial<Resource>
   players?: number[]
+  linkedGroupId?: string
+  strictCanExecute?: boolean
   /** Mark as an anytime action that can interrupt the current flow. */
   anytime?: boolean
   idleOnly?: boolean
@@ -802,6 +818,7 @@ export type ActionDefinition = {
 export type ActionSpace = ActionDefinition & {
   resources: Resource
   takenBy: WorkerRef[]
+  blockedBy?: BlockedActionSpaceRef[]
   exclusiveUse?: { playerId: string; sourceCardId: string; untilRound: number }
 }
 

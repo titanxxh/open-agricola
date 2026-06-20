@@ -99,7 +99,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
         "type": "Major",
         "list": [
           "Major_Fireplace1",
-          "Major_Fireplace2"
+          "Major_Fireplace2",
+          "Major_Fireplace3"
         ]
       }
     },
@@ -110,7 +111,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "cookingHearthIdentity": true,
     "returnCards": [
       "Major_Fireplace1",
-      "Major_Fireplace2"
+      "Major_Fireplace2",
+      "Major_Fireplace3"
     ],
     "desc": [
       "[Anytime]",
@@ -201,6 +203,21 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       "<GRAIN> <ARROW-1X> 5<FOOD>",
       "[When you build it, you can Bake immediately]"
     ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "sourceId": "Major_ClayOven",
+        "max": 1,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
     "kind": "major"
   },
   {
@@ -220,6 +237,21 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       "[__Bake Bread__ action:]",
       "<GRAIN> <ARROW-2X> 4<FOOD>",
       "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_StoneOven",
+        "max": 2,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -315,6 +347,350 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "kind": "major"
   },
   {
+    "id": "Major_Fireplace3",
+    "name": "Fireplace",
+    "deck": "major",
+    "number": 11,
+    "cost": {
+      "clay": 3
+    },
+    "vp": 1,
+    "extraVp": false,
+    "isCookery": true,
+    "isBaking": true,
+    "fireplaceIdentity": true,
+    "desc": [
+      "[Anytime]",
+      "<VEGETABLE> <ARROW> 2<FOOD>      <PIG> <ARROW> 2<FOOD>",
+      "<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>",
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW> 2<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Fireplace3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Fireplace3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Fireplace3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Fireplace3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Fireplace3",
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_CookingHearth3",
+    "name": "Cooking Hearth",
+    "deck": "major",
+    "number": 12,
+    "cost": {
+      "fee": {
+        "clay": 5
+      },
+      "cards": {
+        "type": "Major",
+        "list": [
+          "Major_Fireplace1",
+          "Major_Fireplace2",
+          "Major_Fireplace3"
+        ]
+      }
+    },
+    "vp": 1,
+    "extraVp": false,
+    "isCookery": true,
+    "isBaking": true,
+    "cookingHearthIdentity": true,
+    "returnCards": [
+      "Major_Fireplace1",
+      "Major_Fireplace2",
+      "Major_Fireplace3"
+    ],
+    "desc": [
+      "[Anytime]",
+      "<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>",
+      "<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 4<FOOD>",
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW> 3<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_CookingHearth3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_CookingHearth3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_CookingHearth3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_CookingHearth3",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_CookingHearth3",
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Well2",
+    "name": "Well",
+    "deck": "major",
+    "number": 13,
+    "cost": {
+      "wood": 1,
+      "stone": 3
+    },
+    "vp": 4,
+    "extraVp": false,
+    "desc": [
+      "[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]"
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_ClayOven2",
+    "name": "Clay Oven",
+    "deck": "major",
+    "number": 14,
+    "cost": {
+      "clay": 3,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "isBaking": true,
+    "ovenIdentity": true,
+    "desc": [
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW-1X> 5<FOOD>",
+      "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "sourceId": "Major_ClayOven2",
+        "max": 1,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_StoneOven2",
+    "name": "Stone Oven",
+    "deck": "major",
+    "number": 15,
+    "cost": {
+      "clay": 1,
+      "stone": 3
+    },
+    "vp": 3,
+    "extraVp": false,
+    "isBaking": true,
+    "ovenIdentity": true,
+    "desc": [
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW-2X> 4<FOOD>",
+      "[When you build it, you can Bake immediately]"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_StoneOven2",
+        "max": 2,
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Joinery2",
+    "name": "Joinery",
+    "deck": "major",
+    "number": 16,
+    "cost": {
+      "wood": 2,
+      "stone": 2
+    },
+    "vp": 2,
+    "extraVp": true,
+    "waresSalesmanGains": [
+      {
+        "wood": 1,
+        "reed": 1
+      }
+    ],
+    "desc": [
+      "[Harvest]",
+      "<WOOD> <ARROW-1X> 2<FOOD>",
+      "[Scoring]",
+      "3/5/7<WOOD> <ARROW-1X> 1/2/3<SCORE>"
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Pottery2",
+    "name": "Pottery",
+    "deck": "major",
+    "number": 17,
+    "cost": {
+      "clay": 2,
+      "stone": 2
+    },
+    "vp": 2,
+    "extraVp": true,
+    "potteryIdentity": true,
+    "waresSalesmanGains": [
+      {
+        "clay": 1,
+        "reed": 1
+      }
+    ],
+    "desc": [
+      "[Harvest]",
+      "<CLAY> <ARROW-1X> 2<FOOD>",
+      "[Scoring]",
+      "3/5/7<CLAY> <ARROW-1X> 1/2/3<SCORE>"
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Basket2",
+    "name": "Basketmaker",
+    "deck": "major",
+    "number": 18,
+    "cost": {
+      "reed": 2,
+      "stone": 2
+    },
+    "vp": 2,
+    "extraVp": true,
+    "waresSalesmanGains": [
+      {
+        "reed": 2
+      }
+    ],
+    "desc": [
+      "[Harvest]",
+      "<REED> <ARROW-1X> 3<FOOD>",
+      "[Scoring]",
+      "2/4/5<REED> <ARROW-1X> 1/2/3<SCORE>"
+    ],
+    "kind": "major"
+  },
+  {
     "id": "Major_CookingHearth1",
     "name": "Cooking Hearth",
     "deck": "major",
@@ -338,7 +714,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "cookingHearthIdentity": true,
     "returnCards": [
       "Major_Fireplace1",
-      "Major_Fireplace2"
+      "Major_Fireplace2",
+      "Major_Fireplace3"
     ],
     "desc": [
       "[Anytime]",

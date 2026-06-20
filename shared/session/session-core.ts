@@ -116,6 +116,7 @@ import { getAssignedAnimalCount } from '../domain/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
+import { returnMajorImprovementToSupply, takeMajorImprovementFromSupply } from '../cards/major/supply.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
@@ -146,7 +147,7 @@ import {
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
-import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
+import { clearAllLinkedSpaceBlocks, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import {
   canEnterSpace,
@@ -2074,6 +2075,7 @@ export class GameCore {
     const snapshot = cloneState(state)
     // workers return home at round start — just clear action space occupancy.
     snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
+    clearAllLinkedSpaceBlocks(snapshot)
     snapshot.roundStartSnapshot = null
     return snapshot
   }
@@ -3618,6 +3620,7 @@ export class GameCore {
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     if (!canEnterSpace(space, player, this.state)) return false
     if (workersAvailable(this.state, player) <= 0) return false
+    if (isSpaceBlocked(space)) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
       if (!allowed.some(a => a.spaceId === space.id)) return false
@@ -4240,6 +4243,7 @@ export class GameCore {
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
+    clearAllLinkedSpaceBlocks(this.state)
     // Release any workers that cards were holding (e.g. C22_BasketChair).
     for (const p of this.state.players) {
       const cardStates = p.cardStates ?? {}
@@ -4830,9 +4834,7 @@ export class GameCore {
     }
     this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
-      if (!this.state.availableMajorImprovements.includes(cardId)) {
-        this.state.availableMajorImprovements.push(cardId)
-      }
+      returnMajorImprovementToSupply(this.state, cardId)
     } else if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
@@ -4863,7 +4865,7 @@ export class GameCore {
     this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
       player.improvements.push(cardId)
-      this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
+      takeMajorImprovementFromSupply(this.state, cardId)
     } else if (isOccupation) {
       player.occupationPlayed.push(cardId)
     } else {
@@ -4893,6 +4895,7 @@ export class GameCore {
     if (!space) return this.respond(false, 'space not found')
     if (!playerId) {
       space.takenBy = []
+      space.blockedBy = []
     } else {
       const player = this.state.players.find((p) => p.id === playerId)
       const worker = player ? smallestAvailableWorker(this.state, player) : null

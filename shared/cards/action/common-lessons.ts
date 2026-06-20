@@ -7,7 +7,7 @@ export const lessons: ActionDefinition = {
   descriptionKey: 'actions.lessons.description',
   roundAvailable: 1,
   gainPerRound: {},
-  players: [2, 3, 4],
+  players: [2, 3, 4, 5, 6],
   canBeExecutedByPlayer: (state, player) =>
     hasPlayableOccupationChoice(state, player, 'lessons'),
   execute: () => ({ type: 'ok' }),

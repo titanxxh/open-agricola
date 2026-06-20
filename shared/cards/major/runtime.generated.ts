@@ -8,6 +8,14 @@ import { Major_Well } from './well'
 import { Major_Joinery } from './joinery'
 import { Major_Pottery } from './pottery'
 import { Major_Basket } from './basketmaker'
+import { Major_Fireplace3 } from './fireplace'
+import { Major_CookingHearth3 } from './cooking-hearth'
+import { Major_Well2 } from './well'
+import { Major_ClayOven2 } from './clay-oven'
+import { Major_StoneOven2 } from './stone-oven'
+import { Major_Joinery2 } from './joinery'
+import { Major_Pottery2 } from './pottery'
+import { Major_Basket2 } from './basketmaker'
 import { Major_CookingHearth1 } from './cooking-hearth'
 import { Major_Fireplace1 } from './fireplace'
 
@@ -20,6 +28,14 @@ export const majorCardSources = [
   Major_Joinery,
   Major_Pottery,
   Major_Basket,
+  Major_Fireplace3,
+  Major_CookingHearth3,
+  Major_Well2,
+  Major_ClayOven2,
+  Major_StoneOven2,
+  Major_Joinery2,
+  Major_Pottery2,
+  Major_Basket2,
   Major_CookingHearth1,
   Major_Fireplace1,
 ] as const satisfies readonly CardSource<'major'>[]

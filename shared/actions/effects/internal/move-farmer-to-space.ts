@@ -1,5 +1,10 @@
 import type { ActionDefinition, ActionFlow, ActionSpace } from '../../../contract/types'
-import { addWorkerRef, removeWorkerRef } from '../../../domain/space'
+import {
+  addLinkedSpaceBlocks,
+  addWorkerRef,
+  clearLinkedSpaceBlocksForWorker,
+  removeWorkerRef,
+} from '../../../domain/space'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'
 
 /**
@@ -56,8 +61,10 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     if (!sourceSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const movedWorker = removeWorkerRef(sourceSpace, player.id)
     if (!movedWorker) return { type: 'fail', errorKey: 'log.actionFail' }
+    clearLinkedSpaceBlocksForWorker(state, player.id, movedWorker.workerId)
 
     addWorkerRef(targetSpace, player.id, movedWorker.workerId)
+    addLinkedSpaceBlocks(state, targetSpace, player.id, movedWorker.workerId)
     eventSink?.emit<'worker.placed'>({
       type: 'worker.placed',
       workerId: movedWorker.workerId,

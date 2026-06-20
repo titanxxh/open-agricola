@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A155_Conjurer'
 const listener: CardListenerRegistration = {
@@ -11,7 +12,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || context.space.id !== 'traveling-players') return
+    if (!isTravelingPlayersSpaceId(context.space?.id)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1, grain: 1 }), sourceCard: CARD_ID }
   },
 }

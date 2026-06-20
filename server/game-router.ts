@@ -551,7 +551,9 @@ export const handleGameRoute = async (
         customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
       }
       if (typeof body.playerCount === 'number') {
-        playerCount = Math.max(2, Math.min(4, Math.floor(body.playerCount)))
+        playerCount = Number.isFinite(body.playerCount)
+          ? Math.max(2, Math.min(6, Math.floor(body.playerCount)))
+          : 2
       }
       if (Array.isArray(body.deckIds)) {
         const nextDecks = body.deckIds
