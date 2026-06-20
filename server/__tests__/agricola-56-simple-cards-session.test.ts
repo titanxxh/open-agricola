@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { D172_PutcherMaker } from '../../shared/cards/D/D172_PutcherMaker'
 import { computeAnimalZones, getTotalAnimalCapacity } from '../../shared/domain/animal-zones'
+import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
@@ -286,6 +287,39 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(invalid).toEqual([])
   })
 
+  it('B169 Livestock Sustainer persists animals assigned to its card zone during reorganization', () => {
+    const session = setupLivestockSustainerSession()
+    const state = session.getState().state
+    state.players[1]!.improvements = ['Major_Fireplace1']
+    const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
+    if (!sheepMarket) throw new Error('missing sheep market')
+    sheepMarket.resources.sheep = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'sheep-market')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
+      ],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.B169_LivestockSustainer?.extraData).toMatchObject({
+      held: 1,
+      animalType: 'sheep',
+    })
+    expect(getLivestockSustainerZone(session)).toMatchObject({
+      animalType: 'sheep',
+      animalCount: 1,
+      capacity: 1,
+    })
+  })
+
   it("A178 Carpenter's Boy gives wood for each room another player builds", () => {
     const session = setupFarmEventSession('A178_CarpentersBoy', 1)
     const state = session.getState().state
@@ -391,6 +425,48 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.fields).toHaveLength(1)
     expect(resp.state.players[1]!.resources.wood).toBe(4)
+  })
+
+  it('D169 Plowsmith triggers after an opponent takes 4 wood from Riverbank Forest', () => {
+    const session = setupFarmEventSession('D169_Plowsmith', 1, 1)
+    setActionSpaceResources(session, 'riverbank-forest-56', { wood: 4 })
+
+    let resp = session.takeAction(1, 'riverbank-forest-56')
+    expect(resp.ok).toBe(true)
+    resp = confirmPlayerSwitches(session, resp)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+    resp = completeFirstPlowSelection(session)
+
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.fields).toHaveLength(1)
+    expect(resp.state.players[1]!.resources.wood).toBe(4)
+    expect(resp.state.players[1]!.resources.reed).toBe(1)
+  })
+
+  it('D169 Plowsmith does not offer payment when the owner has no legal plow tile', () => {
+    const session = setupFarmEventSession('D169_Plowsmith', 1, 1)
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const roomKeys = new Set(owner.roomTiles.map(positionKey))
+    owner.fields = getAllTilePositions()
+      .filter((tile) => !roomKeys.has(positionKey(tile)))
+      .map((tile) => ({ ...tile, stacks: [] }))
+    session.loadState(state)
+    setActionSpaceResources(session, 'forest', { wood: 4 })
+
+    let resp = session.takeAction(1, 'forest')
+    expect(resp.ok).toBe(true)
+    resp = confirmPlayerSwitches(session, resp)
+
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
+    expect(resp.state.players[0]!.resources.food).toBe(1)
   })
 
   it('D169 Plowsmith ignores owner, sub-threshold, and non-accumulation wood takes', () => {
@@ -804,8 +880,11 @@ describe('Agricola 5-6 simple occupation cards', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    resp = chooseFirstNonSkipOption(session, 0)
-    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
+      expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(false)
+      resp = chooseFirstNonSkipOption(session, 0)
+      expect(resp.ok).toBe(true)
+    }
 
     const player = resp.state.players[0]!
     expect(player.occupationPlayed).toContain('D177_Graduate')
