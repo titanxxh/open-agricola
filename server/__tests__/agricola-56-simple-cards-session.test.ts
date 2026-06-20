@@ -49,7 +49,188 @@ const setupHarvestStartSession = (cardId: string) => {
   return session
 }
 
+const setupWorkPhaseHookSession = (cardId: string, playerCount = 5) => {
+  const session = new GameSession(undefined, undefined, { playerCount })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+  const player = state.players[0]!
+  player.occupationPlayed.push(cardId)
+  session.loadState(state)
+  return session
+}
+
+const setupRoundStartHookSession = (cardId: string, playerCount = 5) => {
+  const session = new GameSession(undefined, undefined, { playerCount })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 2
+  const player = state.players[0]!
+  player.occupationPlayed.push(cardId)
+  player.resources.food = 0
+  session.loadState(state)
+  return session
+}
+
+const givePastureCattle = (session: GameSession, playerIndex: number) => {
+  const state = session.getState().state
+  const player = state.players[playerIndex]!
+  player.pastures = [{
+    id: `cattle-${playerIndex}`,
+    size: 1,
+    tiles: [{ row: 2, col: playerIndex }],
+    stables: 0,
+    animalType: 'cattle',
+    animalCount: 1,
+  }]
+  player.resources.cattle = 1
+  session.loadState(state)
+}
+
+const occupySpace = (session: GameSession, spaceId: string, playerId = 'p2') => {
+  const state = session.getState().state
+  const space = state.actionSpaces.find((entry) => entry.id === spaceId)
+  if (!space) throw new Error(`${spaceId} missing`)
+  space.takenBy = [{ playerId, workerId: `${playerId}-worker` }]
+  session.loadState(state)
+}
+
+const setStoneAccumulationSpaces = (session: GameSession, stones: Record<string, number>) => {
+  const state = session.getState().state
+  for (const space of state.actionSpaces) {
+    if ((space.gainPerRound.stone ?? 0) > 0) {
+      space.resources.stone = stones[space.id] ?? 0
+    }
+  }
+  session.loadState(state)
+}
+
 describe('Agricola 5-6 simple occupation cards', () => {
+  it('C174 Stone Custodian gives grain when exactly one stone accumulation space has stone left', () => {
+    const session = setupWorkPhaseHookSession('C174_StoneCustodian', 5)
+    setStoneAccumulationSpaces(session, { 'western-quarry': 1 })
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+
+    expect(flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { grain: 1 },
+      sourceCard: 'C174_StoneCustodian',
+    })
+  })
+
+  it('C174 Stone Custodian gives vegetable when at least two stone accumulation spaces have stone left', () => {
+    const session = setupWorkPhaseHookSession('C174_StoneCustodian', 5)
+    setStoneAccumulationSpaces(session, { 'western-quarry': 1, 'eastern-quarry': 1 })
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+
+    expect(flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { vegetable: 1 },
+      sourceCard: 'C174_StoneCustodian',
+    })
+  })
+
+  it('C174 Stone Custodian ignores stone on non-stone accumulation spaces', () => {
+    const session = setupWorkPhaseHookSession('C174_StoneCustodian', 5)
+    setStoneAccumulationSpaces(session, {})
+    const state = session.getState().state
+    state.actionSpaces.find((space) => space.id === 'resource-market-56')!.resources.stone = 1
+    session.loadState(state)
+    const updatedState = session.getState().state
+    const player = updatedState.players[0]!
+
+    const flow = runCardEffectHook(updatedState, player, 'C174_StoneCustodian', 'onBeforeReturnHome')
+
+    expect(flow).toBeNull()
+  })
+
+  it.each([
+    [3, 1],
+    [4, 2],
+    [5, 3],
+  ])('B172 Cattle Caregiver gives %i cattle owners %i food at round start', (cattleOwners, food) => {
+    const session = setupRoundStartHookSession('B172_CattleCaregiver', 5)
+    for (let index = 0; index < cattleOwners; index += 1) {
+      givePastureCattle(session, index)
+    }
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'B172_CattleCaregiver', 'onRoundStart')
+
+    expect(flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { food },
+      sourceCard: 'B172_CattleCaregiver',
+    })
+  })
+
+  it('B172 Cattle Caregiver ignores cattle counters that are not in a valid holding zone', () => {
+    const session = setupRoundStartHookSession('B172_CattleCaregiver', 5)
+    givePastureCattle(session, 0)
+    givePastureCattle(session, 1)
+    givePastureCattle(session, 2)
+    const state = session.getState().state
+    state.players[3]!.resources.cattle = 1
+    session.loadState(state)
+    const updatedState = session.getState().state
+    const player = updatedState.players[0]!
+
+    const flow = runCardEffectHook(updatedState, player, 'B172_CattleCaregiver', 'onRoundStart')
+
+    expect(flow).toMatchObject({ type: 'leaf', params: { food: 1 } })
+  })
+
+  it('A172 Boat Painter offers grain or food when Fishing and 5-6 Traveling Players are occupied', () => {
+    const session = setupWorkPhaseHookSession('A172_BoatPainter', 5)
+    occupySpace(session, 'fishing')
+    occupySpace(session, 'traveling-players-56')
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+
+    expect(flow).toMatchObject({
+      type: 'xor',
+      children: [
+        { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: 'A172_BoatPainter' },
+        { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'A172_BoatPainter' },
+      ],
+    })
+  })
+
+  it('A172 Boat Painter does not trigger when only Fishing is occupied', () => {
+    const session = setupWorkPhaseHookSession('A172_BoatPainter', 5)
+    occupySpace(session, 'fishing')
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+
+    expect(flow).toBeNull()
+  })
+
+  it('A172 Boat Painter also counts the base Traveling Players space', () => {
+    const session = setupWorkPhaseHookSession('A172_BoatPainter', 4)
+    occupySpace(session, 'fishing')
+    occupySpace(session, 'traveling-players')
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const flow = runCardEffectHook(state, player, 'A172_BoatPainter', 'onBeforeReturnHome')
+
+    expect(flow).toMatchObject({ type: 'xor' })
+  })
+
   it('D172 Putcher Maker can exchange multiple reed for food through the anytime exchange action', () => {
     const session = setupLessonsSession('A176_Wheelmaker')
     const state = session.getState().state
