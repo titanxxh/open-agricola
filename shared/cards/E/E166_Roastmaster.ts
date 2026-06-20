@@ -3,12 +3,9 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { findTravelingPlayersSpace, isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'E166_Roastmaster'
-const PAIR: Record<string, string> = {
-  fishing: 'traveling-players',
-  'traveling-players': 'fishing',
-}
 
 const listener: CardListenerRegistration = {
   id: 'E166-roastmaster-before-place-farmer',
@@ -18,7 +15,11 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const placedSpaceId = context.space?.id
     if (!placedSpaceId) return
-    const otherSpaceId = PAIR[placedSpaceId]
+    const otherSpaceId = placedSpaceId === 'fishing'
+      ? findTravelingPlayersSpace(context.state.actionSpaces)?.id
+      : isTravelingPlayersSpaceId(placedSpaceId)
+        ? 'fishing'
+        : undefined
     if (!otherSpaceId) return
     if (!context.state.actionSpaces.find((s) => s.id === otherSpaceId)) return
     // Need at least 1 food on the placed space to move

@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { HOLLOW_SPACE_IDS, isHollowSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A140_ShovelBearer'
 const listener: CardListenerRegistration = {
@@ -12,9 +13,11 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (spaceId !== 'clay-pit' && spaceId !== 'hollow-4') return
-    // Get the OTHER clay space
-    const otherSpaceId = spaceId === 'clay-pit' ? 'hollow-4' : 'clay-pit'
+    if (spaceId !== 'clay-pit' && !isHollowSpaceId(spaceId)) return
+    const otherSpaceId = spaceId === 'clay-pit'
+      ? HOLLOW_SPACE_IDS.find((id) => context.state.actionSpaces.some((space) => space.id === id))
+      : 'clay-pit'
+    if (!otherSpaceId) return
     const otherSpace = context.state.actionSpaces.find((s) => s.id === otherSpaceId)
     if (!otherSpace) return
     const clay = otherSpace.resources?.clay ?? 0

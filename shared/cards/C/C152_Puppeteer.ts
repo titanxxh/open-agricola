@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'C152_Puppeteer'
 /**
@@ -17,7 +18,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.space?.id !== 'traveling-players') return
+    if (!isTravelingPlayersSpaceId(context.space?.id)) return
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
     return {
       flow: {

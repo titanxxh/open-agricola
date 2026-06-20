@@ -7,10 +7,9 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('A150_Stagehand session', () => {
-  const setup = () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  const setup = (playerCount = 4, spaceId = 'traveling-players') => {
+    const session = new GameSession(undefined, undefined, { playerCount })
     const state = session.getState().state
-    // traveling-players is a 4-player action space, keep all 4 players
     state.currentPlayerIndex = 1
 
     const owner = state.players[0]!
@@ -19,8 +18,8 @@ describe('A150_Stagehand session', () => {
 
     const opponent = state.players[1]!
     setWorkersAtHome(state, opponent, 2)
-    const travelingPlayers = state.actionSpaces.find((s) => s.id === 'traveling-players')
-    if (!travelingPlayers) throw new Error('traveling-players space missing')
+    const travelingPlayers = state.actionSpaces.find((s) => s.id === spaceId)
+    if (!travelingPlayers) throw new Error(`${spaceId} space missing`)
     travelingPlayers.resources.food = 3
 
     session.loadState(state)
@@ -37,6 +36,13 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.toPlayerIndex).toBe(0)
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
+  })
+
+  it('triggers when an opponent uses traveling-players-56', () => {
+    const session = setup(5, 'traveling-players-56')
+    const resp = session.takeAction(1, 'traveling-players-56')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
   })
 
   it('full flow: switch to owner, skip optional choice, switch back', () => {

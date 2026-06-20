@@ -6,9 +6,9 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A41_VegetableSlicer'
-const COOKING_HEARTH_IDS = new Set(['Major_CookingHearth1', 'Major_CookingHearth2'])
+const COOKING_HEARTH_IDS = new Set(['Major_CookingHearth1', 'Major_CookingHearth2', 'Major_CookingHearth3'])
 
-const FIREPLACE_IDS = new Set(['Major_Fireplace1', 'Major_Fireplace2'])
+const FIREPLACE_IDS = new Set(['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'])
 
 type QueryableCardPlayedEvent = Extract<GameEvent, { type: 'card.played' }> | DraftGameEvent<'card.played'>
 type QueryableResourcePaidEvent = Extract<GameEvent, { type: 'resource.paid' }> | DraftGameEvent<'resource.paid'>

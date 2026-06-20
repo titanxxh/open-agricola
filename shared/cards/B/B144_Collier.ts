@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isHollowSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'B144_Collier'
 const listener: CardListenerRegistration = {
@@ -15,7 +16,7 @@ const listener: CardListenerRegistration = {
     if (id === 'clay-pit') {
       return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }
     }
-    if (id === 'hollow-4') {
+    if (isHollowSpaceId(id)) {
       return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
     }
   },

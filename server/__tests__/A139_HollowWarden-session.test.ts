@@ -86,6 +86,31 @@ describe('A139_HollowWarden session', () => {
     expect(after.resources.food).toBe(foodBefore + 1)
   })
 
+  it('gains 1 food when using 5/6 hollow space', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 5 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    player.occupationHand.push(CARD_ID)
+    setWorkersAtHome(state, player, 2)
+    player.resources.food = 5
+
+    const hollow = state.actionSpaces.find((s) => s.id === 'hollow-56')
+    expect(hollow).toBeDefined()
+    hollow!.resources.clay = 3
+
+    session.loadState(state)
+    session.devPlayCard(0, CARD_ID)
+
+    const foodBefore = session.getState().state.players[0]!.resources.food
+    const resp = session.takeAction(0, 'hollow-56')
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 1)
+  })
+
   it('does not trigger for opponent using hollow', () => {
     const session = setup()
     const state = session.getState().state
