@@ -105,8 +105,9 @@ export const readAnimalCountsForZoneAssignment = (value: unknown): AnimalCounts 
 }
 
 const fixedAnimalTypeForZone = (zone: AnimalZone): AnimalType | null => {
+  if ('allowedAnimalType' in zone && zone.allowedAnimalType == null) return null
   if (isAnimalKey(zone.allowedAnimalType)) return zone.allowedAnimalType
-  if (isAnimalKey(zone.animalType) && (zone.animalCount ?? 0) <= 0) return zone.animalType
+  if (isAnimalKey(zone.animalType)) return zone.animalType
   return null
 }
 

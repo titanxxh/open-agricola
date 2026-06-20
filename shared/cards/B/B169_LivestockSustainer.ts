@@ -43,6 +43,7 @@ const cardImpl = {
         animalType: singleAnimalType(held),
         animalCount: sumAnimalCounts(held),
         animalCounts: held,
+        allowedAnimalType: null,
       })
     },
     getInvalidAnimals: () => [],
