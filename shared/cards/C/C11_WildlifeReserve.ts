@@ -14,6 +14,7 @@ const cardImpl = {
         capacity: 3,
         animalType: null,
         animalCount: 0,
+        allowedAnimalType: null,
       })
     },
     /**
