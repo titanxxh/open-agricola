@@ -3,7 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
 import type { ActionFlow, Resource } from '../../contract/types'
-import { gainLeaf, returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D180_PartTimeWorker'
@@ -81,10 +81,17 @@ const enumerateReturnMaps = (
 const returnThenGainActionFlow = (
   cost: Partial<Resource>,
   gain: Partial<Resource>,
+  targetSpaceId: string,
 ): ActionFlow => ({
   type: 'seq',
   children: [
-    { type: 'leaf', actionId: 'return-to-space', params: cost, sourceCard: CARD_ID },
+    {
+      type: 'leaf',
+      actionId: 'return-to-space',
+      params: cost,
+      sourceCard: CARD_ID,
+      actionContext: { targetSpaceId },
+    },
     gainLeaf(CARD_ID, gain),
   ],
 })
@@ -96,6 +103,8 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isAccumulationSpace(context)) return
+    const targetSpaceId = context.space?.id
+    if (!targetSpaceId) return
     const collected = collectedFromCurrentSpace(context)
     const reward = REWARD_BY_COLLECTED_TOTAL[totalResources(collected)]
     if (!reward) return
@@ -103,11 +112,10 @@ const listener: CardListenerRegistration = {
     if (returnMaps.length === 0) return
     if (returnMaps.length === 1) {
       return {
-        ...returnToSpaceThenGainFlow({
-          cardId: CARD_ID,
-          cost: returnMaps[0]!,
-          gain: reward.gain,
-        }),
+        flow: {
+          ...returnThenGainActionFlow(returnMaps[0]!, reward.gain, targetSpaceId),
+          optional: true,
+        },
         sourceCard: CARD_ID,
       }
     }
@@ -115,7 +123,7 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'xor',
         optional: true,
-        children: returnMaps.map((cost) => returnThenGainActionFlow(cost, reward.gain)),
+        children: returnMaps.map((cost) => returnThenGainActionFlow(cost, reward.gain, targetSpaceId)),
       },
       sourceCard: CARD_ID,
     }

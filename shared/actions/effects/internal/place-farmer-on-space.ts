@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions, type MatchedCardListener } from '../../../cards/card-listeners'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { incPlacedFarmers } from '../../../session/stats'
@@ -43,13 +43,33 @@ const collectAfterPlacementFlows = (
     result: { type: 'ok' as const },
     actionContext,
   }
-  const flows: ActionFlow[] = []
-  for (const entry of getMatchingListeners(context)) {
-    const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-    if (result?.flow) flows.push(result.flow)
-  }
-  return flows
+  return getMatchingListeners(context).map((entry) =>
+    activatePlacementListenerFlow(entry, player.id, actionContext),
+  )
 }
+
+const activatePlacementListenerFlow = (
+  entry: MatchedCardListener,
+  triggerPlayerId: string,
+  actionContext: Record<string, unknown> | undefined,
+): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'activate-card',
+  sourceCard: entry.cardId || undefined,
+  params: {
+    listenerId: entry.registration.id,
+    cardId: entry.cardId,
+    phase: 'after',
+    actionId: 'place-farmer',
+    event: { result: { type: 'ok' } },
+    ownerPlayerId: entry.ownerPlayerId,
+    ownerCardZone: entry.ownerCardZone,
+    triggerPlayerId,
+    mandatory: entry.registration.mandatory === true,
+  },
+  actionContext: actionContext ? { ...actionContext } : undefined,
+  targetPlayerId: entry.ownerPlayerId || undefined,
+})
 
 const canTargetSpace = (
   state: GameState,

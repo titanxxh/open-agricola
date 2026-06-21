@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { improvementAction } from '../../actions/effects/improvement'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { evaluateWithReservedResources } from '../helpers/reserved-resources'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -42,10 +43,13 @@ const cardImpl = {
     onStartReturnHome: (state, player) => {
       if (player.resources.food < 1) return
       const children: ActionFlow[] = []
-      if (improvementAction.canBeExecutedByPlayer(state, player, {
-        sourceCard: CARD_ID,
-        actionContext: MINOR_ACTION_CONTEXT,
-      })) {
+      const canAffordMinorAfterFee = evaluateWithReservedResources(state, player, { food: 1 }, (nextState, nextPlayer) =>
+        improvementAction.canBeExecutedByPlayer(nextState, nextPlayer, {
+          sourceCard: CARD_ID,
+          actionContext: MINOR_ACTION_CONTEXT,
+        }),
+      )
+      if (canAffordMinorAfterFee) {
         children.push(minorImprovementBranch())
       }
       if (state.ordinaryCardDecks.minor.length > 0) {
