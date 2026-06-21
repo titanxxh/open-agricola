@@ -12,8 +12,8 @@
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
-| 已接受 / 产品策略差异 | 59 |
-| 排除的 BGA legacy 或未实现行为目标 | 14 |
+| 已接受 / 产品策略差异 | 60 |
+| 排除的 BGA legacy 或未实现行为目标 | 13 |
 | 本轮审计视为已对齐 | 815 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
@@ -41,7 +41,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
-| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B175_FieldOverseer`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D170_FoldBuilder`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
+| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D170_FoldBuilder`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 | Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
@@ -746,7 +746,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B173_Sweeper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B174_RiverbankGardener` | 已对齐 | 5+ 产品扩展实现：Riverbank Forest collect 后额外获得 1 vegetable。 |
 | `B175_FieldOverseer` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。harvest field phase 结束时只统计其他玩家 `harvestReapSummary` 中的 grain field 数，3/4/6+ 按最高阈值给 food/grain/vegetable。 |
-| `B176_VillageIdiot` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B176_VillageIdiot` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。通过 hand/played `occupation.isDoable` 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 后给 owner 1 wood + 1 food。 |
 | `B177_StoneClawer` | 已对齐 | 5+ 产品扩展实现：每个成功 plow leaf 结算后给 1 stone。 |
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。return home 前按实际 `takenBy` 占用统计 wood accumulation spaces，3+ 且 owner 有 wood 时可选 1 wood -> 1 boar。 |

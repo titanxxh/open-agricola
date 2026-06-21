@@ -3881,6 +3881,10 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "The Village Idiot is your lone occupation. Each time another player uses the \"Meeting Place\" action space, you get 1 wood and 1 food."
     ],
     "cost": {},
+    "prerequisite": "No Occupations",
+    "occupationPrerequisites": {
+      "max": 0
+    },
     "players": "5+",
     "kind": "occupation"
   },

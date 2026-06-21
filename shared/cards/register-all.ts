@@ -263,6 +263,7 @@ import { B171_GreenhouseBuilder } from './B/B171_GreenhouseBuilder'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
 import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
 import { B175_FieldOverseer } from './B/B175_FieldOverseer'
+import { B176_VillageIdiot } from './B/B176_VillageIdiot'
 import { B177_StoneClawer } from './B/B177_StoneClawer'
 import { B179_WildBoarHunter } from './B/B179_WildBoarHunter'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
@@ -1147,6 +1148,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
   'B174_RiverbankGardener': B174_RiverbankGardener.impl,
   'B175_FieldOverseer': B175_FieldOverseer.impl,
+  'B176_VillageIdiot': B176_VillageIdiot.impl,
   'B177_StoneClawer': B177_StoneClawer.impl,
   'B179_WildBoarHunter': B179_WildBoarHunter.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
