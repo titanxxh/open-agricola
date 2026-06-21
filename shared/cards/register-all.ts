@@ -613,6 +613,7 @@ import { D168_Stockman } from './D/D168_Stockman'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
 import { D170_FoldBuilder } from './D/D170_FoldBuilder'
+import { D171_SeniorTeacher } from './D/D171_SeniorTeacher'
 import { D173_TownClerk } from './D/D173_TownClerk'
 import { D174_LoessGardener } from './D/D174_LoessGardener'
 import { D175_Countryman } from './D/D175_Countryman'
@@ -1502,6 +1503,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
   'D170_FoldBuilder': D170_FoldBuilder.impl,
+  'D171_SeniorTeacher': D171_SeniorTeacher.impl,
   'D173_TownClerk': D173_TownClerk.impl,
   'D174_LoessGardener': D174_LoessGardener.impl,
   'D175_Countryman': D175_Countryman.impl,
