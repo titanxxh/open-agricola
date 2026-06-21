@@ -461,6 +461,23 @@
 .lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
 .lazybones-stable-marker[data-player-color="green"] { border: 2px solid #168a4a; }
 .lazybones-stable-marker[data-player-color="purple"] { border: 2px solid #7c3aed; }
+.action-space-attachments {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 17;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 3px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #222;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.action-space-attachments .res-icon {
+  font-size: 18px;
+}
 .action-exclusive-use {
   position: absolute;
   top: 4px;
