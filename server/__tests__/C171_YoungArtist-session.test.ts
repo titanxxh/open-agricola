@@ -7,6 +7,7 @@ import '../../shared/cards/C/C171_YoungArtist'
 import '../../shared/cards/A/A16_RammedClay'
 import '../../shared/cards/C/C15_Trellis'
 import '../../shared/cards/C/C23_JobContract'
+import '../../shared/cards/C/C4_WritingBoards'
 
 const CARD_ID = 'C171_YoungArtist'
 const MINOR_ID = 'A16_RammedClay'
@@ -111,6 +112,19 @@ describe('C171_YoungArtist', () => {
     expect(owner.minorHand).not.toContain(MINOR_ID)
     expect(owner.minorPlayed).toContain(MINOR_ID)
     expect(resp.state.ordinaryCardDecks.minor).toEqual([])
+  })
+
+  it('does not offer a Minor Improvement branch that becomes unaffordable after the Young Artist food fee', () => {
+    const session = setupSession({ food: 1, minorHand: ['C4_WritingBoards'], minorDeck: [] })
+
+    const resp = session.performRoundEnd()
+
+    const owner = resp.state.players[0]!
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).not.toBe('wait')
+    expect(owner.resources.food).toBe(1)
+    expect(owner.minorHand).toEqual(['C4_WritingBoards'])
+    expect(owner.minorPlayed).not.toContain('C4_WritingBoards')
   })
 
   it('draws only the remaining ordinary minor when fewer than 2 cards are available', () => {
