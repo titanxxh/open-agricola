@@ -517,6 +517,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
 
+`place-farmer-on-space` 是指定目标额外放人的 internal action。它从当前 owner 家里取可用工人放到 `params.spaceId`，然后默认返回目标 action 的 `expandFlow` leaf；`params.allowOccupied` 只跳过 occupied 检查，不跳过 linked block / round availability / action executability / worker supply。需要 piggyback 或固定目标连锁放人的卡牌应使用该 internal action，不要在 listener handler 内直接改 `ActionSpace.takenBy`。
+
 额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
 
 ### 7.4 payment/
