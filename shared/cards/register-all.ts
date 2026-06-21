@@ -625,6 +625,7 @@ import { D177_Graduate } from './D/D177_Graduate'
 import { D178_SubstituteTeacher } from './D/D178_SubstituteTeacher'
 import { D179_Bullcatcher } from './D/D179_Bullcatcher'
 import { D18_SteamPlow } from './D/D18_SteamPlow'
+import { D180_PartTimeWorker } from './D/D180_PartTimeWorker'
 import { D19_PulverizerPlow } from './D/D19_PulverizerPlow'
 import { D2_DwellingPlan } from './D/D2_DwellingPlan'
 import { D20_TurnwrestPlow } from './D/D20_TurnwrestPlow'
@@ -1519,6 +1520,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D178_SubstituteTeacher': D178_SubstituteTeacher.impl,
   'D179_Bullcatcher': D179_Bullcatcher.impl,
   'D18_SteamPlow': D18_SteamPlow.impl,
+  'D180_PartTimeWorker': D180_PartTimeWorker.impl,
   'D19_PulverizerPlow': D19_PulverizerPlow.impl,
   'D2_DwellingPlan': D2_DwellingPlan.impl,
   'D20_TurnwrestPlow': D20_TurnwrestPlow.impl,
