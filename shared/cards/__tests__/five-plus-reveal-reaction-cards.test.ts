@@ -57,6 +57,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       sourceCard: 'B170_CorralBuilder',
       optional: true,
       actionContext: {
+        trueAction: false,
         fencePolicy: {
           segmentBounds: { total: { min: 1, max: 4 } },
           newPastureBounds: { count: { min: 1, max: 1 }, totalSize: { min: 1, max: 1 } },
@@ -193,6 +194,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       sourceCard: 'C170_AmateurFencer',
       optional: true,
       actionContext: {
+        trueAction: false,
         fencePolicy: {
           newPastureBounds: { count: { min: 1, max: 1 }, totalSize: { min: 1, max: 1 } },
           costPolicy: { fence: { wood: 0 } },
@@ -346,7 +348,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     })
   })
 
-  it('C169 Fast Mason ignores non-matching or unaffordable accumulation collections', () => {
+  it('C169 Fast Mason ignores non-matching, unaffordable, or tier-skipping accumulation collections', () => {
     const session = setupOwner('C169_FastMason')
     const state = session.getState().state
     const owner = state.players[0]!
@@ -374,6 +376,24 @@ describe('5+ reveal and reaction occupation cards', () => {
       }],
     } as unknown as CardListenerContext)).toBeUndefined()
 
+    expect(executeCardListener(fastMason, {
+      state,
+      player: owner,
+      ownerPlayer: owner,
+      triggerPlayer: owner,
+      space: quarry,
+      actionId: 'collect',
+      phase: 'after',
+      actionEvents: [{
+        type: 'resource.moved',
+        resources: { stone: 2 },
+        from: { kind: 'actionSpace', spaceId: 'eastern-quarry' },
+        to: { kind: 'player', playerId: owner.id },
+      }],
+    } as unknown as CardListenerContext)).toBeUndefined()
+
+    owner.houseType = 'wood'
+    owner.resources.stone = 2
     expect(executeCardListener(fastMason, {
       state,
       player: owner,
@@ -446,6 +466,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       space: greenhouse,
       actionId: 'renovate-house',
       phase: 'after',
+      actionContext: { renovationActionSpace: true },
     } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({
@@ -480,6 +501,19 @@ describe('5+ reveal and reaction occupation cards', () => {
       ownerPlayer: owner,
       triggerPlayer: owner,
       space: state.actionSpaces.find((candidate) => candidate.id === 'farm-redevelopment')!,
+      actionId: 'renovate-house',
+      phase: 'after',
+    } as unknown as CardListenerContext)).toBeUndefined()
+
+    const hollow = state.actionSpaces.find((candidate) => candidate.id === 'hollow-56')!
+    owner.fields = [{ row: 0, col: 0, stacks: [] }]
+    owner.resources.grain = 1
+    expect(executeCardListener(countryman, {
+      state,
+      player: owner,
+      ownerPlayer: owner,
+      triggerPlayer: owner,
+      space: hollow,
       actionId: 'renovate-house',
       phase: 'after',
     } as unknown as CardListenerContext)).toBeUndefined()

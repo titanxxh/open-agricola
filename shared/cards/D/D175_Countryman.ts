@@ -5,6 +5,7 @@ import { buildSowFarmInteraction } from '../../domain/farmyard'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D175_Countryman'
+const PRINTED_RENOVATION_ACTION_SPACE_IDS = new Set(['house-redevelopment', 'farm-redevelopment'])
 
 const canSowOneField = (context: CardListenerContext): boolean => {
   const farm = buildSowFarmInteraction(context.ownerPlayer ?? context.player, {
@@ -23,7 +24,10 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const ownerId = context.ownerPlayer?.id
     if (!ownerId) return
-    if (!context.state.actionSpaces.some((space) => space.id === context.space?.id)) return
+    const fromRenovationActionSpace =
+      PRINTED_RENOVATION_ACTION_SPACE_IDS.has(context.space?.id ?? '') ||
+      context.actionContext?.renovationActionSpace === true
+    if (!fromRenovationActionSpace) return
     if (!canSowOneField(context)) return
     return {
       flow: {
