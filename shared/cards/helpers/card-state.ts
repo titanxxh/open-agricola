@@ -18,6 +18,13 @@ const CARD_RESOURCE_STATS_KEY = 'resourceStats'
  */
 export const RESERVED_ACTION_SPACES_KEY = 'reservedActionSpaces'
 
+export const ACTION_SPACE_ATTACHMENTS_KEY = 'actionSpaceAttachments'
+
+export type ActionSpaceAttachment = {
+  spaceId: string
+  resources: Partial<Resource>
+}
+
 /** Read the action-space ids reserved by `cardId` for `player` (empty if none). */
 export const getReservedActionSpaces = (
   player: PlayerState,
@@ -33,6 +40,16 @@ export const setReservedActionSpaces = (
 ): void => {
   writeCardExtraData(player, cardId, RESERVED_ACTION_SPACES_KEY, spaces)
 }
+
+export const getActionSpaceAttachments = (
+  player: PlayerState,
+  cardId: string,
+): ActionSpaceAttachment[] =>
+  readCardExtraData<ActionSpaceAttachment[]>(
+    player,
+    cardId,
+    ACTION_SPACE_ATTACHMENTS_KEY,
+  ) ?? []
 
 export const ensureCardState = (
   player: PlayerState,

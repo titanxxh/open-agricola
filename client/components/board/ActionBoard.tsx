@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
-import { RESERVED_ACTION_SPACES_KEY } from '../../../shared/cards/helpers/card-state'
+import {
+  ACTION_SPACE_ATTACHMENTS_KEY,
+  RESERVED_ACTION_SPACES_KEY,
+  type ActionSpaceAttachment,
+} from '../../../shared/cards/helpers/card-state'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
 
@@ -400,6 +404,12 @@ type SpaceFarmerMarker = {
   isNewbornOnly: boolean
 }
 
+type ActionSpaceAttachmentDisplay = {
+  player: PlayerState
+  resource: keyof Resource
+  amount: number
+}
+
 const FUTURE_RESOURCE_ICON_CLASS: Partial<Record<keyof FutureMeepleResourceMap, string>> = {
   stable: 'barn',
 }
@@ -715,6 +725,60 @@ export const ActionBoard = ({
     )
   }
 
+  const attachmentsBySpace = useMemo(() => {
+    const map = new Map<string, ActionSpaceAttachmentDisplay[]>()
+    for (const player of players) {
+      const cardStates = player.cardStates ?? {}
+      for (const cardState of Object.values(cardStates)) {
+        const attachments = cardState?.extraData?.[ACTION_SPACE_ATTACHMENTS_KEY]
+        if (!Array.isArray(attachments)) continue
+        for (const attachment of attachments as ActionSpaceAttachment[]) {
+          if (!attachment || typeof attachment.spaceId !== 'string') continue
+          for (const [resource, amount] of Object.entries(attachment.resources ?? {})) {
+            if (typeof amount !== 'number' || amount <= 0) continue
+            const items = map.get(attachment.spaceId) ?? []
+            items.push({ player, resource: resource as keyof Resource, amount })
+            map.set(attachment.spaceId, items)
+          }
+        }
+      }
+    }
+    return map
+  }, [players])
+
+  const renderActionSpaceAttachments = (space: ActionSpace) => {
+    const items = attachmentsBySpace.get(space.id)
+    if (!items?.length) return null
+    return (
+      <div className="action-space-attachments">
+        {items.flatMap((item, itemIndex) => {
+          const label = getFutureResourceLabel(locale, item.resource)
+          return Array.from({ length: Math.min(item.amount, 6) }, (_, index) => (
+            <span
+              key={`${item.player.id}-${item.resource}-${itemIndex}-${index}`}
+              className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
+              title={`${item.player.name}: ${label}`}
+              aria-label={`${item.player.name}: ${label}`}
+              data-owner-player={item.player.id}
+              data-owner-label={`${item.player.name}: ${label}`}
+              onMouseEnter={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setTooltip({
+                  kind: 'resource',
+                  title: item.player.name,
+                  description: label,
+                  x: rect.right + 8,
+                  y: rect.top - 8,
+                })
+              }}
+              onMouseLeave={hideTooltip}
+            />
+          ))
+        })}
+      </div>
+    )
+  }
+
   const renderExclusiveUseMarker = (space: ActionSpace) => {
     const exclusive = space.exclusiveUse
     if (!exclusive) return null
@@ -933,6 +997,7 @@ export const ActionBoard = ({
                 {renderResourceHolder(space)}
                 {renderFarmerHolder(space)}
                 {renderStableMarker(space)}
+                {renderActionSpaceAttachments(space)}
                 {renderExclusiveUseMarker(space)}
                 {renderBlockedMarker(space)}
               </div>
