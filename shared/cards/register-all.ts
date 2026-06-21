@@ -87,6 +87,7 @@ import { A173_ClayThief } from './A/A173_ClayThief'
 import { A174_MasterHora } from './A/A174_MasterHora'
 import { A175_HollowGardener } from './A/A175_HollowGardener'
 import { A176_Wheelmaker } from './A/A176_Wheelmaker'
+import { A177_Middleman } from './A/A177_Middleman'
 import { A178_CarpentersBoy } from './A/A178_CarpentersBoy'
 import { A179_MountainShepherd } from './A/A179_MountainShepherd'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
@@ -975,6 +976,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A174_MasterHora': A174_MasterHora.impl,
   'A175_HollowGardener': A175_HollowGardener.impl,
   'A176_Wheelmaker': A176_Wheelmaker.impl,
+  'A177_Middleman': A177_Middleman.impl,
   'A178_CarpentersBoy': A178_CarpentersBoy.impl,
   'A179_MountainShepherd': A179_MountainShepherd.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
