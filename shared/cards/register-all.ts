@@ -259,6 +259,7 @@ import { B168_PastureMaster } from './B/B168_PastureMaster'
 import { B169_LivestockSustainer } from './B/B169_LivestockSustainer'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
 import { B170_CorralBuilder } from './B/B170_CorralBuilder'
+import { B171_GreenhouseBuilder } from './B/B171_GreenhouseBuilder'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
 import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
 import { B175_FieldOverseer } from './B/B175_FieldOverseer'
@@ -607,6 +608,7 @@ import { D167_PureBreeder } from './D/D167_PureBreeder'
 import { D168_Stockman } from './D/D168_Stockman'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
+import { D170_FoldBuilder } from './D/D170_FoldBuilder'
 import { D174_LoessGardener } from './D/D174_LoessGardener'
 import { D175_Countryman } from './D/D175_Countryman'
 import { D176_Woodshacker } from './D/D176_Woodshacker'
@@ -1141,6 +1143,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B169_LivestockSustainer': B169_LivestockSustainer.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
   'B170_CorralBuilder': B170_CorralBuilder.impl,
+  'B171_GreenhouseBuilder': B171_GreenhouseBuilder.impl,
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
   'B174_RiverbankGardener': B174_RiverbankGardener.impl,
   'B175_FieldOverseer': B175_FieldOverseer.impl,
@@ -1489,6 +1492,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D168_Stockman': D168_Stockman.impl,
   'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
+  'D170_FoldBuilder': D170_FoldBuilder.impl,
   'D174_LoessGardener': D174_LoessGardener.impl,
   'D175_Countryman': D175_Countryman.impl,
   'D176_Woodshacker': D176_Woodshacker.impl,
