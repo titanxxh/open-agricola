@@ -12,8 +12,8 @@
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
-| 已接受 / 产品策略差异 | 50 |
-| 排除的 BGA legacy 或未实现行为目标 | 23 |
+| 已接受 / 产品策略差异 | 57 |
+| 排除的 BGA legacy 或未实现行为目标 | 16 |
 | 本轮审计视为已对齐 | 815 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
@@ -41,7 +41,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
-| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A180_AnimalBrander`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
+| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B175_FieldOverseer`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 | Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
@@ -740,16 +740,16 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B167_StableSergeant` | 已对齐 |  |
 | `B168_PastureMaster` | 已对齐 |  |
 | `B169_LivestockSustainer` | 已对齐 | 5+ 产品扩展实现：按其他玩家当前 major identity 数量提供混养 animal-holder card zone，含 `alsoCountsAs: ['major']` 的 minor，不计 owner 自己的 major，容量上限 8，major 离场后动态缩容；animal zone 计算只读回显 `animalCounts`，animal reorg 后从通用 card-zone `animalCounts` 恢复各物种，容量归零或缩容后的失效存储在 reorg 写回时清理。 |
-| `B170_CorralBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B170_CorralBuilder` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。Pig Market / Cattle Market reveal 的 round start 独立触发，可选执行 B2-style 免费恰好 1 格牧场 fence flow；若一格牧场非法则不补偿。 |
 | `B171_GreenhouseBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B172_CattleCaregiver` | 已对齐 | 5+ 产品扩展实现：round start 按当前可见且归一化后的动物区域和 animal-holder card zone 统计拥有 cattle 的玩家，3/4/5+ 人分别给 1/2/3 food。 |
 | `B173_Sweeper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B174_RiverbankGardener` | 已对齐 | 5+ 产品扩展实现：Riverbank Forest collect 后额外获得 1 vegetable。 |
-| `B175_FieldOverseer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B175_FieldOverseer` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。harvest field phase 结束时只统计其他玩家 `harvestReapSummary` 中的 grain field 数，3/4/6+ 按最高阈值给 food/grain/vegetable。 |
 | `B176_VillageIdiot` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B177_StoneClawer` | 已对齐 | 5+ 产品扩展实现：每个成功 plow leaf 结算后给 1 stone。 |
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `B179_WildBoarHunter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。return home 前按实际 `takenBy` 占用统计 wood accumulation spaces，3+ 且 owner 有 wood 时可选 1 wood -> 1 boar。 |
 | `B180_GameTeaser` | 已对齐 | 5+ 产品扩展实现：只统计从 food accumulation space 本身移动的 food，1/2/3 food 分别给 cattle/boar/sheep，4+ 不触发。 |
 | `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy` |
 | `C2_Stable` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达免费 stable。 |
@@ -919,11 +919,11 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C166_CattleWhisperer` | 已对齐 |  |
 | `C167_CattleBuyer` | 已对齐 |  |
 | `C168_AnimalCatcher` | 已对齐 |  |
-| `C169_FastMason` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C170_AmateurFencer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `C169_FastMason` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner collect clay/stone accumulation 后，可选执行匹配材质 renovation：clay collection 只到 clay，stone collection 只到 stone，`exactCost` 去掉 reed。 |
+| `C170_AmateurFencer` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。onBuy 时若 owner 无 pasture 且 one-space fence legal，可选执行 B2-style 免费恰好 1 格牧场 fence flow。 |
 | `C171_YoungArtist` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C172_FieldCounter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C173_TopOuter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `C173_TopOuter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。house-building-56 被使用后，owner 收取 linked traveling-players-56 当前全部 food；空 food 或非 house-building-56 不触发。 |
 | `C174_StoneCustodian` | 已对齐 | 5+ 产品扩展实现：work phase return home 前统计有 stone 的 stone accumulation space，1 个给 1 grain，2+ 个给 1 vegetable。 |
 | `C175_VillageTeacher` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner 使用 Lessons 后按当前回合实际 occupied Lessons 数量 1/2/3 给 food/grain/vegetable；linked blocked 格不计数。 |
 | `C176_Cleanacre` | 已对齐 | 5+ 产品扩展实现：Farmland/Cultivation/Farming Supplies 顶层行动完成后给 2 clay；Farming Supplies 多分支每次行动只触发一次。 |
@@ -1105,7 +1105,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D172_PutcherMaker` | 已对齐 | 5+ 产品扩展实现：metadata-driven anytime exchange，1 reed -> 2 food，无每次上限。 |
 | `D173_TownClerk` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D174_LoessGardener` | 已对齐 | 5+ 产品扩展实现：Clay Pit collect 后可选付 1 food 买 1 vegetable。 |
-| `D175_Countryman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `D175_Countryman` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。任意 action-space renovation 后，owner 可选 sow exactly one field；非 action-space renovation 或无合法一田播种不触发。 |
 | `D176_Woodshacker` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。work phase 中 owner 本回合第 1/2 次使用 wood accumulation 额外给 1/2 clay，按实际 worker occupancy 自然随回合回家重置。 |
 | `D177_Graduate` | 已对齐 | 5+ 产品扩展实现：onBuy 有 1 food 时强制支付 1 food；支付成功后获得 2 stone + 2 reed，不能支付则不触发奖励。 |
 | `D178_SubstituteTeacher` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，三个可见 Lessons 格都实际 occupied 后可用，奖励为 1 building resource 或 grain+vegetable。 |

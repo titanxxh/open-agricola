@@ -258,9 +258,12 @@ import { B167_StableSergeant } from './B/B167_StableSergeant'
 import { B168_PastureMaster } from './B/B168_PastureMaster'
 import { B169_LivestockSustainer } from './B/B169_LivestockSustainer'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
+import { B170_CorralBuilder } from './B/B170_CorralBuilder'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
 import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
+import { B175_FieldOverseer } from './B/B175_FieldOverseer'
 import { B177_StoneClawer } from './B/B177_StoneClawer'
+import { B179_WildBoarHunter } from './B/B179_WildBoarHunter'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
 import { B180_GameTeaser } from './B/B180_GameTeaser'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
@@ -426,7 +429,10 @@ import { C165_GameCatcher } from './C/C165_GameCatcher'
 import { C166_CattleWhisperer } from './C/C166_CattleWhisperer'
 import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
+import { C169_FastMason } from './C/C169_FastMason'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
+import { C170_AmateurFencer } from './C/C170_AmateurFencer'
+import { C173_TopOuter } from './C/C173_TopOuter'
 import { C174_StoneCustodian } from './C/C174_StoneCustodian'
 import { C175_VillageTeacher } from './C/C175_VillageTeacher'
 import { C176_Cleanacre } from './C/C176_Cleanacre'
@@ -602,6 +608,7 @@ import { D168_Stockman } from './D/D168_Stockman'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
 import { D174_LoessGardener } from './D/D174_LoessGardener'
+import { D175_Countryman } from './D/D175_Countryman'
 import { D176_Woodshacker } from './D/D176_Woodshacker'
 import { D177_Graduate } from './D/D177_Graduate'
 import { D178_SubstituteTeacher } from './D/D178_SubstituteTeacher'
@@ -1133,9 +1140,12 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B168_PastureMaster': B168_PastureMaster.impl,
   'B169_LivestockSustainer': B169_LivestockSustainer.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
+  'B170_CorralBuilder': B170_CorralBuilder.impl,
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
   'B174_RiverbankGardener': B174_RiverbankGardener.impl,
+  'B175_FieldOverseer': B175_FieldOverseer.impl,
   'B177_StoneClawer': B177_StoneClawer.impl,
+  'B179_WildBoarHunter': B179_WildBoarHunter.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
   'B180_GameTeaser': B180_GameTeaser.impl,
   'B19_MoldboardPlow': B19_MoldboardPlow.impl,
@@ -1301,7 +1311,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C166_CattleWhisperer': C166_CattleWhisperer.impl,
   'C167_CattleBuyer': C167_CattleBuyer.impl,
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
+  'C169_FastMason': C169_FastMason.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
+  'C170_AmateurFencer': C170_AmateurFencer.impl,
+  'C173_TopOuter': C173_TopOuter.impl,
   'C174_StoneCustodian': C174_StoneCustodian.impl,
   'C175_VillageTeacher': C175_VillageTeacher.impl,
   'C176_Cleanacre': C176_Cleanacre.impl,
@@ -1477,6 +1490,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
   'D174_LoessGardener': D174_LoessGardener.impl,
+  'D175_Countryman': D175_Countryman.impl,
   'D176_Woodshacker': D176_Woodshacker.impl,
   'D177_Graduate': D177_Graduate.impl,
   'D178_SubstituteTeacher': D178_SubstituteTeacher.impl,
