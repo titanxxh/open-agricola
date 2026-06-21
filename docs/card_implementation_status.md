@@ -12,8 +12,8 @@
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
-| 已接受 / 产品策略差异 | 46 |
-| 排除的 BGA legacy 或未实现行为目标 | 27 |
+| 已接受 / 产品策略差异 | 50 |
+| 排除的 BGA legacy 或未实现行为目标 | 23 |
 | 本轮审计视为已对齐 | 815 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
@@ -41,7 +41,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
-| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A174_MasterHora`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
+| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A180_AnimalBrander`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 | Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
@@ -559,18 +559,18 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A166_Haydryer` | 已对齐 |  |
 | `A167_BreederBuyer` | 已对齐 |  |
 | `A168_AnimalTeacher` | 已对齐 |  |
-| `A169_OffSiter` | 排除 | BGA implemented=false，本轮无运行时对齐目标；Card Source metadata-only 代表迁移，仍无运行时 impl |
-| `A170_Hayward` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A169_OffSiter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。统计 owner 已建 major improvement 与 alsoCountsAs major 小改的 printed wood/clay/reed/stone cost，总数 9+ 时提供 1 extra room capacity。 |
+| `A170_Hayward` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner 可在 fencing legal 时通过 anytime action 触发普通 fence flow，不放置工人；该实现仍保留普通 fence listener 语义。 |
 | `A171_Sidekick` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A172_BoatPainter` | 已对齐 | 5+ 产品扩展实现：work phase return home 前，Fishing 与 Traveling Players（含 5-6 扩展格）均被占用时，选择 1 grain 或 2 food。 |
-| `A173_ClayThief` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A173_ClayThief` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。work phase start 前若 hollow-56 有 clay 且未使用，可选标记 used / 更新 infobox，并收取 hollow-56 当前全部 clay；无 clay 或已 used 不触发。 |
 | `A174_MasterHora` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner 在六个 5/6 灰色农夫 linked extension spaces 放人前，可选 1 food -> 1 vegetable；若 before flow 后宿主行动异常不可执行，进入 engine-blocked undo-only 状态。 |
 | `A175_HollowGardener` | 已对齐 | 5+ 产品扩展实现：after collect 读取 Hollow（含 hollow-56）实际 clay provenance，3-5 clay 给 grain，6+ clay 给 vegetable。 |
 | `A176_Wheelmaker` | 已对齐 | 5+ 产品扩展实现：onBuy 要求已有另一个职业，且自身 wood 严格大于其他玩家合计 wood，低于 15 时补到 15。 |
 | `A177_Middleman` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A178_CarpentersBoy` | 已对齐 | 5+ 产品扩展实现：opponent construct 后按本次建房数量给 owner 同等 wood。 |
 | `A179_MountainShepherd` | 已对齐 | 5+ 产品扩展实现：使用任一 Quarry 后获得 1 sheep。 |
-| `A180_AnimalBrander` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `A180_AnimalBrander` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。animal-market-56 各原动物分支保留；owner 可在具体分支内选择 paid doubled replacement，额外付 1 food 后完整结算该动物分支两次，cattle 分支总付 3 food 得 2 cattle。 |
 | `B1_UpscaleLifestyle` | 已对齐 | 即时翻修子行动使用当前 `renovate-house` action id。 |
 | `B2_MiniPasture` | 已对齐 | BGA `formatCost([WOOD => 0])` / `miniPasture` 通过 nested `fencePolicy` 表达免费 fence、最多 4 段总 fence、恰好 1 个 1 格新牧场，不走 `fencing` wrapper 丢 params。 |
 | `B3_Moonshine` | 已对齐 |  |

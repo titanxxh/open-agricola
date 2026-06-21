@@ -17,7 +17,7 @@ const cardsDisplayRoot = path.join(repoRoot, 'shared/cards')
 const manifest = () => buildCardsManifest(cardsDisplayRoot)
 
 describe('Card Source representative migrations', () => {
-  it('projects metadata-only Card Source through the production manifest path', () => {
+  it('projects A169 Card Source through the production manifest path', () => {
     const entry = manifest()['A169_OffSiter']
 
     expect(entry?.module).toBe('shared/cards/A/A169_OffSiter')
@@ -34,7 +34,7 @@ describe('Card Source representative migrations', () => {
       cost: {},
       players: '5+',
     })
-    expect(ALL_CARD_IMPLS).not.toHaveProperty('A169_OffSiter')
+    expect(ALL_CARD_IMPLS.A169_OffSiter?.effect?.computeExtraRoomCapacity).toEqual(expect.any(Function))
   })
 
   it('keeps Working Gloves modifiers under Card Source impl and effective in payment', () => {
