@@ -436,6 +436,7 @@ import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C169_FastMason } from './C/C169_FastMason'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
 import { C170_AmateurFencer } from './C/C170_AmateurFencer'
+import { C171_YoungArtist } from './C/C171_YoungArtist'
 import { C172_FieldCounter } from './C/C172_FieldCounter'
 import { C173_TopOuter } from './C/C173_TopOuter'
 import { C174_StoneCustodian } from './C/C174_StoneCustodian'
@@ -1326,6 +1327,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C169_FastMason': C169_FastMason.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
   'C170_AmateurFencer': C170_AmateurFencer.impl,
+  'C171_YoungArtist': C171_YoungArtist.impl,
   'C172_FieldCounter': C172_FieldCounter.impl,
   'C173_TopOuter': C173_TopOuter.impl,
   'C174_StoneCustodian': C174_StoneCustodian.impl,

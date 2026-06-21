@@ -59,6 +59,7 @@ describe('effects architecture guard', () => {
       'collect',
       'complete-parent-father',
       'construct',
+      'draw-ordinary-cards',
       'emit-choice',
       'exchange',
       'family-growth',

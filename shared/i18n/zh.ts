@@ -549,6 +549,7 @@ export const zh = {
     'urgent-wish-children': { name: '紧急渴望孩子', description: '无需房间也可增加 1 家庭成员' },
     'family-growth': { name: '家庭增长', description: '增加 1 家庭成员' },
     'improvement': { name: '改良', description: '建造大型改良或打出小改良' },
+    'draw-ordinary-cards': { name: '摸牌', description: '直接将普通牌摸进手牌' },
     fencing: { name: '围栏', description: '建造围栏圈地' },
     stables: { name: '畜栏', description: '建造 1 个畜栏' },
     construct: { name: '扩建房屋', description: '扩建房屋' },
