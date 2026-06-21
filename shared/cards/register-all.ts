@@ -79,14 +79,18 @@ import { A165_PigBreeder } from './A/A165_PigBreeder'
 import { A166_Haydryer } from './A/A166_Haydryer'
 import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
+import { A169_OffSiter } from './A/A169_OffSiter'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
+import { A170_Hayward } from './A/A170_Hayward'
 import { A172_BoatPainter } from './A/A172_BoatPainter'
+import { A173_ClayThief } from './A/A173_ClayThief'
 import { A174_MasterHora } from './A/A174_MasterHora'
 import { A175_HollowGardener } from './A/A175_HollowGardener'
 import { A176_Wheelmaker } from './A/A176_Wheelmaker'
 import { A178_CarpentersBoy } from './A/A178_CarpentersBoy'
 import { A179_MountainShepherd } from './A/A179_MountainShepherd'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
+import { A180_AnimalBrander } from './A/A180_AnimalBrander'
 import { A19_Handplow } from './A/A19_Handplow'
 import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
 import { A20_DoubleTurnPlow } from './A/A20_DoubleTurnPlow'
@@ -950,14 +954,18 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A166_Haydryer': A166_Haydryer.impl,
   'A167_BreederBuyer': A167_BreederBuyer.impl,
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
+  'A169_OffSiter': A169_OffSiter.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
+  'A170_Hayward': A170_Hayward.impl,
   'A172_BoatPainter': A172_BoatPainter.impl,
+  'A173_ClayThief': A173_ClayThief.impl,
   'A174_MasterHora': A174_MasterHora.impl,
   'A175_HollowGardener': A175_HollowGardener.impl,
   'A176_Wheelmaker': A176_Wheelmaker.impl,
   'A178_CarpentersBoy': A178_CarpentersBoy.impl,
   'A179_MountainShepherd': A179_MountainShepherd.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
+  'A180_AnimalBrander': A180_AnimalBrander.impl,
   'A19_Handplow': A19_Handplow.impl,
   'A2_ShiftingCultivation': A2_ShiftingCultivation.impl,
   'A20_DoubleTurnPlow': A20_DoubleTurnPlow.impl,
