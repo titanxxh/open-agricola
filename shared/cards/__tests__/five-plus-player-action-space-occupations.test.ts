@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { createPlayerActionSpaces, getPlayerActionSpaceConfig } from '../player-action-space'
-import type { ActionExecutionContext, ActionFlow } from '../../contract/types'
+import type { ActionExecutionContext, ActionFlow, GameState } from '../../contract/types'
+import { setWorkersAtHome, workersAvailable } from '../../domain/player'
 import '../B/B171_GreenhouseBuilder'
 import '../D/D170_FoldBuilder'
+import '../D/D179_Bullcatcher'
 
 const setupSession = (cardId: string, playerCount = 5) => {
   const session = new GameSession(42, undefined, { playerCount })
@@ -25,6 +27,14 @@ const leafActionIds = (flow: ActionFlow): string[] => {
 }
 
 describe('5+ player action space occupations', () => {
+  const occupyRoundSlot = (state: GameState, roundNumber: number, playerId: string) => {
+    const actionId = state.roundActionOrder[roundNumber - 1]
+    expect(actionId).toBeTruthy()
+    const space = state.actionSpaces.find((candidate) => candidate.id === actionId)
+    expect(space).toBeDefined()
+    space!.takenBy = [{ playerId, workerId: `slot-${roundNumber}` }]
+  }
+
   it('B171 Greenhouse Builder registers an owner-only space with only revealed printed branches', () => {
     const session = setupSession('B171_GreenhouseBuilder')
     const state = session.getState().state
@@ -184,6 +194,47 @@ describe('5+ player action space occupations', () => {
     expect(cancelled.ok).toBe(false)
     expect(cancelled.state.players[0]!.resources.food).toBe(1)
     expect(cancelled.state.players[1]!.resources.food).toBe(0)
+  })
+
+  it('D179 Bullcatcher is owner-only and only available when round slots 3 and 6 are occupied', () => {
+    const session = setupSession('D179_Bullcatcher')
+    const state = session.getState().state
+    state.round = 6
+    const owner = state.players[0]!
+    const other = state.players[1]!
+    const definition = getPlayerActionSpaceConfig('D179_Bullcatcher')!.createDefinition(owner.id)
+
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
+    occupyRoundSlot(state, 3, other.id)
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
+    occupyRoundSlot(state, 6, other.id)
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(true)
+    expect(definition.canBeExecutedByPlayer(state, other)).toBe(false)
+
+    setWorkersAtHome(state, owner, 0)
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
+  })
+
+  it('D179 Bullcatcher consumes a worker and grants 1 cattle plus 2 food', () => {
+    const session = setupSession('D179_Bullcatcher')
+    const state = session.getState().state
+    state.round = 6
+    const owner = state.players[0]!
+    const other = state.players[1]!
+    const cattleBefore = owner.resources.cattle
+    const foodBefore = owner.resources.food
+    occupyRoundSlot(state, 3, other.id)
+    occupyRoundSlot(state, 6, other.id)
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'D179_Bullcatcher')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.cattle).toBe(cattleBefore + 1)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
+    const bullcatcherSpace = resp.state.actionSpaces.find((candidate) => candidate.id === 'D179_Bullcatcher')
+    expect(bullcatcherSpace?.takenBy).toEqual([{ playerId: owner.id, workerId: '1' }])
   })
 
   it('dynamic player action spaces persist through state normalization with occupied workers', () => {
