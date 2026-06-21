@@ -44,6 +44,7 @@ const listener: CardListenerRegistration = {
       return { decline: true, sourceCard: CARD_ID, alternativeFlow: boarBranch() }
     }
     if (context.actionId === 'pay' && params.food === 1) {
+      if ((context.player.resources.food ?? 0) < 3) return
       return {
         decline: true,
         sourceCard: CARD_ID,

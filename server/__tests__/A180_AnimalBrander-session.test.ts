@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 const CARD_ID = 'A180_AnimalBrander'
 
@@ -88,5 +89,26 @@ describe('A180 Animal Brander', () => {
 
     expect(resp.state.players[0]!.resources.cattle).toBe(2)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('does not offer the doubled cattle branch unless the player can pay all 3 food', () => {
+    const session = setup(2)
+    const state = session.getState().state
+    const player = state.players[0]!
+    const space = state.actionSpaces.find((entry) => entry.id === 'animal-market-56')!
+    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'A180-animal-brander-replace-animal-market')!
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      ownerPlayer: player,
+      triggerPlayer: player,
+      space,
+      actionId: 'pay',
+      phase: 'computeReplace',
+      params: { food: 1 },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
   })
 })

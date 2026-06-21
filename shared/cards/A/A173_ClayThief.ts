@@ -7,7 +7,7 @@ const CARD_ID = 'A173_ClayThief'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onBeforeStartOfTurn: (state, player) => {
+    onRoundStart: (state, player) => {
       if (readCardExtraData<boolean>(player, CARD_ID, 'used')) return
       const hollow = state.actionSpaces.find((space) => space.id === 'hollow-56')
       const clay = hollow?.resources.clay ?? 0

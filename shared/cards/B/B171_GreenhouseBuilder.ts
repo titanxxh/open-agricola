@@ -1,5 +1,7 @@
 import { defineOccupationCard } from '../card-source'
-import type { ActionFlow, GameState } from '../../contract/types'
+import { canStartFencing } from '../../actions/effects/fencing'
+import { buildRenovationPlan } from '../../actions/effects/renovation'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
 import { wrapOptional } from '../../actions/flow'
 import type { CardImpl } from '../registry'
@@ -7,15 +9,18 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'B171_GreenhouseBuilder'
 
 const revealedActionIds = (state: GameState): Set<string> =>
-  new Set(state.roundActionOrder.filter((id): id is string => typeof id === 'string'))
+  new Set(state.roundActionOrder.slice(0, state.round).filter((id): id is string => typeof id === 'string'))
 
-const greenhouseBranches = (state: GameState): ActionFlow[] => {
+const canRenovate = (player: PlayerState) =>
+  buildRenovationPlan(player, 'clay') !== null || buildRenovationPlan(player, 'stone') !== null
+
+const greenhouseBranches = (state: GameState, player: PlayerState): ActionFlow[] => {
   const revealed = revealedActionIds(state)
   const branches: ActionFlow[] = []
-  if (revealed.has('fencing')) {
+  if (revealed.has('fencing') && canStartFencing(state, player)) {
     branches.push({ type: 'leaf', actionId: 'fence', sourceCard: CARD_ID, choiceLabelKey: 'actions.fencing.name' })
   }
-  if (revealed.has('house-redevelopment')) {
+  if (revealed.has('house-redevelopment') && canRenovate(player)) {
     branches.push({
       type: 'seq',
       sourceCard: CARD_ID,
@@ -47,12 +52,12 @@ registerPlayerActionSpace({
     descriptionKey: `cards.${CARD_ID}.desc`,
     strictCanExecute: true,
     canBeExecutedByPlayer: (state, player) =>
-      player.id === ownerId && greenhouseBranches(state).length > 0,
-    execute: ({ state }) => ({
+      player.id === ownerId && greenhouseBranches(state, player).length > 0,
+    execute: ({ state, player }) => ({
       type: 'flow',
       flow: {
         type: 'xor',
-        children: greenhouseBranches(state),
+        children: greenhouseBranches(state, player),
       },
     }),
   }),

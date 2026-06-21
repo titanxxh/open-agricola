@@ -29,9 +29,12 @@ describe('5+ player action space occupations', () => {
     const session = setupSession('B171_GreenhouseBuilder')
     const state = session.getState().state
     state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.round = 4
     state.roundActionOrder[2] = 'vegetable-seeds'
     state.roundActionOrder[3] = 'house-redevelopment'
     const owner = state.players[0]!
+    owner.resources.clay = 2
+    owner.resources.reed = 1
     const other = state.players[1]!
 
     const config = getPlayerActionSpaceConfig('B171_GreenhouseBuilder')
@@ -64,6 +67,7 @@ describe('5+ player action space occupations', () => {
     expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
 
     state.roundActionOrder[0] = 'fencing'
+    owner.resources.wood = 4
     expect(definition.canBeExecutedByPlayer(state, owner)).toBe(true)
     const result = definition.execute({
       state,
@@ -74,6 +78,22 @@ describe('5+ player action space occupations', () => {
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
     expect(leafActionIds(result.flow)).toEqual(['fence'])
+  })
+
+  it('B171 Greenhouse Builder ignores future round cards and revealed branches that cannot execute', () => {
+    const session = setupSession('B171_GreenhouseBuilder')
+    const state = session.getState().state
+    state.round = 1
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[6] = 'fencing'
+    const owner = state.players[0]!
+    const definition = getPlayerActionSpaceConfig('B171_GreenhouseBuilder')!.createDefinition(owner.id)
+
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
+
+    state.roundActionOrder[0] = 'fencing'
+    owner.resources.wood = 0
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
   })
 
   it('D170 Fold Builder registers an all-player space where non-owner pays owner before fencing and sheep', () => {
