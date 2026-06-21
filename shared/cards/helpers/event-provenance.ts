@@ -118,3 +118,18 @@ export const sumResourcePaid = (
     if (amount <= 0 || !predicate(event)) return total
     return total + amount
   }, 0)
+
+export const sumActualPaidResource = (
+  events: readonly QueryableGameEvent[] | undefined,
+  resource: keyof Resource,
+  predicate: (event: QueryableResourcePaidEvent) => boolean = () => true,
+): number =>
+  (events ?? []).reduce((total, event) => {
+    if (!isResourcePaidEvent(event) || !predicate(event)) return total
+    const sources = event.paymentSources
+    const amount = sources?.length
+      ? sources.reduce((sum, source) => sum + (source.resources[resource] ?? 0), 0)
+      : event.resources[resource] ?? 0
+    if (amount <= 0) return total
+    return total + amount
+  }, 0)
