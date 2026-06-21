@@ -2,16 +2,14 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D176_Woodshacker'
 
 const ownerWoodUsesThisRound = (context: CardListenerContext) =>
-  context.state.actionSpaces.filter((space) =>
-    isWoodAccumulationSpaceId(space.id) &&
-    space.takenBy.some((worker) => worker.playerId === context.player.id),
-  ).length
+  getRoundPlacementDetails(context.player).filter((entry) => isWoodAccumulationSpaceId(entry.spaceId)).length
 
 const listener: CardListenerRegistration = {
   id: 'D176-woodshacker-after-wood',

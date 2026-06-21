@@ -49,4 +49,13 @@ describe('A169 Off-Siter', () => {
     expect(getExtraRoomCapacity(player(['Major_Well', 'Major_ClayOven'], ['D60_LargePottery']))).toBe(1)
     expect(getExtraRoomCapacity(player(['Major_Well', 'Major_ClayOven'], ['A1_Shelter']))).toBe(0)
   })
+
+  it('counts fee-based major costs and keeps capacity after the threshold has been reached', () => {
+    const owner = player(['Major_Well', 'Major_CookingHearth1', 'Major_Fireplace1'])
+
+    expect(getExtraRoomCapacity(owner)).toBe(1)
+
+    owner.improvements = []
+    expect(getExtraRoomCapacity(owner)).toBe(1)
+  })
 })
