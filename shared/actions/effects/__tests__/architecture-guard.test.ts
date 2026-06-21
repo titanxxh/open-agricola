@@ -72,6 +72,7 @@ describe('effects architecture guard', () => {
       'occupation-gate',
       'pay',
       'place-farmer',
+      'place-farmer-on-space',
       'plow',
       'pop-card-stack',
       'private-field-phase',
