@@ -4,6 +4,7 @@ import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import '../../shared/cards/D/D180_PartTimeWorker'
 import '../../shared/cards/A/A108_MushroomCollector'
 import '../../shared/cards/A/A56_Basket'
+import '../../shared/cards/A/A171_Sidekick'
 
 const CARD_ID = 'D180_PartTimeWorker'
 const MINOR_CARDS = new Set(['A56_Basket'])
@@ -95,5 +96,37 @@ describe('D180 Part-Time Worker session', () => {
     resp = chooseFrom(session, resp, CARD_ID)
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, cattle: 1 })
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(6)
+  })
+
+  it('returns goods to the collected target space when a card placement collects a different space', () => {
+    const session = new GameSession(42, undefined, { playerCount: 5 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 3
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[0] = 'western-quarry'
+    state.roundActionOrder[1] = 'eastern-quarry'
+    state.players.forEach((player) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    const player = state.players[0]!
+    player.occupationPlayed = ['A171_Sidekick', CARD_ID]
+    player.resources.food = 2
+    player.resources.stone = 0
+    player.resources.sheep = 0
+    const western = state.actionSpaces.find((space) => space.id === 'western-quarry')!
+    const eastern = state.actionSpaces.find((space) => space.id === 'eastern-quarry')!
+    western.resources.stone = 2
+    eastern.resources.stone = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'eastern-quarry')
+    resp = chooseFrom(session, resp, 'A171_Sidekick')
+    resp = chooseFrom(session, resp, CARD_ID)
+
+    expect(resp.state.players[0]!.resources).toMatchObject({ stone: 2, sheep: 1 })
+    expect(resp.state.actionSpaces.find((space) => space.id === 'western-quarry')!.resources.stone).toBe(1)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'eastern-quarry')!.resources.stone).toBe(0)
   })
 })

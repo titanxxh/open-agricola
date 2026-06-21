@@ -773,10 +773,14 @@ export function buildListenerEvent(
   executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'actionContext'>,
   extraEvent: Record<string, unknown> = {},
 ) {
+  const actionContext = executionContext.actionContext
+    ? { ...executionContext.actionContext }
+    : undefined
   return {
     ...extraEvent,
     sourceCard: executionContext.sourceCard,
     ...(executionContext.actionContext ?? {}),
+    ...(actionContext ? { actionContext } : {}),
     trueAction: resolveTrueAction(executionContext.actionContext),
   }
 }

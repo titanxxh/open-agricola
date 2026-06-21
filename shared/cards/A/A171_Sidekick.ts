@@ -6,6 +6,7 @@ import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import { getLeftRoundActionSpaceId, getRoundActionSlot } from '../helpers/round-action-topology'
 import { payLeaf } from '../helpers/pay-gain-node'
+import { evaluateWithReservedResources } from '../helpers/reserved-resources'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A171_Sidekick'
@@ -36,7 +37,9 @@ const canPlaceOnLeftTarget = (context: CardListenerContext, targetSpaceId: strin
   if (!canEnterSpace(targetSpace, owner, context.state)) return false
   if (isSpaceBlocked(targetSpace)) return false
   if (isSpaceOccupied(targetSpace)) return false
-  return targetSpace.canBeExecutedByPlayer(context.state, owner)
+  return evaluateWithReservedResources(context.state, owner, { food: 1 }, (state, player) =>
+    targetSpace.canBeExecutedByPlayer(state, player),
+  )
 }
 
 const listener: CardListenerRegistration = {

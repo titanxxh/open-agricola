@@ -61,7 +61,12 @@ describe('D180 Part-Time Worker listener', () => {
         type: 'seq',
         optional: true,
         children: [
-          { actionId: 'return-to-space', params: { wood: 1 }, sourceCard: CARD_ID },
+          {
+            actionId: 'return-to-space',
+            params: { wood: 1 },
+            sourceCard: CARD_ID,
+            actionContext: { targetSpaceId: 'forest' },
+          },
           { actionId: 'gain', params: { sheep: 1 }, sourceCard: CARD_ID },
         ],
       },
@@ -76,6 +81,7 @@ describe('D180 Part-Time Worker listener', () => {
     const costs = flow.children.map((child) => {
       expect(child.type).toBe('seq')
       if (child.type !== 'seq') return {}
+      expect(child.children[0]!.actionContext).toEqual({ targetSpaceId: 'forest' })
       return child.children[0]!.params
     })
     expect(costs).toEqual([
