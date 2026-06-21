@@ -71,6 +71,22 @@ describe('B176 Village Idiot', () => {
     expect(player.occupationHand).toContain('A174_MasterHora')
   })
 
+  it('blocks minors that provide an occupation after it is played', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.minorHand = ['D25_WitchesDanceFloor']
+    player.resources.food = 2
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'minor-improvement')
+
+    expect(resp.interaction.options?.some((option) => option.value === 'D25_WitchesDanceFloor') ?? false).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain('D25_WitchesDanceFloor')
+    expect(resp.state.players[0]!.extraOccupationsFromCards).toEqual([])
+  })
+
   it('rewards the owner when an opponent uses Meeting Place', () => {
     const session = setup()
     const state = session.getState().state

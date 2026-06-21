@@ -78,7 +78,9 @@ describe('A180 Animal Brander', () => {
     const session = setup(3)
 
     let resp = session.takeAction(0, 'animal-market-56')
-    const cattle = findOption(resp, (option) => option.labelKey === 'ui.interactionActionOrReplace')
+    const cattle = findOption(resp, (option) =>
+      JSON.stringify(option.descriptionPreview).includes('option-cattle'),
+    )
     expect(cattle).toBeDefined()
 
     resp = session.resolveChoice(0, cattle!.value)
@@ -89,6 +91,25 @@ describe('A180 Animal Brander', () => {
 
     expect(resp.state.players[0]!.resources.cattle).toBe(2)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('preserves the original cattle branch when declining Animal Brander', () => {
+    const session = setup(3)
+
+    let resp = session.takeAction(0, 'animal-market-56')
+    const cattle = findOption(resp, (option) =>
+      JSON.stringify(option.descriptionPreview).includes('option-cattle'),
+    )
+    expect(cattle).toBeDefined()
+
+    resp = session.resolveChoice(0, cattle!.value)
+    const original = findOption(resp, (option) => option.sourceCard !== CARD_ID)
+    expect(original).toBeDefined()
+
+    resp = resolveAnimalReorgs(session, session.resolveChoice(0, original!.value), 'cattle')
+
+    expect(resp.state.players[0]!.resources.cattle).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
   })
 
   it('does not offer the doubled cattle branch unless the player can pay all 3 food', () => {
@@ -104,9 +125,8 @@ describe('A180 Animal Brander', () => {
       ownerPlayer: player,
       triggerPlayer: player,
       space,
-      actionId: 'pay',
+      actionId: 'animal-market-cattle-56',
       phase: 'computeReplace',
-      params: { food: 1 },
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()

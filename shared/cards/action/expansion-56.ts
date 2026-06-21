@@ -169,12 +169,9 @@ export const animalMarket56: ActionDefinition = {
       { type: 'leaf', actionId: 'gain', params: { sheep: 1, food: 1 }, choiceLabelKey: 'actions.animal-market-56.option-sheep' },
       { type: 'leaf', actionId: 'gain', params: { boar: 1 }, choiceLabelKey: 'actions.animal-market-56.option-boar' },
       {
-        type: 'seq',
+        type: 'leaf',
+        actionId: 'animal-market-cattle-56',
         choiceLabelKey: 'actions.animal-market-56.option-cattle',
-        children: [
-          { type: 'leaf', actionId: 'pay', params: { food: 1 } },
-          { type: 'leaf', actionId: 'gain', params: { cattle: 1 } },
-        ],
       },
     ],
   },

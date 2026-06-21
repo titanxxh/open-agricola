@@ -13,6 +13,7 @@ describe('effects architecture guard', () => {
       .sort()
 
     expect(files).toEqual([
+      'animal-market-cattle.ts',
       'bake-bread.ts',
       'bonus-vp.ts',
       'breed.ts',
@@ -47,6 +48,7 @@ describe('effects architecture guard', () => {
 
     expect(ids).toEqual([
       'activate-card-effect',
+      'animal-market-cattle-56',
       'bake-bread',
       'bonus-food',
       'bonus-grain',

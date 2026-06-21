@@ -26,7 +26,7 @@ const greenhouseBranches = (state: GameState, player: PlayerState): ActionFlow[]
       sourceCard: CARD_ID,
       choiceLabelKey: 'actions.house-redevelopment.name',
       children: [
-        { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID, actionContext: { renovationActionSpace: true } },
         wrapOptional({ type: 'leaf', actionId: 'improvement', sourceCard: CARD_ID, actionContext: { types: ['major', 'minor'] } }),
       ],
     })

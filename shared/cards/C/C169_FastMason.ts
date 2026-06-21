@@ -16,6 +16,7 @@ const collectedMaterial = (context: CardListenerContext): RenovationMaterial | n
 }
 
 const canPayNoReedRenovation = (context: CardListenerContext, material: RenovationMaterial): boolean => {
+  if (material === 'stone' && context.player.houseType !== 'clay') return false
   const plan = buildRenovationPlan(context.player, material)
   if (!plan) return false
   return (context.player.resources[material] ?? 0) >= context.player.rooms
