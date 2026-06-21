@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export const ALLOWED_EFFECT_FILES = [
+  'animal-market-cattle.ts',
   'bake-bread.ts',
   'bonus-vp.ts',
   'breed.ts',

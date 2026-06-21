@@ -6,6 +6,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'B170_CorralBuilder'
 const REVEAL_SPACES = new Set(['pig-market', 'cattle-market'])
 const ONE_SPACE_PASTURE_CONTEXT = {
+  trueAction: false,
   fencePolicy: {
     segmentBounds: { total: { min: 1, max: 4 } },
     newPastureBounds: {

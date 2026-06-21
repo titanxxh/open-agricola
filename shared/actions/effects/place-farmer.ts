@@ -40,6 +40,33 @@ const placeFarmer = (
   return { type: 'ok', workerId: worker.id }
 }
 
+const collectBeforePlacementFlows = (
+  state: GameState,
+  player: PlayerState,
+  targetSpace: ActionSpace,
+  actionContext: Record<string, unknown> | undefined,
+): ActionFlow[] => {
+  const beforeListenerContext = {
+    state,
+    player,
+    space: targetSpace,
+    actionId: targetSpace.id,
+    phase: 'before' as const,
+    actionContext,
+  }
+  const matched = getMatchingListeners(beforeListenerContext)
+  const flows: ActionFlow[] = []
+  for (const entry of matched) {
+    const result = executeCardListener(
+      entry.registration,
+      beforeListenerContext,
+      listenerOwnerOptions(entry),
+    )
+    if (result?.flow) flows.push(result.flow)
+  }
+  return flows
+}
+
 export const placeFarmerAction: ActionDefinition = {
   id: 'place-farmer',
   nameKey: 'actions.place-farmer.name',
@@ -153,6 +180,16 @@ export const placeFarmerAction: ActionDefinition = {
         sourceCard,
         actionContext: { ...actionContext },
       }
+      const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, actionContext)
+      if (beforeFlows.length > 0) {
+        return {
+          type: 'flow',
+          flow: {
+            type: 'seq',
+            children: [...beforeFlows, targetLeaf, ...cascadeFlows],
+          },
+        }
+      }
       if (cascadeFlows.length === 0) {
         return { type: 'flow', flow: targetLeaf }
       }
@@ -254,6 +291,17 @@ export const placeFarmerAction: ActionDefinition = {
       expandFlow: true,
       sourceCard,
       actionContext: targetActionContext,
+    }
+    const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, targetActionContext)
+    if (beforeFlows.length > 0) {
+      return {
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          children: [...beforeFlows, targetLeaf],
+        },
+        extraData: { actionContextWrite },
+      }
     }
     return {
       type: 'flow',

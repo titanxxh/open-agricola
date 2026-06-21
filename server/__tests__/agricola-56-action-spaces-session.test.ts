@@ -152,8 +152,7 @@ describe('5/6 expansion action spaces', () => {
     let resp = session.takeAction(0, 'animal-market-56')
     expect(resp.ok).toBe(true)
     const cattleOption = resp.interaction.options?.find(
-      (option) => option.labelKey === 'actions.pay.name' &&
-        JSON.stringify(option.descriptionPreview).includes('"cattle":1'),
+      (option) => option.labelKey === 'actions.animal-market-56.option-cattle',
     )
     expect(cattleOption).toBeTruthy()
     resp = session.resolveChoice(0, cattleOption!.value)

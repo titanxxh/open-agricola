@@ -36,6 +36,7 @@ import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { specialEffectAction } from './effects/special-effect'
 import { privateFieldPhaseAction } from './effects/private-field-phase'
+import { animalMarketCattleAction } from './effects/animal-market-cattle'
 import { completeParentFatherAction } from '../parents/father-completion'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -79,5 +80,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   activateCardEffectAction,
   specialEffectAction,
   privateFieldPhaseAction,
+  animalMarketCattleAction,
   completeParentFatherAction,
 ]

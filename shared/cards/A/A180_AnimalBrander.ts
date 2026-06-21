@@ -30,7 +30,7 @@ const boarBranch = (): ActionFlow => ({
 const listener: CardListenerRegistration = {
   id: 'A180-animal-brander-replace-animal-market',
   cardIds: [CARD_ID],
-  actions: ['gain', 'pay'],
+  actions: ['gain', 'animal-market-cattle-56'],
   phases: ['computeReplace' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'animal-market-56') return
@@ -43,7 +43,7 @@ const listener: CardListenerRegistration = {
     if (context.actionId === 'gain' && params.boar === 1) {
       return { decline: true, sourceCard: CARD_ID, alternativeFlow: boarBranch() }
     }
-    if (context.actionId === 'pay' && params.food === 1) {
+    if (context.actionId === 'animal-market-cattle-56') {
       if ((context.player.resources.food ?? 0) < 3) return
       return {
         decline: true,
@@ -53,10 +53,8 @@ const listener: CardListenerRegistration = {
           choiceLabelKey: 'actions.animal-market-56.option-cattle',
           children: [
             payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-            { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-            { type: 'leaf', actionId: 'gain', params: { cattle: 1 }, sourceCard: CARD_ID },
-            { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-            { type: 'leaf', actionId: 'gain', params: { cattle: 1 }, sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'animal-market-cattle-56', sourceCard: CARD_ID },
+            { type: 'leaf', actionId: 'animal-market-cattle-56', sourceCard: CARD_ID },
           ],
         },
       }

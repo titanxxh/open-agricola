@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { placeFarmerAction } from '../../shared/actions/effects/place-farmer'
+import type { ActionExecutionContext } from '../../shared/contract/types'
 
 const CARD_ID = 'A174_MasterHora'
 
@@ -86,6 +88,37 @@ describe('A174 Master Hora', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.vegetable).toBe(0)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+  })
+
+  it('offers the vegetable purchase before resolving an extra place-farmer target on an extension space', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    const host = state.actionSpaces.find((space) => space.id === 'day-laborer')!
+
+    const result = placeFarmerAction.resolveChoice!({
+      state,
+      player,
+      space: host,
+      sourceCard: 'TEST_EXTRA_PLACEMENT',
+      actionContext: { constraints: ['copse-56'] },
+    } as unknown as ActionExecutionContext, 'copse-56')
+
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    expect(result.flow).toMatchObject({
+      type: 'seq',
+      children: [
+        {
+          type: 'seq',
+          children: [
+            { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
+            { actionId: 'gain', params: { vegetable: 1 }, sourceCard: CARD_ID },
+          ],
+        },
+        { actionId: 'copse-56', expandFlow: true },
+      ],
+    })
   })
 
   it('enters engine-blocked if the host action becomes impossible after the before flow', () => {

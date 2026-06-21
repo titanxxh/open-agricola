@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getMinorImprovement } from '../registry-display'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B176_VillageIdiot'
@@ -8,11 +9,11 @@ const CARD_ID = 'B176_VillageIdiot'
 const loneOccupationListener: CardListenerRegistration = {
   id: 'B176-village-idiot-lone-occupation',
   cardIds: [CARD_ID],
-  actions: ['occupation'],
+  actions: ['occupation', 'improvement'],
   phases: ['isDoable' as ActionHookPhase],
   zones: ['hand', 'played'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice === CARD_ID) {
+    if (context.actionId === 'occupation' && context.choice === CARD_ID) {
       const hasOtherOccupation = context.player.occupationPlayed.some((id) => id !== CARD_ID)
       if (hasOtherOccupation || (context.player.extraOccupationsFromCards?.length ?? 0) > 0) {
         return { doable: false }
@@ -20,6 +21,10 @@ const loneOccupationListener: CardListenerRegistration = {
       return
     }
     if (context.player.occupationPlayed.includes(CARD_ID)) {
+      if (context.actionId === 'improvement') {
+        const minor = typeof context.choice === 'string' ? getMinorImprovement(context.choice) : undefined
+        if (!minor?.providesOccupation) return
+      }
       return { doable: false }
     }
   },
