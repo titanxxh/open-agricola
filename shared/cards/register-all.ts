@@ -424,11 +424,13 @@ import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
 import { C174_StoneCustodian } from './C/C174_StoneCustodian'
+import { C175_VillageTeacher } from './C/C175_VillageTeacher'
 import { C176_Cleanacre } from './C/C176_Cleanacre'
 import { C177_MountainHiker } from './C/C177_MountainHiker'
 import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C18_RollOverPlow } from './C/C18_RollOverPlow'
+import { C180_Trapper } from './C/C180_Trapper'
 import { C19_SwingPlow } from './C/C19_SwingPlow'
 import { C2_Stable } from './C/C2_Stable'
 import { C20_MolePlow } from './C/C20_MolePlow'
@@ -596,7 +598,9 @@ import { D168_Stockman } from './D/D168_Stockman'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
 import { D174_LoessGardener } from './D/D174_LoessGardener'
+import { D176_Woodshacker } from './D/D176_Woodshacker'
 import { D177_Graduate } from './D/D177_Graduate'
+import { D178_SubstituteTeacher } from './D/D178_SubstituteTeacher'
 import { D18_SteamPlow } from './D/D18_SteamPlow'
 import { D19_PulverizerPlow } from './D/D19_PulverizerPlow'
 import { D2_DwellingPlan } from './D/D2_DwellingPlan'
@@ -1291,11 +1295,13 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
   'C174_StoneCustodian': C174_StoneCustodian.impl,
+  'C175_VillageTeacher': C175_VillageTeacher.impl,
   'C176_Cleanacre': C176_Cleanacre.impl,
   'C177_MountainHiker': C177_MountainHiker.impl,
   'C178_OnSiteReverend': C178_OnSiteReverend.impl,
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C18_RollOverPlow': C18_RollOverPlow.impl,
+  'C180_Trapper': C180_Trapper.impl,
   'C19_SwingPlow': C19_SwingPlow.impl,
   'C2_Stable': C2_Stable.impl,
   'C20_MolePlow': C20_MolePlow.impl,
@@ -1463,7 +1469,9 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
   'D174_LoessGardener': D174_LoessGardener.impl,
+  'D176_Woodshacker': D176_Woodshacker.impl,
   'D177_Graduate': D177_Graduate.impl,
+  'D178_SubstituteTeacher': D178_SubstituteTeacher.impl,
   'D18_SteamPlow': D18_SteamPlow.impl,
   'D19_PulverizerPlow': D19_PulverizerPlow.impl,
   'D2_DwellingPlan': D2_DwellingPlan.impl,
