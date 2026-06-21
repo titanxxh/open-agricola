@@ -7,6 +7,7 @@ import {
   sumActionSpaceMovedToTriggerPlayer,
   sumResourceMovedFromActionSpace,
   sumResourceMovedToPlayer,
+  sumActualPaidResource,
   sumResourcePaid,
 } from '../event-provenance'
 import type { CardListenerContext } from '../../card-listeners'
@@ -89,6 +90,23 @@ describe('event provenance helpers', () => {
     expect(sumResourceMovedFromActionSpace(undefined, 'clay')).toBe(0)
     expect(sumResourcePaid(undefined, 'food')).toBe(0)
     expect(JSON.stringify(events)).toBe(snapshot)
+  })
+
+  it('sums actual paid resources from payment sources without double-counting', () => {
+    const events: readonly QueryableGameEvent[] = [
+      paid({
+        resources: { 'B155_ArtTeacher:traveling-players-food': 1 },
+        paymentSources: [{ from: { kind: 'actionSpace', spaceId: 'traveling-players' }, resources: { food: 1 } }],
+      }),
+      paid({
+        resources: { food: 1 },
+        paymentSources: [{ from: { kind: 'player', playerId: 'p1' }, resources: { food: 1 } }],
+      }),
+      paid({ resources: { food: 1 }, paymentSources: undefined }),
+      paid({ resources: { wood: 1 }, paymentSources: undefined }),
+    ]
+
+    expect(sumActualPaidResource(events, 'food', event => event.paymentFor === 'occupation')).toBe(3)
   })
 
   it('sums action-space resources moved to the trigger player from listener context', () => {
