@@ -7,18 +7,6 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A174_MasterHora'
 
-const hostActionStillDoableAfterPayment = (context: CardListenerContext): boolean => {
-  const space = context.space
-  if (!space?.canBeExecutedByPlayer) return true
-  const before = context.player.resources.food ?? 0
-  context.player.resources.food = before - 1
-  try {
-    return space.canBeExecutedByPlayer(context.state, context.player)
-  } finally {
-    context.player.resources.food = before
-  }
-}
-
 const listener: CardListenerRegistration = {
   id: 'A174-master-hora-before-extension-space',
   cardIds: [CARD_ID],
@@ -27,7 +15,6 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isExtensionMeepleSpaceId(context.space?.id)) return
     if ((context.player.resources.food ?? 0) < 1) return
-    if (!hostActionStillDoableAfterPayment(context)) return
     return {
       ...payGainNode({
         cardId: CARD_ID,
