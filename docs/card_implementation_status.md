@@ -12,8 +12,8 @@
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 0 |
-| 已接受 / 产品策略差异 | 65 |
-| 排除的 BGA legacy 或未实现行为目标 | 8 |
+| 已接受 / 产品策略差异 | 66 |
+| 排除的 BGA legacy 或未实现行为目标 | 7 |
 | 本轮审计视为已对齐 | 815 |
 | Parent Cards 扩展结构化定义 | 24 / 24 |
 | Parent Cards gameplay 接入 | setup / simultaneous selection / mother rewards via futureMeeples / parentCards fractional scoring / ordinary-card draw deck + keep UI / father simple + complex side quest 已接入 |
@@ -41,7 +41,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
 | field/cardField 作物约束差异 | `E70_CropRotationField` |
-| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
+| BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D25_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B21_HayloftBarn`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
 | BGA stable / FarmHand 模型差异 | `B85_FarmHand` |
 | Candidate Closure：optional 分支候选集是 BGA 单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 BGA optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
@@ -240,7 +240,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onStartHarvest` | `C178_OnSiteReverend`, `C24_BedintheGrainField`, `C62_CookeryExtension`, `D129_LumberVirtuoso`, `D153_WealthyMan`, `D61_BaleofStraw`, `D97_BeggingStudent`, `E110_Dentist`, `E111_Recluse`, `E117_PipeSmoker`, `E147_AnimalDriver`, `E149_MidnightFencer`, `E58_LunchtimeBeer`, `E61_RaisedBed` |
 | effect | `onStartHarvestFeedingPhase` | `C107_Baker`, `E52_Cubbyhole` |
 | effect | `onStartHarvestFieldPhase` | `A112_ScytheWorker`, `B165_GameProvider`, `B61_ThreeFieldRotation`, `C57_Crudite`, `D70_StrawManure`, `D72_StableManure`, `E112_GrainThief`, `E73_Scythe` |
-| effect | `onStartReturnHome` | `A100_Curator`, `A127_Lodger`, `A141_TurnipFarmer`, `A151_Minstrel`, `A152_NightSchoolStudent`, `A157_Bohemian`, `A35_SwimmingClass`, `A58_AsparagusKnife`, `C155_FoodDistributor`, `C97_SeedResearcher`, `D102_SampleStableMaker`, `D107_Bellfounder`, `D10_StorksNest`, `D18_SteamPlow`, `E20_IronHoe`, `E87_MasterRenovator` |
+| effect | `onStartReturnHome` | `A100_Curator`, `A127_Lodger`, `A141_TurnipFarmer`, `A151_Minstrel`, `A152_NightSchoolStudent`, `A157_Bohemian`, `A35_SwimmingClass`, `A58_AsparagusKnife`, `C155_FoodDistributor`, `C171_YoungArtist`, `C97_SeedResearcher`, `D102_SampleStableMaker`, `D107_Bellfounder`, `D10_StorksNest`, `D18_SteamPlow`, `E20_IronHoe`, `E87_MasterRenovator` |
 | effect | `resolveChoice` | `A136_DrudgeryReeve`, `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C133_Soldier`, `C146_WorkshopAssistant`, `D132_HideFarmer`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones` |
 | exchange | `anytime` | `A60_OrientalFireplace`, `B104_SheepWalker`, `B32_Kettle`, `B80_HardPorcelain`, `C139_BasketmakersWife`, `C50_StableYard`, `D162_ClayFirer`, `D172_PutcherMaker`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D60_LargePottery`, `E109_BraidMaker` |
 | exchange | `bake-bread` | `A60_OrientalFireplace`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D64_BakingCourse`, `E63_IronOven`, `E64_SimpleOven` |
@@ -921,7 +921,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C168_AnimalCatcher` | 已对齐 |  |
 | `C169_FastMason` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。owner collect clay/stone accumulation 后，可选执行匹配材质 renovation：clay collection 只到 clay，stone collection 仅 clay house 到 stone，`exactCost` 去掉 reed。 |
 | `C170_AmateurFencer` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。onBuy 时若 owner 无 pasture 且 one-space fence legal，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow。 |
-| `C171_YoungArtist` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
+| `C171_YoungArtist` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。returning home phase owner 有 food 且至少一个分支可行时，可选付 1 food 后执行无工人 Minor Improvement action，或直接从 ordinary minor deck 抽最多 2 张小改良入手；不可行分支隐藏，不走 keep-one 选择。 |
 | `C172_FieldCounter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。opponent 每 plow 1 field 在卡上放 1 food，按 `farm.fieldPlowed.fields` 数量累计；owner 自己 plow 不触发；cashout 复用 shared stored-food helper。 |
 | `C173_TopOuter` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。任意玩家使用 house-building-56 后，owner 收取 linked traveling-players-56 当前全部 food；空 food 或非 house-building-56 不触发。 |
 | `C174_StoneCustodian` | 已对齐 | 5+ 产品扩展实现：work phase return home 前统计有 stone 的 stone accumulation space，1 个给 1 grain，2+ 个给 1 vegetable。 |

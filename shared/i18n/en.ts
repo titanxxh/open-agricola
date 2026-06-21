@@ -568,6 +568,7 @@ export const en = {
     'urgent-wish-children': { name: 'Urgent Wish for Children', description: 'Grow family without rooms' },
     'family-growth': { name: 'Family Growth', description: 'Grow family' },
     'improvement': { name: 'Improvement', description: 'Build a major improvement or play a minor improvement' },
+    'draw-ordinary-cards': { name: 'Draw Cards', description: 'Draw ordinary cards directly into your hand' },
     fencing: { name: 'Fencing', description: 'Build fences to form a pasture' },
     stables: { name: 'Stables', description: 'Build 1 stable' },
     construct: { name: 'Build Rooms', description: 'Build rooms' },
