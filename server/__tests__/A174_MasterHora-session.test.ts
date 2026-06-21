@@ -73,7 +73,7 @@ describe('A174 Master Hora', () => {
     expect(resp.state.players[1]!.resources.wood).toBe(1)
   })
 
-  it('does not offer the option if paying food would make the host action impossible', () => {
+  it('still offers the option if paying food would fail the space precheck', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -81,13 +81,20 @@ describe('A174 Master Hora', () => {
     player.occupationHand = ['A123_FrameBuilder']
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'lessons-56-variable')
+    let resp = session.takeAction(0, 'lessons-56-variable')
 
     expect(resp.ok).toBe(true)
-    expect(findA174Option(resp)).toBeUndefined()
+    const accept = findA174Option(resp)
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected turn confirmation')
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
-    expect(resp.state.players[0]!.resources.vegetable).toBe(0)
-    expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.players[0]!.occupationPlayed).not.toContain('A123_FrameBuilder')
   })
 
   it('offers the vegetable purchase before resolving an extra place-farmer target on an extension space', () => {
