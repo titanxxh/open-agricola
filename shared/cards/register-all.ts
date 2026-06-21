@@ -261,6 +261,7 @@ import { B17_ForestPlow } from './B/B17_ForestPlow'
 import { B170_CorralBuilder } from './B/B170_CorralBuilder'
 import { B171_GreenhouseBuilder } from './B/B171_GreenhouseBuilder'
 import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
+import { B173_Sweeper } from './B/B173_Sweeper'
 import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
 import { B175_FieldOverseer } from './B/B175_FieldOverseer'
 import { B176_VillageIdiot } from './B/B176_VillageIdiot'
@@ -434,6 +435,7 @@ import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
 import { C169_FastMason } from './C/C169_FastMason'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
 import { C170_AmateurFencer } from './C/C170_AmateurFencer'
+import { C172_FieldCounter } from './C/C172_FieldCounter'
 import { C173_TopOuter } from './C/C173_TopOuter'
 import { C174_StoneCustodian } from './C/C174_StoneCustodian'
 import { C175_VillageTeacher } from './C/C175_VillageTeacher'
@@ -610,6 +612,7 @@ import { D168_Stockman } from './D/D168_Stockman'
 import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
 import { D170_FoldBuilder } from './D/D170_FoldBuilder'
+import { D173_TownClerk } from './D/D173_TownClerk'
 import { D174_LoessGardener } from './D/D174_LoessGardener'
 import { D175_Countryman } from './D/D175_Countryman'
 import { D176_Woodshacker } from './D/D176_Woodshacker'
@@ -1146,6 +1149,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B170_CorralBuilder': B170_CorralBuilder.impl,
   'B171_GreenhouseBuilder': B171_GreenhouseBuilder.impl,
   'B172_CattleCaregiver': B172_CattleCaregiver.impl,
+  'B173_Sweeper': B173_Sweeper.impl,
   'B174_RiverbankGardener': B174_RiverbankGardener.impl,
   'B175_FieldOverseer': B175_FieldOverseer.impl,
   'B176_VillageIdiot': B176_VillageIdiot.impl,
@@ -1319,6 +1323,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C169_FastMason': C169_FastMason.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
   'C170_AmateurFencer': C170_AmateurFencer.impl,
+  'C172_FieldCounter': C172_FieldCounter.impl,
   'C173_TopOuter': C173_TopOuter.impl,
   'C174_StoneCustodian': C174_StoneCustodian.impl,
   'C175_VillageTeacher': C175_VillageTeacher.impl,
@@ -1495,6 +1500,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
   'D170_FoldBuilder': D170_FoldBuilder.impl,
+  'D173_TownClerk': D173_TownClerk.impl,
   'D174_LoessGardener': D174_LoessGardener.impl,
   'D175_Countryman': D175_Countryman.impl,
   'D176_Woodshacker': D176_Woodshacker.impl,
