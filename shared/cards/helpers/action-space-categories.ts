@@ -10,6 +10,7 @@ export const EXTENSION_MEEPLE_SPACE_IDS = [
   'house-building-56',
   'traveling-players-56',
 ] as const
+export const MEEPLE_SYMBOL_SPACE_IDS = EXTENSION_MEEPLE_SPACE_IDS
 
 const HOLLOW_SPACE_ID_SET = new Set<string>(HOLLOW_SPACE_IDS)
 const WOOD_ACCUMULATION_SPACE_ID_SET = new Set<string>(WOOD_ACCUMULATION_SPACE_IDS)
@@ -35,6 +36,9 @@ export const isFoodAccumulationSpace = (
 
 export const isExtensionMeepleSpaceId = (spaceId: string | null | undefined): boolean =>
   !!spaceId && EXTENSION_MEEPLE_SPACE_ID_SET.has(spaceId)
+
+export const isMeepleSymbolSpaceId = (spaceId: string | null | undefined): boolean =>
+  isExtensionMeepleSpaceId(spaceId)
 
 export const findTravelingPlayersSpace = <T extends { id: string }>(
   spaces: readonly T[],
