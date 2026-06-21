@@ -3,6 +3,7 @@ import type { CardDefinition } from '../../contract/cards'
 import type { PaymentResourceMap, PlayerState } from '../../contract/types'
 import { getMinorImprovement } from '../registry-display'
 import { majorCardDefinitionsList } from '../major/generated'
+import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A169_OffSiter'
@@ -12,8 +13,9 @@ const majorCards: ReadonlyMap<string, CardDefinition> = new Map(
 )
 
 const printedBuildingResourceCost = (card: CardDefinition): number => {
-  const cost = card.cost as PaymentResourceMap | undefined
-  if (!cost || 'fee' in cost) return 0
+  const rawCost = card.cost as PaymentResourceMap | { fee?: PaymentResourceMap } | undefined
+  const cost: PaymentResourceMap | undefined = rawCost && 'fee' in rawCost ? rawCost.fee : rawCost
+  if (!cost) return 0
   return BUILDING_RESOURCES.reduce((sum, resource) => sum + (cost[resource] ?? 0), 0)
 }
 
@@ -27,8 +29,16 @@ const countedMajorCards = (player: PlayerState): CardDefinition[] => [
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeExtraRoomCapacity: (player: PlayerState) =>
-      countedMajorCards(player).reduce((sum, card) => sum + printedBuildingResourceCost(card), 0) >= 9 ? 1 : 0,
+    computeExtraRoomCapacity: (player: PlayerState) => {
+      if (readCardExtraData<boolean>(player, CARD_ID, 'thresholdReached')) return 1
+      const reached =
+        countedMajorCards(player).reduce((sum, card) => sum + printedBuildingResourceCost(card), 0) >= 9
+      if (reached) {
+        writeCardExtraData(player, CARD_ID, 'thresholdReached', true)
+        return 1
+      }
+      return 0
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -10,8 +10,11 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
+  scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'house-building-56') return
+    const ownerId = context.ownerPlayer?.id
+    if (!ownerId) return
     const traveling = context.state.actionSpaces.find((space) => space.id === 'traveling-players-56')
     const food = traveling?.resources.food ?? 0
     if (food <= 0) return
@@ -21,6 +24,7 @@ const listener: CardListenerRegistration = {
         actionId: 'collect',
         sourceCard: CARD_ID,
         actionContext: { spaceId: 'traveling-players-56', resource: 'food', amount: food },
+        targetPlayerId: ownerId,
       },
       sourceCard: CARD_ID,
     }

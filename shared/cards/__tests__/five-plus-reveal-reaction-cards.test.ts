@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { runCardEffectHook } from '../card-effects'
-import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../card-listeners'
+import { executeCardListener, getRegisteredCardListeners, runCardListeners, type CardListenerContext } from '../card-listeners'
 import { getAllTilePositions } from '../../domain/farm'
 
 const placeholderHands = (session: GameSession) => {
@@ -227,6 +227,32 @@ describe('5+ reveal and reaction occupation cards', () => {
       actionId: 'collect',
       sourceCard: 'C173_TopOuter',
       actionContext: { spaceId: 'traveling-players-56', resource: 'food', amount: 4 },
+      targetPlayerId: owner.id,
+    })
+  })
+
+  it('C173 Top-Outer also triggers when another player uses House Building 5/6', () => {
+    const session = setupOwner('C173_TopOuter')
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const opponent = state.players[1]!
+    const houseBuilding = state.actionSpaces.find((space) => space.id === 'house-building-56')!
+    const traveling = state.actionSpaces.find((space) => space.id === 'traveling-players-56')!
+    traveling.resources.food = 4
+
+    const [result] = runCardListeners({
+      state,
+      player: opponent,
+      triggerPlayer: opponent,
+      space: houseBuilding,
+      actionId: 'place-farmer',
+      phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(result?.flow).toMatchObject({
+      actionId: 'collect',
+      targetPlayerId: owner.id,
+      actionContext: { spaceId: 'traveling-players-56', resource: 'food', amount: 4 },
     })
   })
 
@@ -388,6 +414,43 @@ describe('5+ reveal and reaction occupation cards', () => {
       actionId: 'sow',
       sourceCard: 'D175_Countryman',
       optional: true,
+      targetPlayerId: owner.id,
+      actionContext: { minSelections: 1, maxSelections: 1, trueAction: false },
+    })
+  })
+
+  it('D175 Countryman reacts to opponent and card action-space renovations', () => {
+    const session = setupOwner('D175_Countryman')
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const opponent = state.players[1]!
+    owner.resources.grain = 1
+    owner.fields = [{ row: 0, col: 0, stacks: [] }]
+    state.actionSpaces.push({
+      id: 'B171_GreenhouseBuilder',
+      nameKey: 'cards.B171_GreenhouseBuilder.name',
+      descriptionKey: 'cards.B171_GreenhouseBuilder.desc',
+      roundAvailable: 1,
+      gainPerRound: {},
+      resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+      takenBy: [],
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    })
+    const greenhouse = state.actionSpaces.find((candidate) => candidate.id === 'B171_GreenhouseBuilder')!
+
+    const [result] = runCardListeners({
+      state,
+      player: opponent,
+      triggerPlayer: opponent,
+      space: greenhouse,
+      actionId: 'renovate-house',
+      phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(result?.flow).toMatchObject({
+      actionId: 'sow',
+      targetPlayerId: owner.id,
       actionContext: { minSelections: 1, maxSelections: 1, trueAction: false },
     })
   })
