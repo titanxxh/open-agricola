@@ -267,6 +267,7 @@ import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
 import { B175_FieldOverseer } from './B/B175_FieldOverseer'
 import { B176_VillageIdiot } from './B/B176_VillageIdiot'
 import { B177_StoneClawer } from './B/B177_StoneClawer'
+import { B178_TagAlong } from './B/B178_TagAlong'
 import { B179_WildBoarHunter } from './B/B179_WildBoarHunter'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
 import { B180_GameTeaser } from './B/B180_GameTeaser'
@@ -1159,6 +1160,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B175_FieldOverseer': B175_FieldOverseer.impl,
   'B176_VillageIdiot': B176_VillageIdiot.impl,
   'B177_StoneClawer': B177_StoneClawer.impl,
+  'B178_TagAlong': B178_TagAlong.impl,
   'B179_WildBoarHunter': B179_WildBoarHunter.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
   'B180_GameTeaser': B180_GameTeaser.impl,
