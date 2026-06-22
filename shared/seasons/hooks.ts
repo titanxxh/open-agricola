@@ -3,12 +3,14 @@ import { canStartFencing } from '../actions/effects/fencing'
 import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
 import { canAffordTypedFlatCost } from '../actions/payment/internal'
-import { readActionSnapshotToken } from '../cards/helpers/action-snapshot'
-import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
+import {
+  readActionSnapshotExtraData,
+  readActionSnapshotToken,
+  writeActionSnapshotExtraData,
+} from '../cards/helpers/action-snapshot'
 import { isThroughTheSeasonsSeason } from './rules'
 
-const SUMMER_DAY_LABORER_SOURCE = 'through-the-seasons:summer-day-laborer'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
+const SUMMER_DAY_LABORER_USED_KEY = 'throughTheSeasonsSummerDayLaborerUsed'
 
 export const registerThroughTheSeasonsHooks = (): void => {
   registerActionHook({
@@ -68,19 +70,8 @@ export const registerThroughTheSeasonsHooks = (): void => {
       if (context.space.id !== 'day-laborer') return
       const actionToken = readActionSnapshotToken(context.player)
       if (actionToken !== undefined) {
-        if (
-          readCardExtraData<number>(
-            context.player,
-            SUMMER_DAY_LABORER_SOURCE,
-            USED_ACTION_TOKEN_KEY,
-          ) === actionToken
-        ) return
-        writeCardExtraData(
-          context.player,
-          SUMMER_DAY_LABORER_SOURCE,
-          USED_ACTION_TOKEN_KEY,
-          actionToken,
-        )
+        if (readActionSnapshotExtraData<boolean>(context.player, SUMMER_DAY_LABORER_USED_KEY)) return
+        writeActionSnapshotExtraData(context.player, SUMMER_DAY_LABORER_USED_KEY, true)
       }
       gainResources(context.player, { grain: 1 })
     },

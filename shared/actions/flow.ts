@@ -1,4 +1,3 @@
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../cards/card-listeners'
 import type {
   ActionDefinition,
   ActionFlow,
@@ -9,9 +8,10 @@ import type {
   PlayerState,
   Resource,
 } from '../contract/types'
-import { applyIsDoableHooksDetailed } from './hooks'
+import { HookDispatcher } from '../engine/dispatcher'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
+const flowHookDispatcher = new HookDispatcher()
 
 const emptyResources: Resource = {
   wood: 0,
@@ -103,7 +103,7 @@ const applyChildActionDoable = (
     )
   }
 
-  const actionHookDoable = applyIsDoableHooksDetailed(
+  return flowHookDispatcher.applyIsDoable(
     {
       state: context.state,
       player: context.player,
@@ -112,33 +112,9 @@ const applyChildActionDoable = (
       sourceCard: context.sourceCard,
       actionContext: context.actionContext,
     },
+    action,
     doable,
   )
-  doable = actionHookDoable.doable
-  let vetoed = actionHookDoable.vetoed
-
-  const listenerContext = {
-    state: context.state,
-    player: context.player,
-    space: context.space,
-    actionId,
-    phase: 'isDoable' as const,
-    doable,
-    sourceCard: context.sourceCard,
-    actionContext: context.actionContext,
-  }
-  const matched = getMatchingListeners(listenerContext)
-  for (const entry of matched) {
-    const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
-    if (result?.doable === false) {
-      doable = false
-      vetoed = true
-    } else if (result?.doable === true && !vetoed) {
-      doable = true
-    }
-  }
-
-  return doable
 }
 
 const evaluateFlowDoable = (

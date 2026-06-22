@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A97_Freshman'
 import '../../shared/cards/B/B77_LoamPit'
+import '../../shared/cards/C/C37_DwellingMound'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -155,6 +156,20 @@ describe('Through the Seasons Summer rules', () => {
     )
   })
 
+  it('hides Summer plowing when compute-cost hooks make plowing unaffordable', () => {
+    const session = setupSummer()
+    const player = session.state.players[0]!
+    player.minorPlayed.push('C37_DwellingMound')
+    player.resources.food = 0
+    player.resources.grain = 0
+
+    expect(availableIds(session)).not.toContain(summerActionId)
+    expect(session.takeAction(0, summerActionId)).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+  })
+
   it('uses hook-dispatched bake doability when building the Farmer\'s Market bread branch', () => {
     const session = setupSummer()
     const player = session.state.players[0]!
@@ -205,6 +220,20 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
     expect(resp.state.players[0]!.resources.clay).toBe(clayBefore + 3)
+    expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
+  })
+
+  it('does not let a persisted Day Laborer token suppress a new Summer placement', () => {
+    const session = setupSummer()
+    const player = session.state.players[0]!
+    player.cardStates['through-the-seasons:summer-day-laborer'] = {
+      extraData: { usedActionToken: 1 },
+    }
+    const grainBefore = player.resources.grain
+
+    const resp = session.takeAction(0, 'day-laborer')
+
+    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
   })
 
