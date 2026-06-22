@@ -30,6 +30,7 @@ import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
+import { registerThroughTheSeasonsCardListeners } from '../seasons/card-listeners.ts'
 import { registerThroughTheSeasonsHooks } from '../seasons/hooks.ts'
 import {
   advanceThroughTheSeasons,
@@ -769,6 +770,7 @@ export class GameCore {
       allOccupationCards,
       allMinorImprovementCards,
     )
+    registerThroughTheSeasonsCardListeners(this.cardRegistry)
     // Register majors as effect bundles so getCardEffect resolves them after
     // the older getMajorCardEffect path is removed.
     this.cardRegistry.registerEffects(majorCardDefinitions)

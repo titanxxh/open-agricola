@@ -112,6 +112,10 @@ _Avoid_: ActionDefinition、ActionNode
 Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。
 _Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space
 
+**Season Variant Listener（季节变体监听器）**:
+Through the Seasons 这类游戏变体注册的会话级规则监听器。它可复用 card-purchase Cost Candidate 管线或 Action Hook，但必须由 `GameState.enableThroughTheSeasons` / `currentSeason` 明确门控；它不是已打出的卡牌，也不应写入玩家 `cardStates`。
+_Avoid_: Card Listener from played card、虚拟 source card、前端折扣
+
 **Food Accumulation Space（食物累计格）**:
 印有食物累积的行动格。卡牌提到从食物累计格拿食物时，只指从该类行动格本身取得的食物，不包括同一行动中来自卡牌、兑换或其他奖励来源的食物。
 _Avoid_: 任意给食物的行动、卡牌奖励、兑换收益
