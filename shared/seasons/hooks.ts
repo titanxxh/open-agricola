@@ -3,7 +3,12 @@ import { canStartFencing } from '../actions/effects/fencing'
 import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
 import { canAffordTypedFlatCost } from '../actions/payment/internal'
+import { readActionSnapshotToken } from '../cards/helpers/action-snapshot'
+import { readCardExtraData, writeCardExtraData } from '../cards/helpers/card-state'
 import { isThroughTheSeasonsSeason } from './rules'
+
+const SUMMER_DAY_LABORER_SOURCE = 'through-the-seasons:summer-day-laborer'
+const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 export const registerThroughTheSeasonsHooks = (): void => {
   registerActionHook({
@@ -40,10 +45,13 @@ export const registerThroughTheSeasonsHooks = (): void => {
 
   registerActionHook({
     id: 'through-the-seasons:spring-fence-preview',
-    actions: ['fence'],
+    actions: ['fence', 'fencing'],
     phases: ['isDoable'],
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'spring')) return
+      if (!canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) {
+        return { doable: false }
+      }
       if (context.doable) return
       if (canStartFencing(context.state, context.player, { wood: -2 }, context.actionContext)) {
         return { doable: true }
@@ -58,6 +66,22 @@ export const registerThroughTheSeasonsHooks = (): void => {
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'summer')) return
       if (context.space.id !== 'day-laborer') return
+      const actionToken = readActionSnapshotToken(context.player)
+      if (actionToken !== undefined) {
+        if (
+          readCardExtraData<number>(
+            context.player,
+            SUMMER_DAY_LABORER_SOURCE,
+            USED_ACTION_TOKEN_KEY,
+          ) === actionToken
+        ) return
+        writeCardExtraData(
+          context.player,
+          SUMMER_DAY_LABORER_SOURCE,
+          USED_ACTION_TOKEN_KEY,
+          actionToken,
+        )
+      }
       gainResources(context.player, { grain: 1 })
     },
   })

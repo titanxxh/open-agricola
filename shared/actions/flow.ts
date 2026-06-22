@@ -27,7 +27,7 @@ const emptyResources: Resource = {
   begging: 0,
 }
 
-type FlowActionResolver = (actionId: string) => ActionDefinition | undefined
+export type FlowActionResolver = (actionId: string) => ActionDefinition | undefined
 type FlowDoableContext = {
   state: GameState
   player: PlayerState
@@ -185,6 +185,32 @@ const evaluateFlowDoable = (
     return evaluateFlowDoable(child, context, resolveAction, seenActionIds)
   })
 }
+
+export const isActionDoableInFlowContext = (
+  args: {
+    actionId: string
+    action: ActionDefinition
+    state: GameState
+    player: PlayerState
+    space: ActionSpace
+    sourceCard?: string
+    actionContext?: Record<string, unknown>
+    resolveAction: FlowActionResolver
+  },
+): boolean =>
+  applyChildActionDoable(
+    args.actionId,
+    args.action,
+    {
+      state: args.state,
+      player: args.player,
+      space: args.space,
+      sourceCard: args.sourceCard,
+      actionContext: args.actionContext,
+    },
+    args.resolveAction,
+    new Set(),
+  )
 
 export const initializeFlowDerivedCanBeExecutedByPlayer = (
   action: ActionDefinition,
