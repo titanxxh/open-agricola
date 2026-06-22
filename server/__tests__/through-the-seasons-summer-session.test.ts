@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/B/B77_LoamPit'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -163,6 +164,22 @@ describe('Through the Seasons Summer rules', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
+    expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
+  })
+
+  it('adds Summer Day Laborer grain only once when card gain leaves run under the space', () => {
+    const session = setupSummer()
+    const player = session.state.players[0]!
+    player.minorPlayed.push('B77_LoamPit')
+    const grainBefore = player.resources.grain
+    const foodBefore = player.resources.food
+    const clayBefore = player.resources.clay
+
+    const resp = session.takeAction(0, 'day-laborer')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
+    expect(resp.state.players[0]!.resources.clay).toBe(clayBefore + 3)
     expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)
   })
 

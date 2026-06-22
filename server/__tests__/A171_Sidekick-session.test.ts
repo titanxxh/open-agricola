@@ -9,20 +9,40 @@ import '../../shared/cards/A/A156_Buyer'
 import '../../shared/cards/C/C4_WritingBoards'
 
 const CARD_ID = 'A171_Sidekick'
+type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
+type SeasonsState = {
+  enableThroughTheSeasons?: boolean
+  throughTheSeasons?: {
+    startSeason: SeasonId
+    currentSeason: SeasonId
+  } | null
+}
 
 const setup = (options: {
   food?: number
   workers?: number
+  enableThroughTheSeasons?: boolean
+  currentSeason?: SeasonId
   roundActionOrder?: string[]
   minorHand?: string[]
   extraOccupations?: string[]
   spaceResources?: Record<string, Partial<Resource>>
 } = {}) => {
-  const session = new GameSession(42, undefined, { playerCount: 5 })
-  const state = session.getState().state
+  const session = new GameSession(42, undefined, {
+    playerCount: 5,
+    enableThroughTheSeasons: options.enableThroughTheSeasons === true,
+  } as never)
+  const state = session.getState().state as ReturnType<GameSession['getState']>['state'] & SeasonsState
   state.currentPlayerIndex = 0
   state.round = 3
   state.roundActionOrder = state.roundActionOrder.map(() => null)
+  if (options.currentSeason) {
+    state.enableThroughTheSeasons = true
+    state.throughTheSeasons = {
+      startSeason: options.currentSeason,
+      currentSeason: options.currentSeason,
+    }
+  }
   const order = options.roundActionOrder ?? ['western-quarry', 'vegetable-seeds', 'eastern-quarry']
   order.forEach((spaceId, index) => {
     state.roundActionOrder[index] = spaceId
@@ -120,6 +140,24 @@ describe('A171 Sidekick session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')?.takenBy).toEqual([
       { playerId: owner.id, workerId: '2' },
     ])
+  })
+
+  it('does not offer a fixed target vetoed by season doability after paying food', () => {
+    const session = setup({
+      food: 1,
+      enableThroughTheSeasons: true,
+      currentSeason: 'winter',
+      spaceResources: {
+        'clay-pit': { clay: 1 },
+      },
+    })
+
+    const resp = session.takeAction(0, 'clay-pit')
+
+    expect(resp.ok).toBe(true)
+    expect(acceptOption(resp)).toBeUndefined()
+    expect(resp.state.players[0]!.resources).toMatchObject({ food: 1, clay: 1 })
+    expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy).toEqual([])
   })
 
   it('does not offer a target action that becomes impossible after paying food', () => {

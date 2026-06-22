@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/A/A65_SeedPellets'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -167,6 +168,33 @@ describe('Through the Seasons Spring rules', () => {
     })
   })
 
+  it('uses hook-dispatched sow doability when building Animal and Fruit branches', () => {
+    const session = setupSpring()
+    const player = session.state.players[0]!
+    player.minorPlayed.push('A65_SeedPellets')
+    player.resources.grain = 0
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
+
+    expect(availableIds(session)).toContain(springActionId)
+    let resp = session.takeAction(0, springActionId)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected sow prompt')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
+
+    resp = session.commitSelectionChoice(0, {
+      crops: [{ row: 0, col: 0, crop: 'grain' }],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(0)
+    expect(resp.state.players[0]!.fields).toContainEqual({
+      row: 0,
+      col: 0,
+      stacks: [{ kind: 'grain', remaining: 3 }],
+    })
+  })
+
   it('can resolve Sow then Breeding in the chosen order', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
@@ -237,6 +265,19 @@ describe('Through the Seasons Spring rules', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('keeps Spring fencing unavailable without one payable wood', () => {
+    const session = setupSpring()
+    const player = session.state.players[0]!
+    player.resources.wood = 0
+
+    expect(availableIds(session)).not.toContain('fencing')
+    expect(session.takeAction(0, 'fencing')).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+    expect(session.state.actionSpaces.find((space) => space.id === 'fencing')?.takenBy).toEqual([])
   })
 
   it('does not apply Spring free fences to palisades', () => {
