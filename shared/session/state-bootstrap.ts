@@ -63,6 +63,7 @@ import { normalizePublicEventArchive } from '../events/archive'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import {
+  applySeasonPreparationAdjustments,
   createThroughTheSeasonsState,
   normalizeThroughTheSeasonsState,
 } from '../seasons/state'
@@ -719,6 +720,7 @@ export const createInitialState = (
     completedFeedingPhases: 0,
   }
   applyRoundGrowth(initialState)
+  applySeasonPreparationAdjustments(initialState)
   startParentSelectionIfNeeded(initialState, parentSelectionSeed)
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)
   return initialState
