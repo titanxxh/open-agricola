@@ -1,4 +1,10 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../contract/types'
+import { familyGrowthAction } from '../actions/effects/family-growth'
+import {
+  canAffordTypedFlatCost,
+  payTypedFlatCostDetailed,
+} from '../actions/payment/internal'
+import { isThroughTheSeasonsSeason, romanticEveningCost } from './rules'
 import { seasonIds, type SeasonId } from './types'
 
 const emptyResources: Resource = {
@@ -41,6 +47,42 @@ const canUseSeasonAction = (season: SeasonId): ActionDefinition['canBeExecutedBy
     state.enableThroughTheSeasons === true &&
     state.throughTheSeasons?.currentSeason === season
 
+const canGrowWithoutRoom: ActionDefinition['canBeExecutedByPlayer'] = (state, player) =>
+  familyGrowthAction.canBeExecutedByPlayer(state, player, {
+    actionContext: { skipRoomCheck: true },
+  })
+
+const canUseRomanticEvening: ActionDefinition['canBeExecutedByPlayer'] =
+  (state, player) =>
+    isThroughTheSeasonsSeason(state, 'winter') &&
+    canGrowWithoutRoom(state, player) &&
+    canAffordTypedFlatCost(player, romanticEveningCost(state), undefined, state)
+
+const executeRomanticEvening: ActionDefinition['execute'] = (context) => {
+  if (!canGrowWithoutRoom(context.state, context.player)) {
+    return { type: 'fail', errorKey: 'log.familyFull' }
+  }
+  const payment = payTypedFlatCostDetailed(
+    context.player,
+    romanticEveningCost(context.state),
+    undefined,
+    context.state,
+  )
+  if (!payment.ok) return { type: 'fail', errorKey: 'log.action' }
+  const growth = familyGrowthAction.execute({
+    ...context,
+    actionContext: {
+      ...(context.actionContext ?? {}),
+      skipRoomCheck: true,
+    },
+  })
+  if (growth.type !== 'ok') return growth
+  return {
+    ...growth,
+    resourcesPaid: payment.resourcesPaid,
+  }
+}
+
 const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
   id: seasonActionIdBySeason[season],
   nameKey: seasonActionNameBySeason[season],
@@ -49,8 +91,10 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
   gainPerRound: {},
   players: [2, 3, 4, 5, 6],
   strictCanExecute: true,
-  canBeExecutedByPlayer: canUseSeasonAction(season),
-  execute: () => ({ type: 'ok' }),
+  canBeExecutedByPlayer:
+    season === 'winter' ? canUseRomanticEvening : canUseSeasonAction(season),
+  execute:
+    season === 'winter' ? executeRomanticEvening : () => ({ type: 'ok' }),
 })
 
 export const seasonActionDefinitions: ActionDefinition[] =
