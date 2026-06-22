@@ -15,6 +15,7 @@ const setupContext = (options: {
   targetOccupied?: boolean
   targetBlocked?: boolean
   targetExecutable?: boolean
+  targetSpaceId?: string
   actionContext?: Record<string, unknown>
   missingLeftSlot?: boolean
 } = {}): CardListenerContext => {
@@ -30,7 +31,7 @@ const setupContext = (options: {
   owner.resources.food = options.food ?? 1
   setActiveWorkerCount(owner, 3)
   setWorkersAtHome(state, owner, options.workersAtHome ?? 2)
-  const target = state.actionSpaces.find((space) => space.id === 'vegetable-seeds')!
+  const target = state.actionSpaces.find((space) => space.id === (options.targetSpaceId ?? 'vegetable-seeds'))!
   target.takenBy = options.targetOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
   target.blockedBy = options.targetBlocked ? [{ playerId: state.players[1]!.id, workerId: '1', sourceSpaceId: 'linked' }] : []
   target.canBeExecutedByPlayer = () => options.targetExecutable ?? true
@@ -72,9 +73,41 @@ describe('A171 Sidekick listener', () => {
     })
   })
 
+  it('offers the physical left fixed action when the current space is not a round action', () => {
+    expect(run(setupContext({ currentSpaceId: 'forest', targetSpaceId: 'grain-seeds' }))).toMatchObject({
+      sourceCard: CARD_ID,
+      flow: {
+        children: [
+          { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
+          {
+            actionId: 'place-farmer-on-space',
+            sourceCard: CARD_ID,
+            params: { spaceId: 'grain-seeds', sourceCard: CARD_ID },
+            actionContext: { sidekickChain: ['forest'] },
+          },
+        ],
+      },
+    })
+  })
+
+  it('offers a fixed action to the left of the first round slot', () => {
+    expect(run(setupContext({ currentSpaceId: 'sheep-market', targetSpaceId: 'farm-expansion' }))).toMatchObject({
+      flow: {
+        children: [
+          { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
+          {
+            actionId: 'place-farmer-on-space',
+            sourceCard: CARD_ID,
+            params: { spaceId: 'farm-expansion', sourceCard: CARD_ID },
+            actionContext: { sidekickChain: ['sheep-market'] },
+          },
+        ],
+      },
+    })
+  })
+
   it.each([
-    ['not a round action', { currentSpaceId: 'grain-seeds' }],
-    ['no left neighbor', { currentSpaceId: 'sheep-market' }],
+    ['no left neighbor', { currentSpaceId: 'lessons-56-2f' }],
     ['missing left slot', { missingLeftSlot: true }],
     ['no food', { food: 0 }],
     ['no worker', { workersAtHome: 0 }],
