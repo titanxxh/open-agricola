@@ -24,6 +24,10 @@ _Avoid_: React session、本地 UI store
 一局游戏的领域真相，包含玩家、行动格、回合、阶段、draft、公开事件、日志缓存、future meeple、收获摘要等可序列化状态。
 _Avoid_: 房间连接、WebSocket version、React state
 
+**Game Variant（游戏变体）**:
+创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
+_Avoid_: Card Source、UI toggle、player count layout
+
 **PlayerState**:
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
@@ -104,6 +108,10 @@ _Avoid_: 在 effect 文件里堆叠多卡特例
 棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
 _Avoid_: ActionDefinition、ActionNode
 
+**Season Action Space（季节行动格）**:
+Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。
+_Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space
+
 **Food Accumulation Space（食物累计格）**:
 印有食物累积的行动格。卡牌提到从食物累计格拿食物时，只指从该类行动格本身取得的食物，不包括同一行动中来自卡牌、兑换或其他奖励来源的食物。
 _Avoid_: 任意给食物的行动、卡牌奖励、兑换收益
@@ -168,6 +176,10 @@ _Avoid_: Improvement bonus、card state bonus、printed VP
 **Major Improvement（主要改良）**:
 主要改良包括供应区主要改良，以及卡面语义上同时视为主要改良的已打出小改良。
 _Avoid_: 只统计供应区主要改良、忽略 dual-type improvement
+
+**Major Improvement Purchase（主要改良购买）**:
+通过主要改良购买路径取得供应区主要改良的行为。小改良即使卡面语义上同时视为主要改良，仍不是主要改良购买。
+_Avoid_: dual-type minor purchase、按计数身份套用购买规则
 
 **Major Improvement Supply Stack**:
 主要设施供应区中同一类主要设施的实体卡叠放口径；只有当前可见的顶层实体卡可被购买，被覆盖的实体卡仍属于供应但不可直接选择。
@@ -305,6 +317,10 @@ _Avoid_: Private Field Phase
 卡牌授予的私人田地阶段，只在某个玩家的农场上执行 Reap，不进入完整 Harvest。
 _Avoid_: Harvest、Harvest Field Phase
 
+**Private Breeding Phase**:
+卡牌或游戏变体授予的私人繁殖阶段，只为某个玩家执行动物繁殖，不进入完整 Harvest。
+_Avoid_: Harvest、Harvest Breeding Phase、完整收获繁殖阶段
+
 **Reap**:
 从普通田或 Card Field 顶堆收获作物到玩家 supply 的动作。
 _Avoid_: Harvest
@@ -386,7 +402,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 持续计数、单次标记和单卡历史优先写入 **Card State**；只有跨卡通用事实才进入 `GameState` 或 `PlayerState` 顶层。
 - **Domain** 提供农场、动物、牧场、计分等派生视图和不变量；规则路径可以复用，前端只能把它当安全派生 helper。
 - **Harvest** 包含最多一个 **Harvest Field Phase**；**Private Field Phase** 可以执行 **Reap**，但不是 Harvest。
-- **Harvest Field Phase** 可能触发 harvest-scoped card effects；**Private Field Phase** 不能触发这些效果，除非卡牌明确说明。
+- **Harvest Field Phase** 可能触发 harvest-scoped card effects；**Private Field Phase** 和 **Private Breeding Phase** 不能触发这些效果，除非卡牌明确说明。
 - **Card Field** 在 Reap 时参与田地收获，但其副作用是否属于 Harvest 取决于触发上下文。
 - 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
 - 私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输，不写入公共事件流。
