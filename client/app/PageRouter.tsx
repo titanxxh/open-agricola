@@ -34,6 +34,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'draftPoolSize',
   'enableCommunityDeck',
   'enableParentCards',
+  'enableThroughTheSeasons',
   'customCards',
   'embedded',
   'devMode',

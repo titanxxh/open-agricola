@@ -7,6 +7,7 @@ export type RoomMeta = {
   maxPlayers: number
   customCardDbIds: string[]
   enableParentCards?: boolean
+  enableThroughTheSeasons?: boolean
   status: RoomStatus
   /** Seated players with persisted user identity. Anonymous seats are skipped. */
   players: Array<{ userId: string; playerIndex: number }>

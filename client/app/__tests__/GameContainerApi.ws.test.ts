@@ -8,6 +8,7 @@ import {
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
+  enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -20,7 +21,10 @@ import {
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
+  splitBoardActionSpaces,
 } from '../game-container-helpers'
+import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
+import type { ActionSpace } from '../../../shared/contract/types'
 import type { PlayerScoreSummary } from '../../../shared/domain/scoring'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
@@ -55,6 +59,43 @@ describe('GameContainerApi WS player identity', () => {
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=1')).toBe(2)
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=bogus')).toBe(2)
     expect(maxPlayersFromQuery('?page=game&transport=ws')).toBe(2)
+  })
+
+  it('parses the Through the Seasons room option from query', () => {
+    expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws&enableThroughTheSeasons=true')).toBe(true)
+    expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws&enableThroughTheSeasons=1')).toBe(false)
+    expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws')).toBe(false)
+  })
+
+  it('separates season action spaces from the normal action board', () => {
+    const makeSpace = (id: string): ActionSpace => ({
+      id,
+      nameKey: `actions.${id}.name`,
+      roundAvailable: 1,
+      gainPerRound: {},
+      resources: {
+        wood: 0,
+        clay: 0,
+        reed: 0,
+        stone: 0,
+        food: 0,
+        grain: 0,
+        vegetable: 0,
+        sheep: 0,
+        boar: 0,
+        cattle: 0,
+        begging: 0,
+      },
+      takenBy: [],
+    })
+    const forest = makeSpace('forest')
+    const sheep = makeSpace('sheep-market')
+    const winter = makeSpace(seasonActionIdBySeason.winter)
+
+    expect(splitBoardActionSpaces([forest, sheep, winter], ['sheep-market'])).toEqual({
+      baseActions: [forest],
+      seasonActions: [winter],
+    })
   })
 
   it('maps failed farm commits to local interaction error messages', () => {
