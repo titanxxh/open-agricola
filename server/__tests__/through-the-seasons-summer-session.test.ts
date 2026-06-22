@@ -36,6 +36,15 @@ const setupSummer = () => {
   return session
 }
 
+const availableIds = (session: GameSession, playerIndex = 0) =>
+  session.getAvailableActions(playerIndex).map((action) => action.spaceId)
+
+const fillFarmyardWithFields = (session: GameSession) => {
+  session.state.players[0]!.fields = Array.from({ length: 3 }).flatMap((_, row) =>
+    Array.from({ length: 5 }).map((__, col) => ({ row, col, stacks: [] })),
+  )
+}
+
 const chooseByLabel = (
   session: GameSession,
   resp: SessionResponse,
@@ -82,6 +91,18 @@ describe('Through the Seasons Summer rules', () => {
         'actions.season-summer-farmers-market.option-sell-grain',
       ]),
     )
+  })
+
+  it('keeps Farmer\'s Market unavailable when none of its branches can happen', () => {
+    const session = setupSummer()
+    fillFarmyardWithFields(session)
+    session.state.players[0]!.resources.grain = 0
+
+    expect(availableIds(session)).not.toContain(summerActionId)
+    expect(session.takeAction(0, summerActionId)).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
   })
 
   it('can plow then sell grain and hides selling when grain is unaffordable', () => {

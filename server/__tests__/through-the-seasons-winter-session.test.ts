@@ -100,6 +100,20 @@ describe('Through the Seasons Winter rules', () => {
     })
   })
 
+  it('keeps ordinary plowing unavailable in Winter when the food cost cannot be paid', () => {
+    const session = setupWinter(1)
+    const player = session.state.players[0]!
+    player.resources.food = 0
+
+    expect(availableIds(session)).not.toContain('farmland')
+    expect(session.takeAction(0, 'farmland')).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+    expect(spaceOf(session, 'farmland').takenBy).toHaveLength(0)
+    expect(player.fields).toHaveLength(0)
+  })
+
   it('uses the existing remaining-harvest convention for Romantic Evening cost', () => {
     const session = setupWinter(11)
     const player = session.state.players[0]!

@@ -2,6 +2,7 @@ import { registerActionHook } from '../actions/hooks'
 import { canStartFencing } from '../actions/effects/fencing'
 import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
+import { canAffordTypedFlatCost } from '../actions/payment/internal'
 import { isThroughTheSeasonsSeason } from './rules'
 
 export const registerThroughTheSeasonsHooks = (): void => {
@@ -23,6 +24,17 @@ export const registerThroughTheSeasonsHooks = (): void => {
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'winter')) return
       return { costs: { food: 1 } }
+    },
+  })
+
+  registerActionHook({
+    id: 'through-the-seasons:winter-farmland-food-gate',
+    actions: ['farmland'],
+    phases: ['isDoable'],
+    handler: (context) => {
+      if (!isThroughTheSeasonsSeason(context.state, 'winter')) return
+      if (canAffordTypedFlatCost(context.player, { food: 1 }, 'plow', context.state)) return
+      return { doable: false }
     },
   })
 
