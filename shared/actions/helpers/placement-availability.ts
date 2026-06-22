@@ -3,6 +3,7 @@ import type { CardListenerContextInput } from '../../cards/card-listeners'
 import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
+import { isActionDoableInFlowContext } from '../flow'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
 export type AllowedPlacement = {
@@ -45,6 +46,23 @@ export const canEnterSpace = (space: ActionSpace, player: PlayerState, state: Ga
   return canUseExclusiveSpace(space, player, state)
 }
 
+const canExecutePlacementSpace = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  contextOverrides: Partial<CardListenerContextInput>,
+): boolean =>
+  isActionDoableInFlowContext({
+    actionId: space.id,
+    action: space,
+    state,
+    player,
+    space,
+    sourceCard: contextOverrides.sourceCard,
+    actionContext: contextOverrides.actionContext,
+    resolveAction: (actionId) => state.actionSpaces.find((candidate) => candidate.id === actionId),
+  })
+
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
@@ -54,7 +72,7 @@ export function computeAllowedPlacementSpaces(
     .filter((s) => {
       if (!canEnterSpace(s, player, state)) return false
       if (isSpaceBlocked(s)) return false
-      return !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player)
+      return !isSpaceOccupied(s) && canExecutePlacementSpace(state, player, s, contextOverrides)
     })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
@@ -103,7 +121,7 @@ export function computeAllowedPlacementSpaces(
       if (!space) continue
       if (!canEnterSpace(space, player, state)) continue
       if (isSpaceBlocked(space)) continue
-      if (!space.canBeExecutedByPlayer(state, player)) continue
+      if (!canExecutePlacementSpace(state, player, space, contextOverrides)) continue
       extra.push({ spaceId, allowOccupied: true, option: opt })
     }
   }

@@ -26,6 +26,7 @@ import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from 
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
+import { isThroughTheSeasonsSeason } from '../../seasons/rules.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -100,6 +101,13 @@ export const takeAction = (
     return core.emitResponse(false, 'space unavailable')
   }
   if (space.strictCanExecute && !space.canBeExecutedByPlayer(state, player)) {
+    return core.emitResponse(false, 'space unavailable')
+  }
+  if (
+    space.id === 'fencing' &&
+    isThroughTheSeasonsSeason(state, 'spring') &&
+    !space.canBeExecutedByPlayer(state, player)
+  ) {
     return core.emitResponse(false, 'space unavailable')
   }
   if (isSpaceOccupied(space)) {

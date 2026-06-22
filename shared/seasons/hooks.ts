@@ -51,10 +51,8 @@ export const registerThroughTheSeasonsHooks = (): void => {
     phases: ['isDoable'],
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'spring')) return
-      if (!canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) {
-        return { doable: false }
-      }
       if (context.doable) return
+      if (!canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) return
       if (canStartFencing(context.state, context.player, { wood: -2 }, context.actionContext)) {
         return { doable: true }
       }
