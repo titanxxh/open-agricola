@@ -55,7 +55,7 @@ usage() {
   cat <<'EOF'
 Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
                              [--players N | -p N | --players=N | -p=N]
-                             [--parents] [--draft]
+                             [--parents] [--seasons] [--draft]
                              [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
@@ -69,6 +69,7 @@ backend restarts independently.
                                  Defaults to 4. Links for all fixed rooms are
                                  always printed; the selected one is marked.
   --parents                      Enable Parent Cards for fixed dev rooms.
+  --seasons                      Enable Through the Seasons for fixed dev rooms.
   --draft                        Start fixed dev rooms in simultaneous draft
                                  mode with draft pool size 7. Requires a reset.
   -h, --help                     Show this help.
@@ -78,6 +79,7 @@ EOF
 KILL_ONLY=0
 PLAYERS="4"
 PARENTS_ENABLED=0
+SEASONS_ENABLED=0
 DRAFT_ENABLED=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -99,6 +101,10 @@ while [ $# -gt 0 ]; do
       ;;
     --parents)
       PARENTS_ENABLED=1
+      shift
+      ;;
+    --seasons)
+      SEASONS_ENABLED=1
       shift
       ;;
     --draft)
@@ -251,6 +257,34 @@ try {
 EOF
 }
 
+dev_rooms_without_through_the_seasons() {
+  DB_PATH="$DB_PATH" node <<'EOF'
+const fs = require('node:fs')
+const Database = require('better-sqlite3')
+
+const dbPath = process.env.DB_PATH
+if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
+
+const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+try {
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
+  if (!table) process.exit(0)
+  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
+  const missing = rows.filter((row) => {
+    if (!row.state_json) return true
+    try {
+      return JSON.parse(row.state_json).enableThroughTheSeasons !== true
+    } catch {
+      return true
+    }
+  })
+  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
+} finally {
+  db.close()
+}
+EOF
+}
+
 confirm_dev_room_reset() {
   local reason="$1"
   local answer=""
@@ -352,10 +386,22 @@ RESET_CONFIRMED=0
 RESET_REASON=""
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   RESET_REASON="--draft starts fixed dev rooms from the draft phase."
-elif [ "$PARENTS_ENABLED" -eq 1 ]; then
+else
+  RESET_REASONS=()
+  if [ "$PARENTS_ENABLED" -eq 1 ]; then
   MISSING_PARENT_ROOMS="$(dev_rooms_without_parent_cards)"
   if [ -n "$MISSING_PARENT_ROOMS" ]; then
-    RESET_REASON="existing fixed dev room(s) are not Parent Cards games: $MISSING_PARENT_ROOMS."
+      RESET_REASONS+=("existing fixed dev room(s) are not Parent Cards games: $MISSING_PARENT_ROOMS.")
+    fi
+  fi
+  if [ "$SEASONS_ENABLED" -eq 1 ]; then
+    MISSING_SEASONS_ROOMS="$(dev_rooms_without_through_the_seasons)"
+    if [ -n "$MISSING_SEASONS_ROOMS" ]; then
+      RESET_REASONS+=("existing fixed dev room(s) are not Through the Seasons games: $MISSING_SEASONS_ROOMS.")
+    fi
+  fi
+  if [ "${#RESET_REASONS[@]}" -gt 0 ]; then
+    RESET_REASON="${RESET_REASONS[*]}"
   fi
 fi
 
@@ -380,6 +426,7 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   ALLOW_ANONYMOUS_WS=true \
   BACKEND_HOST="$LAN_IP" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
+  DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
   DEV_DRAFT_POOL_SIZE=7 \
   BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
@@ -411,6 +458,9 @@ echo "WS persistent dev rooms (each survives backend restart):"
 DEV_ROOM_QUERY_SUFFIX=""
 if [ "$PARENTS_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableParentCards=true"
+fi
+if [ "$SEASONS_ENABLED" -eq 1 ]; then
+  DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableThroughTheSeasons=true"
 fi
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftMode=simultaneous&draftPoolSize=7"

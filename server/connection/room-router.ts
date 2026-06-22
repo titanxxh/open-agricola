@@ -152,6 +152,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
   const enableParentCards = (msg as Record<string, unknown>).enableParentCards === true
+  const enableThroughTheSeasons = (msg as Record<string, unknown>).enableThroughTheSeasons === true
   const customCards = loadCustomCardsFromDb(customCardDbIds, ctx.currentUserId)
   const session = new GameSession(
     undefined,
@@ -160,6 +161,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
       playerCount: maxPlayers,
       enableCommunityDeck,
       enableParentCards,
+      enableThroughTheSeasons,
       ...(draftOptions.value
         ? {
             draftMode: draftOptions.value.draftMode,
@@ -178,6 +180,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     createdBy: ctx.currentUserId,
     customCardDbIds,
     enableParentCards,
+    enableThroughTheSeasons,
   }
   ctx.registry.set(room)
   ctx.currentRoom = room
@@ -326,12 +329,14 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
+  const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
   room.session = new GameSession(
     typeof msg.seed === 'number' ? msg.seed : undefined,
     customCards.length > 0 ? customCards : undefined,
-    { playerCount: room.maxPlayers, enableParentCards },
+    { playerCount: room.maxPlayers, enableParentCards, enableThroughTheSeasons },
   )
   room.enableParentCards = enableParentCards
+  room.enableThroughTheSeasons = enableThroughTheSeasons
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
 }

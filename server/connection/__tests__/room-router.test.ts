@@ -84,6 +84,27 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
 
+  it('forwards enableThroughTheSeasons into the created room session', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableThroughTheSeasons: true } as never)
+
+    expect(ctx.currentRoom!.session.state.enableThroughTheSeasons).toBe(true)
+    expect(ctx.currentRoom!.session.state.throughTheSeasons).not.toBeNull()
+  })
+
+  it('preserves enableThroughTheSeasons when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableThroughTheSeasons: true } as never)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.enableThroughTheSeasons).toBe(true)
+    expect(ctx.currentRoom!.session.state.throughTheSeasons).not.toBeNull()
+  })
+
   it('preserves six seats when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
