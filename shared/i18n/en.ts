@@ -502,7 +502,12 @@ export const en = {
       'option-breed-sow': 'Breeding, then Sow',
       'option-sow-breed': 'Sow, then Breeding',
     },
-    'season-summer-farmers-market': { name: "Farmer's Market", description: 'Plow and/or bake bread or sell grain' },
+    'season-summer-farmers-market': {
+      name: "Farmer's Market",
+      description: 'Plow and/or bake bread or sell grain',
+      'option-bread-or-sell': 'Bake Bread or Sell Grain',
+      'option-sell-grain': 'Sell Grain',
+    },
     'season-autumn-thanksgiving': { name: 'Thanksgiving', description: 'Private field phase and/or gain 1 vegetable' },
     fishing: { name: 'Fishing', description: 'Gain food' },
     'day-laborer': { name: 'Day Laborer', description: 'Gain 2 food' },

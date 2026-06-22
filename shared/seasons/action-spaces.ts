@@ -1,7 +1,9 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../contract/types'
 import { breedLeaf } from '../actions/effects/breed'
 import { familyGrowthAction } from '../actions/effects/family-growth'
+import { plowAction } from '../actions/effects/plow'
 import { sowAction } from '../actions/effects/sow'
+import { summerBreadOrSellAction, summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
 import {
   canAffordTypedFlatCost,
   payTypedFlatCostDetailed,
@@ -105,6 +107,41 @@ const executeSpringAnimalAndFruit: ActionDefinition['execute'] = ({ state, playe
   flow: springAnimalAndFruitFlow(state, player),
 })
 
+const summerPlowLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'plow',
+  sourceCard: summerSourceCard,
+  choiceLabelKey: 'actions.plow.name',
+})
+
+const summerFarmersMarketFlow = (
+  state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
+  player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
+): ActionFlow => {
+  const children: ActionFlow[] = []
+  if (plowAction.canBeExecutedByPlayer(state, player)) children.push(summerPlowLeaf())
+  const breadOrSell = summerBreadOrSellFlow(state, player)
+  if (breadOrSell?.type === 'xor') {
+    children.push({
+      type: 'leaf',
+      actionId: summerBreadOrSellAction.id,
+      sourceCard: summerSourceCard,
+      choiceLabelKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
+    })
+  } else if (breadOrSell) {
+    children.push(breadOrSell)
+  }
+  return {
+    type: 'or',
+    children,
+  }
+}
+
+const executeSummerFarmersMarket: ActionDefinition['execute'] = ({ state, player }) => ({
+  type: 'flow',
+  flow: summerFarmersMarketFlow(state, player),
+})
+
 const canGrowWithoutRoom: ActionDefinition['canBeExecutedByPlayer'] = (state, player) =>
   familyGrowthAction.canBeExecutedByPlayer(state, player, {
     actionContext: { skipRoomCheck: true },
@@ -156,7 +193,9 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
       ? executeRomanticEvening
       : season === 'spring'
         ? executeSpringAnimalAndFruit
-        : () => ({ type: 'ok' }),
+        : season === 'summer'
+          ? executeSummerFarmersMarket
+          : () => ({ type: 'ok' }),
 })
 
 export const seasonActionDefinitions: ActionDefinition[] =
