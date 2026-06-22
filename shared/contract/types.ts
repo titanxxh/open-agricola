@@ -2,6 +2,7 @@ import type { PromptKey } from './prompt-keys'
 import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
+import type { ThroughTheSeasonsState } from '../seasons/types'
 
 export type Resource = {
   wood: number
@@ -548,6 +549,8 @@ export type GameState = {
   /** When true, community-deck cards are included in the deal pool. */
   enableCommunityDeck: boolean
   enableParentCards: boolean
+  enableThroughTheSeasons: boolean
+  throughTheSeasons: ThroughTheSeasonsState | null
   ordinaryCardDecks: OrdinaryCardDecks
   ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
   nextOrdinaryCardDrawChoiceSeq: number

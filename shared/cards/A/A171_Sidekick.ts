@@ -1,7 +1,9 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isActionDoableInFlowContext } from '../../actions/flow'
 import { canEnterSpace } from '../../actions/helpers/placement-availability'
+import { getActionDefinition } from '../../actions/index'
 import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import { getLeftBoardActionSpaceId } from '../helpers/round-action-topology'
@@ -36,9 +38,17 @@ const canPlaceOnLeftTarget = (context: CardListenerContext, targetSpaceId: strin
   if (!canEnterSpace(targetSpace, owner, context.state)) return false
   if (isSpaceBlocked(targetSpace)) return false
   if (isSpaceOccupied(targetSpace)) return false
-  return evaluateWithReservedResources(context.state, owner, { food: 1 }, (state, player) =>
-    targetSpace.canBeExecutedByPlayer(state, player),
-  )
+  return evaluateWithReservedResources(context.state, owner, { food: 1 }, (state, player) => {
+    return isActionDoableInFlowContext({
+      actionId: targetSpace.id,
+      action: targetSpace,
+      state,
+      player,
+      space: targetSpace,
+      sourceCard: CARD_ID,
+      resolveAction: getActionDefinition,
+    })
+  })
 }
 
 const listener: CardListenerRegistration = {

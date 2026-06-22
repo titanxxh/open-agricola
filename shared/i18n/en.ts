@@ -8,6 +8,18 @@ export const en = {
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
+    seasons: {
+      board: 'Seasons Board',
+      winter: 'Winter',
+      spring: 'Spring',
+      summer: 'Summer',
+      autumn: 'Autumn',
+      current: 'current',
+      inactive: 'inactive',
+      available: 'available',
+      disabled: 'disabled',
+      missingAction: 'Unavailable',
+    },
     leftActionSpace: 'Left: {action}',
     majorImprovements: 'Major Improvements',
     stageLabel: 'Stage {stage}',
@@ -483,6 +495,24 @@ export const en = {
   },
   actions: {
     'future-meeples': { name: 'Future Resources', description: 'Place future resources on upcoming rounds' },
+    'season-winter-romantic-evening': { name: 'Romantic Evening', description: 'Family growth without room' },
+    'season-spring-animal-and-fruit': {
+      name: 'Animal and Fruit',
+      description: 'Private breeding and/or sow',
+      'option-breed-sow': 'Breeding, then Sow',
+      'option-sow-breed': 'Sow, then Breeding',
+    },
+    'season-summer-farmers-market': {
+      name: "Farmer's Market",
+      description: 'Plow and/or bake bread or sell grain',
+      'option-bread-or-sell': 'Bake Bread or Sell Grain',
+      'option-sell-grain': 'Sell Grain',
+    },
+    'season-autumn-thanksgiving': {
+      name: 'Thanksgiving',
+      description: 'Private field phase and/or gain 1 vegetable',
+      'option-vegetable': 'Gain 1 Vegetable',
+    },
     fishing: { name: 'Fishing', description: 'Gain food' },
     'day-laborer': { name: 'Day Laborer', description: 'Gain 2 food' },
     'meeting-place': {

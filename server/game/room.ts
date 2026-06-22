@@ -23,6 +23,7 @@ export type Room = {
   createdBy?: string
   customCardDbIds?: string[]
   enableParentCards?: boolean
+  enableThroughTheSeasons?: boolean
 }
 
 export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
@@ -39,6 +40,7 @@ export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.ha
 
 export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
+  enableThroughTheSeasons?: boolean
   draftMode?: 'simultaneous'
   draftPoolSize?: number
 }
@@ -49,6 +51,9 @@ export const parseFixedDevRoomStartupOptions = (
   const options: FixedDevRoomStartupOptions = {}
   if (env.DEV_ENABLE_PARENT_CARDS === 'true' || env.DEV_ENABLE_PARENT_CARDS === '1') {
     options.enableParentCards = true
+  }
+  if (env.DEV_ENABLE_THROUGH_THE_SEASONS === 'true' || env.DEV_ENABLE_THROUGH_THE_SEASONS === '1') {
+    options.enableThroughTheSeasons = true
   }
   if (env.DEV_DRAFT_MODE === 'simultaneous') {
     const rawPoolSize = Number(env.DEV_DRAFT_POOL_SIZE)
@@ -66,6 +71,7 @@ export const buildFixedDevRoomInitialStateOptions = (
 ): InitialStateOptions => ({
   playerCount,
   ...(startupOptions.enableParentCards ? { enableParentCards: true } : {}),
+  ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
   ...(startupOptions.draftMode === 'simultaneous'
     ? {
         draftMode: 'simultaneous' as const,
@@ -88,6 +94,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
+  enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   status: getRoomStatus(room),
   players: room.players
     .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
@@ -184,6 +191,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
     })
   }
   try {
@@ -196,6 +204,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
     })
   }
 }
@@ -213,4 +222,5 @@ export const snapshotToRoom = (
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
   enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
+  enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
 })

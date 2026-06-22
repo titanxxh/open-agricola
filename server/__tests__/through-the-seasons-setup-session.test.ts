@@ -1,0 +1,251 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import type { ActionAccumulatedEvent, GameEvent } from '../../shared/contract/events'
+import { rehydrateState, serializeState } from '../../shared/session/serialization'
+
+type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
+type SeasonsState = {
+  enableThroughTheSeasons?: boolean
+  throughTheSeasons?: {
+    startSeason: SeasonId
+    currentSeason: SeasonId
+  } | null
+}
+
+const seasonsOf = (session: GameSession) => session.state as typeof session.state & SeasonsState
+
+const setSeason = (session: GameSession, season: SeasonId) => {
+  const state = seasonsOf(session)
+  state.throughTheSeasons = { startSeason: season, currentSeason: season }
+}
+
+const finishRound = (session: GameSession) => {
+  const state = session.state
+  state.players.forEach((player) => markAllWorkersUsed(state, player))
+  return session.performRoundEnd()
+}
+
+const spaceOf = (session: GameSession, id: string) => {
+  const space = session.state.actionSpaces.find((entry) => entry.id === id)
+  if (!space) throw new Error(`missing action space ${id}`)
+  return space
+}
+
+const accumulatedEvents = (events: GameEvent[]): ActionAccumulatedEvent[] =>
+  events.filter((event): event is ActionAccumulatedEvent => event.type === 'action.accumulated')
+
+const seasonActionIds: Record<SeasonId, string> = {
+  winter: 'season-winter-romantic-evening',
+  spring: 'season-spring-animal-and-fruit',
+  summer: 'season-summer-farmers-market',
+  autumn: 'season-autumn-thanksgiving',
+}
+
+describe('Through the Seasons setup', () => {
+  it('creates deterministic public season state only when the variant is enabled', () => {
+    const first = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    const repeat = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    const disabled = new GameSession(4242)
+
+    const enabledState = seasonsOf(first)
+    expect(enabledState.enableThroughTheSeasons).toBe(true)
+    expect(enabledState.throughTheSeasons).not.toBeNull()
+    expect(['winter', 'spring', 'summer', 'autumn']).toContain(
+      enabledState.throughTheSeasons?.startSeason,
+    )
+    expect(enabledState.throughTheSeasons?.currentSeason).toBe(
+      enabledState.throughTheSeasons?.startSeason,
+    )
+    expect(seasonsOf(repeat).throughTheSeasons).toEqual(enabledState.throughTheSeasons)
+
+    expect(seasonsOf(disabled).enableThroughTheSeasons).toBe(false)
+    expect(seasonsOf(disabled).throughTheSeasons).toBeNull()
+  })
+
+  it('exposes all season action spaces but only the current season is available', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    const state = seasonsOf(session)
+    const currentSeason = state.throughTheSeasons!.currentSeason
+    const currentActionId = seasonActionIds[currentSeason]
+    const nonCurrentActionId = Object.values(seasonActionIds).find((id) => id !== currentActionId)!
+
+    expect(state.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).toContain(currentActionId)
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).not.toContain(nonCurrentActionId)
+    expect(session.takeAction(0, nonCurrentActionId)).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+  })
+
+  it('restores season action spaces when a persisted seasons room is rehydrated', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'summer')
+    const serialized = serializeState(session.getState().state, {
+      engineStack: session.getEngineStack(),
+    })
+    const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
+
+    expect(restored.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
+    expect(restored.actionSpaces.find((space) => space.id === seasonActionIds.summer)?.canBeExecutedByPlayer(restored, restored.players[0]!)).toBe(true)
+  })
+
+  it('applies the starting season preparation adjustment during setup', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('summer')
+    expect(spaceOf(session, 'clay-pit').resources.clay).toBe(2)
+    expect(spaceOf(session, 'fishing').resources.food).toBe(2)
+    expect(spaceOf(session, 'western-quarry').resources.stone).toBe(0)
+  })
+
+  it('advances to the next season when the next round starts', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'winter')
+    const player = session.state.players[0]!
+    player.resources.grain = 1
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
+
+    const resp = finishRound(session)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.round).toBe(2)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('spring')
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).toContain(
+      seasonActionIds.spring,
+    )
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).not.toContain(
+      seasonActionIds.winter,
+    )
+  })
+
+  it('applies Winter preparation adjustments after the season advances', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'autumn')
+    spaceOf(session, 'clay-pit').resources.clay = 0
+    spaceOf(session, 'reed-bank').resources.reed = 0
+
+    const resp = finishRound(session)
+
+    expect(resp.ok).toBe(true)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('winter')
+    expect(spaceOf(session, 'clay-pit').resources.clay).toBe(0)
+    expect(spaceOf(session, 'reed-bank').resources.reed).toBe(0)
+  })
+
+  it('applies Summer preparation adjustments after the season advances', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'spring')
+    spaceOf(session, 'clay-pit').resources.clay = 0
+    spaceOf(session, 'fishing').resources.food = 0
+    spaceOf(session, 'western-quarry').resources.stone = 0
+    spaceOf(session, 'eastern-quarry').resources.stone = 0
+
+    const resp = finishRound(session)
+
+    expect(resp.ok).toBe(true)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('summer')
+    expect(spaceOf(session, 'clay-pit').resources.clay).toBe(2)
+    expect(spaceOf(session, 'fishing').resources.food).toBe(2)
+    expect(spaceOf(session, 'western-quarry').resources.stone).toBe(0)
+    expect(spaceOf(session, 'eastern-quarry').resources.stone).toBe(0)
+  })
+
+  it('logs accumulated resources after season preparation adjustments are applied', () => {
+    const summerSession = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(summerSession, 'spring')
+    spaceOf(summerSession, 'clay-pit').resources.clay = 0
+    spaceOf(summerSession, 'fishing').resources.food = 0
+
+    const summerResp = finishRound(summerSession)
+    const summerAccumulated = accumulatedEvents(summerResp.state.events)
+
+    expect(summerAccumulated).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'action.accumulated',
+          spaceId: 'clay-pit',
+          resources: { clay: 2 },
+        }),
+        expect.objectContaining({
+          type: 'action.accumulated',
+          spaceId: 'fishing',
+          resources: { food: 2 },
+        }),
+      ]),
+    )
+
+    const winterSession = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(winterSession, 'autumn')
+    spaceOf(winterSession, 'clay-pit').resources.clay = 0
+    spaceOf(winterSession, 'reed-bank').resources.reed = 0
+
+    const winterResp = finishRound(winterSession)
+    const winterAccumulated = accumulatedEvents(winterResp.state.events)
+
+    expect(winterAccumulated).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'action.accumulated',
+          spaceId: 'clay-pit',
+          resources: { clay: 1 },
+        }),
+        expect.objectContaining({
+          type: 'action.accumulated',
+          spaceId: 'reed-bank',
+          resources: { reed: 1 },
+        }),
+      ]),
+    )
+  })
+
+  it('cycles through all four seasons at successive round starts', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'winter')
+
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('winter')
+    expect(finishRound(session).state.round).toBe(2)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('spring')
+    expect(finishRound(session).state.round).toBe(3)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('summer')
+    expect(finishRound(session).state.round).toBe(4)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('autumn')
+    expect(finishRound(session).state.round).toBe(5)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('winter')
+  })
+})

@@ -29,8 +29,18 @@ import type { ActionDetailParts, PublicEventCancellation } from '../contract/pro
 import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
+import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
+import { registerThroughTheSeasonsCardListeners } from '../seasons/card-listeners.ts'
+import { registerThroughTheSeasonsHooks } from '../seasons/hooks.ts'
+import {
+  advanceThroughTheSeasons,
+  applySeasonPreparationAdjustments,
+} from '../seasons/state.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
-import { clearActionHooks } from '../actions/hooks.ts'
+import {
+  applyIsDoableHooksDetailed,
+  clearActionHooks,
+} from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
 import {
@@ -725,9 +735,11 @@ export class GameCore {
     })
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
+    seasonActionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
     getAllAdHocActions().forEach((a) => this.registry.register(a))
     clearActionHooks()
+    registerThroughTheSeasonsHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
@@ -758,6 +770,7 @@ export class GameCore {
       allOccupationCards,
       allMinorImprovementCards,
     )
+    registerThroughTheSeasonsCardListeners(this.cardRegistry)
     // Register majors as effect bundles so getCardEffect resolves them after
     // the older getMajorCardEffect path is removed.
     this.cardRegistry.registerEffects(majorCardDefinitions)
@@ -3005,6 +3018,8 @@ export class GameCore {
         ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
         ...(entry.roomType ? { roomType: entry.roomType } : {}),
       }) as ImmediateEventDraft)
+    const openActionSpaceIds = new Set<string>()
+    const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       const openRound = roundOpen.get(space.id) ?? space.roundAvailable
       const events: ImmediateEventDraft[] = []
@@ -3030,28 +3045,35 @@ export class GameCore {
         delete space.exclusiveUse
       }
       if (this.state.round >= openRound) {
-        const resources: Partial<Resource> = {}
-        resourceKeyList.forEach((key) => {
-          const amount = space.gainPerRound[key] ?? 0
-          if (amount > 0) resources[key] = amount
-        })
-        if (Object.keys(resources).length > 0) {
-          events.push({
-            type: 'action.accumulated',
-            spaceId: space.id,
-            resources,
-          })
-        }
+        openActionSpaceIds.add(space.id)
+        actionSpaceResourcesBefore.set(space.id, { ...space.resources })
       }
       return events
     })
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
+    applySeasonPreparationAdjustments(this.state)
+    const accumulatedActionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
+      if (!openActionSpaceIds.has(space.id)) return []
+      const before = actionSpaceResourcesBefore.get(space.id) ?? emptyResources
+      const resources: Partial<Resource> = {}
+      resourceKeyList.forEach((key) => {
+        const delta = (space.resources[key] ?? 0) - (before[key] ?? 0)
+        if (delta > 0) resources[key] = delta
+      })
+      if (Object.keys(resources).length === 0) return []
+      return [{
+        type: 'action.accumulated',
+        spaceId: space.id,
+        resources,
+      }]
+    })
     applyFutureMeeples(this.state, { skipResourceReceive: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
       ...actionEvents,
+      ...accumulatedActionEvents,
     ])
     this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
     if (futureMeepleActionFlow) {
@@ -3629,22 +3651,26 @@ export class GameCore {
   }
 
   /**
-   * Returns true when at least one card listener for the `isDoable` phase
-   * explicitly vetoes the action (e.g. C51 FishingNet blocking opponent
-   * fishing on 0 food). Unlike the full `applyIsDoable` path, this skips
-   * `space.canBeExecutedByPlayer` and `applyIsDoableHooks` — those are
+   * Returns true when at least one global action hook or card listener for the
+   * `isDoable` phase explicitly vetoes the action. Unlike the full
+   * `applyIsDoable` path, this skips `space.canBeExecutedByPlayer` — that is
    * conservative for OR-flow actions and would over-block normal cases like
    * "OR(sow, bake-bread)" where every child is currently undoable but the
    * engine still wants to enter and present a skip-only choice.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
+    const actionHookDoable = applyIsDoableHooksDetailed(
+      { state: this.state, player, space, actionId: space.id },
+      true,
+    )
+    if (actionHookDoable.vetoed) return true
     const ctx: import('../cards/card-listeners.ts').CardListenerContextInput = {
       state: this.state,
       player,
       space,
       actionId: space.id,
       phase: 'isDoable',
-      doable: true,
+      doable: actionHookDoable.doable,
     }
     const matched = getMatchingListeners(ctx)
     for (const entry of matched) {
@@ -4363,6 +4389,7 @@ export class GameCore {
     if (this.state.round > 14) {
       return this.continueBeforeEndGameHooks(0, 0)
     }
+    advanceThroughTheSeasons(this.state)
     return this.continueBeforeStartOfTurn()
   }
 

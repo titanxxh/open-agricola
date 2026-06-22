@@ -110,6 +110,7 @@ export type InitialStateOptions = {
   /** When true, include community-deck cards in the deal pool. Default false. */
   enableCommunityDeck?: boolean
   enableParentCards?: boolean
+  enableThroughTheSeasons?: boolean
   parentSelectionSeed?: number
   ordinaryCardDeckSeed?: number
 }
