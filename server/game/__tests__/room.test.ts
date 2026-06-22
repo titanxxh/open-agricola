@@ -168,6 +168,18 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('builds Through the Seasons fixed dev room options', () => {
+    const startup = parseFixedDevRoomStartupOptions({
+      DEV_ENABLE_THROUGH_THE_SEASONS: 'true',
+    })
+
+    expect(startup).toEqual({ enableThroughTheSeasons: true })
+    expect(buildFixedDevRoomInitialStateOptions(2, startup)).toEqual({
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    })
+  })
+
   it('builds parent-card draft fixed dev room options when draft is requested', () => {
     const startup = parseFixedDevRoomStartupOptions({
       DEV_ENABLE_PARENT_CARDS: 'true',

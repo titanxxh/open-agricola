@@ -58,6 +58,7 @@ const ensureFixedDevRooms = (
         version: 0,
         status: 'playing',
         enableParentCards: session.state.enableParentCards,
+        enableThroughTheSeasons: session.state.enableThroughTheSeasons,
       })
     }
   }

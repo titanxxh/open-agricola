@@ -51,6 +51,8 @@ type ClientCommandBody =
       enableCommunityDeck?: boolean
       /** When true, start the Parent Cards expansion selection phase before play. Default false. */
       enableParentCards?: boolean
+      /** When true, enable the Through the Seasons game variant. Default false. */
+      enableThroughTheSeasons?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */

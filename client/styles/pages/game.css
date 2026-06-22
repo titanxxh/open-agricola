@@ -928,6 +928,102 @@
   width: 100%;
   overflow: hidden;
 }
+
+.seasons-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(128px, 1fr));
+  grid-template-rows: repeat(2, minmax(92px, 1fr));
+  gap: 6px;
+  width: min(100%, 360px);
+  min-height: 210px;
+  padding: 8px;
+  border: 1px solid rgba(83, 64, 38, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(238, 235, 220, 0.96), rgba(216, 207, 183, 0.94)),
+    repeating-linear-gradient(90deg, rgba(91, 70, 40, 0.08) 0, rgba(91, 70, 40, 0.08) 1px, transparent 1px, transparent 9px);
+  box-shadow: 0 10px 22px rgba(34, 28, 18, 0.18);
+}
+
+.seasons-board__tile {
+  min-width: 0;
+  border: 1px solid rgba(73, 55, 30, 0.3);
+  border-radius: 7px;
+  padding: 10px;
+  color: #2e2618;
+  text-align: left;
+  background: rgba(255, 252, 236, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.seasons-board__tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.seasons-board__tile.is-current {
+  border-color: rgba(80, 108, 48, 0.8);
+  box-shadow: 0 0 0 2px rgba(125, 157, 68, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.seasons-board__tile--winter {
+  background: linear-gradient(145deg, #f5f7f2, #dbe3df);
+}
+
+.seasons-board__tile--spring {
+  background: linear-gradient(145deg, #e8f0cd, #c8d899);
+}
+
+.seasons-board__tile--summer {
+  background: linear-gradient(145deg, #d6e892, #9fca62);
+}
+
+.seasons-board__tile--autumn {
+  background: linear-gradient(145deg, #ead18a, #c99d4d);
+}
+
+.seasons-board__season {
+  display: block;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.seasons-board__action {
+  display: block;
+  margin-top: 8px;
+  font-weight: 650;
+  font-size: 0.86rem;
+  line-height: 1.18;
+}
+
+.seasons-board__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  width: 78px;
+  height: 78px;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid rgba(71, 54, 29, 0.42);
+  background: rgba(250, 244, 218, 0.92);
+  box-shadow: 0 5px 14px rgba(45, 35, 20, 0.22);
+  pointer-events: none;
+}
+
+.seasons-board__counter {
+  max-width: 64px;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-weight: 850;
+  font-size: 0.8rem;
+  line-height: 1.05;
+}
+
 .action-board {
   position: relative;
   background:

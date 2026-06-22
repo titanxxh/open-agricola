@@ -78,4 +78,19 @@ describe('LobbyPage player count selection', () => {
       maxPlayers: '6',
     })
   })
+
+  it('sends the Through the Seasons option to game setup when enabled', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByLabelText('启用 Through the Seasons 扩展'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+      enableThroughTheSeasons: 'true',
+    })
+  })
 })

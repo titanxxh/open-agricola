@@ -18,6 +18,7 @@ import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
+import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
@@ -49,6 +50,7 @@ import {
   buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
+  enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -61,6 +63,7 @@ import {
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
+  splitBoardActionSpaces,
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
@@ -217,12 +220,14 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
           const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
+          const enableThroughTheSeasons = enableThroughTheSeasonsFromQuery(window.location.search) || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
             customCardIds,
             enableCommunityDeck,
             enableParentCards,
+            enableThroughTheSeasons,
             ...(draftParams ?? {}),
           })
         })
@@ -1021,11 +1026,14 @@ export const GameContainerApi = () => {
       }
     })
   }, [roundActionOrder, actionMap])
-  const baseActions = useMemo(() => {
-    if (!actionSpaces || !roundActionOrder) return []
-    const roundIds = new Set(roundActionOrder.filter(Boolean))
-    return actionSpaces.filter((space) => !roundIds.has(space.id))
-  }, [actionSpaces, roundActionOrder])
+  const { baseActions, seasonActions } = useMemo(
+    () => splitBoardActionSpaces(actionSpaces, roundActionOrder),
+    [actionSpaces, roundActionOrder],
+  )
+  const takeSeasonAction = useCallback((spaceId: string) => {
+    const space = seasonActions.find((candidate) => candidate.id === spaceId)
+    if (space) takeAction(space)
+  }, [seasonActions, takeAction])
 
   const playedCards = displayPlayer ? getPlayedCardKeys(displayPlayer) : []
 
@@ -2221,6 +2229,17 @@ export const GameContainerApi = () => {
           <section className="board-panel board-action">
             <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
           </section>
+          {state.enableThroughTheSeasons && state.throughTheSeasons ? (
+            <section className="board-panel board-seasons">
+              <SeasonsBoard
+                locale={locale}
+                throughTheSeasons={state.throughTheSeasons}
+                seasonActions={seasonActions}
+                canTakeAction={(space) => currentPlayer ? canTakeActionForBoard(space, currentPlayer) : false}
+                takeAction={takeSeasonAction}
+              />
+            </section>
+          ) : null}
         </div>
         <div className="game-layout__center">
           <StageBar currentRound={state.round ?? 1} />

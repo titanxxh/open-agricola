@@ -1,6 +1,7 @@
 import { resourceKeyList } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
-import type { ActionChoiceOption, FarmTilePosition, Resource } from '../../shared/contract/types'
+import { seasonActionIds } from '../../shared/seasons/action-spaces'
+import type { ActionChoiceOption, ActionSpace, FarmTilePosition, Resource } from '../../shared/contract/types'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { PlayerScoreSummary } from '../../shared/domain/scoring'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
@@ -288,6 +289,22 @@ export const maxPlayersFromQuery = (search: string): number => {
   const raw = Number(new URLSearchParams(search).get('maxPlayers'))
   if (!Number.isFinite(raw)) return 2
   return Math.min(Math.max(2, Math.floor(raw)), 6)
+}
+
+export const enableThroughTheSeasonsFromQuery = (search: string): boolean =>
+  new URLSearchParams(search).get('enableThroughTheSeasons') === 'true'
+
+export const splitBoardActionSpaces = (
+  actionSpaces: readonly ActionSpace[] | null | undefined,
+  roundActionOrder: readonly (string | null | undefined)[] | null | undefined,
+): { baseActions: ActionSpace[]; seasonActions: ActionSpace[] } => {
+  if (!actionSpaces || !roundActionOrder) return { baseActions: [], seasonActions: [] }
+  const roundIds = new Set(roundActionOrder.filter((id): id is string => !!id))
+  const seasonIds = new Set(seasonActionIds)
+  return {
+    baseActions: actionSpaces.filter((space) => !roundIds.has(space.id) && !seasonIds.has(space.id)),
+    seasonActions: actionSpaces.filter((space) => seasonIds.has(space.id)),
+  }
 }
 
 export const isDevModeAllowedFromQuery = (search: string): boolean => {

@@ -62,6 +62,11 @@ import {
 import { normalizePublicEventArchive } from '../events/archive'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
+import {
+  createThroughTheSeasonsState,
+  normalizeThroughTheSeasonsState,
+} from '../seasons/state'
+import { createSeasonActionSpaces, seasonActionIds } from '../seasons/action-spaces'
 
 export * from './state-constants'
 
@@ -225,6 +230,18 @@ export const normalizeState = (raw: GameState): GameState => {
       exclusiveUse: stored?.exclusiveUse,
     }
   })
+  if (raw.enableThroughTheSeasons) {
+    for (const seasonSpace of createSeasonActionSpaces(raw.players?.length)) {
+      const stored = spaceMap.get(seasonSpace.id)
+      if (stored) {
+        seasonSpace.resources = stored.resources ?? seasonSpace.resources
+        seasonSpace.takenBy = normalizeTakenBy(stored.takenBy)
+        seasonSpace.blockedBy = normalizeBlockedBy(stored.blockedBy)
+        seasonSpace.exclusiveUse = stored.exclusiveUse
+      }
+      actionSpaces.push(seasonSpace)
+    }
+  }
   // Append PlayerActionCard dynamic spaces
   const playerActionSpaces = createPlayerActionSpaces({ players: raw.players } as GameState)
   for (const pas of playerActionSpaces) {
@@ -243,7 +260,7 @@ export const normalizeState = (raw: GameState): GameState => {
   const knownIds = new Set(actionSpaces.map((s) => s.id))
   for (const stored of raw.actionSpaces ?? []) {
     if (knownIds.has(stored.id)) continue
-    if (allBaseActionIds.has(stored.id)) continue
+    if (allBaseActionIds.has(stored.id) || seasonActionIds.includes(stored.id)) continue
     actionSpaces.push({
       ...stored,
       takenBy: normalizeTakenBy(stored.takenBy),
@@ -444,6 +461,7 @@ export const normalizeState = (raw: GameState): GameState => {
     raw.nextPublicEventArchivePacketSeq,
   )
   const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, createSeed())
+  const enableThroughTheSeasons = raw.enableThroughTheSeasons ?? false
   const normalizedState: GameState = {
     ...raw,
     players,
@@ -464,6 +482,10 @@ export const normalizeState = (raw: GameState): GameState => {
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
     enableParentCards: raw.enableParentCards ?? false,
+    enableThroughTheSeasons,
+    throughTheSeasons: enableThroughTheSeasons
+      ? normalizeThroughTheSeasonsState(raw.throughTheSeasons, seed)
+      : null,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
     nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
@@ -658,7 +680,10 @@ export const createInitialState = (
     parentSelection: null,
     currentPlayerIndex: 0,
     players,
-    actionSpaces: createActionSpaces(players.length),
+    actionSpaces: [
+      ...createActionSpaces(players.length),
+      ...(options.enableThroughTheSeasons ? createSeasonActionSpaces(players.length) : []),
+    ],
     log: eventsToLogEntries(initialEvents, { playerNames }),
     events: initialEvents,
     nextEventSeq: 2,
@@ -683,6 +708,10 @@ export const createInitialState = (
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
     enableParentCards: options.enableParentCards ?? false,
+    enableThroughTheSeasons: options.enableThroughTheSeasons ?? false,
+    throughTheSeasons: options.enableThroughTheSeasons
+      ? createThroughTheSeasonsState(gameSeed)
+      : null,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: {},
     nextOrdinaryCardDrawChoiceSeq: 1,

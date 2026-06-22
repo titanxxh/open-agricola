@@ -42,7 +42,7 @@ describe('setPage URL hygiene', () => {
     window.history.replaceState(
       null,
       '',
-      '/open-agricola/?page=game&transport=ws&room=room-1&player=p2&draftMode=simultaneous',
+      '/open-agricola/?page=game&transport=ws&room=room-1&player=p2&draftMode=simultaneous&enableThroughTheSeasons=true',
     )
 
     setPage('workshop')

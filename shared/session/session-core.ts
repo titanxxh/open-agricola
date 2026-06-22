@@ -29,6 +29,7 @@ import type { ActionDetailParts, PublicEventCancellation } from '../contract/pro
 import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
+import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
@@ -725,6 +726,7 @@ export class GameCore {
     })
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
+    seasonActionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
     getAllAdHocActions().forEach((a) => this.registry.register(a))
     clearActionHooks()
