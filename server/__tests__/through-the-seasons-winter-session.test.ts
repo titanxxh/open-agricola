@@ -6,6 +6,7 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
 } from '../../shared/domain/player'
+import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import '../../shared/cards/E/E113_Godmother'
 import '../../shared/cards/E/E155_Visionary'
 
@@ -63,6 +64,15 @@ describe('Through the Seasons Winter rules', () => {
       error: 'space unavailable',
     })
     expect(spaceOf(session, 'fishing').resources.food).toBe(3)
+  })
+
+  it('blocks Fishing in generic extra placement choices through round 11', () => {
+    const session = setupWinter(11)
+    spaceOf(session, 'fishing').resources.food = 3
+
+    const placements = computeAllowedPlacementSpaces(session.state, session.state.players[0]!)
+
+    expect(placements.map((entry) => entry.spaceId)).not.toContain('fishing')
   })
 
   it('allows Fishing from round 12 onward when the ordinary action is available', () => {

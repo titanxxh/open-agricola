@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A65_SeedPellets'
+import '../../shared/cards/B/B94_StockProtector'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -278,6 +279,21 @@ describe('Through the Seasons Spring rules', () => {
       error: 'space unavailable',
     })
     expect(session.state.actionSpaces.find((space) => space.id === 'fencing')?.takenBy).toEqual([])
+  })
+
+  it('does not veto card-provided free fencing in Spring', () => {
+    const session = setupSpring()
+    const player = session.state.players[0]!
+    player.occupationPlayed.push('B94_StockProtector')
+    player.resources.wood = 0
+
+    expect(availableIds(session)).toContain('fencing')
+    const resp = session.takeAction(0, 'fencing')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger prompt')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
   })
 
   it('does not apply Spring free fences to palisades', () => {
