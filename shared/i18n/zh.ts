@@ -489,7 +489,12 @@ export const zh = {
       'option-breed-sow': '先繁殖，再播种',
       'option-sow-breed': '先播种，再繁殖',
     },
-    'season-summer-farmers-market': { name: '农夫市场', description: '犁田和/或烤面包或卖谷物' },
+    'season-summer-farmers-market': {
+      name: '农夫市场',
+      description: '犁田和/或烤面包或卖谷物',
+      'option-bread-or-sell': '烤面包或卖谷物',
+      'option-sell-grain': '卖谷物',
+    },
     'season-autumn-thanksgiving': { name: '感恩节', description: '私人田地阶段和/或获得 1 蔬菜' },
     fishing: { name: '捕鱼', description: '获得食物' },
     'day-laborer': { name: '打零工', description: '立即获得 2 食物' },
