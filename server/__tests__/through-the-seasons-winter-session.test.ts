@@ -6,6 +6,8 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
 } from '../../shared/domain/player'
+import '../../shared/cards/E/E113_Godmother'
+import '../../shared/cards/E/E155_Visionary'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -145,6 +147,37 @@ describe('Through the Seasons Winter rules', () => {
       ok: false,
       error: 'space unavailable',
     })
+  })
+
+  it('runs Romantic Evening availability through family-growth isDoable listeners', () => {
+    const session = setupWinter(10)
+    const player = session.state.players[0]!
+    player.resources.food = 3
+    player.resources.wood = 2
+    player.rooms = 2
+    player.occupationPlayed.push('E155_Visionary')
+
+    expect(availableIds(session)).not.toContain(winterActionId)
+    expect(session.takeAction(0, winterActionId)).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+  })
+
+  it('dispatches Romantic Evening growth through family-growth after listeners', () => {
+    const session = setupWinter(11)
+    const player = session.state.players[0]!
+    player.resources.food = 3
+    player.resources.wood = 2
+    player.resources.vegetable = 0
+    player.rooms = 2
+    player.occupationPlayed.push('E113_Godmother')
+
+    const resp = session.takeAction(0, winterActionId)
+
+    expect(resp.ok).toBe(true)
+    expect(familySize(resp.state.players[0]!)).toBe(3)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
   })
 
   it('keeps Romantic Evening subject to family supply and occupancy constraints', () => {

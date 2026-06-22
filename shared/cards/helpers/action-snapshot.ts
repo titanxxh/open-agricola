@@ -20,6 +20,24 @@ export const recordActionSnapshot = (
 export const readActionSnapshotToken = (player: PlayerState): number | undefined =>
   player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.token as number | undefined
 
+export const readActionSnapshotExtraData = <T>(
+  player: PlayerState,
+  key: string,
+): T | undefined =>
+  player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.[key] as T | undefined
+
+export const writeActionSnapshotExtraData = (
+  player: PlayerState,
+  key: string,
+  value: unknown,
+) => {
+  const cardState = ensureCardState(player, ACTION_SNAPSHOT_CARD_ID)
+  cardState.extraData = {
+    ...(cardState.extraData ?? {}),
+    [key]: value,
+  }
+}
+
 export const getStableTilesBuiltThisAction = (player: PlayerState) => {
   const before =
     player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.stableTiles as number | undefined
