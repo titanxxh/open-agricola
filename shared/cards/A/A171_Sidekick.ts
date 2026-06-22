@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canEnterSpace } from '../../actions/helpers/placement-availability'
 import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
-import { getLeftRoundActionSpaceId, getRoundActionSlot } from '../helpers/round-action-topology'
+import { getLeftBoardActionSpaceId } from '../helpers/round-action-topology'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { evaluateWithReservedResources } from '../helpers/reserved-resources'
 import type { CardImpl } from '../registry'
@@ -21,8 +21,7 @@ const getLeftTargetSpaceId = (context: CardListenerContext): string | null => {
   if (!currentSpaceId) return null
   const chain = sidekickChain(context)
   if (chain.includes(currentSpaceId)) return null
-  if (!getRoundActionSlot(context.state, currentSpaceId)) return null
-  const leftSpaceId = getLeftRoundActionSpaceId(context.state, currentSpaceId)
+  const leftSpaceId = getLeftBoardActionSpaceId(context.state, currentSpaceId)
   if (!leftSpaceId || chain.includes(leftSpaceId)) return null
   return leftSpaceId
 }

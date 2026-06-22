@@ -8,6 +8,7 @@ export const zh = {
     statusRoundReady: '可结算回合',
     statusWaiting: '等待行动',
     actionArea: '行动区',
+    leftActionSpace: '左侧：{action}',
     majorImprovements: '重大改进',
     stageLabel: '阶段 {stage}',
     baseActions: '基础行动',

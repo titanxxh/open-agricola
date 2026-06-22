@@ -102,6 +102,26 @@ describe('A171 Sidekick session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'vegetable-seeds')?.takenBy).toEqual([])
   })
 
+  it('can chain from a fixed board action to its physical left action', () => {
+    const session = setup({
+      spaceResources: {
+        forest: { wood: 2 },
+      },
+    })
+
+    let resp = session.takeAction(0, 'forest')
+    const accept = acceptOption(resp)
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+
+    const owner = resp.state.players[0]!
+    expect(owner.resources).toMatchObject({ food: 1, wood: 2, grain: 1 })
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')?.takenBy).toEqual([
+      { playerId: owner.id, workerId: '2' },
+    ])
+  })
+
   it('does not offer a target action that becomes impossible after paying food', () => {
     const session = setup({
       food: 1,

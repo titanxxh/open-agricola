@@ -136,6 +136,38 @@ describe('ActionBoard', () => {
     expect(html).toMatch(/action-card-holder[^"]*\bevent-highlight\b[^"]*" data-action-id="forest"/)
   })
 
+  it('shows the physical left action name in action hover tooltips', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('grain-seeds', 'actions.grain-seeds.name'),
+          createAction('forest', 'actions.forest.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    const forest = container.querySelector('[data-action-id="forest"]')
+    expect(forest).not.toBeNull()
+    fireEvent.mouseEnter(forest!)
+
+    expect(screen.getByText('Left: Grain Seeds')).toBeTruthy()
+  })
+
   it('adds player-count-specific board classes', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

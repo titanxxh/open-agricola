@@ -8,6 +8,7 @@ export const en = {
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
+    leftActionSpace: 'Left: {action}',
     majorImprovements: 'Major Improvements',
     stageLabel: 'Stage {stage}',
     baseActions: 'Base Actions',
