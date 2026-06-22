@@ -867,9 +867,17 @@ export const fenceAction: ActionDefinition = {
         (ctx as { actionContext?: Record<string, unknown> }).actionContext,
       ),
   },
-  execute: ({ state, player, space, actionContext }): ActionExecutionResult => {
+  execute: ({ state, player, space, sourceCard, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
     const policy = readFenceActionPolicy(actionContext)
+    if (
+      isThroughTheSeasonsSeason(state, 'spring') &&
+      !sourceCard &&
+      !hasCanStartPolicy(policy) &&
+      !canAffordTypedFlatCost(player, { wood: 1 }, 'fencing', state)
+    ) {
+      return { type: 'fail', errorKey: 'log.payFail' }
+    }
     const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', {
       spaceId: space.id,
       actionContext,

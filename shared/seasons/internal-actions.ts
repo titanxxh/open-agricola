@@ -46,12 +46,29 @@ export const summerSellGrainAction: ActionDefinition = {
   canBeExecutedByPlayer: (_state, player) => player.resources.grain >= 1,
   execute: ({ player }) => {
     if (player.resources.grain < 1) return { type: 'fail', errorKey: 'log.action' }
-    player.resources.grain -= 1
-    player.resources.food += 4
     return {
-      type: 'ok',
-      resourcesPaid: { grain: 1 },
-      resourcesGained: { food: 4 },
+      type: 'flow',
+      flow: {
+        type: 'seq',
+        sourceCard: summerSourceCard,
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'pay',
+            sourceCard: summerSourceCard,
+            params: {
+              cost: { grain: 1 },
+              sourceActionId: summerSellGrainAction.id,
+            },
+          },
+          {
+            type: 'leaf',
+            actionId: 'gain',
+            sourceCard: summerSourceCard,
+            params: { food: 4 },
+          },
+        ],
+      },
     }
   },
 }

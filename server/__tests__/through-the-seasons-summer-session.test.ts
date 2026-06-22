@@ -141,6 +141,16 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 4)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { grain: 1 },
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        resources: { food: 4 },
+      }),
+    ]))
 
     const noGrain = setupSummer()
     noGrain.state.players[0]!.resources.grain = 0
