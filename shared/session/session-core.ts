@@ -30,12 +30,16 @@ import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
+import { registerThroughTheSeasonsHooks } from '../seasons/hooks.ts'
 import {
   advanceThroughTheSeasons,
   applySeasonPreparationAdjustments,
 } from '../seasons/state.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
-import { clearActionHooks } from '../actions/hooks.ts'
+import {
+  applyIsDoableHooksDetailed,
+  clearActionHooks,
+} from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
 import {
@@ -734,6 +738,7 @@ export class GameCore {
     internalActionDefinitions.forEach((a) => this.registry.register(a))
     getAllAdHocActions().forEach((a) => this.registry.register(a))
     clearActionHooks()
+    registerThroughTheSeasonsHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
 
@@ -3636,22 +3641,26 @@ export class GameCore {
   }
 
   /**
-   * Returns true when at least one card listener for the `isDoable` phase
-   * explicitly vetoes the action (e.g. C51 FishingNet blocking opponent
-   * fishing on 0 food). Unlike the full `applyIsDoable` path, this skips
-   * `space.canBeExecutedByPlayer` and `applyIsDoableHooks` — those are
+   * Returns true when at least one global action hook or card listener for the
+   * `isDoable` phase explicitly vetoes the action. Unlike the full
+   * `applyIsDoable` path, this skips `space.canBeExecutedByPlayer` — that is
    * conservative for OR-flow actions and would over-block normal cases like
    * "OR(sow, bake-bread)" where every child is currently undoable but the
    * engine still wants to enter and present a skip-only choice.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
+    const actionHookDoable = applyIsDoableHooksDetailed(
+      { state: this.state, player, space, actionId: space.id },
+      true,
+    )
+    if (actionHookDoable.vetoed) return true
     const ctx: import('../cards/card-listeners.ts').CardListenerContextInput = {
       state: this.state,
       player,
       space,
       actionId: space.id,
       phase: 'isDoable',
-      doable: true,
+      doable: actionHookDoable.doable,
     }
     const matched = getMatchingListeners(ctx)
     for (const entry of matched) {
