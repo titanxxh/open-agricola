@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/A/A97_Freshman'
 import '../../shared/cards/B/B77_LoamPit'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
@@ -152,6 +153,30 @@ describe('Through the Seasons Summer rules', () => {
     expect(noGrainResp.interaction.options?.map((option) => option.labelKey)).not.toContain(
       'actions.season-summer-farmers-market.option-bread-or-sell',
     )
+  })
+
+  it('uses hook-dispatched bake doability when building the Farmer\'s Market bread branch', () => {
+    const session = setupSummer()
+    const player = session.state.players[0]!
+    fillFarmyardWithFields(session)
+    player.occupationPlayed.push('A97_Freshman')
+    player.occupationHand = ['A114_SeasonalWorker']
+    player.resources.grain = 0
+
+    expect(availableIds(session)).toContain(summerActionId)
+    let resp = session.takeAction(0, summerActionId)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Farmer\'s Market choice')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionFreshmanOccupation')
+
+    resp = chooseByLabel(session, resp, 'ui.interactionFreshmanOccupation')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Freshman prompt')
+    expect(resp.interaction.promptKey).toBe('ui.interactionFreshmanOccupation')
   })
 
   it('adds one grain to Day Laborer in Summer', () => {

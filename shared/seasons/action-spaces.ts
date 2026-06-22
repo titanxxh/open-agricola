@@ -174,7 +174,7 @@ const summerFarmersMarketFlow = (
   if (canUseFlowChildAction(state, player, space, plowAction, summerSourceCard)) {
     children.push(summerPlowLeaf())
   }
-  const breadOrSell = summerBreadOrSellFlow(state, player)
+  const breadOrSell = summerBreadOrSellFlow(state, player, space)
   if (breadOrSell?.type === 'xor') {
     children.push({
       type: 'leaf',
