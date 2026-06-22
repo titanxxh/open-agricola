@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../contract/types'
-import { breedLeaf } from '../actions/effects/breed'
+import { breedLeaf, canBreedAnimals } from '../actions/effects/breed'
 import { familyGrowthAction } from '../actions/effects/family-growth'
 import { plowAction } from '../actions/effects/plow'
 import { privateFieldPhaseAction } from '../actions/effects/private-field-phase'
@@ -69,44 +69,50 @@ const springSowLeaf = (choiceLabelKey?: string): ActionFlow => ({
 const springAnimalAndFruitFlow = (
   state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
-): ActionFlow => {
+): ActionFlow | undefined => {
+  const canBreed = canBreedAnimals(state, player, { sourceCard: springSourceCard })
   const canSow = sowAction.canBeExecutedByPlayer(state, player)
-  const children: ActionFlow[] = [
-    springBreedLeaf('actions.breed.name'),
-  ]
+  const children: ActionFlow[] = []
+  if (canBreed) children.push(springBreedLeaf('actions.breed.name'))
   if (canSow) {
-    children.push(
-      springSowLeaf('actions.sow.name'),
-      {
-        type: 'seq',
-        sourceCard: springSourceCard,
-        choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-breed-sow',
-        children: [
-          springBreedLeaf(),
-          springSowLeaf(),
-        ],
-      },
-      {
-        type: 'seq',
-        sourceCard: springSourceCard,
-        choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-sow-breed',
-        children: [
-          springSowLeaf(),
-          springBreedLeaf(),
-        ],
-      },
-    )
+    children.push(springSowLeaf('actions.sow.name'))
   }
+  if (canBreed && canSow) {
+    children.push({
+      type: 'seq',
+      sourceCard: springSourceCard,
+      choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-breed-sow',
+      children: [
+        springBreedLeaf(),
+        springSowLeaf(),
+      ],
+    }, {
+      type: 'seq',
+      sourceCard: springSourceCard,
+      choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-sow-breed',
+      children: [
+        springSowLeaf(),
+        springBreedLeaf(),
+      ],
+    })
+  }
+  if (children.length === 0) return undefined
   return {
     type: 'xor',
     children,
   }
 }
 
-const executeSpringAnimalAndFruit: ActionDefinition['execute'] = ({ state, player }) => ({
-  type: 'flow',
-  flow: springAnimalAndFruitFlow(state, player),
-})
+const canUseSpringAnimalAndFruit: ActionDefinition['canBeExecutedByPlayer'] =
+  (state, player) =>
+    isThroughTheSeasonsSeason(state, 'spring') &&
+    springAnimalAndFruitFlow(state, player) !== undefined
+
+const executeSpringAnimalAndFruit: ActionDefinition['execute'] = ({ state, player }) => {
+  const flow = springAnimalAndFruitFlow(state, player)
+  if (!flow) return { type: 'fail', errorKey: 'log.action' }
+  return { type: 'flow', flow }
+}
 
 const summerPlowLeaf = (): ActionFlow => ({
   type: 'leaf',
@@ -118,7 +124,7 @@ const summerPlowLeaf = (): ActionFlow => ({
 const summerFarmersMarketFlow = (
   state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
-): ActionFlow => {
+): ActionFlow | undefined => {
   const children: ActionFlow[] = []
   if (plowAction.canBeExecutedByPlayer(state, player)) children.push(summerPlowLeaf())
   const breadOrSell = summerBreadOrSellFlow(state, player)
@@ -132,16 +138,23 @@ const summerFarmersMarketFlow = (
   } else if (breadOrSell) {
     children.push(breadOrSell)
   }
+  if (children.length === 0) return undefined
   return {
     type: 'or',
     children,
   }
 }
 
-const executeSummerFarmersMarket: ActionDefinition['execute'] = ({ state, player }) => ({
-  type: 'flow',
-  flow: summerFarmersMarketFlow(state, player),
-})
+const canUseSummerFarmersMarket: ActionDefinition['canBeExecutedByPlayer'] =
+  (state, player) =>
+    isThroughTheSeasonsSeason(state, 'summer') &&
+    summerFarmersMarketFlow(state, player) !== undefined
+
+const executeSummerFarmersMarket: ActionDefinition['execute'] = ({ state, player }) => {
+  const flow = summerFarmersMarketFlow(state, player)
+  if (!flow) return { type: 'fail', errorKey: 'log.action' }
+  return { type: 'flow', flow }
+}
 
 const autumnPrivateFieldLeaf = (): ActionFlow => ({
   type: 'leaf',
@@ -221,7 +234,13 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
   players: [2, 3, 4, 5, 6],
   strictCanExecute: true,
   canBeExecutedByPlayer:
-    season === 'winter' ? canUseRomanticEvening : canUseSeasonAction(season),
+    season === 'winter'
+      ? canUseRomanticEvening
+      : season === 'spring'
+        ? canUseSpringAnimalAndFruit
+        : season === 'summer'
+          ? canUseSummerFarmersMarket
+          : canUseSeasonAction(season),
   execute:
     season === 'winter'
       ? executeRomanticEvening
