@@ -89,6 +89,8 @@ export const breedAction: ActionDefinition = {
         cardId: zone.cardId,
         animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
         animalCount: zone.animalCount ?? 0,
+        ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
+        ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
         capacity: zone.capacity,
       }))
       return {

@@ -588,6 +588,10 @@ const executeActivateCardAction = (
     (ownerPlayerId
       ? context.state.players.find((player) => player.id === ownerPlayerId)
       : null) ?? triggerPlayer
+  const eventActionContext = params.event.actionContext && typeof params.event.actionContext === 'object'
+    ? params.event.actionContext as Record<string, unknown>
+    : undefined
+  const actionContext = actionContextForNode(node, int) ?? eventActionContext
   const event: Record<string, unknown> = {
     ...params.event,
     triggerPlayerId,
@@ -604,9 +608,10 @@ const executeActivateCardAction = (
     triggerPlayer,
     ownerPlayer: effectPlayer,
     effectPlayer,
-    space: context.space,
+    space: resolveExecutionSpace(context.state, context.space, actionContext),
     actionId: params.actionId,
     phase: params.phase,
+    actionContext,
     ...eventReadContext,
     ...event,
     triggerSnapshot: params.triggerSnapshot,

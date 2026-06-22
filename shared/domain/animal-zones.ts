@@ -2,6 +2,16 @@ import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getCardEffect, type Meeple, type PastureCapacityModifier } from '../cards/card-effects.ts'
 import { playerHasCardCapability } from '../cards/helpers/card-type.ts'
+import {
+  ANIMAL_KEYS,
+  clampAnimalCountsToCapacity,
+  compactAnimalCounts,
+  isAnimalKey,
+  readAnimalHolderCounts,
+  singleAnimalType,
+  sumAnimalCounts,
+  type AnimalCounts,
+} from './animal-holder-state.ts'
 
 // ---------------------------------------------------------------------------
 // AnimalZone type and computation helpers (formerly in
@@ -17,6 +27,8 @@ export type AnimalZone = {
   houseAnimalZone?: boolean
   animalType?: string | null
   animalCount?: number
+  animalCounts?: Partial<Record<AnimalType, number>>
+  allowedAnimalType?: AnimalType | null
   cardId?: string
   pastureIndex?: number
 }
@@ -79,6 +91,115 @@ const applyPastureCapacityModifiers = (
     capacity = modifier.apply(capacity, ctx)
   }
   return capacity
+}
+
+export const readAnimalCountsForZoneAssignment = (value: unknown): AnimalCounts => {
+  const counts = readAnimalHolderCounts(value)
+  if (sumAnimalCounts(counts) > 0) return counts
+  if (!value || typeof value !== 'object') return counts
+  const assignment = value as { animalType?: unknown; animalCount?: unknown }
+  if (!isAnimalKey(assignment.animalType)) return counts
+  if (typeof assignment.animalCount !== 'number' || !Number.isFinite(assignment.animalCount)) return counts
+  counts[assignment.animalType] = Math.max(0, Math.floor(assignment.animalCount))
+  return counts
+}
+
+const fixedAnimalTypeForZone = (zone: AnimalZone): AnimalType | null => {
+  if ('allowedAnimalType' in zone && zone.allowedAnimalType == null) return null
+  if (isAnimalKey(zone.allowedAnimalType)) return zone.allowedAnimalType
+  if (isAnimalKey(zone.animalType)) return zone.animalType
+  return null
+}
+
+const allowsMixedAnimalTypes = (zone: AnimalZone): boolean =>
+  'allowedAnimalType' in zone && zone.allowedAnimalType == null
+
+const preferredSingleAnimalType = (
+  value: unknown,
+  counts: Partial<Record<AnimalType, number>>,
+): AnimalType | null => {
+  const assignment = value && typeof value === 'object'
+    ? value as { animalType?: unknown }
+    : undefined
+  if (isAnimalKey(assignment?.animalType) && (counts[assignment.animalType] ?? 0) > 0) {
+    return assignment.animalType
+  }
+  return singleAnimalType(counts) ?? ANIMAL_KEYS.find((key) => (counts[key] ?? 0) > 0) ?? null
+}
+
+const applyAnimalCountsToZone = (
+  zone: AnimalZone,
+  counts: Partial<Record<AnimalType, number>>,
+  fixedAnimalType: AnimalType | null,
+) => {
+  const compact = compactAnimalCounts(counts)
+  const total = sumAnimalCounts(compact)
+  if (fixedAnimalType || 'allowedAnimalType' in zone) zone.allowedAnimalType = fixedAnimalType
+  else delete zone.allowedAnimalType
+  zone.animalCount = total
+  if (total <= 0) {
+    delete zone.animalCounts
+    zone.animalType = fixedAnimalType
+    return
+  }
+  zone.animalCounts = compact
+  zone.animalType = singleAnimalType(compact) ?? fixedAnimalType
+}
+
+const expandCountsToMeeples = (counts: Partial<Record<AnimalType, number>>): Meeple[] =>
+  ANIMAL_KEYS.flatMap((type) =>
+    Array.from({ length: Math.max(0, Math.floor(counts[type] ?? 0)) }, () => ({ type } as Meeple)),
+  )
+
+export const normalizeAnimalCountsForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+  value: unknown,
+): AnimalCounts => {
+  const fixedType = fixedAnimalTypeForZone(zone)
+  const raw = readAnimalCountsForZoneAssignment(value)
+  if (fixedType) {
+    for (const key of ANIMAL_KEYS) {
+      if (key !== fixedType) raw[key] = 0
+    }
+  } else if (!allowsMixedAnimalTypes(zone)) {
+    const type = preferredSingleAnimalType(value, raw)
+    for (const key of ANIMAL_KEYS) {
+      if (key !== type) raw[key] = 0
+    }
+  }
+  let counts = raw
+  const total = sumAnimalCounts(counts)
+  if (total <= 0) return clampAnimalCountsToCapacity(counts, zone.capacity).counts
+  const candidateZone: AnimalZone = {
+    ...zone,
+    animalType: singleAnimalType(counts) ?? fixedType,
+    animalCount: total,
+    animalCounts: compactAnimalCounts(counts),
+    allowedAnimalType: fixedType,
+  }
+  const invalid = computeInvalidAnimalsForZone(state, player, candidateZone)
+  for (const meeple of invalid) {
+    counts[meeple.type] = Math.max(0, counts[meeple.type] - 1)
+  }
+  counts = clampAnimalCountsToCapacity(counts, zone.capacity).counts
+  return counts
+}
+
+const rehydrateAnimalHolderZones = (
+  state: GameState,
+  player: PlayerState,
+  zones: AnimalZone[],
+) => {
+  for (const zone of zones) {
+    if (zone.zoneType !== 'card' || !zone.cardId) continue
+    if (typeof player.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
+    const fixedType = fixedAnimalTypeForZone(zone)
+    const extraData = player.cardStates?.[zone.cardId]?.extraData
+    const counts = normalizeAnimalCountsForZone(state, player, zone, extraData)
+    applyAnimalCountsToZone(zone, counts, fixedType)
+  }
 }
 
 /** Loose-stable tile keys (stables not inside any pasture). */
@@ -151,6 +272,7 @@ export const computeAnimalZones = (
       zone.capacity = 0
     }
   })
+  rehydrateAnimalHolderZones(state, player, zones)
   return zones
 }
 
@@ -175,11 +297,8 @@ export const getTotalAnimalCapacity = (
 ) => computeAnimalZones(player, state).reduce((sum, zone) => sum + zone.capacity, 0)
 
 const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
-  const type = zone.animalType
-  const count = zone.animalCount ?? 0
-  if (!type || count <= 0) return []
-  if (type !== 'sheep' && type !== 'boar' && type !== 'cattle') return []
-  return Array.from({ length: count }, () => ({ type } as Meeple))
+  const counts = readAnimalCountsForZoneAssignment(zone)
+  return expandCountsToMeeples(counts)
 }
 
 /**

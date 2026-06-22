@@ -10,5 +10,8 @@ export const D172_PutcherMaker = defineOccupationCard({
     desc: ['At any time, you can exchange 1 reed for 2 food.'],
     cost: {},
     players: '5+',
+    exchanges: [
+      { from: { reed: 1 }, to: { food: 2 }, triggers: ['anytime'] },
+    ],
   },
 })

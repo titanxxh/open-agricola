@@ -92,6 +92,49 @@ import {
 } from './replay-timeline'
 
 type RoundSlot = { round: number; action?: ActionSpace }
+type ReorgAnimalType = 'sheep' | 'boar' | 'cattle'
+
+const REORG_ANIMAL_TYPES: ReorgAnimalType[] = ['sheep', 'boar', 'cattle']
+
+const emptyAnimalTotals = () => ({ sheep: 0, boar: 0, cattle: 0 })
+
+const compactAnimalCounts = (counts: Record<ReorgAnimalType, number>) => {
+  const compact: Partial<Record<ReorgAnimalType, number>> = {}
+  for (const type of REORG_ANIMAL_TYPES) {
+    if (counts[type] > 0) compact[type] = counts[type]
+  }
+  return compact
+}
+
+const animalCountsTotal = (counts: Partial<Record<ReorgAnimalType, number>>) =>
+  REORG_ANIMAL_TYPES.reduce((sum, type) => sum + Math.max(0, counts[type] ?? 0), 0)
+
+const singleAnimalType = (counts: Partial<Record<ReorgAnimalType, number>>) => {
+  const occupied = REORG_ANIMAL_TYPES.filter((type) => (counts[type] ?? 0) > 0)
+  return occupied.length === 1 ? occupied[0]! : null
+}
+
+const zoneAnimalCounts = (zone: AnimalReorgState['zones'][number]) => {
+  const counts = emptyAnimalTotals()
+  for (const type of REORG_ANIMAL_TYPES) {
+    counts[type] = Math.max(0, Math.floor(zone.animalCounts?.[type] ?? 0))
+  }
+  if (animalCountsTotal(counts) > 0) return counts
+  if (zone.animalType) counts[zone.animalType] = Math.max(0, Math.floor(zone.animalCount ?? 0))
+  return counts
+}
+
+const cardZoneAllowsMixedAnimals = (zone: AnimalReorgState['zones'][number]) =>
+  zone.zoneType === 'card' && zone.allowedAnimalType === null
+
+const addAnimalCounts = (
+  target: Record<ReorgAnimalType, number>,
+  counts: Partial<Record<ReorgAnimalType, number>>,
+) => {
+  for (const type of REORG_ANIMAL_TYPES) {
+    target[type] += counts[type] ?? 0
+  }
+}
 
 const httpTransportSingleton = new HttpGameTransport()
 
@@ -1377,7 +1420,10 @@ export const GameContainerApi = () => {
   }, [pendingAnimalReorg, state])
   const reorgTotals = useMemo(() => {
     if (!animalReorg) return { sheep: 0, boar: 0, cattle: 0 }
-    return animalReorg.zones.reduce((acc, z) => { if (z.animalType) acc[z.animalType] += z.animalCount; return acc }, { sheep: 0, boar: 0, cattle: 0 })
+    return animalReorg.zones.reduce((acc, z) => {
+      addAnimalCounts(acc, zoneAnimalCounts(z))
+      return acc
+    }, emptyAnimalTotals())
   }, [animalReorg])
   void [reorgAvailable, reorgTotals]
   const hasReorgOverflow = useMemo(() => {
@@ -1517,11 +1563,10 @@ export const GameContainerApi = () => {
 
       const totals = prev.zones.reduce(
         (acc, zone) => {
-          if (!zone.animalType) return acc
-          acc[zone.animalType] += zone.animalCount
+          addAnimalCounts(acc, zoneAnimalCounts(zone))
           return acc
         },
-        { sheep: 0, boar: 0, cattle: 0 },
+        emptyAnimalTotals(),
       )
 
       const available = {
@@ -1532,11 +1577,31 @@ export const GameContainerApi = () => {
 
       if (delta > 0) {
         const baseTotals = { ...totals }
-        if (current.animalType) {
-          baseTotals[current.animalType] -= current.animalCount
-        }
+        const currentCounts = zoneAnimalCounts(current)
+        addAnimalCounts(baseTotals, {
+          sheep: -currentCounts.sheep,
+          boar: -currentCounts.boar,
+          cattle: -currentCounts.cattle,
+        })
         const remaining = available[animalType] - baseTotals[animalType]
         if (remaining <= 0) return prev
+
+        if (cardZoneAllowsMixedAnimals(current)) {
+          const nextCounts = { ...currentCounts }
+          if (animalCountsTotal(nextCounts) >= capacity) return prev
+          nextCounts[animalType] += 1
+          const nextTotal = animalCountsTotal(nextCounts)
+          const zones = prev.zones.map((zone) => {
+            if (zone.id !== zoneId) return zone
+            return {
+              ...zone,
+              animalCounts: compactAnimalCounts(nextCounts),
+              animalType: singleAnimalType(nextCounts),
+              animalCount: nextTotal,
+            }
+          })
+          return { ...prev, zones, confirmDiscard: false }
+        }
 
         const nextCount =
           current.animalType === animalType
@@ -1547,10 +1612,28 @@ export const GameContainerApi = () => {
 
         const zones = prev.zones.map((zone) => {
           if (zone.id !== zoneId) return zone
+          const { animalCounts: _animalCounts, ...rest } = zone
           return {
-            ...zone,
+            ...rest,
             animalType,
             animalCount: nextCount,
+          }
+        })
+        return { ...prev, zones, confirmDiscard: false }
+      }
+
+      if (cardZoneAllowsMixedAnimals(current)) {
+        const currentCounts = zoneAnimalCounts(current)
+        if (currentCounts[animalType] <= 0) return prev
+        const nextCounts = { ...currentCounts, [animalType]: currentCounts[animalType] - 1 }
+        const nextTotal = animalCountsTotal(nextCounts)
+        const zones = prev.zones.map((zone) => {
+          if (zone.id !== zoneId) return zone
+          return {
+            ...zone,
+            animalCounts: compactAnimalCounts(nextCounts),
+            animalType: singleAnimalType(nextCounts),
+            animalCount: nextTotal,
           }
         })
         return { ...prev, zones, confirmDiscard: false }
@@ -1562,8 +1645,9 @@ export const GameContainerApi = () => {
       const nextCount = Math.max(0, current.animalCount - 1)
       const zones = prev.zones.map((zone) => {
         if (zone.id !== zoneId) return zone
+        const { animalCounts: _animalCounts, ...rest } = zone
         return {
-          ...zone,
+          ...rest,
           animalType: nextCount > 0 ? animalType : null,
           animalCount: nextCount,
         }

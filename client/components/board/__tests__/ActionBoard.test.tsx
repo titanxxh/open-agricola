@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
+import { ACTION_SPACE_ATTACHMENTS_KEY } from '../../../../shared/cards/helpers/card-state'
 import { ActionBoard } from '../ActionBoard'
 
 afterEach(() => {
@@ -74,6 +75,44 @@ const expectActionStyle = (
 }
 
 describe('ActionBoard', () => {
+  it('renders owner-labeled action-space resource attachments from card state', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    const playerC = createPlayer('p3', 'PlayerC', 'yellow')
+    const playerD = createPlayer('p4', 'PlayerD', 'black')
+    const playerE = createPlayer('p5', 'PlayerE', 'green')
+    playerA.cardStates = {
+      A177_Middleman: {
+        extraData: {
+          [ACTION_SPACE_ATTACHMENTS_KEY]: [
+            { spaceId: 'copse-56', resources: { stone: 1, food: 1 } },
+          ],
+        },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('copse-56', 'actions.copse-56.name')]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB, playerC, playerD, playerE]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('action-space-attachments')
+    expect(html).toContain('res-icon-stone')
+    expect(html).toContain('res-icon-food')
+    expect(html).toContain('PlayerA: Stone')
+    expect(html).toContain('PlayerA: Food')
+  })
+
   it('marks highlighted action spaces', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
@@ -95,6 +134,38 @@ describe('ActionBoard', () => {
     )
 
     expect(html).toMatch(/action-card-holder[^"]*\bevent-highlight\b[^"]*" data-action-id="forest"/)
+  })
+
+  it('shows the physical left action name in action hover tooltips', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[
+          createAction('grain-seeds', 'actions.grain-seeds.name'),
+          createAction('forest', 'actions.forest.name'),
+        ]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    const forest = container.querySelector('[data-action-id="forest"]')
+    expect(forest).not.toBeNull()
+    fireEvent.mouseEnter(forest!)
+
+    expect(screen.getByText('Left: Grain Seeds')).toBeTruthy()
   })
 
   it('adds player-count-specific board classes', () => {

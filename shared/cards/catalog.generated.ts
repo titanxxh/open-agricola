@@ -3776,6 +3776,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "5+",
+    "animalHolder": true,
     "kind": "occupation"
   },
   {
@@ -3880,6 +3881,10 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "The Village Idiot is your lone occupation. Each time another player uses the \"Meeting Place\" action space, you get 1 wood and 1 food."
     ],
     "cost": {},
+    "prerequisite": "No Occupations",
+    "occupationPrerequisites": {
+      "max": 0
+    },
     "players": "5+",
     "kind": "occupation"
   },
@@ -9293,6 +9298,19 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "5+",
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
     "kind": "occupation"
   },
   {

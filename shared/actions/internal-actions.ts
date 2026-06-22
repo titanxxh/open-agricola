@@ -34,8 +34,11 @@ import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
+import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
+import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { specialEffectAction } from './effects/special-effect'
 import { privateFieldPhaseAction } from './effects/private-field-phase'
+import { animalMarketCattleAction } from './effects/animal-market-cattle'
 import { completeParentFatherAction } from '../parents/father-completion'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -77,7 +80,10 @@ export const internalActionDefinitions: ActionDefinition[] = [
   buildFarmhandRoomAction,
   selectionAction,
   activateCardEffectAction,
+  drawOrdinaryCardsAction,
+  placeFarmerOnSpaceAction,
   specialEffectAction,
   privateFieldPhaseAction,
+  animalMarketCattleAction,
   completeParentFatherAction,
 ]

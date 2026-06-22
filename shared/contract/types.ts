@@ -977,6 +977,8 @@ export type InteractionAnimalReorgZone = {
   cardId?: string
   animalType: 'sheep' | 'boar' | 'cattle' | null
   animalCount: number
+  animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
+  allowedAnimalType?: 'sheep' | 'boar' | 'cattle' | null
   capacity: number
 }
 

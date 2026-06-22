@@ -1,8 +1,33 @@
 import { defineOccupationCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import { computeAnimalZones, readAnimalCountsForZoneAssignment } from '../../domain/animal-zones'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'B172_CattleCaregiver'
+const hasLegallyHeldCattle = (
+  state: Parameters<typeof computeAnimalZones>[1],
+  player: Parameters<typeof computeAnimalZones>[0],
+) => {
+  return computeAnimalZones(player, state).some((zone) =>
+    zone.capacity > 0 && readAnimalCountsForZoneAssignment(zone).cattle > 0,
+  )
+}
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onRoundStart: (state) => {
+      const cattleOwners = state.players.filter((player) => hasLegallyHeldCattle(state, player)).length
+      if (cattleOwners < 3) return
+      return gainLeaf(CARD_ID, { food: Math.min(3, cattleOwners - 2) })
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const B172_CattleCaregiver = defineOccupationCard({
   meta: {
-    id: 'B172_CattleCaregiver',
+    id: CARD_ID,
     name: 'Cattle Caregiver',
     deck: 'B',
     number: 172,
@@ -11,4 +36,7 @@ export const B172_CattleCaregiver = defineOccupationCard({
     cost: {},
     players: '5+',
   },
+  impl: cardImpl,
 })
+
+export const B172_CattleCaregiver_impl = B172_CattleCaregiver.impl

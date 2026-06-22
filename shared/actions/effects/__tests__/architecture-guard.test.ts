@@ -13,6 +13,7 @@ describe('effects architecture guard', () => {
       .sort()
 
     expect(files).toEqual([
+      'animal-market-cattle.ts',
       'bake-bread.ts',
       'bonus-vp.ts',
       'breed.ts',
@@ -47,6 +48,7 @@ describe('effects architecture guard', () => {
 
     expect(ids).toEqual([
       'activate-card-effect',
+      'animal-market-cattle-56',
       'bake-bread',
       'bonus-food',
       'bonus-grain',
@@ -57,6 +59,7 @@ describe('effects architecture guard', () => {
       'collect',
       'complete-parent-father',
       'construct',
+      'draw-ordinary-cards',
       'emit-choice',
       'exchange',
       'family-growth',
@@ -69,6 +72,7 @@ describe('effects architecture guard', () => {
       'occupation-gate',
       'pay',
       'place-farmer',
+      'place-farmer-on-space',
       'plow',
       'pop-card-stack',
       'private-field-phase',

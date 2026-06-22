@@ -59,4 +59,29 @@ describe('B148_PetBroker session', () => {
     expect(cardZone).toBeDefined()
     expect(cardZone!.animalType).toBe('sheep')
   })
+
+  it('keeps sheep assigned to its unkeyed card zone during reorganization', () => {
+    const session = setup()
+
+    let resp = session.devSetResources(0, { sheep: 1, boar: 1 })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        {
+          id: 'card:B148_PetBroker',
+          zoneType: 'card',
+          animalType: 'sheep',
+          animalCount: 1,
+        },
+      ],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+    expect(resp.state.players[0]!.resources.boar).toBe(0)
+  })
 })

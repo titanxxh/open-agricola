@@ -79,8 +79,20 @@ import { A165_PigBreeder } from './A/A165_PigBreeder'
 import { A166_Haydryer } from './A/A166_Haydryer'
 import { A167_BreederBuyer } from './A/A167_BreederBuyer'
 import { A168_AnimalTeacher } from './A/A168_AnimalTeacher'
+import { A169_OffSiter } from './A/A169_OffSiter'
 import { A17_ReclamationPlow } from './A/A17_ReclamationPlow'
+import { A170_Hayward } from './A/A170_Hayward'
+import { A171_Sidekick } from './A/A171_Sidekick'
+import { A172_BoatPainter } from './A/A172_BoatPainter'
+import { A173_ClayThief } from './A/A173_ClayThief'
+import { A174_MasterHora } from './A/A174_MasterHora'
+import { A175_HollowGardener } from './A/A175_HollowGardener'
+import { A176_Wheelmaker } from './A/A176_Wheelmaker'
+import { A177_Middleman } from './A/A177_Middleman'
+import { A178_CarpentersBoy } from './A/A178_CarpentersBoy'
+import { A179_MountainShepherd } from './A/A179_MountainShepherd'
 import { A18_WheelPlow } from './A/A18_WheelPlow'
+import { A180_AnimalBrander } from './A/A180_AnimalBrander'
 import { A19_Handplow } from './A/A19_Handplow'
 import { A2_ShiftingCultivation } from './A/A2_ShiftingCultivation'
 import { A20_DoubleTurnPlow } from './A/A20_DoubleTurnPlow'
@@ -246,8 +258,20 @@ import { B165_GameProvider } from './B/B165_GameProvider'
 import { B166_CattleFeeder } from './B/B166_CattleFeeder'
 import { B167_StableSergeant } from './B/B167_StableSergeant'
 import { B168_PastureMaster } from './B/B168_PastureMaster'
+import { B169_LivestockSustainer } from './B/B169_LivestockSustainer'
 import { B17_ForestPlow } from './B/B17_ForestPlow'
+import { B170_CorralBuilder } from './B/B170_CorralBuilder'
+import { B171_GreenhouseBuilder } from './B/B171_GreenhouseBuilder'
+import { B172_CattleCaregiver } from './B/B172_CattleCaregiver'
+import { B173_Sweeper } from './B/B173_Sweeper'
+import { B174_RiverbankGardener } from './B/B174_RiverbankGardener'
+import { B175_FieldOverseer } from './B/B175_FieldOverseer'
+import { B176_VillageIdiot } from './B/B176_VillageIdiot'
+import { B177_StoneClawer } from './B/B177_StoneClawer'
+import { B178_TagAlong } from './B/B178_TagAlong'
+import { B179_WildBoarHunter } from './B/B179_WildBoarHunter'
 import { B18_GrasslandHarrow } from './B/B18_GrasslandHarrow'
+import { B180_GameTeaser } from './B/B180_GameTeaser'
 import { B19_MoldboardPlow } from './B/B19_MoldboardPlow'
 import { B2_MiniPasture } from './B/B2_MiniPasture'
 import { B20_ChainFloat } from './B/B20_ChainFloat'
@@ -411,8 +435,20 @@ import { C165_GameCatcher } from './C/C165_GameCatcher'
 import { C166_CattleWhisperer } from './C/C166_CattleWhisperer'
 import { C167_CattleBuyer } from './C/C167_CattleBuyer'
 import { C168_AnimalCatcher } from './C/C168_AnimalCatcher'
+import { C169_FastMason } from './C/C169_FastMason'
 import { C17_NewlyPlowedField } from './C/C17_NewlyPlowedField'
+import { C170_AmateurFencer } from './C/C170_AmateurFencer'
+import { C171_YoungArtist } from './C/C171_YoungArtist'
+import { C172_FieldCounter } from './C/C172_FieldCounter'
+import { C173_TopOuter } from './C/C173_TopOuter'
+import { C174_StoneCustodian } from './C/C174_StoneCustodian'
+import { C175_VillageTeacher } from './C/C175_VillageTeacher'
+import { C176_Cleanacre } from './C/C176_Cleanacre'
+import { C177_MountainHiker } from './C/C177_MountainHiker'
+import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
+import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C18_RollOverPlow } from './C/C18_RollOverPlow'
+import { C180_Trapper } from './C/C180_Trapper'
 import { C19_SwingPlow } from './C/C19_SwingPlow'
 import { C2_Stable } from './C/C2_Stable'
 import { C20_MolePlow } from './C/C20_MolePlow'
@@ -577,8 +613,19 @@ import { D165_PigStalker } from './D/D165_PigStalker'
 import { D166_StableMilker } from './D/D166_StableMilker'
 import { D167_PureBreeder } from './D/D167_PureBreeder'
 import { D168_Stockman } from './D/D168_Stockman'
+import { D169_Plowsmith } from './D/D169_Plowsmith'
 import { D17_DrillHarrow } from './D/D17_DrillHarrow'
+import { D170_FoldBuilder } from './D/D170_FoldBuilder'
+import { D171_SeniorTeacher } from './D/D171_SeniorTeacher'
+import { D173_TownClerk } from './D/D173_TownClerk'
+import { D174_LoessGardener } from './D/D174_LoessGardener'
+import { D175_Countryman } from './D/D175_Countryman'
+import { D176_Woodshacker } from './D/D176_Woodshacker'
+import { D177_Graduate } from './D/D177_Graduate'
+import { D178_SubstituteTeacher } from './D/D178_SubstituteTeacher'
+import { D179_Bullcatcher } from './D/D179_Bullcatcher'
 import { D18_SteamPlow } from './D/D18_SteamPlow'
+import { D180_PartTimeWorker } from './D/D180_PartTimeWorker'
 import { D19_PulverizerPlow } from './D/D19_PulverizerPlow'
 import { D2_DwellingPlan } from './D/D2_DwellingPlan'
 import { D20_TurnwrestPlow } from './D/D20_TurnwrestPlow'
@@ -927,8 +974,20 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A166_Haydryer': A166_Haydryer.impl,
   'A167_BreederBuyer': A167_BreederBuyer.impl,
   'A168_AnimalTeacher': A168_AnimalTeacher.impl,
+  'A169_OffSiter': A169_OffSiter.impl,
   'A17_ReclamationPlow': A17_ReclamationPlow.impl,
+  'A170_Hayward': A170_Hayward.impl,
+  'A171_Sidekick': A171_Sidekick.impl,
+  'A172_BoatPainter': A172_BoatPainter.impl,
+  'A173_ClayThief': A173_ClayThief.impl,
+  'A174_MasterHora': A174_MasterHora.impl,
+  'A175_HollowGardener': A175_HollowGardener.impl,
+  'A176_Wheelmaker': A176_Wheelmaker.impl,
+  'A177_Middleman': A177_Middleman.impl,
+  'A178_CarpentersBoy': A178_CarpentersBoy.impl,
+  'A179_MountainShepherd': A179_MountainShepherd.impl,
   'A18_WheelPlow': A18_WheelPlow.impl,
+  'A180_AnimalBrander': A180_AnimalBrander.impl,
   'A19_Handplow': A19_Handplow.impl,
   'A2_ShiftingCultivation': A2_ShiftingCultivation.impl,
   'A20_DoubleTurnPlow': A20_DoubleTurnPlow.impl,
@@ -1094,8 +1153,20 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'B166_CattleFeeder': B166_CattleFeeder.impl,
   'B167_StableSergeant': B167_StableSergeant.impl,
   'B168_PastureMaster': B168_PastureMaster.impl,
+  'B169_LivestockSustainer': B169_LivestockSustainer.impl,
   'B17_ForestPlow': B17_ForestPlow.impl,
+  'B170_CorralBuilder': B170_CorralBuilder.impl,
+  'B171_GreenhouseBuilder': B171_GreenhouseBuilder.impl,
+  'B172_CattleCaregiver': B172_CattleCaregiver.impl,
+  'B173_Sweeper': B173_Sweeper.impl,
+  'B174_RiverbankGardener': B174_RiverbankGardener.impl,
+  'B175_FieldOverseer': B175_FieldOverseer.impl,
+  'B176_VillageIdiot': B176_VillageIdiot.impl,
+  'B177_StoneClawer': B177_StoneClawer.impl,
+  'B178_TagAlong': B178_TagAlong.impl,
+  'B179_WildBoarHunter': B179_WildBoarHunter.impl,
   'B18_GrasslandHarrow': B18_GrasslandHarrow.impl,
+  'B180_GameTeaser': B180_GameTeaser.impl,
   'B19_MoldboardPlow': B19_MoldboardPlow.impl,
   'B2_MiniPasture': B2_MiniPasture.impl,
   'B20_ChainFloat': B20_ChainFloat.impl,
@@ -1259,8 +1330,20 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C166_CattleWhisperer': C166_CattleWhisperer.impl,
   'C167_CattleBuyer': C167_CattleBuyer.impl,
   'C168_AnimalCatcher': C168_AnimalCatcher.impl,
+  'C169_FastMason': C169_FastMason.impl,
   'C17_NewlyPlowedField': C17_NewlyPlowedField.impl,
+  'C170_AmateurFencer': C170_AmateurFencer.impl,
+  'C171_YoungArtist': C171_YoungArtist.impl,
+  'C172_FieldCounter': C172_FieldCounter.impl,
+  'C173_TopOuter': C173_TopOuter.impl,
+  'C174_StoneCustodian': C174_StoneCustodian.impl,
+  'C175_VillageTeacher': C175_VillageTeacher.impl,
+  'C176_Cleanacre': C176_Cleanacre.impl,
+  'C177_MountainHiker': C177_MountainHiker.impl,
+  'C178_OnSiteReverend': C178_OnSiteReverend.impl,
+  'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C18_RollOverPlow': C18_RollOverPlow.impl,
+  'C180_Trapper': C180_Trapper.impl,
   'C19_SwingPlow': C19_SwingPlow.impl,
   'C2_Stable': C2_Stable.impl,
   'C20_MolePlow': C20_MolePlow.impl,
@@ -1425,8 +1508,19 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D166_StableMilker': D166_StableMilker.impl,
   'D167_PureBreeder': D167_PureBreeder.impl,
   'D168_Stockman': D168_Stockman.impl,
+  'D169_Plowsmith': D169_Plowsmith.impl,
   'D17_DrillHarrow': D17_DrillHarrow.impl,
+  'D170_FoldBuilder': D170_FoldBuilder.impl,
+  'D171_SeniorTeacher': D171_SeniorTeacher.impl,
+  'D173_TownClerk': D173_TownClerk.impl,
+  'D174_LoessGardener': D174_LoessGardener.impl,
+  'D175_Countryman': D175_Countryman.impl,
+  'D176_Woodshacker': D176_Woodshacker.impl,
+  'D177_Graduate': D177_Graduate.impl,
+  'D178_SubstituteTeacher': D178_SubstituteTeacher.impl,
+  'D179_Bullcatcher': D179_Bullcatcher.impl,
   'D18_SteamPlow': D18_SteamPlow.impl,
+  'D180_PartTimeWorker': D180_PartTimeWorker.impl,
   'D19_PulverizerPlow': D19_PulverizerPlow.impl,
   'D2_DwellingPlan': D2_DwellingPlan.impl,
   'D20_TurnwrestPlow': D20_TurnwrestPlow.impl,
