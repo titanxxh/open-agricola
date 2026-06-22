@@ -9,6 +9,7 @@ import { getCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
+import { createSeasonActionSpaces } from '../seasons/action-spaces'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
@@ -651,7 +652,10 @@ export type RehydratedState = {
 }
 
 export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
-  const templates = createActionSpaces(raw.players?.length)
+  const templates = [
+    ...createActionSpaces(raw.players?.length),
+    ...(raw.enableThroughTheSeasons ? createSeasonActionSpaces(raw.players?.length) : []),
+  ]
   const { engineStack, players, ...rest } = raw
   // Strip the snapshot-only `specialStables` display projection so it never
   // leaks into the authoritative `PlayerState` domain shape.

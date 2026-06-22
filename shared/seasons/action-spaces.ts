@@ -9,7 +9,6 @@ import { getActionDefinition } from '../actions/index'
 import { summerBreadOrSellAction, summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
 import {
   canAffordTypedFlatCost,
-  payTypedFlatCostDetailed,
 } from '../actions/payment/internal'
 import { isThroughTheSeasonsSeason, romanticEveningCost } from './rules'
 import { seasonIds, type SeasonId } from './types'
@@ -240,39 +239,58 @@ const executeAutumnThanksgiving: ActionDefinition['execute'] = ({ state, player 
   flow: autumnThanksgivingFlow(state, player),
 })
 
-const canGrowWithoutRoom: ActionDefinition['canBeExecutedByPlayer'] = (state, player) =>
-  familyGrowthAction.canBeExecutedByPlayer(state, player, {
+const winterSourceCard = 'through-the-seasons:winter'
+
+const canGrowWithoutRoom = (
+  state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
+  player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
+  space: ActionSpace,
+) =>
+  isActionDoableInFlowContext({
+    actionId: familyGrowthAction.id,
+    action: familyGrowthAction,
+    state,
+    player,
+    space,
+    sourceCard: winterSourceCard,
     actionContext: { skipRoomCheck: true },
+    resolveAction: getActionDefinition,
   })
 
 const canUseRomanticEvening: ActionDefinition['canBeExecutedByPlayer'] =
-  (state, player) =>
+  function (this: ActionDefinition | ActionSpace, state, player) {
+    const space = seasonHostSpace('winter', this)
+    return (
     isThroughTheSeasonsSeason(state, 'winter') &&
-    canGrowWithoutRoom(state, player) &&
+    canGrowWithoutRoom(state, player, space) &&
     canAffordTypedFlatCost(player, romanticEveningCost(state), undefined, state)
+    )
+  }
 
 const executeRomanticEvening: ActionDefinition['execute'] = (context) => {
-  if (!canGrowWithoutRoom(context.state, context.player)) {
+  if (!canGrowWithoutRoom(context.state, context.player, context.space)) {
     return { type: 'fail', errorKey: 'log.familyFull' }
   }
-  const payment = payTypedFlatCostDetailed(
-    context.player,
-    romanticEveningCost(context.state),
-    undefined,
-    context.state,
-  )
-  if (!payment.ok) return { type: 'fail', errorKey: 'log.action' }
-  const growth = familyGrowthAction.execute({
-    ...context,
-    actionContext: {
-      ...(context.actionContext ?? {}),
-      skipRoomCheck: true,
-    },
-  })
-  if (growth.type !== 'ok') return growth
   return {
-    ...growth,
-    resourcesPaid: payment.resourcesPaid,
+    type: 'flow',
+    flow: {
+      type: 'seq',
+      sourceCard: winterSourceCard,
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'pay',
+          sourceCard: winterSourceCard,
+          params: romanticEveningCost(context.state),
+        },
+        {
+          type: 'leaf',
+          actionId: 'family-growth',
+          sourceCard: winterSourceCard,
+          actionContext: { skipRoomCheck: true },
+        },
+      ],
+    },
   }
 }
 

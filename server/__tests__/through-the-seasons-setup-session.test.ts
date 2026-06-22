@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionAccumulatedEvent, GameEvent } from '../../shared/contract/events'
+import { rehydrateState, serializeState } from '../../shared/session/serialization'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -85,6 +86,21 @@ describe('Through the Seasons setup', () => {
       ok: false,
       error: 'space unavailable',
     })
+  })
+
+  it('restores season action spaces when a persisted seasons room is rehydrated', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'summer')
+    const serialized = serializeState(session.getState().state, {
+      engineStack: session.getEngineStack(),
+    })
+    const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
+
+    expect(restored.actionSpaces.filter((space) => Object.values(seasonActionIds).includes(space.id))).toHaveLength(4)
+    expect(restored.actionSpaces.find((space) => space.id === seasonActionIds.summer)?.canBeExecutedByPlayer(restored, restored.players[0]!)).toBe(true)
   })
 
   it('applies the starting season preparation adjustment during setup', () => {
