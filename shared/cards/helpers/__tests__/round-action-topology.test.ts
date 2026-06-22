@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import {
+  getLeftBoardActionSpaceId,
   getLeftRoundActionSpaceId,
   getRoundActionSlot,
   getRoundSpaceActionId,
@@ -23,11 +24,19 @@ const space = (id: string, occupied = false): ActionSpace => ({
   execute: () => ({ type: 'ok' }),
 } as ActionSpace)
 
-const stateFor = (round: number, occupiedIds: string[] = []): GameState => ({
+const stateFor = (round: number, occupiedIds: string[] = [], playerCount = 5): GameState => ({
   round,
   currentPlayerIndex: 0,
-  players: [player],
-  actionSpaces: order.map((id) => space(id, occupiedIds.includes(id))),
+  players: Array.from({ length: playerCount }, (_, index) => ({ ...player, id: `p${index + 1}` }) as PlayerState),
+  actionSpaces: [
+    ...order,
+    'farm-expansion',
+    'forest',
+    'grain-seeds',
+    'copse-56',
+    'lessons-56-2f',
+    'farm-supplies-6',
+  ].map((id) => space(id, occupiedIds.includes(id))),
   log: [],
   roundStartSnapshot: null,
   roundActionOrder: [...order],
@@ -68,6 +77,19 @@ describe('round action topology helpers', () => {
     expect(getLeftRoundActionSpaceId(state, 'round-12')).toBeNull()
     expect(getLeftRoundActionSpaceId(state, 'round-13')).toBe('round-12')
     expect(getLeftRoundActionSpaceId(state, 'round-14')).toBe('round-13')
+  })
+
+  it('returns the physical board action immediately left of fixed and round spaces', () => {
+    const fivePlayer = stateFor(14)
+
+    expect(getLeftBoardActionSpaceId(fivePlayer, 'round-1')).toBe('farm-expansion')
+    expect(getLeftBoardActionSpaceId(fivePlayer, 'farm-expansion')).toBe('copse-56')
+    expect(getLeftBoardActionSpaceId(fivePlayer, 'forest')).toBe('grain-seeds')
+    expect(getLeftBoardActionSpaceId(fivePlayer, 'round-2')).toBe('round-1')
+    expect(getLeftBoardActionSpaceId(fivePlayer, 'lessons-56-2f')).toBeNull()
+
+    const sixPlayer = stateFor(14, [], 6)
+    expect(getLeftBoardActionSpaceId(sixPlayer, 'lessons-56-2f')).toBe('farm-supplies-6')
   })
 
   it('checks occupancy for the action space corresponding to a revealed round slot', () => {

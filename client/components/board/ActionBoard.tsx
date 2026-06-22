@@ -7,6 +7,7 @@ import {
   RESERVED_ACTION_SPACES_KEY,
   type ActionSpaceAttachment,
 } from '../../../shared/cards/helpers/card-state'
+import { getLeftBoardActionSpaceId } from '../../../shared/cards/helpers/round-action-topology'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
 
@@ -394,6 +395,7 @@ type TooltipInfo = {
   description?: string
   spritePos?: string
   action?: ActionSpace
+  leftActionName?: string
   x: number
   y: number
 }
@@ -599,6 +601,35 @@ export const ActionBoard = ({
     () => getLinkedActionConnectors(baseActions, basePositions),
     [baseActions, basePositions],
   )
+  const roundActionOrder = useMemo(() => {
+    const order: (string | null)[] = Array.from({ length: 14 }, () => null)
+    for (const slot of roundSlots) {
+      if (slot.round >= 1 && slot.round <= 14) order[slot.round - 1] = slot.action?.id ?? null
+    }
+    return order
+  }, [roundSlots])
+  const boardActionSpaces = useMemo(
+    () => [
+      ...baseActions,
+      ...roundSlots.map((slot) => slot.action).filter((action): action is ActionSpace => !!action),
+    ],
+    [baseActions, roundSlots],
+  )
+  const actionById = useMemo(
+    () => new Map(boardActionSpaces.map((action) => [action.id, action])),
+    [boardActionSpaces],
+  )
+  const getLeftActionName = useCallback((actionId: string): string | undefined => {
+    const leftActionId = getLeftBoardActionSpaceId({
+      players,
+      round: currentRound,
+      roundActionOrder,
+      actionSpaces: boardActionSpaces,
+    }, actionId)
+    if (!leftActionId) return undefined
+    const leftAction = actionById.get(leftActionId)
+    return leftAction ? t(locale, leftAction.nameKey) : undefined
+  }, [actionById, boardActionSpaces, currentRound, locale, players, roundActionOrder])
 
   const updateScale = useCallback(() => {
     const el = wrapperRef.current
@@ -853,6 +884,7 @@ export const ActionBoard = ({
       descKey: action.descriptionKey,
       spritePos,
       action,
+      leftActionName: getLeftActionName(action.id),
       x,
       y: rect.top,
     })
@@ -1158,6 +1190,11 @@ export const ActionBoard = ({
                 <div className="action-desc">{renderTooltipBody(tooltip)}</div>
               </div>
               <div className="tooltip-text">
+                {tooltip.leftActionName && (
+                  <p className="tooltip-left-action">
+                    {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}
+                  </p>
+                )}
                 {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [t(locale, tooltip.descKey!)]).map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
@@ -1166,6 +1203,11 @@ export const ActionBoard = ({
           ) : (
             <div className="tooltip-text">
               <strong>{tooltip.kind === 'action' ? t(locale, tooltip.nameKey!) : tooltip.title}</strong>
+              {tooltip.kind === 'action' && tooltip.leftActionName && (
+                <p className="tooltip-left-action">
+                  {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}
+                </p>
+              )}
               {(tooltip.kind === 'action' || tooltip.description) && (
                 <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
               )}

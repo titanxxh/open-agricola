@@ -1710,6 +1710,10 @@
   margin: 0 0 7px;
   color: #5a5042;
 }
+.tooltip-text .tooltip-left-action {
+  color: #2f5d35;
+  font-weight: 700;
+}
 .tooltip-text p:last-child {
   margin-bottom: 0;
 }
