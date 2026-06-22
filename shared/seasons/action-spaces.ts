@@ -1,5 +1,7 @@
-import type { ActionDefinition, ActionSpace, Resource } from '../contract/types'
+import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../contract/types'
+import { breedLeaf } from '../actions/effects/breed'
 import { familyGrowthAction } from '../actions/effects/family-growth'
+import { sowAction } from '../actions/effects/sow'
 import {
   canAffordTypedFlatCost,
   payTypedFlatCostDetailed,
@@ -46,6 +48,62 @@ const canUseSeasonAction = (season: SeasonId): ActionDefinition['canBeExecutedBy
   (state) =>
     state.enableThroughTheSeasons === true &&
     state.throughTheSeasons?.currentSeason === season
+
+const springSourceCard = 'through-the-seasons:spring'
+
+const springBreedLeaf = (choiceLabelKey?: string): ActionFlow => ({
+  ...breedLeaf(springSourceCard),
+  choiceLabelKey,
+})
+
+const springSowLeaf = (choiceLabelKey?: string): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'sow',
+  sourceCard: springSourceCard,
+  choiceLabelKey,
+})
+
+const springAnimalAndFruitFlow = (
+  state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
+  player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
+): ActionFlow => {
+  const canSow = sowAction.canBeExecutedByPlayer(state, player)
+  const children: ActionFlow[] = [
+    springBreedLeaf('actions.breed.name'),
+  ]
+  if (canSow) {
+    children.push(
+      springSowLeaf('actions.sow.name'),
+      {
+        type: 'seq',
+        sourceCard: springSourceCard,
+        choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-breed-sow',
+        children: [
+          springBreedLeaf(),
+          springSowLeaf(),
+        ],
+      },
+      {
+        type: 'seq',
+        sourceCard: springSourceCard,
+        choiceLabelKey: 'actions.season-spring-animal-and-fruit.option-sow-breed',
+        children: [
+          springSowLeaf(),
+          springBreedLeaf(),
+        ],
+      },
+    )
+  }
+  return {
+    type: 'xor',
+    children,
+  }
+}
+
+const executeSpringAnimalAndFruit: ActionDefinition['execute'] = ({ state, player }) => ({
+  type: 'flow',
+  flow: springAnimalAndFruitFlow(state, player),
+})
 
 const canGrowWithoutRoom: ActionDefinition['canBeExecutedByPlayer'] = (state, player) =>
   familyGrowthAction.canBeExecutedByPlayer(state, player, {
@@ -94,7 +152,11 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
   canBeExecutedByPlayer:
     season === 'winter' ? canUseRomanticEvening : canUseSeasonAction(season),
   execute:
-    season === 'winter' ? executeRomanticEvening : () => ({ type: 'ok' }),
+    season === 'winter'
+      ? executeRomanticEvening
+      : season === 'spring'
+        ? executeSpringAnimalAndFruit
+        : () => ({ type: 'ok' }),
 })
 
 export const seasonActionDefinitions: ActionDefinition[] =

@@ -483,7 +483,12 @@ export const zh = {
   actions: {
     'future-meeples': { name: '未来资源', description: '将资源放置到未来回合' },
     'season-winter-romantic-evening': { name: '浪漫夜晚', description: '无房间生人' },
-    'season-spring-animal-and-fruit': { name: '动物与果实', description: '私人繁殖和/或播种' },
+    'season-spring-animal-and-fruit': {
+      name: '动物与果实',
+      description: '私人繁殖和/或播种',
+      'option-breed-sow': '先繁殖，再播种',
+      'option-sow-breed': '先播种，再繁殖',
+    },
     'season-summer-farmers-market': { name: '农夫市场', description: '犁田和/或烤面包或卖谷物' },
     'season-autumn-thanksgiving': { name: '感恩节', description: '私人田地阶段和/或获得 1 蔬菜' },
     fishing: { name: '捕鱼', description: '获得食物' },
