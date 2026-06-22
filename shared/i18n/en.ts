@@ -508,7 +508,11 @@ export const en = {
       'option-bread-or-sell': 'Bake Bread or Sell Grain',
       'option-sell-grain': 'Sell Grain',
     },
-    'season-autumn-thanksgiving': { name: 'Thanksgiving', description: 'Private field phase and/or gain 1 vegetable' },
+    'season-autumn-thanksgiving': {
+      name: 'Thanksgiving',
+      description: 'Private field phase and/or gain 1 vegetable',
+      'option-vegetable': 'Gain 1 Vegetable',
+    },
     fishing: { name: 'Fishing', description: 'Gain food' },
     'day-laborer': { name: 'Day Laborer', description: 'Gain 2 food' },
     'meeting-place': {
