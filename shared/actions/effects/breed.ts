@@ -19,6 +19,21 @@ export type BreedOptions = {
 
 const DEFAULT_TYPES: ReadonlyArray<BreedAnimalType> = ['sheep', 'boar', 'cattle']
 
+export const canBreedAnimals = (
+  state: GameState,
+  player: PlayerState,
+  opts: BreedOptions,
+): boolean => {
+  const types = opts.animalTypes ?? DEFAULT_TYPES
+  const freeCapacity = getTotalAnimalCapacity(player, state)
+  for (const type of types) {
+    if (freeCapacity <= 0) return false
+    if (player.resources[type] < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    return true
+  }
+  return false
+}
+
 /**
  * Core breed helper — replays the legacy `breedAnimals` semantics:
  *   - free capacity = `getTotalAnimalCapacity(player)` (no subtraction of

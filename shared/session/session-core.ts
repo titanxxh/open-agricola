@@ -3018,6 +3018,8 @@ export class GameCore {
         ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
         ...(entry.roomType ? { roomType: entry.roomType } : {}),
       }) as ImmediateEventDraft)
+    const openActionSpaceIds = new Set<string>()
+    const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       const openRound = roundOpen.get(space.id) ?? space.roundAvailable
       const events: ImmediateEventDraft[] = []
@@ -3043,29 +3045,35 @@ export class GameCore {
         delete space.exclusiveUse
       }
       if (this.state.round >= openRound) {
-        const resources: Partial<Resource> = {}
-        resourceKeyList.forEach((key) => {
-          const amount = space.gainPerRound[key] ?? 0
-          if (amount > 0) resources[key] = amount
-        })
-        if (Object.keys(resources).length > 0) {
-          events.push({
-            type: 'action.accumulated',
-            spaceId: space.id,
-            resources,
-          })
-        }
+        openActionSpaceIds.add(space.id)
+        actionSpaceResourcesBefore.set(space.id, { ...space.resources })
       }
       return events
     })
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
     applySeasonPreparationAdjustments(this.state)
+    const accumulatedActionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
+      if (!openActionSpaceIds.has(space.id)) return []
+      const before = actionSpaceResourcesBefore.get(space.id) ?? emptyResources
+      const resources: Partial<Resource> = {}
+      resourceKeyList.forEach((key) => {
+        const delta = (space.resources[key] ?? 0) - (before[key] ?? 0)
+        if (delta > 0) resources[key] = delta
+      })
+      if (Object.keys(resources).length === 0) return []
+      return [{
+        type: 'action.accumulated',
+        spaceId: space.id,
+        resources,
+      }]
+    })
     applyFutureMeeples(this.state, { skipResourceReceive: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
       ...actionEvents,
+      ...accumulatedActionEvents,
     ])
     this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
     if (futureMeepleActionFlow) {

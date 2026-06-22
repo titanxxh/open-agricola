@@ -94,6 +94,16 @@ describe('Through the Seasons Spring rules', () => {
     )
   })
 
+  it('keeps Animal and Fruit unavailable when neither breeding nor sowing can happen', () => {
+    const session = setupSpring()
+
+    expect(availableIds(session)).not.toContain(springActionId)
+    expect(session.takeAction(0, springActionId)).toMatchObject({
+      ok: false,
+      error: 'space unavailable',
+    })
+  })
+
   it('runs private breeding only for the acting player without harvest summary', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
@@ -137,11 +147,7 @@ describe('Through the Seasons Spring rules', () => {
     player.resources.grain = 1
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
-    let resp = chooseByLabel(
-      session,
-      session.takeAction(0, springActionId),
-      'actions.sow.name',
-    )
+    let resp = session.takeAction(0, springActionId)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected sow prompt')
