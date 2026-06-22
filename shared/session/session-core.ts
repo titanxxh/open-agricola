@@ -30,6 +30,10 @@ import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
+import {
+  advanceThroughTheSeasons,
+  applySeasonPreparationAdjustments,
+} from '../seasons/state.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
@@ -3049,6 +3053,7 @@ export class GameCore {
     })
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
+    applySeasonPreparationAdjustments(this.state)
     applyFutureMeeples(this.state, { skipResourceReceive: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
@@ -4365,6 +4370,7 @@ export class GameCore {
     if (this.state.round > 14) {
       return this.continueBeforeEndGameHooks(0, 0)
     }
+    advanceThroughTheSeasons(this.state)
     return this.continueBeforeStartOfTurn()
   }
 
