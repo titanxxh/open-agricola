@@ -495,7 +495,11 @@ export const zh = {
       'option-bread-or-sell': '烤面包或卖谷物',
       'option-sell-grain': '卖谷物',
     },
-    'season-autumn-thanksgiving': { name: '感恩节', description: '私人田地阶段和/或获得 1 蔬菜' },
+    'season-autumn-thanksgiving': {
+      name: '感恩节',
+      description: '私人田地阶段和/或获得 1 蔬菜',
+      'option-vegetable': '获得 1 蔬菜',
+    },
     fishing: { name: '捕鱼', description: '获得食物' },
     'day-laborer': { name: '打零工', description: '立即获得 2 食物' },
     'meeting-place': { name: '集会所', description: '成为起始玩家并可打出 1 张改良' },

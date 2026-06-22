@@ -153,4 +153,22 @@ describe('Through the Seasons setup', () => {
     expect(spaceOf(session, 'western-quarry').resources.stone).toBe(0)
     expect(spaceOf(session, 'eastern-quarry').resources.stone).toBe(0)
   })
+
+  it('cycles through all four seasons at successive round starts', () => {
+    const session = new GameSession(4242, undefined, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+    } as never)
+    setSeason(session, 'winter')
+
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('winter')
+    expect(finishRound(session).state.round).toBe(2)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('spring')
+    expect(finishRound(session).state.round).toBe(3)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('summer')
+    expect(finishRound(session).state.round).toBe(4)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('autumn')
+    expect(finishRound(session).state.round).toBe(5)
+    expect(seasonsOf(session).throughTheSeasons?.currentSeason).toBe('winter')
+  })
 })

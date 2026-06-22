@@ -2,6 +2,7 @@ import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../con
 import { breedLeaf } from '../actions/effects/breed'
 import { familyGrowthAction } from '../actions/effects/family-growth'
 import { plowAction } from '../actions/effects/plow'
+import { privateFieldPhaseAction } from '../actions/effects/private-field-phase'
 import { sowAction } from '../actions/effects/sow'
 import { summerBreadOrSellAction, summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
 import {
@@ -142,6 +143,39 @@ const executeSummerFarmersMarket: ActionDefinition['execute'] = ({ state, player
   flow: summerFarmersMarketFlow(state, player),
 })
 
+const autumnPrivateFieldLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'private-field-phase',
+  choiceLabelKey: 'actions.private-field-phase.name',
+})
+
+const autumnVegetableLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'gain',
+  params: { vegetable: 1 },
+  choiceLabelKey: 'actions.season-autumn-thanksgiving.option-vegetable',
+})
+
+const autumnThanksgivingFlow = (
+  state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
+  player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
+): ActionFlow => {
+  const children: ActionFlow[] = []
+  if (privateFieldPhaseAction.canBeExecutedByPlayer(state, player)) {
+    children.push(autumnPrivateFieldLeaf())
+  }
+  children.push(autumnVegetableLeaf())
+  return {
+    type: 'or',
+    children,
+  }
+}
+
+const executeAutumnThanksgiving: ActionDefinition['execute'] = ({ state, player }) => ({
+  type: 'flow',
+  flow: autumnThanksgivingFlow(state, player),
+})
+
 const canGrowWithoutRoom: ActionDefinition['canBeExecutedByPlayer'] = (state, player) =>
   familyGrowthAction.canBeExecutedByPlayer(state, player, {
     actionContext: { skipRoomCheck: true },
@@ -195,7 +229,7 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => ({
         ? executeSpringAnimalAndFruit
         : season === 'summer'
           ? executeSummerFarmersMarket
-          : () => ({ type: 'ok' }),
+          : executeAutumnThanksgiving,
 })
 
 export const seasonActionDefinitions: ActionDefinition[] =
