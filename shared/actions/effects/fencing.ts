@@ -52,6 +52,7 @@ import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
 } from '../../cards/helpers/pending-fence-bonus'
+import { isThroughTheSeasonsSeason } from '../../seasons/rules'
 
 export const maxFences = MAX_ORDINARY_FENCE_PIECES
 export const maxPastureCells = 15
@@ -618,6 +619,7 @@ const computeFenceCostAdjustment = (
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
+  policy: FenceActionPolicy,
 ): {
   freeFences: number
   extraWood: number
@@ -634,13 +636,42 @@ const computeFenceCostAdjustment = (
     space,
   )
   const hookWood = fenceOverride.costs.wood ?? 0
+  const hookFreeFences = Math.max(0, -hookWood)
+  const springFreeFences = computeSpringFreeFences(
+    state,
+    player,
+    newFenceEdges,
+    policy,
+    pendingFreeFences + hookFreeFences,
+    Math.max(0, hookWood),
+  )
   return {
-    freeFences: pendingFreeFences + Math.max(0, -hookWood),
+    freeFences: pendingFreeFences + hookFreeFences + springFreeFences,
     extraWood: Math.max(0, hookWood),
     trades: fenceOverride.trades,
     bonuses: fenceOverride.bonuses,
     paymentResourceProviders: fenceOverride.paymentResourceProviders,
   }
+}
+
+const computeSpringFreeFences = (
+  state: GameState,
+  _player: PlayerState,
+  newFenceEdges: string[],
+  policy: FenceActionPolicy,
+  freeFencesBeforeSpring: number,
+  extraWoodBeforeSpring: number,
+): number => {
+  if (!isThroughTheSeasonsSeason(state, 'spring')) return 0
+  if (isBorrowedFenceSourcePolicy(policy.sourcePolicy)) return 0
+  if (newFenceEdges.length <= 0) return 0
+  const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
+  if (fenceWoodCost <= 0) return 0
+  const ordinaryWoodBeforeSpring =
+    Math.max(0, newFenceEdges.length - freeFencesBeforeSpring) * fenceWoodCost +
+    extraWoodBeforeSpring
+  const maxFreeByPayment = Math.floor(Math.max(0, ordinaryWoodBeforeSpring - 1) / fenceWoodCost)
+  return Math.max(0, Math.min(2, newFenceEdges.length, maxFreeByPayment))
 }
 
 const buildFencePaymentCost = (
@@ -708,6 +739,7 @@ const finalizeFence = (
     newFenceEdgesPreview,
     newPalisadeEdgesPreview,
     ctx.space,
+    currentPolicy,
   )
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
@@ -922,6 +954,7 @@ export const fenceAction: ActionDefinition = {
         newFenceEdgesPreview,
         newPalisadeEdgesPreview,
         ctx.space,
+        currentPolicy,
       )
       const idx = ctx.state.players.indexOf(ctx.player)
       const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({

@@ -496,7 +496,12 @@ export const en = {
   actions: {
     'future-meeples': { name: 'Future Resources', description: 'Place future resources on upcoming rounds' },
     'season-winter-romantic-evening': { name: 'Romantic Evening', description: 'Family growth without room' },
-    'season-spring-animal-and-fruit': { name: 'Animal and Fruit', description: 'Private breeding and/or sow' },
+    'season-spring-animal-and-fruit': {
+      name: 'Animal and Fruit',
+      description: 'Private breeding and/or sow',
+      'option-breed-sow': 'Breeding, then Sow',
+      'option-sow-breed': 'Sow, then Breeding',
+    },
     'season-summer-farmers-market': { name: "Farmer's Market", description: 'Plow and/or bake bread or sell grain' },
     'season-autumn-thanksgiving': { name: 'Thanksgiving', description: 'Private field phase and/or gain 1 vegetable' },
     fishing: { name: 'Fishing', description: 'Gain food' },
