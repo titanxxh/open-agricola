@@ -101,4 +101,36 @@ describe('cookery exchange metadata-driven helpers', () => {
       expect.objectContaining({ sourceId: 'Major_CookingHearth3', from: { grain: 1 }, to: { food: 3 } }),
     ]))
   })
+
+  it('adds horse exchange only to Farmers of the Moor horse cookery majors', () => {
+    const horseSlaughterhouse = createMockPlayer({
+      improvements: ['Major_Moor_HorseSlaughterhouse1'],
+    })
+    const slaughterhouseTrades = getExchangesInWindow(horseSlaughterhouse, 'anytime')
+    expect(slaughterhouseTrades).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: 'Major_Moor_HorseSlaughterhouse1',
+        from: { horse: 1 },
+        to: { food: 2 },
+      }),
+    ]))
+
+    const cookhouse = createMockPlayer({
+      improvements: ['Major_Moor_Cookhouse1'],
+    })
+    const cookhouseTrades = getExchangesInWindow(cookhouse, 'anytime')
+    expect(cookhouseTrades).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: 'Major_Moor_Cookhouse1',
+        from: { horse: 1 },
+        to: { food: 2 },
+      }),
+    ]))
+
+    const fireplace = createMockPlayer({
+      improvements: ['Major_Fireplace1', 'Major_CookingHearth1'],
+    })
+    expect(getExchangesInWindow(fireplace, 'anytime').some((trade) => trade.from.horse === 1))
+      .toBe(false)
+  })
 })

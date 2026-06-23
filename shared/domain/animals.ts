@@ -1,15 +1,17 @@
 import type { PlayerState } from '../contract/types'
 import type { AnimalKey } from '../contract/animals'
+import { ALL_ANIMAL_KEYS } from '../contract/animals'
 import {
-  ANIMAL_KEYS,
+  type AnimalCounts,
   createAnimalCounts,
   isAnimalKey,
   readAnimalHolderCounts,
+  sumAnimalCounts,
   writeAnimalHolderCounts,
 } from './animal-holder-state'
 export type { AnimalKey }
 
-const ZERO: Record<AnimalKey, number> = createAnimalCounts()
+const ZERO: AnimalCounts = createAnimalCounts()
 
 /**
  * Count animals placed on a player's board (pasture + house + stable + animal-holder cards).
@@ -29,8 +31,8 @@ const ZERO: Record<AnimalKey, number> = createAnimalCounts()
  * `docs/superpowers/specs/2026-05-17-B157_Salter-design.md` §7 for the known
  * B157 deviation this causes.
  */
-export const getAssignedAnimalsByType = (player: PlayerState): Record<AnimalKey, number> => {
-  const result: Record<AnimalKey, number> = { ...ZERO }
+export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
+  const result: AnimalCounts = { ...ZERO }
   for (const pasture of player.pastures ?? []) {
     if (pasture.animalType && pasture.animalCount > 0 && isAnimalKey(pasture.animalType)) {
       result[pasture.animalType] += pasture.animalCount
@@ -44,14 +46,17 @@ export const getAssignedAnimalsByType = (player: PlayerState): Record<AnimalKey,
   }
   for (const state of Object.values(player.cardStates ?? {})) {
     const counts = readAnimalHolderCounts(state?.extraData)
-    for (const key of ANIMAL_KEYS) result[key] += counts[key]
+    for (const key of ALL_ANIMAL_KEYS) {
+      const amount = counts[key] ?? 0
+      if (amount > 0) result[key] = (result[key] ?? 0) + amount
+    }
   }
   return result
 }
 
 export const getAssignedAnimalCount = (player: PlayerState): number => {
   const byType = getAssignedAnimalsByType(player)
-  return byType.sheep + byType.boar + byType.cattle
+  return sumAnimalCounts(byType)
 }
 
 /**
@@ -70,7 +75,7 @@ export const subtractAnimalsFromBoard = (
   player: PlayerState,
   counts: Partial<Record<AnimalKey, number>>,
 ): void => {
-  for (const type of ['sheep', 'boar', 'cattle'] as const) {
+  for (const type of ALL_ANIMAL_KEYS) {
     let remaining = counts[type] ?? 0
     if (remaining <= 0) continue
     // 1. pasture
@@ -105,7 +110,7 @@ export const subtractAnimalsFromBoard = (
         const extra = state?.extraData as Record<string, unknown> | undefined
         if (!extra) continue
         const counts = readAnimalHolderCounts(extra)
-        const take = Math.min(counts[type], remaining)
+        const take = Math.min(counts[type] ?? 0, remaining)
         if (take <= 0) continue
         counts[type] -= take
         writeAnimalHolderCounts(extra, counts)

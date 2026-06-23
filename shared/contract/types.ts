@@ -4,6 +4,7 @@ import type { PrivateGameEvent } from './private-events'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { ThroughTheSeasonsState } from '../seasons/types'
 import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
+import type { AnimalKey } from './animals'
 
 export type Resource = {
   wood: number
@@ -310,9 +311,9 @@ export type PlayerState = {
   occupationPlayed: string[]
   extraOccupationsFromCards: string[]
   playedCards: string[]
-  houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
+  houseAnimalType: AnimalKey | null
   houseAnimalCount: number
-  stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>
+  stableAnimals: Record<string, AnimalKey | null>
   pastures: Pasture[]
   fenceSegments: FenceSegment[]
   majorEffects: MajorEffectState
@@ -349,7 +350,7 @@ export type Pasture = {
   size: number
   tiles: FarmTilePosition[]
   stables: number
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
 }
 
@@ -996,10 +997,10 @@ export type InteractionAnimalReorgZone = {
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   cardId?: string
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
-  animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
-  allowedAnimalType?: 'sheep' | 'boar' | 'cattle' | null
+  animalCounts?: Partial<Record<AnimalKey, number>>
+  allowedAnimalType?: AnimalKey | null
   capacity: number
 }
 

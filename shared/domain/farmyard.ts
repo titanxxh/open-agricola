@@ -18,6 +18,7 @@ import {
 } from '../actions/payment/internal'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import { ANIMAL_KEYS, readAnimalHolderCounts } from './animal-holder-state.ts'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
 import {
   computeExtraSowableFields,
   collectLockedFarmTileKeys,
@@ -45,7 +46,7 @@ export type Pasture = {
   size: number
   tiles: FarmTilePosition[]
   stables: number
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
 }
 
@@ -476,28 +477,37 @@ export const computeFencedRegions = (edgeSet: Set<string>) => {
 const getPastureCapacityLocal = (pasture: Pasture) =>
   pasture.size * 2 * Math.pow(2, pasture.stables ?? 0)
 
-const animalTypes = ['sheep', 'boar', 'cattle'] as const
+const animalTypesForPlayer = (player: PlayerFarmAnimalState): readonly AnimalKey[] =>
+  (player.resources?.horse ?? 0) > 0 ||
+  player.houseAnimalType === 'horse' ||
+  Object.values(player.stableAnimals ?? {}).includes('horse') ||
+  (player.pastures ?? []).some((pasture) => pasture.animalType === 'horse')
+    ? ALL_ANIMAL_KEYS
+    : ANIMAL_KEYS
 
 const countPastureAnimals = (player: PlayerFarmAnimalState) => {
-  const totals: Record<FarmAnimalType, number> = { sheep: 0, boar: 0, cattle: 0 }
+  const totals: Partial<Record<FarmAnimalType, number>> = { sheep: 0, boar: 0, cattle: 0 }
   for (const pasture of player.pastures ?? []) {
     if (!pasture.animalType || pasture.animalCount <= 0) continue
-    totals[pasture.animalType] += pasture.animalCount
+    totals[pasture.animalType] = (totals[pasture.animalType] ?? 0) + pasture.animalCount
   }
   return totals
 }
 
 const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
-  const totals: Record<FarmAnimalType, number> = { sheep: 0, boar: 0, cattle: 0 }
+  const totals: Partial<Record<FarmAnimalType, number>> = { sheep: 0, boar: 0, cattle: 0 }
   if (player.houseAnimalType && (player.houseAnimalCount ?? 0) > 0) {
-    totals[player.houseAnimalType] += player.houseAnimalCount ?? 0
+    totals[player.houseAnimalType] = (totals[player.houseAnimalType] ?? 0) + (player.houseAnimalCount ?? 0)
   }
   Object.values(player.stableAnimals ?? {}).forEach((animal) => {
-    if (animal) totals[animal] += 1
+    if (animal) totals[animal] = (totals[animal] ?? 0) + 1
   })
   Object.values(player.cardStates ?? {}).forEach((cardState) => {
     const counts = readAnimalHolderCounts(cardState?.extraData)
-    for (const key of ANIMAL_KEYS) totals[key] += counts[key]
+    for (const key of ALL_ANIMAL_KEYS) {
+      const amount = counts[key] ?? 0
+      if (amount > 0) totals[key] = (totals[key] ?? 0) + amount
+    }
   })
   const c148Held = player.cardStates?.C148_MudWallower?.counters?.held ?? 0
   if (c148Held > 0) {
@@ -505,10 +515,10 @@ const countNonPastureAnimals = (player: PlayerFarmAnimalState) => {
     const availableBoars = Math.max(
       0,
       (player.resources?.boar ?? 0) -
-        pastureTotals.boar -
-        totals.boar,
+        (pastureTotals.boar ?? 0) -
+        (totals.boar ?? 0),
     )
-    totals.boar += Math.min(Math.floor(c148Held), availableBoars)
+    totals.boar = (totals.boar ?? 0) + Math.min(Math.floor(c148Held), availableBoars)
   }
   return totals
 }
@@ -519,10 +529,13 @@ const enforcePastureAnimalCapacity = (
 ) => {
   const sourceAnimalPlayer = sourcePlayer as PlayerFarmAnimalState
   const nonPastureTotals = countNonPastureAnimals(sourceAnimalPlayer)
-  const totals = {
-    sheep: Math.max(0, (player.resources?.sheep ?? 0) - nonPastureTotals.sheep),
-    boar: Math.max(0, (player.resources?.boar ?? 0) - nonPastureTotals.boar),
-    cattle: Math.max(0, (player.resources?.cattle ?? 0) - nonPastureTotals.cattle),
+  const animalTypes = animalTypesForPlayer(sourceAnimalPlayer)
+  const totals: Partial<Record<FarmAnimalType, number>> = {}
+  for (const animalType of animalTypes) {
+    totals[animalType] = Math.max(
+      0,
+      ((player.resources?.[animalType] ?? 0) as number) - (nonPastureTotals[animalType] ?? 0),
+    )
   }
   player.pastures = (player.pastures ?? []).map((pasture) => {
     const capacity = getPastureCapacityLocal(pasture)
@@ -553,11 +566,11 @@ const enforcePastureAnimalCapacity = (
   }
   player.pastures = player.pastures.map((pasture) => {
     if (pasture.animalType) return pasture
-    let next = fillPasture(pasture, 'sheep')
-    if (next.animalType) return next
-    next = fillPasture(pasture, 'boar')
-    if (next.animalType) return next
-    return fillPasture(pasture, 'cattle')
+    for (const animalType of animalTypes) {
+      const next = fillPasture(pasture, animalType)
+      if (next.animalType) return next
+    }
+    return pasture
   })
   animalTypes.forEach((animalType) => {
     const pastureCount = player.pastures
@@ -565,7 +578,7 @@ const enforcePastureAnimalCapacity = (
       .reduce((sum, pasture) => sum + pasture.animalCount, 0)
     player.resources[animalType] =
       pastureCount +
-      Math.min(nonPastureTotals[animalType], player.resources?.[animalType] ?? 0)
+      Math.min(nonPastureTotals[animalType] ?? 0, player.resources?.[animalType] ?? 0)
   })
 }
 

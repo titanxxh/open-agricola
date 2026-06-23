@@ -124,11 +124,11 @@ import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, workersAvailable } from '../domain/player.ts'
 import { getAssignedAnimalsByType } from '../domain/animals.ts'
 import {
-  ANIMAL_KEYS,
   createAnimalCounts,
   readAnimalHolderCounts,
   sumAnimalCounts,
 } from '../domain/animal-holder-state.ts'
+import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
@@ -1186,35 +1186,36 @@ export class GameCore {
   }
 
   private getAnimalCount(p: PlayerState) {
-    return p.resources.sheep + p.resources.boar + p.resources.cattle
+    return animalKeysForState(this.state).reduce((sum, key) => sum + (p.resources[key] ?? 0), 0)
   }
 
   private getAssignedAnimalCountForPending(p: PlayerState) {
     const assigned = { ...getAssignedAnimalsByType(p) }
     const idx = this.state.players.indexOf(p)
+    const animalKeys = animalKeysForState(this.state)
     if (idx < 0) {
-      return assigned.sheep + assigned.boar + assigned.cattle
+      return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
     }
     const visibleByCardId = new Map<string, ReturnType<typeof createAnimalCounts>>()
     for (const zone of playerBoard(this.state, idx).animals.zones()) {
       if (zone.zoneType !== 'card' || !zone.cardId) continue
-      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts()
+      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
       const zoneCounts = readAnimalCountsForZoneAssignment(zone)
-      for (const key of ANIMAL_KEYS) {
-        counts[key] += zoneCounts[key]
+      for (const key of animalKeys) {
+        counts[key] = (counts[key] ?? 0) + (zoneCounts[key] ?? 0)
       }
       visibleByCardId.set(zone.cardId, counts)
     }
     for (const [cardId, cardState] of Object.entries(p.cardStates ?? {})) {
       if (typeof cardState?.counters?.held === 'number') continue
       const stored = readAnimalHolderCounts(cardState?.extraData)
-      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts()
+      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
       if (sumAnimalCounts(stored) <= 0 && sumAnimalCounts(visible) <= 0) continue
-      for (const key of ANIMAL_KEYS) {
-        assigned[key] += visible[key] - stored[key]
+      for (const key of animalKeys) {
+        assigned[key] = (assigned[key] ?? 0) + (visible[key] ?? 0) - (stored[key] ?? 0)
       }
     }
-    return assigned.sheep + assigned.boar + assigned.cattle
+    return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
   }
 
   private hasPendingAnimals(p: PlayerState) {
@@ -1585,7 +1586,7 @@ export class GameCore {
       id: zone.id,
       zoneType: zone.zoneType,
       cardId: zone.cardId,
-      animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+      animalType: zone.animalType ?? null,
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
@@ -4890,14 +4891,14 @@ export class GameCore {
   devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const animalKeys = new Set(['sheep', 'boar', 'cattle'])
+    const animalKeys = new Set(animalKeysForState(this.state))
     let increasedAnimals = false
     Object.entries(resources).forEach(([key, value]) => {
       if (typeof value === 'number') {
         const resourceBag = player.resources as Record<string, number>
         const priorValue = resourceBag[key] ?? 0
         resourceBag[key] = value
-        if (animalKeys.has(key) && value > priorValue) increasedAnimals = true
+        if (animalKeys.has(key as AnimalKey) && value > priorValue) increasedAnimals = true
       }
     })
     if (increasedAnimals) {
