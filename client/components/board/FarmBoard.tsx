@@ -14,7 +14,7 @@ import { emptyResources } from '../../../shared/contract/state-constants'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
-import { getParentCardDefinition, type ParentCardId } from '../../../shared/parents'
+import type { ParentCardId } from '../../../shared/parents'
 import {
   getPlayerPanelSupplySummary,
   type PlayerPanelSupplySummary,
@@ -24,9 +24,9 @@ import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../typ
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { CardWithCopy } from '../common/CardWithCopy'
+import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
-import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
@@ -39,8 +39,11 @@ type CardAnimalDisplay = {
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
-const PARENT_CARD_PREVIEW_WIDTH = 360
-const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 510) / 735)
+const PARENT_CARD_PREVIEW_WIDTH = 320
+const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 560) / 735)
+
+const parentFatherCompletedTier = (value: unknown): 1 | 2 | 3 | undefined =>
+  value === 1 || value === 2 || value === 3 ? value : undefined
 
 const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
   WC: ['wood', 'clay'],
@@ -577,37 +580,28 @@ const ParentCardTile = ({
   locale,
   id,
   infobox,
+  completedTier,
   devMode,
 }: {
   locale: Locale
   id: ParentCardId
   infobox?: string
+  completedTier?: 1 | 2 | 3
   devMode: boolean
 }) => {
-  const def = getParentCardDefinition(id)
-  if (!def) return null
-  const { frontUrl } = resolveParentCardAssetUrls(def.assets)
-  const alt = `${def.kind} ${id}`
   return (
     <CardWithCopy
       locale={locale}
       cardId={id}
       devMode={devMode}
       className="parent-card-tile"
-      previewCard={
-        <img
-          className="parent-card-hover-preview-image"
-          src={frontUrl}
-          alt={`${alt} preview`}
-        />
-      }
+      previewCard={<ParentCardFace id={id} infobox={infobox} completedTier={completedTier} />}
       previewWidth={PARENT_CARD_PREVIEW_WIDTH}
       previewHeight={PARENT_CARD_PREVIEW_HEIGHT}
       previewClassName="parent-card-hover-preview"
       data-card-id={id}
     >
-      <img className="parent-card-image" src={frontUrl} alt={alt} />
-      {infobox ? <div className="card-infobox parent-card-infobox">{infobox}</div> : null}
+      <ParentCardFace id={id} infobox={infobox} completedTier={completedTier} />
     </CardWithCopy>
   )
 }
@@ -1282,6 +1276,9 @@ export const FarmBoard = ({
               locale={locale}
               id={displayPlayer.parentCards.father}
               infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
+              completedTier={parentFatherCompletedTier(
+                displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.extraData?.fatherCompletedTier,
+              )}
               devMode={devMode}
             />
           ) : null}

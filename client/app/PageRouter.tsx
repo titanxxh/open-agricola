@@ -85,11 +85,11 @@ export function PageRouter() {
     return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
 
+  const page = getPage()
+
   if (!user) {
     return <LoginPage />
   }
-
-  const page = getPage()
 
   let pageNode: ReactElement
   switch (page) {

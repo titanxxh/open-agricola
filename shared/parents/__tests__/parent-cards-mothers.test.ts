@@ -147,7 +147,7 @@ describe('mother parent cards', () => {
     assertPngExists(join(assetRoot, 'backs/mother.png'))
 
     for (const card of motherParentCards) {
-      assertPngExists(join(assetRoot, 'cards', card.assets.front))
+      assertPngExists(join(assetRoot, 'portrait', card.assets.front))
       expect(card.assets.back).toBe('mother')
     }
   })
