@@ -303,6 +303,20 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(p2!.sickWorkerIds).toEqual([])
   })
 
+  it('hides ordinary action spaces when only sick workers remain at home', () => {
+    const session = new GameSession(56, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const player = session.state.players[0]!
+    player.sickWorkerIds = ['1', '2']
+
+    expect(session.getActionAvailability(0).forest).toBe(false)
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).not.toContain('forest')
+    expect(session.getActionAvailability(0)['moor-infirmary']).toBe(true)
+  })
+
   it('scores sick workers as one point instead of three', () => {
     const session = new GameSession(57, undefined, {
       playerCount: 2,

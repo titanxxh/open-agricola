@@ -30,6 +30,7 @@ beforeAll(async () => {
     A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
     B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
     C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
+    C11_WildlifeReserve: manifestEntry('C11_WildlifeReserve', 'Wildlife Reserve', 'minor'),
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
@@ -230,6 +231,34 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('res-icon-horse')
     expect(html).toContain('Horse')
+  })
+
+  it('counts horses when disabling over-capacity card-zone controls', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['C11_WildlifeReserve']
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['C11_WildlifeReserve'],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 1, boar: 0, cattle: 0, horse: 0 },
+          cardDisplayMap: new Map([
+            ['C11_WildlifeReserve', {
+              zoneId: 'card:C11_WildlifeReserve',
+              capacity: 3,
+              animalType: null,
+              animalCount: 3,
+              animalCounts: { sheep: 1, boar: 1, horse: 1 },
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain(
+      '<span class="pasture-control-label">Sheep</span><button>-</button><span class="pasture-control-value">1</span><button disabled="">+</button>',
+    )
   })
 
   it('renders kept Parent Cards from portrait assets', () => {
