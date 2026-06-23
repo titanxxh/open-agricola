@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EngineStack } from '../../engine'
-import { rehydrateState, serializeState } from '../serialization'
+import { rehydrateState, serializeState, serializeStateForPlayer } from '../serialization'
 import { createInitialState } from '../state-bootstrap'
 
 const countTerrain = (
@@ -74,6 +74,30 @@ describe('Farmers of the Moor setup', () => {
     expect(restored.enableFarmersOfTheMoor).toBe(true)
     expect(restored.farmersOfTheMoor).toEqual(state.farmersOfTheMoor)
     expect(restored.players[0]!.farmTerrain).toEqual(state.players[0]!.farmTerrain)
+  })
+
+  it('preserves public Farmers of the Moor state in player snapshots while masking hidden hands', () => {
+    const state = createInitialState(321, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    state.players[0]!.resources.fuel = 2
+    state.players[0]!.resources.horse = 1
+    state.players[1]!.sickWorkerIds = ['2']
+
+    const p1View = serializeStateForPlayer(state, 'p1', { engineStack: new EngineStack() })
+    const spectatorView = serializeStateForPlayer(state, null, { engineStack: new EngineStack() })
+
+    expect(p1View.enableFarmersOfTheMoor).toBe(true)
+    expect(p1View.farmersOfTheMoor).toEqual(state.farmersOfTheMoor)
+    expect(p1View.players[0]!.farmTerrain).toEqual(state.players[0]!.farmTerrain)
+    expect(p1View.players[1]!.farmTerrain).toEqual(state.players[1]!.farmTerrain)
+    expect(p1View.players[0]!.resources.fuel).toBe(2)
+    expect(p1View.players[0]!.resources.horse).toBe(1)
+    expect(p1View.players[1]!.sickWorkerIds).toEqual(['2'])
+    expect(p1View.players[1]!.minorHand).toEqual(Array(state.players[1]!.minorHand.length).fill('?'))
+    expect(spectatorView.players[0]!.minorHand).toEqual(Array(state.players[0]!.minorHand.length).fill('?'))
   })
 
   it('rejects Farmers of the Moor setup by default when its minor pool is incomplete', () => {
