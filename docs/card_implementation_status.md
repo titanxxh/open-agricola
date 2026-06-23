@@ -1122,7 +1122,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
 | `E9_BarteringHut` | 已对齐 |  |
-| `E10_StrawHat` | 已对齐 | 第 3/6 轮 return-home 返回 mandatory XOR；food 分支始终存在，有 Farmland worker 且有合法目标时追加 move 分支，move 真实移走 Farmland worker 并执行目标行动 flow |
+| `E10_StrawHat` | 已对齐 | 第 3/6 轮 return-home 返回 mandatory XOR；food 分支始终存在，有 Farmland worker 且有合法目标时追加 move 分支，move 真实移走 Farmland worker 并执行目标行动 flow；移动已有 Farmland worker 不要求家中另有可用工人 |
 | `E11_PettingZoo` | 已对齐 |  |
 | `E12_AnimalBedding` | 已对齐 |  |
 | `E13_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |

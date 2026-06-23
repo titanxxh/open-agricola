@@ -9,6 +9,7 @@ export type PromptKey =
   | 'ui.confirmNextPlayer'
   | 'ui.confirmPlayerSwitch'
   | 'ui.harvestFeed'
+  | 'ui.harvestHeating'
   | 'ui.interactionFlowSelect'
   | 'ui.interactionOptionalAction'
   | 'ui.interactionEngineBlocked'
@@ -84,6 +85,7 @@ export type PromptKey =
 
 export type PromptParams<K extends PromptKey> =
   K extends 'ui.harvestFeed'              ? { remaining: number; foodUsed: number }
+  : K extends 'ui.harvestHeating'         ? { required: number }
   : K extends 'ui.interactionAnimalReorg' ? { trigger: ReorganizeTrigger }
   : K extends 'ui.interactionSow' | 'ui.interactionSowSelect'         ? { allowedCrops?: CropType[]; needed?: number }
   : K extends 'ui.interactionRoom' | 'ui.interactionRoomSelect'       ? { needed?: number; maxSelections?: number }

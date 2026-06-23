@@ -18,7 +18,7 @@ const cardImpl = {
     if (!TRIGGER_ROUNDS.includes(state.round)) return
     const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)
     const hasFarmlandWorker = farmland ? spaceHasPlayer(farmland, player.id) : false
-    const hasMoveTarget = hasFarmlandWorker && computeAllowedPlacementSpaces(state, player)
+    const hasMoveTarget = hasFarmlandWorker && computeAllowedPlacementSpaces(state, player, { ignoreWorkerAvailability: true })
       .some((placement) => placement.spaceId !== FARMLAND_SPACE_ID)
     const children: ActionFlow[] = [gainLeaf(CARD_ID, { food: 1 })]
     if (hasMoveTarget) {

@@ -1,6 +1,7 @@
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContextInput } from '../../cards/card-listeners'
-import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
+import { canSpaceAcceptWorker, isSpaceBlocked } from '../../domain/space'
+import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
 import { isActionDoableInFlowContext } from '../flow'
@@ -10,6 +11,10 @@ export type AllowedPlacement = {
   spaceId: string
   allowOccupied: boolean
   option?: ActionChoiceOption
+}
+
+type PlacementContextOverrides = Partial<CardListenerContextInput> & {
+  ignoreWorkerAvailability?: boolean
 }
 
 const createPlaceFarmerVirtualSpace = (): ActionSpace => ({
@@ -66,13 +71,15 @@ const canExecutePlacementSpace = (
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
-  contextOverrides: Partial<CardListenerContextInput> = {},
+  contextOverrides: PlacementContextOverrides = {},
 ): AllowedPlacement[] {
   const base: AllowedPlacement[] = state.actionSpaces
     .filter((s) => {
       if (!canEnterSpace(s, player, state)) return false
       if (isSpaceBlocked(s)) return false
-      return !isSpaceOccupied(s) && canExecutePlacementSpace(state, player, s, contextOverrides)
+      if (!canSpaceAcceptWorker(s)) return false
+      if (!contextOverrides.ignoreWorkerAvailability && !canMoorWorkerEnterSpace(state, player, s.id)) return false
+      return canExecutePlacementSpace(state, player, s, contextOverrides)
     })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
@@ -121,6 +128,7 @@ export function computeAllowedPlacementSpaces(
       if (!space) continue
       if (!canEnterSpace(space, player, state)) continue
       if (isSpaceBlocked(space)) continue
+      if (!contextOverrides.ignoreWorkerAvailability && !canMoorWorkerEnterSpace(state, player, space.id)) continue
       if (!canExecutePlacementSpace(state, player, space, contextOverrides)) continue
       extra.push({ spaceId, allowOccupied: true, option: opt })
     }

@@ -32,7 +32,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params, sourceCard, actionContext }) => {
     const excludeId = params?.excludeSpaceId as string | undefined
-    const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+    const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
     const spaces = state.actionSpaces.filter((s) => isSelectableSpace(s, excludeId, allowed))
     if (spaces.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
@@ -48,7 +48,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     const targetSpace = state.actionSpaces.find((s) => s.id === choice)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const excludeId = params?.excludeSpaceId as string | undefined
-    const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+    const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
     if (!isSelectableSpace(targetSpace, excludeId, allowed)) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
