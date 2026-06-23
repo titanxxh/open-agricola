@@ -11,7 +11,7 @@
  *   finalizeDraft(gameState)        -> write kept hands back to players, clear phase
  */
 
-import type { DraftPickPayload, DraftPool, DraftState } from './types'
+import type { DraftPickPayload, DraftPool, DraftStageKind, DraftStageSpec, DraftState } from './types'
 import type { GameState } from '../contract/types'
 
 export function initDraftState(
@@ -48,6 +48,70 @@ export function initDraftState(
   }
 }
 
+export function initStagedDraftState(
+  seatOrder: string[],
+  stages: DraftStageSpec[],
+): DraftState {
+  if (stages.length === 0) {
+    throw new Error('staged draft requires at least one stage')
+  }
+  const kept: Record<string, DraftPool> = {}
+  const pendingPicks: Record<string, { occ: string | null; minor: string | null }> = {}
+
+  for (const pid of seatOrder) {
+    kept[pid] = { occ: [], minor: [] }
+    pendingPicks[pid] = { occ: null, minor: null }
+  }
+
+  const first = normalizeStage(seatOrder, stages[0])
+  return {
+    mode: 'simultaneous',
+    stage: first.kind,
+    stageIndex: 0,
+    stages: stages.map((stage) => normalizeStage(seatOrder, stage)),
+    round: 1,
+    totalRounds: first.totalRounds,
+    poolSize: first.poolSize,
+    seatOrder: [...seatOrder],
+    pools: structuredClone(first.pools),
+    kept,
+    pendingPicks,
+  }
+}
+
+function normalizeStage(seatOrder: string[], stage: DraftStageSpec): DraftStageSpec {
+  const pools: Record<string, DraftPool> = {}
+  for (const pid of seatOrder) {
+    const pool = stage.pools[pid]
+    if (!pool) {
+      throw new Error(`bad initial hand for ${pid}: missing ${stage.kind} pool`)
+    }
+    const activeLength = stage.kind === 'occupation' ? pool.occ.length : pool.minor.length
+    if (activeLength !== stage.poolSize) {
+      throw new Error(
+        `bad initial hand for ${pid}: expected ${stage.poolSize} ${stage.kind} cards`,
+      )
+    }
+    pools[pid] = { occ: [...pool.occ], minor: [...pool.minor] }
+  }
+  return { ...stage, pools }
+}
+
+const activeStageKind = (draft: DraftState): DraftStageKind => draft.stage ?? 'standard'
+
+const isMinorStage = (stage: DraftStageKind): boolean =>
+  stage === 'farmersOfTheMoorMinor' || stage === 'publishedMinor'
+
+const isSubmittedForStage = (
+  pick: { occ: string | null; minor: string | null } | undefined,
+  stage: DraftStageKind,
+): boolean => {
+  if (!pick) return false
+  if (stage === 'standard') return pick.occ !== null && pick.minor !== null
+  if (stage === 'occupation') return pick.occ !== null
+  return pick.minor !== null
+}
+
 export function processSubmit(
   draft: DraftState,
   pid: string,
@@ -56,22 +120,45 @@ export function processSubmit(
   if (!draft.pools[pid] || !draft.pendingPicks[pid]) {
     return { draft, error: `unknown player ${pid}` }
   }
-  if (draft.pendingPicks[pid].occ !== null || draft.pendingPicks[pid].minor !== null) {
+  const stage = activeStageKind(draft)
+  if (isSubmittedForStage(draft.pendingPicks[pid], stage)) {
     return { draft, error: `already submitted this round` }
   }
-  if (!draft.pools[pid].occ.includes(pick.occCardId)) {
-    return { draft, error: `occ card not in pool` }
+  if (stage === 'standard' || stage === 'occupation') {
+    if (!pick.occCardId || !draft.pools[pid].occ.includes(pick.occCardId)) {
+      return { draft, error: `occ card not in pool` }
+    }
   }
-  if (!draft.pools[pid].minor.includes(pick.minorCardId)) {
-    return { draft, error: `minor card not in pool` }
+  if (stage === 'standard' || isMinorStage(stage)) {
+    if (!pick.minorCardId || !draft.pools[pid].minor.includes(pick.minorCardId)) {
+      return { draft, error: `minor card not in pool` }
+    }
   }
 
   const next = structuredClone(draft)
-  next.pendingPicks[pid] = { occ: pick.occCardId, minor: pick.minorCardId }
-  next.kept[pid].occ.push(pick.occCardId)
-  next.kept[pid].minor.push(pick.minorCardId)
+  if (stage === 'standard') {
+    next.pendingPicks[pid] = { occ: pick.occCardId!, minor: pick.minorCardId! }
+    next.kept[pid].occ.push(pick.occCardId!)
+    next.kept[pid].minor.push(pick.minorCardId!)
+    next.pools[pid] = {
+      occ: next.pools[pid].occ.filter((id) => id !== pick.occCardId),
+      minor: next.pools[pid].minor.filter((id) => id !== pick.minorCardId),
+    }
+    return { draft: next }
+  }
+  if (stage === 'occupation') {
+    next.pendingPicks[pid] = { occ: pick.occCardId!, minor: null }
+    next.kept[pid].occ.push(pick.occCardId!)
+    next.pools[pid] = {
+      ...next.pools[pid],
+      occ: next.pools[pid].occ.filter((id) => id !== pick.occCardId),
+    }
+    return { draft: next }
+  }
+  next.pendingPicks[pid] = { occ: null, minor: pick.minorCardId! }
+  next.kept[pid].minor.push(pick.minorCardId!)
   next.pools[pid] = {
-    occ: next.pools[pid].occ.filter((id) => id !== pick.occCardId),
+    ...next.pools[pid],
     minor: next.pools[pid].minor.filter((id) => id !== pick.minorCardId),
   }
   return { draft: next }
@@ -82,11 +169,11 @@ export function tryAdvanceRound(draft: DraftState): {
   advanced: boolean
   finished: boolean
 } {
+  const stage = activeStageKind(draft)
   const allSubmitted = draft.seatOrder.every(
     (pid) =>
       draft.pendingPicks[pid] != null &&
-      draft.pendingPicks[pid].occ !== null &&
-      draft.pendingPicks[pid].minor !== null,
+      isSubmittedForStage(draft.pendingPicks[pid], stage),
   )
   if (!allSubmitted) return { draft, advanced: false, finished: false }
 
@@ -111,23 +198,52 @@ export function tryAdvanceRound(draft: DraftState): {
   }
 
   const autoFinished = autoKeepFinalSingleCardPools(next)
-  const finished = autoFinished || next.round > next.totalRounds
+  const stageFinished = autoFinished || next.round > next.totalRounds
+  if (stageFinished && next.stages && next.stageIndex !== undefined) {
+    const nextStageIndex = next.stageIndex + 1
+    const nextStage = next.stages[nextStageIndex]
+    if (nextStage) {
+      next.stageIndex = nextStageIndex
+      next.stage = nextStage.kind
+      next.round = 1
+      next.totalRounds = nextStage.totalRounds
+      next.poolSize = nextStage.poolSize
+      next.pools = structuredClone(nextStage.pools)
+      for (const pid of next.seatOrder) {
+        next.pendingPicks[pid] = { occ: null, minor: null }
+      }
+      return { draft: next, advanced: true, finished: false }
+    }
+  }
+  const finished = stageFinished
   return { draft: next, advanced: true, finished }
 }
 
 function autoKeepFinalSingleCardPools(draft: DraftState): boolean {
   if (draft.round !== draft.totalRounds) return false
+  const stage = activeStageKind(draft)
   const allPoolsAreSingleCard = draft.seatOrder.every((pid) => {
     const pool = draft.pools[pid]
-    return pool?.occ.length === 1 && pool.minor.length === 1
+    if (!pool) return false
+    if (stage === 'standard') return pool.occ.length === 1 && pool.minor.length === 1
+    if (stage === 'occupation') return pool.occ.length === 1
+    return pool.minor.length === 1
   })
   if (!allPoolsAreSingleCard) return false
 
   for (const pid of draft.seatOrder) {
     const pool = draft.pools[pid]
-    draft.kept[pid].occ.push(pool.occ[0])
-    draft.kept[pid].minor.push(pool.minor[0])
-    draft.pools[pid] = { occ: [], minor: [] }
+    if (stage === 'standard') {
+      draft.kept[pid].occ.push(pool.occ[0])
+      draft.kept[pid].minor.push(pool.minor[0])
+      draft.pools[pid] = { occ: [], minor: [] }
+    } else if (stage === 'occupation') {
+      draft.kept[pid].occ.push(pool.occ[0])
+      draft.pools[pid] = { ...pool, occ: [] }
+    } else {
+      draft.kept[pid].minor.push(pool.minor[0])
+      draft.pools[pid] = { ...pool, minor: [] }
+    }
   }
   draft.round += 1
   return true

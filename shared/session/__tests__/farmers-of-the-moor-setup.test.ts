@@ -18,10 +18,12 @@ describe('Farmers of the Moor setup', () => {
     const first = createInitialState(321, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const second = createInitialState(321, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
 
     expect(first.enableFarmersOfTheMoor).toBe(true)
@@ -60,6 +62,7 @@ describe('Farmers of the Moor setup', () => {
     const state = createInitialState(321, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const serialized = serializeState(state, { engineStack: new EngineStack() })
 
@@ -71,5 +74,25 @@ describe('Farmers of the Moor setup', () => {
     expect(restored.enableFarmersOfTheMoor).toBe(true)
     expect(restored.farmersOfTheMoor).toEqual(state.farmersOfTheMoor)
     expect(restored.players[0]!.farmTerrain).toEqual(state.players[0]!.farmTerrain)
+  })
+
+  it('rejects Farmers of the Moor setup by default when its minor pool is incomplete', () => {
+    expect(() => createInitialState(321, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+    })).toThrow(/Farmers of the Moor minor pool/)
+  })
+
+  it('allows zero Farmers of the Moor minors and still deals three published-pool minors', () => {
+    const state = createInitialState(321, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+
+    for (const player of state.players) {
+      expect(player.occupationHand).toHaveLength(7)
+      expect(player.minorHand).toHaveLength(3)
+    }
   })
 })

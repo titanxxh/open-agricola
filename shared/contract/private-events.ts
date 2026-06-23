@@ -1,3 +1,5 @@
+import type { DraftPickPayload } from '../draft/types'
+
 export type PrivatePromptShownEvent = {
   schemaVersion: 1
   type: 'private.promptShown'
@@ -25,7 +27,7 @@ export type PrivateDraftUpdatedEvent = {
   recipientPlayerId: string
   round: number
   totalRounds: number
-  picked?: { occCardId: string; minorCardId: string }
+  picked?: DraftPickPayload
   poolCounts: { occ: number; minor: number }
   keptCounts: { occ: number; minor: number }
   advanced: boolean

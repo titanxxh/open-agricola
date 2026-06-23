@@ -26,8 +26,8 @@ import {
   implementedCommunityMinors,
   implementedCommunityOccupations,
 } from '../cards/catalog'
-import { initDraftState } from '../draft/draft-manager'
-import type { DraftPool } from '../draft/types'
+import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
+import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
@@ -102,6 +102,42 @@ const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
   return next.length > 0 ? Array.from(new Set(next)) : [...defaultSandboxDeckIds]
 }
 
+const farmersOfTheMoorMinorHandSize = 4
+const farmersOfTheMoorPublishedMinorHandSize = 3
+const implementedFarmersOfTheMoorMinorIds: readonly string[] = []
+
+const resolveFarmersOfTheMoorMinorHandSize = (
+  playerCount: number,
+  allowIncomplete: boolean,
+): number => {
+  const available = implementedFarmersOfTheMoorMinorIds.length
+  const required = playerCount * farmersOfTheMoorMinorHandSize
+  if (available >= required) return farmersOfTheMoorMinorHandSize
+  if (!allowIncomplete) {
+    throw new Error(
+      `createInitialState: Farmers of the Moor minor pool has ${available} cards; need ${required} or enable allowIncompleteFarmersOfTheMoorMinorDeal`,
+    )
+  }
+  return Math.min(
+    farmersOfTheMoorMinorHandSize,
+    Math.floor(available / playerCount),
+  )
+}
+
+const dealFarmersOfTheMoorMinorHands = (
+  playerCount: number,
+  seed: number,
+  handSize: number,
+): string[][] => {
+  if (handSize <= 0) {
+    return Array.from({ length: playerCount }, () => [])
+  }
+  const shuffled = shuffleWithRng([...implementedFarmersOfTheMoorMinorIds], createRng(seed))
+  return Array.from({ length: playerCount }, (_, index) =>
+    shuffled.slice(index * handSize, index * handSize + handSize),
+  )
+}
+
 export const dealHands = (
   playerCount: number,
   seed: number,
@@ -174,6 +210,12 @@ const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; m
   Object.values(draft.kept).forEach((pool) => {
     pool.occ.forEach((id) => occupation.add(id))
     pool.minor.forEach((id) => minor.add(id))
+  })
+  draft.stages?.forEach((stage) => {
+    Object.values(stage.pools).forEach((pool) => {
+      pool.occ.forEach((id) => occupation.add(id))
+      pool.minor.forEach((id) => minor.add(id))
+    })
   })
   return { occupation, minor }
 }
@@ -582,14 +624,46 @@ const createInitialPlayers = (
     draftMode,
     enableCommunityDeck = false,
     enableFarmersOfTheMoor = false,
+    allowIncompleteFarmersOfTheMoorMinorDeal = false,
   } = options
   const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
-  // In draft mode, leave hands empty — createInitialState will seed state.draft
-  // with per-player pools separately, and finalizeDraft will populate hands later.
-  const dealtHands =
-    draftMode === 'simultaneous'
-      ? { minorHands: [] as string[][], occupationHands: [] as string[][] }
-      : dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
+  let dealtHands = { minorHands: [] as string[][], occupationHands: [] as string[][] }
+  if (draftMode !== 'simultaneous') {
+    if (enableFarmersOfTheMoor) {
+      const ordinaryMinorDeal = dealHands(
+        count,
+        seed,
+        extraMinorIds,
+        extraOccupationIds,
+        deckIds,
+        farmersOfTheMoorPublishedMinorHandSize,
+        enableCommunityDeck,
+      )
+      const occupationDeal = dealHands(
+        count,
+        seed,
+        extraMinorIds,
+        extraOccupationIds,
+        deckIds,
+        7,
+        enableCommunityDeck,
+      )
+      const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
+        count,
+        allowIncompleteFarmersOfTheMoorMinorDeal,
+      )
+      const moorMinorHands = dealFarmersOfTheMoorMinorHands(count, seed, moorMinorHandSize)
+      dealtHands = {
+        occupationHands: occupationDeal.occupationHands,
+        minorHands: ordinaryMinorDeal.minorHands.map((hand, index) => [
+          ...(moorMinorHands[index] ?? []),
+          ...hand,
+        ]),
+      }
+    } else {
+      dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
+    }
+  }
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -700,24 +774,88 @@ export const createInitialState = (
       )
     }
     const playerCount = players.length
-    const draftDeal = dealHands(
-      playerCount,
-      gameSeed,
-      options.extraMinorIds ?? [],
-      options.extraOccupationIds ?? [],
-      options.deckIds,
-      poolSize,
-      options.enableCommunityDeck ?? false,
-    )
     const seatOrder = players.map((p) => p.id)
-    const hands: Record<string, DraftPool> = {}
-    seatOrder.forEach((pid, i) => {
-      hands[pid] = {
-        occ: draftDeal.occupationHands[i] ?? [],
-        minor: draftDeal.minorHands[i] ?? [],
+    if (enableFarmersOfTheMoor) {
+      const occupationDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        7,
+        options.enableCommunityDeck ?? false,
+      )
+      const publishedMinorDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        farmersOfTheMoorPublishedMinorHandSize,
+        options.enableCommunityDeck ?? false,
+      )
+      const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
+        playerCount,
+        options.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+      )
+      const moorMinorHands = dealFarmersOfTheMoorMinorHands(playerCount, gameSeed, moorMinorHandSize)
+      const occupationPools: Record<string, DraftPool> = {}
+      const publishedMinorPools: Record<string, DraftPool> = {}
+      const moorMinorPools: Record<string, DraftPool> = {}
+      seatOrder.forEach((pid, i) => {
+        occupationPools[pid] = {
+          occ: occupationDeal.occupationHands[i] ?? [],
+          minor: [],
+        }
+        moorMinorPools[pid] = {
+          occ: [],
+          minor: moorMinorHands[i] ?? [],
+        }
+        publishedMinorPools[pid] = {
+          occ: [],
+          minor: publishedMinorDeal.minorHands[i] ?? [],
+        }
+      })
+      const stages: DraftStageSpec[] = [{
+        kind: 'occupation',
+        poolSize: 7,
+        totalRounds: 7,
+        pools: occupationPools,
+      }]
+      if (moorMinorHandSize > 0) {
+        stages.push({
+          kind: 'farmersOfTheMoorMinor',
+          poolSize: moorMinorHandSize,
+          totalRounds: moorMinorHandSize,
+          pools: moorMinorPools,
+        })
       }
-    })
-    draft = initDraftState(seatOrder, hands, poolSize)
+      stages.push({
+        kind: 'publishedMinor',
+        poolSize: farmersOfTheMoorPublishedMinorHandSize,
+        totalRounds: farmersOfTheMoorPublishedMinorHandSize,
+        pools: publishedMinorPools,
+      })
+      draft = initStagedDraftState(seatOrder, stages)
+    } else {
+      const draftDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        poolSize,
+        options.enableCommunityDeck ?? false,
+      )
+      const hands: Record<string, DraftPool> = {}
+      seatOrder.forEach((pid, i) => {
+        hands[pid] = {
+          occ: draftDeal.occupationHands[i] ?? [],
+          minor: draftDeal.minorHands[i] ?? [],
+        }
+      })
+      draft = initDraftState(seatOrder, hands, poolSize)
+    }
     ordinaryCardDecks = createFallbackOrdinaryCardDecks(
       players,
       ordinaryCardDeckSeed,

@@ -1,8 +1,10 @@
 export type DraftMode = 'none' | 'simultaneous'
 
+export type DraftStageKind = 'standard' | 'occupation' | 'farmersOfTheMoorMinor' | 'publishedMinor'
+
 export type DraftPickPayload = {
-  occCardId: string
-  minorCardId: string
+  occCardId?: string
+  minorCardId?: string
 }
 
 export type DraftPool = {
@@ -10,8 +12,18 @@ export type DraftPool = {
   minor: string[]
 }
 
+export type DraftStageSpec = {
+  kind: Exclude<DraftStageKind, 'standard'>
+  poolSize: number
+  totalRounds: number
+  pools: Record<string, DraftPool>
+}
+
 export type DraftState = {
   mode: 'simultaneous'
+  stage?: DraftStageKind
+  stageIndex?: number
+  stages?: DraftStageSpec[]
   round: number               // 1..totalRounds
   totalRounds: number         // 7
   poolSize: number            // 7..10

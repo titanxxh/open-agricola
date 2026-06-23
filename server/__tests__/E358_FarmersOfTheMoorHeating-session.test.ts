@@ -55,6 +55,7 @@ const prepareMajorPurchaseSession = (cardId: string) => {
   const session = new GameSession(58, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
+    allowIncompleteFarmersOfTheMoorMinorDeal: true,
   })
   prepareHands(session)
   const player = session.state.players[0]!
@@ -98,6 +99,7 @@ const prepareAnytimeExchangeSession = (
   const session = new GameSession(59, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor,
+    allowIncompleteFarmersOfTheMoorMinorDeal: enableFarmersOfTheMoor,
   })
   prepareHands(session)
   const player = session.state.players[0]!
@@ -150,6 +152,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(51, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     prepareHarvest(session)
     const [p1, p2] = session.state.players
@@ -171,6 +174,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const stoneSession = new GameSession(52, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     prepareHarvest(stoneSession)
     for (const player of stoneSession.state.players) {
@@ -190,6 +194,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(53, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     prepareHarvest(session)
     const [p1, p2] = session.state.players
@@ -211,6 +216,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(54, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     prepareHarvest(session)
     const [p1, p2] = session.state.players
@@ -241,6 +247,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(55, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
       enableThroughTheSeasons: true,
     })
     prepareHarvest(session)
@@ -262,6 +269,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(56, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     prepareHands(session)
     const [p1, p2] = session.state.players
@@ -299,6 +307,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(57, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     player.sickWorkerIds = ['2']
@@ -332,6 +341,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const session = new GameSession(61, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     player.improvements = ['Major_Moor_TiledOven']

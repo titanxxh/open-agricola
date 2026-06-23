@@ -81,6 +81,7 @@ const prepareFarmersOfTheMoorMajorSession = () => {
   const session = new GameSession(undefined, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
+    allowIncompleteFarmersOfTheMoorMinorDeal: true,
   })
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -160,7 +161,11 @@ describe('major improvement supply stacks', () => {
   })
 
   it('initializes Farmers of the Moor major supply instead of six-player duplicates when enabled', () => {
-    const state = createInitialState(42, { playerCount: 6, enableFarmersOfTheMoor: true })
+    const state = createInitialState(42, {
+      playerCount: 6,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
     const supply = readMajorSupply(state)
 
     expect(supply).toHaveLength(12)

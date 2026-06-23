@@ -29,6 +29,7 @@ const prepareMajorPurchaseSession = (
   const session = new GameSession(62, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
+    allowIncompleteFarmersOfTheMoorMinorDeal: true,
   })
   prepareHands(session)
   const player = session.state.players[0]!
@@ -84,6 +85,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const noHorseSession = new GameSession(63, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const noHorsePlayer = noHorseSession.state.players[0]!
     noHorsePlayer.improvements = ['Major_Moor_PeatCharcoalKiln']
@@ -95,6 +97,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const horseSession = new GameSession(64, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const horsePlayer = horseSession.state.players[0]!
     horsePlayer.improvements = ['Major_Moor_PeatCharcoalKiln']
@@ -113,6 +116,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const session = new GameSession(65, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     player.improvements = ['Major_Moor_ForestersLodge']
@@ -125,6 +129,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const horseSession = new GameSession(66, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const horsePlayer = horseSession.state.players[0]!
     horsePlayer.improvements = ['Major_Moor_ForestersLodge']
@@ -182,6 +187,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const blockedSession = new GameSession(67, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const blockedPlayer = blockedSession.state.players[0]!
     blockedSession.state.round = 3
@@ -208,6 +214,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const paidSession = new GameSession(68, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const paidPlayer = paidSession.state.players[0]!
     paidSession.state.round = 3
@@ -237,6 +244,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const session = new GameSession(69, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     session.state.round = 14
     const player = session.state.players[0]!
