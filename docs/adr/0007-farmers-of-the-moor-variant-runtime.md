@@ -13,4 +13,12 @@ Horses are added to the shared animal/resource type system, but are gated by `en
 
 Major improvement supply selection uses a variant registry. The base game, 5/6-player duplicate supply, and Farmers of the Moor supply are separate templates selected by the enabled variant combination. Purchase and return-to-supply logic must operate through the stack-aware supply helper rather than scattering `enableFarmersOfTheMoor` branches through improvement flows.
 
+Farmers of the Moor minor improvements are not implemented in the current slice. Their recurring rule terms still have reserved runtime contracts so future minor cards do not invent incompatible local meanings:
+
+- Visible Forests / Visible Moors are the public `player.farmTerrain` entries whose `kind` is `forest` / `moor`; serialization must preserve them for every viewer.
+- Blocked Farmyard Space means a farmyard position that future minor effects make unavailable to room, field, stable, or fence placement through shared farmyard validation inputs, not through frontend-only filtering.
+- Farmyard Extensions must extend the shared farmyard geometry and validation helpers before any card can place or use outside-board spaces.
+- Moving Up Major Improvement and Upgrade use the stack-aware major supply return/purchase helpers and card identity metadata; they must not push raw ids into `availableMajorImprovements`.
+- Usage Counters live under the owning card's `player.cardStates[cardId]` counters or extraData and are consumed by card-local listeners or existing shared helpers.
+
 The rejected alternative was to attach Farmers of the Moor behavior to existing base flows with small conditionals: special actions as pseudo action spaces, heating fields on `feed`, horses as ad hoc resources, and Farmers of the Moor major cards appended to the existing supply. That would look smaller initially, but it would blur rule boundaries, make feed and action-space semantics harder to reason about, and recreate the ordering problems that the stack-aware major supply was introduced to avoid.
