@@ -46,6 +46,22 @@ describe('computeAllowedPlacementSpaces', () => {
     expect(result.some(e => e.spaceId === 'day-laborer')).toBe(false)
   })
 
+  it('allows spaces that still have action-space capacity', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const st = session.getState().state
+    const space = st.actionSpaces.find(s => s.id === 'day-laborer')!
+    space.takenBy = [{ playerId: st.players[1]!.id, workerId: 'w1' }]
+    ;(space as typeof space & { maxOccupancy: number }).maxOccupancy = 2
+    session.loadState(st)
+
+    const { state } = session.getState()
+    const player = state.players[0]!
+    const result = computeAllowedPlacementSpaces(state, player)
+    const entry = result.find(e => e.spaceId === 'day-laborer')
+    expect(entry).toBeDefined()
+    expect(entry!.allowOccupied).toBe(false)
+  })
+
   it('adds occupied spaces when a computeArgs listener emits allow-occupied', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
     const st = session.getState().state

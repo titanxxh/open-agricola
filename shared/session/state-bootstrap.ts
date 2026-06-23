@@ -74,6 +74,7 @@ import {
 } from '../moor/state'
 import { normalizeFarmTerrain } from '../moor/farm-terrain'
 import { getMoorStartCardTerrain } from '../moor/start-cards'
+import { createMoorActionSpaces } from '../moor/action-spaces'
 
 export * from './state-constants'
 
@@ -243,8 +244,22 @@ export const normalizeState = (raw: GameState): GameState => {
       takenBy: normalizeTakenBy(stored?.takenBy),
       blockedBy: normalizeBlockedBy(stored?.blockedBy),
       exclusiveUse: stored?.exclusiveUse,
+      maxOccupancy: stored?.maxOccupancy ?? space.maxOccupancy,
     }
   })
+  if (enableFarmersOfTheMoor) {
+    for (const moorSpace of createMoorActionSpaces(raw.players?.length ?? 2)) {
+      const stored = spaceMap.get(moorSpace.id)
+      if (stored) {
+        moorSpace.resources = stored.resources ?? moorSpace.resources
+        moorSpace.takenBy = normalizeTakenBy(stored.takenBy)
+        moorSpace.blockedBy = normalizeBlockedBy(stored.blockedBy)
+        moorSpace.exclusiveUse = stored.exclusiveUse
+        moorSpace.maxOccupancy = stored.maxOccupancy ?? moorSpace.maxOccupancy
+      }
+      actionSpaces.push(moorSpace)
+    }
+  }
   if (raw.enableThroughTheSeasons) {
     for (const seasonSpace of createSeasonActionSpaces(raw.players?.length)) {
       const stored = spaceMap.get(seasonSpace.id)
@@ -253,6 +268,7 @@ export const normalizeState = (raw: GameState): GameState => {
         seasonSpace.takenBy = normalizeTakenBy(stored.takenBy)
         seasonSpace.blockedBy = normalizeBlockedBy(stored.blockedBy)
         seasonSpace.exclusiveUse = stored.exclusiveUse
+        seasonSpace.maxOccupancy = stored.maxOccupancy ?? seasonSpace.maxOccupancy
       }
       actionSpaces.push(seasonSpace)
     }
@@ -266,6 +282,7 @@ export const normalizeState = (raw: GameState): GameState => {
       pas.takenBy = normalizeTakenBy(stored.takenBy)
       pas.blockedBy = normalizeBlockedBy(stored.blockedBy)
       pas.exclusiveUse = stored.exclusiveUse
+      pas.maxOccupancy = stored.maxOccupancy ?? pas.maxOccupancy
     }
     actionSpaces.push(pas)
   }
@@ -740,6 +757,7 @@ export const createInitialState = (
     players,
     actionSpaces: [
       ...createActionSpaces(players.length),
+      ...(enableFarmersOfTheMoor ? createMoorActionSpaces(players.length) : []),
       ...(options.enableThroughTheSeasons ? createSeasonActionSpaces(players.length) : []),
     ],
     log: eventsToLogEntries(initialEvents, { playerNames }),

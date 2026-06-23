@@ -1,6 +1,5 @@
 import type { FarmTilePosition, Field, GameState, PlayerState } from '../contract/types'
 import { positionKey } from '../domain/farm'
-import { workersAtHome } from '../domain/player'
 import { replaceTerrainWithField } from './farm-terrain'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
 
@@ -18,11 +17,6 @@ export const isMoorSpecialActionCardUsableByPlayer = (
   if (card.location.kind === 'market') return true
   if (card.location.kind === 'playerFaceUp') return card.location.playerId !== playerId
   return false
-}
-
-export const hasHealthyWorkerAtHome = (state: GameState, player: PlayerState): boolean => {
-  const sick = new Set(player.sickWorkerIds ?? [])
-  return workersAtHome(state, player).some((worker) => !sick.has(worker.id))
 }
 
 const removeTerrain = (

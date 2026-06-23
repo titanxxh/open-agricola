@@ -482,7 +482,10 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     })
 
     const playerFamilySize = familySize(player)
-    const farmerScore = playerFamilySize * 3
+    const sickWorkerCount = state.enableFarmersOfTheMoor === true
+      ? Math.min(playerFamilySize, new Set(player.sickWorkerIds ?? []).size)
+      : 0
+    const farmerScore = (playerFamilySize - sickWorkerCount) * 3 + sickWorkerCount
     categories.push({
       key: 'farmers',
       total: farmerScore,
