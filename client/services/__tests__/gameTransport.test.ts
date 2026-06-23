@@ -237,6 +237,35 @@ describe('WsGameTransport request correlation', () => {
 
     transport.destroy()
   })
+
+  it('sends Farmers of the Moor special actions as dedicated specialAction commands', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const payload = { tile: { row: 1, col: 2 } }
+    const specialActionPromise = transport.takeSpecialAction(
+      0,
+      'moor-special-cut-peat',
+      'cut-peat',
+      payload,
+    )
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'specialAction',
+      cardId: 'moor-special-cut-peat',
+      actionId: 'cut-peat',
+      payload,
+    })
+    expect(socket.sent[0]).not.toMatchObject({ type: 'action' })
+    expect(socket.sent[0]?.requestId).toBeTypeOf('string')
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 13))
+    await expect(specialActionPromise).resolves.toMatchObject({ historyLength: 13 })
+
+    transport.destroy()
+  })
 })
 
 describe('HttpGameTransport parentSubmit', () => {

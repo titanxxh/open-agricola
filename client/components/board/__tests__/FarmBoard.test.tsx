@@ -208,6 +208,30 @@ describe('FarmBoard', () => {
     expect(html).toContain('res-icon-horse')
   })
 
+  it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
+    player.roomTiles = [{ row: 0, col: 0 }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          roomPositions: new Set(['0-0']),
+          isReorgActive: true,
+          houseDisplay: { animalType: 'horse', animalCount: 1 },
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
+        })}
+      />,
+    )
+
+    expect(html).toContain('res-icon-horse')
+    expect(html).toContain('Horse')
+  })
+
   it('renders kept Parent Cards from portrait assets', () => {
     const player = {
       ...createPlayer('p1', 'Player A', 'red'),

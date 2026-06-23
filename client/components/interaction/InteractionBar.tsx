@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
+import type { AnimalKey } from '../../../shared/contract/animals'
 import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
@@ -44,6 +45,8 @@ type HeatingPending = {
   maxFuelPayable: number
   maxWoodConvertibleToFuel: number
 }
+
+const emptyAnimalCounts: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0, horse: 0 }
 
 const clampWhole = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)))
@@ -527,7 +530,7 @@ type Props = {
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
   borrowedFenceSources?: BorrowedFenceSourceControls
   animalReorg?: AnimalReorgState | null
-  reorgRemaining?: { sheep: number; boar: number; cattle: number } | null
+  reorgRemaining?: Record<AnimalKey, number> | null
   hasReorgOverflow?: boolean
   confirmAnimalReorg?: () => void
   cancelAnimalDiscardPrompt?: () => void
@@ -709,7 +712,7 @@ export const InteractionBar = ({
                   <span>
                     {formatAnimalCounts(
                       locale,
-                      reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                      reorgRemaining ?? emptyAnimalCounts,
                     )}
                   </span>
                 </div>
@@ -722,7 +725,7 @@ export const InteractionBar = ({
                       {t(locale, 'ui.reorgDiscardPrompt', {
                         animals: formatAnimalCounts(
                           locale,
-                          reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                          reorgRemaining ?? emptyAnimalCounts,
                         ),
                       })}
                     </div>
