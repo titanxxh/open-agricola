@@ -379,7 +379,7 @@ describe('father parent cards', () => {
 
   it('keeps father runtime assets available under the resolved public asset paths', () => {
     for (const id of FATHER_PARENT_CARD_IDS) {
-      expect(existsSync(assetPath(`cards/${id}.png`))).toBe(true)
+      expect(existsSync(assetPath(`portrait/${id}.png`))).toBe(true)
     }
 
     expect(existsSync(assetPath('backs/father.png'))).toBe(true)

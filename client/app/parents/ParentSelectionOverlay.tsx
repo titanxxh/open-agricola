@@ -7,8 +7,7 @@ import type {
 } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import type { FatherParentCardId, MotherParentCardId, ParentCardId } from '../../../shared/parents'
-import { getParentCardDefinition } from '../../../shared/parents'
-import { resolveParentCardAssetUrls } from '../../services/parent-assets'
+import { ParentCardFace } from '../../components/common/ParentCardFace'
 import { DraftHistoryPanel } from '../draft/DraftHistoryPanel'
 
 type VisibleParentId = ParentCardId | '?'
@@ -75,11 +74,6 @@ interface Props {
   onSubmit: (selection: ParentSelectionSubmission) => void | Promise<void>
 }
 
-const parentCardTitle = (id: ParentCardId): string => {
-  const def = getParentCardDefinition(id)
-  return def ? `${def.kind === 'mother' ? 'Mother' : 'Father'} ${def.id}` : id
-}
-
 function ParentChoiceCard({
   id,
   selected,
@@ -89,8 +83,6 @@ function ParentChoiceCard({
   selected: boolean
   onSelect: (id: ParentCardId) => void
 }) {
-  const def = getParentCardDefinition(id)
-  const asset = def ? resolveParentCardAssetUrls(def.assets).frontUrl : ''
   return (
     <button
       type="button"
@@ -98,11 +90,7 @@ function ParentChoiceCard({
       data-card-id={id}
       onClick={() => onSelect(id)}
     >
-      {asset ? (
-        <img className="parent-choice-card__image" src={asset} alt={parentCardTitle(id)} />
-      ) : (
-        <span className="parent-choice-card__fallback">{id}</span>
-      )}
+      <ParentCardFace id={id} selected={selected} />
     </button>
   )
 }

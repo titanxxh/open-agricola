@@ -121,11 +121,12 @@ describe('complete parent card extraction', () => {
   })
 
   it('keeps runtime asset references logical and backed by public assets', () => {
-    const cardFiles = readdirSync(repoPath('public/assets/parents/cards'))
+    const cardFiles = readdirSync(repoPath('public/assets/parents/portrait'))
       .filter(file => file.endsWith('.png'))
       .sort()
 
     expect(cardFiles).toEqual(PARENT_CARD_IDS.map(id => `${id}.png`).sort())
+    expect(existsSync(repoPath('public/assets/parents/cards'))).toBe(false)
     assertPngExists('public/assets/parents/backs/mother.png')
     assertPngExists('public/assets/parents/backs/father.png')
 
@@ -134,7 +135,7 @@ describe('complete parent card extraction', () => {
         front: `${card.id}.png`,
         back: card.kind,
       })
-      assertPngExists(`public/assets/parents/cards/${card.assets.front}`)
+      assertPngExists(`public/assets/parents/portrait/${card.assets.front}`)
     }
   })
 

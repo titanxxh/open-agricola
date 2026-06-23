@@ -13,7 +13,7 @@ const getParentAssetsBaseUrl = (): string => {
 }
 
 export type ResolvedParentCardAssetUrls = {
-  frontUrl: string
+  portraitUrl: string
   backUrl: string
 }
 
@@ -24,7 +24,7 @@ export const resolveParentCardAssetUrls = (
   const normalizedBaseUrl = trimTrailingSlashes(baseUrl)
 
   return {
-    frontUrl: `${normalizedBaseUrl}/cards/${assets.front}`,
+    portraitUrl: `${normalizedBaseUrl}/portrait/${assets.front}`,
     backUrl: `${normalizedBaseUrl}/backs/${assets.back}.png`,
   }
 }

@@ -181,12 +181,12 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('res-compact-label')
   })
 
-  it('renders kept Parent Cards as public card images', () => {
+  it('renders kept Parent Cards from portrait assets', () => {
     const player = {
       ...createPlayer('p1', 'Player A', 'red'),
       parentCards: { mother: 'PR01', father: 'PS01' },
       cardStates: {
-        PS01: { infobox: 'Completed' },
+        PS01: { infobox: 'Completed', extraData: { fatherCompletedTier: 2 } },
       },
     } as PlayerState
 
@@ -196,13 +196,16 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('class="parent-cards-row"')
     expect(html).toContain('data-card-id="PR01"')
-    expect(html).toContain('/assets/parents/cards/PR01.png')
+    expect(html).toContain('/assets/parents/portrait/PR01.png')
+    expect(html).not.toContain('/assets/parents/cards/PR01.png')
     expect(html).toContain('data-card-id="PS01"')
-    expect(html).toContain('/assets/parents/cards/PS01.png')
+    expect(html).toContain('/assets/parents/portrait/PS01.png')
+    expect(html).not.toContain('/assets/parents/cards/PS01.png')
     expect(html).toContain('Completed')
+    expect(html.match(/parent-card-face__slash-segment is-completed/g)).toHaveLength(2)
   })
 
-  it('shows an enlarged horizontal Parent Card preview on hover', () => {
+  it('shows an enlarged portrait-built Parent Card preview on hover', () => {
     vi.useFakeTimers()
     try {
       const player = {
@@ -225,9 +228,9 @@ describe('FarmBoard', () => {
         '.card-hover-preview.parent-card-hover-preview',
       ) as HTMLElement | null
       expect(preview).toBeTruthy()
-      expect(preview?.style.width).toBe('360px')
+      expect(preview?.style.width).toBe('320px')
       expect(preview?.querySelector('img')?.getAttribute('src')).toContain(
-        '/assets/parents/cards/PR01.png',
+        '/assets/parents/portrait/PR01.png',
       )
 
       fireEvent.pointerOut(tile!, { pointerType: 'mouse' })
