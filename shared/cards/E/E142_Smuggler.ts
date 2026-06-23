@@ -16,7 +16,7 @@ export const TRADE_OPTIONS = [
 ] as const satisfies readonly TradeOption[]
 
 const hasResources = (resources: Resource, cost: ResourceMap, multiplier = 1): boolean =>
-  Object.entries(cost).every(([resource, amount]) => resources[resource as keyof Resource] >= amount * multiplier)
+  Object.entries(cost).every(([resource, amount]) => (resources[resource as keyof Resource] ?? 0) >= (amount ?? 0) * multiplier)
 
 const scaleResources = (resources: ResourceMap, multiplier: number): ResourceMap =>
   Object.fromEntries(Object.entries(resources).map(([resource, amount]) => [resource, amount * multiplier])) as ResourceMap

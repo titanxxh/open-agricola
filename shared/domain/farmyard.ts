@@ -72,6 +72,8 @@ export type PlayerFarmState = {
     sheep: number
     boar: number
     cattle: number
+    horse?: number
+    fuel?: number
     begging: number
   }
   rooms: number
@@ -79,6 +81,7 @@ export type PlayerFarmState = {
   fields: FarmField[]
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
+  farmTerrain?: PlayerState['farmTerrain']
   fenceSegments: FenceSegment[]
   pastures: Pasture[]
 }
@@ -360,6 +363,8 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
     roomTiles.length = desiredRooms
   }
   const used = new Set(roomTiles.map(localPositionKey))
+  const farmTerrain = (player.farmTerrain ?? []).map((tile) => ({ ...tile }))
+  farmTerrain.forEach((tile) => used.add(localPositionKey(tile)))
   const allPositions = allTilePositions()
   const nextEmpty = () =>
     allPositions.find((pos) => !used.has(localPositionKey(pos)))
@@ -379,6 +384,7 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
     return [{ ...field, row: next.row, col: next.col }]
   })
   const usedTiles = new Set(roomTiles.map(localPositionKey))
+  farmTerrain.forEach((tile) => usedTiles.add(localPositionKey(tile)))
   normalizedFields.forEach((field) =>
     usedTiles.add(localPositionKey({ row: field.row, col: field.col })),
   )
@@ -395,6 +401,7 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
     fenceSegments: player.fenceSegments ?? [],
     pastures: player.pastures ?? [],
     stableTiles,
+    farmTerrain,
   }
 }
 
@@ -590,6 +597,7 @@ export const validatePlowSelection = <T extends PlayerFarmState>(
   }
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(localPositionKey))
+  normalized.farmTerrain?.forEach((tile) => occupied.add(localPositionKey(tile)))
   normalized.fields.forEach((field) =>
     occupied.add(localPositionKey({ row: field.row, col: field.col })),
   )
@@ -774,6 +782,7 @@ export const validateRoomSelection = (
       .flatMap((pasture) => pasture.tiles ?? [])
       .map(localPositionKey),
   )
+  const terrainSet = new Set((player.farmTerrain ?? []).map(localPositionKey))
   const selectedSet = new Set<string>()
   for (const room of rooms) {
     if (!isWithinFarm(room)) {
@@ -785,7 +794,8 @@ export const validateRoomSelection = (
       roomSet.has(key) ||
       fieldSet.has(key) ||
       stableSet.has(key) ||
-      pastureSet.has(key)
+      pastureSet.has(key) ||
+      terrainSet.has(key)
     ) {
       return { ok: false, code: 'OCCUPIED' }
     }
@@ -839,6 +849,7 @@ export const validateStableSelection = (
   const stableSet = new Set(
     (player.stableTiles ?? []).map((tile) => localPositionKey(tile)),
   )
+  const terrainSet = new Set((player.farmTerrain ?? []).map(localPositionKey))
   const selectedSet = new Set<string>()
   for (const stable of stables) {
     if (!isWithinFarm(stable)) {
@@ -846,7 +857,7 @@ export const validateStableSelection = (
     }
     const key = localPositionKey(stable)
     if (selectedSet.has(key)) continue
-    if (roomSet.has(key) || fieldSet.has(key) || stableSet.has(key)) {
+    if (roomSet.has(key) || fieldSet.has(key) || stableSet.has(key) || terrainSet.has(key)) {
       return { ok: false, code: 'OCCUPIED' }
     }
     if (lockedKeys?.has(key)) {
@@ -1183,10 +1194,13 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       localPositionKey({ row: field.row, col: field.col }),
     ),
   )
+  const terrainSet = new Set((normalized.farmTerrain ?? []).map(localPositionKey))
   const occupiedRegion = fencedRegions.find((region) =>
     region.tiles.some(
       (tile) =>
-        roomSet.has(localPositionKey(tile)) || fieldSet.has(localPositionKey(tile)),
+        roomSet.has(localPositionKey(tile)) ||
+        fieldSet.has(localPositionKey(tile)) ||
+        terrainSet.has(localPositionKey(tile)),
     ),
   )
   if (occupiedRegion) {
@@ -1396,6 +1410,7 @@ export const tryAddRoomTile = (
 ): boolean => {
   const used = new Set<string>()
   for (const tile of player.roomTiles ?? []) used.add(positionKey(tile))
+  for (const tile of player.farmTerrain ?? []) used.add(positionKey(tile))
   for (const tile of player.stableTiles ?? []) used.add(positionKey(tile))
   for (const field of player.fields ?? []) used.add(positionKey(field))
   for (const pasture of player.pastures ?? []) {
@@ -1459,6 +1474,7 @@ export const buildRoomFarmInteraction = (
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
+  normalized.farmTerrain?.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.pastures
@@ -1504,6 +1520,7 @@ export const buildStableFarmInteraction = (
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
+  normalized.farmTerrain?.forEach((tile) => occupied.add(positionKey(tile)))
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   const lockedKeys = collectLockedFarmTileKeys(player)

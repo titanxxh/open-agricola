@@ -50,6 +50,7 @@ import {
   buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
+  enableFarmersOfTheMoorFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
@@ -221,6 +222,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
           const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
           const enableThroughTheSeasons = enableThroughTheSeasonsFromQuery(window.location.search) || undefined
+          const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
@@ -228,6 +230,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             enableCommunityDeck,
             enableParentCards,
             enableThroughTheSeasons,
+            enableFarmersOfTheMoor,
             ...(draftParams ?? {}),
           })
         })

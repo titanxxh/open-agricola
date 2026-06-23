@@ -35,6 +35,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'enableCommunityDeck',
   'enableParentCards',
   'enableThroughTheSeasons',
+  'enableFarmersOfTheMoor',
   'customCards',
   'embedded',
   'devMode',
