@@ -28,9 +28,13 @@ const DEFAULT_MAX_TABLES = 15
 
 const BGA_ORIGIN = 'https://en.boardgamearena.com'
 const BGA_AGRICOLA_TABLES_URL = `${BGA_ORIGIN}/gametables?game=agricola`
+const BGA_CDN_ORIGIN = 'https://x.boardgamearena.net'
 
 const AGRICOLA_CDN_IMG_FILE_RE =
   /\/games\/agricola\/[^/]+\/img\/[^/?#]+\.(png|webp|jpe?g|gif|svg|ico)(\?|#|$)/i
+const AGRICOLA_CDN_CSS_FILE_RE =
+  /\/games\/agricola\/(\d{6}-\d{4})\/agricola\.css(\?|#|$)/i
+const AGRICOLA_VERSION_RE = /\d{6}-\d{4}/
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -41,6 +45,10 @@ function looksLikeMeeplesAssetUrl(url: string): boolean {
 
 function looksLikeAgricolaCdnImgFileUrl(url: string): boolean {
   return AGRICOLA_CDN_IMG_FILE_RE.test(url)
+}
+
+function looksLikeAgricolaCdnCssFileUrl(url: string): boolean {
+  return AGRICOLA_CDN_CSS_FILE_RE.test(url)
 }
 
 function repoRoot(): string {
@@ -81,6 +89,60 @@ function normalizeBase(url: string): string {
   return url.trim().replace(/\/+$/, '')
 }
 
+function normalizeEmbeddedText(text: string): string {
+  return text.replace(/\\\//g, '/').replace(/&amp;/g, '&')
+}
+
+export function baseUrlFromAgricolaVersion(version: string): string | null {
+  if (!AGRICOLA_VERSION_RE.test(version)) return null
+  return `${BGA_CDN_ORIGIN}/data/themereleases/current/games/agricola/${version}/img`
+}
+
+export function baseUrlFromKnownAgricolaAsset(fullUrl: string): string | null {
+  let u: URL
+  try {
+    u = new URL(normalizeEmbeddedText(fullUrl.trim()))
+  } catch {
+    return null
+  }
+
+  if (AGRICOLA_CDN_IMG_FILE_RE.test(u.pathname)) {
+    u.pathname = u.pathname.replace(/\/[^/]+$/, '')
+    u.search = ''
+    u.hash = ''
+    return normalizeBase(u.toString())
+  }
+
+  const css = u.pathname.match(AGRICOLA_CDN_CSS_FILE_RE)
+  if (css) {
+    u.pathname = u.pathname.replace(/\/agricola\.css$/i, '/img')
+    u.search = ''
+    u.hash = ''
+    return normalizeBase(u.toString())
+  }
+
+  return null
+}
+
+export function extractAgricolaCdnBasesFromText(text: string): string[] {
+  const normalized = normalizeEmbeddedText(text)
+  const candidates: string[] = []
+  const assetRe =
+    /https?:\/\/[^\s"'<>]+\/games\/agricola\/\d{6}-\d{4}\/(?:agricola\.css|img\/[^\s"'<>]+)/gi
+  for (const m of normalized.matchAll(assetRe)) {
+    const base = baseUrlFromKnownAgricolaAsset(m[0])
+    if (base) candidates.push(base)
+  }
+
+  const versionRe = /"name"\s*:\s*"agricola"[\s\S]{0,800}?"version"\s*:\s*"(\d{6}-\d{4})"/gi
+  for (const m of normalized.matchAll(versionRe)) {
+    const base = baseUrlFromAgricolaVersion(m[1])
+    if (base) candidates.push(base)
+  }
+
+  return dedupeBasesPreserveOrder(candidates)
+}
+
 function tableIdFromHref(href: string): string | null {
   const m = href.match(/[?&]table=(\d+)/i)
   return m?.[1] ?? null
@@ -112,18 +174,13 @@ type TableCdnCapture = {
 }
 
 function baseUrlFromImgAsset(fullUrl: string): string {
-  const u = new URL(fullUrl.trim())
-  const pathname = u.pathname
-  if (!/\/games\/agricola\/[^/]+\/img\//i.test(pathname)) {
+  const base = baseUrlFromKnownAgricolaAsset(fullUrl)
+  if (!base) {
     throw new Error(
       `Expected path containing /games/agricola/<id>/img/<file>, got: ${JSON.stringify(fullUrl)}`,
     )
   }
-  const dir = pathname.replace(/\/[^/]+$/, '')
-  u.pathname = dir
-  u.search = ''
-  u.hash = ''
-  return normalizeBase(u.toString())
+  return base
 }
 
 async function collectOrderedTableTargets(
@@ -157,32 +214,42 @@ async function captureSampleUrlOnTablePage(
 ): Promise<string> {
   let meeplesHit: string | null = null
   let imgFallback: string | null = null
+  let cssFallback: string | null = null
   const handler = (response: Response) => {
     if (response.status() >= 400) return
     const url = response.url()
     if (looksLikeMeeplesAssetUrl(url)) meeplesHit = url
     else if (looksLikeAgricolaCdnImgFileUrl(url) && !imgFallback) imgFallback = url
+    else if (looksLikeAgricolaCdnCssFileUrl(url) && !cssFallback) cssFallback = url
   }
   page.on('response', handler)
   try {
-    await page.goto(tableUrl, {
-      waitUntil: 'load',
-      timeout: TABLE_GOTO_TIMEOUT_MS,
-    })
+    const pick = () => meeplesHit ?? imgFallback ?? cssFallback
+    try {
+      await page.goto(tableUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: TABLE_GOTO_TIMEOUT_MS,
+      })
+    } catch (e) {
+      const got = pick()
+      if (got) return got
+      throw e
+    }
     await page.waitForLoadState('networkidle', { timeout: 25_000 }).catch(() => {})
     await page
       .locator('#game_play_area')
       .waitFor({ state: 'attached', timeout: GAME_AREA_WAIT_MS })
       .catch(() => {})
 
-    const pick = () => meeplesHit ?? imgFallback
     if (pick()) return pick()!
 
     try {
       const resp = await page.waitForResponse(
         (r) =>
           r.status() < 400 &&
-          (looksLikeMeeplesAssetUrl(r.url()) || looksLikeAgricolaCdnImgFileUrl(r.url())),
+          (looksLikeMeeplesAssetUrl(r.url()) ||
+            looksLikeAgricolaCdnImgFileUrl(r.url()) ||
+            looksLikeAgricolaCdnCssFileUrl(r.url())),
         { timeout: assetWaitMs },
       )
       return resp.url()
@@ -219,6 +286,15 @@ async function fetchCdnCapturesFromPlaywright(): Promise<TableCdnCapture[]> {
     })
 
     const listPage = await context.newPage()
+    const listAssetUrls: string[] = []
+    const listResponseHandler = (response: Response) => {
+      if (response.status() >= 400) return
+      const url = response.url()
+      if (looksLikeAgricolaCdnImgFileUrl(url) || looksLikeAgricolaCdnCssFileUrl(url)) {
+        listAssetUrls.push(url)
+      }
+    }
+    listPage.on('response', listResponseHandler)
     const listGotoTimeout = Math.max(DEFAULT_TABLE_WAIT_MS, 60_000)
     const listGotoAttempts = 3
     let lastGotoError: unknown
@@ -253,11 +329,26 @@ async function fetchCdnCapturesFromPlaywright(): Promise<TableCdnCapture[]> {
       )
     }
 
+    const listBases = extractAgricolaCdnBasesFromText(
+      `${listAssetUrls.join('\n')}\n${await listPage.content()}`,
+    )
+    if (listBases.length > 0) {
+      listPage.off('response', listResponseHandler)
+      await listPage.close()
+      return listBases.map((base) => ({
+        tableId: 'gametables',
+        tableUrl: BGA_AGRICOLA_TABLES_URL,
+        sampleUrl: `${base.replace(/\/img$/, '')}/agricola.css`,
+        base,
+      }))
+    }
+
     const tableTargets = await collectOrderedTableTargets(
       listPage,
       DEFAULT_TABLE_WAIT_MS,
       DEFAULT_MAX_TABLES,
     )
+    listPage.off('response', listResponseHandler)
     await listPage.close()
 
     if (tableTargets.length === 0) {
@@ -367,15 +458,20 @@ function parseArgs(argv: string[]): {
 
 function printProbeDetails(captures: TableCdnCapture[], basesNewestFirst: string[]): void {
   console.log('')
-  console.log(`成功 ${captures.length} 桌；去重后 ${basesNewestFirst.length} 个 CDN 基址。`)
+  console.log(`成功 ${captures.length} 个样本；去重后 ${basesNewestFirst.length} 个 CDN 基址。`)
   console.log('')
   console.log('去重后的 BGA_CDN_BASE_URL（新→旧，按列表中首次出现顺序）:')
   for (const b of basesNewestFirst) console.log(b)
   console.log('')
-  console.log('各桌样本（含同源多桌）:')
+  console.log('各样本（含同源多桌）:')
   for (const c of captures) {
-    const via = looksLikeMeeplesAssetUrl(c.sampleUrl) ? 'meeples' : '其它 img'
-    console.log(`  table=${c.tableId} (${via})`)
+    const via = looksLikeMeeplesAssetUrl(c.sampleUrl)
+      ? 'meeples'
+      : looksLikeAgricolaCdnCssFileUrl(c.sampleUrl)
+        ? 'css'
+        : '其它 img'
+    const label = c.tableId === 'gametables' ? 'source=gametables' : `table=${c.tableId}`
+    console.log(`  ${label} (${via})`)
     console.log(`    ${c.sampleUrl}`)
   }
   console.log('')
@@ -395,7 +491,7 @@ async function main(): Promise<number> {
 
   try {
     console.log(
-      `按 gametables 列表顺序（新→旧）最多扫描 ${DEFAULT_MAX_TABLES} 桌，捕获 …/games/agricola/…/img/ 资源（优先 meeples）…`,
+      `从 gametables 捕获 Agricola release，必要时最多扫描 ${DEFAULT_MAX_TABLES} 桌资源（优先 meeples）…`,
     )
     captures = await fetchCdnCapturesFromPlaywright()
     basesNewestFirst = dedupeBasesPreserveOrder(captures.map((c) => c.base))
@@ -458,9 +554,11 @@ async function main(): Promise<number> {
   return 0
 }
 
-main()
-  .then((code) => process.exit(code))
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((e) => {
+      console.error(e)
+      process.exit(1)
+    })
+}

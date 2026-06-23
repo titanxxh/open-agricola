@@ -78,6 +78,55 @@ describe('canSubmitParentSelection', () => {
 })
 
 describe('ParentSelectionOverlay', () => {
+  test('renders parent choices from portrait assets instead of full card images', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('img', { name: 'Mother PR01' })).toHaveAttribute(
+      'src',
+      '/assets/parents/portrait/PR01.png',
+    )
+    expect(screen.getByRole('img', { name: 'Father PS01' })).toHaveAttribute(
+      'src',
+      '/assets/parents/portrait/PS01.png',
+    )
+  })
+
+  test('renders father requirements as compact slash summaries', () => {
+    const { container } = render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection({
+          candidates: {
+            p1: { mother: ['PR01'], father: ['PS08'] },
+            p2: { mother: ['PR03'], father: ['PS03'] },
+          },
+        }),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      onSubmit: () => {},
+    }))
+
+    const conditionLine = container.querySelector('[data-card-id="PS08"] [data-kind="condition"]')
+    expect(conditionLine?.textContent).toContain('at most 7 / 5 / 3 unused farmyard spaces left')
+  })
+
   test('shows the local player already drafted occupation and minor cards', () => {
     render(createElement(ParentSelectionOverlay, {
       state: {
@@ -108,11 +157,11 @@ describe('ParentSelectionOverlay', () => {
 })
 
 describe('parent card CSS', () => {
-  test('renders parent cards with the horizontal full-card ratio', () => {
+  test('renders parent cards with the compact horizontal mock ratio', () => {
     const cssPath = join(process.cwd(), 'client/styles/pages/game.css')
     const css = readFileSync(cssPath, 'utf-8')
 
-    expect(css).toMatch(/\.parent-choice-card\s*\{[^}]*aspect-ratio:\s*735\s*\/\s*510/s)
-    expect(css).toMatch(/\.parent-card-tile\s*\{[^}]*aspect-ratio:\s*735\s*\/\s*510/s)
+    expect(css).toMatch(/\.parent-card-face\s*\{[^}]*aspect-ratio:\s*735\s*\/\s*560/s)
+    expect(css).toMatch(/\.parent-card-face__portrait-frame\s*\{/)
   })
 })

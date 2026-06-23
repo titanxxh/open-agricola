@@ -2235,6 +2235,7 @@ export const GameContainerApi = () => {
                 locale={locale}
                 throughTheSeasons={state.throughTheSeasons}
                 seasonActions={seasonActions}
+                players={state.players}
                 canTakeAction={(space) => currentPlayer ? canTakeActionForBoard(space, currentPlayer) : false}
                 takeAction={takeSeasonAction}
               />

@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_BIN="$SCRIPT_DIR/node_modules/.bin/tsx"
 FRONTEND_BIN="$SCRIPT_DIR/node_modules/.bin/vite"
+PNPM_BIN="${PNPM_BIN:-pnpm}"
 BACKEND_PORT=5175
 FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
@@ -55,7 +56,7 @@ usage() {
   cat <<'EOF'
 Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
                              [--players N | -p N | --players=N | -p=N]
-                             [--parents] [--seasons] [--draft]
+                             [--parents] [--seasons] [--draft] [--preview]
                              [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
@@ -72,6 +73,8 @@ backend restarts independently.
   --seasons                      Enable Through the Seasons for fixed dev rooms.
   --draft                        Start fixed dev rooms in simultaneous draft
                                  mode with draft pool size 7. Requires a reset.
+  --preview                      Build the frontend and serve dist with
+                                 vite preview for production-like loading.
   -h, --help                     Show this help.
 EOF
 }
@@ -81,6 +84,7 @@ PLAYERS="4"
 PARENTS_ENABLED=0
 SEASONS_ENABLED=0
 DRAFT_ENABLED=0
+PREVIEW_ENABLED=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --kill-only|--kill_only|-k)
@@ -109,6 +113,10 @@ while [ $# -gt 0 ]; do
       ;;
     --draft)
       DRAFT_ENABLED=1
+      shift
+      ;;
+    --preview)
+      PREVIEW_ENABLED=1
       shift
       ;;
     -h|--help)
@@ -420,6 +428,29 @@ if [ "$RESET_CONFIRMED" -eq 1 ]; then
   reset_persisted_dev_rooms
 fi
 
+if [ "$PREVIEW_ENABLED" -eq 1 ]; then
+  echo "Building frontend preview bundle..."
+  if [ -n "${BGA_CDN_BASE_URL:-}" ]; then
+    env \
+      VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
+      VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+      BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL" \
+      "$PNPM_BIN" run build
+  else
+    if [ ! -d "$BGA_IMAGE_DIR" ]; then
+      echo "Error: BGA_IMAGE_DIR does not exist: $BGA_IMAGE_DIR"
+      exit 1
+    fi
+    env \
+      VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
+      VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+      "$PNPM_BIN" run build
+    rm -rf "$SCRIPT_DIR/dist/bga-img"
+    mkdir -p "$SCRIPT_DIR/dist/bga-img"
+    cp -R "$BGA_IMAGE_DIR"/. "$SCRIPT_DIR/dist/bga-img"/
+  fi
+fi
+
 echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PERSIST_ROOMS=sqlite \
@@ -437,11 +468,19 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   CARD_ART_DIR="$CARD_ART_DIR" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
-echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
-start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
-  BACKEND_HOST="$LAN_IP" \
-  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
-  "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
+if [ "$PREVIEW_ENABLED" -eq 1 ]; then
+  echo "Starting frontend preview (port $FRONTEND_PORT on $LAN_IP)..."
+  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
+    VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
+    VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+    "$FRONTEND_BIN" preview --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
+else
+  echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
+  start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
+    BACKEND_HOST="$LAN_IP" \
+    BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
+    "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
+fi
 
 echo ""
 echo "Persistent dev state:"
@@ -450,6 +489,7 @@ echo "  DB_PATH            = $DB_PATH"
 echo "  PERSISTED_ROOMS_DIR= $PERSISTED_ROOMS_DIR"
 echo "  CARD_ART_DIR       = $CARD_ART_DIR"
 echo "  BGA_IMAGE_DIR      = $BGA_IMAGE_DIR"
+echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
 echo ""
 echo "=== Open Agricola (intranet) ==="
