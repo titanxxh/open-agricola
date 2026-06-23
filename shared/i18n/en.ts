@@ -534,6 +534,22 @@ export const en = {
     stubBonus: 'Bonus',
     stubPayGainVpPrompt: 'Pay to gain VP',
 },
+  moor: {
+    specialActions: {
+      title: 'Special Actions',
+      market: 'Public',
+      ownFaceUp: 'Used',
+      borrowable: 'Borrow 2 food',
+      faceDown: 'Unavailable',
+      'cut-peat': 'Cut Peat',
+      'fell-trees': 'Fell Trees',
+      'slash-and-burn': 'Slash and Burn',
+      'horse-market': 'Horse Market',
+      'hiring-fair': 'Hiring Fair',
+      'black-market': 'Black Market',
+      'illicit-work': 'Illicit Work',
+    },
+  },
   prompt: {
     selectPayment: 'Choose payment method',
     selectPaymentOption: 'Payment option',

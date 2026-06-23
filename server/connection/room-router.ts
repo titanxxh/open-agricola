@@ -275,6 +275,14 @@ function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'a
   ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
 }
 
+function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'specialAction' }>): void {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const resp = room.session.withCtx(() =>
+    room.session.takeSpecialAction(ctx.currentPlayerIndex, msg.cardId, msg.actionId, msg.payload),
+  )
+  ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
+}
+
 function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'choice' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.resolveChoice(ctx.currentPlayerIndex, msg.value, msg.payload))
@@ -404,6 +412,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   dissolveRoom: handleDissolveRoom,
   getState: handleGetState,
   action: handleAction,
+  specialAction: handleSpecialAction,
   choice: handleChoice,
   anytime: handleAnytime,
   ordinaryDrawKeep: handleOrdinaryDrawKeep,

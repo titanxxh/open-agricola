@@ -2,6 +2,7 @@ import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
+import type { MoorSpecialActionId } from '../../shared/moor/types'
 
 export type ValidateResult = {
   valid: boolean
@@ -27,9 +28,19 @@ type CommitSelectionPayload = {
   crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
 }
 
+type MoorSpecialActionPayload = {
+  tile?: { row: number; col: number }
+}
+
 export interface GameTransport {
   getState(): Promise<GameSyncPayload>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
+  takeSpecialAction(
+    playerIndex: number,
+    cardId: string,
+    actionId: MoorSpecialActionId,
+    payload?: MoorSpecialActionPayload,
+  ): Promise<GameSyncPayload>
   resolveChoice(
     playerIndex: number,
     value: string,
@@ -138,6 +149,15 @@ export class HttpGameTransport implements GameTransport {
 
   takeAction(playerIndex: number, spaceId: string) {
     return this.send(() => post('/api/game/action', { playerIndex, spaceId }))
+  }
+
+  takeSpecialAction(
+    playerIndex: number,
+    cardId: string,
+    actionId: MoorSpecialActionId,
+    payload?: MoorSpecialActionPayload,
+  ) {
+    return this.send(() => post('/api/game/special-action', { playerIndex, cardId, actionId, payload }))
   }
 
   resolveChoice(playerIndex: number, value: string, payload?: Record<string, unknown>) {
@@ -356,6 +376,15 @@ export class WsGameTransport implements GameTransport {
 
   async takeAction(_playerIndex: number, spaceId: string): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'action', spaceId })
+  }
+
+  async takeSpecialAction(
+    _playerIndex: number,
+    cardId: string,
+    actionId: MoorSpecialActionId,
+    payload?: MoorSpecialActionPayload,
+  ): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'specialAction', cardId, actionId, payload })
   }
 
   async resolveChoice(

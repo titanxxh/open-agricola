@@ -521,6 +521,22 @@ export const zh = {
     stubBonus: '额外奖励',
     stubPayGainVpPrompt: '支付以获得胜利点',
 },
+  moor: {
+    specialActions: {
+      title: '特殊行动',
+      market: '公共',
+      ownFaceUp: '已使用',
+      borrowable: '借用 2 食物',
+      faceDown: '不可用',
+      'cut-peat': '挖泥炭',
+      'fell-trees': '伐木',
+      'slash-and-burn': '刀耕火种',
+      'horse-market': '马市',
+      'hiring-fair': '雇工集市',
+      'black-market': '黑市',
+      'illicit-work': '非法工作',
+    },
+  },
   prompt: {
     selectPayment: '选择支付方式',
     selectPaymentOption: '支付选项',
