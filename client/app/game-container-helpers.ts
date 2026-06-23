@@ -297,6 +297,9 @@ export const enableThroughTheSeasonsFromQuery = (search: string): boolean =>
 export const enableFarmersOfTheMoorFromQuery = (search: string): boolean =>
   new URLSearchParams(search).get('enableFarmersOfTheMoor') === 'true'
 
+export const allowIncompleteFarmersOfTheMoorMinorDealFromQuery = (search: string): boolean =>
+  new URLSearchParams(search).get('allowIncompleteFarmersOfTheMoorMinorDeal') === 'true'
+
 export const splitBoardActionSpaces = (
   actionSpaces: readonly ActionSpace[] | null | undefined,
   roundActionOrder: readonly (string | null | undefined)[] | null | undefined,

@@ -37,6 +37,22 @@ const firstPick = (session: GameSession, pid: string) => {
   return { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! }
 }
 
+const firstOccupationPick = (session: GameSession, pid: string) => {
+  const draft = session.getState().state.draft
+  if (!draft) throw new Error('no draft state')
+  const pool = draft.pools[pid]
+  if (!pool) throw new Error(`no pool for ${pid}`)
+  return { occCardId: pool.occ[0]! }
+}
+
+const firstMinorPick = (session: GameSession, pid: string) => {
+  const draft = session.getState().state.draft
+  if (!draft) throw new Error('no draft state')
+  const pool = draft.pools[pid]
+  if (!pool) throw new Error(`no pool for ${pid}`)
+  return { minorCardId: pool.minor[0]! }
+}
+
 describe('GameSession — draft mode setup', () => {
   it('seeds phase=draft with populated per-player pools and empty player hands', () => {
     const session = makeDraftSession(2, 7)
@@ -113,6 +129,57 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     for (const p of finalResp.state.players) {
       expect(p.occupationHand.length).toBe(7)
       expect(p.minorHand.length).toBe(7)
+    }
+  })
+
+  it('runs Farmers of the Moor draft as occupations before published-pool minors when FoM minors are absent', () => {
+    const session = new GameSession(123456, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+
+    expect(session.getState().state.draft!.stage).toBe('occupation')
+    expect(session.getState().state.draft!.totalRounds).toBe(7)
+    for (const pid of ['p1', 'p2']) {
+      expect(session.getState().state.draft!.pools[pid].occ).toHaveLength(7)
+      expect(session.getState().state.draft!.pools[pid].minor).toEqual([])
+    }
+
+    for (let round = 1; round <= 6; round += 1) {
+      for (const pid of ['p1', 'p2']) {
+        const resp = session.submitDraftPick(pid, firstOccupationPick(session, pid))
+        expect(resp.ok).toBe(true)
+      }
+    }
+
+    const publishedStage = session.getState().state
+    expect(publishedStage.phase).toBe('draft')
+    expect(publishedStage.draft!.stage).toBe('publishedMinor')
+    expect(publishedStage.draft!.round).toBe(1)
+    expect(publishedStage.draft!.totalRounds).toBe(3)
+    for (const pid of ['p1', 'p2']) {
+      expect(publishedStage.draft!.pools[pid].occ).toEqual([])
+      expect(publishedStage.draft!.pools[pid].minor).toHaveLength(3)
+      expect(publishedStage.draft!.kept[pid].occ).toHaveLength(7)
+      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(0)
+    }
+
+    for (let round = 1; round <= 2; round += 1) {
+      for (const pid of ['p1', 'p2']) {
+        const resp = session.submitDraftPick(pid, firstMinorPick(session, pid))
+        expect(resp.ok).toBe(true)
+      }
+    }
+
+    const final = session.getState().state
+    expect(final.phase).toBe('playing')
+    expect(final.draft).toBeNull()
+    for (const player of final.players) {
+      expect(player.occupationHand).toHaveLength(7)
+      expect(player.minorHand).toHaveLength(3)
     }
   })
 

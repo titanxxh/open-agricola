@@ -8,6 +8,7 @@ import {
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
+  allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
@@ -65,6 +66,12 @@ describe('GameContainerApi WS player identity', () => {
     expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws&enableThroughTheSeasons=true')).toBe(true)
     expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws&enableThroughTheSeasons=1')).toBe(false)
     expect(enableThroughTheSeasonsFromQuery('?page=game&transport=ws')).toBe(false)
+  })
+
+  it('parses the incomplete Farmers of the Moor minor-deal room option from query', () => {
+    expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=true')).toBe(true)
+    expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=1')).toBe(false)
+    expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?page=game')).toBe(false)
   })
 
   it('separates season action spaces from the normal action board', () => {
