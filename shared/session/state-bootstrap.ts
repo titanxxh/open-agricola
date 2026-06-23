@@ -68,6 +68,12 @@ import {
   normalizeThroughTheSeasonsState,
 } from '../seasons/state'
 import { createSeasonActionSpaces, seasonActionIds } from '../seasons/action-spaces'
+import {
+  createFarmersOfTheMoorState,
+  normalizeFarmersOfTheMoorState,
+} from '../moor/state'
+import { normalizeFarmTerrain } from '../moor/farm-terrain'
+import { getMoorStartCardTerrain } from '../moor/start-cards'
 
 export * from './state-constants'
 
@@ -213,6 +219,14 @@ const normalizeOrdinaryCardDecks = (
 
 export const normalizeState = (raw: GameState): GameState => {
   const seed = raw.gameSeed ?? createSeed()
+  const enableFarmersOfTheMoor = raw.enableFarmersOfTheMoor === true
+  const farmersOfTheMoor = enableFarmersOfTheMoor
+    ? normalizeFarmersOfTheMoorState(
+        raw.farmersOfTheMoor,
+        (raw.players ?? []).map((player) => player.id),
+        seed,
+      )
+    : null
   const roundActionOrder =
     raw.roundActionOrder?.length === 14
       ? raw.roundActionOrder
@@ -285,10 +299,17 @@ export const normalizeState = (raw: GameState): GameState => {
     const occupationPlayed = player.occupationPlayed ?? []
     const extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     const playedCards = player.playedCards ?? []
-    const normalized = {
+    const normalized: PlayerState = {
       ...player,
       color:
         player.color ?? defaultPlayerColors[index % defaultPlayerColors.length],
+      resources: enableFarmersOfTheMoor
+        ? {
+            ...player.resources,
+            fuel: player.resources?.fuel ?? 0,
+            horse: player.resources?.horse ?? 0,
+          }
+        : { ...player.resources },
       houseType: player.houseType ?? 'wood',
       improvements: improvements.length > 0 ? improvements : [],
       minorHand:
@@ -334,6 +355,24 @@ export const normalizeState = (raw: GameState): GameState => {
       parentCards: player.parentCards ?? { mother: null, father: null },
       supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
+    if (enableFarmersOfTheMoor) {
+      const startCardId = farmersOfTheMoor?.startCardByPlayerId[normalized.id]
+      const hasRawTerrain = Array.isArray(player.farmTerrain)
+      const rawTerrain = normalizeFarmTerrain(player.farmTerrain)
+      normalized.farmTerrain = hasRawTerrain
+        ? rawTerrain
+        : startCardId
+          ? getMoorStartCardTerrain(startCardId)
+          : []
+      normalized.sickWorkerIds = Array.isArray(player.sickWorkerIds)
+        ? player.sickWorkerIds.filter((id): id is string => typeof id === 'string')
+        : []
+    } else {
+      delete normalized.farmTerrain
+      delete normalized.sickWorkerIds
+      delete normalized.resources.fuel
+      delete normalized.resources.horse
+    }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
       const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
@@ -349,6 +388,7 @@ export const normalizeState = (raw: GameState): GameState => {
       normalized.roomTiles = normalized.roomTiles.slice(0, desiredRooms)
     }
     const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
+    normalized.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
     const allPositions = getAllTilePositions()
     const nextEmpty = () =>
       allPositions.find((pos) => !used.has(positionKey(pos)))
@@ -487,6 +527,8 @@ export const normalizeState = (raw: GameState): GameState => {
     throughTheSeasons: enableThroughTheSeasons
       ? normalizeThroughTheSeasonsState(raw.throughTheSeasons, seed)
       : null,
+    enableFarmersOfTheMoor,
+    farmersOfTheMoor,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
     nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
@@ -522,6 +564,7 @@ const createInitialPlayers = (
     playerNames = [],
     draftMode,
     enableCommunityDeck = false,
+    enableFarmersOfTheMoor = false,
   } = options
   const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
   // In draft mode, leave hands empty — createInitialState will seed state.draft
@@ -548,7 +591,9 @@ const createInitialPlayers = (
       id: info.id,
       name: playerNames[index] ?? info.name,
       color: info.color,
-      resources: { ...emptyResources, food: 2 },
+      resources: enableFarmersOfTheMoor
+        ? { ...emptyResources, food: 2, fuel: 0, horse: 0 }
+        : { ...emptyResources, food: 2 },
       workers: [
         { id: '1', isActive: true,  isNewborn: false },
         { id: '2', isActive: true,  isNewborn: false },
@@ -606,6 +651,18 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  const enableFarmersOfTheMoor = options.enableFarmersOfTheMoor === true
+  const farmersOfTheMoor = enableFarmersOfTheMoor
+    ? createFarmersOfTheMoorState(players.map((player) => player.id), gameSeed)
+    : null
+  if (enableFarmersOfTheMoor && farmersOfTheMoor) {
+    for (const player of players) {
+      player.farmTerrain = getMoorStartCardTerrain(farmersOfTheMoor.startCardByPlayerId[player.id]!)
+      player.sickWorkerIds = []
+      player.resources.fuel = player.resources.fuel ?? 0
+      player.resources.horse = player.resources.horse ?? 0
+    }
+  }
   const ordinaryCardDeckSeed =
     typeof options.ordinaryCardDeckSeed === 'number' && Number.isFinite(options.ordinaryCardDeckSeed)
       ? Math.floor(options.ordinaryCardDeckSeed)
@@ -713,6 +770,8 @@ export const createInitialState = (
     throughTheSeasons: options.enableThroughTheSeasons
       ? createThroughTheSeasonsState(gameSeed)
       : null,
+    enableFarmersOfTheMoor,
+    farmersOfTheMoor,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: {},
     nextOrdinaryCardDrawChoiceSeq: 1,

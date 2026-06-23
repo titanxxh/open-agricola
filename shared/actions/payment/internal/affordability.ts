@@ -101,7 +101,7 @@ export const canPayResources = (
   Object.keys(splitSupplyTokenCost(cost).resources).every((key) => {
     const resourceKey = key as keyof Resource
     const amount = cost[resourceKey] ?? 0
-    return amount <= 0 || player.resources[resourceKey] >= amount
+    return amount <= 0 || (player.resources[resourceKey] ?? 0) >= amount
   })
 
 export const isComplexCost = (

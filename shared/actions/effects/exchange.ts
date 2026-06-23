@@ -315,7 +315,7 @@ export const canAffordTrade = (
 
   return resourceKeys.every((key) => {
     const requiredAmount = (fromResources[key] ?? 0) * times
-    return player.resources[key] >= requiredAmount
+    return (player.resources[key] ?? 0) >= requiredAmount
   })
 }
 
@@ -335,7 +335,7 @@ export const getMaxTradeTimes = (player: PlayerState, trade: Trade): number => {
     const requiredPerTrade = fromResources[key] ?? 0
     if (requiredPerTrade > 0) {
       const timesFromThisResource = Math.floor(
-        player.resources[key] / requiredPerTrade,
+        (player.resources[key] ?? 0) / requiredPerTrade,
       )
       maxFromResources = Math.min(maxFromResources, timesFromThisResource)
     }

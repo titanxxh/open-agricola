@@ -3,6 +3,7 @@ import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { ThroughTheSeasonsState } from '../seasons/types'
+import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
 
 export type Resource = {
   wood: number
@@ -15,6 +16,8 @@ export type Resource = {
   sheep: number
   boar: number
   cattle: number
+  horse?: number
+  fuel?: number
   begging: number
 }
 
@@ -292,7 +295,9 @@ export type PlayerState = {
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
+  farmTerrain?: FarmTerrainTile[]
   workers: Worker[]
+  sickWorkerIds?: string[]
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: Field[]
@@ -551,6 +556,8 @@ export type GameState = {
   enableParentCards: boolean
   enableThroughTheSeasons: boolean
   throughTheSeasons: ThroughTheSeasonsState | null
+  enableFarmersOfTheMoor?: boolean
+  farmersOfTheMoor?: FarmersOfTheMoorState | null
   ordinaryCardDecks: OrdinaryCardDecks
   ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
   nextOrdinaryCardDrawChoiceSeq: number

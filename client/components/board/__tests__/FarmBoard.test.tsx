@@ -181,6 +181,33 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('res-compact-label')
   })
 
+  it('renders Farmers of the Moor terrain and resource chips when present', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.resources = { ...player.resources, fuel: 0, horse: 0 }
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'moor' },
+    ]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+          ],
+        })}
+      />,
+    )
+
+    expect(html).toContain('farm-terrain-forest')
+    expect(html).toContain('farm-terrain-moor')
+    expect(html).toContain('Forest')
+    expect(html).toContain('Moor')
+    expect(html).toContain('res-icon-fuel')
+    expect(html).toContain('res-icon-horse')
+  })
+
   it('renders kept Parent Cards from portrait assets', () => {
     const player = {
       ...createPlayer('p1', 'Player A', 'red'),

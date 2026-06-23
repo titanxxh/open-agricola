@@ -53,6 +53,8 @@ type ClientCommandBody =
       enableParentCards?: boolean
       /** When true, enable the Through the Seasons game variant. Default false. */
       enableThroughTheSeasons?: boolean
+      /** When true, enable the Farmers of the Moor game variant. Default false. */
+      enableFarmersOfTheMoor?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */

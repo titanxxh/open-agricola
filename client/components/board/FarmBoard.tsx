@@ -759,6 +759,13 @@ export const FarmBoard = ({
               <CompactResourceItem iconClass="res-icon-begging" value={displayPlayer.resources.begging} label={`${t(locale, 'resources.begging')}: ${displayPlayer.resources.begging}`} />
             </>)}
           </span>
+          {displayPlayer.resources.fuel !== undefined || displayPlayer.resources.horse !== undefined ? (<>
+            <span className="res-compact-divider" />
+            <span className="res-compact-group">
+              <CompactResourceItem iconClass="res-icon-fuel" value={displayPlayer.resources.fuel ?? 0} label={`${t(locale, 'resources.fuel')}: ${displayPlayer.resources.fuel ?? 0}`} />
+              <CompactResourceItem iconClass="res-icon-horse" value={displayPlayer.resources.horse ?? 0} label={`${t(locale, 'resources.horse')}: ${displayPlayer.resources.horse ?? 0}`} />
+            </span>
+          </>) : null}
           <span className="res-compact-divider" />
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
@@ -833,6 +840,15 @@ export const FarmBoard = ({
           const isRoom = roomPositions.has(tileKey)
           const isField = fieldPositions.has(tileKey)
           const isStable = stablePositions.has(tileKey)
+          const terrain = (displayPlayer.farmTerrain ?? []).find(
+            (tile) => tile.row === tileRow && tile.col === tileCol,
+          )
+          const terrainLabel =
+            terrain?.kind === 'forest'
+              ? t(locale, 'ui.tileForest')
+              : terrain?.kind === 'moor'
+                ? t(locale, 'ui.tileMoor')
+                : null
           const isRoomSelectable =
             isInteractive && roomSelectableSet.has(tileKey)
           const isRoomSelected = isInteractive && pendingRoomSet.has(tileKey)
@@ -918,7 +934,7 @@ export const FarmBoard = ({
                     : isStable
                       ? ' stable'
                       : ''
-              }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
+              }${terrain ? ` farm-terrain-${terrain.kind}` : ''}${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
               }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
               onClick={() => {
@@ -958,7 +974,7 @@ export const FarmBoard = ({
                     ? t(locale, 'ui.tileField')
                     : isStable
                       ? null
-                      : t(locale, 'ui.tileEmpty')}
+                      : terrainLabel ?? t(locale, 'ui.tileEmpty')}
               </span>
               {isSowSelectable ? (
                 <SowChoiceButtons
