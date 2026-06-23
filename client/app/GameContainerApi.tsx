@@ -1456,7 +1456,7 @@ export const GameContainerApi = () => {
       }
     }
     return { 
-      animalType: (displayPlayer?.houseAnimalType ?? null) as 'sheep' | 'boar' | 'cattle' | null, 
+      animalType: displayPlayer?.houseAnimalType ?? null,
       animalCount: displayPlayer?.houseAnimalCount ?? 0 
     }
   }, [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount, isReorgActive, animalReorg])

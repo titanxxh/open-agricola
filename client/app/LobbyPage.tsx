@@ -39,6 +39,8 @@ export function LobbyPage() {
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
   const [enableParentCards, setEnableParentCards] = useState(false)
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(false)
+  const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(false)
+  const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(false)
   const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
   const fetchRooms = useCallback(async () => {
@@ -81,6 +83,12 @@ export function LobbyPage() {
     }
     if (enableThroughTheSeasons) {
       params.enableThroughTheSeasons = 'true'
+    }
+    if (enableFarmersOfTheMoor) {
+      params.enableFarmersOfTheMoor = 'true'
+      if (allowIncompleteFarmersOfTheMoorMinorDeal) {
+        params.allowIncompleteFarmersOfTheMoorMinorDeal = 'true'
+      }
     }
     setPage('game', params)
   }
@@ -285,6 +293,27 @@ export function LobbyPage() {
                 />
                 <span>启用 Through the Seasons 扩展</span>
               </label>
+              <label className="community-deck-toggle">
+                <input
+                  type="checkbox"
+                  checked={enableFarmersOfTheMoor}
+                  onChange={(e) => {
+                    setEnableFarmersOfTheMoor(e.target.checked)
+                    if (!e.target.checked) setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
+                  }}
+                />
+                <span>启用 Farmers of the Moor 扩展</span>
+              </label>
+              {enableFarmersOfTheMoor && (
+                <label className="community-deck-toggle">
+                  <input
+                    type="checkbox"
+                    checked={allowIncompleteFarmersOfTheMoorMinorDeal}
+                    onChange={(e) => setAllowIncompleteFarmersOfTheMoorMinorDeal(e.target.checked)}
+                  />
+                  <span>允许 Farmers of the Moor 小改良池不完整</span>
+                </label>
+              )}
               <div className="player-select-actions">
                 <button type="button" className="btn-primary" onClick={handleCreateGame}>
                   {t('platform.createGame')}
