@@ -43,7 +43,7 @@ const isHarvestFeedTrigger = (ex: CardExchange) => {
 const playerCanAfford = (player: PlayerState, ex: CardExchange) => {
   for (const [k, v] of Object.entries(ex.from)) {
     const need = (v as number) ?? 0
-    if (need > 0 && player.resources[k as keyof Resource] < need) return false
+    if (need > 0 && (player.resources[k as keyof Resource] ?? 0) < need) return false
   }
   return true
 }

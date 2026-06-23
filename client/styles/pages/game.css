@@ -2940,6 +2940,14 @@
   background: #6faa4a;
   color: #203912;
 }
+.farm-tile.farm-terrain-forest {
+  background: #3f7a47;
+  color: #f5ffe8;
+}
+.farm-tile.farm-terrain-moor {
+  background: #765f83;
+  color: #fff2dc;
+}
 .farm-tile.stable {
   background: #f0d8a8;
   color: #6a4a1f;
@@ -3626,6 +3634,18 @@
 .res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
+.res-icon-horse {
+  width: 0.9em;
+  height: 0.8em;
+  border-radius: 40% 55% 45% 45%;
+  background: #b77942;
+}
+.res-icon-fuel {
+  width: 0.72em;
+  height: 0.84em;
+  border-radius: 50% 50% 48% 48%;
+  background: radial-gradient(circle at 50% 35%, #ffd166 0 22%, #ef7b2d 23% 58%, #3a2a28 59%);
+}
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */

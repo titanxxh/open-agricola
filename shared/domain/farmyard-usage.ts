@@ -24,6 +24,7 @@ export const getPastureTileKeys = (player: PlayerState) => {
 export const getUsedFarmyardTileKeys = (player: PlayerState) => {
   const used = new Set<string>()
   player.roomTiles.forEach((tile) => used.add(positionKey(tile)))
+  player.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
   player.fields.forEach((field) =>
     used.add(positionKey({ row: field.row, col: field.col })),
   )

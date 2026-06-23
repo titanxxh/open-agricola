@@ -37,6 +37,7 @@ export const parsePositionKey = (key: string): FarmTilePosition | null => {
 export const getUsedFarmyardTileKeys = (player: PlayerState) => {
   const used = new Set<string>()
   player.roomTiles.forEach((tile) => used.add(positionKey(tile)))
+  player.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
   player.fields.forEach((field) =>
     used.add(positionKey({ row: field.row, col: field.col })),
   )
@@ -57,9 +58,11 @@ const getNextEmptyTile = (
   roomTiles: FarmTilePosition[],
   fields: Field[],
   stableTiles: FarmTilePosition[] = [],
+  farmTerrain: FarmTilePosition[] = [],
 ) => {
   const used = new Set<string>()
   roomTiles.forEach((tile) => used.add(positionKey(tile)))
+  farmTerrain.forEach((tile) => used.add(positionKey(tile)))
   fields.forEach((field) =>
     used.add(positionKey({ row: field.row, col: field.col })),
   )
@@ -70,7 +73,7 @@ const getNextEmptyTile = (
 }
 
 export const getNextEmptyTileForPlayer = (player: PlayerState) =>
-  getNextEmptyTile(player.roomTiles, player.fields, player.stableTiles)
+  getNextEmptyTile(player.roomTiles, player.fields, player.stableTiles, player.farmTerrain ?? [])
 
 export const isBorderEdge = (edgeId: string): boolean => {
   const match = /^([HV])-(\d+)-(\d+)$/.exec(edgeId)
