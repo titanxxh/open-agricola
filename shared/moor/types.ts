@@ -17,10 +17,25 @@ export type MoorStartCardId =
   | 'moor-start-8'
   | 'moor-start-9'
 
+export type MoorSpecialActionId =
+  | 'cut-peat'
+  | 'fell-trees'
+  | 'slash-and-burn'
+  | 'horse-market'
+  | 'hiring-fair'
+  | 'black-market'
+  | 'illicit-work'
+
+export type MoorSpecialActionCardLocation =
+  | { kind: 'market' }
+  | { kind: 'playerFaceUp'; playerId: string }
+  | { kind: 'playerFaceDown'; playerId: string }
+
 export type MoorSpecialActionCardState = {
   id: string
-  ownerPlayerId: string | null
-  face: 'public' | 'faceUp' | 'faceDown'
+  players: number[]
+  actions: MoorSpecialActionId[]
+  location: MoorSpecialActionCardLocation
 }
 
 export type FarmersOfTheMoorState = {

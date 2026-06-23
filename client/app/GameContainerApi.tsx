@@ -12,6 +12,8 @@ import { emptyResources, resourceKeyList } from '../../shared/contract/state-con
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
+import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
@@ -20,6 +22,7 @@ import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
+import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
@@ -97,6 +100,7 @@ import {
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type ReorgAnimalType = 'sheep' | 'boar' | 'cattle'
+type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
 
 const REORG_ANIMAL_TYPES: ReorgAnimalType[] = ['sheep', 'boar', 'cattle']
 
@@ -367,6 +371,7 @@ export const GameContainerApi = () => {
   const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
+  const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
@@ -523,6 +528,7 @@ export const GameContainerApi = () => {
       setAnimalReorg(null)
     }
     if (payload.ok) {
+      setSelectedSpecialAction(null)
       setPendingFenceEdges([])
       setPendingFenceSources({})
       setSelectedFenceSourcePlayerId(null)
@@ -662,6 +668,23 @@ export const GameContainerApi = () => {
       console.error('takeAnytimeAction error', e)
     })
   }, [state, transport, isInteractive, interaction])
+
+  const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState) => {
+    if (!state || !currentPlayer || !isInteractive) return false
+    if (interaction.stateId !== 'idle') return false
+    if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
+    if (card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id) {
+      return currentPlayer.resources.food >= 2
+    }
+    return true
+  }, [currentPlayer, interaction.stateId, isInteractive, state])
+
+  const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
+    if (!state || !isInteractive || interaction.stateId !== 'idle') return
+    void transport.takeSpecialAction(state.currentPlayerIndex, cardId, actionId).catch((e) => {
+      console.error('takeSpecialAction error', e)
+    })
+  }, [interaction.stateId, isInteractive, state, transport])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     if (farmType === 'fence') {
@@ -1507,6 +1530,22 @@ export const GameContainerApi = () => {
       ),
     [selectionInteraction],
   )
+  const specialTerrainSelectableSet = useMemo(() => {
+    if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
+    if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
+    if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
+    if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
+    const targetKind = selectedSpecialAction.actionId === 'cut-peat' ? 'moor' : 'forest'
+    return new Set(
+      (displayPlayer.farmTerrain ?? [])
+        .filter((tile) => tile.kind === targetKind)
+        .map((tile) => positionKey(tile)),
+    )
+  }, [currentPlayer, displayPlayer, interaction.stateId, isInteractive, selectedSpecialAction, state])
+  const combinedPositionSelectableSet = useMemo(
+    () => new Set([...positionSelectableSet, ...specialTerrainSelectableSet]),
+    [positionSelectableSet, specialTerrainSelectableSet],
+  )
   const { sowSelectableMap, extraSowTargets } = useMemo(() => {
     const map = new Map<string, PendingSowCrop[]>()
     const extraTargets: ExtraSowTarget[] = []
@@ -1548,8 +1587,20 @@ export const GameContainerApi = () => {
     togglePlowTileInternal(tile, positionKey)
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
-  const wrappedTogglePositionSelection = (tile: FarmTilePosition) =>
+  const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
+    if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'idle') {
+      void transport.takeSpecialAction(
+        state.currentPlayerIndex,
+        selectedSpecialAction.cardId,
+        selectedSpecialAction.actionId,
+        { tile },
+      ).catch((e) => {
+        console.error('takeSpecialAction error', e)
+      })
+      return
+    }
     togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
+  }
   const wrappedToggleFenceEdge = (edgeId: string) =>
     toggleFenceEdge(
       edgeId,
@@ -2244,6 +2295,25 @@ export const GameContainerApi = () => {
               />
             </section>
           ) : null}
+          {state.enableFarmersOfTheMoor && state.farmersOfTheMoor && currentPlayer ? (
+            <section className="board-panel board-special-actions">
+              <SpecialActionsPanel
+                locale={locale}
+                cards={state.farmersOfTheMoor.specialActionCards}
+                currentPlayerId={currentPlayer.id}
+                canTakeSpecialAction={canTakeSpecialAction}
+                selected={selectedSpecialAction}
+                onSelectTerrainAction={(cardId, actionId) => {
+                  setSelectedSpecialAction((current) =>
+                    current?.cardId === cardId && current.actionId === actionId
+                      ? null
+                      : { cardId, actionId },
+                  )
+                }}
+                onTakeImmediateAction={takeImmediateSpecialAction}
+              />
+            </section>
+          ) : null}
         </div>
         <div className="game-layout__center">
           <StageBar currentRound={state.round ?? 1} />
@@ -2275,7 +2345,7 @@ export const GameContainerApi = () => {
               pendingFarmHandKey={pendingFarmHand ? positionKey(pendingFarmHand) : null}
               builtSpecialStableKeys={builtSpecialStableKeys}
               maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-              positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
+              positionSelectableSet={combinedPositionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
               stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}

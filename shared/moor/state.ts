@@ -1,5 +1,6 @@
 import type { FarmersOfTheMoorState, MoorStartCardId } from './types'
 import { dealMoorStartCards, isMoorStartCardId } from './start-cards'
+import { createMoorSpecialActionCards, normalizeMoorSpecialActionCards } from './special-action-cards'
 
 export const createFarmersOfTheMoorState = (
   playerIds: readonly string[],
@@ -7,7 +8,7 @@ export const createFarmersOfTheMoorState = (
 ): FarmersOfTheMoorState => ({
   complexity: 'iii',
   startCardByPlayerId: dealMoorStartCards(playerIds, seed),
-  specialActionCards: [],
+  specialActionCards: createMoorSpecialActionCards(playerIds.length),
 })
 
 export const normalizeFarmersOfTheMoorState = (
@@ -28,6 +29,6 @@ export const normalizeFarmersOfTheMoorState = (
   return {
     complexity: 'iii',
     startCardByPlayerId,
-    specialActionCards: [],
+    specialActionCards: normalizeMoorSpecialActionCards(source.specialActionCards, playerIds.length),
   }
 }

@@ -1,0 +1,88 @@
+import type { Locale } from '../../../shared/i18n'
+import { t } from '../../../shared/i18n'
+import {
+  isMoorSpecialActionCardUsableByPlayer,
+  isMoorTerrainAction,
+} from '../../../shared/moor/special-actions'
+import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
+
+type SelectedSpecialAction = {
+  cardId: string
+  actionId: MoorSpecialActionId
+} | null
+
+type SpecialActionsPanelProps = {
+  locale: Locale
+  cards: MoorSpecialActionCardState[]
+  currentPlayerId: string
+  canTakeSpecialAction: (card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => boolean
+  selected: SelectedSpecialAction
+  onSelectTerrainAction: (cardId: string, actionId: MoorSpecialActionId) => void
+  onTakeImmediateAction: (cardId: string, actionId: MoorSpecialActionId) => void
+}
+
+const specialActionLabel = (locale: Locale, actionId: MoorSpecialActionId) =>
+  t(locale, `moor.specialActions.${actionId}`)
+
+const locationLabel = (
+  locale: Locale,
+  card: MoorSpecialActionCardState,
+  currentPlayerId: string,
+) => {
+  if (card.location.kind === 'market') return t(locale, 'moor.specialActions.market')
+  if (card.location.kind === 'playerFaceUp' && card.location.playerId === currentPlayerId) {
+    return t(locale, 'moor.specialActions.ownFaceUp')
+  }
+  if (card.location.kind === 'playerFaceUp') return t(locale, 'moor.specialActions.borrowable')
+  return t(locale, 'moor.specialActions.faceDown')
+}
+
+export function SpecialActionsPanel({
+  locale,
+  cards,
+  currentPlayerId,
+  canTakeSpecialAction,
+  selected,
+  onSelectTerrainAction,
+  onTakeImmediateAction,
+}: SpecialActionsPanelProps) {
+  if (cards.length === 0) return null
+
+  return (
+    <div className="special-actions-panel">
+      <div className="special-actions-panel__title">{t(locale, 'moor.specialActions.title')}</div>
+      <div className="special-actions-panel__grid">
+        {cards.flatMap((card) =>
+          card.actions.map((actionId) => {
+            const label = specialActionLabel(locale, actionId)
+            const available =
+              isMoorSpecialActionCardUsableByPlayer(card, currentPlayerId) &&
+              canTakeSpecialAction(card, actionId)
+            const isSelected = selected?.cardId === card.id && selected.actionId === actionId
+            return (
+              <button
+                key={`${card.id}:${actionId}`}
+                type="button"
+                className={`special-action-card${isSelected ? ' selected' : ''}`}
+                disabled={!available}
+                aria-pressed={isSelected}
+                onClick={() => {
+                  if (isMoorTerrainAction(actionId)) {
+                    onSelectTerrainAction(card.id, actionId)
+                    return
+                  }
+                  onTakeImmediateAction(card.id, actionId)
+                }}
+              >
+                <span className="special-action-card__name">{label}</span>
+                <span className="special-action-card__status">
+                  {locationLabel(locale, card, currentPlayerId)}
+                </span>
+              </button>
+            )
+          }),
+        )}
+      </div>
+    </div>
+  )
+}

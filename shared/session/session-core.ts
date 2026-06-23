@@ -181,6 +181,8 @@ import {
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
+import { resetMoorSpecialActionCards, type MoorSpecialActionPayload } from '../moor/special-actions'
+import type { MoorSpecialActionId } from '../moor/types'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -3821,6 +3823,15 @@ export class GameCore {
     return roundPhase.takeAction(this, playerIndex, spaceId)
   }
 
+  takeSpecialAction(
+    playerIndex: number,
+    cardId: string,
+    actionId: MoorSpecialActionId,
+    payload?: MoorSpecialActionPayload,
+  ): SessionResponse {
+    return roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload)
+  }
+
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
     return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
@@ -4304,6 +4315,7 @@ export class GameCore {
       }])
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
+    resetMoorSpecialActionCards(this.state)
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
     clearAllLinkedSpaceBlocks(this.state)
