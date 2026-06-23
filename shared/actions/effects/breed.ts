@@ -8,6 +8,7 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
+import { animalKeysForState } from '../../contract/animals'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
@@ -17,18 +18,16 @@ export type BreedOptions = {
   sourceCard: string
 }
 
-const DEFAULT_TYPES: ReadonlyArray<BreedAnimalType> = ['sheep', 'boar', 'cattle']
-
 export const canBreedAnimals = (
   state: GameState,
   player: PlayerState,
   opts: BreedOptions,
 ): boolean => {
-  const types = opts.animalTypes ?? DEFAULT_TYPES
+  const types = opts.animalTypes ?? animalKeysForState(state)
   const freeCapacity = getTotalAnimalCapacity(player, state)
   for (const type of types) {
     if (freeCapacity <= 0) return false
-    if (player.resources[type] < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    if ((player.resources[type] ?? 0) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
     return true
   }
   return false
@@ -51,12 +50,12 @@ export const breed = (
   opts: BreedOptions,
   eventSink?: EventSink,
 ): { breedSummary: HarvestBreedSummary } => {
-  const types = opts.animalTypes ?? DEFAULT_TYPES
+  const types = opts.animalTypes ?? animalKeysForState(state)
   let freeCapacity = getTotalAnimalCapacity(player, state)
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   for (const type of types) {
     if (freeCapacity <= 0) break
-    if (player.resources[type] < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    if ((player.resources[type] ?? 0) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
     player.resources[type] += 1
     summary.resources[type] = 1
     summary.animalTypes += 1
@@ -102,7 +101,7 @@ export const breedAction: ActionDefinition = {
         id: zone.id,
         zoneType: zone.zoneType,
         cardId: zone.cardId,
-        animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+        animalType: zone.animalType ?? null,
         animalCount: zone.animalCount ?? 0,
         ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
         ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),

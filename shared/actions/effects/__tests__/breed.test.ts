@@ -163,6 +163,38 @@ describe('breed core helper', () => {
     expect(player.resources.boar).toBe(2)
   })
 
+  it('includes horses in default harvest breeding when Farmers of the Moor is enabled', () => {
+    const player = makePlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, horse: 2, begging: 0,
+      },
+      pastures: [makePasture(1)],
+    } as Partial<PlayerState>)
+    const state = { ...makeState(player), enableFarmersOfTheMoor: true } as GameState
+
+    const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
+
+    expect(breedSummary.resources.horse).toBe(1)
+    expect(player.resources.horse).toBe(3)
+  })
+
+  it('keeps horses out of default harvest breeding when Farmers of the Moor is disabled', () => {
+    const player = makePlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, horse: 2, begging: 0,
+      },
+      pastures: [makePasture(1)],
+    } as Partial<PlayerState>)
+    const state = makeState(player)
+
+    const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
+
+    expect(breedSummary.resources.horse).toBeUndefined()
+    expect(player.resources.horse).toBe(2)
+  })
+
   it('E84 lowers only harvest sheep breeding threshold and does not write virtual sheep state', () => {
     const player = makePlayer({
       resources: {

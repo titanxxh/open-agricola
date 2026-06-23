@@ -27,8 +27,10 @@ import { CardWithCopy } from '../common/CardWithCopy'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 
-type AnimalType = 'sheep' | 'boar' | 'cattle'
+type AnimalType = AnimalKey
+const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
 type CardAnimalDisplay = {
   animalType: AnimalType | null
@@ -291,17 +293,17 @@ export type FarmBoardProps = {
   pastureTiles: Map<string, { pastureId: string; isCorner: boolean }>
   pastureDisplayMap: Map<
     string,
-    { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+    { animalType: AnimalType | null; animalCount: number }
   >
   pastureCapacityMap: Map<string, number>
-  houseDisplay: { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+  houseDisplay: { animalType: AnimalType | null; animalCount: number }
   stableDisplayMap: Map<
     string,
-    { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+    { animalType: AnimalType | null; animalCount: number }
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
   isReorgActive: boolean
-  reorgRemaining: { sheep: number; boar: number; cattle: number } | null
+  reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
@@ -318,7 +320,7 @@ export type FarmBoardProps = {
   toggleFenceEdge: (edgeId: string) => void
   adjustReorgAnimal: (
     zoneId: string,
-    animalType: 'sheep' | 'boar' | 'cattle',
+    animalType: AnimalType,
     delta: number,
   ) => void
   confirmAnimalReorg: () => void
@@ -997,7 +999,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={pastureAnimalCount} animalType={pastureAnimalType} capacity={pastureCapacity} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           pastureAnimalType === animalType ? pastureAnimalCount : 0
                         const canDecrease =
@@ -1040,7 +1042,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={houseDisplay.animalCount} animalType={houseDisplay.animalType} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           houseDisplay.animalType === animalType
                             ? houseDisplay.animalCount
@@ -1082,7 +1084,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={stableDisplay?.animalCount ?? 0} animalType={stableDisplay?.animalType ?? null} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           stableDisplay?.animalType === animalType
                             ? stableDisplay.animalCount
@@ -1365,7 +1367,7 @@ export const FarmBoard = ({
                     capacity={cardDisplay.capacity}
                   />
                   <div className="pasture-controls">
-                    {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                    {ANIMAL_CONTROL_TYPES.map((animalType) => {
                       const cardAnimalCounts = cardDisplay.animalCounts ?? {}
                       const count =
                         cardAnimalCounts[animalType] ??

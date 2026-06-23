@@ -9,6 +9,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../contract/types'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../contract/animals'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
@@ -33,8 +34,7 @@ import { exchangeToTrade } from './exchange-to-trade'
 export { dispatchTradeAppliedListener } from './trade-applied-listener'
 export { exchangeToTrade } from './exchange-to-trade'
 
-const ANIMAL_KEYS = ['sheep', 'boar', 'cattle'] as const
-type AnimalResourceKey = typeof ANIMAL_KEYS[number]
+type AnimalResourceKey = AnimalKey
 type CardCounterAnimalSource = {
   kind: 'cardCounter'
   cardId?: string
@@ -47,7 +47,7 @@ type AnimalPaymentPreference = {
 }
 
 const isAnimalResourceKey = (key: ResourceKey): key is AnimalResourceKey =>
-  (ANIMAL_KEYS as readonly string[]).includes(key)
+  (ALL_ANIMAL_KEYS as readonly string[]).includes(key)
 
 const readAnimalPaymentPreference = (
   actionContext: Record<string, unknown> | undefined,
@@ -55,7 +55,7 @@ const readAnimalPaymentPreference = (
   const raw = actionContext?.animalPaymentPreference
   if (!raw || typeof raw !== 'object') return undefined
   const pref = raw as Partial<AnimalPaymentPreference>
-  if (pref.animal !== 'sheep' && pref.animal !== 'boar' && pref.animal !== 'cattle') return undefined
+  if (!ALL_ANIMAL_KEYS.includes(pref.animal as AnimalKey)) return undefined
   return pref as AnimalPaymentPreference
 }
 

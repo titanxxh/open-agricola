@@ -136,6 +136,31 @@ describe('computeScores', () => {
     ]))
   })
 
+  it('scores horses only when Farmers of the Moor is enabled', () => {
+    const disabledPlayer = createPlayer()
+    disabledPlayer.resources.horse = 2
+    const [disabled] = computeScores(createState(disabledPlayer))
+    expect(disabled.categories.some((category) => category.key === 'horses')).toBe(false)
+
+    const noHorsePlayer = createPlayer()
+    noHorsePlayer.resources.horse = 0
+    const noHorseState = { ...createState(noHorsePlayer), enableFarmersOfTheMoor: true } as GameState
+    const [noHorse] = computeScores(noHorseState)
+    expect(noHorse.categories.find((category) => category.key === 'horses')).toMatchObject({
+      total: -1,
+      quantity: 0,
+    })
+
+    const horsePlayer = createPlayer()
+    horsePlayer.resources.horse = 2
+    const horseState = { ...createState(horsePlayer), enableFarmersOfTheMoor: true } as GameState
+    const [horse] = computeScores(horseState)
+    expect(horse.categories.find((category) => category.key === 'horses')).toMatchObject({
+      total: 2,
+      quantity: 2,
+    })
+  })
+
   it('scores Soldier from wood and stone pairs', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']

@@ -53,6 +53,9 @@ const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boo
   ].some((neighbor) => fieldKeys.has(positionKey(neighbor)))
 }
 
+const horseMarketFoodCost = (state: GameState): number =>
+  [2, 5, 6].includes(state.players.length) ? 1 : 0
+
 export const validateMoorSpecialAction = (
   state: GameState,
   playerIndex: number,
@@ -68,7 +71,10 @@ export const validateMoorSpecialAction = (
   if (!isMoorSpecialActionCardUsableByPlayer(card, player.id)) {
     return { ok: false, error: 'special action unavailable' }
   }
-  if (card.location.kind === 'playerFaceUp' && player.resources.food < 2) {
+  const requiredFood =
+    (card.location.kind === 'playerFaceUp' ? 2 : 0) +
+    (actionId === 'horse-market' ? horseMarketFoodCost(state) : 0)
+  if (player.resources.food < requiredFood) {
     return { ok: false, error: 'not enough food' }
   }
 
@@ -88,6 +94,8 @@ export const validateMoorSpecialAction = (
       }
       break
     case 'hiring-fair':
+      break
+    case 'horse-market':
       break
     default:
       return { ok: false, error: 'special action unavailable' }
@@ -124,6 +132,10 @@ export const applyMoorSpecialAction = (
     }
     case 'hiring-fair':
       player.resources.food += state.players.length === 3 ? 2 : 1
+      break
+    case 'horse-market':
+      player.resources.food -= horseMarketFoodCost(state)
+      player.resources.horse = (player.resources.horse ?? 0) + 1
       break
     default:
       return { ok: false, error: 'special action unavailable' }

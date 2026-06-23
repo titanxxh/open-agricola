@@ -29,6 +29,7 @@ describe('Farmers of the Moor special actions', () => {
         expect.objectContaining({ actions: ['fell-trees'], location: { kind: 'market' } }),
         expect.objectContaining({ actions: ['slash-and-burn'], location: { kind: 'market' } }),
         expect.objectContaining({ actions: ['hiring-fair'], location: { kind: 'market' } }),
+        expect.objectContaining({ actions: ['horse-market'], location: { kind: 'market' } }),
       ]),
     )
   })
@@ -99,6 +100,72 @@ describe('Farmers of the Moor special actions', () => {
     expect(card.location).toEqual({ kind: 'playerFaceDown', playerId: p2.id })
     confirmNext(session)
     expect(session.takeSpecialAction(0, card.id, 'hiring-fair').ok).toBe(false)
+  })
+
+  it('Horse Market costs 1 food in a two-player game and opens horse reorganization', () => {
+    const session = new GameSession(41, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+    })
+    const player = session.state.players[0]!
+    const card = findCardFor(session, 'horse-market')
+    player.resources.food = 1
+
+    const resp = session.takeSpecialAction(0, card.id, 'horse-market')
+
+    expect(resp.ok).toBe(true)
+    expect(player.resources.food).toBe(0)
+    expect(player.resources.horse).toBe(1)
+    expect(card.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+
+    const placed = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
+    })
+
+    expect(placed.state.players[0]!.houseAnimalType).toBe('horse')
+    expect(placed.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(placed.state.players[0]!.resources.horse).toBe(1)
+  })
+
+  it('Horse Market allows horse cookery exchange before unaccommodated horse runs away', () => {
+    const session = new GameSession(41, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+    })
+    const player = session.state.players[0]!
+    const card = findCardFor(session, 'horse-market')
+    player.resources.food = 1
+    player.improvements.push('Major_Moor_HorseSlaughterhouse1')
+    session.state.availableMajorImprovements = session.state.availableMajorImprovements.filter(
+      (id) => id !== 'Major_Moor_HorseSlaughterhouse1',
+    )
+
+    let resp = session.takeSpecialAction(0, card.id, 'horse-market')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+
+    resp = session.takeAnytimeAction(0, 'exchange')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    const horseExchange = resp.interaction.options?.find((option) =>
+      option.effectPreview?.kind === 'resourceExchange' &&
+      option.effectPreview.resourcesPaid.horse === 1
+    )
+    expect(horseExchange).toBeDefined()
+
+    resp = session.resolveChoice(0, horseExchange!.value)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    expect(resp.state.players[0]!.resources.horse).toBe(0)
   })
 
   it('requires an unplaced healthy worker and returns special action cards home at return-home', () => {

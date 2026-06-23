@@ -2,11 +2,12 @@ import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { getHarvestOutcome } from '../../actions/helpers/harvest-outcome'
+import { animalKeysForState } from '../../contract/animals'
 import type { ActionChoiceOption, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E134_Omnifarmer'
-type Storable = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle'
+type Storable = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle' | 'horse'
 
 const KEY_STORED = 'storedGoods'
 
@@ -55,7 +56,7 @@ const cardImpl = {
     },
     resolveChoice: (state, player, choice) => {
       if (choice === 'skip') return
-      const validTypes: Storable[] = ['grain', 'vegetable', 'sheep', 'boar', 'cattle']
+      const validTypes: Storable[] = ['grain', 'vegetable', ...animalKeysForState(state)]
       if (!validTypes.includes(choice as Storable)) return
       const stored = readStored(player)
       if (stored.includes(choice as Storable)) return

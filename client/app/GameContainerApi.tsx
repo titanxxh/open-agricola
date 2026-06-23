@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
@@ -99,12 +100,12 @@ import {
 } from './replay-timeline'
 
 type RoundSlot = { round: number; action?: ActionSpace }
-type ReorgAnimalType = 'sheep' | 'boar' | 'cattle'
+type ReorgAnimalType = AnimalKey
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
 
-const REORG_ANIMAL_TYPES: ReorgAnimalType[] = ['sheep', 'boar', 'cattle']
+const REORG_ANIMAL_TYPES: ReorgAnimalType[] = [...ALL_ANIMAL_KEYS]
 
-const emptyAnimalTotals = () => ({ sheep: 0, boar: 0, cattle: 0 })
+const emptyAnimalTotals = () => ({ sheep: 0, boar: 0, cattle: 0, horse: 0 })
 
 const compactAnimalCounts = (counts: Record<ReorgAnimalType, number>) => {
   const compact: Partial<Record<ReorgAnimalType, number>> = {}
@@ -1464,13 +1465,16 @@ export const GameContainerApi = () => {
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
-    // 使用本地 animalReorg 状态或 pendingAnimalReorg
     const playerIndex = pendingAnimalReorg?.playerIndex ?? state.currentPlayerIndex
     const player = state.players[playerIndex]
-    return player ? { sheep: player.resources.sheep, boar: player.resources.boar, cattle: player.resources.cattle } : null
+    if (!player) return null
+    return REORG_ANIMAL_TYPES.reduce((acc, animal) => {
+      acc[animal] = player.resources[animal] ?? 0
+      return acc
+    }, emptyAnimalTotals())
   }, [pendingAnimalReorg, state])
   const reorgTotals = useMemo(() => {
-    if (!animalReorg) return { sheep: 0, boar: 0, cattle: 0 }
+    if (!animalReorg) return emptyAnimalTotals()
     return animalReorg.zones.reduce((acc, z) => {
       addAnimalCounts(acc, zoneAnimalCounts(z))
       return acc
@@ -1479,13 +1483,15 @@ export const GameContainerApi = () => {
   void [reorgAvailable, reorgTotals]
   const hasReorgOverflow = useMemo(() => {
     if (!reorgAvailable) return false
-    return reorgTotals.sheep > reorgAvailable.sheep || reorgTotals.boar > reorgAvailable.boar || reorgTotals.cattle > reorgAvailable.cattle
+    return REORG_ANIMAL_TYPES.some((animal) => reorgTotals[animal] > reorgAvailable[animal])
   }, [reorgAvailable, reorgTotals])
-  const reorgRemaining = useMemo(() => reorgAvailable ? {
-    sheep: Math.max(0, reorgAvailable.sheep - reorgTotals.sheep),
-    boar: Math.max(0, reorgAvailable.boar - reorgTotals.boar),
-    cattle: Math.max(0, reorgAvailable.cattle - reorgTotals.cattle),
-  } : null, [reorgAvailable, reorgTotals])
+  const reorgRemaining = useMemo(() => {
+    if (!reorgAvailable) return null
+    return REORG_ANIMAL_TYPES.reduce((acc, animal) => {
+      acc[animal] = Math.max(0, reorgAvailable[animal] - reorgTotals[animal])
+      return acc
+    }, emptyAnimalTotals())
+  }, [reorgAvailable, reorgTotals])
   const confirmAnimalReorg = useCallback(() => {
     if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {
       setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: true } : prev)
@@ -1629,7 +1635,7 @@ export const GameContainerApi = () => {
     setViewPlayerId(value)
   }, [])
 
-  const adjustReorgAnimal = (zoneId: string, animalType: 'sheep' | 'boar' | 'cattle', delta: number) => {
+  const adjustReorgAnimal = (zoneId: string, animalType: ReorgAnimalType, delta: number) => {
     setAnimalReorg((prev) => {
       if (!prev || !pendingAnimalReorg || !state) return prev
       const player = state.players[pendingAnimalReorg.playerIndex]
@@ -1652,6 +1658,7 @@ export const GameContainerApi = () => {
         sheep: player.resources.sheep,
         boar: player.resources.boar,
         cattle: player.resources.cattle,
+        horse: player.resources.horse ?? 0,
       }
 
       if (delta > 0) {
@@ -1661,6 +1668,7 @@ export const GameContainerApi = () => {
           sheep: -currentCounts.sheep,
           boar: -currentCounts.boar,
           cattle: -currentCounts.cattle,
+          horse: -(currentCounts.horse ?? 0),
         })
         const remaining = available[animalType] - baseTotals[animalType]
         if (remaining <= 0) return prev

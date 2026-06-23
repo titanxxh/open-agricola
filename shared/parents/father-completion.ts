@@ -1,4 +1,5 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, ChoiceEffectPreview, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
+import { animalKeysForState, type AnimalKey } from '../contract/animals'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
 import { buildSowFarmInteraction } from '../domain/farmyard'
@@ -47,14 +48,15 @@ const totalCardsIncludingParents = (player: PlayerState): number =>
   (player.parentCards.mother ? 1 : 0) +
   (player.parentCards.father ? 1 : 0)
 
-const animalCounts = (state: GameState, player: PlayerState): Record<'sheep' | 'boar' | 'cattle', number> => {
-  const counts = { sheep: 0, boar: 0, cattle: 0 }
+const animalCounts = (state: GameState, player: PlayerState): Partial<Record<AnimalKey, number>> => {
+  const allowed = new Set(animalKeysForState(state))
+  const counts: Partial<Record<AnimalKey, number>> = {}
   for (const zone of computeAnimalZones(player, state)) {
     if (zone.blocked) continue
     const type = zone.animalType
     const count = zone.animalCount ?? 0
-    if ((type === 'sheep' || type === 'boar' || type === 'cattle') && count > 0) {
-      counts[type] += count
+    if (type && allowed.has(type) && count > 0) {
+      counts[type] = (counts[type] ?? 0) + count
     }
   }
   return counts
@@ -99,7 +101,7 @@ export const isFatherRequirementSatisfied = (
       if (requirement.animal === 'any') {
         return Object.values(counts).reduce((sum, count) => sum + count, 0) >= requirement.amount
       }
-      return counts[requirement.animal] >= requirement.amount
+      return (counts[requirement.animal] ?? 0) >= requirement.amount
     }
     case 'farm-count-at-least':
       switch (requirement.target) {

@@ -10,6 +10,7 @@ export const moorSpecialActionCardDefinitions: MoorSpecialActionCardDefinition[]
   { id: 'moor-special-cut-peat', players: [2, 3, 4, 5, 6], actions: ['cut-peat'] },
   { id: 'moor-special-fell-trees', players: [2, 3, 4, 5, 6], actions: ['fell-trees'] },
   { id: 'moor-special-slash-and-burn', players: [2, 3, 4, 5, 6], actions: ['slash-and-burn'] },
+  { id: 'moor-special-horse-market', players: [2, 3, 4, 5, 6], actions: ['horse-market'] },
   { id: 'moor-special-hiring-fair', players: [2, 3, 4, 5, 6], actions: ['hiring-fair'] },
 ]
 
