@@ -64,7 +64,7 @@ export const en = {
       },
       boardCopy: {
         winterPlow: 'Pay 1 food per plowed field',
-        winterPlowShort: 'per plowed field',
+        winterPlowShort: 'plowing a field:',
         winterFishing: 'Fishing: not until Round 11',
         springFences: 'Fences: +2 free fences (must buy at least one)',
         springFencesShort: 'Fences',

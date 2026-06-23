@@ -14,7 +14,6 @@ type Props = {
 }
 
 const seasonOrder: SeasonId[] = ['winter', 'spring', 'autumn', 'summer']
-const seasonFlowOrder: SeasonId[] = ['winter', 'spring', 'summer', 'autumn']
 
 const seasonLabelKey: Record<SeasonId, string> = {
   winter: 'ui.seasons.winter',
@@ -28,20 +27,6 @@ const seasonToken: Record<SeasonId, string> = {
   spring: 'Sp',
   summer: 'S',
   autumn: 'A',
-}
-
-const seasonShortLabelKey: Record<SeasonId, string> = {
-  winter: 'ui.seasons.short.winter',
-  spring: 'ui.seasons.short.spring',
-  summer: 'ui.seasons.short.summer',
-  autumn: 'ui.seasons.short.autumn',
-}
-
-const flowSummaryKey: Record<SeasonId, string> = {
-  winter: 'ui.seasons.flowSummary.winter',
-  spring: 'ui.seasons.flowSummary.spring',
-  summer: 'ui.seasons.flowSummary.summer',
-  autumn: 'ui.seasons.flowSummary.autumn',
 }
 
 type SeasonIconKind =
@@ -64,6 +49,7 @@ type SeasonIconItem = {
   icon: SeasonIconKind
   text?: string
   dividerAfter?: boolean
+  arrowAfter?: boolean
 }
 
 type SeasonResourceAdjustment = {
@@ -84,6 +70,7 @@ const SeasonIconRow = ({ items }: { items: SeasonIconItem[] }) => (
         {item.text ? <span className="seasons-board__icon-text">{item.text}</span> : null}
         <SeasonIcon icon={item.icon} />
         {item.dividerAfter ? <span className="seasons-board__icon-separator">/</span> : null}
+        {item.arrowAfter ? <span className="seasons-board__icon-arrow">→</span> : null}
       </span>
     ))}
   </span>
@@ -107,7 +94,7 @@ const seasonResourceAdjustments: SeasonResourceAdjustment[] = [
   {
     className: 'winter-plow',
     labelKey: 'ui.seasons.boardCopy.winterPlowShort',
-    items: [{ icon: 'food', text: '1' }, { icon: 'field' }],
+    items: [{ icon: 'food', text: '1', arrowAfter: true }, { icon: 'field' }],
   },
   {
     className: 'spring-basic',
@@ -244,8 +231,6 @@ export const SeasonsBoard = ({
   const actionById = new Map(seasonActions.map((action) => [action.id, action]))
   const playerById = new Map(players.map((player) => [player.id, player]))
   const currentSeason = throughTheSeasons.currentSeason
-  const currentAction = actionById.get(seasonActionIdBySeason[currentSeason])
-  const currentActionName = currentAction ? t(locale, currentAction.nameKey) : t(locale, 'ui.seasons.missingAction')
 
   return (
     <section className="seasons-board" aria-label={t(locale, 'ui.seasons.board')}>
@@ -326,34 +311,6 @@ export const SeasonsBoard = ({
           )
         })}
       </div>
-      <aside className="seasons-board__sidebar">
-        <div className="seasons-board__status-card">
-          <h3>{t(locale, seasonLabelKey[currentSeason])}</h3>
-          <p>{t(locale, 'ui.seasons.activeSpecialAction', { action: currentActionName })}</p>
-          <dl>
-            <div>
-              <dt>{t(locale, 'ui.seasons.seasonStatus')}</dt>
-              <dd>{t(locale, seasonLabelKey[currentSeason])}</dd>
-            </div>
-            <div>
-              <dt>{t(locale, 'ui.seasons.actionStatus')}</dt>
-              <dd>{currentActionName}</dd>
-            </div>
-          </dl>
-        </div>
-        <div className="seasons-board__flow">
-          <h3>{t(locale, 'ui.seasons.flowTitle')}</h3>
-          <p>{t(locale, 'ui.seasons.flowSubtitle')}</p>
-          <ol>
-            {seasonFlowOrder.map((season) => (
-              <li key={season} className={season === currentSeason ? 'is-current' : undefined}>
-                <strong>{t(locale, seasonShortLabelKey[season])}</strong>
-                <span>{t(locale, flowSummaryKey[season])}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </aside>
     </section>
   )
 }
