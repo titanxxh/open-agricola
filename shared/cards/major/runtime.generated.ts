@@ -18,6 +18,16 @@ import { Major_Pottery2 } from './pottery'
 import { Major_Basket2 } from './basketmaker'
 import { Major_Moor_HorseSlaughterhouse2 } from './moor-horse-cookery'
 import { Major_Moor_Cookhouse2 } from './moor-horse-cookery'
+import { Major_Moor_PeatCharcoalKiln } from './moor-major-improvements'
+import { Major_Moor_ForestersLodge } from './moor-major-improvements'
+import { Major_Moor_RidingStables } from './moor-major-improvements'
+import { Major_Moor_MuseumOfTheMoors } from './moor-major-improvements'
+import { Major_Moor_HeatingOven } from './moor-major-improvements'
+import { Major_Moor_TiledOven } from './moor-major-improvements'
+import { Major_Moor_VillageChurch } from './moor-major-improvements'
+import { Major_Moor_FurnitureStall } from './moor-major-improvements'
+import { Major_Moor_CeramicsStall } from './moor-major-improvements'
+import { Major_Moor_BasketStall } from './moor-major-improvements'
 import { Major_CookingHearth1 } from './cooking-hearth'
 import { Major_Fireplace1 } from './fireplace'
 import { Major_Moor_Cookhouse1 } from './moor-horse-cookery'
@@ -42,6 +52,16 @@ export const majorCardSources = [
   Major_Basket2,
   Major_Moor_HorseSlaughterhouse2,
   Major_Moor_Cookhouse2,
+  Major_Moor_PeatCharcoalKiln,
+  Major_Moor_ForestersLodge,
+  Major_Moor_RidingStables,
+  Major_Moor_MuseumOfTheMoors,
+  Major_Moor_HeatingOven,
+  Major_Moor_TiledOven,
+  Major_Moor_VillageChurch,
+  Major_Moor_FurnitureStall,
+  Major_Moor_CeramicsStall,
+  Major_Moor_BasketStall,
   Major_CookingHearth1,
   Major_Fireplace1,
   Major_Moor_Cookhouse1,
