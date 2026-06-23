@@ -41,6 +41,7 @@ import { privateFieldPhaseAction } from './effects/private-field-phase'
 import { animalMarketCattleAction } from './effects/animal-market-cattle'
 import { completeParentFatherAction } from '../parents/father-completion'
 import { summerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
+import { moorWoodToFuelAction } from '../moor/wood-to-fuel'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -89,4 +90,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   completeParentFatherAction,
   summerSellGrainAction,
   summerBreadOrSellAction,
+  moorWoodToFuelAction,
 ]

@@ -24,6 +24,7 @@ export type SubFlowReason =
   | 'stage-hook'
   | 'reorganize'
   | 'feed'
+  | 'heating'
   | 'card-draft'
   | 'confirm-next-player'
   | 'confirm-player-switch'

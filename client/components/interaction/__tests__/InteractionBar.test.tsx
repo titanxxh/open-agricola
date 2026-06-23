@@ -35,6 +35,67 @@ afterEach(() => {
 })
 
 describe('InteractionBar', () => {
+  it('confirms heating with selected fuel and wood conversion', () => {
+    const confirmHeating = vi.fn()
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        heatingPending={{
+          playerName: 'P1',
+          required: 2,
+          maxFuelPayable: 1,
+          maxWoodConvertibleToFuel: 1,
+        }}
+        confirmHeating={confirmHeating}
+        onUndo={noop}
+        onUndoAction={noop}
+        canUndoStep={false}
+        canUndoAction={false}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Wood to convert'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Fuel to pay'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm heating' }))
+
+    expect(confirmHeating).toHaveBeenCalledWith({ woodToFuel: 1, fuelUsed: 2 })
+  })
+
   it('allows empty confirm for optional farm-position selection prompts', () => {
     const resolveChoice = vi.fn()
     const optionalSelectionChoice: PendingChoice = {

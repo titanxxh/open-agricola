@@ -946,6 +946,18 @@ export const GameContainerApi = () => {
         : null,
     [interaction, state],
   )
+  const heatingPending = useMemo(
+    () =>
+      interaction.stateId === 'wait' && interaction.request.kind === 'heating' && state
+        ? {
+            playerName: state.players[interaction.playerIndex]?.name ?? '',
+            required: interaction.request.required,
+            maxFuelPayable: interaction.request.maxFuelPayable,
+            maxWoodConvertibleToFuel: interaction.request.maxWoodConvertibleToFuel,
+          }
+        : null,
+    [interaction, state],
+  )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId === 'wait') {
@@ -1247,6 +1259,11 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait' || interaction.request.kind !== 'feed') return
     void transport.confirmFeed(interaction.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
   }, [interaction, transport, isInteractive, harvestFeedSelections])
+  const confirmHeating = useCallback((payload: { fuelUsed: number; woodToFuel: number }) => {
+    if (!isInteractive) return
+    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'heating') return
+    void transport.resolveChoice(interaction.playerIndex, 'confirm', payload).catch((e) => console.error(e))
+  }, [interaction, transport, isInteractive])
 
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
@@ -2439,6 +2456,8 @@ export const GameContainerApi = () => {
         isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
         resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
         harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
+        heatingPending={heatingPending}
+        confirmHeating={confirmHeating}
         isInteractive={isInteractive}
         onUndo={undoStep}
         onUndoAction={undoAction}

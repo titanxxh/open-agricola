@@ -764,6 +764,7 @@ export type ActionDefinition = {
   gainPerRound: Partial<Resource>
   players?: number[]
   linkedGroupId?: string
+  maxOccupancy?: number | null
   strictCanExecute?: boolean
   /** Mark as an anytime action that can interrupt the current flow. */
   anytime?: boolean
@@ -847,6 +848,7 @@ export type FeedQueueEntry = {
   index: number
   remaining: number
   foodUsed: number
+  needsFeed?: boolean
 }
 
 export type SubFlowKind =
@@ -855,6 +857,7 @@ export type SubFlowKind =
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'feed'
+  | 'heating'
   | 'farm-select'
   | 'selection'
   | 'card-draft'
@@ -874,6 +877,14 @@ export type InteractionRequest =
       kind: 'feed'
       remaining: number
       foodUsed: number
+      feedQueue?: FeedQueueEntry[]
+    }
+  | {
+      kind: 'heating'
+      playerId: string
+      required: number
+      maxFuelPayable: number
+      maxWoodConvertibleToFuel: number
       feedQueue?: FeedQueueEntry[]
     }
   | {

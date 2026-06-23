@@ -183,6 +183,12 @@ import {
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 import { resetMoorSpecialActionCards, type MoorSpecialActionPayload } from '../moor/special-actions'
 import type { MoorSpecialActionId } from '../moor/types'
+import {
+  applyHeatingPayment,
+  computeHeatingRequirement,
+  recoverInfirmaryWorkers,
+  type HeatingPaymentPayload,
+} from '../moor/heating'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -1138,6 +1144,13 @@ export class GameCore {
   ): void {
     roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
   }
+  private startHeatingSubFlow(
+    playerIndex: number,
+    required: number,
+    feedQueue?: FeedQueueEntry[],
+  ): void {
+    roundPhase.startHeatingSubFlow(this, playerIndex, required, feedQueue)
+  }
 
   private createEngine(
     actionId: string,
@@ -1690,6 +1703,18 @@ export class GameCore {
           remaining: request.remaining,
           foodUsed: request.foodUsed,
           feedQueue: request.feedQueue,
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
+      case 'heating':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
@@ -2880,9 +2905,29 @@ export class GameCore {
     return this.executeFeedingLogic()
   }
 
+  private continueHarvestFeedingQueue(feedQueue: FeedQueueEntry[]): SessionResponse {
+    const next = feedQueue[0]
+    if (!next) return this.startBreedPhase()
+    const rest = feedQueue.slice(1)
+    if (next.needsFeed) {
+      this.startFeedSubFlow(next.index, next.remaining, next.foodUsed, rest)
+      return this.respond()
+    }
+    return this.startHeatingOrContinue(next.index, rest)
+  }
+
+  private startHeatingOrContinue(playerIndex: number, feedQueue: FeedQueueEntry[]): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.continueHarvestFeedingQueue(feedQueue)
+    const required = computeHeatingRequirement(this.state, player)
+    if (required <= 0) return this.continueHarvestFeedingQueue(feedQueue)
+    this.startHeatingSubFlow(playerIndex, required, feedQueue)
+    return this.respond()
+  }
+
   private executeFeedingLogic(): SessionResponse {
     const harvestOrder = this.getHarvestPlayerIndices()
-    const feedQueue: { index: number; remaining: number; foodUsed: number }[] = []
+    const feedQueue: FeedQueueEntry[] = []
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
@@ -2901,9 +2946,10 @@ export class GameCore {
           if (useFood > 0) {
             this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
           }
+          feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
           continue
         }
-        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
+        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood, needsFeed: true })
         continue
       }
 
@@ -2913,28 +2959,18 @@ export class GameCore {
         hasHarvestExchange
 
       if (canConvert) {
-        feedQueue.push({ index: i, remaining, foodUsed: useFood })
+        feedQueue.push({ index: i, remaining, foodUsed: useFood, needsFeed: true })
       } else {
         player.resources.begging += remaining
         this.logHarvestResourceEntry('log.harvestFeedDetail', player, {
           food: useFood,
           begging: remaining,
         })
+        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
       }
     }
 
-    if (feedQueue.length > 0) {
-      const first = feedQueue[0]!
-      this.startFeedSubFlow(
-        first.index,
-        first.remaining,
-        first.foodUsed,
-        feedQueue.slice(1),
-      )
-      return this.respond()
-    }
-
-    return this.startBreedPhase()
+    return this.continueHarvestFeedingQueue(feedQueue)
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
@@ -4005,6 +4041,8 @@ export class GameCore {
             ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
           return this.handleFeedResolved(playerIndex, sels)
         }
+        case 'heating':
+          return this.handleHeatingResolved(playerIndex, payload as HeatingPaymentPayload | undefined)
         case 'animal-reorg':
         case 'choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
@@ -4246,18 +4284,31 @@ export class GameCore {
     // one residual `__interaction_only__` frame per resolved player.
     const top = this.engineStack.current()
     if (top?.reason === 'feed') this.engineStack.pop()
-    if (feedQueue.length > 0) {
-      const next = feedQueue[0]!
-      this.startFeedSubFlow(
-        next.index,
-        next.remaining,
-        next.foodUsed,
-        feedQueue.slice(1),
-      )
-      return this.respond()
-    }
+    return this.startHeatingOrContinue(playerIndex, feedQueue)
+  }
 
-    return this.startBreedPhase()
+  private handleHeatingResolved(
+    playerIndex: number,
+    payload: HeatingPaymentPayload = {},
+  ): SessionResponse {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const request = envelope?.request
+    const frame = this.engineStack.current()
+    if (
+      request?.kind !== 'heating' ||
+      frame?.ownerPlayerIndex !== playerIndex
+    ) {
+      return this.respond(false, 'no pending heating')
+    }
+    this.pushHistory()
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+
+    applyHeatingPayment(this.state, player, payload)
+
+    const top = this.engineStack.current()
+    if (top?.reason === 'heating') this.engineStack.pop()
+    return this.continueHarvestFeedingQueue(request.feedQueue ?? [])
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
@@ -4315,6 +4366,7 @@ export class GameCore {
       }])
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
+    recoverInfirmaryWorkers(this.state)
     resetMoorSpecialActionCards(this.state)
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })

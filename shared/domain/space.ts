@@ -19,6 +19,12 @@ export const normalizeTakenBy = (value: unknown): WorkerRef[] => {
 export const isSpaceOccupied = (s: ActionSpace): boolean =>
   s.takenBy.length > 0
 
+export const canSpaceAcceptWorker = (s: ActionSpace): boolean => {
+  if (s.maxOccupancy === null) return true
+  const maxOccupancy = s.maxOccupancy ?? 1
+  return s.takenBy.length < maxOccupancy
+}
+
 export const normalizeBlockedBy = (value: unknown): BlockedActionSpaceRef[] => {
   if (!Array.isArray(value)) return []
   return value.flatMap((entry): BlockedActionSpaceRef[] => {

@@ -1283,6 +1283,7 @@ export function engineProceed(
         result.request.kind === 'confirm-next-player' ||
         result.request.kind === 'confirm-player-switch' ||
         result.request.kind === 'feed' ||
+        result.request.kind === 'heating' ||
         result.request.kind === 'selection' ||
         result.request.kind === 'card-draft' ||
         result.request.kind === 'select-trigger' ||

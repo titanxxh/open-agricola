@@ -48,6 +48,7 @@ export type EngineChoice = {
 export type PendingSyntheticKind =
   | 'interaction-only'
   | 'feed'
+  | 'heating'
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'farm-select'

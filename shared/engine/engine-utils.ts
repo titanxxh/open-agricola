@@ -1076,6 +1076,7 @@ function requestSyntheticKind(
 ): PendingSyntheticKind | undefined {
   if (pendingActionId === '__interaction_only__') return 'interaction-only'
   if (request.kind === 'feed') return 'feed'
+  if (request.kind === 'heating') return 'heating'
   if (request.kind === 'confirm-next-player') return 'confirm-next-player'
   if (request.kind === 'confirm-player-switch') return 'confirm-player-switch'
   if (request.kind === 'farm-select') return 'farm-select'
