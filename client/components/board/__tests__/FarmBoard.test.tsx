@@ -453,6 +453,32 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
   })
 
+  it('renders BGA-style image layers for empty, room, and field farm tiles', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+            { key: 'tile-0-2', type: 'tile', tileRow: 0, tileCol: 2 },
+          ],
+          roomPositions: new Set(['0-0']),
+          fieldPositions: new Set(['0-1']),
+        })}
+      />,
+    )
+
+    expect(html).toContain('farm-node-background')
+    expect(html).toContain('empty-node empty-node-')
+    expect(html).toContain('meeple-roomWood')
+    expect(html).toContain('meeple-field')
+    expect(html).not.toContain('farm-tile-text">Wood room')
+    expect(html).not.toContain('farm-tile-text">Field')
+    expect(html).not.toContain('farm-tile-text">Empty')
+  })
+
   it('renders a B85 farmHand candidate as a clickable frame at the 2x2 center post', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

@@ -258,6 +258,64 @@ const humanizeSourceCard = (sourceCard: string) => {
 const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
   sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
 
+const BGA_EMPTY_SLOT_VARIANTS = [
+  [4, 0, 1, 2, 6],
+  [5, 1, 6, 5, 4],
+  [3, 3, 2, 1, 0],
+] as const
+
+const BGA_ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly number[])[]> = {
+  red: [
+    [0, 12, 4, 9, 10],
+    [5, 1, 7, 3, 4],
+    [3, 11, 2, 8, 6],
+  ],
+  yellow: [
+    [10, 3, 2, 0, 6],
+    [15, 11, 7, 14, 4],
+    [5, 1, 4, 12, 13],
+  ],
+  blue: [
+    [1, 5, 13, 8, 12],
+    [2, 0, 10, 3, 15],
+    [7, 11, 6, 14, 4],
+  ],
+  black: [
+    [12, 2, 0, 7, 11],
+    [13, 9, 15, 4, 5],
+    [6, 3, 14, 8, 1],
+  ],
+  green: [
+    [10, 3, 2, 0, 6],
+    [15, 11, 7, 14, 4],
+    [5, 1, 4, 12, 13],
+  ],
+  purple: [
+    [7, 1, 2, 15, 0],
+    [3, 5, 14, 12, 4],
+    [8, 11, 10, 9, 6],
+  ],
+}
+
+const tileVariant = (matrix: readonly (readonly number[])[], row: number, col: number): number => {
+  const r = ((row % matrix.length) + matrix.length) % matrix.length
+  const c = ((col % matrix[r].length) + matrix[r].length) % matrix[r].length
+  return matrix[r][c] ?? 0
+}
+
+const emptySlotClass = (row: number, col: number) =>
+  `empty-node-${tileVariant(BGA_EMPTY_SLOT_VARIANTS, row, col)}`
+
+const roomLayoutClass = (color: PlayerState['color'], row: number, col: number) =>
+  `room-layout-${tileVariant(BGA_ROOM_LAYOUT_VARIANTS[color], row, col)}`
+
+const roomSpriteClass = (houseType: PlayerState['houseType']) =>
+  houseType === 'clay'
+    ? 'meeple-roomClay'
+    : houseType === 'stone'
+      ? 'meeple-roomStone'
+      : 'meeple-roomWood'
+
 export type FarmBoardProps = {
   locale: Locale
   players: PlayerState[]
@@ -924,6 +982,17 @@ export const FarmBoard = ({
                 )}/1`
               : '0/1'
             : null
+          const tileLabel = isRoom
+            ? displayPlayer.houseType === 'clay'
+              ? t(locale, 'ui.houseClay')
+              : displayPlayer.houseType === 'stone'
+                ? t(locale, 'ui.houseStone')
+                : t(locale, 'ui.houseWood')
+            : isField
+              ? t(locale, 'ui.tileField')
+              : isStable
+                ? t(locale, 'ui.tileStable')
+                : terrainLabel ?? t(locale, 'ui.tileEmpty')
           return (
             <div
               key={cell.key}
@@ -940,6 +1009,8 @@ export const FarmBoard = ({
               }${terrain ? ` farm-terrain-${terrain.kind}` : ''}${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
               }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
+              title={tileLabel}
+              aria-label={tileLabel}
               onClick={() => {
                 if (isRoomSelectable) {
                   toggleRoomTile({ row: tileRow, col: tileCol })
@@ -958,6 +1029,15 @@ export const FarmBoard = ({
                 }
               }}
             >
+              <div className="farm-node-background" aria-hidden="true">
+                {isRoom ? (
+                  <div className={`${roomSpriteClass(displayPlayer.houseType)} ${roomLayoutClass(displayPlayer.color, tileRow, tileCol)}`} />
+                ) : isField ? (
+                  <div className="meeple-field" />
+                ) : (
+                  <div className={`empty-node ${emptySlotClass(tileRow, tileCol)}`} />
+                )}
+              </div>
               {isStable ? (
                 <div
                   className="stable-barn-icon"
@@ -966,19 +1046,6 @@ export const FarmBoard = ({
                   <span className="res-icon res-icon-barn" />
                 </div>
               ) : null}
-              <span className="farm-tile-text">
-                {isRoom
-                  ? displayPlayer.houseType === 'clay'
-                    ? t(locale, 'ui.houseClay')
-                    : displayPlayer.houseType === 'stone'
-                      ? t(locale, 'ui.houseStone')
-                      : t(locale, 'ui.houseWood')
-                  : isField
-                    ? t(locale, 'ui.tileField')
-                    : isStable
-                      ? null
-                      : terrainLabel ?? t(locale, 'ui.tileEmpty')}
-              </span>
               {isSowSelectable ? (
                 <SowChoiceButtons
                   locale={locale}
