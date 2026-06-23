@@ -2448,9 +2448,11 @@ export class GameCore {
       if (playerIndex === -1) continue
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
       const receiveResources: Partial<Resource> = {}
-      for (const key of resourceKeyList) {
-        const amount = entry.resources[key] ?? 0
-        if (amount > 0) receiveResources[key] = amount
+      if (this.futureMeepleResourceConditionMet(entry)) {
+        for (const key of resourceKeyList) {
+          const amount = entry.resources[key] ?? 0
+          if (amount > 0) receiveResources[key] = amount
+        }
       }
       if (Object.keys(receiveResources).length > 0) {
         const receiveEntries = receiveEntriesByPlayer.get(entry.playerId) ?? []
@@ -2504,6 +2506,40 @@ export class GameCore {
       flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
       playerIndex: firstPlayerIndex,
     }
+  }
+
+  private futureMeepleResourceConditionMet(entry: GameState['futureMeeples'][number]): boolean {
+    const condition = entry.actionContext?.resourceCondition
+    if (!condition || typeof condition !== 'object' || Array.isArray(condition)) return true
+    const raw = condition as { kind?: unknown; resource?: unknown; amount?: unknown }
+    if (raw.kind !== 'min-resource') return true
+    if (typeof raw.resource !== 'string') return true
+    const resource = raw.resource as keyof Resource
+    if (!resourceKeyList.includes(resource) && resource !== 'horse' && resource !== 'fuel') return true
+    if (typeof raw.amount !== 'number' || !Number.isFinite(raw.amount)) return true
+    const player = this.state.players.find((candidate) => candidate.id === entry.playerId)
+    if (!player) return false
+    return (player.resources[resource] ?? 0) >= Math.max(0, Math.floor(raw.amount))
+  }
+
+  private buildFutureMeepleResolvedEvents(): ImmediateEventDraft[] {
+    return this.state.futureMeeples
+      .filter((entry) =>
+        entry.round === this.state.round &&
+        this.state.players.some((player) => player.id === entry.playerId),
+      )
+      .map((entry) => {
+        const resources = this.futureMeepleResourceConditionMet(entry) ? entry.resources : {}
+        return {
+          type: 'futureMeeple.resolved',
+          playerId: entry.playerId,
+          cardId: entry.cardId,
+          sourceCardId: entry.cardId,
+          round: entry.round,
+          ...(Object.keys(resources ?? {}).length > 0 ? { resources } : {}),
+          ...(entry.roomType ? { roomType: entry.roomType } : {}),
+        } as ImmediateEventDraft
+      })
   }
 
   private startStageFlow(
@@ -3043,20 +3079,7 @@ export class GameCore {
       delete player._extraTurnConsumedCount
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
-    const futureResolvedEvents = this.state.futureMeeples
-      .filter((entry) =>
-        entry.round === this.state.round &&
-        this.state.players.some((player) => player.id === entry.playerId),
-      )
-      .map((entry) => ({
-        type: 'futureMeeple.resolved',
-        playerId: entry.playerId,
-        cardId: entry.cardId,
-        sourceCardId: entry.cardId,
-        round: entry.round,
-        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
-        ...(entry.roomType ? { roomType: entry.roomType } : {}),
-      }) as ImmediateEventDraft)
+    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
     const openActionSpaceIds = new Set<string>()
     const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
@@ -3148,20 +3171,7 @@ export class GameCore {
 
   private continueCurrentFutureMeepleActions(): SessionResponse {
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
-    const futureResolvedEvents = this.state.futureMeeples
-      .filter((entry) =>
-        entry.round === this.state.round &&
-        this.state.players.some((player) => player.id === entry.playerId),
-      )
-      .map((entry) => ({
-        type: 'futureMeeple.resolved',
-        playerId: entry.playerId,
-        cardId: entry.cardId,
-        sourceCardId: entry.cardId,
-        round: entry.round,
-        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
-        ...(entry.roomType ? { roomType: entry.roomType } : {}),
-      }) as ImmediateEventDraft)
+    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
     applyFutureMeeples(this.state, { skipResourceReceive: true })
     if (futureResolvedEvents.length > 0) {
       const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)

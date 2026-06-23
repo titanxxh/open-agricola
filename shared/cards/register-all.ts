@@ -895,6 +895,10 @@ import { Major_StoneOven2 } from './major/stone-oven'
 import { Major_Joinery2 } from './major/joinery'
 import { Major_Pottery2 } from './major/pottery'
 import { Major_Basket2 } from './major/basketmaker'
+import { Major_Moor_PeatCharcoalKiln } from './major/moor-major-improvements'
+import { Major_Moor_ForestersLodge } from './major/moor-major-improvements'
+import { Major_Moor_RidingStables } from './major/moor-major-improvements'
+import { Major_Moor_MuseumOfTheMoors } from './major/moor-major-improvements'
 import { Major_Moor_HeatingOven } from './major/moor-major-improvements'
 import { Major_Moor_VillageChurch } from './major/moor-major-improvements'
 
@@ -1792,6 +1796,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'Major_Joinery2': Major_Joinery2.impl,
   'Major_Pottery2': Major_Pottery2.impl,
   'Major_Basket2': Major_Basket2.impl,
+  'Major_Moor_PeatCharcoalKiln': Major_Moor_PeatCharcoalKiln.impl,
+  'Major_Moor_ForestersLodge': Major_Moor_ForestersLodge.impl,
+  'Major_Moor_RidingStables': Major_Moor_RidingStables.impl,
+  'Major_Moor_MuseumOfTheMoors': Major_Moor_MuseumOfTheMoors.impl,
   'Major_Moor_HeatingOven': Major_Moor_HeatingOven.impl,
   'Major_Moor_VillageChurch': Major_Moor_VillageChurch.impl,
 }

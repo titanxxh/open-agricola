@@ -52,7 +52,7 @@ const choosePaymentIfNeeded = (session: GameSession, resp: ReturnType<GameSessio
 const buyMajor = (session: GameSession, cardId: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
-  if (resp.interaction.stateId === 'wait') {
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseImprovement') {
     const option = resp.interaction.options?.find(
       (candidate: ActionChoiceOption) => candidate.value === `major:${cardId}`,
     )
@@ -61,6 +61,22 @@ const buyMajor = (session: GameSession, cardId: string) => {
     expect(resp.ok).toBe(true)
   }
   return choosePaymentIfNeeded(session, resp)
+}
+
+const performRoundEndThroughReorganize = (session: GameSession) => {
+  let resp = session.performRoundEnd()
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+    resp = session.resolveChoice(
+      resp.interaction.playerIndex ?? 0,
+      'confirm',
+      (resp.interaction as { zones?: unknown }).zones,
+    )
+    expect(resp.ok).toBe(true)
+    resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+  }
+  return resp
 }
 
 describe('Farmers of the Moor remaining major improvements', () => {
@@ -145,10 +161,11 @@ describe('Farmers of the Moor remaining major improvements', () => {
 
     const blocked = blockedSession.takeAction(0, 'major-improvement')
 
-    if (blocked.ok && blocked.interaction.stateId === 'wait') {
+    if (blocked.ok && blocked.interaction.stateId === 'wait' && blocked.interaction.options) {
       expect(blocked.interaction.options?.map((option) => option.value)).not.toContain('major:Major_Fireplace1')
     } else {
-      expect(blocked.ok).toBe(false)
+      expect(blockedSession.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+      expect(blockedSession.state.players[0]!.resources.clay).toBe(1)
     }
   })
 
@@ -178,10 +195,12 @@ describe('Farmers of the Moor remaining major improvements', () => {
       actionContext: { resourceCondition: { kind: 'min-resource', resource: 'horse', amount: 2 } },
     }]
     blockedPlayer.resources.horse = 1
+    blockedPlayer.houseAnimalType = 'horse'
+    blockedPlayer.houseAnimalCount = 1
     const foodBefore = blockedPlayer.resources.food
     for (const player of blockedSession.state.players) markAllWorkersUsed(blockedSession.state, player)
 
-    expect(blockedSession.performRoundEnd().ok).toBe(true)
+    performRoundEndThroughReorganize(blockedSession)
     expect(blockedSession.state.round).toBe(4)
     expect(blockedPlayer.resources.food).toBe(foodBefore)
     expect(blockedSession.state.futureMeeples).toEqual([])
@@ -202,10 +221,14 @@ describe('Farmers of the Moor remaining major improvements', () => {
       actionContext: { resourceCondition: { kind: 'min-resource', resource: 'horse', amount: 2 } },
     }]
     paidPlayer.resources.horse = 2
+    paidPlayer.houseAnimalType = 'horse'
+    paidPlayer.houseAnimalCount = 1
+    paidPlayer.stableTiles = [{ row: 0, col: 0 }]
+    paidPlayer.stableAnimals = { '0-0': 'horse' }
     const paidFoodBefore = paidPlayer.resources.food
     for (const player of paidSession.state.players) markAllWorkersUsed(paidSession.state, player)
 
-    expect(paidSession.performRoundEnd().ok).toBe(true)
+    performRoundEndThroughReorganize(paidSession)
     expect(paidSession.state.round).toBe(4)
     expect(paidPlayer.resources.food).toBe(paidFoodBefore + 1)
   })

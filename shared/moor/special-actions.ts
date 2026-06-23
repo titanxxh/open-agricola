@@ -1,4 +1,5 @@
-import type { FarmTilePosition, Field, GameState, PlayerState } from '../contract/types'
+import type { FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
+import { getMajorCard } from '../cards/major'
 import { positionKey } from '../domain/farm'
 import { replaceTerrainWithField } from './farm-terrain'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
@@ -55,6 +56,26 @@ const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boo
 
 const horseMarketFoodCost = (state: GameState): number =>
   [2, 5, 6].includes(state.players.length) ? 1 : 0
+
+const applyMoorSpecialActionBonuses = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+): void => {
+  if (state.enableFarmersOfTheMoor !== true) return
+  const resources = player.resources as Record<keyof Resource, number | undefined>
+  for (const cardId of player.improvements ?? []) {
+    const card = getMajorCard(cardId)
+    for (const bonus of card?.moorSpecialActionBonuses ?? []) {
+      if (bonus.actionId !== actionId) continue
+      const amount = (resources.horse ?? 0) > 0 && bonus.horseAmount !== undefined
+        ? bonus.horseAmount
+        : bonus.amount
+      if (amount <= 0) continue
+      resources[bonus.resource] = (resources[bonus.resource] ?? 0) + amount
+    }
+  }
+}
 
 export const validateMoorSpecialAction = (
   state: GameState,
@@ -119,10 +140,12 @@ export const applyMoorSpecialAction = (
     case 'cut-peat':
       if (!removeTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
       player.resources.fuel = (player.resources.fuel ?? 0) + 3
+      applyMoorSpecialActionBonuses(state, player, actionId)
       break
     case 'fell-trees':
       if (!removeTerrain(player, payload.tile, 'forest')) return { ok: false, error: 'terrain unavailable' }
       player.resources.wood += 2
+      applyMoorSpecialActionBonuses(state, player, actionId)
       break
     case 'slash-and-burn': {
       if (!payload.tile) return { ok: false, error: 'terrain unavailable' }
