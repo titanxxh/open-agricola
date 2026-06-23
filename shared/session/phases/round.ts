@@ -220,6 +220,10 @@ export const takeSpecialAction = (
 
   const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!result.ok) return core.emitResponse(false, result.error)
+  if (core.hasPendingAnimalsCheck(player)) {
+    core.startReorgSubFlow(playerIndex, 'anytime', { originPlayerIndex: playerIndex })
+    return core.emitResponse()
+  }
   return core.invokeEndTurnHooks(playerIndex)
 }
 

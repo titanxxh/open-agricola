@@ -31,9 +31,9 @@ describe('computeAnytimePolicy', () => {
       .toEqual({ allowed: false, reason: 'confirm-window' })
   })
 
-  it('rule 4 — animal-reorg → allowed, blocks exchange', () => {
+  it('rule 4 — animal-reorg → allowed, including exchange before animals run away', () => {
     expect(computeAnytimePolicy(base({ interactionKind: 'animal-reorg' })))
-      .toEqual({ allowed: true, blockedIds: ['exchange'] })
+      .toEqual({ allowed: true, blockedIds: [] })
   })
 
   it('rule 5 — exchange promptKey → allowed, blocks exchange', () => {
@@ -54,7 +54,7 @@ describe('computeAnytimePolicy', () => {
           stageResume: { hook: 'onReorganizeComplete', playerIndex: 0, cardIndex: 0 },
         }),
       ),
-    ).toEqual({ allowed: true, blockedIds: ['exchange'] })
+    ).toEqual({ allowed: true, blockedIds: [] })
   })
 
   it('rule 5 overrides rule 6 — exchange promptKey + stageResume non-null still allowed', () => {

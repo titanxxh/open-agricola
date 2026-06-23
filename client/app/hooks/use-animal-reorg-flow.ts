@@ -1,16 +1,13 @@
 import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
-export type AnimalTotals = {
-  sheep: number
-  boar: number
-  cattle: number
-}
+export type AnimalTotals = Record<AnimalKey, number>
 
-type AnimalType = 'sheep' | 'boar' | 'cattle'
+type AnimalType = AnimalKey
 
 type AnimalDisplay = {
   animalType: AnimalType | null
@@ -19,7 +16,7 @@ type AnimalDisplay = {
 }
 
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
-  Boolean(remaining && (remaining.sheep > 0 || remaining.boar > 0 || remaining.cattle > 0))
+  Boolean(remaining && ALL_ANIMAL_KEYS.some((animal) => remaining[animal] > 0))
 
 export const shouldShowAnimalDiscardPrompt = (
   animalReorg: AnimalReorgState | null,
@@ -51,15 +48,15 @@ export const applyAnimalReorgToPlayer = (params: {
   player.houseAnimalType = houseZone?.animalType ?? null
   player.houseAnimalCount = houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
   const stableZones = animalReorg.zones.filter((zone) => zone.zoneType === 'stable')
-  const stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
+  const stableAnimals: Record<string, AnimalType | null> = {}
   stableZones.forEach((zone) => {
     const key = zone.id.replace('stable:', '')
     stableAnimals[key] = zone.animalType ?? null
   })
   player.stableAnimals = stableAnimals
-  player.resources.sheep = totals.sheep
-  player.resources.boar = totals.boar
-  player.resources.cattle = totals.cattle
+  for (const animal of ALL_ANIMAL_KEYS) {
+    player.resources[animal] = totals[animal]
+  }
 }
 
 export const buildPastureDisplayMap = (

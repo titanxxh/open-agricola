@@ -5,7 +5,7 @@ import type { CardProvidedPaymentResourceKey, PaymentResourceKey, Resource } fro
 export const REAL_RESOURCE_KEYS = [
   'wood', 'clay', 'reed', 'stone',
   'food', 'grain', 'vegetable',
-  'sheep', 'boar', 'cattle',
+  'sheep', 'boar', 'cattle', 'horse', 'fuel',
   'begging',
 ] as const satisfies ReadonlyArray<keyof Resource>
 

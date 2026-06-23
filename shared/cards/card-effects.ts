@@ -4,6 +4,7 @@ import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../dom
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
+import type { AnimalKey } from '../contract/animals'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
@@ -25,10 +26,10 @@ export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
  * authors can mirror BGA's `foreach($zone['meeples'] as $meeple)` loop.
  */
 export type Meeple = {
-  type: 'sheep' | 'boar' | 'cattle'
+  type: AnimalKey
 }
 
-export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
+export type BreedAnimalType = AnimalKey
 
 export type BreedThresholdContext = {
   sourceCard: string

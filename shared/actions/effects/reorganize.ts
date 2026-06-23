@@ -6,13 +6,13 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard } from '../../domain'
 import {
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
 } from '../../domain/animal-zones'
 import {
-  ANIMAL_KEYS,
   createAnimalCounts,
   readAnimalHolderCounts,
   sumAnimalCounts,
@@ -29,16 +29,17 @@ export type ZoneAssignment = {
   id: string
   zoneType: InteractionAnimalReorgZone['zoneType']
   cardId?: string
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
-  animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
+  animalCounts?: Partial<Record<AnimalKey, number>>
 }
 
 const addAnimalCounts = (
   target: ReturnType<typeof createAnimalCounts>,
-  counts: Partial<Record<'sheep' | 'boar' | 'cattle', number>>,
+  counts: Partial<Record<AnimalKey, number>>,
+  keys: readonly AnimalKey[],
 ) => {
-  for (const key of ANIMAL_KEYS) target[key] += Math.max(0, counts[key] ?? 0)
+  for (const key of keys) target[key] = (target[key] ?? 0) + Math.max(0, counts[key] ?? 0)
 }
 
 export const applyReorganizeMutate = (
@@ -49,24 +50,29 @@ export const applyReorganizeMutate = (
   const idx = state.players.indexOf(player)
   const computed = playerBoard(state, idx).animals.zones()
   const cap = (id: string) => computed.find((z) => z.id === id)?.capacity ?? 0
+  const animalKeys = animalKeysForState(state)
+  const normalizeAnimalType = (type: AnimalKey | null | undefined): AnimalKey | null =>
+    type && animalKeys.includes(type) ? type : null
 
   const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
   player.pastures = player.pastures.map((p) => {
     const a = pastureZones.find((z) => z.id === p.id)
-    if (!a || !a.animalType) return { ...p, animalType: null, animalCount: 0 }
+    const animalType = normalizeAnimalType(a?.animalType)
+    if (!a || !animalType) return { ...p, animalType: null, animalCount: 0 }
     const count = Math.max(0, Math.min(cap(p.id), a.animalCount))
-    return { ...p, animalType: count > 0 ? a.animalType : null, animalCount: count }
+    return { ...p, animalType: count > 0 ? animalType : null, animalCount: count }
   })
 
   const houseZone = zones.find((z) => z.zoneType === 'house')
-  player.houseAnimalType = houseZone?.animalType ?? null
-  player.houseAnimalCount = houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
+  const houseAnimalType = normalizeAnimalType(houseZone?.animalType)
+  player.houseAnimalType = houseAnimalType
+  player.houseAnimalCount = houseAnimalType && (houseZone?.animalCount ?? 0) > 0 ? 1 : 0
 
-  const stable: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
+  const stable: Record<string, AnimalKey | null> = {}
   zones
     .filter((z) => z.zoneType === 'stable')
     .forEach((z) => {
-      stable[z.id.replace('stable:', '')] = z.animalType ?? null
+      stable[z.id.replace('stable:', '')] = normalizeAnimalType(z.animalType)
     })
   player.stableAnimals = stable
 
@@ -88,11 +94,11 @@ export const applyReorganizeMutate = (
   for (const [cardId, cardZones] of cardZonesById) {
     const existing = player.cardStates?.[cardId]
     const zoneIds = new Set(cardZones.map((zone) => zone.id))
-    const assignedCounts = createAnimalCounts()
+    const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
     zones
       .filter((z) => z.zoneType === 'card' && zoneIds.has(z.id))
       .forEach((assigned) => {
-        addAnimalCounts(assignedCounts, readAnimalCountsForZoneAssignment(assigned))
+        addAnimalCounts(assignedCounts, readAnimalCountsForZoneAssignment(assigned), animalKeys)
       })
     const baseZone = {
       ...cardZones[0]!,
@@ -122,50 +128,48 @@ export const applyReorganizeMutate = (
     player.cardStates![cardId] = nextState
   }
 
-  const totals = createAnimalCounts()
+  const totals = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   zones
     .filter((zone) => zone.zoneType !== 'card' || !keyedCardZoneIds.has(zone.id))
     .forEach((zone) => {
       if (zone.zoneType === 'card') {
         const baseZone = computedZonesById.get(zone.id)
         if (baseZone) {
-          addAnimalCounts(totals, normalizeAnimalCountsForZone(state, player, baseZone, zone))
+          addAnimalCounts(totals, normalizeAnimalCountsForZone(state, player, baseZone, zone), animalKeys)
           return
         }
       }
-      addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone))
+      addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
-  for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts)
-  player.resources.sheep = totals.sheep
-  player.resources.boar = totals.boar
-  player.resources.cattle = totals.cattle
+  for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts, animalKeys)
+  for (const animal of animalKeys) player.resources[animal] = totals[animal] ?? 0
 }
 
-const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
-
-const animalTotals = (player: PlayerState): Pick<Resource, (typeof ANIMAL_TYPES)[number]> => ({
-  sheep: player.resources.sheep ?? 0,
-  boar: player.resources.boar ?? 0,
-  cattle: player.resources.cattle ?? 0,
-})
+const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {
+  const totals: Partial<Pick<Resource, AnimalKey>> = {}
+  for (const type of animalKeysForState(state)) totals[type] = player.resources[type] ?? 0
+  return totals
+}
 
 const discardedAnimals = (
-  before: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
-  after: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
+  state: GameState,
+  before: Partial<Pick<Resource, AnimalKey>>,
+  after: Partial<Pick<Resource, AnimalKey>>,
 ): Partial<Resource> => {
   const discarded: Partial<Resource> = {}
-  for (const type of ANIMAL_TYPES) {
-    const amount = before[type] - after[type]
+  for (const type of animalKeysForState(state)) {
+    const amount = (before[type] ?? 0) - (after[type] ?? 0)
     if (amount > 0) discarded[type] = amount
   }
   return discarded
 }
 
 const positiveAnimals = (
-  animals: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
-): Partial<Pick<Resource, (typeof ANIMAL_TYPES)[number]>> => {
-  const result: Partial<Pick<Resource, (typeof ANIMAL_TYPES)[number]>> = {}
-  for (const type of ANIMAL_TYPES) {
+  state: GameState,
+  animals: Partial<Pick<Resource, AnimalKey>>,
+): Partial<Pick<Resource, AnimalKey>> => {
+  const result: Partial<Pick<Resource, AnimalKey>> = {}
+  for (const type of animalKeysForState(state)) {
     const amount = animals[type] ?? 0
     if (amount > 0) result[type] = amount
   }
@@ -195,7 +199,7 @@ export const reorganizeAction: ActionDefinition = {
       id: zone.id,
       zoneType: zone.zoneType,
       cardId: zone.cardId,
-      animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+      animalType: zone.animalType ?? null,
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
@@ -223,17 +227,17 @@ export const reorganizeAction: ActionDefinition = {
         ? (rawPayload as { zones: ZoneAssignment[] }).zones
         : undefined
     if (!zones) return { type: 'fail', errorKey: 'log.reorganizeFail' }
-    const before = animalTotals(ctx.player)
+    const before = animalTotals(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
-    const after = animalTotals(ctx.player)
-    const assigned = positiveAnimals(after)
+    const after = animalTotals(ctx.state, ctx.player)
+    const assigned = positiveAnimals(ctx.state, after)
     if (Object.keys(assigned).length > 0) {
       ctx.eventSink?.emit<'farm.animalMoved'>({
         type: 'farm.animalMoved',
         animals: assigned,
       })
     }
-    const discarded = discardedAnimals(before, after)
+    const discarded = discardedAnimals(ctx.state, before, after)
     if (Object.keys(discarded).length > 0) {
       ctx.eventSink?.emit<'farm.animalDiscarded'>({
         type: 'farm.animalDiscarded',

@@ -117,7 +117,7 @@ export const subtractScoringReserve = (
   const out: Resource = { ...resources }
   for (const key of REAL_RESOURCE_KEYS) {
     const amount = reserved[key] ?? 0
-    if (amount > 0) out[key] = Math.max(0, out[key] - amount)
+    if (amount > 0) out[key] = Math.max(0, (out[key] ?? 0) - amount)
   }
   return out
 }

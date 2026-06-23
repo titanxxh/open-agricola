@@ -35,6 +35,7 @@ type ScoreCategoryKey =
   | 'sheeps'
   | 'boars'
   | 'cattles'
+  | 'horses'
   | 'empty'
   | 'stables'
   | 'clayRooms'
@@ -111,6 +112,8 @@ const RESOURCE_KEYS: (keyof Resource)[] = [
   'sheep',
   'boar',
   'cattle',
+  'horse',
+  'fuel',
   'begging',
 ]
 
@@ -432,6 +435,17 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       quantity: cattleCount,
       entries: [{ type: 'quantity', quantity: cattleCount, score: cattleScore }],
     })
+
+    if (state.enableFarmersOfTheMoor === true) {
+      const horseCount = player.resources.horse ?? 0
+      const horseScore = horseCount > 0 ? horseCount : -1
+      categories.push({
+        key: 'horses',
+        total: horseScore,
+        quantity: horseCount,
+        entries: [{ type: 'quantity', quantity: horseCount, score: horseScore }],
+      })
+    }
 
     const usedTiles = getUsedFarmyardTileKeys(player)
     const rawEmptyCount = Math.max(0, totalTiles - usedTiles.size)

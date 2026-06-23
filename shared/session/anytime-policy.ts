@@ -43,7 +43,7 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
     return { allowed: false, reason: 'confirm-window' }
   }
   if (input.interactionKind === 'animal-reorg') {
-    return { allowed: true, blockedIds: ['exchange'] }
+    return { allowed: true, blockedIds: [] }
   }
   const promptKey = input.promptKey
   if (
