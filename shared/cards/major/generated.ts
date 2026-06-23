@@ -961,6 +961,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 1,
     "extraVp": false,
     "ovenIdentity": true,
+    "requiresFarmersOfTheMoor": true,
+    "heatingRoomDiscount": 1,
     "desc": [
       "Immediately gain 2 fuel.",
       "When heating, heat 1 fewer room than you have."
@@ -979,6 +981,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 1,
     "extraVp": false,
     "ovenIdentity": true,
+    "requiresFarmersOfTheMoor": true,
+    "heatingFuelCap": 1,
     "desc": [
       "Regardless of house size, you need at most 1 fuel to heat your entire home."
     ],
@@ -995,6 +999,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 4,
     "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "Immediately gain 2 food.",
       "[Harvest]",
@@ -1013,9 +1018,24 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "Exchange wood for the same amount of clay."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "wood": 1
+        },
+        "to": {
+          "clay": 1
+        },
+        "sourceId": "Major_Moor_FurnitureStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -1030,9 +1050,24 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "Exchange clay for the same amount of wood."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "wood": 1
+        },
+        "sourceId": "Major_Moor_CeramicsStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
     ],
     "kind": "major"
   },
@@ -1047,9 +1082,48 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "Exchange reed for the same amount of other building resources."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "wood": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "clay": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "stone": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
     ],
     "kind": "major"
   },

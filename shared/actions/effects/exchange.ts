@@ -435,14 +435,17 @@ export const reverseTrade = (trade: Trade): Trade => ({
 // Anytime Cookery Trades (metadata-driven)
 // ============================================
 
-const getCardExchanges = (cardId: string): readonly CardExchange[] => {
+const getCardExchanges = (cardId: string, state?: GameState): readonly CardExchange[] => {
   if (isMajorCardId(cardId)) {
     const major = getMajorCard(cardId)
+    if (major?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
     if (major?.exchanges) return major.exchanges
   }
   const minor = getRegisteredMinorImprovement(cardId)
+  if (minor?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
   if (minor?.exchanges) return minor.exchanges
   const occ = getRegisteredOccupation(cardId)
+  if (occ?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
   if (occ?.exchanges) return occ.exchanges
   return []
 }
@@ -469,7 +472,7 @@ export const getExchangesInWindow = (
 ): Trade[] => {
   const out: Trade[] = []
   for (const cardId of playedCardIds(player)) {
-    for (const ex of getCardExchanges(cardId)) {
+    for (const ex of getCardExchanges(cardId, state)) {
       if ((ex.triggers ?? []).includes(window)) {
         out.push(exchangeToTrade(ex, cardId))
       }
