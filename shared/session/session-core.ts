@@ -121,7 +121,7 @@ import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-fee
 import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, workersAvailable } from '../domain/player.ts'
+import { familySize } from '../domain/player.ts'
 import { getAssignedAnimalsByType } from '../domain/animals.ts'
 import {
   createAnimalCounts,
@@ -185,6 +185,7 @@ import { resetMoorSpecialActionCards, type MoorSpecialActionPayload } from '../m
 import type { MoorSpecialActionId } from '../moor/types'
 import {
   applyHeatingPayment,
+  canMoorWorkerEnterSpace,
   computeHeatingRequirement,
   recoverInfirmaryWorkers,
   type HeatingPaymentPayload,
@@ -3731,7 +3732,7 @@ export class GameCore {
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     if (!canEnterSpace(space, player, this.state)) return false
-    if (workersAvailable(this.state, player) <= 0) return false
+    if (!canMoorWorkerEnterSpace(this.state, player, space.id)) return false
     if (isSpaceBlocked(space)) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
@@ -3767,7 +3768,7 @@ export class GameCore {
     }
 
     // Also mark occupied spaces that computeArgs listeners expose as extra options
-    if (workersAvailable(this.state, player) > 0) {
+    if (canMoorWorkerEnterSpace(this.state, player, 'place-farmer')) {
       const listenerContext: import('../cards/card-listeners.ts').CardListenerContextInput = {
         state: this.state,
         player,

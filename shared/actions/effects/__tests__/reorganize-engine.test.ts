@@ -252,4 +252,33 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.boar).toBe(1)
     expect(ctx.player.resources.cattle).toBe(1)
   })
+
+  it('rejects horses from Wildlife Reserve card zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['C11_WildlifeReserve'],
+        resources: { sheep: 1, boar: 1, cattle: 1, horse: 1 } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: 'card:C11_WildlifeReserve',
+        zoneType: 'card',
+        cardId: 'C11_WildlifeReserve',
+        animalType: null,
+        animalCount: 4,
+        animalCounts: { sheep: 1, boar: 1, cattle: 1, horse: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(1)
+    expect(ctx.player.resources.boar).toBe(1)
+    expect(ctx.player.resources.cattle).toBe(1)
+    expect(ctx.player.resources.horse).toBe(0)
+  })
 })

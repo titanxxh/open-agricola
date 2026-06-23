@@ -54,4 +54,17 @@ describe('C11_WildlifeReserve getInvalidAnimals', () => {
     expect(invalid.length).toBe(2)
     expect(invalid.every(m => m.type === 'sheep')).toBe(true)
   })
+
+  it('flags horses as invalid under Farmers of the Moor', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]!
+    const zone = computeAnimalZones(player).find(z => z.id === `card:C11_WildlifeReserve`)!
+    zone.animalCounts = { sheep: 1, horse: 1 }
+
+    const invalid = computeInvalidAnimalsForZone(state, player, zone)
+
+    expect(invalid).toEqual([{ type: 'horse' }])
+  })
 })

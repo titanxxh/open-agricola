@@ -28,6 +28,7 @@ import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
+import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -1372,11 +1373,7 @@ export const FarmBoard = ({
                       const count =
                         cardAnimalCounts[animalType] ??
                         (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)
-                      const totalCount =
-                        (cardAnimalCounts.sheep ?? 0) +
-                        (cardAnimalCounts.boar ?? 0) +
-                        (cardAnimalCounts.cattle ?? 0) ||
-                        cardDisplay.animalCount
+                      const totalCount = sumAnimalCounts(cardAnimalCounts) || cardDisplay.animalCount
                       const canDecrease =
                         count > 0
                       const canIncrease =
