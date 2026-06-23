@@ -64,7 +64,7 @@ export const zh = {
       },
       boardCopy: {
         winterPlow: '每块已犁田支付 1 食物',
-        winterPlowShort: '每块已犁田',
+        winterPlowShort: '犁一块田：',
         winterFishing: '捕鱼：第 11 回合前不可用',
         springFences: '围栏：+2 段免费围栏（至少购买 1 段）',
         springFencesShort: '围栏',

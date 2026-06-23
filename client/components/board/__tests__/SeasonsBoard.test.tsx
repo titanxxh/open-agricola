@@ -93,7 +93,7 @@ describe('SeasonsBoard', () => {
     expect(takeAction).toHaveBeenCalledWith('season-spring-animal-and-fruit')
   })
 
-  it('renders a clean-background seasons board with active status and localized flow panel', () => {
+  it('renders a clean-background seasons board without extra summary panels', () => {
     const actions = [
       createAction('season-winter-romantic-evening', 'actions.season-winter-romantic-evening.name'),
       createAction('season-spring-animal-and-fruit', 'actions.season-spring-animal-and-fruit.name'),
@@ -135,6 +135,10 @@ describe('SeasonsBoard', () => {
     expect(container.querySelector('.seasons-board__space-button--autumn .seasons-board__action-header')).toHaveTextContent('Thanksgiving')
     expect(container.querySelectorAll('.seasons-board__action-footer')).toHaveLength(4)
     expect(container.querySelector('.seasons-board__resource-adjustment--winter-basic .res-icon-wood')).toBeTruthy()
+    expect(container.querySelector('.seasons-board__resource-adjustment--winter-plow')).toHaveTextContent('plowing a field:')
+    expect(container.querySelector('.seasons-board__resource-adjustment--winter-plow .res-icon-food')).toBeTruthy()
+    expect(container.querySelector('.seasons-board__resource-adjustment--winter-plow .seasons-board__icon-arrow')).toBeTruthy()
+    expect(container.querySelector('.seasons-board__resource-adjustment--winter-plow .res-icon-field')).toBeTruthy()
     expect(container.querySelector('.seasons-board__resource-adjustment--spring-basic .res-icon-stone')).toBeTruthy()
     expect(container.querySelector('.seasons-board__resource-adjustment--summer-fishing .res-icon-food')).toBeTruthy()
     expect(container.querySelector('.seasons-board__resource-adjustment--summer-day-laborer .res-icon-grain')).toBeTruthy()
@@ -150,10 +154,10 @@ describe('SeasonsBoard', () => {
     expect(container.querySelector('.seasons-board__space-button--summer')).toHaveClass('is-current')
     expect(container.querySelector('[data-season-status="occupied"]')).toHaveTextContent('occupied')
     expect(container.querySelectorAll('[data-season-status="locked"]')).toHaveLength(3)
-    expect(screen.getByRole('heading', { name: 'Summer' })).toBeInTheDocument()
-    expect(screen.getByText("Farmer's Market is the active special action.")).toBeInTheDocument()
-    expect(screen.getByText('Season flow')).toBeInTheDocument()
-    expect(screen.getByText(/One seasonal action is exposed each round/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Summer' })).not.toBeInTheDocument()
+    expect(screen.queryByText("Farmer's Market is the active special action.")).not.toBeInTheDocument()
+    expect(screen.queryByText('Season flow')).not.toBeInTheDocument()
+    expect(screen.queryByText(/One seasonal action is exposed each round/i)).not.toBeInTheDocument()
   })
 
   it('localizes the visible seasons board copy in Chinese', () => {
@@ -180,9 +184,9 @@ describe('SeasonsBoard', () => {
     expect(container.querySelectorAll('.seasons-board__cutout-image')).toHaveLength(0)
     expect(container.querySelector('.seasons-board__space-button--winter .seasons-board__action-header')).toHaveTextContent('浪漫夜晚')
     expect(screen.getByText('家中无空房也可')).toBeInTheDocument()
-    expect(screen.getByText('每块已犁田')).toBeInTheDocument()
-    expect(screen.getByText('季节流程')).toBeInTheDocument()
-    expect(screen.getByText(/浪漫夜晚。犁田需要 1 食物/)).toBeInTheDocument()
+    expect(screen.getByText('犁一块田：')).toBeInTheDocument()
+    expect(screen.queryByText('季节流程')).not.toBeInTheDocument()
+    expect(screen.queryByText(/浪漫夜晚。犁田需要 1 食物/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Romantic Evening\. Plow costs/)).not.toBeInTheDocument()
   })
 })

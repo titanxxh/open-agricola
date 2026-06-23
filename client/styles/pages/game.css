@@ -956,6 +956,7 @@
 
 .seasons-board__map {
   position: relative;
+  --seasons-board-copy-size: clamp(0.48rem, 1.04vw, 0.8rem);
   aspect-ratio: 1486 / 1058;
   overflow: hidden;
   border: 1px solid rgba(59, 41, 20, 0.38);
@@ -1058,7 +1059,7 @@
   color: #241909;
   background: transparent;
   font-family: var(--agricola-font);
-  font-size: clamp(0.58rem, 1.45vw, 1.05rem);
+  font-size: var(--seasons-board-copy-size);
   font-weight: 900;
   line-height: 1.02;
   text-align: center;
@@ -1073,7 +1074,6 @@
 .seasons-board__board-copy--season-autumn {
   padding: 0.2% 0.7%;
   background: transparent;
-  font-size: clamp(1rem, 2.75vw, 2.05rem);
   line-height: 0.9;
 }
 
@@ -1122,7 +1122,6 @@
   width: 12.8%;
   height: 4.2%;
   color: #fff4d1;
-  font-size: clamp(0.38rem, 0.76vw, 0.58rem);
   line-height: 0.96;
   text-shadow: 0 2px 3px rgba(18, 22, 22, 0.75);
 }
@@ -1136,7 +1135,7 @@
   gap: 0.3em;
   color: #241909;
   font-family: var(--agricola-font);
-  font-size: clamp(0.62rem, 1.55vw, 1.08rem);
+  font-size: var(--seasons-board-copy-size);
   font-weight: 950;
   line-height: 1;
   text-align: center;
@@ -1202,13 +1201,18 @@
 .seasons-board__icon-separator {
   margin: 0 0.02em;
   color: #2c1c08;
-  font-size: 1.18em;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.seasons-board__icon-arrow {
+  margin: 0 0.08em;
+  color: #2c1c08;
   font-weight: 950;
   line-height: 1;
 }
 
 .seasons-board__icon-text {
-  font-size: 1.15em;
   font-weight: 950;
 }
 
@@ -1226,6 +1230,7 @@
   left: 2.7%;
   top: 34.6%;
   width: 29.5%;
+  gap: 0.2em;
 }
 
 .seasons-board__resource-adjustment--spring-basic {
@@ -1256,7 +1261,6 @@
   width: 12.8%;
   justify-content: flex-end;
   color: #fff4d1;
-  font-size: clamp(0.48rem, 1vw, 0.78rem);
   text-shadow: 0 2px 3px rgba(17, 35, 29, 0.75);
 }
 
@@ -1266,7 +1270,6 @@
   width: 12.8%;
   justify-content: flex-end;
   color: #fff4d1;
-  font-size: clamp(0.48rem, 1vw, 0.78rem);
   text-shadow: 0 2px 3px rgba(18, 22, 22, 0.75);
 }
 
@@ -1276,7 +1279,6 @@
   width: 12.8%;
   justify-content: flex-end;
   color: #fff4d1;
-  font-size: clamp(0.48rem, 1vw, 0.78rem);
   text-shadow: 0 2px 3px rgba(18, 22, 22, 0.75);
 }
 
@@ -1335,28 +1337,28 @@
 .seasons-board__space-button--winter {
   left: 0.9%;
   top: 1.6%;
-  width: 26.6%;
+  width: 24.9%;
   height: 31.6%;
 }
 
 .seasons-board__space-button--spring {
-  left: 73%;
+  left: 74.5%;
   top: 1.4%;
-  width: 26.4%;
+  width: 24.9%;
   height: 32%;
 }
 
 .seasons-board__space-button--summer {
-  left: 74.0%;
+  left: 75.3%;
   top: 63.8%;
-  width: 25.3%;
+  width: 23.8%;
   height: 32.2%;
 }
 
 .seasons-board__space-button--autumn {
   left: 0.7%;
   top: 65.6%;
-  width: 30.0%;
+  width: 23.8%;
   height: 28.7%;
 }
 
@@ -1411,7 +1413,7 @@
   color: #241909;
   background: transparent;
   font-family: var(--agricola-font);
-  font-size: clamp(0.36rem, 1.02vw, 0.78rem);
+  font-size: var(--seasons-board-copy-size);
   font-weight: 850;
   line-height: 1.05;
   text-align: center;
@@ -1436,7 +1438,6 @@
 
 .seasons-board__large-plus {
   color: #1e180f;
-  font-size: 2.15em;
   font-weight: 950;
   line-height: 0.8;
 }
@@ -1446,14 +1447,12 @@
 }
 
 .seasons-board__winter-family > span:last-child {
-  font-size: 0.95em;
   line-height: 1.08;
 }
 
 .seasons-board__winter-harvest {
   display: block;
   max-width: 94%;
-  font-size: 0.92em;
   line-height: 1.12;
 }
 
@@ -1480,11 +1479,9 @@
   gap: 0.08em;
   justify-items: center;
   line-height: 1.03;
-  font-size: 0.88em;
 }
 
 .seasons-board__spring-text strong {
-  font-size: 1.16em;
   line-height: 0.95;
 }
 
@@ -1509,7 +1506,6 @@
 }
 
 .seasons-board__summer-plow strong {
-  font-size: 1.0em;
   line-height: 0.98;
 }
 
@@ -1522,7 +1518,6 @@
   flex: 0 0 10%;
   place-items: center;
   width: 100%;
-  font-size: 0.82em;
   line-height: 1;
 }
 
@@ -1543,16 +1538,11 @@
 }
 
 .seasons-board__summer-market strong {
-  font-size: 0.96em;
   line-height: 0.92;
 }
 
 .seasons-board__summer-market .res-icon-bake {
   font-size: 1.45em;
-}
-
-.seasons-board__summer-market > span:not(.seasons-board__trade-line) {
-  font-size: 0.78em;
 }
 
 .seasons-board__trade-line {
@@ -1561,7 +1551,6 @@
   justify-content: center;
   gap: 0.08em;
   margin-top: 0.05em;
-  font-size: 0.94em;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1580,7 +1569,6 @@
   display: grid;
   gap: 0.1em;
   justify-items: center;
-  font-size: 0.84em;
   line-height: 1.08;
 }
 
@@ -1589,7 +1577,6 @@
   align-items: center;
   justify-content: center;
   gap: 0.12em;
-  font-size: 1.12em;
   line-height: 1;
 }
 
@@ -1601,19 +1588,10 @@
   display: none;
 }
 
-.seasons-board__space-button--summer .seasons-board__action-copy {
-  font-size: clamp(0.34rem, 0.94vw, 0.72rem);
-}
-
-.seasons-board__space-button--autumn .seasons-board__action-copy {
-  font-size: clamp(0.34rem, 0.94vw, 0.7rem);
-}
-
 @media (max-width: 600px) {
   .seasons-board__board-copy--season-autumn {
     left: 31%;
     width: 15%;
-    font-size: clamp(0.72rem, 5vw, 1.2rem);
   }
 }
 
@@ -1665,7 +1643,7 @@
   background: radial-gradient(circle at 35% 30%, #fff0b5, #d7992a);
   box-shadow: 0 6px 12px rgba(35, 23, 12, 0.42), inset 0 0 0 2px rgba(255, 246, 201, 0.72);
   font-family: var(--agricola-font);
-  font-size: clamp(0.85rem, 1.8vw, 1.25rem);
+  font-size: var(--seasons-board-copy-size);
   font-weight: 950;
 }
 
@@ -1689,119 +1667,7 @@
   top: 54.9%;
 }
 
-.seasons-board__sidebar {
-  display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-  gap: 12px;
-  align-items: start;
-  min-width: 0;
-}
-
-.seasons-board__status-card,
-.seasons-board__flow {
-  overflow: hidden;
-  border: 1px solid rgba(66, 42, 19, 0.36);
-  border-radius: 8px;
-  color: #f9edc6;
-  background: #5b3518;
-  box-shadow: 0 8px 18px rgba(33, 24, 13, 0.22);
-}
-
-.seasons-board__status-card h3,
-.seasons-board__flow h3 {
-  margin: 0;
-  padding: 12px 12px 2px;
-  font-family: var(--agricola-font);
-  font-size: 1.45rem;
-  line-height: 0.95;
-}
-
-.seasons-board__status-card p,
-.seasons-board__flow > p {
-  margin: 0;
-  padding: 0 12px 10px;
-  font-size: 0.76rem;
-  font-weight: 750;
-  line-height: 1.25;
-  color: #f2d996;
-}
-
-.seasons-board__status-card dl {
-  display: grid;
-  margin: 0;
-  border-top: 1px solid rgba(40, 25, 11, 0.24);
-  color: #271904;
-  background: #e8d08e;
-}
-
-.seasons-board__status-card dl > div {
-  display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(86, 60, 24, 0.18);
-}
-
-.seasons-board__status-card dl > div:last-child {
-  border-bottom: 0;
-}
-
-.seasons-board__status-card dt {
-  margin: 0;
-  color: #674a22;
-  font-size: 0.76rem;
-  font-weight: 850;
-}
-
-.seasons-board__status-card dd {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 900;
-  line-height: 1.18;
-}
-
-.seasons-board__flow ol {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0 10px 10px;
-  list-style: none;
-}
-
-.seasons-board__flow li {
-  display: grid;
-  grid-template-columns: 58px 1fr;
-  gap: 8px;
-  padding: 9px;
-  border: 1px solid rgba(107, 78, 33, 0.2);
-  border-radius: 7px;
-  color: #2b1c08;
-  background: #f2dfa4;
-}
-
-.seasons-board__flow li.is-current {
-  border-color: rgba(117, 88, 21, 0.48);
-  background: #e6c85d;
-  box-shadow: inset 3px 0 0 #8a6a12;
-}
-
-.seasons-board__flow strong {
-  font-family: var(--agricola-font);
-  font-size: 1.06rem;
-  line-height: 0.95;
-}
-
-.seasons-board__flow span {
-  font-size: 0.72rem;
-  font-weight: 760;
-  line-height: 1.18;
-}
-
 @media (max-width: 900px) {
-  .seasons-board__sidebar {
-    grid-template-columns: 1fr;
-  }
-
   .seasons-board__badge,
   .seasons-board__worker {
     max-width: 86px;
