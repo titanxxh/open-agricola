@@ -1,5 +1,32 @@
 import { defineMajorCard } from '../card-source'
 import type { CardSourceMetaInput } from '../card-source'
+import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { GameState, PlayerState } from '../../contract/types'
+
+const buildGainOnBuyImpl = (cardId: string, gain: Parameters<typeof gainLeaf>[1]) => ({
+  effect: {
+    id: cardId,
+    onBuy: () => gainLeaf(cardId, gain),
+  },
+})
+
+const buildVillageChurchImpl = (cardId: string) => ({
+  effect: {
+    id: cardId,
+    onBuy: () => gainLeaf(cardId, { food: 2 }),
+    onHarvest: (_state: GameState, player: PlayerState) => {
+      if ((player.resources.fuel ?? 0) < 1) return
+      return {
+        type: 'seq' as const,
+        optional: true,
+        children: [
+          payLeaf({ cardId, cost: { fuel: 1 } }),
+          { type: 'leaf' as const, actionId: 'bonus-vp' as const, sourceCard: cardId },
+        ],
+      }
+    },
+  },
+})
 
 export const Major_Moor_PeatCharcoalKiln = defineMajorCard({
   meta: {
@@ -78,11 +105,14 @@ export const Major_Moor_HeatingOven = defineMajorCard({
     vp: 1,
     extraVp: false,
     ovenIdentity: true,
+    requiresFarmersOfTheMoor: true,
+    heatingRoomDiscount: 1,
     desc: [
       'Immediately gain 2 fuel.',
       'When heating, heat 1 fewer room than you have.',
     ],
   } satisfies CardSourceMetaInput,
+  impl: buildGainOnBuyImpl('Major_Moor_HeatingOven', { fuel: 2 }),
 })
 
 export const Major_Moor_TiledOven = defineMajorCard({
@@ -95,6 +125,8 @@ export const Major_Moor_TiledOven = defineMajorCard({
     vp: 1,
     extraVp: false,
     ovenIdentity: true,
+    requiresFarmersOfTheMoor: true,
+    heatingFuelCap: 1,
     desc: [
       'Regardless of house size, you need at most 1 fuel to heat your entire home.',
     ],
@@ -110,12 +142,14 @@ export const Major_Moor_VillageChurch = defineMajorCard({
     cost: { wood: 2, stone: 4 },
     vp: 4,
     extraVp: true,
+    requiresFarmersOfTheMoor: true,
     desc: [
       'Immediately gain 2 food.',
       '[Harvest]',
       'Once each harvest, you may pay 1 fuel to gain 1 bonus point.',
     ],
   } satisfies CardSourceMetaInput,
+  impl: buildVillageChurchImpl('Major_Moor_VillageChurch'),
 })
 
 export const Major_Moor_FurnitureStall = defineMajorCard({
@@ -127,9 +161,13 @@ export const Major_Moor_FurnitureStall = defineMajorCard({
     cost: { wood: 1, stone: 1 },
     vp: 2,
     extraVp: false,
+    requiresFarmersOfTheMoor: true,
     desc: [
       '[Anytime]',
       'Exchange wood for the same amount of clay.',
+    ],
+    exchanges: [
+      { from: { wood: 1 }, to: { clay: 1 }, sourceId: 'Major_Moor_FurnitureStall', triggers: ['anytime'] },
     ],
   } satisfies CardSourceMetaInput,
 })
@@ -143,9 +181,13 @@ export const Major_Moor_CeramicsStall = defineMajorCard({
     cost: { clay: 1, stone: 1 },
     vp: 2,
     extraVp: false,
+    requiresFarmersOfTheMoor: true,
     desc: [
       '[Anytime]',
       'Exchange clay for the same amount of wood.',
+    ],
+    exchanges: [
+      { from: { clay: 1 }, to: { wood: 1 }, sourceId: 'Major_Moor_CeramicsStall', triggers: ['anytime'] },
     ],
   } satisfies CardSourceMetaInput,
 })
@@ -159,9 +201,15 @@ export const Major_Moor_BasketStall = defineMajorCard({
     cost: { reed: 1, stone: 1 },
     vp: 2,
     extraVp: false,
+    requiresFarmersOfTheMoor: true,
     desc: [
       '[Anytime]',
       'Exchange reed for the same amount of other building resources.',
+    ],
+    exchanges: [
+      { from: { reed: 1 }, to: { wood: 1 }, sourceId: 'Major_Moor_BasketStall', triggers: ['anytime'] },
+      { from: { reed: 1 }, to: { clay: 1 }, sourceId: 'Major_Moor_BasketStall', triggers: ['anytime'] },
+      { from: { reed: 1 }, to: { stone: 1 }, sourceId: 'Major_Moor_BasketStall', triggers: ['anytime'] },
     ],
   } satisfies CardSourceMetaInput,
 })

@@ -1,4 +1,5 @@
 import type { GameState, PlayerState, Worker } from '../contract/types'
+import { getMajorCard } from '../cards/major'
 import { workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
@@ -31,8 +32,15 @@ export const computeHeatingRequirement = (
   if (state.enableFarmersOfTheMoor !== true) return 0
   if (isThroughTheSeasonsSeason(state, 'summer')) return 0
   const rooms = player.roomTiles?.length ?? player.rooms ?? 0
-  const discount = player.houseType === 'stone' ? 2 : player.houseType === 'clay' ? 1 : 0
-  return Math.max(0, rooms - discount)
+  const houseDiscount = player.houseType === 'stone' ? 2 : player.houseType === 'clay' ? 1 : 0
+  const majorCards = player.improvements.map((cardId) => getMajorCard(cardId)).filter((card) => card !== undefined)
+  const cardDiscount = majorCards.reduce((sum, card) => sum + Math.max(0, Math.floor(card.heatingRoomDiscount ?? 0)), 0)
+  const caps = majorCards
+    .map((card) => card.heatingFuelCap)
+    .filter((cap): cap is number => typeof cap === 'number' && Number.isFinite(cap))
+    .map((cap) => Math.max(0, Math.floor(cap)))
+  const baseRequirement = Math.max(0, rooms - houseDiscount - cardDiscount)
+  return caps.length > 0 ? Math.min(baseRequirement, ...caps) : baseRequirement
 }
 
 export const healthyWorkersAtHome = (
