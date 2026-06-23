@@ -123,6 +123,12 @@ export const isFireplaceIdentityCard = (cardId: string): boolean => {
   return false
 }
 
+export const isCookingHearthIdentityCard = (cardId: string): boolean => {
+  if (getMajorCard(cardId)?.cookingHearthIdentity) return true
+  if (getRegisteredMinorImprovement(cardId)?.cookingHearthIdentity) return true
+  return false
+}
+
 /**
  * `enablesPalisades` query rolled up to a player — true iff any of the
  * player's played cards declares the marker that unlocks placing wooden

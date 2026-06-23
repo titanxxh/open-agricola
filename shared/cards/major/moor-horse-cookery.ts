@@ -7,7 +7,7 @@ const horseSlaughterhouse1: CardSourceMetaInput = {
   deck: 'major',
   number: 101,
   cost: { clay: 1, stone: 1 },
-  vp: 0,
+  vp: 2,
   extraVp: false,
   isCookery: true,
   desc: [
@@ -60,7 +60,7 @@ const cookhouse1: CardSourceMetaInput = {
       ],
     },
   },
-  vp: 0,
+  vp: 2,
   extraVp: false,
   isCookery: true,
   isBaking: true,

@@ -746,7 +746,7 @@ export const createInitialState = (
     visibility: 'public',
   }]
   const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
-  const majorImprovementSupply = createMajorImprovementSupply(players.length)
+  const majorImprovementSupply = createMajorImprovementSupply(players.length, { enableFarmersOfTheMoor })
   const initialState: GameState = {
     round: 1,
     phase,
