@@ -895,6 +895,8 @@ import { Major_StoneOven2 } from './major/stone-oven'
 import { Major_Joinery2 } from './major/joinery'
 import { Major_Pottery2 } from './major/pottery'
 import { Major_Basket2 } from './major/basketmaker'
+import { Major_Moor_HeatingOven } from './major/moor-major-improvements'
+import { Major_Moor_VillageChurch } from './major/moor-major-improvements'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A1_Shelter': A1_Shelter.impl,
@@ -1790,6 +1792,8 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'Major_Joinery2': Major_Joinery2.impl,
   'Major_Pottery2': Major_Pottery2.impl,
   'Major_Basket2': Major_Basket2.impl,
+  'Major_Moor_HeatingOven': Major_Moor_HeatingOven.impl,
+  'Major_Moor_VillageChurch': Major_Moor_VillageChurch.impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS

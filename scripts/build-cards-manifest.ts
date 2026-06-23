@@ -56,6 +56,9 @@ export type CardMeta = {
   blocksHouseAnimalZones?: boolean
   waresSalesmanGains?: unknown
   mustBePlayedViaMinorAction?: boolean
+  requiresFarmersOfTheMoor?: boolean
+  heatingRoomDiscount?: number
+  heatingFuelCap?: number
   mustBePlayedViaMajorImprovementAction?: boolean
   alsoCountsAs?: string[]
   cardField?: unknown
@@ -80,6 +83,7 @@ const META_FIELDS = new Set([
   'fireplaceIdentity', 'cookingHearthIdentity', 'ovenIdentity', 'potteryIdentity',
   'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
   'waresSalesmanGains', 'mustBePlayedViaMinorAction',
+  'requiresFarmersOfTheMoor', 'heatingRoomDiscount', 'heatingFuelCap',
   'mustBePlayedViaMajorImprovementAction', 'alsoCountsAs', 'cardField',
   'enablesPalisades', 'locales',
 ])
