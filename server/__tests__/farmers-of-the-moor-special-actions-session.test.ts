@@ -21,6 +21,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
 
     expect(session.state.farmersOfTheMoor?.specialActionCards).toEqual(
@@ -38,6 +39,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     const card = findCardFor(session, 'cut-peat')
@@ -56,6 +58,7 @@ describe('Farmers of the Moor special actions', () => {
     const fellSession = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const fellPlayer = fellSession.state.players[0]!
     const fellCard = findCardFor(fellSession, 'fell-trees')
@@ -68,6 +71,7 @@ describe('Farmers of the Moor special actions', () => {
     const slashSession = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const slashPlayer = slashSession.state.players[0]!
     const slashCard = findCardFor(slashSession, 'slash-and-burn')
@@ -82,6 +86,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const p1 = session.state.players[0]!
     const p2 = session.state.players[1]!
@@ -106,6 +111,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     const card = findCardFor(session, 'horse-market')
@@ -134,6 +140,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const player = session.state.players[0]!
     const card = findCardFor(session, 'horse-market')
@@ -172,6 +179,7 @@ describe('Farmers of the Moor special actions', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
     const p1 = session.state.players[0]!
     const p2 = session.state.players[1]!

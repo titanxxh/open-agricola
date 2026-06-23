@@ -36,6 +36,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'enableParentCards',
   'enableThroughTheSeasons',
   'enableFarmersOfTheMoor',
+  'allowIncompleteFarmersOfTheMoorMinorDeal',
   'customCards',
   'embedded',
   'devMode',

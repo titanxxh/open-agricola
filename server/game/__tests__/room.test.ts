@@ -180,6 +180,23 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('builds Farmers of the Moor incomplete-minor fixed dev room options', () => {
+    const startup = parseFixedDevRoomStartupOptions({
+      DEV_ENABLE_FARMERS_OF_THE_MOOR: 'true',
+      DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL: 'true',
+    })
+
+    expect(startup).toEqual({
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    expect(buildFixedDevRoomInitialStateOptions(2, startup)).toEqual({
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+  })
+
   it('builds parent-card draft fixed dev room options when draft is requested', () => {
     const startup = parseFixedDevRoomStartupOptions({
       DEV_ENABLE_PARENT_CARDS: 'true',

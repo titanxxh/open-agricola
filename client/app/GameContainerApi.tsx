@@ -54,6 +54,7 @@ import {
   buildCompactScoreRows,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
+  allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   enableFarmersOfTheMoorFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
@@ -228,6 +229,8 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
           const enableThroughTheSeasons = enableThroughTheSeasonsFromQuery(window.location.search) || undefined
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
+          const allowIncompleteFarmersOfTheMoorMinorDeal =
+            allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
           ws.sendRoomCommand('createRoom', {
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
@@ -236,6 +239,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             enableParentCards,
             enableThroughTheSeasons,
             enableFarmersOfTheMoor,
+            allowIncompleteFarmersOfTheMoorMinorDeal,
             ...(draftParams ?? {}),
           })
         })

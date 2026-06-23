@@ -28,6 +28,7 @@ describe('computeDraftViewModel', () => {
     const draft = mkDraft()
     const vm = computeDraftViewModel(draft, 'p1')
     expect(vm.round).toBe(1)
+    expect(vm.stage).toBe('standard')
     expect(vm.totalRounds).toBe(7)
     expect(vm.seatCount).toBe(2)
     expect(vm.submittedCount).toBe(0)
@@ -63,6 +64,26 @@ describe('computeDraftViewModel', () => {
       },
     })
     expect(computeDraftViewModel(fullPick, 'p1').alreadySubmitted).toBe(true)
+  })
+
+  test('alreadySubmitted follows the active staged draft card type', () => {
+    const occupationStage = mkDraft({
+      stage: 'occupation',
+      pendingPicks: {
+        p1: { occ: 'A001', minor: null },
+        p2: { occ: null, minor: null },
+      },
+    })
+    expect(computeDraftViewModel(occupationStage, 'p1').alreadySubmitted).toBe(true)
+
+    const minorStage = mkDraft({
+      stage: 'publishedMinor',
+      pendingPicks: {
+        p1: { occ: null, minor: 'B001' },
+        p2: { occ: null, minor: null },
+      },
+    })
+    expect(computeDraftViewModel(minorStage, 'p1').alreadySubmitted).toBe(true)
   })
 
   test('submittedCount counts only fully-submitted players', () => {
@@ -114,6 +135,16 @@ describe('canSubmitPick', () => {
 
   test('returns true when both selected and in pool', () => {
     expect(canSubmitPick(baseVm, 'A001', 'B001')).toBe(true)
+  })
+
+  test('supports occupation-only and minor-only staged picks', () => {
+    const occupationVm = computeDraftViewModel(mkDraft({ stage: 'occupation' }), 'p1')
+    expect(canSubmitPick(occupationVm, 'A001', null)).toBe(true)
+    expect(canSubmitPick(occupationVm, null, 'B001')).toBe(false)
+
+    const minorVm = computeDraftViewModel(mkDraft({ stage: 'publishedMinor' }), 'p1')
+    expect(canSubmitPick(minorVm, null, 'B001')).toBe(true)
+    expect(canSubmitPick(minorVm, 'A001', null)).toBe(false)
   })
 
   test('rejects ids not present in the current pool (defensive)', () => {
