@@ -52,6 +52,6 @@ export function applyMonthlyBackground(date: Date = new Date()): void {
   const variant = resolveSeasonalVariant(date);
   if (!variant) return;
   const base = import.meta.env.BASE_URL || '/';
-  const url = `${base}seasons/${variant}.webp`;
+  const url = `${base}assets/website-bg/${variant}.webp`;
   document.documentElement.style.setProperty('--bg-monthly', `url("${url}")`);
 }
