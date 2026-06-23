@@ -856,6 +856,55 @@
   flex-direction: column;
   gap: 12px;
 }
+.special-actions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.special-actions-panel__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2f3a2f;
+}
+.special-actions-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+.special-action-card {
+  min-height: 56px;
+  border: 1px solid #b7c3a8;
+  border-radius: 8px;
+  background: #f6fbf0;
+  color: #1f2d20;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.special-action-card:hover:not(:disabled) {
+  border-color: #5f7d52;
+  background: #eef7e5;
+}
+.special-action-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.special-action-card.selected {
+  border-color: #245e47;
+  box-shadow: inset 0 0 0 1px #245e47;
+}
+.special-action-card__name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.special-action-card__status {
+  font-size: 11px;
+  color: #516050;
+}
 .game-layout__center {
   min-width: 0;
   display: flex;

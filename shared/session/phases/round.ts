@@ -15,6 +15,13 @@ import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts
 import { smallestAvailableWorker, workersAvailable } from '../../domain/player.ts'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
+  applyMoorSpecialAction,
+  hasHealthyWorkerAtHome,
+  validateMoorSpecialAction,
+  type MoorSpecialActionPayload,
+} from '../../moor/special-actions.ts'
+import type { MoorSpecialActionId } from '../../moor/types.ts'
+import {
   canUseExclusiveSpace,
   computeAllowedPlacementSpaces,
 } from '../../actions/helpers/placement-availability.ts'
@@ -178,6 +185,45 @@ export const takeAction = (
 
   core.driveEngineSteps()
   return core.emitResponse()
+}
+
+export const takeSpecialAction = (
+  core: GameCore,
+  playerIndex: number,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload?: MoorSpecialActionPayload,
+): SessionResponse => {
+  const state = core.state
+  if (state.gameOver) return core.emitResponse(false, 'game is over')
+  if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
+  if (hasPendingOrdinaryCardDrawChoice(state)) {
+    return core.emitResponse(false, 'ordinary card draw choice in progress')
+  }
+  if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
+  if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
+  if (state.roundPhase !== 'work') return core.emitResponse(false, 'not work phase')
+  if (!state.enableFarmersOfTheMoor || !state.farmersOfTheMoor) {
+    return core.emitResponse(false, 'farmers of the moor unavailable')
+  }
+  const player = state.players[playerIndex]
+  if (!player || !hasHealthyWorkerAtHome(state, player)) {
+    return core.emitResponse(false, 'no healthy workers available')
+  }
+  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  if (!validation.ok) return core.emitResponse(false, validation.error)
+
+  core.appendHistory(true)
+  core.setTurnOwner(playerIndex)
+  player._activeActionBonusSources = []
+  core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+  core.resetActionResultDetails()
+  recordActionSnapshot(player, core.allocActionToken())
+
+  const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  if (!result.ok) return core.emitResponse(false, result.error)
+  return core.invokeEndTurnHooks(playerIndex)
 }
 
 /**
