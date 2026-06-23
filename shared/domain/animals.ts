@@ -35,14 +35,14 @@ export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
   const result: AnimalCounts = { ...ZERO }
   for (const pasture of player.pastures ?? []) {
     if (pasture.animalType && pasture.animalCount > 0 && isAnimalKey(pasture.animalType)) {
-      result[pasture.animalType] += pasture.animalCount
+      result[pasture.animalType] = (result[pasture.animalType] ?? 0) + pasture.animalCount
     }
   }
   if (player.houseAnimalType && player.houseAnimalCount > 0 && isAnimalKey(player.houseAnimalType)) {
-    result[player.houseAnimalType] += player.houseAnimalCount
+    result[player.houseAnimalType] = (result[player.houseAnimalType] ?? 0) + player.houseAnimalCount
   }
   for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal && isAnimalKey(animal)) result[animal] += 1
+    if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
   }
   for (const state of Object.values(player.cardStates ?? {})) {
     const counts = readAnimalHolderCounts(state?.extraData)

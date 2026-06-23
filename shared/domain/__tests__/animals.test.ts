@@ -63,6 +63,16 @@ describe('getAssignedAnimalsByType', () => {
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 2, boar: 0, cattle: 1 })
   })
 
+  it('counts assigned horses without producing NaN', () => {
+    const p = mkPlayer({
+      houseAnimalType: 'horse',
+      houseAnimalCount: 1,
+      stableAnimals: { 's-1': 'horse' },
+    })
+    expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 0, cattle: 0, horse: 2 })
+    expect(getAssignedAnimalCount(p)).toBe(2)
+  })
+
   it('counts animal-holder card zones (extraData.held style)', () => {
     const p = mkPlayer({
       cardStates: {

@@ -150,6 +150,43 @@ describe('serializeStateForPlayer', () => {
     expect(draft.pools.p2.minor).toEqual(Array(p2PoolMinor.length).fill('?'))
   })
 
+  it('masks staged draft pools for non-viewers', () => {
+    const state = makeDraftState()
+    state.draft = {
+      ...state.draft!,
+      stage: 'farmersOfTheMoorMinor',
+      stageIndex: 1,
+      stages: [
+        {
+          kind: 'occupation',
+          poolSize: 1,
+          totalRounds: 1,
+          pools: {
+            p1: { occ: ['occ-p1'], minor: [] },
+            p2: { occ: ['occ-p2'], minor: [] },
+          },
+        },
+        {
+          kind: 'farmersOfTheMoorMinor',
+          poolSize: 1,
+          totalRounds: 1,
+          pools: {
+            p1: { occ: [], minor: ['fom-p1'] },
+            p2: { occ: [], minor: ['fom-p2'] },
+          },
+        },
+      ],
+    }
+
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const draft = out.draft as DraftState
+
+    expect(draft.stages![0]!.pools.p1.occ).toEqual(['occ-p1'])
+    expect(draft.stages![0]!.pools.p2.occ).toEqual(['?'])
+    expect(draft.stages![1]!.pools.p1.minor).toEqual(['fom-p1'])
+    expect(draft.stages![1]!.pools.p2.minor).toEqual(['?'])
+  })
+
   it('masks non-viewer draft.kept and submitted pendingPicks', () => {
     const state = makeDraftState()
     state.draft!.pendingPicks.p1 = {

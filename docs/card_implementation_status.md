@@ -766,7 +766,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C8_PlantFertilizer` | 已对齐 |  |
 | `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `C10_BunkBeds` | 已对齐 |  |
-| `C11_WildlifeReserve` | 已对齐 |  |
+| `C11_WildlifeReserve` | 已对齐 | Farmers of the Moor 启用时仍只允许 sheep / boar / cattle 各 1，horse 会被 card-zone invalid-animal 校验拒绝。 |
 | `C12_CattleFarm` | 已对齐 |  |
 | `C13_WoodSlideHammer` | 已对齐 | wood house 且至少 5 rooms 的直接翻修到 stone 折扣走 mandatory sourced bonus modifier，不保留原始 stone 翻修成本分支。 |
 | `C14_StrawThatchedRoof` | 已对齐 | construct / renovation 移除 reed 通过 `capDiscountAtCost` 表达，不再依赖过量折扣被 payment 枚举器截断。 |

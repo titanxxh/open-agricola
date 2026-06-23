@@ -511,6 +511,16 @@ export const filterPublicEventCancellationsForPlayer = (
   return filtered.length > 0 ? filtered : undefined
 }
 
+const maskDraftPoolForViewer = (
+  pool: { occ: string[]; minor: string[] },
+  visible: boolean,
+) => visible
+  ? pool
+  : {
+      occ: Array(pool.occ.length).fill('?'),
+      minor: Array(pool.minor.length).fill('?'),
+    }
+
 /**
  * Per-viewer snapshot. Identical to `serializeState` except that secret
  * information belonging to non-viewer players is replaced with same-length
@@ -552,17 +562,21 @@ export const serializeStateForPlayer = (
         ...base.draft,
         pools: Object.fromEntries(
           Object.entries(base.draft.pools).map(([pid, pool]) =>
-            pid === viewerPlayerId
-              ? [pid, pool]
-              : [
-                  pid,
-                  {
-                    occ: Array(pool.occ.length).fill('?'),
-                    minor: Array(pool.minor.length).fill('?'),
-                  },
-                ],
+            [pid, maskDraftPoolForViewer(pool, pid === viewerPlayerId)],
           ),
         ),
+        ...(base.draft.stages
+          ? {
+              stages: base.draft.stages.map((stage) => ({
+                ...stage,
+                pools: Object.fromEntries(
+                  Object.entries(stage.pools).map(([pid, pool]) =>
+                    [pid, maskDraftPoolForViewer(pool, pid === viewerPlayerId)],
+                  ),
+                ),
+              })),
+            }
+          : {}),
         kept: Object.fromEntries(
           Object.entries(base.draft.kept).map(([pid, pool]) =>
             pid === viewerPlayerId

@@ -375,6 +375,37 @@ describe('HTTP privacy + seat binding', () => {
       expect(data.error).toBe('seat mismatch')
     })
 
+    it('draft-submit accepts a staged minor-only pick', async () => {
+      const session = new GameSession(12345, undefined, {
+        playerCount: 2,
+        draftMode: 'simultaneous',
+        enableFarmersOfTheMoor: true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      })
+      const minorStage = session.state.draft!.stages!.find((stage) => stage.kind === 'publishedMinor')!
+      session.state.draft!.stage = 'publishedMinor'
+      session.state.draft!.stageIndex = session.state.draft!.stages!.indexOf(minorStage)
+      session.state.draft!.pools = structuredClone(minorStage.pools)
+      const pick = {
+        minorCardId: session.state.draft!.pools.p1.minor[0]!,
+      }
+      setSession(session)
+
+      const res = mockRes()
+      await handleGameRoute(
+        mockReq(
+          'POST',
+          '/api/game/draft-submit',
+          { playerId: 'p1', pick },
+          { 'x-viewer-player': 'p1' },
+        ),
+        res,
+      )
+
+      expect(res.statusCode).toBe(200)
+      expect(JSON.parse(res.body).ok).toBe(true)
+    })
+
     it('draft-submit returns private draftUpdated only for the matching viewer', async () => {
       const session = new GameSession(12345, undefined, {
         playerCount: 2,

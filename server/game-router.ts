@@ -735,11 +735,12 @@ export const handleGameRoute = async (
       playerId?: string
       pick?: { occCardId?: unknown; minorCardId?: unknown }
     }
+    const occCardId = typeof body.pick?.occCardId === 'string' ? body.pick.occCardId : undefined
+    const minorCardId = typeof body.pick?.minorCardId === 'string' ? body.pick.minorCardId : undefined
     if (
       typeof body.playerId !== 'string' ||
       !body.pick ||
-      typeof body.pick.occCardId !== 'string' ||
-      typeof body.pick.minorCardId !== 'string'
+      (!occCardId && !minorCardId)
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
@@ -752,7 +753,7 @@ export const handleGameRoute = async (
         return true
       }
     }
-    const pick = { occCardId: body.pick.occCardId, minorCardId: body.pick.minorCardId }
+    const pick = { occCardId, minorCardId }
     const { resp, result } = callAndRespond(req, s => s.submitDraftPick(body.playerId!, pick))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
