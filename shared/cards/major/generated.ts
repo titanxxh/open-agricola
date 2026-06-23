@@ -887,6 +887,15 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 1,
     "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "cut-peat",
+        "resource": "fuel",
+        "amount": 1,
+        "horseAmount": 2
+      }
+    ],
     "desc": [
       "[Special action: Cut Peat]",
       "Gain 1 extra fuel, or 2 extra fuel if you have at least 1 horse.",
@@ -906,6 +915,15 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 1,
     "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "fell-trees",
+        "resource": "wood",
+        "amount": 1,
+        "horseAmount": 2
+      }
+    ],
     "desc": [
       "[Special action: Fell Trees]",
       "Gain 1 extra wood, or 2 extra wood if you have at least 1 horse.",
@@ -926,6 +944,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 3,
     "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "Place 1 food on each remaining round space.",
       "At the start of each round, gain that food if you have at least 2 horses."
@@ -944,6 +963,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 3,
     "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "Selected major improvements cost you 1 fewer matching building resource."
     ],
