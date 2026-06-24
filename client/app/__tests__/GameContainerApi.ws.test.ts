@@ -52,6 +52,7 @@ describe('GameContainerApi WS player identity', () => {
     expect(isDevModeAllowedFromQuery('?page=workshop&player=p1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?player=p1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=abc123&devMode=1')).toBe(false)
+    expect(isDevModeAllowedFromQuery('?transport=ws&room=abc123&player=p1&devMode=1')).toBe(false)
     expect(isDevModeAllowedFromQuery('?page=game&devMode=1')).toBe(false)
   })
 

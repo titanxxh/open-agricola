@@ -19,11 +19,11 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 function clientId(): string {
-  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? ''
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? ''
 }
 
 function clientSecret(): string {
-  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? ''
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET ?? ''
 }
 
 export async function exchangeGoogleOAuthCode(
