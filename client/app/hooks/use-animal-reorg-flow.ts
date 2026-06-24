@@ -2,6 +2,7 @@ import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
+import { positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
@@ -86,6 +87,14 @@ export const buildStableDisplayMap = (
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
   const map = new Map<string, AnimalDisplay>()
+  ;(player?.stableTiles ?? []).forEach((tile) => {
+    const key = positionKey(tile)
+    const type = player?.stableAnimals?.[key] ?? null
+    map.set(key, {
+      animalType: type as AnimalType | null,
+      animalCount: type ? 1 : 0,
+    })
+  })
   Object.entries(player?.stableAnimals ?? {}).forEach(([key, type]) => {
     map.set(key, {
       animalType: type as AnimalType | null,

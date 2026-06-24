@@ -148,6 +148,14 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(display.get('1-1')).toEqual({ animalType: 'cattle', animalCount: 1 })
   })
 
+  it('builds empty stable display from stable tiles', () => {
+    const target = player()
+    target.stableTiles = [{ row: 0, col: 0 }]
+    target.stableAnimals = {}
+    const display = buildStableDisplayMap(target, null)
+    expect(display.get('0-0')).toEqual({ animalType: null, animalCount: 0 })
+  })
+
   it('builds card display from reorg draft zones while reorganizing', () => {
     const display = buildCardDisplayMap(animalReorgState())
     expect(display.get('C148_MudWallower')).toEqual({

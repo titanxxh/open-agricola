@@ -412,6 +412,12 @@ type ActionSpaceAttachmentDisplay = {
   amount: number
 }
 
+type ResourceStackItem = {
+  resource: keyof FutureMeepleResourceMap
+  amount: number
+  player?: PlayerState
+}
+
 const FUTURE_RESOURCE_ICON_CLASS: Partial<Record<keyof FutureMeepleResourceMap, string>> = {
   stable: 'barn',
 }
@@ -651,12 +657,12 @@ export const ActionBoard = ({
     [players],
   )
 
-  const buildStackItems = (
+  const buildFutureMeepleItems = (
     action: ActionSpace | undefined,
-    options: { round?: number; includeActionResources?: boolean } = {},
+    options: { round?: number } = {},
   ) => {
-    const { round, includeActionResources = true } = options
-    const items: { resource: keyof FutureMeepleResourceMap; amount: number; player?: PlayerState }[] = []
+    const { round } = options
+    const items: ResourceStackItem[] = []
     const seen = new Map<string, number>()
     const add = (resource: keyof FutureMeepleResourceMap, amount: number, player?: PlayerState) => {
       if (amount <= 0) return
@@ -665,11 +671,6 @@ export const ActionBoard = ({
       if (idx !== undefined) { items[idx].amount += amount; return }
       seen.set(key, items.length)
       items.push({ resource, amount, player })
-    }
-    if (action && includeActionResources) {
-      for (const [k, v] of Object.entries(action.resources)) {
-        if ((v ?? 0) > 0) add(k as keyof Resource, v ?? 0)
-      }
     }
     for (const fm of futureMeeples) {
       const matchesAction = !!action && fm.actionId === action.id
@@ -683,12 +684,48 @@ export const ActionBoard = ({
     return items
   }
 
+  const buildActionResourceItems = (action: ActionSpace | undefined): ResourceStackItem[] =>
+    action
+      ? Object.entries(action.resources)
+        .filter(([, amount]) => (amount ?? 0) > 0)
+        .map(([resource, amount]) => ({
+          resource: resource as keyof Resource,
+          amount: amount ?? 0,
+        }))
+      : []
+
+  const renderResourceIcons = (items: ResourceStackItem[]) =>
+    items.flatMap((item) => {
+      const label = getFutureResourceLabel(locale, item.resource)
+      return Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
+        <span
+          key={`${item.player?.id ?? 'none'}-${item.resource}-${i}`}
+          className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
+          title={item.player ? `${item.player.name}: ${label}` : undefined}
+          aria-label={item.player ? `${item.player.name}: ${label}` : undefined}
+          data-owner-player={item.player?.id}
+          data-owner-label={item.player ? `${item.player.name}: ${label}` : undefined}
+          onMouseEnter={(e) => {
+            if (!item.player) return
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setTooltip({
+              kind: 'resource',
+              title: item.player.name,
+              description: label,
+              x: rect.right + 8,
+              y: rect.top - 8,
+            })
+          }}
+          onMouseLeave={hideTooltip}
+        />
+      ))
+    })
+
   const renderResourceHolder = (
     space: ActionSpace | undefined,
     isRound = false,
-    options: { round?: number; includeActionResources?: boolean } = {},
   ) => {
-    const items = buildStackItems(space, options)
+    const items = buildActionResourceItems(space)
     if (!items.length) return null
     const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
     const offset: React.CSSProperties = space ? resourceOffsets[space.id]
@@ -696,31 +733,21 @@ export const ActionBoard = ({
       : (isRound ? { bottom: 6, right: 30 } : {})
     return (
       <div className="resource-holder" data-n={totalCount} style={offset}>
-        {items.flatMap((item) => {
-          const label = getFutureResourceLabel(locale, item.resource)
-          return Array.from({ length: Math.min(item.amount, 6) }, (_, i) => (
-            <span
-              key={`${item.player?.id ?? 'none'}-${item.resource}-${i}`}
-              className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
-              title={item.player ? `${item.player.name}: ${label}` : undefined}
-              aria-label={item.player ? `${item.player.name}: ${label}` : undefined}
-              data-owner-player={item.player?.id}
-              data-owner-label={item.player ? `${item.player.name}: ${label}` : undefined}
-              onMouseEnter={(e) => {
-                if (!item.player) return
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                setTooltip({
-                  kind: 'resource',
-                  title: item.player.name,
-                  description: label,
-                  x: rect.right + 8,
-                  y: rect.top - 8,
-                })
-              }}
-              onMouseLeave={hideTooltip}
-            />
-          ))
-        })}
+        {renderResourceIcons(items)}
+      </div>
+    )
+  }
+
+  const renderFutureMeepleHolder = (
+    action: ActionSpace | undefined,
+    options: { round?: number } = {},
+  ) => {
+    const items = buildFutureMeepleItems(action, options)
+    if (!items.length) return null
+    const totalCount = items.reduce((sum, item) => sum + item.amount, 0)
+    return (
+      <div className="future-meeple-holder" data-n={totalCount}>
+        {renderResourceIcons(items)}
       </div>
     )
   }
@@ -1027,6 +1054,7 @@ export const ActionBoard = ({
                   <div className="action-footer" />
                 </button>
                 {renderResourceHolder(space)}
+                {renderFutureMeepleHolder(space)}
                 {renderFarmerHolder(space)}
                 {renderStableMarker(space)}
                 {renderActionSpaceAttachments(space)}
@@ -1086,7 +1114,8 @@ export const ActionBoard = ({
                       </div>
                       <div className="action-footer" />
                     </button>
-                    {renderResourceHolder(action, true, { round: slot.round })}
+                    {renderResourceHolder(action, true)}
+                    {renderFutureMeepleHolder(action, { round: slot.round })}
                     {renderFarmerHolder(action)}
                     {renderExclusiveUseMarker(action)}
                     {renderBlockedMarker(action)}
@@ -1098,7 +1127,7 @@ export const ActionBoard = ({
                       <span className="turn-round">{slot.round}</span>
                       <span className="turn-q">?</span>
                     </div>
-                    {renderResourceHolder(action, true, { round: slot.round, includeActionResources: false })}
+                    {renderFutureMeepleHolder(action, { round: slot.round })}
                   </>
                 )}
               </div>
