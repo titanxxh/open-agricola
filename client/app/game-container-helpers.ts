@@ -317,8 +317,12 @@ export const isDevModeAllowedFromQuery = (search: string): boolean => {
   const params = new URLSearchParams(search)
   if (params.get('devMode') !== '1') return false
   const page = params.get('page')
-  if (!page || page === 'lobby' || page === 'workshop') return true
   const roomId = params.get('room')
+  if (!page) {
+    if (params.get('transport') === 'ws' || roomId) return !!roomId && FIXED_DEV_ROOM_IDS.has(roomId)
+    return true
+  }
+  if (page === 'lobby' || page === 'workshop') return true
   if (roomId && FIXED_DEV_ROOM_IDS.has(roomId)) return true
   return params.get('embedded') === '1' && params.get('transport') !== 'ws'
 }
