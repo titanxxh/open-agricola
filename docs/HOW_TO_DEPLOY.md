@@ -369,13 +369,38 @@ Push 到 `platform` 分支即可自动重新部署。
 
 ---
 
+## Auth OAuth
+
+生产环境必须配置 OAuth 登录/注册。直接调用 `/api/auth/register` 已禁用。
+
+必需后端环境变量：
+
+- `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端 origin，例如 `https://your-user.github.io`。
+- `CORS_ORIGIN`：前后端不同源时必须等于前端 origin。
+- `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`：GitHub OAuth App 凭据。
+- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`：Google OAuth Client 凭据。
+
+OAuth callback URL 填后端 origin：
+
+```text
+https://<backend-origin>/api/auth/oauth/github/callback
+https://<backend-origin>/api/auth/oauth/google/callback
+```
+
+生产环境不要设置：
+
+- `ALLOW_ANONYMOUS_WS=true`
+- `ENABLE_AUTH_TEST_HELPERS=1`
+
+---
+
 ## 四、验证清单
 
 部署完成后逐项验证：
 
 - [ ] `curl https://your-backend/api/health` 返回 `{"ok":true}`
 - [ ] 访问前端 URL，能看到登录页
-- [ ] 注册新用户
+- [ ] 通过 GitHub 或 Google 注册新用户
 - [ ] 登录成功，进入大厅
 - [ ] 创建房间，开始游戏
 - [ ] WebSocket 连接正常（浏览器 Console 无 WS 错误）
@@ -398,6 +423,12 @@ Push 到 `platform` 分支即可自动重新部署。
 | `PERSIST_ROOMS` | `sqlite` | 房间持久化方式 (`sqlite` / `json`) |
 | `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
+| `PUBLIC_APP_ORIGIN` | — | 前端公开 origin，用于 OAuth/跨源认证跳转 |
+| `GITHUB_OAUTH_CLIENT_ID` | — | GitHub OAuth App client id |
+| `GITHUB_OAUTH_CLIENT_SECRET` | — | GitHub OAuth App client secret |
+| `GOOGLE_OAUTH_CLIENT_ID` | — | Google OAuth client id |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | — | Google OAuth client secret |
+| `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
