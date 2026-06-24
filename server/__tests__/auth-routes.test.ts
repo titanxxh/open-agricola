@@ -23,6 +23,7 @@ vi.mock('../connection/ws-server.ts', () => ({
       getRooms: () => [],
       dissolveRoomById: () => ({ ok: true }),
     },
+    closeUserConnections: vi.fn(),
   }),
 }))
 
@@ -87,6 +88,7 @@ vi.mock('../db.ts', () => {
       provider_email_verified INTEGER NOT NULL DEFAULT 0,
       display_name TEXT,
       avatar_url TEXT,
+      return_to TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -556,6 +558,46 @@ describe('auth routes', () => {
     expect(withCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
   })
 
+  it('preserves safe returnTo through OAuth onboarding completion', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-onboarding-return',
+      providerLogin: 'onboarding-return-gh',
+      emailVerified: true,
+      displayName: 'Onboarding Return',
+    }
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const callback = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+    expect(callback.status).toBe(302)
+    expect(callback.headers.Location).toBe('https://frontend.example/open-agricola/?page=onboarding')
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+
+    const complete = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      {
+        username: 'returnuser',
+        displayName: 'Return User',
+        password: 'password123',
+        confirmPassword: 'password123',
+      },
+      { Cookie: onboardingCookie },
+    )
+
+    expect(complete.status).toBe(200)
+    expect(complete.json).toMatchObject({ ok: true, returnTo: '/?page=workshop' })
+    expect(complete.headers['Set-Cookie']).toContain('oa_session=')
+  })
+
   it('redirects OAuth app destinations to PUBLIC_APP_ORIGIN while preserving safe returnTo', async () => {
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
     const user = await createLocalUserForTests('frontredir', 'password123', 'Front Redir')
@@ -596,6 +638,31 @@ describe('auth routes', () => {
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const res = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=workshop')
+  })
+
+  it('does not duplicate PUBLIC_APP_ORIGIN path base when OAuth returnTo omits the trailing slash before query', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+    const user = await createLocalUserForTests('querybase', 'password123', 'Query Base')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-querybase',
+      providerLogin: 'querybase-gh',
+      emailVerified: true,
+    }
+    linkIdentity(user.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%3Fpage%3Dworkshop')
     const state = new URL(String(start.headers.Location)).searchParams.get('state')
     const res = await requestJson(
       'GET',

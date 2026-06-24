@@ -112,6 +112,49 @@ describe('AuthProvider', () => {
     expect(url.searchParams.get('returnTo')).toBe('/?page=workshop&view=sandbox')
   })
 
+  it('preserves the current route as OAuth register returnTo', async () => {
+    window.history.pushState(null, '', '/?page=workshop&view=sandbox')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return new Response(JSON.stringify({ ok: false }), { status: 401 })
+      }
+      return new Response(JSON.stringify({ ok: true }))
+    }))
+
+    function Probe() {
+      const { oauthStartUrl } = useAuth()
+      return <a href={oauthStartUrl('github', 'register')}>github</a>
+    }
+
+    render(<AuthProvider><Probe /></AuthProvider>)
+
+    const link = await screen.findByRole('link', { name: 'github' })
+    const url = new URL(link.getAttribute('href')!, window.location.origin)
+    expect(url.searchParams.get('intent')).toBe('register')
+    expect(url.searchParams.get('returnTo')).toBe('/?page=workshop&view=sandbox')
+  })
+
+  it('does not add OAuth returnTo on login or onboarding pages', async () => {
+    window.history.pushState(null, '', '/?page=login')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return new Response(JSON.stringify({ ok: false }), { status: 401 })
+      }
+      return new Response(JSON.stringify({ ok: true }))
+    }))
+
+    function Probe() {
+      const { oauthStartUrl } = useAuth()
+      return <a href={oauthStartUrl('github', 'register')}>github</a>
+    }
+
+    render(<AuthProvider><Probe /></AuthProvider>)
+
+    const link = await screen.findByRole('link', { name: 'github' })
+    const url = new URL(link.getAttribute('href')!, window.location.origin)
+    expect(url.searchParams.has('returnTo')).toBe(false)
+  })
+
   it('keeps documented non-game dev shortcuts authenticated', async () => {
     window.history.pushState(null, '', '/?page=workshop&player=p1&devMode=1')
     const fetchMock = vi.fn()

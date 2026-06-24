@@ -89,6 +89,7 @@ function stripFrontendBasePath(path: string, baseUrl: URL): string {
   const basePath = baseUrl.pathname.replace(/\/$/, '')
   if (!basePath) return path
   if (path === basePath) return '/'
+  if (path.startsWith(`${basePath}?`)) return `/${path.slice(basePath.length)}`
   if (path.startsWith(`${basePath}/`)) return path.slice(basePath.length) || '/'
   return path
 }
@@ -99,6 +100,13 @@ function appLocation(path: string): string {
   if (!baseUrl) return safePath
   const appPath = stripFrontendBasePath(safePath, baseUrl)
   return new URL(appPath.replace(/^\//, ''), baseUrl).toString()
+}
+
+function appRelativeReturnTo(path: string | undefined): string | undefined {
+  const safePath = safeReturnTo(path)
+  if (!safePath) return undefined
+  const baseUrl = frontendBaseUrl()
+  return baseUrl ? stripFrontendBasePath(safePath, baseUrl) : safePath
 }
 
 function redirect(res: ServerResponse, location: string, headers: Record<string, string | string[]> = {}): void {
@@ -278,7 +286,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const ticket = createOnboardingTicket(profile)
+  const ticket = createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo))
   redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
     'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
   }))
@@ -310,7 +318,11 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
 
   const token = createSession(result.user.id)
   consumeOnboardingTicket(ticket)
-  sendJson(res, 200, { ok: true, user: result.user }, {
+  sendJson(res, 200, {
+    ok: true,
+    user: result.user,
+    ...(profile.returnTo ? { returnTo: appRelativeReturnTo(profile.returnTo) } : {}),
+  }, {
     'Set-Cookie': [
       serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
       clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),

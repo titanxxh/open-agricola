@@ -209,7 +209,10 @@ const server = createServer(async (req, res) => {
   if (req.url === '/api/auth/logout-all' && req.method === 'POST') {
     const token = getAuthToken(req)
     const user = validateSession(token)
-    if (user) logoutAll(user.id)
+    if (user) {
+      logoutAll(user.id)
+      wssCtx?.closeUserConnections(user.id)
+    }
     sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
     return
   }

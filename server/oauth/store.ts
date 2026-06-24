@@ -20,6 +20,11 @@ type OnboardingTicketRow = {
   provider_email_verified: number
   display_name: string | null
   avatar_url: string | null
+  return_to: string | null
+}
+
+export type OAuthOnboardingProfile = OAuthProfile & {
+  returnTo?: string
 }
 
 function createRawSecret(): string {
@@ -122,16 +127,16 @@ export function linkIdentity(userId: string, profile: OAuthProfile): void {
   )
 }
 
-export function createOnboardingTicket(profile: OAuthProfile): string {
+export function createOnboardingTicket(profile: OAuthProfile, returnTo?: string): string {
   const raw = createRawSecret()
   const now = Date.now()
   pruneExpiredOAuthRows(now)
   getDb().prepare(`
     INSERT INTO oauth_onboarding_tickets (
       ticket_hash, provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, expires_at, created_at
+      provider_email_verified, display_name, avatar_url, return_to, expires_at, created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     hashSecret(raw),
     profile.provider,
@@ -141,13 +146,14 @@ export function createOnboardingTicket(profile: OAuthProfile): string {
     profile.emailVerified ? 1 : 0,
     profile.displayName ?? null,
     profile.avatarUrl ?? null,
+    returnTo ?? null,
     now + ONBOARDING_TICKET_TTL_MS,
     now,
   )
   return raw
 }
 
-function profileFromTicketRow(row: OnboardingTicketRow): OAuthProfile {
+function profileFromTicketRow(row: OnboardingTicketRow): OAuthOnboardingProfile {
   return {
     provider: row.provider,
     providerUserId: row.provider_user_id,
@@ -156,14 +162,15 @@ function profileFromTicketRow(row: OnboardingTicketRow): OAuthProfile {
     emailVerified: row.provider_email_verified === 1,
     ...(row.display_name ? { displayName: row.display_name } : {}),
     ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
+    ...(row.return_to ? { returnTo: row.return_to } : {}),
   }
 }
 
-export function getOnboardingTicket(rawTicket: string): OAuthProfile | null {
+export function getOnboardingTicket(rawTicket: string): OAuthOnboardingProfile | null {
   const ticketHash = hashSecret(rawTicket)
   const row = getDb().prepare(`
     SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url
+      provider_email_verified, display_name, avatar_url, return_to
     FROM oauth_onboarding_tickets
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
   `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
@@ -171,13 +178,13 @@ export function getOnboardingTicket(rawTicket: string): OAuthProfile | null {
   return row ? profileFromTicketRow(row) : null
 }
 
-export function consumeOnboardingTicket(rawTicket: string): OAuthProfile | null {
+export function consumeOnboardingTicket(rawTicket: string): OAuthOnboardingProfile | null {
   const db = getDb()
   const ticketHash = hashSecret(rawTicket)
   const now = Date.now()
   const row = db.prepare(`
     SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url
+      provider_email_verified, display_name, avatar_url, return_to
     FROM oauth_onboarding_tickets
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
   `).get(ticketHash, now) as OnboardingTicketRow | undefined
