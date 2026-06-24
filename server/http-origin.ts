@@ -46,6 +46,7 @@ export function trustedOrigins(req: IncomingMessage): Set<string> {
 }
 
 export function isTrustedOrigin(req: IncomingMessage): boolean {
+  if (req.headers.origin === undefined || req.headers.origin === null) return true
   const origin = normalizeOrigin(req.headers.origin)
-  return !origin || trustedOrigins(req).has(origin)
+  return !!origin && trustedOrigins(req).has(origin)
 }

@@ -76,6 +76,7 @@ vi.mock('../db.ts', () => {
       provider_email_verified INTEGER NOT NULL DEFAULT 0,
       display_name TEXT,
       avatar_url TEXT,
+      return_to TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER

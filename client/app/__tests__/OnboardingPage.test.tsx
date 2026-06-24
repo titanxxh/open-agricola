@@ -88,4 +88,24 @@ describe('OnboardingPage', () => {
     expect(refreshSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
   })
+
+  it('navigates to the onboarding return target when provided', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      user: { id: 'u1', username: 'newuser', displayName: 'New User' },
+      returnTo: '/?page=workshop',
+    })))
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.replaceState(null, '', '/open-agricola/?page=onboarding')
+    render(<OnboardingPage />)
+
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=workshop'))
+  })
 })

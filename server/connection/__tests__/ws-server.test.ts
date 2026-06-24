@@ -220,6 +220,44 @@ describe('room-manager ws sync', () => {
     }
   })
 
+  it('can close active websocket connections for a revoked user session', async () => {
+    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.resetModules()
+    const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
+    const persistence = new InMemoryRoomPersistence()
+    const isolatedServer = createServer()
+    const isolatedWsServerResult = createWsServerWithEnv(isolatedServer, { persistence })
+    await new Promise<void>((resolve) => {
+      isolatedServer.listen(0, '127.0.0.1', () => resolve())
+    })
+    const address = isolatedServer.address() as AddressInfo
+    const isolatedBaseUrl = `ws://127.0.0.1:${address.port}/ws`
+    try {
+      const { createLocalUserForTests, createSession } = await import('../../auth.ts')
+      const username = `wsrevoke_${Date.now()}`
+      const user = await createLocalUserForTests(username, 'password123', 'WS Revoke')
+      const token = createSession(user.id)
+      const ws = new WebSocket(isolatedBaseUrl, { headers: { Cookie: `oa_session=${token}` } }) as TestSocket
+      ws.received = []
+      sockets.push(ws)
+      await waitForOpen(ws)
+
+      const closed = new Promise<{ code: number; reason: string }>((resolve) => {
+        ws.once('close', (code, reason) => {
+          resolve({ code, reason: reason.toString() })
+        })
+      })
+      isolatedWsServerResult.closeUserConnections(user.id)
+
+      expect(await closed).toEqual({ code: 1008, reason: 'session revoked' })
+    } finally {
+      clearInterval(isolatedWsServerResult.cleanupTimer)
+      isolatedWsServerResult.wss.close()
+      isolatedServer.close()
+      delete process.env.ALLOW_ANONYMOUS_WS
+    }
+  })
+
   it('rejects non-fixed devMode-style unauthenticated room commands in production-like mode', async () => {
     process.env.ALLOW_ANONYMOUS_WS = 'false'
     vi.resetModules()

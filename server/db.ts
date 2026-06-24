@@ -267,6 +267,12 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX idx_oauth_onboarding_expires ON oauth_onboarding_tickets(expires_at);
       `,
     },
+    {
+      version: 9,
+      sql: `
+        ALTER TABLE oauth_onboarding_tickets ADD COLUMN return_to TEXT;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

@@ -6,6 +6,33 @@ import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
 
+function safeReturnTo(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null
+  try {
+    new URL(raw, 'http://open-agricola.local')
+    return raw
+  } catch {
+    return null
+  }
+}
+
+function appBasePath(): string {
+  const configured = new URL(import.meta.env.BASE_URL || '/', window.location.origin).pathname.replace(/\/$/, '')
+  if (configured) return configured
+  const current = window.location.pathname
+  return current !== '/' && current.endsWith('/') ? current.replace(/\/$/, '') : ''
+}
+
+function onboardingDestination(rawReturnTo: unknown): string {
+  const returnTo = safeReturnTo(rawReturnTo)
+  if (!returnTo) return window.location.pathname
+  const basePath = appBasePath()
+  if (!basePath || returnTo === basePath || returnTo.startsWith(`${basePath}/`) || returnTo.startsWith(`${basePath}?`)) {
+    return returnTo
+  }
+  return `${basePath}${returnTo}`
+}
+
 export function OnboardingPage() {
   const { refreshSession } = useAuth()
   const { t } = useLocale()
@@ -48,7 +75,7 @@ export function OnboardingPage() {
       const data = await resp.json()
       if (data.ok) {
         await refreshSession()
-        window.history.pushState(null, '', window.location.pathname)
+        window.history.pushState(null, '', onboardingDestination(data.returnTo))
         window.dispatchEvent(new PopStateEvent('popstate'))
         return
       }
