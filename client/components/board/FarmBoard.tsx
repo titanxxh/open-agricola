@@ -316,6 +316,18 @@ const roomSpriteClass = (houseType: PlayerState['houseType']) =>
       ? 'meeple-roomStone'
       : 'meeple-roomWood'
 
+const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
+  red: 'ff0000',
+  yellow: 'ffa500',
+  blue: '72c3b1',
+  black: '7b7b7b',
+  green: '008000',
+  purple: '982fff',
+}
+
+const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
+  color ? BGA_FENCE_COLORS[color] : undefined
+
 export type FarmBoardProps = {
   locale: Locale
   players: PlayerState[]
@@ -1240,10 +1252,13 @@ export const FarmBoard = ({
           return (
             <div
               key={cell.key}
-              className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
+              className={`farm-cell farm-${cell.type} meeple-fence ${
+                cell.type === 'fence-h' ? 'fence-hor' : 'fence-ver'
+              }${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
               data-player-color={sourcePlayerColor}
+              data-color={bgaFenceColor(sourcePlayerColor)}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)
