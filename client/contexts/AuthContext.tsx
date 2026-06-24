@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
+import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
 
 export type AuthUser = {
   id: string
@@ -62,10 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check existing session on mount
   useEffect(() => {
-    // Dev shortcut: ?player=p1 skips auth entirely (for restart-intranet.sh dev links)
     const params = new URLSearchParams(window.location.search)
     const devPlayer = params.get('player')
-    if (devPlayer && (params.get('transport') === 'ws' || params.get('devMode'))) {
+    if (import.meta.env.DEV && devPlayer && isDevModeAllowedFromQuery(window.location.search)) {
       const displayName = devPlayer === 'p1' ? 'Player 1' : devPlayer === 'p2' ? 'Player 2' : devPlayer
       setState({ user: { id: devPlayer, username: devPlayer, displayName }, loading: false })
       return
