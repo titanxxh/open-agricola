@@ -186,6 +186,7 @@ describe('auth routes', () => {
     delete process.env.ENABLE_AUTH_TEST_HELPERS
     delete process.env.PUBLIC_APP_ORIGIN
     delete process.env.PUBLIC_API_BASE
+    delete process.env.CORS_ORIGIN
   })
 
   it('login sets an HttpOnly session cookie and does not return token', async () => {
@@ -262,6 +263,36 @@ describe('auth routes', () => {
     expect(validateSession(one)).toBeNull()
     expect(validateSession(two)).toBeNull()
     expect(res.headers['Set-Cookie']).toContain('oa_session=;')
+  })
+
+  it('rejects cross-site cookie-backed mutation requests', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    const user = await createLocalUserForTests('csrfuser', 'password123', 'CSRF User')
+    const one = createSession(user.id)
+    const two = createSession(user.id)
+
+    const rejected = await requestJson(
+      'POST',
+      '/api/auth/logout-all',
+      {},
+      { Cookie: `oa_session=${one}`, Origin: 'https://evil.example' },
+    )
+
+    expect(rejected.status).toBe(403)
+    expect(rejected.json).toMatchObject({ ok: false, code: 'csrf_rejected' })
+    expect(validateSession(one)?.username).toBe('csrfuser')
+    expect(validateSession(two)?.username).toBe('csrfuser')
+
+    const allowed = await requestJson(
+      'POST',
+      '/api/auth/logout-all',
+      {},
+      { Cookie: `oa_session=${one}`, Origin: 'https://frontend.example' },
+    )
+
+    expect(allowed.status).toBe(200)
+    expect(validateSession(one)).toBeNull()
+    expect(validateSession(two)).toBeNull()
   })
 
   it('completes onboarding from an oauth ticket and sets a session cookie', async () => {
@@ -456,7 +487,7 @@ describe('auth routes', () => {
   })
 
   it('redirects OAuth app destinations to PUBLIC_APP_ORIGIN while preserving safe returnTo', async () => {
-    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
     const user = await createLocalUserForTests('frontredir', 'password123', 'Front Redir')
     const profile = {
       provider: 'github' as const,
@@ -472,7 +503,7 @@ describe('auth routes', () => {
     const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
 
     expect(res.status).toBe(302)
-    expect(res.headers.Location).toBe('https://frontend.example/?page=settings')
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=settings')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
   })
 

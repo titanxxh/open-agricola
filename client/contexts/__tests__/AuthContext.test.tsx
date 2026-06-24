@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '../AuthContext'
 
 afterEach(() => {
   cleanup()
+  window.history.pushState(null, '', '/')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -63,5 +64,28 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     expect(screen.getByText('newuser')).toBeInTheDocument()
+  })
+
+  it('preserves the current route as OAuth login returnTo', async () => {
+    window.history.pushState(null, '', '/?page=game&room=abc#board')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return new Response(JSON.stringify({ ok: false }), { status: 401 })
+      }
+      return new Response(JSON.stringify({ ok: true }))
+    }))
+
+    function Probe() {
+      const { oauthStartUrl } = useAuth()
+      return <a href={oauthStartUrl('github', 'login')}>github</a>
+    }
+
+    render(<AuthProvider><Probe /></AuthProvider>)
+
+    const link = await screen.findByRole('link', { name: 'github' })
+    const url = new URL(link.getAttribute('href')!, window.location.origin)
+    expect(url.pathname).toBe('/api/auth/oauth/github/start')
+    expect(url.searchParams.get('intent')).toBe('login')
+    expect(url.searchParams.get('returnTo')).toBe('/?page=game&room=abc#board')
   })
 })

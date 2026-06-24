@@ -11,6 +11,7 @@ import {
 } from '../auth-cookies.ts'
 import { createSession, validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
+import { corsHeaders, getRequestOrigin } from '../http-origin.ts'
 import { assertOAuthProvider, buildOAuthAuthorizationUrl, exchangeOAuthCode } from './providers.ts'
 import {
   consumeOAuthState,
@@ -25,12 +26,6 @@ import {
 import type { OAuthIntent, OAuthProfile, OAuthProvider } from './types.ts'
 
 const SCRYPT_KEYLEN = 64
-
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': CORS_ORIGIN,
-  ...(CORS_ORIGIN !== '*' ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
-}
 
 function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -72,13 +67,16 @@ function safeReturnTo(returnTo: string | null | undefined): string | undefined {
   }
 }
 
-function frontendOrigin(): string | undefined {
+function frontendBaseUrl(): URL | undefined {
   const raw = process.env.PUBLIC_APP_ORIGIN
   if (!raw) return undefined
   try {
     const url = new URL(raw)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
-    return url.origin
+    url.search = ''
+    url.hash = ''
+    if (!url.pathname.endsWith('/')) url.pathname += '/'
+    return url
   } catch {
     return undefined
   }
@@ -86,14 +84,9 @@ function frontendOrigin(): string | undefined {
 
 function appLocation(path: string): string {
   const safePath = safeReturnTo(path) ?? '/'
-  const origin = frontendOrigin()
-  return origin ? new URL(safePath, origin).toString() : safePath
-}
-
-function getRequestOrigin(req: IncomingMessage): string {
-  const host = req.headers.host ?? 'localhost'
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? 'http'
-  return `${proto}://${host}`
+  const baseUrl = frontendBaseUrl()
+  if (!baseUrl) return safePath
+  return new URL(safePath.replace(/^\//, ''), baseUrl).toString()
 }
 
 function redirect(res: ServerResponse, location: string, headers: Record<string, string | string[]> = {}): void {
@@ -102,7 +95,7 @@ function redirect(res: ServerResponse, location: string, headers: Record<string,
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers })
+  res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(), ...headers })
   res.end(JSON.stringify(payload))
 }
 

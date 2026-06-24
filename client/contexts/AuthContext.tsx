@@ -42,6 +42,15 @@ async function authFetch(path: string, body: Record<string, unknown>, retries = 
   }
 }
 
+function currentReturnTo(intent: 'login' | 'register' | 'link'): string | undefined {
+  if (intent === 'register') return undefined
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const params = new URLSearchParams(window.location.search)
+  const page = params.get('page')
+  if (page === 'login' || page === 'onboarding') return undefined
+  return current.startsWith('/') ? current : undefined
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: true })
 
@@ -113,7 +122,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const oauthStartUrl = useCallback((
     provider: 'github' | 'google',
     intent: 'login' | 'register' | 'link',
-  ) => `${API_BASE}/api/auth/oauth/${provider}/start?intent=${intent}`, [])
+  ) => {
+    const params = new URLSearchParams({ intent })
+    const returnTo = currentReturnTo(intent)
+    if (returnTo) params.set('returnTo', returnTo)
+    return `${API_BASE}/api/auth/oauth/${provider}/start?${params.toString()}`
+  }, [])
 
   return (
     <AuthContext.Provider value={{
