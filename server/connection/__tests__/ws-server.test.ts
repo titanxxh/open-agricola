@@ -178,6 +178,48 @@ describe('room-manager ws sync', () => {
     }
   })
 
+  it('closes websocket connections from untrusted origins before cookie auth', async () => {
+    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    vi.resetModules()
+    const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
+    const persistence = new InMemoryRoomPersistence()
+    const isolatedServer = createServer()
+    const isolatedWsServerResult = createWsServerWithEnv(isolatedServer, { persistence })
+    await new Promise<void>((resolve) => {
+      isolatedServer.listen(0, '127.0.0.1', () => resolve())
+    })
+    const address = isolatedServer.address() as AddressInfo
+    const isolatedBaseUrl = `ws://127.0.0.1:${address.port}/ws`
+    try {
+      const { createLocalUserForTests, createSession } = await import('../../auth.ts')
+      const username = `wsorigin_${Date.now()}`
+      const user = await createLocalUserForTests(username, 'password123', 'WS Origin')
+      const token = createSession(user.id)
+      const ws = new WebSocket(isolatedBaseUrl, {
+        headers: {
+          Cookie: `oa_session=${token}`,
+          Origin: 'https://evil.example',
+        },
+      }) as TestSocket
+      ws.received = []
+      sockets.push(ws)
+
+      const closed = await new Promise<{ code: number; reason: string }>((resolve) => {
+        ws.once('close', (code, reason) => {
+          resolve({ code, reason: reason.toString() })
+        })
+      })
+      expect(closed).toEqual({ code: 1008, reason: 'invalid origin' })
+    } finally {
+      clearInterval(isolatedWsServerResult.cleanupTimer)
+      isolatedWsServerResult.wss.close()
+      isolatedServer.close()
+      delete process.env.ALLOW_ANONYMOUS_WS
+      delete process.env.PUBLIC_APP_ORIGIN
+    }
+  })
+
   it('rejects non-fixed devMode-style unauthenticated room commands in production-like mode', async () => {
     process.env.ALLOW_ANONYMOUS_WS = 'false'
     vi.resetModules()

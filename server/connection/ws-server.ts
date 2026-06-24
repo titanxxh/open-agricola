@@ -22,6 +22,7 @@ import { dispatch } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
+import { isTrustedOrigin } from '../http-origin.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -122,6 +123,11 @@ type ConnectionDeps = {
 }
 
 const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionDeps): void => {
+  if (!isTrustedOrigin(req)) {
+    ws.close(1008, 'invalid origin')
+    return
+  }
+
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
   const user = validateSession(token)
   const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS || !!user, user?.id)

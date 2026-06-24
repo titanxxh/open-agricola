@@ -1218,6 +1218,7 @@ export const zh = {
       not_authenticated: '请先登录',
       missing_fields: '请填写所有必填项',
       invalid_display_name: '显示名称需要 1-60 个字符',
+      csrf_rejected: '请求来源不可信',
       rate_limited: '请求过多，请稍后再试',
       too_many_requests: '请求过多，请稍后再试',
     },

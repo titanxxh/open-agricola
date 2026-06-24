@@ -12,6 +12,7 @@ import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
 import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, type AuthErrorCode } from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
 import {
   handleLinkedIdentities,
   handleOAuthCallback,
@@ -25,16 +26,13 @@ const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'ca
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': CORS_ORIGIN,
-  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  ...(CORS_ORIGIN !== '*' ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
-}
+const serverCorsHeaders = () => corsHeaders({
+  methods: 'GET,POST,PATCH,DELETE,OPTIONS',
+  headers: 'Content-Type, Authorization',
+})
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}) => {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers })
+  res.writeHead(status, { 'Content-Type': 'application/json', ...serverCorsHeaders(), ...headers })
   res.end(JSON.stringify(payload))
 }
 
@@ -87,16 +85,20 @@ function getAuthToken(req: IncomingMessage): string {
   return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
 }
 
-function getRequestOrigin(req: IncomingMessage): string {
-  const host = req.headers.host ?? 'localhost'
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? 'http'
-  return `${proto}://${host}`
-}
-
 function forwardCookieSessionAsBearer(req: IncomingMessage): void {
   if (req.headers.authorization) return
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
   if (token) req.headers.authorization = `Bearer ${token}`
+}
+
+function isMutatingRequest(req: IncomingMessage): boolean {
+  return req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE'
+}
+
+function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!isMutatingRequest(req) || isTrustedOrigin(req)) return false
+  sendJson(res, 403, authError('csrf_rejected', 'Untrusted origin'))
+  return true
 }
 
 // Initialize database on import
@@ -125,10 +127,12 @@ const server = createServer(async (req, res) => {
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS)
+    res.writeHead(204, serverCorsHeaders())
     res.end()
     return
   }
+
+  if (rejectUntrustedOrigin(req, res)) return
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
@@ -353,7 +357,7 @@ const server = createServer(async (req, res) => {
       if (existsSync(filePath)) {
         const ext = extname(filePath).toLowerCase()
         const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : ext === '.woff2' ? 'font/woff2' : ext === '.woff' ? 'font/woff' : ext === '.ttf' ? 'font/ttf' : 'application/octet-stream'
-        res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
         res.end(readFileSync(filePath))
         return
       }
@@ -364,7 +368,7 @@ const server = createServer(async (req, res) => {
       if (cdnRes.ok) {
         const contentType = cdnRes.headers.get('content-type') || 'application/octet-stream'
         const buf = await cdnRes.arrayBuffer()
-        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
         res.end(Buffer.from(buf))
         return
       }
@@ -380,7 +384,7 @@ const server = createServer(async (req, res) => {
     if (filename && existsSync(filePath)) {
       const ext = extname(filename).toLowerCase()
       const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : 'application/octet-stream'
-      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
       res.end(readFileSync(filePath))
     } else {
       sendJson(res, 404, { error: 'Not found' })

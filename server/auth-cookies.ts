@@ -29,7 +29,12 @@ export function readCookie(header: string | undefined, name: string): string {
   if (!header) return ''
   for (const part of header.split(';')) {
     const [rawKey, ...rawValue] = part.trim().split('=')
-    if (rawKey === name) return decodeURIComponent(rawValue.join('='))
+    if (rawKey !== name) continue
+    try {
+      return decodeURIComponent(rawValue.join('='))
+    } catch {
+      return ''
+    }
   }
   return ''
 }

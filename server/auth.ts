@@ -29,6 +29,7 @@ export type AuthErrorCode =
   | 'rate_limited'
   | 'missing_fields'
   | 'invalid_display_name'
+  | 'csrf_rejected'
 
 export type AuthResult =
   | { ok: true; user: AuthUser; token?: string }

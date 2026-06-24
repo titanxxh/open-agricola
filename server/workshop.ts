@@ -6,15 +6,12 @@ import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
 import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
 import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
-
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*'
+import { corsHeaders } from './http-origin.ts'
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': CORS_ORIGIN,
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    ...corsHeaders({ methods: 'GET,POST,DELETE,OPTIONS' }),
   })
   res.end(JSON.stringify(payload))
 }

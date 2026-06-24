@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { createLocalUserForTests } from '../../auth.ts'
 import { getDb } from '../../db.ts'
@@ -83,11 +83,37 @@ describe('oauth store', () => {
     `)
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('creates and consumes oauth state exactly once', () => {
     const raw = createOAuthState({ provider: 'github', intent: 'register', returnTo: '/?page=lobby' })
     const consumed = consumeOAuthState(raw)
     expect(consumed).toMatchObject({ provider: 'github', intent: 'register', returnTo: '/?page=lobby' })
     expect(consumeOAuthState(raw)).toBeNull()
+  })
+
+  it('prunes expired and used temporary oauth rows before creating new rows', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const usedState = createOAuthState({ provider: 'github', intent: 'register' })
+    consumeOAuthState(usedState)
+    createOnboardingTicket({
+      provider: 'google',
+      providerUserId: 'g-expired',
+      emailVerified: false,
+    })
+
+    vi.setSystemTime(new Date('2026-01-01T00:16:00Z'))
+    createOAuthState({ provider: 'google', intent: 'login' })
+
+    const row = getDb().prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM oauth_states) AS states,
+        (SELECT COUNT(*) FROM oauth_onboarding_tickets) AS tickets
+    `).get() as { states: number; tickets: number }
+    expect(row).toEqual({ states: 1, tickets: 0 })
   })
 
   it('links one provider identity to one user', async () => {
