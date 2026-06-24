@@ -11,9 +11,10 @@
 
 ## Features
 
-- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成卡牌艺术，PR 一键提交到工坊
 - 后端权威 + WebSocket 实时多人同步
-- 248+ 张原版 Agricola 卡（接近 BGA 完整集）
+- 2-6 人房间、simultaneous draft、Community Deck、自定义工坊卡
+- 888 张 BGA A-E canonical 卡牌定义已对齐；Parent Cards、Through the Seasons、Farmers of the Moor complexity III 已接入，细节见卡牌实现现状文档
+- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成卡牌艺术，PR 一键提交到工坊
 - 一键 Docker 自部署（自建 VPS + GitHub Pages 双部署）
 - 自定义代码沙盒（TypeScript AST 校验 + VM 隔离执行）
 
@@ -32,6 +33,14 @@ pnpm install
 ./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
 ```
 
+常用验证命令：
+
+```bash
+pnpm test:fast
+pnpm run lint
+pnpm run build
+```
+
 ## URL Parameters
 
 | 参数 | 说明 |
@@ -39,8 +48,16 @@ pnpm install
 | `player=p1` / `player=p2` | 锁定玩家视角 |
 | `transport=ws` | 启用 WebSocket 实时同步 |
 | `room=<id>` | 加入指定房间 |
-| `devMode=1` | 启用开发者面板（资源编辑、回合跳转、卡牌工具） |
+| `maxPlayers=2..6` | 创建 WS 房间时设置人数 |
+| `draftMode=simultaneous` | 创建 WS 房间时启用 simultaneous draft |
+| `draftPoolSize=7..10` | 设置 draft 每类牌池大小 |
+| `enableCommunityDeck=true` | 创建 WS 房间时加入 Community Deck |
+| `enableParentCards=true` | 创建 WS 房间时启用 Parent Cards |
+| `enableThroughTheSeasons=true` | 创建 WS 房间时启用 Through the Seasons |
+| `enableFarmersOfTheMoor=true` | 创建 WS 房间时启用 Farmers of the Moor |
+| `allowIncompleteFarmersOfTheMoorMinorDeal=true` | Farmers of the Moor 小改良池不完整时仍允许开局 |
 | `customCards=id1,id2` | 创建 WS 房间时加载工坊卡 ID |
+| `devMode=1` | 在固定 dev 房间或 embedded sandbox 启用开发者面板 |
 | `page=workshop` | 打开工坊页面 |
 | `page=login` | 强制跳登录页（认证后默认跳大厅）|
 
@@ -72,6 +89,9 @@ docs/      架构、部署、平台设计、卡牌进度
 | Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
 | Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |
 | 卡牌实现现状 | [docs/card_implementation_status.md](docs/card_implementation_status.md) |
+| Custom Card Sandbox | [docs/CUSTOM_CARD_SANDBOX.md](docs/CUSTOM_CARD_SANDBOX.md) |
+| Community Cards | [docs/community_cards.md](docs/community_cards.md) |
+| CI Checks | [docs/operations/ci-checks.md](docs/operations/ci-checks.md) |
 
 ## Contributing
 
