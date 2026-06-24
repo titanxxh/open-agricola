@@ -61,6 +61,16 @@ function parseIntent(url: URL): OAuthIntent {
   return 'login'
 }
 
+function safeReturnTo(returnTo: string | null | undefined): string | undefined {
+  if (!returnTo?.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('\\')) return undefined
+  try {
+    new URL(returnTo, 'http://open-agricola.local')
+    return returnTo
+  } catch {
+    return undefined
+  }
+}
+
 function redirect(res: ServerResponse, location: string, headers: Record<string, string | string[]> = {}): void {
   res.writeHead(302, { Location: location, ...headers })
   res.end()
@@ -138,11 +148,12 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
     return
   }
 
+  const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
   const state = createOAuthState({
     provider,
     intent,
     ...(user ? { userId: user.id } : {}),
-    ...(url.searchParams.get('returnTo') ? { returnTo: url.searchParams.get('returnTo')! } : {}),
+    ...(returnTo ? { returnTo } : {}),
   })
   redirect(res, buildOAuthAuthorizationUrl(provider, state, req))
 }
@@ -198,7 +209,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   const existing = findIdentity(profile.provider, profile.providerUserId)
   if (existing) {
     const token = createSession(existing.userId)
-    redirect(res, state.returnTo ?? '/', { 'Set-Cookie': serializeSessionCookie(token) })
+    redirect(res, safeReturnTo(state.returnTo) ?? '/', { 'Set-Cookie': serializeSessionCookie(token) })
     return
   }
 
