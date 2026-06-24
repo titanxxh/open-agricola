@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 
 let routeHandler: ((req: IncomingMessage, res: ServerResponse) => void | Promise<void>) | null = null
+const originalNodeEnv = process.env.NODE_ENV
 
 vi.mock('node:http', async () => {
   const actual = await vi.importActual<typeof import('node:http')>('node:http')
@@ -179,6 +180,12 @@ describe('auth routes', () => {
     `)
   })
 
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
+    delete process.env.ENABLE_AUTH_TEST_HELPERS
+  })
+
   it('login sets an HttpOnly session cookie and does not return token', async () => {
     await createLocalUserForTests('cookieuser', 'password123', 'Cookie User')
     const res = await requestJson('POST', '/api/auth/login', { username: 'cookieuser', password: 'password123' })
@@ -246,6 +253,33 @@ describe('auth routes', () => {
     )
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'password_mismatch' })
+  })
+
+  it('test oauth helper is unavailable by default', async () => {
+    delete process.env.ENABLE_AUTH_TEST_HELPERS
+    const res = await requestJson('POST', '/api/test/oauth/github/callback', { providerUserId: 'x' })
+    expect(res.status).toBe(404)
+  })
+
+  it('test oauth helper creates onboarding cookie when explicitly enabled outside production', async () => {
+    process.env.NODE_ENV = 'test'
+    process.env.ENABLE_AUTH_TEST_HELPERS = '1'
+    const res = await requestJson('POST', '/api/test/oauth/github/callback', {
+      providerUserId: 'gh-e2e',
+      providerLogin: 'gh-e2e',
+      email: 'gh-e2e@example.com',
+      displayName: 'GH E2E',
+    })
+    expect(res.status).toBe(200)
+    expect(res.json).toMatchObject({ ok: true, provider: 'github' })
+    expect(res.headers['Set-Cookie']).toContain('oa_onboarding=')
+  })
+
+  it('test oauth helper remains unavailable in production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.ENABLE_AUTH_TEST_HELPERS = '1'
+    const res = await requestJson('POST', '/api/test/oauth/github/callback', { providerUserId: 'x' })
+    expect(res.status).toBe(404)
   })
 
   it('rejects link callback when provider identity is already linked to another user', async () => {

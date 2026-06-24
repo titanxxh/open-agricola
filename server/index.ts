@@ -11,13 +11,15 @@ import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
 import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
-import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import {
   handleLinkedIdentities,
   handleOAuthCallback,
   handleOAuthStart,
   handleOnboardingComplete,
 } from './oauth/handler.ts'
+import { assertOAuthProvider } from './oauth/providers.ts'
+import { createOnboardingTicket } from './oauth/store.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
@@ -78,6 +80,12 @@ function getClientIp(req: IncomingMessage): string {
 
 function getAuthToken(req: IncomingMessage): string {
   return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+}
+
+function forwardCookieSessionAsBearer(req: IncomingMessage): void {
+  if (req.headers.authorization) return
+  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  if (token) req.headers.authorization = `Bearer ${token}`
 }
 
 // Initialize database on import
@@ -227,6 +235,53 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  if (req.url?.startsWith('/api/test/oauth/') && req.method === 'POST') {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTH_TEST_HELPERS !== '1') {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    const parts = url.pathname.split('/')
+    const provider = parts[4] ?? ''
+    if (parts.length !== 6 || parts[5] !== 'callback') {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+
+    try {
+      assertOAuthProvider(provider)
+    } catch {
+      sendJson(res, 400, { ok: false, code: 'unsupported_oauth_provider', error: 'Unsupported OAuth provider' })
+      return
+    }
+
+    const body = await parseBody<{
+      provider?: string
+      providerUserId?: string
+      providerLogin?: string
+      email?: string
+      displayName?: string
+      avatarUrl?: string
+    }>(req)
+    if (!body?.providerUserId || (body.provider && body.provider !== provider)) {
+      sendJson(res, 400, { ok: false, error: 'Invalid OAuth test profile' })
+      return
+    }
+
+    const ticket = createOnboardingTicket({
+      provider,
+      providerUserId: body.providerUserId,
+      emailVerified: true,
+      ...(body.providerLogin ? { providerLogin: body.providerLogin } : {}),
+      ...(body.email ? { email: body.email } : {}),
+      ...(body.displayName ? { displayName: body.displayName } : {}),
+      ...(body.avatarUrl ? { avatarUrl: body.avatarUrl } : {}),
+    })
+    sendJson(res, 200, { ok: true, provider }, { 'Set-Cookie': serializeOnboardingCookie(ticket) })
+    return
+  }
+
   // ── Lobby routes ───────────────────────────────────────
   if (req.method === 'GET' && req.url && (req.url === '/api/rooms' || req.url.startsWith('/api/rooms?'))) {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
@@ -316,7 +371,7 @@ const server = createServer(async (req, res) => {
 
   // ── Art upload ─────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/workshop/art') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const contentLength = parseInt(req.headers['content-length'] ?? '0', 10)
@@ -341,12 +396,14 @@ const server = createServer(async (req, res) => {
 
   // ── Workshop routes ────────────────────────────────────
   if (req.url?.startsWith('/api/workshop/') || req.url?.startsWith('/api/admin/')) {
+    forwardCookieSessionAsBearer(req)
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return
   }
 
   // ── Game routes (existing) ─────────────────────────────
   if (req.url?.startsWith('/api/game/')) {
+    forwardCookieSessionAsBearer(req)
     const handled = await handleGameRoute(req, res)
     if (handled) return
   }
