@@ -1,6 +1,26 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { register, login, logout, validateSession } from '../auth.ts'
+import {
+  changePassword,
+  createLocalUserForTests,
+  createSession,
+  login,
+  logout,
+  logoutAll,
+  register,
+  validateSession,
+} from '../auth.ts'
+import {
+  clearOnboardingCookie,
+  clearSessionCookie,
+  ONBOARDING_COOKIE,
+  readCookie,
+  serializeOnboardingCookie,
+  serializeSessionCookie,
+  SESSION_COOKIE,
+} from '../auth-cookies.ts'
+import { checkRateLimit, resetRateLimitsForTests } from '../rate-limit.ts'
+import { getDb } from '../db.ts'
 
 // Use an in-memory database for tests
 vi.mock('../db.ts', () => {
@@ -12,6 +32,7 @@ vi.mock('../db.ts', () => {
       username TEXT UNIQUE NOT NULL COLLATE NOCASE,
       display_name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      password_updated_at INTEGER,
       created_at INTEGER NOT NULL,
       last_login_at INTEGER
     );
@@ -21,6 +42,44 @@ vi.mock('../db.ts', () => {
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE auth_identities (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      provider_login TEXT,
+      provider_email TEXT,
+      provider_email_verified INTEGER NOT NULL DEFAULT 0,
+      display_name TEXT,
+      avatar_url TEXT,
+      linked_at INTEGER NOT NULL,
+      last_login_at INTEGER,
+      UNIQUE(provider, provider_user_id),
+      UNIQUE(user_id, provider)
+    );
+    CREATE TABLE oauth_states (
+      state_hash TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      intent TEXT NOT NULL,
+      user_id TEXT,
+      return_to TEXT,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE TABLE oauth_onboarding_tickets (
+      ticket_hash TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      provider_login TEXT,
+      provider_email TEXT,
+      provider_email_verified INTEGER NOT NULL DEFAULT 0,
+      display_name TEXT,
+      avatar_url TEXT,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
   `)
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
@@ -28,51 +87,31 @@ vi.mock('../db.ts', () => {
 import { vi } from 'vitest'
 
 describe('auth', () => {
+  beforeEach(() => {
+    const db = getDb()
+    db.exec(`
+      DELETE FROM oauth_onboarding_tickets;
+      DELETE FROM oauth_states;
+      DELETE FROM auth_identities;
+      DELETE FROM sessions;
+      DELETE FROM users;
+    `)
+  })
+
   describe('register', () => {
-    it('creates a user and returns a token', async () => {
-      const result = await register('testuser', 'password123')
-      expect(result.ok).toBe(true)
-      if (!result.ok) return
-      expect(result.user.username).toBe('testuser')
-      expect(result.token).toBeTruthy()
-    })
-
-    it('rejects duplicate username', async () => {
-      await register('dupeuser', 'pass1234')
-      const result = await register('dupeuser', 'pass5678')
-      expect(result.ok).toBe(false)
-      if (result.ok) return
-      expect(result.error).toMatch(/taken/i)
-    })
-
-    it('rejects short username', async () => {
-      const result = await register('x', 'password123')
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects short password', async () => {
-      const result = await register('validuser2', '123')
-      expect(result.ok).toBe(false)
-    })
-
-    it('uses username as displayName when not provided', async () => {
-      const result = await register('nameless', 'password123')
-      expect(result.ok).toBe(true)
-      if (!result.ok) return
-      expect(result.user.displayName).toBe('nameless')
-    })
-
-    it('accepts custom displayName', async () => {
-      const result = await register('myuser', 'password123', 'My Name')
-      expect(result.ok).toBe(true)
-      if (!result.ok) return
-      expect(result.user.displayName).toBe('My Name')
+    it('direct register is disabled with a stable code', async () => {
+      const result = await register('newuser', 'password123', 'New User')
+      expect(result).toEqual({
+        ok: false,
+        code: 'oauth_registration_required',
+        error: 'Registration requires GitHub or Google',
+      })
     })
   })
 
   describe('login', () => {
     beforeEach(async () => {
-      await register('logintest', 'correctpass', 'Login Test')
+      await createLocalUserForTests('logintest', 'correctpass', 'Login Test')
     })
 
     it('succeeds with correct credentials', async () => {
@@ -99,13 +138,32 @@ describe('auth', () => {
       const result = await login('LOGINTEST', 'correctpass')
       expect(result.ok).toBe(true)
     })
+
+    it('password login still works for legacy local accounts', async () => {
+      const created = await createLocalUserForTests('legacy', 'password123', 'Legacy User')
+      expect(created.username).toBe('legacy')
+      const result = await login('legacy', 'password123')
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.token).toBeTruthy()
+      expect(result.user.username).toBe('legacy')
+    })
+  })
+
+  describe('local users', () => {
+    it('requires eight character passwords for local users and password changes', async () => {
+      await expect(createLocalUserForTests('weakpass', '1234567', 'Weak')).rejects.toThrow(/Password must be at least 8 characters/)
+
+      const user = await createLocalUserForTests('changepass', 'password123', 'Change Pass')
+      await expect(changePassword(user.id, 'password123', '1234567')).resolves.toBe('Password must be at least 8 characters')
+    })
   })
 
   describe('validateSession', () => {
     it('returns user for valid token', async () => {
-      const reg = await register('sessuser', 'password123')
-      if (!reg.ok) return
-      const user = validateSession(reg.token)
+      const created = await createLocalUserForTests('sessuser', 'password123')
+      const token = createSession(created.id)
+      const user = validateSession(token)
       expect(user).not.toBeNull()
       expect(user?.username).toBe('sessuser')
     })
@@ -122,11 +180,47 @@ describe('auth', () => {
 
   describe('logout', () => {
     it('invalidates the session', async () => {
-      const reg = await register('logoutuser', 'password123')
-      if (!reg.ok) return
-      logout(reg.token)
-      const user = validateSession(reg.token)
+      const created = await createLocalUserForTests('logoutuser', 'password123')
+      const token = createSession(created.id)
+      logout(token)
+      const user = validateSession(token)
       expect(user).toBeNull()
+    })
+
+    it('logoutAll invalidates every session for a user', async () => {
+      const user = await createLocalUserForTests('multi', 'password123', 'Multi')
+      const one = createSession(user.id)
+      const two = createSession(user.id)
+      expect(validateSession(one)?.username).toBe('multi')
+      expect(validateSession(two)?.username).toBe('multi')
+      logoutAll(user.id)
+      expect(validateSession(one)).toBeNull()
+      expect(validateSession(two)).toBeNull()
+    })
+  })
+
+  describe('cookies', () => {
+    it('serializes and reads auth cookies', () => {
+      const session = serializeSessionCookie('tok en')
+      const onboarding = serializeOnboardingCookie('ticket=value')
+      expect(session).toContain(`${SESSION_COOKIE}=tok%20en`)
+      expect(session).toContain('HttpOnly')
+      expect(onboarding).toContain(`${ONBOARDING_COOKIE}=ticket%3Dvalue`)
+      expect(readCookie(`${session}; ${onboarding}`, SESSION_COOKIE)).toBe('tok en')
+      expect(clearSessionCookie()).toContain(`${SESSION_COOKIE}=;`)
+      expect(clearOnboardingCookie()).toContain(`${ONBOARDING_COOKIE}=;`)
+    })
+  })
+
+  describe('rate limit', () => {
+    beforeEach(() => {
+      resetRateLimitsForTests()
+    })
+
+    it('rejects requests over the configured window limit', () => {
+      expect(checkRateLimit('auth:test', { windowMs: 1000, max: 2 })).toBe(true)
+      expect(checkRateLimit('auth:test', { windowMs: 1000, max: 2 })).toBe(true)
+      expect(checkRateLimit('auth:test', { windowMs: 1000, max: 2 })).toBe(false)
     })
   })
 })
