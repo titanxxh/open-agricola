@@ -3,21 +3,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
+import { authErrorMessage } from './auth-errors'
 
 type Mode = 'login' | 'register'
-
-export function authErrorMessage(
-  code: string | undefined,
-  fallback: string | undefined,
-  t: (key: string) => string,
-): string {
-  if (code) {
-    const key = `platform.authErrors.${code}`
-    const localized = t(key)
-    if (localized !== key) return localized
-  }
-  return fallback || t('platform.unknownError')
-}
 
 export function LoginPage() {
   const { login, oauthStartUrl } = useAuth()

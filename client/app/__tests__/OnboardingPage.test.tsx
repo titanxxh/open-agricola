@@ -4,6 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnboardingPage } from '../OnboardingPage'
 
+const refreshSessionMock = vi.fn(async () => {})
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    refreshSession: refreshSessionMock,
+  }),
+}))
+
 vi.mock('../../contexts/LocaleContext', () => {
   const labels: Record<string, string> = {
     'platform.loginTitle': 'Open Agricola',
@@ -77,6 +85,7 @@ describe('OnboardingPage', () => {
     await user.click(screen.getByRole('button', { name: '完成注册' }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/auth/onboarding/complete'), expect.objectContaining({ credentials: 'include' })))
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
   })
 })

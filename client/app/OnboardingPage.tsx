@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { API_BASE } from '../config'
+import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
-import { authErrorMessage } from './LoginPage'
+import { authErrorMessage } from './auth-errors'
 
 export function OnboardingPage() {
+  const { refreshSession } = useAuth()
   const { t } = useLocale()
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -45,6 +47,7 @@ export function OnboardingPage() {
       })
       const data = await resp.json()
       if (data.ok) {
+        await refreshSession()
         window.history.pushState(null, '', window.location.pathname)
         window.dispatchEvent(new PopStateEvent('popstate'))
         return

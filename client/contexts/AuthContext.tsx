@@ -17,6 +17,7 @@ type AuthContextValue = AuthState & {
   login: (username: string, password: string) => Promise<{ ok: boolean; code?: string; error?: string }>
   logout: () => Promise<void>
   logoutAll: () => Promise<void>
+  refreshSession: () => Promise<void>
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   oauthStartUrl: (provider: 'github' | 'google', intent: 'login' | 'register' | 'link') => string
 }
@@ -43,6 +44,22 @@ async function authFetch(path: string, body: Record<string, unknown>, retries = 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: true })
 
+  const refreshSessionFn = useCallback(async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/me`, {
+        credentials: 'include',
+      })
+      const data = await resp.json()
+      if (data.ok && data.user) {
+        setState({ user: data.user, loading: false })
+      } else {
+        setState({ user: null, loading: false })
+      }
+    } catch {
+      setState({ user: null, loading: false })
+    }
+  }, [])
+
   // Check existing session on mount
   useEffect(() => {
     // Dev shortcut: ?player=p1 skips auth entirely (for restart-intranet.sh dev links)
@@ -54,21 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    fetch(`${API_BASE}/api/auth/me`, {
-      credentials: 'include',
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok && data.user) {
-          setState({ user: data.user, loading: false })
-        } else {
-          setState({ user: null, loading: false })
-        }
-      })
-      .catch(() => {
-        setState({ user: null, loading: false })
-      })
-  }, [])
+    void refreshSessionFn()
+  }, [refreshSessionFn])
 
   const loginFn = useCallback(async (username: string, password: string) => {
     const data = await authFetch('/api/auth/login', { username, password })
@@ -117,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: loginFn,
       logout: logoutFn,
       logoutAll: logoutAllFn,
+      refreshSession: refreshSessionFn,
       apiFetch: apiFetchFn,
       oauthStartUrl,
     }}>

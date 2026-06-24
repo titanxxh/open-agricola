@@ -4,7 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
-import { authErrorMessage } from './LoginPage'
+import { authErrorMessage } from './auth-errors'
 import { setPage } from './PageRouter'
 
 type LinkedIdentity = {
