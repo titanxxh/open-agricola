@@ -570,6 +570,23 @@ describe('FarmBoard', () => {
     expect(html).toContain('pasture-info')
   })
 
+  it('keeps the empty capacity badge on a built stable tile alongside the barn icon', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+          stableDisplayMap: new Map([['0-0', { animalType: null, animalCount: 0 }]]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('>0/1<')
+  })
+
   it('does not render a barn icon on a buildable stable candidate tile', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
