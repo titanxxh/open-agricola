@@ -23,6 +23,7 @@ export const LEGACY_FAST_INCLUDE = [
   'server/__tests__/*.test.ts',
   'server/game/**/__tests__/*.test.ts',
   'server/connection/**/__tests__/*.test.ts',
+  'server/oauth/**/__tests__/*.test.ts',
   'server/workshop-pr/__tests__/*.test.ts',
 ]
 
@@ -63,6 +64,7 @@ export const FAST_SERVER_INCLUDE = [
   'server/__tests__/*.test.ts',
   'server/game/**/__tests__/*.test.ts',
   'server/connection/**/__tests__/*.test.ts',
+  'server/oauth/**/__tests__/*.test.ts',
   'server/workshop-pr/__tests__/*.test.ts',
 ]
 
