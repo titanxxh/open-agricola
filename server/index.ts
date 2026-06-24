@@ -10,7 +10,14 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
+import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
+import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import {
+  handleLinkedIdentities,
+  handleOAuthCallback,
+  handleOAuthStart,
+  handleOnboardingComplete,
+} from './oauth/handler.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
@@ -21,10 +28,11 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': CORS_ORIGIN,
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  ...(CORS_ORIGIN !== '*' ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
 }
 
-const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS })
+const sendJson = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}) => {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers })
   res.end(JSON.stringify(payload))
 }
 
@@ -68,6 +76,10 @@ function getClientIp(req: IncomingMessage): string {
   return req.socket.remoteAddress ?? 'unknown'
 }
 
+function getAuthToken(req: IncomingMessage): string {
+  return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+}
+
 // Initialize database on import
 getDb()
 
@@ -106,6 +118,28 @@ const server = createServer(async (req, res) => {
   }
 
   // ── Auth routes ────────────────────────────────────────
+  if (req.url?.startsWith('/api/auth/oauth/')) {
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    if (req.method === 'GET' && url.pathname.endsWith('/start')) {
+      handleOAuthStart(req, res, url)
+      return
+    }
+    if (req.method === 'GET' && url.pathname.endsWith('/callback')) {
+      await handleOAuthCallback(req, res, url)
+      return
+    }
+  }
+
+  if (req.url === '/api/auth/onboarding/complete' && req.method === 'POST') {
+    await handleOnboardingComplete(req, res)
+    return
+  }
+
+  if (req.url === '/api/auth/identities' && req.method === 'GET') {
+    handleLinkedIdentities(req, res)
+    return
+  }
+
   if (req.url === '/api/auth/register' && req.method === 'POST') {
     const ip = getClientIp(req)
     if (!checkRateLimit(ip)) {
@@ -134,19 +168,31 @@ const server = createServer(async (req, res) => {
       return
     }
     const result = await login(body.username, body.password)
-    sendJson(res, result.ok ? 200 : 400, result)
+    if (!result.ok) {
+      sendJson(res, 400, result)
+      return
+    }
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token) })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     if (token) logout(token)
-    sendJson(res, 200, { ok: true })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie() })
+    return
+  }
+
+  if (req.url === '/api/auth/logout-all' && req.method === 'POST') {
+    const token = getAuthToken(req)
+    const user = validateSession(token)
+    if (user) logoutAll(user.id)
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie() })
     return
   }
 
   if (req.url === '/api/auth/profile' && req.method === 'PATCH') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const body = await parseBody<{ displayName?: string }>(req)
@@ -157,7 +203,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/change-password' && req.method === 'POST') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const body = await parseBody<{ oldPassword?: string; newPassword?: string }>(req)
@@ -171,7 +217,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.url === '/api/auth/me' && req.method === 'GET') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) {
       sendJson(res, 401, { ok: false, error: 'Not authenticated' })
@@ -194,7 +240,7 @@ const server = createServer(async (req, res) => {
 
   // Dissolve a room (HTTP, for lobby use)
   if (req.method === 'POST' && req.url?.startsWith('/api/rooms/') && req.url.endsWith('/dissolve')) {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
@@ -205,7 +251,7 @@ const server = createServer(async (req, res) => {
 
   // Rooms the current user has participated in (SQLite mode only)
   if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     try {
