@@ -376,9 +376,12 @@ Push 到 `platform` 分支即可自动重新部署。
 必需后端环境变量：
 
 - `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端 origin，例如 `https://your-user.github.io`。
+- `PUBLIC_API_BASE`：用户浏览器可访问的后端 origin，例如 `https://api.your-domain.com`，用于 OAuth provider callback URL。
 - `CORS_ORIGIN`：前后端不同源时必须等于前端 origin。
-- `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`：GitHub OAuth App 凭据。
-- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`：Google OAuth Client 凭据。
+- `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`：账号登录/注册用 GitHub OAuth App 凭据。
+- `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` / `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET`：账号登录/注册用 Google OAuth Client 凭据。
+
+账号 OAuth 兼容旧变量 `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`，但新部署应使用 `ACCOUNT_*`，避免和 Workshop PR OAuth 配置混用。
 
 OAuth callback URL 填后端 origin：
 
@@ -424,10 +427,11 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
 | `PUBLIC_APP_ORIGIN` | — | 前端公开 origin，用于 OAuth/跨源认证跳转 |
-| `GITHUB_OAUTH_CLIENT_ID` | — | GitHub OAuth App client id |
-| `GITHUB_OAUTH_CLIENT_SECRET` | — | GitHub OAuth App client secret |
-| `GOOGLE_OAUTH_CLIENT_ID` | — | Google OAuth client id |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | — | Google OAuth client secret |
+| `PUBLIC_API_BASE` | — | 后端公开 origin，用于 OAuth provider callback URL |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` | — | 账号 GitHub OAuth App client id；未设置时兼容回退到 `GITHUB_OAUTH_CLIENT_ID` |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | 账号 GitHub OAuth App client secret；未设置时兼容回退到 `GITHUB_OAUTH_CLIENT_SECRET` |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id；未设置时兼容回退到 `GOOGLE_OAUTH_CLIENT_ID` |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | 账号 Google OAuth client secret；未设置时兼容回退到 `GOOGLE_OAUTH_CLIENT_SECRET` |
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |

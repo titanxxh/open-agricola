@@ -49,7 +49,7 @@ export function SettingsPage() {
         body: JSON.stringify({ displayName }),
       })
       const d = await resp.json()
-      setNameMsg(d.ok ? { ok: true, text: t('platform.saved') } : { ok: false, text: d.error ?? t('platform.saveFailed') })
+      setNameMsg(d.ok ? { ok: true, text: t('platform.saved') } : { ok: false, text: authErrorMessage(d.code, d.error, t) })
     } catch {
       setNameMsg({ ok: false, text: t('platform.networkError') })
     } finally {
@@ -79,7 +79,7 @@ export function SettingsPage() {
         setConfirmPassword('')
         setTimeout(() => { logout() }, 1500)
       } else {
-        setPwMsg({ ok: false, text: d.error ?? t('platform.changeFailed') })
+        setPwMsg({ ok: false, text: authErrorMessage(d.code, d.error, t) })
       }
     } catch {
       setPwMsg({ ok: false, text: t('platform.networkError') })

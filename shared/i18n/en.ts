@@ -1236,6 +1236,9 @@ export const en = {
       oauth_onboarding_required: 'Please complete registration first',
       oauth_onboarding_expired: 'Registration session expired. Please register again with GitHub or Google',
       not_authenticated: 'Please sign in first',
+      missing_fields: 'Please fill in all required fields',
+      invalid_display_name: 'Display name must be 1-60 characters',
+      rate_limited: 'Too many requests. Please try again later',
       too_many_requests: 'Too many requests. Please try again later',
     },
 

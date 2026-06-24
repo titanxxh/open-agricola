@@ -18,6 +18,14 @@ async function readJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
+function clientId(): string {
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? ''
+}
+
+function clientSecret(): string {
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? ''
+}
+
 export async function exchangeGoogleOAuthCode(
   code: string,
   redirectUri: string,
@@ -27,8 +35,8 @@ export async function exchangeGoogleOAuthCode(
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
-      client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+      client_id: clientId(),
+      client_secret: clientSecret(),
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
