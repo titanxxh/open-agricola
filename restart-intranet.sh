@@ -456,6 +456,8 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PERSIST_ROOMS=sqlite \
   ALLOW_ANONYMOUS_WS=true \
   BACKEND_HOST="$LAN_IP" \
+  CORS_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
+  PUBLIC_APP_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
