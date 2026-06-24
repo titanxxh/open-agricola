@@ -3,9 +3,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { nanoid } from 'nanoid'
 import {
   clearOnboardingCookie,
+  clearOAuthStateCookie,
   ONBOARDING_COOKIE,
+  OAUTH_STATE_COOKIE,
   readCookie,
   serializeOnboardingCookie,
+  serializeOAuthStateCookie,
   serializeSessionCookie,
   SESSION_COOKIE,
 } from '../auth-cookies.ts'
@@ -103,6 +106,22 @@ function redirect(res: ServerResponse, location: string, headers: Record<string,
   res.end()
 }
 
+function appendSetCookie(headers: Record<string, string | string[]>, cookie: string): Record<string, string | string[]> {
+  const existing = headers['Set-Cookie']
+  if (!existing) return { ...headers, 'Set-Cookie': cookie }
+  return {
+    ...headers,
+    'Set-Cookie': Array.isArray(existing) ? [...existing, cookie] : [existing, cookie],
+  }
+}
+
+function oauthStateClearHeaders(
+  req: IncomingMessage,
+  headers: Record<string, string | string[]> = {},
+): Record<string, string | string[]> {
+  return appendSetCookie(headers, clearOAuthStateCookie({ backendOrigin: getRequestOrigin(req) }))
+}
+
 function sendJson(res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}): void {
   res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(), ...headers })
   res.end(JSON.stringify(payload))
@@ -182,19 +201,27 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
     ...(user ? { userId: user.id } : {}),
     ...(returnTo ? { returnTo } : {}),
   })
-  redirect(res, buildOAuthAuthorizationUrl(provider, state, req))
+  redirect(res, buildOAuthAuthorizationUrl(provider, state, req), {
+    'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
+  })
 }
 
 export async function handleOAuthCallback(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   if (url.searchParams.get('error')) {
-    redirect(res, appLocation('/?page=login&authError=oauth_cancelled'))
+    redirect(res, appLocation('/?page=login&authError=oauth_cancelled'), oauthStateClearHeaders(req))
     return
   }
 
   const rawState = url.searchParams.get('state') ?? ''
+  const cookieState = readCookie(req.headers.cookie, OAUTH_STATE_COOKIE)
+  if (!rawState || cookieState !== rawState) {
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
+    return
+  }
+
   const state = consumeOAuthState(rawState)
   if (!state) {
-    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
     return
   }
 
@@ -203,7 +230,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     provider = parseProvider(url)
     if (provider !== state.provider) throw new Error('provider mismatch')
   } catch {
-    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'), oauthStateClearHeaders(req))
     return
   }
 
@@ -211,7 +238,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     const token = readCookie(req.headers.cookie, SESSION_COOKIE)
     const currentUser = token ? validateSession(token) : null
     if (!state.userId || !currentUser || currentUser.id !== state.userId) {
-      redirect(res, appLocation('/?page=settings&authError=not_authenticated'))
+      redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
       return
     }
   }
@@ -220,24 +247,24 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   try {
     profile = await exchangeOAuthCode(provider, url.searchParams.get('code') ?? '', req)
   } catch {
-    redirect(res, appLocation('/?page=login&authError=oauth_profile_failed'))
+    redirect(res, appLocation('/?page=login&authError=oauth_profile_failed'), oauthStateClearHeaders(req))
     return
   }
 
   if (state.intent === 'link') {
     if (!state.userId) {
-      redirect(res, appLocation('/?page=settings&authError=not_authenticated'))
+      redirect(res, appLocation('/?page=settings&authError=not_authenticated'), oauthStateClearHeaders(req))
       return
     }
     if (findIdentity(profile.provider, profile.providerUserId)) {
-      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'))
+      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
       return
     }
     try {
       linkIdentity(state.userId, profile)
-      redirect(res, appLocation(`/?page=settings&linked=${provider}`))
+      redirect(res, appLocation(`/?page=settings&linked=${provider}`), oauthStateClearHeaders(req))
     } catch {
-      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'))
+      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'), oauthStateClearHeaders(req))
     }
     return
   }
@@ -245,12 +272,16 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   const existing = findIdentity(profile.provider, profile.providerUserId)
   if (existing) {
     const token = createSession(existing.userId)
-    redirect(res, appLocation(safeReturnTo(state.returnTo) ?? '/'), { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
+    redirect(res, appLocation(safeReturnTo(state.returnTo) ?? '/'), oauthStateClearHeaders(req, {
+      'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
+    }))
     return
   }
 
   const ticket = createOnboardingTicket(profile)
-  redirect(res, appLocation('/?page=onboarding'), { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
+  redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
+    'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
+  }))
 }
 
 export async function handleOnboardingComplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
