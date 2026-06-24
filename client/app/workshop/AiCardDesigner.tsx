@@ -29,7 +29,12 @@ import { ResourceText } from '../../components/common/ResourceText'
 import { Section } from '../../components/common/Section'
 import { API_BASE } from '../../config'
 
-const TOKEN_KEY = 'open-agricola-token'
+type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
+
+const cookieApiFetch: ApiFetch = (path, init) => fetch(`${API_BASE}${path}`, {
+  ...init,
+  credentials: 'include',
+})
 
 /** Generate a card ID from a display name — English only */
 function autoCardId(name: string): string {
@@ -46,14 +51,15 @@ function isValidCardId(id: string): { valid: boolean; reason?: string } {
   return { valid: true }
 }
 
-async function uploadArt(dataUrl: string): Promise<string | null> {
+async function uploadArt(
+  dataUrl: string,
+  apiFetch: ApiFetch,
+): Promise<string | null> {
   try {
-    const token = localStorage.getItem(TOKEN_KEY)
-    const resp = await fetch(`${API_BASE}/api/workshop/art`, {
+    const resp = await apiFetch('/api/workshop/art', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ dataUrl }),
     })
@@ -508,13 +514,14 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
 
 // ── Art Panel ─────────────────────────────────────────────────────────────────
 
-function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersion }: {
+function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersion, apiFetch }: {
   cardType: 'minor' | 'occupation'
   cardName: string
   artUrl: string | null
   setArtUrl: (url: string | null) => void
   refCache?: Map<string, ReferenceImage>
   configVersion?: number
+  apiFetch: ApiFetch
 }) {
   const { locale, t } = useLocale()
   const [config, setConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
@@ -544,7 +551,7 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersi
         reader.readAsDataURL(file)
       })
       const processed = await processCardArt(dataUrl, cardType)
-      const uploaded = await uploadArt(processed)
+      const uploaded = await uploadArt(processed, apiFetch)
       setArtUrl(uploaded ?? processed)
     } catch (err) {
       setArtError(err instanceof Error ? err.message : 'Upload failed')
@@ -589,7 +596,7 @@ function ArtPanel({ cardType, cardName, artUrl, setArtUrl, refCache, configVersi
       }
       // Process through hexagonal/circular gold border clipping
       const dataUrl = await processCardArt(rawDataUrl, cardType)
-      const uploaded = await uploadArt(dataUrl)
+      const uploaded = await uploadArt(dataUrl, apiFetch)
       if (!uploaded) {
         setArtError(locale === 'zh'
           ? '⚠️ 图片上传到服务器失败，图片仅在本地显示'
@@ -1040,7 +1047,7 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
+export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded, apiFetch }: {
   initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
@@ -1050,8 +1057,10 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
   /** Called whenever the user opens an existing card in the editor. Lets
    *  the parent reflect the active card id in the URL. */
   onCardLoaded?: (cardDbId: string) => void
+  apiFetch?: ApiFetch
 }) {
   const { locale, t } = useLocale()
+  const workshopApiFetch = apiFetch ?? cookieApiFetch
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
   const [cardName, setCardName] = useState('')
   const [cardIdInput, setCardIdInput] = useState('')
@@ -1105,15 +1114,11 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
   }, [])
 
   const refreshMyCards = useCallback(() => {
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) return
-    fetch(`${API_BASE}/api/workshop/cards?scope=mine`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
+    workshopApiFetch('/api/workshop/cards?scope=mine')
       .then(r => r.json())
       .then(d => { if (d.ok) setMyCards(d.cards as ApiCard[]) })
       .catch(err => { console.warn('[AiCardDesigner] Failed to load saved designs:', err) })
-  }, [])
+  }, [workshopApiFetch])
 
   // Load user's own cards on mount
   useEffect(() => { refreshMyCards() }, [refreshMyCards])
@@ -1188,7 +1193,6 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
 
     if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
     try {
-      const token = localStorage.getItem(TOKEN_KEY)
       const card = extracted?.card
       const cardJson = {
         id: cardId,
@@ -1226,11 +1230,10 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
         body.effect_code = extracted.sourceCode
       }
 
-      const r = await fetch(`${API_BASE}/api/workshop/cards`, {
+      const r = await workshopApiFetch('/api/workshop/cards', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),
       })
@@ -1589,6 +1592,7 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
               setArtUrl={setArtUrl}
               refCache={refCache}
               configVersion={configVersion}
+              apiFetch={workshopApiFetch}
             />
             <AbilityPanel
               cardType={cardType}

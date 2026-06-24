@@ -183,11 +183,6 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
   }
 }
 
-function authHeaders(token: string | null): Record<string, string> {
-  if (!token) return {}
-  return { Authorization: `Bearer ${token}` }
-}
-
 /**
  * Returns true iff `card.card_json.locales.zh` carries a non-empty translation
  * (name + at least one desc line). Required gate for submitting to the main
@@ -432,9 +427,10 @@ function CardDetailPrSection({
 
 // ── Card Detail Panel ────────────────────────────────────────────────────────
 
-function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh, currentUserId, t }: {
+function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, isOwner, isUserAdmin, onRefresh, currentUserId, t }: {
   card: WorkshopCard
-  token: string | null
+  isLoggedIn: boolean
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onBack: () => void
   onEdit?: () => void
   onAddSandbox: (id: string) => void
@@ -463,9 +459,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   }, [card.id])
 
   const handleLike = async () => {
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/like`, {
-      method: 'POST', headers: authHeaders(token),
-    })
+    const r = await apiFetch(`/api/workshop/cards/${card.id}/like`, { method: 'POST' })
     const d = await r.json()
     if (d.ok) {
       setLiked(d.liked)
@@ -476,9 +470,9 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   const handleComment = async () => {
     if (!newComment.trim()) return
     setSubmitting(true)
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/comments`, {
+    const r = await apiFetch(`/api/workshop/cards/${card.id}/comments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: newComment }),
     })
     const d = await r.json()
@@ -495,7 +489,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
     setVersionsError(null)
     setShowVersions(true)
     try {
-      const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/versions`, { headers: authHeaders(token) })
+      const r = await apiFetch(`/api/workshop/cards/${card.id}/versions`)
       const d = await r.json()
       if (d.ok && Array.isArray(d.versions)) {
         setVersions(d.versions)
@@ -512,9 +506,9 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   }
 
   const handleRevert = async (versionId: string) => {
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/revert`, {
+    const r = await apiFetch(`/api/workshop/cards/${card.id}/revert`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ version_id: versionId }),
     })
     const d = await r.json()
@@ -522,9 +516,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
   }
 
   const handleFeatureToggle = async () => {
-    const r = await fetch(`${API_BASE}/api/workshop/cards/${card.id}/feature`, {
-      method: 'POST', headers: authHeaders(token),
-    })
+    const r = await apiFetch(`/api/workshop/cards/${card.id}/feature`, { method: 'POST' })
     const d = await r.json()
     if (d.ok) setIsFeatured(d.featured)
   }
@@ -533,9 +525,9 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
   const handleTogglePublish = async () => {
     const newStatus = cardStatus === 'published' ? 'draft' : 'published'
-    const r = await fetch(`${API_BASE}/api/workshop/cards`, {
+    const r = await apiFetch('/api/workshop/cards', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         card_id: card.card_id,
         card_type: card.card_type,
@@ -665,7 +657,7 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
             </li>
           ))}
         </ul>
-        {token && (
+        {isLoggedIn && (
           <div className="ws-comment-form">
             <textarea
               value={newComment}
@@ -685,9 +677,9 @@ function CardDetail({ card, token, onBack, onEdit, onAddSandbox, isOwner, isUser
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
+function CardEditor({ initial, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
   initial?: WorkshopCard
-  token: string | null
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
@@ -709,6 +701,7 @@ function CardEditor({ initial, onCancel, onAddToSandboxAndRestart, sandboxErrors
         sandboxErrors={sandboxErrors}
         onSandboxErrorsConsumed={onSandboxErrorsConsumed}
         onCardLoaded={onCardLoaded}
+        apiFetch={apiFetch}
       />
     </div>
   )
@@ -773,14 +766,16 @@ function SelectableSandboxCard({
 }
 
 function SandboxResetModal({
-  token,
+  isLoggedIn,
+  apiFetch,
   currentCards,
   currentSettings,
   onClose,
   onSave,
   t,
 }: {
-  token: string | null
+  isLoggedIn: boolean
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   currentCards: WorkshopCard[]
   currentSettings: SandboxSettings
   onClose: () => void
@@ -808,7 +803,7 @@ function SandboxResetModal({
   }, [currentSettings])
 
   const loadMyCards = useCallback(async () => {
-    if (!token) return
+    if (!isLoggedIn) return
     setLoadingMine(true)
     try {
       const params = new URLSearchParams({
@@ -816,15 +811,13 @@ function SandboxResetModal({
         sort: 'recent',
         page: '1',
       })
-      const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
-        headers: authHeaders(token),
-      })
+      const response = await apiFetch(`/api/workshop/cards?${params}`)
       const data = await response.json()
       if (data.ok) setMyCards(data.cards)
     } finally {
       setLoadingMine(false)
     }
-  }, [token])
+  }, [apiFetch, isLoggedIn])
 
   const loadPublishedCards = useCallback(async () => {
     setLoadingPublished(true)
@@ -835,15 +828,13 @@ function SandboxResetModal({
         page: '1',
         search: publishedSearch,
       })
-      const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
-        headers: authHeaders(token),
-      })
+      const response = await apiFetch(`/api/workshop/cards?${params}`)
       const data = await response.json()
       if (data.ok) setPublishedCards(data.cards)
     } finally {
       setLoadingPublished(false)
     }
-  }, [publishedSearch, token])
+  }, [apiFetch, publishedSearch])
 
   useEffect(() => {
     void loadMyCards()
@@ -1095,7 +1086,7 @@ function SandboxView({
 // ── Main WorkshopPage ─────────────────────────────────────────────────────────
 
 export function WorkshopPage() {
-  const { user, token } = useAuth()
+  const { user, apiFetch } = useAuth()
   const { t } = useLocale()
   const [view, setView] = useState<View>('home')
   const [browseCards, setBrowseCards] = useState<WorkshopCard[]>([])
@@ -1123,11 +1114,9 @@ export function WorkshopPage() {
   const communityDeckEnabled = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
   const fetchCardList = useCallback(async (params: URLSearchParams) => {
-    const response = await fetch(`${API_BASE}/api/workshop/cards?${params}`, {
-      headers: authHeaders(token),
-    })
+    const response = await apiFetch(`/api/workshop/cards?${params}`)
     return response.json()
-  }, [token])
+  }, [apiFetch])
 
   const loadBrowseCards = useCallback(async (
     pageToLoad: number,
@@ -1169,7 +1158,7 @@ export function WorkshopPage() {
   }, [fetchCardList])
 
   const loadMyCards = useCallback(async () => {
-    if (!token) {
+    if (!user) {
       setMyCards([])
       return
     }
@@ -1185,23 +1174,21 @@ export function WorkshopPage() {
     } finally {
       setMyLoading(false)
     }
-  }, [fetchCardList, token])
+  }, [fetchCardList, user])
 
   const loadSandboxData = useCallback(async () => {
-    if (!token) {
+    if (!user) {
       setSandboxCards([])
       setSandboxSettings(DEFAULT_SANDBOX_SETTINGS)
       return
     }
-    const response = await fetch(`${API_BASE}/api/workshop/sandbox`, {
-      headers: authHeaders(token),
-    })
+    const response = await apiFetch('/api/workshop/sandbox')
     const data = await response.json()
     if (data.ok) {
       setSandboxCards(data.cards)
       setSandboxSettings(normalizeSandboxSettings(data.settings))
     }
-  }, [token])
+  }, [apiFetch, user])
 
   useEffect(() => {
     const queryChanged =
@@ -1274,29 +1261,28 @@ export function WorkshopPage() {
   })()
 
   const handleAddSandbox = async (cardDbId: string) => {
-    if (!token) return
-    await fetch(`${API_BASE}/api/workshop/sandbox`, {
+    if (!user) return
+    await apiFetch('/api/workshop/sandbox', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ workshop_card_id: cardDbId }),
     })
     await loadSandboxData()
   }
 
   const handleRemoveSandboxCard = async (cardDbId: string) => {
-    if (!token) return
-    await fetch(`${API_BASE}/api/workshop/sandbox/${cardDbId}`, {
+    if (!user) return
+    await apiFetch(`/api/workshop/sandbox/${cardDbId}`, {
       method: 'DELETE',
-      headers: authHeaders(token),
     })
     await loadSandboxData()
   }
 
   const handleResetSandbox = async (nextCardIds: string[], nextSettings: SandboxSettings) => {
-    if (!token) return
-    await fetch(`${API_BASE}/api/workshop/sandbox`, {
+    if (!user) return
+    await apiFetch('/api/workshop/sandbox', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workshop_card_ids: nextCardIds,
         settings: nextSettings,
@@ -1306,10 +1292,9 @@ export function WorkshopPage() {
   }
 
   const handleLike = async (cardDbId: string) => {
-    if (!token) return
-    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}/like`, {
+    if (!user) return
+    const response = await apiFetch(`/api/workshop/cards/${cardDbId}/like`, {
       method: 'POST',
-      headers: authHeaders(token),
     })
     const data = await response.json()
     if (data.ok) {
@@ -1323,9 +1308,9 @@ export function WorkshopPage() {
 
   const handleStartSandboxGame = async (extraCardId?: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/game/new-sandbox`, {
+      const response = await apiFetch('/api/game/new-sandbox', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
           playerCount: sandboxSettings.player_count,
@@ -1377,26 +1362,22 @@ export function WorkshopPage() {
   }, [writeWorkshopUrl])
 
   const loadCardDetail = useCallback(async (cardDbId: string) => {
-    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
-      headers: authHeaders(token),
-    })
+    const response = await apiFetch(`/api/workshop/cards/${cardDbId}`)
     const data = await response.json()
     if (data.ok) {
       setSelectedCard(data.card)
       setView('detail')
     }
-  }, [token])
+  }, [apiFetch])
 
   const loadCardForEdit = useCallback(async (cardDbId: string) => {
-    const response = await fetch(`${API_BASE}/api/workshop/cards/${cardDbId}`, {
-      headers: authHeaders(token),
-    })
+    const response = await apiFetch(`/api/workshop/cards/${cardDbId}`)
     const data = await response.json()
     if (data.ok) {
       setEditCard(data.card)
       setView('editor')
     }
-  }, [token])
+  }, [apiFetch])
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -1456,7 +1437,8 @@ export function WorkshopPage() {
         />
         <CardDetail
           card={selectedCard}
-          token={token}
+          isLoggedIn={!!user}
+          apiFetch={apiFetch}
           onBack={goBack}
           onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
             ? () => { prevView.current = 'detail'; setEditCard(selectedCard); navigateView('editor') }
@@ -1466,7 +1448,7 @@ export function WorkshopPage() {
           isUserAdmin={!!user?.isAdmin}
           currentUserId={user?.id}
           onRefresh={() => {
-            fetch(`${API_BASE}/api/workshop/cards/${selectedCard.id}`, { headers: authHeaders(token) })
+            apiFetch(`/api/workshop/cards/${selectedCard.id}`)
               .then(response => response.json())
               .then(data => {
                 if (data.ok) {
@@ -1492,7 +1474,7 @@ export function WorkshopPage() {
         />
         <CardEditor
           initial={editCard}
-          token={token}
+          apiFetch={apiFetch}
           onCancel={() => {
             const target = prevView.current
             const next = target === 'sandbox' || target === 'detail' ? target : 'home'
@@ -1570,7 +1552,8 @@ export function WorkshopPage() {
         />
         {resetSandboxOpen && (
           <SandboxResetModal
-            token={token}
+            isLoggedIn={!!user}
+            apiFetch={apiFetch}
             currentCards={sandboxCards}
             currentSettings={sandboxSettings}
             onClose={() => setResetSandboxOpen(false)}
@@ -1838,7 +1821,8 @@ export function WorkshopPage() {
 
       {resetSandboxOpen && (
         <SandboxResetModal
-          token={token}
+          isLoggedIn={!!user}
+          apiFetch={apiFetch}
           currentCards={sandboxCards}
           currentSettings={sandboxSettings}
           onClose={() => setResetSandboxOpen(false)}

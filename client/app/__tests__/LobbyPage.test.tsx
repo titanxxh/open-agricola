@@ -7,8 +7,8 @@ import { setPage } from '../PageRouter'
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 'u1', username: 'host', displayName: 'Host' },
-    token: null,
     logout: vi.fn(),
+    apiFetch: vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))),
   }),
 }))
 
