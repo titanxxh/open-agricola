@@ -62,14 +62,25 @@ afterEach(() => {
 })
 
 describe('LoginPage auth UI', () => {
+  it('renders provider logos inside OAuth login links', () => {
+    render(<LoginPage />)
+
+    expect(screen.getByRole('link', { name: '使用 GitHub 登录' }).querySelector('.oauth-provider-icon--github')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '使用 Google 登录' }).querySelector('.oauth-provider-icon--google')).toBeTruthy()
+  })
+
   it('register mode offers GitHub and Google instead of username password registration', async () => {
     const user = userEvent.setup()
     render(<LoginPage />)
 
     await user.click(screen.getByRole('tab', { name: '注册' }))
 
-    expect(screen.getByRole('link', { name: '使用 GitHub 注册' })).toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register')
-    expect(screen.getByRole('link', { name: '使用 Google 注册' })).toHaveAttribute('href', '/api/auth/oauth/google/start?intent=register')
+    const githubLink = screen.getByRole('link', { name: '使用 GitHub 注册' })
+    const googleLink = screen.getByRole('link', { name: '使用 Google 注册' })
+    expect(githubLink).toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register')
+    expect(googleLink).toHaveAttribute('href', '/api/auth/oauth/google/start?intent=register')
+    expect(githubLink.querySelector('.oauth-provider-icon--github')).toBeTruthy()
+    expect(googleLink.querySelector('.oauth-provider-icon--google')).toBeTruthy()
     expect(screen.queryByLabelText('确认密码')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
   })
