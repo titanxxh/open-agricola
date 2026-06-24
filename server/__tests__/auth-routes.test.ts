@@ -25,6 +25,14 @@ vi.mock('../connection/ws-server.ts', () => ({
   }),
 }))
 
+vi.mock('../oauth/providers.ts', () => ({
+  assertOAuthProvider: (provider: string) => {
+    if (provider !== 'github' && provider !== 'google') throw new Error('unsupported oauth provider')
+  },
+  buildOAuthAuthorizationUrl: (_provider: string, state: string) => `https://oauth.example/authorize?state=${state}`,
+  exchangeOAuthCode: vi.fn(),
+}))
+
 vi.mock('../db.ts', () => {
   const db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
@@ -87,7 +95,8 @@ vi.mock('../db.ts', () => {
 })
 
 const { createLocalUserForTests, createSession, validateSession } = await import('../auth.ts')
-const { createOnboardingTicket, findIdentity } = await import('../oauth/store.ts')
+const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
+const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { getDb } = await import('../db.ts')
 
 await import('../index.ts')
@@ -237,5 +246,33 @@ describe('auth routes', () => {
     )
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'password_mismatch' })
+  })
+
+  it('rejects link callback when provider identity is already linked to another user', async () => {
+    const linkedUser = await createLocalUserForTests('linkeduser', 'password123', 'Linked User')
+    const currentUser = await createLocalUserForTests('currentuser', 'password123', 'Current User')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-linked',
+      providerLogin: 'linked-gh',
+      emailVerified: true,
+    }
+    linkIdentity(linkedUser.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const state = createOAuthState({ provider: 'github', intent: 'link', userId: currentUser.id })
+    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toContain('page=settings')
+    expect(res.headers.Location).toContain('authError=oauth_identity_taken')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+    expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 0 })
+  })
+
+  it('allows PATCH in CORS preflight methods', async () => {
+    const res = await requestJson('OPTIONS', '/api/auth/profile')
+    expect(res.status).toBe(204)
+    expect(res.headers['Access-Control-Allow-Methods']).toContain('PATCH')
   })
 })
