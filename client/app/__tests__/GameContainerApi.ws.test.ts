@@ -44,11 +44,13 @@ describe('GameContainerApi WS player identity', () => {
     expect(playerIdFromWsStatus({ phase: 'ready', roomId: 'room-1', playerIndex: 1 })).toBe('p2')
   })
 
-  it('allows dev mode only for fixed dev rooms or embedded sandbox', () => {
+  it('allows dev mode for fixed dev rooms, embedded sandbox, and documented non-game shortcuts', () => {
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev2&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev5&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev6&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&embedded=1&devMode=1')).toBe(true)
+    expect(isDevModeAllowedFromQuery('?page=workshop&player=p1&devMode=1')).toBe(true)
+    expect(isDevModeAllowedFromQuery('?player=p1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=abc123&devMode=1')).toBe(false)
     expect(isDevModeAllowedFromQuery('?page=game&devMode=1')).toBe(false)
   })
