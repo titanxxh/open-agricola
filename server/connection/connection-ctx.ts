@@ -24,10 +24,11 @@ export const createConnectionCtx = (
   ws: WebSocket,
   deps: ConnectionDeps,
   initialAuthenticated: boolean,
+  currentUserId?: string,
 ): ConnectionCtx => ({
   ws,
   authenticated: initialAuthenticated,
-  currentUserId: undefined,
+  currentUserId,
   currentRoom: null,
   currentPlayerIndex: -1,
   ...deps,

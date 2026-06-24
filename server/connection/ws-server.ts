@@ -1,4 +1,4 @@
-import type { Server as HttpServer } from 'node:http'
+import type { IncomingMessage, Server as HttpServer } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession } from '../game/authoritative-session.ts'
 import { RoomRegistry } from '../game/room-registry.ts'
@@ -20,6 +20,8 @@ import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { dispatch } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
+import { validateSession } from '../auth.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -119,11 +121,13 @@ type ConnectionDeps = {
   lobby: Lobby
 }
 
-const handleConnection = (ws: WebSocket, deps: ConnectionDeps): void => {
-  const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS)
+const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionDeps): void => {
+  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const user = validateSession(token)
+  const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS || !!user, user?.id)
 
   let authTimer: ReturnType<typeof setTimeout> | undefined
-  if (!ALLOW_ANONYMOUS_WS) {
+  if (!ctx.authenticated) {
     authTimer = setTimeout(() => {
       if (!ctx.authenticated) {
         deps.broadcaster.sendTo(ws, { type: 'error', error: 'authentication timeout' })
@@ -195,8 +199,8 @@ export function createWsServer(
   const cleanupTimer = startRoomCleanup(registry, deps.persistence)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
-  wss.on('connection', (ws) =>
-    handleConnection(ws, {
+  wss.on('connection', (ws, req) =>
+    handleConnection(ws, req, {
       registry,
       persistence: deps.persistence,
       broadcaster,
