@@ -270,6 +270,27 @@ describe('auth routes', () => {
     expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 0 })
   })
 
+  it('ignores external oauth returnTo redirects', async () => {
+    const user = await createLocalUserForTests('oauthuser', 'password123', 'OAuth User')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-oauthuser',
+      providerLogin: 'oauth-gh',
+      emailVerified: true,
+    }
+    linkIdentity(user.id, profile)
+
+    for (const returnTo of ['https://evil.test', '//evil.test', '\\\\evil']) {
+      vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+      const start = await requestJson('GET', `/api/auth/oauth/github/start?returnTo=${encodeURIComponent(returnTo)}`)
+      const state = new URL(String(start.headers.Location)).searchParams.get('state')
+      const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+
+      expect(res.status).toBe(302)
+      expect(res.headers.Location).toBe('/')
+    }
+  })
+
   it('allows PATCH in CORS preflight methods', async () => {
     const res = await requestJson('OPTIONS', '/api/auth/profile')
     expect(res.status).toBe(204)
