@@ -10,7 +10,7 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
+import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession } from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import {
   handleLinkedIdentities,
@@ -19,7 +19,7 @@ import {
   handleOnboardingComplete,
 } from './oauth/handler.ts'
 import { assertOAuthProvider } from './oauth/providers.ts'
-import { createOnboardingTicket } from './oauth/store.ts'
+import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
@@ -269,7 +269,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    const ticket = createOnboardingTicket({
+    const profile = {
       provider,
       providerUserId: body.providerUserId,
       emailVerified: true,
@@ -277,8 +277,16 @@ const server = createServer(async (req, res) => {
       ...(body.email ? { email: body.email } : {}),
       ...(body.displayName ? { displayName: body.displayName } : {}),
       ...(body.avatarUrl ? { avatarUrl: body.avatarUrl } : {}),
-    })
-    sendJson(res, 200, { ok: true, provider }, { 'Set-Cookie': serializeOnboardingCookie(ticket) })
+    }
+    const existing = findIdentity(provider, body.providerUserId)
+    if (existing) {
+      const token = createSession(existing.userId)
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token) })
+      return
+    }
+
+    const ticket = createOnboardingTicket(profile)
+    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket) })
     return
   }
 
