@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
+import { OnboardingPage } from './OnboardingPage'
 import { SettingsPage } from './SettingsPage'
 import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
@@ -20,7 +21,7 @@ function GameShellFallback() {
   return <GameLoadScreen percent={percent} label={t(labelKey)} />
 }
 
-type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
+type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding'
 
 const PAGE_SCOPED_QUERY_KEYS = [
   'card',
@@ -45,7 +46,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
 function getPage(): Page {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings') return page
+  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   return 'lobby'
 }
@@ -82,14 +83,21 @@ export function PageRouter() {
     return () => window.removeEventListener('popstate', handler)
   }, [])
 
+  const page = getPage()
+
+  useEffect(() => {
+    if (!loading && user && page === 'onboarding') {
+      setPage('lobby')
+    }
+  }, [loading, page, user])
+
   if (loading) {
     const { percent, labelKey } = getGameLoadProgress('auth')
     return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
 
-  const page = getPage()
-
   if (!user) {
+    if (page === 'onboarding') return <OnboardingPage />
     return <LoginPage />
   }
 
@@ -112,6 +120,7 @@ export function PageRouter() {
     case 'settings':
       pageNode = <SettingsPage />
       break
+    case 'onboarding':
     case 'lobby':
     default:
       pageNode = <LobbyPage />

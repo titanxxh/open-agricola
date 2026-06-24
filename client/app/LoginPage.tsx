@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
@@ -6,26 +6,39 @@ import { BrandMark } from '../components/common/BrandMark'
 
 type Mode = 'login' | 'register'
 
+export function authErrorMessage(
+  code: string | undefined,
+  fallback: string | undefined,
+  t: (key: string) => string,
+): string {
+  if (code) {
+    const key = `platform.authErrors.${code}`
+    const localized = t(key)
+    if (localized !== key) return localized
+  }
+  return fallback || t('platform.unknownError')
+}
+
 export function LoginPage() {
-  const { login, register } = useAuth()
+  const { login, oauthStartUrl } = useAuth()
   const { t } = useLocale()
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get('authError') ?? undefined
+    return code ? authErrorMessage(code, undefined, t) : ''
+  })
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const result = mode === 'login'
-        ? await login(username, password)
-        : await register(username, password, displayName || undefined)
+      const result = await login(username, password)
       if (!result.ok) {
-        setError(result.error || t('platform.unknownError'))
+        setError(authErrorMessage(result.code, result.error, t))
       }
     } catch {
       setError(t('platform.networkError'))
@@ -69,56 +82,50 @@ export function LoginPage() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-field">
-            <label htmlFor="username">
-              {t('platform.username')}
-              <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              autoComplete="username"
-              required
-            />
-          </div>
-
-          {mode === 'register' && (
+        {mode === 'login' ? (
+          <form onSubmit={handleSubmit} className="login-form">
+            <a className="btn-primary" href={oauthStartUrl('github', 'login')}>{t('platform.oauthLoginGithub')}</a>
+            <a className="btn-primary" href={oauthStartUrl('google', 'login')}>{t('platform.oauthLoginGoogle')}</a>
             <div className="form-field">
-              <label htmlFor="displayName">{t('platform.displayName')}</label>
+              <label htmlFor="username">{t('platform.username')}</label>
+              <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
               <input
-                id="displayName"
+                id="username"
                 type="text"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder={t('platform.displayNamePlaceholder')}
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                autoComplete="username"
+                required
               />
             </div>
-          )}
 
-          <div className="form-field">
-            <label htmlFor="password">
-              {t('platform.password')}
+            <div className="form-field">
+              <label htmlFor="password">{t('platform.password')}</label>
               <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              required
-            />
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+
+            {error && <div className="form-error" role="alert">{error}</div>}
+
+            <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
+              {loading ? t('platform.loading') : t('platform.loginBtn')}
+            </button>
+          </form>
+        ) : (
+          <div className="login-form">
+            <p>{t('platform.oauthRegisterIntro')}</p>
+            {error && <div className="form-error" role="alert">{error}</div>}
+            <a className="btn-primary" href={oauthStartUrl('github', 'register')}>{t('platform.oauthRegisterGithub')}</a>
+            <a className="btn-primary" href={oauthStartUrl('google', 'register')}>{t('platform.oauthRegisterGoogle')}</a>
           </div>
-
-          {error && <div className="form-error" role="alert">{error}</div>}
-
-          <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
-            {loading ? t('platform.loading') : mode === 'login' ? t('platform.loginBtn') : t('platform.registerBtn')}
-          </button>
-        </form>
+        )}
       </div>
     </div>
   )

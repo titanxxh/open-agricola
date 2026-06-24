@@ -1,21 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
+import { authErrorMessage } from './LoginPage'
 import { setPage } from './PageRouter'
 
+type LinkedIdentity = {
+  provider: 'github' | 'google'
+  providerLogin?: string
+  providerEmail?: string
+  linkedAt: number
+}
+
 export function SettingsPage() {
-  const { user, apiFetch, logout } = useAuth()
+  const { user, apiFetch, logout, logoutAll, oauthStartUrl } = useAuth()
   const { t } = useLocale()
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [identities, setIdentities] = useState<LinkedIdentity[]>([])
+  const authError = new URLSearchParams(window.location.search).get('authError') ?? undefined
   const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch('/api/auth/identities')
+      .then(resp => resp.json())
+      .then(data => {
+        if (!cancelled && data.ok) setIdentities(data.identities ?? [])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [apiFetch])
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,10 +88,13 @@ export function SettingsPage() {
     }
   }
 
-  const handleLogoutAll = () => {
-    logout()
+  const handleLogoutAll = async () => {
+    await logoutAll()
     setPage('lobby')
   }
+
+  const githubIdentity = identities.find(identity => identity.provider === 'github')
+  const googleIdentity = identities.find(identity => identity.provider === 'google')
 
   return (
     <div className="settings-page">
@@ -151,6 +175,24 @@ export function SettingsPage() {
             <button type="submit" className="btn-primary" disabled={saving}>{t('platform.changePasswordBtn')}</button>
           </div>
         </form>
+      </Section>
+
+      <Section icon="🔗" title={t('platform.linkedAccounts')} variant="parchment">
+        <div className="settings-form">
+          {authError && <div className="form-error" role="alert">{authErrorMessage(authError, undefined, t)}</div>}
+          <p className="settings-readonly">
+            GitHub
+            <span className="settings-readonly-chip">{githubIdentity?.providerLogin ?? githubIdentity?.providerEmail ?? t('platform.notLinked')}</span>
+          </p>
+          <p className="settings-readonly">
+            Google
+            <span className="settings-readonly-chip">{googleIdentity?.providerEmail ?? googleIdentity?.providerLogin ?? t('platform.notLinked')}</span>
+          </p>
+          <div className="settings-actions">
+            <a className="btn-primary" href={oauthStartUrl('github', 'link')}>{t('platform.linkGithub')}</a>
+            <a className="btn-primary" href={oauthStartUrl('google', 'link')}>{t('platform.linkGoogle')}</a>
+          </div>
+        </div>
       </Section>
 
       <Section
