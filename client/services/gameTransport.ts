@@ -100,24 +100,18 @@ export function parseDraftParamsFromQuery(
   return { draftMode: 'simultaneous' }
 }
 
-const TOKEN_KEY = 'open-agricola-token'
-
-const authHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  return token ? { 'Authorization': `Bearer ${token}` } : {}
-}
-
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
   return resp.json() as Promise<GameSyncPayload>
 }
 
 const get = async (path: string): Promise<GameSyncPayload> => {
-  const resp = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
+  const resp = await fetch(`${API_BASE}${path}`, { credentials: 'include' })
   return resp.json() as Promise<GameSyncPayload>
 }
 
@@ -242,6 +236,7 @@ export class HttpGameTransport implements GameTransport {
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {
     const resp = await fetch(`${API_BASE}/api/game/validate`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, playerId, payload }),
     })
@@ -269,7 +264,6 @@ export class WsGameTransport implements GameTransport {
   }>()
   private reqCounter = 0
   private readonly wsUrl: string
-  private readonly authToken: string | null
   readonly roomId: string
   readonly playerIndex: number
   private _connected = false
@@ -278,15 +272,10 @@ export class WsGameTransport implements GameTransport {
     wsUrl: string = WS_BASE,
     roomId?: string,
     playerIndex?: number,
-    authToken?: string | null,
   ) {
     this.wsUrl = wsUrl
     this.roomId = roomId ?? ''
     this.playerIndex = playerIndex ?? 0
-    // If not explicitly provided, read from localStorage
-    this.authToken = authToken !== undefined
-      ? authToken
-      : (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null)
   }
 
   get connected() { return this._connected }
@@ -303,14 +292,8 @@ export class WsGameTransport implements GameTransport {
       }
 
       this.ws.onopen = () => {
-        // Send auth token immediately after opening.
-        // If no token, rely on server's ALLOW_ANONYMOUS_WS setting.
-        if (this.authToken) {
-          this.ws!.send(JSON.stringify({ type: 'auth', token: this.authToken }))
-        } else {
-          this._connected = true
-          resolve()
-        }
+        this._connected = true
+        resolve()
       }
 
       this.ws.onmessage = (event) => {

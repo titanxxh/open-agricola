@@ -25,7 +25,7 @@ type MyRoom = {
 }
 
 export function LobbyPage() {
-  const { user, token, logout } = useAuth()
+  const { user, logout, apiFetch } = useAuth()
   const { t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyRoom[]>([])
@@ -52,15 +52,13 @@ export function LobbyPage() {
   }, [])
 
   const fetchMyRooms = useCallback(async () => {
-    if (!token) return
+    if (!user) return
     try {
-      const resp = await fetch(`${API_BASE}/api/lobby/my-rooms`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const resp = await apiFetch('/api/lobby/my-rooms')
       const data = await resp.json()
       if (data.ok) setMyRooms(data.rooms)
     } catch { /* silently fail */ }
-  }, [token])
+  }, [apiFetch, user])
 
   useEffect(() => {
     fetchRooms()
@@ -103,12 +101,11 @@ export function LobbyPage() {
   const handleResumeRoom = (roomId: string, playerIndex: number) =>
     setPage('game', { transport: 'ws', room: roomId, player: `p${playerIndex + 1}` })
   const handleDissolveRoom = async (roomId: string) => {
-    if (!token) return
+    if (!user) return
     if (!window.confirm(t('platform.dissolveConfirm'))) return
     try {
-      await fetch(`${API_BASE}/api/rooms/${roomId}/dissolve`, {
+      await apiFetch(`/api/rooms/${roomId}/dissolve`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       })
       fetchRooms()
       fetchMyRooms()
@@ -140,7 +137,7 @@ export function LobbyPage() {
           >
             {user?.displayName || user?.username}
           </button>
-          <button type="button" className="btn-link" onClick={logout}>{t('platform.logout')}</button>
+          <button type="button" className="btn-link" onClick={() => { void logout() }}>{t('platform.logout')}</button>
         </div>
         <button
           type="button"
@@ -187,7 +184,7 @@ export function LobbyPage() {
                 type="button"
                 className="lobby-drawer__item lobby-drawer__item--danger"
                 role="menuitem"
-                onClick={() => { setMenuOpen(false); logout() }}
+                onClick={() => { setMenuOpen(false); void logout() }}
               >
                 <span aria-hidden>↪︎</span>
                 {t('platform.logout')}
