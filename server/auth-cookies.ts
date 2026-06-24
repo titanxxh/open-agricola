@@ -1,5 +1,6 @@
 export const SESSION_COOKIE = 'oa_session'
 export const ONBOARDING_COOKIE = 'oa_onboarding'
+export const OAUTH_STATE_COOKIE = 'oa_oauth_state'
 
 type CookieOptions = {
   backendOrigin?: string
@@ -54,10 +55,18 @@ export function serializeOnboardingCookie(ticket: string, options: CookieOptions
   return `${ONBOARDING_COOKIE}=${encodeURIComponent(ticket)}; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=900${secureSuffix(options)}`
 }
 
+export function serializeOAuthStateCookie(state: string, options: CookieOptions = {}): string {
+  return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=600${secureSuffix(options)}`
+}
+
 export function clearSessionCookie(options: CookieOptions = {}): string {
   return `${SESSION_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}`
 }
 
 export function clearOnboardingCookie(options: CookieOptions = {}): string {
   return `${ONBOARDING_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}`
+}
+
+export function clearOAuthStateCookie(options: CookieOptions = {}): string {
+  return `${OAUTH_STATE_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}`
 }
