@@ -18,6 +18,7 @@ import {
   createOAuthState,
   createOnboardingTicket,
   findIdentity,
+  getOnboardingTicket,
   getLinkedIdentities,
   linkIdentity,
 } from './store.ts'
@@ -69,6 +70,30 @@ function safeReturnTo(returnTo: string | null | undefined): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function frontendOrigin(): string | undefined {
+  const raw = process.env.PUBLIC_APP_ORIGIN
+  if (!raw) return undefined
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
+    return url.origin
+  } catch {
+    return undefined
+  }
+}
+
+function appLocation(path: string): string {
+  const safePath = safeReturnTo(path) ?? '/'
+  const origin = frontendOrigin()
+  return origin ? new URL(safePath, origin).toString() : safePath
+}
+
+function getRequestOrigin(req: IncomingMessage): string {
+  const host = req.headers.host ?? 'localhost'
+  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? 'http'
+  return `${proto}://${host}`
 }
 
 function redirect(res: ServerResponse, location: string, headers: Record<string, string | string[]> = {}): void {
@@ -136,7 +161,7 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
   try {
     provider = parseProvider(url)
   } catch {
-    redirect(res, '/?page=login&authError=unsupported_oauth_provider')
+    redirect(res, appLocation('/?page=login&authError=unsupported_oauth_provider'))
     return
   }
 
@@ -144,7 +169,7 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
   const user = token ? validateSession(token) : null
   if (intent === 'link' && !user) {
-    redirect(res, '/?page=login&authError=not_authenticated')
+    redirect(res, appLocation('/?page=login&authError=not_authenticated'))
     return
   }
 
@@ -160,14 +185,14 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
 
 export async function handleOAuthCallback(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   if (url.searchParams.get('error')) {
-    redirect(res, '/?page=login&authError=oauth_cancelled')
+    redirect(res, appLocation('/?page=login&authError=oauth_cancelled'))
     return
   }
 
   const rawState = url.searchParams.get('state') ?? ''
   const state = consumeOAuthState(rawState)
   if (!state) {
-    redirect(res, '/?page=login&authError=oauth_state_invalid')
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
     return
   }
 
@@ -176,32 +201,41 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     provider = parseProvider(url)
     if (provider !== state.provider) throw new Error('provider mismatch')
   } catch {
-    redirect(res, '/?page=login&authError=oauth_state_invalid')
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
     return
+  }
+
+  if (state.intent === 'link') {
+    const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+    const currentUser = token ? validateSession(token) : null
+    if (!state.userId || !currentUser || currentUser.id !== state.userId) {
+      redirect(res, appLocation('/?page=settings&authError=not_authenticated'))
+      return
+    }
   }
 
   let profile: OAuthProfile
   try {
     profile = await exchangeOAuthCode(provider, url.searchParams.get('code') ?? '', req)
   } catch {
-    redirect(res, '/?page=login&authError=oauth_profile_failed')
+    redirect(res, appLocation('/?page=login&authError=oauth_profile_failed'))
     return
   }
 
   if (state.intent === 'link') {
     if (!state.userId) {
-      redirect(res, '/?page=settings&authError=not_authenticated')
+      redirect(res, appLocation('/?page=settings&authError=not_authenticated'))
       return
     }
     if (findIdentity(profile.provider, profile.providerUserId)) {
-      redirect(res, '/?page=settings&authError=oauth_identity_taken')
+      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'))
       return
     }
     try {
       linkIdentity(state.userId, profile)
-      redirect(res, `/?page=settings&linked=${provider}`)
+      redirect(res, appLocation(`/?page=settings&linked=${provider}`))
     } catch {
-      redirect(res, '/?page=settings&authError=oauth_identity_taken')
+      redirect(res, appLocation('/?page=settings&authError=oauth_identity_taken'))
     }
     return
   }
@@ -209,17 +243,17 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   const existing = findIdentity(profile.provider, profile.providerUserId)
   if (existing) {
     const token = createSession(existing.userId)
-    redirect(res, safeReturnTo(state.returnTo) ?? '/', { 'Set-Cookie': serializeSessionCookie(token) })
+    redirect(res, appLocation(safeReturnTo(state.returnTo) ?? '/'), { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
   const ticket = createOnboardingTicket(profile)
-  redirect(res, '/?page=onboarding', { 'Set-Cookie': serializeOnboardingCookie(ticket) })
+  redirect(res, appLocation('/?page=onboarding'), { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
 }
 
 export async function handleOnboardingComplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const ticket = readCookie(req.headers.cookie, ONBOARDING_COOKIE)
-  const profile = ticket ? consumeOnboardingTicket(ticket) : null
+  const profile = ticket ? getOnboardingTicket(ticket) : null
   if (!profile) {
     sendJson(res, 400, { ok: false, code: 'oauth_onboarding_expired', error: 'Onboarding ticket is missing or expired' })
     return
@@ -242,8 +276,12 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
   }
 
   const token = createSession(result.user.id)
+  consumeOnboardingTicket(ticket)
   sendJson(res, 200, { ok: true, user: result.user }, {
-    'Set-Cookie': [serializeSessionCookie(token), clearOnboardingCookie()],
+    'Set-Cookie': [
+      serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
+      clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),
+    ],
   })
 }
 

@@ -26,7 +26,9 @@ export type AuthErrorCode =
   | 'oauth_onboarding_required'
   | 'oauth_onboarding_expired'
   | 'not_authenticated'
-  | 'too_many_requests'
+  | 'rate_limited'
+  | 'missing_fields'
+  | 'invalid_display_name'
 
 export type AuthResult =
   | { ok: true; user: AuthUser; token?: string }

@@ -10,7 +10,7 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession } from './auth.ts'
+import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, type AuthErrorCode } from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import {
   handleLinkedIdentities,
@@ -37,6 +37,11 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown, headers
   res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers })
   res.end(JSON.stringify(payload))
 }
+
+const authError = (code: AuthErrorCode, error: string) => ({ ok: false, code, error })
+
+const changePasswordErrorCode = (error: string): AuthErrorCode =>
+  error === 'User not found' ? 'not_authenticated' : 'invalid_password'
 
 const readBody = (req: IncomingMessage): Promise<string> =>
   new Promise((resolve) => {
@@ -80,6 +85,12 @@ function getClientIp(req: IncomingMessage): string {
 
 function getAuthToken(req: IncomingMessage): string {
   return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+}
+
+function getRequestOrigin(req: IncomingMessage): string {
+  const host = req.headers.host ?? 'localhost'
+  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? 'http'
+  return `${proto}://${host}`
 }
 
 function forwardCookieSessionAsBearer(req: IncomingMessage): void {
@@ -151,12 +162,12 @@ const server = createServer(async (req, res) => {
   if (req.url === '/api/auth/register' && req.method === 'POST') {
     const ip = getClientIp(req)
     if (!checkRateLimit(ip)) {
-      sendJson(res, 429, { ok: false, error: 'Too many requests' })
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
     const body = await parseBody<{ username?: string; password?: string; displayName?: string }>(req)
     if (!body?.username || !body.password) {
-      sendJson(res, 400, { ok: false, error: 'Missing username or password' })
+      sendJson(res, 400, authError('missing_fields', 'Missing username or password'))
       return
     }
     const result = await register(body.username, body.password, body.displayName)
@@ -167,12 +178,12 @@ const server = createServer(async (req, res) => {
   if (req.url === '/api/auth/login' && req.method === 'POST') {
     const ip = getClientIp(req)
     if (!checkRateLimit(ip)) {
-      sendJson(res, 429, { ok: false, error: 'Too many requests' })
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
     const body = await parseBody<{ username?: string; password?: string }>(req)
     if (!body?.username || !body.password) {
-      sendJson(res, 400, { ok: false, error: 'Missing username or password' })
+      sendJson(res, 400, authError('missing_fields', 'Missing username or password'))
       return
     }
     const result = await login(body.username, body.password)
@@ -180,14 +191,14 @@ const server = createServer(async (req, res) => {
       sendJson(res, 400, result)
       return
     }
-    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token) })
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = getAuthToken(req)
     if (token) logout(token)
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie() })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
@@ -195,17 +206,17 @@ const server = createServer(async (req, res) => {
     const token = getAuthToken(req)
     const user = validateSession(token)
     if (user) logoutAll(user.id)
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie() })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
   if (req.url === '/api/auth/profile' && req.method === 'PATCH') {
     const token = getAuthToken(req)
     const user = validateSession(token)
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ displayName?: string }>(req)
     const err = updateDisplayName(user.id, body?.displayName ?? '')
-    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
+    if (err) { sendJson(res, 400, authError('invalid_display_name', err)); return }
     sendJson(res, 200, { ok: true })
     return
   }
@@ -213,13 +224,13 @@ const server = createServer(async (req, res) => {
   if (req.url === '/api/auth/change-password' && req.method === 'POST') {
     const token = getAuthToken(req)
     const user = validateSession(token)
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ oldPassword?: string; newPassword?: string }>(req)
     if (!body?.oldPassword || !body.newPassword) {
-      sendJson(res, 400, { ok: false, error: 'Missing oldPassword or newPassword' }); return
+      sendJson(res, 400, authError('missing_fields', 'Missing oldPassword or newPassword')); return
     }
     const err = await changePassword(user.id, body.oldPassword, body.newPassword)
-    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
+    if (err) { sendJson(res, 400, authError(changePasswordErrorCode(err), err)); return }
     sendJson(res, 200, { ok: true })
     return
   }
@@ -228,7 +239,7 @@ const server = createServer(async (req, res) => {
     const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) {
-      sendJson(res, 401, { ok: false, error: 'Not authenticated' })
+      sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
     sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username) } })
@@ -281,12 +292,12 @@ const server = createServer(async (req, res) => {
     const existing = findIdentity(provider, body.providerUserId)
     if (existing) {
       const token = createSession(existing.userId)
-      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token) })
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
       return
     }
 
     const ticket = createOnboardingTicket(profile)
-    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket) })
+    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
     return
   }
 

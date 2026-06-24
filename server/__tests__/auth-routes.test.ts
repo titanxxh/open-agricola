@@ -184,6 +184,8 @@ describe('auth routes', () => {
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV
     else process.env.NODE_ENV = originalNodeEnv
     delete process.env.ENABLE_AUTH_TEST_HELPERS
+    delete process.env.PUBLIC_APP_ORIGIN
+    delete process.env.PUBLIC_API_BASE
   })
 
   it('login sets an HttpOnly session cookie and does not return token', async () => {
@@ -195,6 +197,46 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
     expect(res.headers['Set-Cookie']).toContain('HttpOnly')
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
+  })
+
+  it('uses cross-site cookie attributes for production frontend and backend origins', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    process.env.PUBLIC_API_BASE = 'https://api.example'
+    await createLocalUserForTests('crosscookie', 'password123', 'Cross Cookie')
+    const res = await requestJson('POST', '/api/auth/login', { username: 'crosscookie', password: 'password123' })
+
+    expect(res.status).toBe(200)
+    expect(res.headers['Set-Cookie']).toContain('SameSite=None')
+    expect(res.headers['Set-Cookie']).toContain('Secure')
+  })
+
+  it('keeps same-site production cookies on SameSite=Lax', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_ORIGIN = 'https://app.example'
+    process.env.PUBLIC_API_BASE = 'https://app.example'
+    await createLocalUserForTests('samecookie', 'password123', 'Same Cookie')
+    const res = await requestJson('POST', '/api/auth/login', { username: 'samecookie', password: 'password123' })
+
+    expect(res.status).toBe(200)
+    expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
+    expect(res.headers['Set-Cookie']).toContain('Secure')
+  })
+
+  it('uses request-derived backend origin for cross-site production cookies without PUBLIC_API_BASE', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    await createLocalUserForTests('reqcookie', 'password123', 'Request Cookie')
+    const res = await requestJson(
+      'POST',
+      '/api/auth/login',
+      { username: 'reqcookie', password: 'password123' },
+      { Host: 'api.example', 'X-Forwarded-Proto': 'https' },
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.headers['Set-Cookie']).toContain('SameSite=None')
+    expect(res.headers['Set-Cookie']).toContain('Secure')
   })
 
   it('direct register returns oauth_registration_required', async () => {
@@ -253,6 +295,51 @@ describe('auth routes', () => {
     )
     expect(res.status).toBe(400)
     expect(res.json).toMatchObject({ ok: false, code: 'password_mismatch' })
+  })
+
+  it('preserves onboarding ticket after password mismatch and allows retry', async () => {
+    const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-retry', emailVerified: false })
+    const mismatch = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'retryuser', password: 'password123', confirmPassword: 'different123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+    expect(mismatch.status).toBe(400)
+    expect(mismatch.json).toMatchObject({ ok: false, code: 'password_mismatch' })
+
+    const retry = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'retryuser', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+    expect(retry.status).toBe(200)
+    expect((retry.json.user as { username: string }).username).toBe('retryuser')
+    expect(findIdentity('google', 'g-retry')?.userId).toBe((retry.json.user as { id: string }).id)
+  })
+
+  it('preserves onboarding ticket after duplicate username and allows retry', async () => {
+    await createLocalUserForTests('takenname', 'password123', 'Taken Name')
+    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-retry', emailVerified: true })
+    const duplicate = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'takenname', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+    expect(duplicate.status).toBe(400)
+    expect(duplicate.json).toMatchObject({ ok: false, code: 'username_taken' })
+
+    const retry = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'uniquename', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+    expect(retry.status).toBe(200)
+    expect((retry.json.user as { username: string }).username).toBe('uniquename')
+    expect(findIdentity('github', 'gh-retry')?.userId).toBe((retry.json.user as { id: string }).id)
   })
 
   it('test oauth helper is unavailable by default', async () => {
@@ -323,13 +410,95 @@ describe('auth routes', () => {
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
 
     const state = createOAuthState({ provider: 'github', intent: 'link', userId: currentUser.id })
-    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    const currentToken = createSession(currentUser.id)
+    const res = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: `oa_session=${currentToken}` },
+    )
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toContain('page=settings')
     expect(res.headers.Location).toContain('authError=oauth_identity_taken')
     expect(res.headers['Set-Cookie']).toBeUndefined()
-    expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 0 })
+    expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 1 })
+  })
+
+  it('rejects link callback without a matching current session cookie', async () => {
+    const stateUser = await createLocalUserForTests('stateuser', 'password123', 'State User')
+    const otherUser = await createLocalUserForTests('otheruser', 'password123', 'Other User')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-session-required',
+      providerLogin: 'session-required-gh',
+      emailVerified: true,
+    }
+    const state = createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id })
+
+    const noCookie = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    expect(noCookie.status).toBe(302)
+    expect(noCookie.headers.Location).toContain('page=settings')
+    expect(noCookie.headers.Location).toContain('authError=not_authenticated')
+    expect(findIdentity('github', 'gh-session-required')).toBeNull()
+
+    const secondState = createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id })
+    const otherToken = createSession(otherUser.id)
+    const mismatch = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${secondState}`,
+      undefined,
+      { Cookie: `oa_session=${otherToken}` },
+    )
+    expect(mismatch.status).toBe(302)
+    expect(mismatch.headers.Location).toContain('authError=not_authenticated')
+    expect(findIdentity('github', 'gh-session-required')).toBeNull()
+  })
+
+  it('redirects OAuth app destinations to PUBLIC_APP_ORIGIN while preserving safe returnTo', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+    const user = await createLocalUserForTests('frontredir', 'password123', 'Front Redir')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-frontredir',
+      providerLogin: 'frontredir-gh',
+      emailVerified: true,
+    }
+    linkIdentity(user.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2F%3Fpage%3Dsettings')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toBe('https://frontend.example/?page=settings')
+    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+  })
+
+  it('returns stable auth error codes from representative cookie auth routes', async () => {
+    const missingLogin = await requestJson('POST', '/api/auth/login', {})
+    expect(missingLogin.status).toBe(400)
+    expect(missingLogin.json).toMatchObject({ ok: false, code: 'missing_fields' })
+
+    const unauthMe = await requestJson('GET', '/api/auth/me')
+    expect(unauthMe.status).toBe(401)
+    expect(unauthMe.json).toMatchObject({ ok: false, code: 'not_authenticated' })
+
+    const unauthProfile = await requestJson('PATCH', '/api/auth/profile', { displayName: 'Name' })
+    expect(unauthProfile.status).toBe(401)
+    expect(unauthProfile.json).toMatchObject({ ok: false, code: 'not_authenticated' })
+
+    const user = await createLocalUserForTests('pwuser', 'password123', 'Pw User')
+    const token = createSession(user.id)
+    const missingPasswordFields = await requestJson(
+      'POST',
+      '/api/auth/change-password',
+      {},
+      { Cookie: `oa_session=${token}` },
+    )
+    expect(missingPasswordFields.status).toBe(400)
+    expect(missingPasswordFields.json).toMatchObject({ ok: false, code: 'missing_fields' })
   })
 
   it('ignores external oauth returnTo redirects', async () => {
