@@ -27,6 +27,21 @@ describe('http origin helpers', () => {
     }))).toBe(false)
   })
 
+  it('rejects opaque or malformed origin headers', () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
+
+    expect(isTrustedOrigin(req({
+      origin: 'null',
+      host: 'api.example',
+      'x-forwarded-proto': 'https',
+    }))).toBe(false)
+    expect(isTrustedOrigin(req({
+      origin: 'not a url',
+      host: 'api.example',
+      'x-forwarded-proto': 'https',
+    }))).toBe(false)
+  })
+
   it('adds credentialed CORS headers for explicit CORS origins', () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'
 

@@ -61,8 +61,7 @@ function stripBasePath(pathname: string): string {
   return pathname
 }
 
-function currentReturnTo(intent: 'login' | 'register' | 'link'): string | undefined {
-  if (intent === 'register') return undefined
+function currentReturnTo(): string | undefined {
   const current = `${stripBasePath(window.location.pathname)}${window.location.search}${window.location.hash}`
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
@@ -142,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     intent: 'login' | 'register' | 'link',
   ) => {
     const params = new URLSearchParams({ intent })
-    const returnTo = currentReturnTo(intent)
+    const returnTo = currentReturnTo()
     if (returnTo) params.set('returnTo', returnTo)
     return `${API_BASE}/api/auth/oauth/${provider}/start?${params.toString()}`
   }, [])

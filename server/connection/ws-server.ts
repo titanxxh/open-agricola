@@ -120,6 +120,7 @@ type ConnectionDeps = {
   persistence: RoomPersistence
   broadcaster: Broadcaster
   lobby: Lobby
+  activeUserSockets: Map<string, Set<WebSocket>>
 }
 
 const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionDeps): void => {
@@ -131,6 +132,20 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
   const token = readCookie(req.headers.cookie, SESSION_COOKIE)
   const user = validateSession(token)
   const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS || !!user, user?.id)
+  let trackedUserId = user?.id
+
+  const untrack = (userId: string): void => {
+    const sockets = deps.activeUserSockets.get(userId)
+    if (!sockets) return
+    sockets.delete(ws)
+    if (sockets.size === 0) deps.activeUserSockets.delete(userId)
+  }
+
+  if (trackedUserId) {
+    const sockets = deps.activeUserSockets.get(trackedUserId) ?? new Set<WebSocket>()
+    sockets.add(ws)
+    deps.activeUserSockets.set(trackedUserId, sockets)
+  }
 
   let authTimer: ReturnType<typeof setTimeout> | undefined
   if (!ctx.authenticated) {
@@ -154,6 +169,13 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
       return
     }
     dispatch(ctx, msg)
+    if (ctx.currentUserId && ctx.currentUserId !== trackedUserId) {
+      if (trackedUserId) untrack(trackedUserId)
+      trackedUserId = ctx.currentUserId
+      const sockets = deps.activeUserSockets.get(trackedUserId) ?? new Set<WebSocket>()
+      sockets.add(ws)
+      deps.activeUserSockets.set(trackedUserId, sockets)
+    }
     if (ctx.authenticated && authTimer) {
       clearTimeout(authTimer)
       authTimer = undefined
@@ -162,6 +184,7 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
 
   ws.on('close', () => {
     clearTimeout(authTimer)
+    if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
@@ -184,6 +207,7 @@ export type CreateWsServerResult = {
   broadcaster: Broadcaster
   lobby: Lobby
   cleanupTimer: NodeJS.Timeout
+  closeUserConnections: (userId: string) => void
 }
 
 export function createWsServer(
@@ -198,6 +222,7 @@ export function createWsServer(
     persistence: deps.persistence,
     shouldPersist: deps.shouldPersist,
   })
+  const activeUserSockets = new Map<string, Set<WebSocket>>()
   const lobby = createLobby({ registry, persistence: deps.persistence, broadcaster })
 
   ensureFixedDevRooms(registry, deps.persistence)
@@ -211,8 +236,18 @@ export function createWsServer(
       persistence: deps.persistence,
       broadcaster,
       lobby,
+      activeUserSockets,
     }),
   )
 
-  return { wss, registry, broadcaster, lobby, cleanupTimer }
+  const closeUserConnections = (userId: string): void => {
+    const sockets = activeUserSockets.get(userId)
+    if (!sockets) return
+    for (const ws of [...sockets]) {
+      ws.close(1008, 'session revoked')
+    }
+    activeUserSockets.delete(userId)
+  }
+
+  return { wss, registry, broadcaster, lobby, cleanupTimer, closeUserConnections }
 }
