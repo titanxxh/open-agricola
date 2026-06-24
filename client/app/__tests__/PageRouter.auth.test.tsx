@@ -74,6 +74,17 @@ describe('PageRouter auth routes', () => {
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
   })
 
+  it('normalizes authenticated login page back to lobby navigation', async () => {
+    stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+    window.history.replaceState(null, '', '/?page=login')
+
+    renderWithAuth()
+
+    expect(await screen.findByText('Lobby Page')).toBeInTheDocument()
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
+    expect(screen.getByText('Mobile Tab Bar')).toBeInTheDocument()
+  })
+
   it('does not bypass login for arbitrary ws rooms with player and devMode params', async () => {
     stubMe({ ok: false })
     window.history.replaceState(null, '', '/?page=game&transport=ws&room=abc123&player=p1&devMode=1')
