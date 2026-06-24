@@ -9,6 +9,7 @@ import type {
   Resource,
 } from './types'
 import type { ActionDetailParts } from './protocol/game'
+import type { AnimalKey } from './animals'
 
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
@@ -146,18 +147,18 @@ export type FarmFenceConsumedEvent = GameEventBase<'farm.fenceConsumed'> & {
 }
 
 export type FarmAnimalMovedEvent = GameEventBase<'farm.animalMoved'> & {
-  animals: Partial<Pick<Resource, 'sheep' | 'boar' | 'cattle'>>
+  animals: Partial<Pick<Resource, AnimalKey>>
   from?: ResourceLocation
   to?: ResourceLocation
 }
 
 export type FarmAnimalDiscardedEvent = GameEventBase<'farm.animalDiscarded'> & {
-  animals: Partial<Pick<Resource, 'sheep' | 'boar' | 'cattle'>>
+  animals: Partial<Pick<Resource, AnimalKey>>
   reason: 'noRoom' | 'pay' | 'cardEffect'
 }
 
 export type FarmAnimalBredEvent = GameEventBase<'farm.animalBred'> & {
-  animals: Partial<Pick<Resource, 'sheep' | 'boar' | 'cattle'>>
+  animals: Partial<Pick<Resource, AnimalKey>>
   source?: 'harvest' | 'cardEffect'
 }
 

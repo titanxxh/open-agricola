@@ -41,9 +41,9 @@ export const collectAccumulatedResources = (
 ) => {
   Object.keys(space.resources).forEach((key) => {
     const resourceKey = key as keyof Resource
-    const amount = space.resources[resourceKey]
+    const amount = space.resources[resourceKey] ?? 0
     if (amount > 0) {
-      player.resources[resourceKey] += amount
+      player.resources[resourceKey] = (player.resources[resourceKey] ?? 0) + amount
       space.resources[resourceKey] = 0
     }
   })

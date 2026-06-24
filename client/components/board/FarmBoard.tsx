@@ -27,8 +27,11 @@ import { CardWithCopy } from '../common/CardWithCopy'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
+import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
 
-type AnimalType = 'sheep' | 'boar' | 'cattle'
+type AnimalType = AnimalKey
+const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
 type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
 type CardAnimalDisplay = {
   animalType: AnimalType | null
@@ -255,6 +258,76 @@ const humanizeSourceCard = (sourceCard: string) => {
 const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
   sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
 
+const BGA_EMPTY_SLOT_VARIANTS = [
+  [4, 0, 1, 2, 6],
+  [5, 1, 6, 5, 4],
+  [3, 3, 2, 1, 0],
+] as const
+
+const BGA_ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly number[])[]> = {
+  red: [
+    [0, 12, 4, 9, 10],
+    [5, 1, 7, 3, 4],
+    [3, 11, 2, 8, 6],
+  ],
+  yellow: [
+    [10, 3, 2, 0, 6],
+    [15, 11, 7, 14, 4],
+    [5, 1, 4, 12, 13],
+  ],
+  blue: [
+    [1, 5, 13, 8, 12],
+    [2, 0, 10, 3, 15],
+    [7, 11, 6, 14, 4],
+  ],
+  black: [
+    [12, 2, 0, 7, 11],
+    [13, 9, 15, 4, 5],
+    [6, 3, 14, 8, 1],
+  ],
+  green: [
+    [10, 3, 2, 0, 6],
+    [15, 11, 7, 14, 4],
+    [5, 1, 4, 12, 13],
+  ],
+  purple: [
+    [7, 1, 2, 15, 0],
+    [3, 5, 14, 12, 4],
+    [8, 11, 10, 9, 6],
+  ],
+}
+
+const tileVariant = (matrix: readonly (readonly number[])[], row: number, col: number): number => {
+  const r = ((row % matrix.length) + matrix.length) % matrix.length
+  const c = ((col % matrix[r].length) + matrix[r].length) % matrix[r].length
+  return matrix[r][c] ?? 0
+}
+
+const emptySlotClass = (row: number, col: number) =>
+  `empty-node-${tileVariant(BGA_EMPTY_SLOT_VARIANTS, row, col)}`
+
+const roomLayoutClass = (color: PlayerState['color'], row: number, col: number) =>
+  `room-layout-${tileVariant(BGA_ROOM_LAYOUT_VARIANTS[color], row, col)}`
+
+const roomSpriteClass = (houseType: PlayerState['houseType']) =>
+  houseType === 'clay'
+    ? 'meeple-roomClay'
+    : houseType === 'stone'
+      ? 'meeple-roomStone'
+      : 'meeple-roomWood'
+
+const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
+  red: 'ff0000',
+  yellow: 'ffa500',
+  blue: '72c3b1',
+  black: '7b7b7b',
+  green: '008000',
+  purple: '982fff',
+}
+
+const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
+  color ? BGA_FENCE_COLORS[color] : undefined
+
 export type FarmBoardProps = {
   locale: Locale
   players: PlayerState[]
@@ -291,17 +364,17 @@ export type FarmBoardProps = {
   pastureTiles: Map<string, { pastureId: string; isCorner: boolean }>
   pastureDisplayMap: Map<
     string,
-    { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+    { animalType: AnimalType | null; animalCount: number }
   >
   pastureCapacityMap: Map<string, number>
-  houseDisplay: { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+  houseDisplay: { animalType: AnimalType | null; animalCount: number }
   stableDisplayMap: Map<
     string,
-    { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }
+    { animalType: AnimalType | null; animalCount: number }
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
   isReorgActive: boolean
-  reorgRemaining: { sheep: number; boar: number; cattle: number } | null
+  reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
   animalReorg: AnimalReorgState | null
   pendingFenceSet: Set<string>
@@ -318,7 +391,7 @@ export type FarmBoardProps = {
   toggleFenceEdge: (edgeId: string) => void
   adjustReorgAnimal: (
     zoneId: string,
-    animalType: 'sheep' | 'boar' | 'cattle',
+    animalType: AnimalType,
     delta: number,
   ) => void
   confirmAnimalReorg: () => void
@@ -759,6 +832,13 @@ export const FarmBoard = ({
               <CompactResourceItem iconClass="res-icon-begging" value={displayPlayer.resources.begging} label={`${t(locale, 'resources.begging')}: ${displayPlayer.resources.begging}`} />
             </>)}
           </span>
+          {displayPlayer.resources.fuel !== undefined || displayPlayer.resources.horse !== undefined ? (<>
+            <span className="res-compact-divider" />
+            <span className="res-compact-group">
+              <CompactResourceItem iconClass="res-icon-fuel" value={displayPlayer.resources.fuel ?? 0} label={`${t(locale, 'resources.fuel')}: ${displayPlayer.resources.fuel ?? 0}`} />
+              <CompactResourceItem iconClass="res-icon-horse" value={displayPlayer.resources.horse ?? 0} label={`${t(locale, 'resources.horse')}: ${displayPlayer.resources.horse ?? 0}`} />
+            </span>
+          </>) : null}
           <span className="res-compact-divider" />
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
@@ -833,6 +913,15 @@ export const FarmBoard = ({
           const isRoom = roomPositions.has(tileKey)
           const isField = fieldPositions.has(tileKey)
           const isStable = stablePositions.has(tileKey)
+          const terrain = (displayPlayer.farmTerrain ?? []).find(
+            (tile) => tile.row === tileRow && tile.col === tileCol,
+          )
+          const terrainLabel =
+            terrain?.kind === 'forest'
+              ? t(locale, 'ui.tileForest')
+              : terrain?.kind === 'moor'
+                ? t(locale, 'ui.tileMoor')
+                : null
           const isRoomSelectable =
             isInteractive && roomSelectableSet.has(tileKey)
           const isRoomSelected = isInteractive && pendingRoomSet.has(tileKey)
@@ -905,6 +994,17 @@ export const FarmBoard = ({
                 )}/1`
               : '0/1'
             : null
+          const tileLabel = isRoom
+            ? displayPlayer.houseType === 'clay'
+              ? t(locale, 'ui.houseClay')
+              : displayPlayer.houseType === 'stone'
+                ? t(locale, 'ui.houseStone')
+                : t(locale, 'ui.houseWood')
+            : isField
+              ? t(locale, 'ui.tileField')
+              : isStable
+                ? t(locale, 'ui.tileStable')
+                : terrainLabel ?? t(locale, 'ui.tileEmpty')
           return (
             <div
               key={cell.key}
@@ -918,9 +1018,11 @@ export const FarmBoard = ({
                     : isStable
                       ? ' stable'
                       : ''
-              }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
+              }${terrain ? ` farm-terrain-${terrain.kind}` : ''}${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
               }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
+              title={tileLabel}
+              aria-label={tileLabel}
               onClick={() => {
                 if (isRoomSelectable) {
                   toggleRoomTile({ row: tileRow, col: tileCol })
@@ -939,6 +1041,15 @@ export const FarmBoard = ({
                 }
               }}
             >
+              <div className="farm-node-background" aria-hidden="true">
+                {isRoom ? (
+                  <div className={`${roomSpriteClass(displayPlayer.houseType)} ${roomLayoutClass(displayPlayer.color, tileRow, tileCol)}`} />
+                ) : isField ? (
+                  <div className="meeple-field" />
+                ) : (
+                  <div className={`empty-node ${emptySlotClass(tileRow, tileCol)}`} />
+                )}
+              </div>
               {isStable ? (
                 <div
                   className="stable-barn-icon"
@@ -947,19 +1058,6 @@ export const FarmBoard = ({
                   <span className="res-icon res-icon-barn" />
                 </div>
               ) : null}
-              <span className="farm-tile-text">
-                {isRoom
-                  ? displayPlayer.houseType === 'clay'
-                    ? t(locale, 'ui.houseClay')
-                    : displayPlayer.houseType === 'stone'
-                      ? t(locale, 'ui.houseStone')
-                      : t(locale, 'ui.houseWood')
-                  : isField
-                    ? t(locale, 'ui.tileField')
-                    : isStable
-                      ? null
-                      : t(locale, 'ui.tileEmpty')}
-              </span>
               {isSowSelectable ? (
                 <SowChoiceButtons
                   locale={locale}
@@ -981,7 +1079,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={pastureAnimalCount} animalType={pastureAnimalType} capacity={pastureCapacity} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           pastureAnimalType === animalType ? pastureAnimalCount : 0
                         const canDecrease =
@@ -1024,7 +1122,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={houseDisplay.animalCount} animalType={houseDisplay.animalType} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           houseDisplay.animalType === animalType
                             ? houseDisplay.animalCount
@@ -1066,7 +1164,7 @@ export const FarmBoard = ({
                   <div className="pasture-count"><AnimalCount count={stableDisplay?.animalCount ?? 0} animalType={stableDisplay?.animalType ?? null} capacity={1} /></div>
                   {isReorgActive ? (
                     <div className="pasture-controls">
-                      {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const count =
                           stableDisplay?.animalType === animalType
                             ? stableDisplay.animalCount
@@ -1154,10 +1252,13 @@ export const FarmBoard = ({
           return (
             <div
               key={cell.key}
-              className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
+              className={`farm-cell farm-${cell.type} meeple-fence ${
+                cell.type === 'fence-h' ? 'fence-hor' : 'fence-ver'
+              }${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
               data-player-color={sourcePlayerColor}
+              data-color={bgaFenceColor(sourcePlayerColor)}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)
@@ -1349,16 +1450,12 @@ export const FarmBoard = ({
                     capacity={cardDisplay.capacity}
                   />
                   <div className="pasture-controls">
-                    {(['sheep', 'boar', 'cattle'] as const).map((animalType) => {
+                    {ANIMAL_CONTROL_TYPES.map((animalType) => {
                       const cardAnimalCounts = cardDisplay.animalCounts ?? {}
                       const count =
                         cardAnimalCounts[animalType] ??
                         (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)
-                      const totalCount =
-                        (cardAnimalCounts.sheep ?? 0) +
-                        (cardAnimalCounts.boar ?? 0) +
-                        (cardAnimalCounts.cattle ?? 0) ||
-                        cardDisplay.animalCount
+                      const totalCount = sumAnimalCounts(cardAnimalCounts) || cardDisplay.animalCount
                       const canDecrease =
                         count > 0
                       const canIncrease =

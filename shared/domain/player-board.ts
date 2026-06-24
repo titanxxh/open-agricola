@@ -1,8 +1,9 @@
 import type { GameState, PlayerState } from '../contract/types.ts'
+import type { AnimalKey } from '../contract/animals.ts'
 import { Farmyard } from './farmyard.ts'
 import { AnimalZones } from './animal-zones.ts'
 
-type AnimalType = 'sheep' | 'boar' | 'cattle'
+type AnimalType = AnimalKey
 
 /**
  * Facade over a single player's board. Composes the `Farmyard` and

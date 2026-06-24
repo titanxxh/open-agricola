@@ -121,14 +121,14 @@ import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-fee
 import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, workersAvailable } from '../domain/player.ts'
+import { familySize } from '../domain/player.ts'
 import { getAssignedAnimalsByType } from '../domain/animals.ts'
 import {
-  ANIMAL_KEYS,
   createAnimalCounts,
   readAnimalHolderCounts,
   sumAnimalCounts,
 } from '../domain/animal-holder-state.ts'
+import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
@@ -181,6 +181,15 @@ import {
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
+import { resetMoorSpecialActionCards, type MoorSpecialActionPayload } from '../moor/special-actions'
+import type { MoorSpecialActionId } from '../moor/types'
+import {
+  applyHeatingPayment,
+  canMoorWorkerEnterSpace,
+  computeHeatingRequirement,
+  recoverInfirmaryWorkers,
+  type HeatingPaymentPayload,
+} from '../moor/heating'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -1136,6 +1145,13 @@ export class GameCore {
   ): void {
     roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
   }
+  private startHeatingSubFlow(
+    playerIndex: number,
+    required: number,
+    feedQueue?: FeedQueueEntry[],
+  ): void {
+    roundPhase.startHeatingSubFlow(this, playerIndex, required, feedQueue)
+  }
 
   private createEngine(
     actionId: string,
@@ -1171,35 +1187,36 @@ export class GameCore {
   }
 
   private getAnimalCount(p: PlayerState) {
-    return p.resources.sheep + p.resources.boar + p.resources.cattle
+    return animalKeysForState(this.state).reduce((sum, key) => sum + (p.resources[key] ?? 0), 0)
   }
 
   private getAssignedAnimalCountForPending(p: PlayerState) {
     const assigned = { ...getAssignedAnimalsByType(p) }
     const idx = this.state.players.indexOf(p)
+    const animalKeys = animalKeysForState(this.state)
     if (idx < 0) {
-      return assigned.sheep + assigned.boar + assigned.cattle
+      return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
     }
     const visibleByCardId = new Map<string, ReturnType<typeof createAnimalCounts>>()
     for (const zone of playerBoard(this.state, idx).animals.zones()) {
       if (zone.zoneType !== 'card' || !zone.cardId) continue
-      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts()
+      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
       const zoneCounts = readAnimalCountsForZoneAssignment(zone)
-      for (const key of ANIMAL_KEYS) {
-        counts[key] += zoneCounts[key]
+      for (const key of animalKeys) {
+        counts[key] = (counts[key] ?? 0) + (zoneCounts[key] ?? 0)
       }
       visibleByCardId.set(zone.cardId, counts)
     }
     for (const [cardId, cardState] of Object.entries(p.cardStates ?? {})) {
       if (typeof cardState?.counters?.held === 'number') continue
       const stored = readAnimalHolderCounts(cardState?.extraData)
-      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts()
+      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
       if (sumAnimalCounts(stored) <= 0 && sumAnimalCounts(visible) <= 0) continue
-      for (const key of ANIMAL_KEYS) {
-        assigned[key] += visible[key] - stored[key]
+      for (const key of animalKeys) {
+        assigned[key] = (assigned[key] ?? 0) + (visible[key] ?? 0) - (stored[key] ?? 0)
       }
     }
-    return assigned.sheep + assigned.boar + assigned.cattle
+    return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
   }
 
   private hasPendingAnimals(p: PlayerState) {
@@ -1570,7 +1587,7 @@ export class GameCore {
       id: zone.id,
       zoneType: zone.zoneType,
       cardId: zone.cardId,
-      animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+      animalType: zone.animalType ?? null,
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
@@ -1688,6 +1705,18 @@ export class GameCore {
           remaining: request.remaining,
           foodUsed: request.foodUsed,
           feedQueue: request.feedQueue,
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
+      case 'heating':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
@@ -2420,9 +2449,11 @@ export class GameCore {
       if (playerIndex === -1) continue
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
       const receiveResources: Partial<Resource> = {}
-      for (const key of resourceKeyList) {
-        const amount = entry.resources[key] ?? 0
-        if (amount > 0) receiveResources[key] = amount
+      if (this.futureMeepleResourceConditionMet(entry)) {
+        for (const key of resourceKeyList) {
+          const amount = entry.resources[key] ?? 0
+          if (amount > 0) receiveResources[key] = amount
+        }
       }
       if (Object.keys(receiveResources).length > 0) {
         const receiveEntries = receiveEntriesByPlayer.get(entry.playerId) ?? []
@@ -2476,6 +2507,40 @@ export class GameCore {
       flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
       playerIndex: firstPlayerIndex,
     }
+  }
+
+  private futureMeepleResourceConditionMet(entry: GameState['futureMeeples'][number]): boolean {
+    const condition = entry.actionContext?.resourceCondition
+    if (!condition || typeof condition !== 'object' || Array.isArray(condition)) return true
+    const raw = condition as { kind?: unknown; resource?: unknown; amount?: unknown }
+    if (raw.kind !== 'min-resource') return true
+    if (typeof raw.resource !== 'string') return true
+    const resource = raw.resource as keyof Resource
+    if (!resourceKeyList.includes(resource) && resource !== 'horse' && resource !== 'fuel') return true
+    if (typeof raw.amount !== 'number' || !Number.isFinite(raw.amount)) return true
+    const player = this.state.players.find((candidate) => candidate.id === entry.playerId)
+    if (!player) return false
+    return (player.resources[resource] ?? 0) >= Math.max(0, Math.floor(raw.amount))
+  }
+
+  private buildFutureMeepleResolvedEvents(): ImmediateEventDraft[] {
+    return this.state.futureMeeples
+      .filter((entry) =>
+        entry.round === this.state.round &&
+        this.state.players.some((player) => player.id === entry.playerId),
+      )
+      .map((entry) => {
+        const resources = this.futureMeepleResourceConditionMet(entry) ? entry.resources : {}
+        return {
+          type: 'futureMeeple.resolved',
+          playerId: entry.playerId,
+          cardId: entry.cardId,
+          sourceCardId: entry.cardId,
+          round: entry.round,
+          ...(Object.keys(resources ?? {}).length > 0 ? { resources } : {}),
+          ...(entry.roomType ? { roomType: entry.roomType } : {}),
+        } as ImmediateEventDraft
+      })
   }
 
   private startStageFlow(
@@ -2878,9 +2943,29 @@ export class GameCore {
     return this.executeFeedingLogic()
   }
 
+  private continueHarvestFeedingQueue(feedQueue: FeedQueueEntry[]): SessionResponse {
+    const next = feedQueue[0]
+    if (!next) return this.startBreedPhase()
+    const rest = feedQueue.slice(1)
+    if (next.needsFeed) {
+      this.startFeedSubFlow(next.index, next.remaining, next.foodUsed, rest)
+      return this.respond()
+    }
+    return this.startHeatingOrContinue(next.index, rest)
+  }
+
+  private startHeatingOrContinue(playerIndex: number, feedQueue: FeedQueueEntry[]): SessionResponse {
+    const player = this.state.players[playerIndex]
+    if (!player) return this.continueHarvestFeedingQueue(feedQueue)
+    const required = computeHeatingRequirement(this.state, player)
+    if (required <= 0) return this.continueHarvestFeedingQueue(feedQueue)
+    this.startHeatingSubFlow(playerIndex, required, feedQueue)
+    return this.respond()
+  }
+
   private executeFeedingLogic(): SessionResponse {
     const harvestOrder = this.getHarvestPlayerIndices()
-    const feedQueue: { index: number; remaining: number; foodUsed: number }[] = []
+    const feedQueue: FeedQueueEntry[] = []
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
@@ -2899,9 +2984,10 @@ export class GameCore {
           if (useFood > 0) {
             this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
           }
+          feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
           continue
         }
-        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
+        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood, needsFeed: true })
         continue
       }
 
@@ -2911,28 +2997,18 @@ export class GameCore {
         hasHarvestExchange
 
       if (canConvert) {
-        feedQueue.push({ index: i, remaining, foodUsed: useFood })
+        feedQueue.push({ index: i, remaining, foodUsed: useFood, needsFeed: true })
       } else {
         player.resources.begging += remaining
         this.logHarvestResourceEntry('log.harvestFeedDetail', player, {
           food: useFood,
           begging: remaining,
         })
+        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
       }
     }
 
-    if (feedQueue.length > 0) {
-      const first = feedQueue[0]!
-      this.startFeedSubFlow(
-        first.index,
-        first.remaining,
-        first.foodUsed,
-        feedQueue.slice(1),
-      )
-      return this.respond()
-    }
-
-    return this.startBreedPhase()
+    return this.continueHarvestFeedingQueue(feedQueue)
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
@@ -3004,20 +3080,7 @@ export class GameCore {
       delete player._extraTurnConsumedCount
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
-    const futureResolvedEvents = this.state.futureMeeples
-      .filter((entry) =>
-        entry.round === this.state.round &&
-        this.state.players.some((player) => player.id === entry.playerId),
-      )
-      .map((entry) => ({
-        type: 'futureMeeple.resolved',
-        playerId: entry.playerId,
-        cardId: entry.cardId,
-        sourceCardId: entry.cardId,
-        round: entry.round,
-        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
-        ...(entry.roomType ? { roomType: entry.roomType } : {}),
-      }) as ImmediateEventDraft)
+    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
     const openActionSpaceIds = new Set<string>()
     const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
@@ -3109,20 +3172,7 @@ export class GameCore {
 
   private continueCurrentFutureMeepleActions(): SessionResponse {
     const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
-    const futureResolvedEvents = this.state.futureMeeples
-      .filter((entry) =>
-        entry.round === this.state.round &&
-        this.state.players.some((player) => player.id === entry.playerId),
-      )
-      .map((entry) => ({
-        type: 'futureMeeple.resolved',
-        playerId: entry.playerId,
-        cardId: entry.cardId,
-        sourceCardId: entry.cardId,
-        round: entry.round,
-        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
-        ...(entry.roomType ? { roomType: entry.roomType } : {}),
-      }) as ImmediateEventDraft)
+    const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
     applyFutureMeeples(this.state, { skipResourceReceive: true })
     if (futureResolvedEvents.length > 0) {
       const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)
@@ -3682,7 +3732,7 @@ export class GameCore {
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     if (!canEnterSpace(space, player, this.state)) return false
-    if (workersAvailable(this.state, player) <= 0) return false
+    if (!canMoorWorkerEnterSpace(this.state, player, space.id)) return false
     if (isSpaceBlocked(space)) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
@@ -3718,7 +3768,7 @@ export class GameCore {
     }
 
     // Also mark occupied spaces that computeArgs listeners expose as extra options
-    if (workersAvailable(this.state, player) > 0) {
+    if (canMoorWorkerEnterSpace(this.state, player, 'place-farmer')) {
       const listenerContext: import('../cards/card-listeners.ts').CardListenerContextInput = {
         state: this.state,
         player,
@@ -3819,6 +3869,15 @@ export class GameCore {
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
     return roundPhase.takeAction(this, playerIndex, spaceId)
+  }
+
+  takeSpecialAction(
+    playerIndex: number,
+    cardId: string,
+    actionId: MoorSpecialActionId,
+    payload?: MoorSpecialActionPayload,
+  ): SessionResponse {
+    return roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload)
   }
 
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
@@ -3994,6 +4053,8 @@ export class GameCore {
             ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
           return this.handleFeedResolved(playerIndex, sels)
         }
+        case 'heating':
+          return this.handleHeatingResolved(playerIndex, payload as HeatingPaymentPayload | undefined)
         case 'animal-reorg':
         case 'choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
@@ -4235,18 +4296,31 @@ export class GameCore {
     // one residual `__interaction_only__` frame per resolved player.
     const top = this.engineStack.current()
     if (top?.reason === 'feed') this.engineStack.pop()
-    if (feedQueue.length > 0) {
-      const next = feedQueue[0]!
-      this.startFeedSubFlow(
-        next.index,
-        next.remaining,
-        next.foodUsed,
-        feedQueue.slice(1),
-      )
-      return this.respond()
-    }
+    return this.startHeatingOrContinue(playerIndex, feedQueue)
+  }
 
-    return this.startBreedPhase()
+  private handleHeatingResolved(
+    playerIndex: number,
+    payload: HeatingPaymentPayload = {},
+  ): SessionResponse {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const request = envelope?.request
+    const frame = this.engineStack.current()
+    if (
+      request?.kind !== 'heating' ||
+      frame?.ownerPlayerIndex !== playerIndex
+    ) {
+      return this.respond(false, 'no pending heating')
+    }
+    this.pushHistory()
+    const player = this.state.players[playerIndex]
+    if (!player) return this.respond(false, 'invalid player')
+
+    applyHeatingPayment(this.state, player, payload)
+
+    const top = this.engineStack.current()
+    if (top?.reason === 'heating') this.engineStack.pop()
+    return this.continueHarvestFeedingQueue(request.feedQueue ?? [])
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
@@ -4304,6 +4378,8 @@ export class GameCore {
       }])
     }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
+    recoverInfirmaryWorkers(this.state)
+    resetMoorSpecialActionCards(this.state)
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
     clearAllLinkedSpaceBlocks(this.state)
@@ -4826,14 +4902,14 @@ export class GameCore {
   devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const animalKeys = new Set(['sheep', 'boar', 'cattle'])
+    const animalKeys = new Set(animalKeysForState(this.state))
     let increasedAnimals = false
     Object.entries(resources).forEach(([key, value]) => {
       if (typeof value === 'number') {
         const resourceBag = player.resources as Record<string, number>
         const priorValue = resourceBag[key] ?? 0
         resourceBag[key] = value
-        if (animalKeys.has(key) && value > priorValue) increasedAnimals = true
+        if (animalKeys.has(key as AnimalKey) && value > priorValue) increasedAnimals = true
       }
     })
     if (increasedAnimals) {

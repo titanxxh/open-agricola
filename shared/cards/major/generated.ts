@@ -691,6 +691,463 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "kind": "major"
   },
   {
+    "id": "Major_Moor_HorseSlaughterhouse2",
+    "name": "Horse Slaughterhouse",
+    "deck": "major",
+    "number": 102,
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "isCookery": true,
+    "desc": [
+      "[Anytime]",
+      "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",
+      "<CATTLE> <ARROW> 2<FOOD>      <HORSE> <ARROW> 2<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_Cookhouse2",
+    "name": "Cookhouse",
+    "deck": "major",
+    "number": 104,
+    "cost": {
+      "fee": {
+        "clay": 6
+      },
+      "cards": {
+        "type": "Major",
+        "list": [
+          "Major_Fireplace1",
+          "Major_Fireplace2",
+          "Major_Fireplace3",
+          "Major_CookingHearth1",
+          "Major_CookingHearth2",
+          "Major_CookingHearth3"
+        ]
+      }
+    },
+    "vp": 2,
+    "extraVp": false,
+    "isCookery": true,
+    "isBaking": true,
+    "cookingHearthIdentity": true,
+    "returnCards": [
+      "Major_Fireplace1",
+      "Major_Fireplace2",
+      "Major_Fireplace3",
+      "Major_CookingHearth1",
+      "Major_CookingHearth2",
+      "Major_CookingHearth3"
+    ],
+    "desc": [
+      "[Anytime]",
+      "<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>",
+      "<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 4<FOOD>",
+      "<HORSE> <ARROW> 2<FOOD>",
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW> 3<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse2",
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_PeatCharcoalKiln",
+    "name": "Peat-charcoal Kiln",
+    "deck": "major",
+    "number": 105,
+    "cost": {
+      "stone": 1
+    },
+    "vp": 1,
+    "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "cut-peat",
+        "resource": "fuel",
+        "amount": 1,
+        "horseAmount": 2
+      }
+    ],
+    "desc": [
+      "[Special action: Cut Peat]",
+      "Gain 1 extra fuel, or 2 extra fuel if you have at least 1 horse.",
+      "[Scoring]",
+      "3/5 fuel <ARROW> 1/2 bonus points."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_ForestersLodge",
+    "name": "Forester's Lodge",
+    "deck": "major",
+    "number": 106,
+    "cost": {
+      "wood": 1,
+      "clay": 2
+    },
+    "vp": 1,
+    "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "fell-trees",
+        "resource": "wood",
+        "amount": 1,
+        "horseAmount": 2
+      }
+    ],
+    "desc": [
+      "[Special action: Fell Trees]",
+      "Gain 1 extra wood, or 2 extra wood if you have at least 1 horse.",
+      "[Scoring]",
+      "Gain 1 bonus point for each forest in your farmyard."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_RidingStables",
+    "name": "Riding Stables",
+    "deck": "major",
+    "number": 107,
+    "cost": {
+      "wood": 2,
+      "clay": 1,
+      "reed": 1
+    },
+    "vp": 3,
+    "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "Place 1 food on each remaining round space.",
+      "At the start of each round, gain that food if you have at least 2 horses."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_MuseumOfTheMoors",
+    "name": "Museum of the Moors",
+    "deck": "major",
+    "number": 108,
+    "cost": {
+      "clay": 1,
+      "reed": 1,
+      "stone": 1
+    },
+    "vp": 3,
+    "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "Selected major improvements cost you 1 fewer matching building resource."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_HeatingOven",
+    "name": "Furnace",
+    "deck": "major",
+    "number": 109,
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 1,
+    "extraVp": false,
+    "ovenIdentity": true,
+    "requiresFarmersOfTheMoor": true,
+    "heatingRoomDiscount": 1,
+    "desc": [
+      "Immediately gain 2 fuel.",
+      "When heating, heat 1 fewer room than you have."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_TiledOven",
+    "name": "Heating Stove",
+    "deck": "major",
+    "number": 110,
+    "cost": {
+      "clay": 2,
+      "stone": 1
+    },
+    "vp": 1,
+    "extraVp": false,
+    "ovenIdentity": true,
+    "requiresFarmersOfTheMoor": true,
+    "heatingFuelCap": 1,
+    "desc": [
+      "Regardless of house size, you need at most 1 fuel to heat your entire home."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_VillageChurch",
+    "name": "Village Church",
+    "deck": "major",
+    "number": 111,
+    "cost": {
+      "wood": 2,
+      "stone": 4
+    },
+    "vp": 4,
+    "extraVp": true,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "Immediately gain 2 food.",
+      "[Harvest]",
+      "Once each harvest, you may pay 1 fuel to gain 1 bonus point."
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_FurnitureStall",
+    "name": "Furniture Stall",
+    "deck": "major",
+    "number": 112,
+    "cost": {
+      "wood": 1,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "[Anytime]",
+      "Exchange wood for the same amount of clay."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "wood": 1
+        },
+        "to": {
+          "clay": 1
+        },
+        "sourceId": "Major_Moor_FurnitureStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_CeramicsStall",
+    "name": "Ceramics Stall",
+    "deck": "major",
+    "number": 113,
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "[Anytime]",
+      "Exchange clay for the same amount of wood."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "wood": 1
+        },
+        "sourceId": "Major_Moor_CeramicsStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_BasketStall",
+    "name": "Basket Stall",
+    "deck": "major",
+    "number": 114,
+    "cost": {
+      "reed": 1,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "requiresFarmersOfTheMoor": true,
+    "desc": [
+      "[Anytime]",
+      "Exchange reed for the same amount of other building resources."
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "wood": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "clay": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "stone": 1
+        },
+        "sourceId": "Major_Moor_BasketStall",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
     "id": "Major_CookingHearth1",
     "name": "Cooking Hearth",
     "deck": "major",
@@ -867,6 +1324,193 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
         "sourceId": "Major_Fireplace1",
         "triggers": [
           "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_Cookhouse1",
+    "name": "Cookhouse",
+    "deck": "major",
+    "number": 103,
+    "cost": {
+      "fee": {
+        "clay": 6
+      },
+      "cards": {
+        "type": "Major",
+        "list": [
+          "Major_Fireplace1",
+          "Major_Fireplace2",
+          "Major_Fireplace3",
+          "Major_CookingHearth1",
+          "Major_CookingHearth2",
+          "Major_CookingHearth3"
+        ]
+      }
+    },
+    "vp": 2,
+    "extraVp": false,
+    "isCookery": true,
+    "isBaking": true,
+    "cookingHearthIdentity": true,
+    "returnCards": [
+      "Major_Fireplace1",
+      "Major_Fireplace2",
+      "Major_Fireplace3",
+      "Major_CookingHearth1",
+      "Major_CookingHearth2",
+      "Major_CookingHearth3"
+    ],
+    "desc": [
+      "[Anytime]",
+      "<VEGETABLE> <ARROW> 3<FOOD>      <PIG> <ARROW> 3<FOOD>",
+      "<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 4<FOOD>",
+      "<HORSE> <ARROW> 2<FOOD>",
+      "[__Bake Bread__ action:]",
+      "<GRAIN> <ARROW> 3<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 4
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "Major_Moor_Cookhouse1",
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "kind": "major"
+  },
+  {
+    "id": "Major_Moor_HorseSlaughterhouse1",
+    "name": "Horse Slaughterhouse",
+    "deck": "major",
+    "number": 101,
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": false,
+    "isCookery": true,
+    "desc": [
+      "[Anytime]",
+      "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",
+      "<CATTLE> <ARROW> 2<FOOD>      <HORSE> <ARROW> 2<FOOD>"
+    ],
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse1",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "Major_Moor_HorseSlaughterhouse1",
+        "triggers": [
+          "anytime"
         ]
       }
     ],

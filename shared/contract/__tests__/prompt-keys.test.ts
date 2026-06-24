@@ -4,6 +4,7 @@ import type { PromptKey, PromptParams } from '../prompt-keys'
 describe('PromptKey + PromptParams', () => {
   it('PromptKey is a closed union covering all emit literals', () => {
     expectTypeOf<'ui.harvestFeed'>().toExtend<PromptKey>()
+    expectTypeOf<'ui.harvestHeating'>().toExtend<PromptKey>()
     expectTypeOf<'ui.interactionPlow'>().toExtend<PromptKey>()
     expectTypeOf<'ui.interactionPlowSelect'>().toExtend<PromptKey>()
     expectTypeOf<'ui.interactionDairyCrierChoice'>().toExtend<PromptKey>()
@@ -16,6 +17,10 @@ describe('PromptKey + PromptParams', () => {
 
   it('PromptParams maps harvestFeed to remaining/foodUsed', () => {
     expectTypeOf<PromptParams<'ui.harvestFeed'>>().toEqualTypeOf<{ remaining: number; foodUsed: number }>()
+  })
+
+  it('PromptParams maps harvestHeating to required fuel', () => {
+    expectTypeOf<PromptParams<'ui.harvestHeating'>>().toEqualTypeOf<{ required: number }>()
   })
 
   it('PromptParams maps -Select variants to same shape as bare farmType', () => {

@@ -12,8 +12,15 @@
  */
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
-import { smallestAvailableWorker, workersAvailable } from '../../domain/player.ts'
+import { workersAvailable } from '../../domain/player.ts'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
+import {
+  applyMoorSpecialAction,
+  validateMoorSpecialAction,
+  type MoorSpecialActionPayload,
+} from '../../moor/special-actions.ts'
+import type { MoorSpecialActionId } from '../../moor/types.ts'
+import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import {
   canUseExclusiveSpace,
   computeAllowedPlacementSpaces,
@@ -91,9 +98,7 @@ export const takeAction = (
   if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
   if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
   const player = state.players[playerIndex]
-  if (!player || workersAvailable(state, player) <= 0) {
-    return core.emitResponse(false, 'no workers available')
-  }
+  if (!player) return core.emitResponse(false, 'no workers available')
   const space = state.actionSpaces.find((s) => s.id === spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
   if (isSpaceBlocked(space)) return core.emitResponse(false, 'space unavailable')
@@ -120,6 +125,8 @@ export const takeAction = (
   if (core.listenersVetoIsDoableCheck(player, space)) {
     return core.emitResponse(false, 'space unavailable')
   }
+  const worker = selectWorkerForMoorAction(state, player, spaceId)
+  if (!worker) return core.emitResponse(false, 'no workers available')
 
   core.appendHistory(true)
   core.setTurnOwner(playerIndex)
@@ -127,19 +134,16 @@ export const takeAction = (
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
   core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
-  const worker = smallestAvailableWorker(state, player)
-  if (worker) {
-    addWorkerRef(space, player.id, worker.id)
-    addLinkedSpaceBlocks(state, space, player.id, worker.id)
-    appendImmediateEvents(state, [{
-      type: 'worker.placed',
-      workerId: worker.id,
-      spaceId,
-    }], {
-      actorPlayerId: player.id,
-      sourceActionId: spaceId,
-    })
-  }
+  addWorkerRef(space, player.id, worker.id)
+  addLinkedSpaceBlocks(state, space, player.id, worker.id)
+  appendImmediateEvents(state, [{
+    type: 'worker.placed',
+    workerId: worker.id,
+    spaceId,
+  }], {
+    actorPlayerId: player.id,
+    sourceActionId: spaceId,
+  })
   recordRoundPlacement(player, spaceId, worker?.id ?? '?')
   incPlacedFarmers(player)
 
@@ -178,6 +182,49 @@ export const takeAction = (
 
   core.driveEngineSteps()
   return core.emitResponse()
+}
+
+export const takeSpecialAction = (
+  core: GameCore,
+  playerIndex: number,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload?: MoorSpecialActionPayload,
+): SessionResponse => {
+  const state = core.state
+  if (state.gameOver) return core.emitResponse(false, 'game is over')
+  if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
+  if (hasPendingOrdinaryCardDrawChoice(state)) {
+    return core.emitResponse(false, 'ordinary card draw choice in progress')
+  }
+  if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
+  if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
+  if (state.roundPhase !== 'work') return core.emitResponse(false, 'not work phase')
+  if (!state.enableFarmersOfTheMoor || !state.farmersOfTheMoor) {
+    return core.emitResponse(false, 'farmers of the moor unavailable')
+  }
+  const player = state.players[playerIndex]
+  if (!player || !hasHealthyWorkerAtHome(state, player)) {
+    return core.emitResponse(false, 'no healthy workers available')
+  }
+  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  if (!validation.ok) return core.emitResponse(false, validation.error)
+
+  core.appendHistory(true)
+  core.setTurnOwner(playerIndex)
+  player._activeActionBonusSources = []
+  core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+  core.resetActionResultDetails()
+  recordActionSnapshot(player, core.allocActionToken())
+
+  const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  if (!result.ok) return core.emitResponse(false, result.error)
+  if (core.hasPendingAnimalsCheck(player)) {
+    core.startReorgSubFlow(playerIndex, 'anytime', { originPlayerIndex: playerIndex })
+    return core.emitResponse()
+  }
+  return core.invokeEndTurnHooks(playerIndex)
 }
 
 /**
@@ -247,6 +294,32 @@ export const startFeedSubFlow = (
     ownerNodeId: null,
     syntheticKind: 'feed',
   } satisfies PendingEnvelope, playerIndex, 'feed')
+}
+
+export const startHeatingSubFlow = (
+  core: GameCore,
+  playerIndex: number,
+  required: number,
+  feedQueue?: FeedQueueEntry[],
+): void => {
+  const player = core.state.players[playerIndex]
+  if (!player) return
+  const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
+  core.pushSyntheticPendingFrame({
+    hostNodeId: core.mintSyntheticNodeId('interaction:heating'),
+    request: {
+      kind: 'heating',
+      playerId: player.id,
+      required,
+      maxFuelPayable: Math.min(player.resources.fuel ?? 0, required),
+      maxWoodConvertibleToFuel: player.resources.wood,
+      feedQueue,
+    },
+    choices: options,
+    promptKey: 'ui.harvestHeating',
+    ownerNodeId: null,
+    syntheticKind: 'heating',
+  } satisfies PendingEnvelope, playerIndex, 'heating')
 }
 
 /**

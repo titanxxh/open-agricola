@@ -8,6 +8,8 @@ export type RoomMeta = {
   customCardDbIds: string[]
   enableParentCards?: boolean
   enableThroughTheSeasons?: boolean
+  enableFarmersOfTheMoor?: boolean
+  allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   status: RoomStatus
   /** Seated players with persisted user identity. Anonymous seats are skipped. */
   players: Array<{ userId: string; playerIndex: number }>

@@ -18,6 +18,7 @@ const dummySpace: ActionSpace = {
 
 const makeCtx = (opts: {
   player?: Partial<PlayerState>
+  state?: Partial<GameState>
   actionContext?: Record<string, unknown>
 } = {}): ActionExecutionContext => {
   const player = {
@@ -53,6 +54,7 @@ const makeCtx = (opts: {
   const state = {
     players: [player],
     currentPlayerIndex: 0,
+    ...(opts.state ?? {}),
   } as unknown as GameState
   return {
     state,
@@ -135,6 +137,41 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.sheep).toBe(2)
   })
 
+  it('keeps assigned horse totals when Farmers of the Moor is enabled', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        resources: {
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+          horse: 2,
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 1,
+            tiles: [{ row: 0, col: 0 }],
+            stables: 0,
+            animalType: null,
+            animalCount: 0,
+          },
+        ],
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.pastures[0]!.animalType).toBe('horse')
+    expect(ctx.player.pastures[0]!.animalCount).toBe(1)
+    expect(ctx.player.resources.horse).toBe(1)
+  })
+
   it('normalizes mixed animalCounts on same-type unkeyed card zones', () => {
     const ctx = makeCtx({
       player: {
@@ -214,5 +251,34 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.sheep).toBe(1)
     expect(ctx.player.resources.boar).toBe(1)
     expect(ctx.player.resources.cattle).toBe(1)
+  })
+
+  it('rejects horses from Wildlife Reserve card zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['C11_WildlifeReserve'],
+        resources: { sheep: 1, boar: 1, cattle: 1, horse: 1 } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: 'card:C11_WildlifeReserve',
+        zoneType: 'card',
+        cardId: 'C11_WildlifeReserve',
+        animalType: null,
+        animalCount: 4,
+        animalCounts: { sheep: 1, boar: 1, cattle: 1, horse: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(1)
+    expect(ctx.player.resources.boar).toBe(1)
+    expect(ctx.player.resources.cattle).toBe(1)
+    expect(ctx.player.resources.horse).toBe(0)
   })
 })

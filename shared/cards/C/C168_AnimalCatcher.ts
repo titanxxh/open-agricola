@@ -2,10 +2,29 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C168_AnimalCatcher'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
+const baseAnimals: Partial<Resource> = { sheep: 1, boar: 1, cattle: 1 }
+const farmersOfTheMoorAnimalCombos: { gain: Partial<Resource>; labelKey: string }[] = [
+  { gain: { sheep: 1, boar: 1, cattle: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepBoarCattle' },
+  { gain: { sheep: 1, boar: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepBoarHorse' },
+  { gain: { sheep: 1, cattle: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceSheepCattleHorse' },
+  { gain: { boar: 1, cattle: 1, horse: 1 }, labelKey: 'cards.C168_AnimalCatcher.choiceBoarCattleHorse' },
+]
+
+const animalGainFlow = (context: CardListenerContext): ActionFlow => {
+  if (context.state.enableFarmersOfTheMoor !== true) {
+    return gainLeaf(CARD_ID, baseAnimals)
+  }
+  return {
+    type: 'xor' as const,
+    children: farmersOfTheMoorAnimalCombos.map((combo) =>
+      gainLeaf(CARD_ID, combo.gain, combo.labelKey)),
+  }
+}
 
 /**
  * computeReplace on gain action when on day-laborer space:
@@ -26,7 +45,7 @@ const computeReplaceListener: CardListenerRegistration = {
       alternativeFlow: {
         type: 'seq',
         children: [
-          gainLeaf(CARD_ID, { sheep: 1, boar: 1, cattle: 1 }),
+          animalGainFlow(context),
           ...(remaining > 0
             ? [payLeaf({ cardId: CARD_ID, cost: { food: remaining } })]
             : []),

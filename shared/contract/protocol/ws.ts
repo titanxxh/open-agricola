@@ -1,6 +1,7 @@
 import type { StateUpdateEnvelope } from './game'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
+import type { MoorSpecialActionId } from '../../moor/types'
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -19,9 +20,14 @@ type CommitSelectionPayload = {
   crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
 }
 
+type MoorSpecialActionPayload = {
+  tile?: { row: number; col: number }
+}
+
 type ClientCommandBody =
   | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
+  | { type: 'specialAction'; cardId: string; actionId: MoorSpecialActionId; payload?: MoorSpecialActionPayload }
   | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
   | { type: 'ordinaryDrawKeep'; playerIndex: number; choiceId: string; keepCardId: string }
@@ -53,6 +59,9 @@ type ClientCommandBody =
       enableParentCards?: boolean
       /** When true, enable the Through the Seasons game variant. Default false. */
       enableThroughTheSeasons?: boolean
+      /** When true, enable the Farmers of the Moor game variant. Default false. */
+      enableFarmersOfTheMoor?: boolean
+      allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */

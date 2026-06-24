@@ -30,6 +30,7 @@ beforeAll(async () => {
     A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
     B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
     C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
+    C11_WildlifeReserve: manifestEntry('C11_WildlifeReserve', 'Wildlife Reserve', 'minor'),
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
@@ -179,6 +180,85 @@ describe('FarmBoard', () => {
     expect(html).toContain('>0/15<')
     expect(html).toContain('>0/4<')
     expect(html).not.toContain('res-compact-label')
+  })
+
+  it('renders Farmers of the Moor terrain and resource chips when present', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.resources = { ...player.resources, fuel: 0, horse: 0 }
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'moor' },
+    ]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+          ],
+        })}
+      />,
+    )
+
+    expect(html).toContain('farm-terrain-forest')
+    expect(html).toContain('farm-terrain-moor')
+    expect(html).toContain('Forest')
+    expect(html).toContain('Moor')
+    expect(html).toContain('res-icon-fuel')
+    expect(html).toContain('res-icon-horse')
+  })
+
+  it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
+    player.roomTiles = [{ row: 0, col: 0 }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          roomPositions: new Set(['0-0']),
+          isReorgActive: true,
+          houseDisplay: { animalType: 'horse', animalCount: 1 },
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
+        })}
+      />,
+    )
+
+    expect(html).toContain('res-icon-horse')
+    expect(html).toContain('Horse')
+  })
+
+  it('counts horses when disabling over-capacity card-zone controls', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['C11_WildlifeReserve']
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['C11_WildlifeReserve'],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 1, boar: 0, cattle: 0, horse: 0 },
+          cardDisplayMap: new Map([
+            ['C11_WildlifeReserve', {
+              zoneId: 'card:C11_WildlifeReserve',
+              capacity: 3,
+              animalType: null,
+              animalCount: 3,
+              animalCounts: { sheep: 1, boar: 1, horse: 1 },
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain(
+      '<span class="pasture-control-label">Sheep</span><button>-</button><span class="pasture-control-value">1</span><button disabled="">+</button>',
+    )
   })
 
   it('renders kept Parent Cards from portrait assets', () => {
@@ -373,6 +453,32 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
   })
 
+  it('renders BGA-style image layers for empty, room, and field farm tiles', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+            { key: 'tile-0-2', type: 'tile', tileRow: 0, tileCol: 2 },
+          ],
+          roomPositions: new Set(['0-0']),
+          fieldPositions: new Set(['0-1']),
+        })}
+      />,
+    )
+
+    expect(html).toContain('farm-node-background')
+    expect(html).toContain('empty-node empty-node-')
+    expect(html).toContain('meeple-roomWood')
+    expect(html).toContain('meeple-field')
+    expect(html).not.toContain('farm-tile-text">Wood room')
+    expect(html).not.toContain('farm-tile-text">Field')
+    expect(html).not.toContain('farm-tile-text">Empty')
+  })
+
   it('renders a B85 farmHand candidate as a clickable frame at the 2x2 center post', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -464,6 +570,23 @@ describe('FarmBoard', () => {
     expect(html).toContain('pasture-info')
   })
 
+  it('keeps the empty capacity badge on a built stable tile alongside the barn icon', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+          stableDisplayMap: new Map([['0-0', { animalType: null, animalCount: 0 }]]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('>0/1<')
+  })
+
   it('does not render a barn icon on a buildable stable candidate tile', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -521,6 +644,33 @@ describe('FarmBoard', () => {
 
     expect(html).toMatch(/farm-fence-h[^>]*data-player-color="red"/)
     expect(html).toMatch(/farm-fence-v[^>]*data-player-color="blue"/)
+  })
+
+  it('renders farm fences with BGA fence orientation classes and color tokens', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      fenceSegments: [
+        { edge: 'H-0-0', type: 'fence' as const },
+        { edge: 'V-0-0', type: 'fence' as const, source: { kind: 'borrowed' as const, ownerPlayerId: 'p2' } },
+      ],
+    }
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [
+            { key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: 'fence-v-0-0', type: 'fence-v', fenceId: 'V-0-0' },
+          ],
+          existingFenceSet: new Set(['H-0-0', 'V-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^"]*\bmeeple-fence\b[^"]*\bfence-hor\b[^>]*data-color="ff0000"/)
+    expect(html).toMatch(/farm-fence-v[^"]*\bmeeple-fence\b[^"]*\bfence-ver\b[^>]*data-color="72c3b1"/)
   })
 
   it('previews pending borrowed fence edges with the selected donor color', () => {

@@ -412,6 +412,47 @@ describe('ActionBoard', () => {
     expect(html).toContain('data-owner-player="p1"')
   })
 
+  it('renders future meeple resources separately from accumulated resources', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+    const sheepMarket = createAction('sheep-market', 'actions.sheep-market.name')
+    sheepMarket.resources.stone = 1
+    const futureMeeples: FutureMeeple[] = [
+      {
+        id: 'fm-1',
+        cardId: 'PR08',
+        playerId: 'p2',
+        round: 3,
+        actionId: 'sheep-market',
+        resources: { stone: 1 },
+      },
+    ]
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 3, action: sheepMarket }]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={futureMeeples}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={3}
+        devMode={false}
+      />,
+    )
+
+    const holder = container.querySelector('[data-action-id="sheep-market"]')
+    expect(holder?.querySelector('.resource-holder [data-owner-player]')).toBeNull()
+    expect(holder?.querySelector('.future-meeple-holder [data-owner-player="p2"]')).not.toBeNull()
+    expect(holder?.querySelector('.future-meeple-holder')).not.toBe(holder?.querySelector('.resource-holder'))
+  })
+
   it('shows future meeple resources on unrevealed round placeholders', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

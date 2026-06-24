@@ -93,4 +93,25 @@ describe('LobbyPage player count selection', () => {
       enableThroughTheSeasons: 'true',
     })
   })
+
+  it('sends Farmers of the Moor with incomplete minor deal and compatible variants', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByLabelText('启用 Parent Cards 扩展'))
+    fireEvent.click(screen.getByLabelText('启用 Through the Seasons 扩展'))
+    fireEvent.click(screen.getByLabelText('启用 Farmers of the Moor 扩展'))
+    fireEvent.click(screen.getByLabelText('允许 Farmers of the Moor 小改良池不完整'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+      enableParentCards: 'true',
+      enableThroughTheSeasons: 'true',
+      enableFarmersOfTheMoor: 'true',
+      allowIncompleteFarmersOfTheMoorMinorDeal: 'true',
+    })
+  })
 })

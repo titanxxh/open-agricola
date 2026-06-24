@@ -26,8 +26,8 @@ import {
   implementedCommunityMinors,
   implementedCommunityOccupations,
 } from '../cards/catalog'
-import { initDraftState } from '../draft/draft-manager'
-import type { DraftPool } from '../draft/types'
+import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
+import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
@@ -68,6 +68,13 @@ import {
   normalizeThroughTheSeasonsState,
 } from '../seasons/state'
 import { createSeasonActionSpaces, seasonActionIds } from '../seasons/action-spaces'
+import {
+  createFarmersOfTheMoorState,
+  normalizeFarmersOfTheMoorState,
+} from '../moor/state'
+import { normalizeFarmTerrain } from '../moor/farm-terrain'
+import { getMoorStartCardTerrain } from '../moor/start-cards'
+import { createMoorActionSpaces } from '../moor/action-spaces'
 
 export * from './state-constants'
 
@@ -93,6 +100,42 @@ const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
       (defaultSandboxDeckIds as readonly string[]).includes(deck),
     ) ?? []
   return next.length > 0 ? Array.from(new Set(next)) : [...defaultSandboxDeckIds]
+}
+
+const farmersOfTheMoorMinorHandSize = 4
+const farmersOfTheMoorPublishedMinorHandSize = 3
+const implementedFarmersOfTheMoorMinorIds: readonly string[] = []
+
+const resolveFarmersOfTheMoorMinorHandSize = (
+  playerCount: number,
+  allowIncomplete: boolean,
+): number => {
+  const available = implementedFarmersOfTheMoorMinorIds.length
+  const required = playerCount * farmersOfTheMoorMinorHandSize
+  if (available >= required) return farmersOfTheMoorMinorHandSize
+  if (!allowIncomplete) {
+    throw new Error(
+      `createInitialState: Farmers of the Moor minor pool has ${available} cards; need ${required} or enable allowIncompleteFarmersOfTheMoorMinorDeal`,
+    )
+  }
+  return Math.min(
+    farmersOfTheMoorMinorHandSize,
+    Math.floor(available / playerCount),
+  )
+}
+
+const dealFarmersOfTheMoorMinorHands = (
+  playerCount: number,
+  seed: number,
+  handSize: number,
+): string[][] => {
+  if (handSize <= 0) {
+    return Array.from({ length: playerCount }, () => [])
+  }
+  const shuffled = shuffleWithRng([...implementedFarmersOfTheMoorMinorIds], createRng(seed))
+  return Array.from({ length: playerCount }, (_, index) =>
+    shuffled.slice(index * handSize, index * handSize + handSize),
+  )
 }
 
 export const dealHands = (
@@ -168,6 +211,12 @@ const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; m
     pool.occ.forEach((id) => occupation.add(id))
     pool.minor.forEach((id) => minor.add(id))
   })
+  draft.stages?.forEach((stage) => {
+    Object.values(stage.pools).forEach((pool) => {
+      pool.occ.forEach((id) => occupation.add(id))
+      pool.minor.forEach((id) => minor.add(id))
+    })
+  })
   return { occupation, minor }
 }
 
@@ -213,6 +262,14 @@ const normalizeOrdinaryCardDecks = (
 
 export const normalizeState = (raw: GameState): GameState => {
   const seed = raw.gameSeed ?? createSeed()
+  const enableFarmersOfTheMoor = raw.enableFarmersOfTheMoor === true
+  const farmersOfTheMoor = enableFarmersOfTheMoor
+    ? normalizeFarmersOfTheMoorState(
+        raw.farmersOfTheMoor,
+        (raw.players ?? []).map((player) => player.id),
+        seed,
+      )
+    : null
   const roundActionOrder =
     raw.roundActionOrder?.length === 14
       ? raw.roundActionOrder
@@ -229,8 +286,22 @@ export const normalizeState = (raw: GameState): GameState => {
       takenBy: normalizeTakenBy(stored?.takenBy),
       blockedBy: normalizeBlockedBy(stored?.blockedBy),
       exclusiveUse: stored?.exclusiveUse,
+      maxOccupancy: stored?.maxOccupancy ?? space.maxOccupancy,
     }
   })
+  if (enableFarmersOfTheMoor) {
+    for (const moorSpace of createMoorActionSpaces(raw.players?.length ?? 2)) {
+      const stored = spaceMap.get(moorSpace.id)
+      if (stored) {
+        moorSpace.resources = stored.resources ?? moorSpace.resources
+        moorSpace.takenBy = normalizeTakenBy(stored.takenBy)
+        moorSpace.blockedBy = normalizeBlockedBy(stored.blockedBy)
+        moorSpace.exclusiveUse = stored.exclusiveUse
+        moorSpace.maxOccupancy = stored.maxOccupancy ?? moorSpace.maxOccupancy
+      }
+      actionSpaces.push(moorSpace)
+    }
+  }
   if (raw.enableThroughTheSeasons) {
     for (const seasonSpace of createSeasonActionSpaces(raw.players?.length)) {
       const stored = spaceMap.get(seasonSpace.id)
@@ -239,6 +310,7 @@ export const normalizeState = (raw: GameState): GameState => {
         seasonSpace.takenBy = normalizeTakenBy(stored.takenBy)
         seasonSpace.blockedBy = normalizeBlockedBy(stored.blockedBy)
         seasonSpace.exclusiveUse = stored.exclusiveUse
+        seasonSpace.maxOccupancy = stored.maxOccupancy ?? seasonSpace.maxOccupancy
       }
       actionSpaces.push(seasonSpace)
     }
@@ -252,6 +324,7 @@ export const normalizeState = (raw: GameState): GameState => {
       pas.takenBy = normalizeTakenBy(stored.takenBy)
       pas.blockedBy = normalizeBlockedBy(stored.blockedBy)
       pas.exclusiveUse = stored.exclusiveUse
+      pas.maxOccupancy = stored.maxOccupancy ?? pas.maxOccupancy
     }
     actionSpaces.push(pas)
   }
@@ -285,10 +358,17 @@ export const normalizeState = (raw: GameState): GameState => {
     const occupationPlayed = player.occupationPlayed ?? []
     const extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     const playedCards = player.playedCards ?? []
-    const normalized = {
+    const normalized: PlayerState = {
       ...player,
       color:
         player.color ?? defaultPlayerColors[index % defaultPlayerColors.length],
+      resources: enableFarmersOfTheMoor
+        ? {
+            ...player.resources,
+            fuel: player.resources?.fuel ?? 0,
+            horse: player.resources?.horse ?? 0,
+          }
+        : { ...player.resources },
       houseType: player.houseType ?? 'wood',
       improvements: improvements.length > 0 ? improvements : [],
       minorHand:
@@ -334,6 +414,24 @@ export const normalizeState = (raw: GameState): GameState => {
       parentCards: player.parentCards ?? { mother: null, father: null },
       supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
+    if (enableFarmersOfTheMoor) {
+      const startCardId = farmersOfTheMoor?.startCardByPlayerId[normalized.id]
+      const hasRawTerrain = Array.isArray(player.farmTerrain)
+      const rawTerrain = normalizeFarmTerrain(player.farmTerrain)
+      normalized.farmTerrain = hasRawTerrain
+        ? rawTerrain
+        : startCardId
+          ? getMoorStartCardTerrain(startCardId)
+          : []
+      normalized.sickWorkerIds = Array.isArray(player.sickWorkerIds)
+        ? player.sickWorkerIds.filter((id): id is string => typeof id === 'string')
+        : []
+    } else {
+      delete normalized.farmTerrain
+      delete normalized.sickWorkerIds
+      delete normalized.resources.fuel
+      delete normalized.resources.horse
+    }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
       const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
@@ -349,6 +447,7 @@ export const normalizeState = (raw: GameState): GameState => {
       normalized.roomTiles = normalized.roomTiles.slice(0, desiredRooms)
     }
     const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
+    normalized.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
     const allPositions = getAllTilePositions()
     const nextEmpty = () =>
       allPositions.find((pos) => !used.has(positionKey(pos)))
@@ -487,6 +586,8 @@ export const normalizeState = (raw: GameState): GameState => {
     throughTheSeasons: enableThroughTheSeasons
       ? normalizeThroughTheSeasonsState(raw.throughTheSeasons, seed)
       : null,
+    enableFarmersOfTheMoor,
+    farmersOfTheMoor,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
     nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
@@ -522,14 +623,47 @@ const createInitialPlayers = (
     playerNames = [],
     draftMode,
     enableCommunityDeck = false,
+    enableFarmersOfTheMoor = false,
+    allowIncompleteFarmersOfTheMoorMinorDeal = false,
   } = options
   const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
-  // In draft mode, leave hands empty — createInitialState will seed state.draft
-  // with per-player pools separately, and finalizeDraft will populate hands later.
-  const dealtHands =
-    draftMode === 'simultaneous'
-      ? { minorHands: [] as string[][], occupationHands: [] as string[][] }
-      : dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
+  let dealtHands = { minorHands: [] as string[][], occupationHands: [] as string[][] }
+  if (draftMode !== 'simultaneous') {
+    if (enableFarmersOfTheMoor) {
+      const ordinaryMinorDeal = dealHands(
+        count,
+        seed,
+        extraMinorIds,
+        extraOccupationIds,
+        deckIds,
+        farmersOfTheMoorPublishedMinorHandSize,
+        enableCommunityDeck,
+      )
+      const occupationDeal = dealHands(
+        count,
+        seed,
+        extraMinorIds,
+        extraOccupationIds,
+        deckIds,
+        7,
+        enableCommunityDeck,
+      )
+      const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
+        count,
+        allowIncompleteFarmersOfTheMoorMinorDeal,
+      )
+      const moorMinorHands = dealFarmersOfTheMoorMinorHands(count, seed, moorMinorHandSize)
+      dealtHands = {
+        occupationHands: occupationDeal.occupationHands,
+        minorHands: ordinaryMinorDeal.minorHands.map((hand, index) => [
+          ...(moorMinorHands[index] ?? []),
+          ...hand,
+        ]),
+      }
+    } else {
+      dealtHands = dealHands(count, seed, extraMinorIds, extraOccupationIds, deckIds, 7, enableCommunityDeck)
+    }
+  }
   const base: Array<{
     id: PlayerState['id']
     name: string
@@ -548,7 +682,9 @@ const createInitialPlayers = (
       id: info.id,
       name: playerNames[index] ?? info.name,
       color: info.color,
-      resources: { ...emptyResources, food: 2 },
+      resources: enableFarmersOfTheMoor
+        ? { ...emptyResources, food: 2, fuel: 0, horse: 0 }
+        : { ...emptyResources, food: 2 },
       workers: [
         { id: '1', isActive: true,  isNewborn: false },
         { id: '2', isActive: true,  isNewborn: false },
@@ -606,6 +742,18 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  const enableFarmersOfTheMoor = options.enableFarmersOfTheMoor === true
+  const farmersOfTheMoor = enableFarmersOfTheMoor
+    ? createFarmersOfTheMoorState(players.map((player) => player.id), gameSeed)
+    : null
+  if (enableFarmersOfTheMoor && farmersOfTheMoor) {
+    for (const player of players) {
+      player.farmTerrain = getMoorStartCardTerrain(farmersOfTheMoor.startCardByPlayerId[player.id]!)
+      player.sickWorkerIds = []
+      player.resources.fuel = player.resources.fuel ?? 0
+      player.resources.horse = player.resources.horse ?? 0
+    }
+  }
   const ordinaryCardDeckSeed =
     typeof options.ordinaryCardDeckSeed === 'number' && Number.isFinite(options.ordinaryCardDeckSeed)
       ? Math.floor(options.ordinaryCardDeckSeed)
@@ -626,24 +774,88 @@ export const createInitialState = (
       )
     }
     const playerCount = players.length
-    const draftDeal = dealHands(
-      playerCount,
-      gameSeed,
-      options.extraMinorIds ?? [],
-      options.extraOccupationIds ?? [],
-      options.deckIds,
-      poolSize,
-      options.enableCommunityDeck ?? false,
-    )
     const seatOrder = players.map((p) => p.id)
-    const hands: Record<string, DraftPool> = {}
-    seatOrder.forEach((pid, i) => {
-      hands[pid] = {
-        occ: draftDeal.occupationHands[i] ?? [],
-        minor: draftDeal.minorHands[i] ?? [],
+    if (enableFarmersOfTheMoor) {
+      const occupationDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        7,
+        options.enableCommunityDeck ?? false,
+      )
+      const publishedMinorDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        farmersOfTheMoorPublishedMinorHandSize,
+        options.enableCommunityDeck ?? false,
+      )
+      const moorMinorHandSize = resolveFarmersOfTheMoorMinorHandSize(
+        playerCount,
+        options.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+      )
+      const moorMinorHands = dealFarmersOfTheMoorMinorHands(playerCount, gameSeed, moorMinorHandSize)
+      const occupationPools: Record<string, DraftPool> = {}
+      const publishedMinorPools: Record<string, DraftPool> = {}
+      const moorMinorPools: Record<string, DraftPool> = {}
+      seatOrder.forEach((pid, i) => {
+        occupationPools[pid] = {
+          occ: occupationDeal.occupationHands[i] ?? [],
+          minor: [],
+        }
+        moorMinorPools[pid] = {
+          occ: [],
+          minor: moorMinorHands[i] ?? [],
+        }
+        publishedMinorPools[pid] = {
+          occ: [],
+          minor: publishedMinorDeal.minorHands[i] ?? [],
+        }
+      })
+      const stages: DraftStageSpec[] = [{
+        kind: 'occupation',
+        poolSize: 7,
+        totalRounds: 7,
+        pools: occupationPools,
+      }]
+      if (moorMinorHandSize > 0) {
+        stages.push({
+          kind: 'farmersOfTheMoorMinor',
+          poolSize: moorMinorHandSize,
+          totalRounds: moorMinorHandSize,
+          pools: moorMinorPools,
+        })
       }
-    })
-    draft = initDraftState(seatOrder, hands, poolSize)
+      stages.push({
+        kind: 'publishedMinor',
+        poolSize: farmersOfTheMoorPublishedMinorHandSize,
+        totalRounds: farmersOfTheMoorPublishedMinorHandSize,
+        pools: publishedMinorPools,
+      })
+      draft = initStagedDraftState(seatOrder, stages)
+    } else {
+      const draftDeal = dealHands(
+        playerCount,
+        gameSeed,
+        options.extraMinorIds ?? [],
+        options.extraOccupationIds ?? [],
+        options.deckIds,
+        poolSize,
+        options.enableCommunityDeck ?? false,
+      )
+      const hands: Record<string, DraftPool> = {}
+      seatOrder.forEach((pid, i) => {
+        hands[pid] = {
+          occ: draftDeal.occupationHands[i] ?? [],
+          minor: draftDeal.minorHands[i] ?? [],
+        }
+      })
+      draft = initDraftState(seatOrder, hands, poolSize)
+    }
     ordinaryCardDecks = createFallbackOrdinaryCardDecks(
       players,
       ordinaryCardDeckSeed,
@@ -672,7 +884,7 @@ export const createInitialState = (
     visibility: 'public',
   }]
   const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
-  const majorImprovementSupply = createMajorImprovementSupply(players.length)
+  const majorImprovementSupply = createMajorImprovementSupply(players.length, { enableFarmersOfTheMoor })
   const initialState: GameState = {
     round: 1,
     phase,
@@ -683,6 +895,7 @@ export const createInitialState = (
     players,
     actionSpaces: [
       ...createActionSpaces(players.length),
+      ...(enableFarmersOfTheMoor ? createMoorActionSpaces(players.length) : []),
       ...(options.enableThroughTheSeasons ? createSeasonActionSpaces(players.length) : []),
     ],
     log: eventsToLogEntries(initialEvents, { playerNames }),
@@ -713,6 +926,8 @@ export const createInitialState = (
     throughTheSeasons: options.enableThroughTheSeasons
       ? createThroughTheSeasonsState(gameSeed)
       : null,
+    enableFarmersOfTheMoor,
+    farmersOfTheMoor,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: {},
     nextOrdinaryCardDrawChoiceSeq: 1,

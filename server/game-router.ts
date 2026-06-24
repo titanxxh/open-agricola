@@ -13,6 +13,7 @@ import {
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/contract/types.ts'
+import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
@@ -268,6 +269,29 @@ export const handleGameRoute = async (
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.takeAction(body.playerIndex!, body.spaceId!))
+    sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/special-action') {
+    const body = JSON.parse(await readBody(req)) as {
+      playerIndex?: number
+      cardId?: string
+      actionId?: MoorSpecialActionId
+      payload?: { tile?: { row: number; col: number } }
+    }
+    if (
+      typeof body.playerIndex !== 'number' ||
+      typeof body.cardId !== 'string' ||
+      typeof body.actionId !== 'string'
+    ) {
+      sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
+    const { resp, result } = callAndRespond(req, s =>
+      s.takeSpecialAction(body.playerIndex!, body.cardId!, body.actionId!, body.payload),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -711,11 +735,12 @@ export const handleGameRoute = async (
       playerId?: string
       pick?: { occCardId?: unknown; minorCardId?: unknown }
     }
+    const occCardId = typeof body.pick?.occCardId === 'string' ? body.pick.occCardId : undefined
+    const minorCardId = typeof body.pick?.minorCardId === 'string' ? body.pick.minorCardId : undefined
     if (
       typeof body.playerId !== 'string' ||
       !body.pick ||
-      typeof body.pick.occCardId !== 'string' ||
-      typeof body.pick.minorCardId !== 'string'
+      (!occCardId && !minorCardId)
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
@@ -728,7 +753,7 @@ export const handleGameRoute = async (
         return true
       }
     }
-    const pick = { occCardId: body.pick.occCardId, minorCardId: body.pick.minorCardId }
+    const pick = { occCardId, minorCardId }
     const { resp, result } = callAndRespond(req, s => s.submitDraftPick(body.playerId!, pick))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true

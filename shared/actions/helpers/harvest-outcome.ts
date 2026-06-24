@@ -1,7 +1,8 @@
 import type { GameState, Resource } from '../../contract/types'
+import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 
 export type HarvestCropType = 'grain' | 'vegetable'
-export type NewbornAnimalType = 'sheep' | 'boar' | 'cattle'
+export type NewbornAnimalType = AnimalKey
 
 export type HarvestOutcome = {
   reapedCrops: Partial<Record<HarvestCropType, number>>
@@ -11,7 +12,6 @@ export type HarvestOutcome = {
 }
 
 const CROP_TYPES: HarvestCropType[] = ['grain', 'vegetable']
-const ANIMAL_TYPES: NewbornAnimalType[] = ['sheep', 'boar', 'cattle']
 
 export const getHarvestOutcome = (state: GameState, playerId: string): HarvestOutcome => {
   const reapedCrops: Partial<Record<HarvestCropType, number>> = {}
@@ -25,7 +25,8 @@ export const getHarvestOutcome = (state: GameState, playerId: string): HarvestOu
 
   const breed = state.harvestBreedSummary?.[playerId]
   const newbornAnimals: Partial<Pick<Resource, NewbornAnimalType>> = {}
-  for (const animal of ANIMAL_TYPES) {
+  const animalTypes = animalKeysForState(state)
+  for (const animal of animalTypes) {
     const amount = breed?.resources?.[animal] ?? 0
     if (amount > 0) newbornAnimals[animal] = amount
   }
@@ -34,6 +35,6 @@ export const getHarvestOutcome = (state: GameState, playerId: string): HarvestOu
     reapedCrops,
     harvestedCropTypes: CROP_TYPES.filter((crop) => (reapedCrops[crop] ?? 0) > 0),
     newbornAnimals,
-    newbornAnimalTypes: ANIMAL_TYPES.filter((animal) => (newbornAnimals[animal] ?? 0) > 0),
+    newbornAnimalTypes: animalTypes.filter((animal) => (newbornAnimals[animal] ?? 0) > 0),
   }
 }

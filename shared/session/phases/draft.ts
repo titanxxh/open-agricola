@@ -42,8 +42,8 @@ export const submitDraftPick = (
   const player = core.state.players.find((p) => p.id === playerId)
   if (player && core.state.draft) {
     const draftTurn = core.state.draft.round
-    recordDraftPick(player, pick.occCardId, draftTurn)
-    recordDraftPick(player, pick.minorCardId, draftTurn)
+    if (pick.occCardId) recordDraftPick(player, pick.occCardId, draftTurn)
+    if (pick.minorCardId) recordDraftPick(player, pick.minorCardId, draftTurn)
   }
   if (!core.state.draft) return core.emitResponse()
   const advance = tryAdvanceRound(core.state.draft)

@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { animalKeysForState } from '../../contract/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A135_AnimalReeve'
@@ -24,12 +25,7 @@ const cardImpl = {
   },
   computeSharedPostScore: (state) => {
     return state.players.flatMap((player) => {
-      const sets = Math.min(
-        player.resources.sheep,
-        player.resources.boar,
-        player.resources.cattle,
-        4,
-      )
+      const sets = Math.min(...animalKeysForState(state).map((animal) => player.resources[animal] ?? 0), 4)
       const score = SETS_VP_MAP[sets] ?? 0
       if (score <= 0) return []
       return [{ playerId: player.id, score }]

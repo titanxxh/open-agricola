@@ -105,6 +105,49 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.throughTheSeasons).not.toBeNull()
   })
 
+  it('forwards enableFarmersOfTheMoor into the created room session', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    } as never)
+
+    expect(ctx.currentRoom!.session.state.enableFarmersOfTheMoor).toBe(true)
+    expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
+  })
+
+  it('rejects enableFarmersOfTheMoor by default while its minor pool is incomplete', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableFarmersOfTheMoor: true } as never)
+
+    expect(ctx.currentRoom).toBeNull()
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      error: expect.stringMatching(/Farmers of the Moor minor pool/),
+    }))
+  })
+
+  it('preserves enableFarmersOfTheMoor when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    } as never)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.enableFarmersOfTheMoor).toBe(true)
+    expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
+  })
+
   it('preserves six seats when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

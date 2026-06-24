@@ -28,6 +28,10 @@ _Avoid_: 房间连接、WebSocket version、React state
 创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
 _Avoid_: Card Source、UI toggle、player count layout
 
+**Farmers of the Moor**:
+Agricola 的可选扩展名称。讨论该扩展时使用完整名称，不缩写为 Farmers；只有代码标识符可按既有命名使用 `FarmersOfTheMoor`。
+_Avoid_: Farmers
+
 **PlayerState**:
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
+import type { AnimalKey } from '../../../shared/contract/animals'
 import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
@@ -36,6 +37,89 @@ type BorrowedFenceSourceControls = {
   selectedPlayerId: string | null
   onSelect: (playerId: string) => void
   hasMissingSources: boolean
+}
+
+type HeatingPending = {
+  playerName: string
+  required: number
+  maxFuelPayable: number
+  maxWoodConvertibleToFuel: number
+}
+
+const emptyAnimalCounts: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0, horse: 0 }
+
+const clampWhole = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)))
+
+const HeatingPanel = ({
+  locale,
+  pending,
+  isInteractive,
+  onConfirm,
+}: {
+  locale: Locale
+  pending: HeatingPending
+  isInteractive: boolean
+  onConfirm: (payload: { fuelUsed: number; woodToFuel: number }) => void
+}) => {
+  const [woodToFuel, setWoodToFuel] = useState(0)
+  const [fuelUsed, setFuelUsed] = useState(Math.min(pending.required, pending.maxFuelPayable))
+  const maxWood = pending.maxWoodConvertibleToFuel
+  const maxFuel = Math.min(pending.required, pending.maxFuelPayable + woodToFuel)
+  const commit = () => {
+    onConfirm({
+      woodToFuel: clampWhole(woodToFuel, 0, maxWood),
+      fuelUsed: clampWhole(fuelUsed, 0, maxFuel),
+    })
+  }
+  return (
+    <>
+      <div className="interaction-title">
+        {t(locale, 'ui.harvestHeatingTitle')}
+      </div>
+      <div className="interaction-subtitle">
+        {t(locale, 'ui.harvestHeatingSubtitle', {
+          player: pending.playerName,
+          count: pending.required,
+        })}
+      </div>
+      <div className="interaction-resource-quantity-panel">
+        <div className="resource-quantity-grid">
+          <label className="resource-quantity-row">
+            <span className="resource-quantity-label">
+              {t(locale, 'ui.harvestHeatingWoodToFuel')}
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={maxWood}
+              value={woodToFuel}
+              disabled={!isInteractive || maxWood <= 0}
+              onChange={(event) => setWoodToFuel(clampWhole(Number(event.target.value), 0, maxWood))}
+            />
+          </label>
+          <label className="resource-quantity-row">
+            <span className="resource-quantity-label">
+              {t(locale, 'ui.harvestHeatingFuelUsed')}
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={maxFuel}
+              value={fuelUsed}
+              disabled={!isInteractive || maxFuel <= 0}
+              onChange={(event) => setFuelUsed(clampWhole(Number(event.target.value), 0, maxFuel))}
+            />
+          </label>
+        </div>
+        <div className="interaction-actions resource-quantity-actions">
+          <button onClick={commit} disabled={!isInteractive}>
+            {t(locale, 'ui.harvestHeatingConfirm')}
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 const isResourceExchangeLabelParams = (
@@ -430,6 +514,8 @@ type Props = {
   confirmPlayerSwitch: () => void
   harvestFeedPlayerName: string | null
   confirmHarvestFeed: () => void
+  heatingPending?: HeatingPending | null
+  confirmHeating?: (payload: { fuelUsed: number; woodToFuel: number }) => void
   onUndo: () => void
   onUndoAction: () => void
   canUndoStep: boolean
@@ -444,7 +530,7 @@ type Props = {
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
   borrowedFenceSources?: BorrowedFenceSourceControls
   animalReorg?: AnimalReorgState | null
-  reorgRemaining?: { sheep: number; boar: number; cattle: number } | null
+  reorgRemaining?: Record<AnimalKey, number> | null
   hasReorgOverflow?: boolean
   confirmAnimalReorg?: () => void
   cancelAnimalDiscardPrompt?: () => void
@@ -501,6 +587,8 @@ export const InteractionBar = ({
   confirmPlayerSwitch,
   harvestFeedPlayerName,
   confirmHarvestFeed,
+  heatingPending = null,
+  confirmHeating = () => {},
   onUndo,
   onUndoAction,
   canUndoStep,
@@ -549,6 +637,7 @@ export const InteractionBar = ({
     pendingAnimalReorg ||
     resourceBatchExchangeSelect ||
     resourceQuantitySelect ||
+    heatingPending ||
     harvestFeedPlayerName ||
     (pendingEngineBlocked && isInteractive) ||
     (pendingChoice && isInteractive) ||
@@ -623,7 +712,7 @@ export const InteractionBar = ({
                   <span>
                     {formatAnimalCounts(
                       locale,
-                      reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                      reorgRemaining ?? emptyAnimalCounts,
                     )}
                   </span>
                 </div>
@@ -636,7 +725,7 @@ export const InteractionBar = ({
                       {t(locale, 'ui.reorgDiscardPrompt', {
                         animals: formatAnimalCounts(
                           locale,
-                          reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                          reorgRemaining ?? emptyAnimalCounts,
                         ),
                       })}
                     </div>
@@ -676,6 +765,14 @@ export const InteractionBar = ({
               requireAtLeastOne={resourceQuantitySelect.requireAtLeastOne}
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
+            />
+          ) : heatingPending ? (
+            <HeatingPanel
+              key={`${heatingPending.playerName}:${heatingPending.required}:${heatingPending.maxFuelPayable}:${heatingPending.maxWoodConvertibleToFuel}`}
+              locale={locale}
+              pending={heatingPending}
+              isInteractive={isInteractive}
+              onConfirm={confirmHeating}
             />
           ) : harvestFeedPlayerName ? (
             <>

@@ -76,6 +76,15 @@ export type CardDefinition = {
   blocksHouseAnimalZones?: boolean
   waresSalesmanGains?: readonly Partial<Resource>[]
   mustBePlayedViaMinorAction?: boolean
+  requiresFarmersOfTheMoor?: boolean
+  heatingRoomDiscount?: number
+  heatingFuelCap?: number
+  moorSpecialActionBonuses?: readonly {
+    actionId: 'cut-peat' | 'fell-trees'
+    resource: keyof Resource
+    amount: number
+    horseAmount?: number
+  }[]
   /**
    * BGA `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
    * Shed enforces "this card can only be played via a Major Improvement

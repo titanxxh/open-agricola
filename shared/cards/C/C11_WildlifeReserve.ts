@@ -26,6 +26,10 @@ const cardImpl = {
       const counters: Record<string, number> = { sheep: 0, boar: 0, cattle: 0 }
       const invalid: typeof meeples = []
       for (const meeple of meeples) {
+        if (!(meeple.type in counters)) {
+          invalid.push(meeple)
+          continue
+        }
         counters[meeple.type] = (counters[meeple.type] ?? 0) + 1
         if (counters[meeple.type]! > 1) invalid.push(meeple)
       }

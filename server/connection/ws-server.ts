@@ -59,6 +59,7 @@ const ensureFixedDevRooms = (
         status: 'playing',
         enableParentCards: session.state.enableParentCards,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
+        enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
       })
     }
   }

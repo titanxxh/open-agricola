@@ -24,6 +24,8 @@ export type Room = {
   customCardDbIds?: string[]
   enableParentCards?: boolean
   enableThroughTheSeasons?: boolean
+  enableFarmersOfTheMoor?: boolean
+  allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
 }
 
 export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
@@ -41,6 +43,8 @@ export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.ha
 export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
   enableThroughTheSeasons?: boolean
+  enableFarmersOfTheMoor?: boolean
+  allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   draftMode?: 'simultaneous'
   draftPoolSize?: number
 }
@@ -54,6 +58,15 @@ export const parseFixedDevRoomStartupOptions = (
   }
   if (env.DEV_ENABLE_THROUGH_THE_SEASONS === 'true' || env.DEV_ENABLE_THROUGH_THE_SEASONS === '1') {
     options.enableThroughTheSeasons = true
+  }
+  if (env.DEV_ENABLE_FARMERS_OF_THE_MOOR === 'true' || env.DEV_ENABLE_FARMERS_OF_THE_MOOR === '1') {
+    options.enableFarmersOfTheMoor = true
+  }
+  if (
+    env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL === 'true' ||
+    env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL === '1'
+  ) {
+    options.allowIncompleteFarmersOfTheMoorMinorDeal = true
   }
   if (env.DEV_DRAFT_MODE === 'simultaneous') {
     const rawPoolSize = Number(env.DEV_DRAFT_POOL_SIZE)
@@ -72,6 +85,8 @@ export const buildFixedDevRoomInitialStateOptions = (
   playerCount,
   ...(startupOptions.enableParentCards ? { enableParentCards: true } : {}),
   ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
+  ...(startupOptions.enableFarmersOfTheMoor ? { enableFarmersOfTheMoor: true } : {}),
+  ...(startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal ? { allowIncompleteFarmersOfTheMoorMinorDeal: true } : {}),
   ...(startupOptions.draftMode === 'simultaneous'
     ? {
         draftMode: 'simultaneous' as const,
@@ -95,6 +110,8 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
+  enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
+  allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
   status: getRoomStatus(room),
   players: room.players
     .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
@@ -192,6 +209,8 @@ const createSessionFromSnapshot = (
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
+      enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
+      allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
     })
   }
   try {
@@ -205,6 +224,8 @@ const createSessionFromSnapshot = (
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
+      enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
+      allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
     })
   }
 }
@@ -223,4 +244,6 @@ export const snapshotToRoom = (
   customCardDbIds: snapshot.meta.customCardDbIds,
   enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
   enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
+  enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
+  allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
 })

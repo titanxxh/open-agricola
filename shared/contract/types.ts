@@ -3,6 +3,8 @@ import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { ThroughTheSeasonsState } from '../seasons/types'
+import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
+import type { AnimalKey } from './animals'
 
 export type Resource = {
   wood: number
@@ -15,6 +17,8 @@ export type Resource = {
   sheep: number
   boar: number
   cattle: number
+  horse?: number
+  fuel?: number
   begging: number
 }
 
@@ -292,7 +296,9 @@ export type PlayerState = {
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
+  farmTerrain?: FarmTerrainTile[]
   workers: Worker[]
+  sickWorkerIds?: string[]
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: Field[]
@@ -305,9 +311,9 @@ export type PlayerState = {
   occupationPlayed: string[]
   extraOccupationsFromCards: string[]
   playedCards: string[]
-  houseAnimalType: 'sheep' | 'boar' | 'cattle' | null
+  houseAnimalType: AnimalKey | null
   houseAnimalCount: number
-  stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null>
+  stableAnimals: Record<string, AnimalKey | null>
   pastures: Pasture[]
   fenceSegments: FenceSegment[]
   majorEffects: MajorEffectState
@@ -344,7 +350,7 @@ export type Pasture = {
   size: number
   tiles: FarmTilePosition[]
   stables: number
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
 }
 
@@ -551,6 +557,8 @@ export type GameState = {
   enableParentCards: boolean
   enableThroughTheSeasons: boolean
   throughTheSeasons: ThroughTheSeasonsState | null
+  enableFarmersOfTheMoor?: boolean
+  farmersOfTheMoor?: FarmersOfTheMoorState | null
   ordinaryCardDecks: OrdinaryCardDecks
   ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
   nextOrdinaryCardDrawChoiceSeq: number
@@ -757,6 +765,7 @@ export type ActionDefinition = {
   gainPerRound: Partial<Resource>
   players?: number[]
   linkedGroupId?: string
+  maxOccupancy?: number | null
   strictCanExecute?: boolean
   /** Mark as an anytime action that can interrupt the current flow. */
   anytime?: boolean
@@ -840,6 +849,7 @@ export type FeedQueueEntry = {
   index: number
   remaining: number
   foodUsed: number
+  needsFeed?: boolean
 }
 
 export type SubFlowKind =
@@ -848,6 +858,7 @@ export type SubFlowKind =
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'feed'
+  | 'heating'
   | 'farm-select'
   | 'selection'
   | 'card-draft'
@@ -867,6 +878,14 @@ export type InteractionRequest =
       kind: 'feed'
       remaining: number
       foodUsed: number
+      feedQueue?: FeedQueueEntry[]
+    }
+  | {
+      kind: 'heating'
+      playerId: string
+      required: number
+      maxFuelPayable: number
+      maxWoodConvertibleToFuel: number
       feedQueue?: FeedQueueEntry[]
     }
   | {
@@ -978,10 +997,10 @@ export type InteractionAnimalReorgZone = {
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   cardId?: string
-  animalType: 'sheep' | 'boar' | 'cattle' | null
+  animalType: AnimalKey | null
   animalCount: number
-  animalCounts?: Partial<Record<'sheep' | 'boar' | 'cattle', number>>
-  allowedAnimalType?: 'sheep' | 'boar' | 'cattle' | null
+  animalCounts?: Partial<Record<AnimalKey, number>>
+  allowedAnimalType?: AnimalKey | null
   capacity: number
 }
 

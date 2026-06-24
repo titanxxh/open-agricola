@@ -478,6 +478,23 @@
 .action-space-attachments .res-icon {
   font-size: 18px;
 }
+.future-meeple-holder {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 3px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #1f2937;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.future-meeple-holder .res-icon {
+  font-size: 18px;
+}
 .action-exclusive-use {
   position: absolute;
   top: 4px;
@@ -855,6 +872,55 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.special-actions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.special-actions-panel__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2f3a2f;
+}
+.special-actions-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+.special-action-card {
+  min-height: 56px;
+  border: 1px solid #b7c3a8;
+  border-radius: 8px;
+  background: #f6fbf0;
+  color: #1f2d20;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.special-action-card:hover:not(:disabled) {
+  border-color: #5f7d52;
+  background: #eef7e5;
+}
+.special-action-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.special-action-card.selected {
+  border-color: #245e47;
+  box-shadow: inset 0 0 0 1px #245e47;
+}
+.special-action-card__name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.special-action-card__status {
+  font-size: 11px;
+  color: #516050;
 }
 .game-layout__center {
   min-width: 0;
@@ -2791,58 +2857,31 @@
   color: #fff;
 }
 /* ══════════ FARM GRID ══════════ */
-/* Outer board reads as a matte wooden tray instead of bright grass — frees the
- * outer monthly background to own the green palette and lets the empty plots
- * sit on a neutral surface. */
 .farm-grid {
   display: grid;
-  /* Size tiles by the .center container width, not the viewport.
-     Otherwise, in the 3-column board layout the .center column is
-     only ~1/3 of the viewport and the vw-sized grid overflows. */
-  --tile: clamp(40px, min(8vw, 14cqw), 96px);
-  --fence: clamp(6px, min(1.2vw, 2.1cqw), 14px);
+  --tile: clamp(46px, calc(100cqw / 5.981818), 110px);
+  --fence: calc(var(--tile) * 18 / 110);
   grid-template-columns: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence) var(--tile) var(--fence)
     var(--tile) var(--fence);
   grid-template-rows: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence);
-  background-color: #8a623d;
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      rgba(60, 36, 18, 0.18) 0,
-      rgba(60, 36, 18, 0.18) 1px,
-      transparent 1px,
-      transparent 14px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      rgba(255, 240, 210, 0.05) 0,
-      rgba(255, 240, 210, 0.05) 1px,
-      transparent 1px,
-      transparent 6px
-    ),
-    linear-gradient(180deg, #936b44 0%, #7a5230 100%);
-  padding: 12px;
-  border-radius: 14px;
+  background: #8dcc4a;
+  padding: 0;
+  border: 1px dashed #7b776e;
+  border-radius: 10px;
   margin-bottom: 16px;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 240, 210, 0.18),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.18);
   width: 100%;
-  justify-content: center;
+  max-width: calc(var(--tile) * 5 + var(--fence) * 6 + 2px);
+  justify-content: stretch;
+  box-sizing: border-box;
+  overflow: visible;
 }
 .farm-cell {
   width: 100%;
   height: 100%;
 }
 .farm-tile {
-  background: #f0dcb0;
-  border-radius: 8px;
-  box-shadow:
-    inset 0 0 0 1px rgba(120, 84, 44, 0.35),
-    inset 0 1px 0 rgba(255, 248, 224, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2850,24 +2889,97 @@
   font-size: 12px;
   font-weight: 700;
   color: #5a3a1f;
-  padding: 4px;
+  padding: 0;
   position: relative;
+  overflow: visible;
 }
 .farm-tile.selectable {
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px rgba(47, 133, 90, 0.35);
+  box-shadow: inset 0 0 0 max(2px, calc(var(--tile) * 0.025)) rgba(255, 0, 0, 0.35);
 }
 .farm-tile.selected {
-  background: #dff1d2;
-  box-shadow: inset 0 0 0 2px #2f855a;
+  box-shadow: inset 0 0 0 max(2px, calc(var(--tile) * 0.03)) rgba(0, 180, 0, 0.65);
 }
 .farm-tile.stable-selectable {
-  box-shadow: inset 0 0 0 2px rgba(180, 116, 39, 0.45);
+  box-shadow: inset 0 0 0 max(2px, calc(var(--tile) * 0.025)) rgba(180, 116, 39, 0.55);
 }
 .farm-tile.stable-selected {
-  background: #f6ead3;
-  box-shadow: inset 0 0 0 2px #b47427;
+  box-shadow: inset 0 0 0 max(2px, calc(var(--tile) * 0.03)) #b47427;
 }
+.farm-node-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.farm-node-background .empty-node,
+.farm-node-background .meeple-field,
+.farm-node-background .meeple-roomWood,
+.farm-node-background .meeple-roomClay,
+.farm-node-background .meeple-roomStone {
+  width: 100%;
+  height: 100%;
+}
+.farm-node-background .empty-node {
+  background-image: url('/bga-img/empty_slots.png');
+  background-repeat: no-repeat;
+  background-size: 700% 100%;
+}
+.empty-node-0 { background-position-x: 0%; }
+.empty-node-1 { background-position-x: 16.6667%; }
+.empty-node-2 { background-position-x: 33.3333%; }
+.empty-node-3 { background-position-x: 50%; }
+.empty-node-4 { background-position-x: 66.6667%; }
+.empty-node-5 { background-position-x: 83.3333%; }
+.empty-node-6 { background-position-x: 100%; }
+.farm-node-background .meeple-field {
+  background-image: url('/bga-img/field.png');
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+.farm-node-background .meeple-roomWood,
+.farm-node-background .meeple-roomClay,
+.farm-node-background .meeple-roomStone {
+  position: relative;
+  background-image: url('/bga-img/rooms.png');
+  background-repeat: no-repeat;
+  background-size: 300% 100%;
+}
+.farm-node-background .meeple-roomClay {
+  background-position-x: 50%;
+}
+.farm-node-background .meeple-roomStone {
+  background-position-x: 100%;
+}
+.farm-node-background .meeple-roomWood::after,
+.farm-node-background .meeple-roomClay::after,
+.farm-node-background .meeple-roomStone::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background-image: url('/bga-img/room_layouts.png');
+  background-repeat: no-repeat;
+  background-size: 400% 400%;
+}
+.room-layout-0::after { background-position: 0% 0%; }
+.room-layout-1::after { background-position: 33.3333% 0%; }
+.room-layout-2::after { background-position: 66.6667% 0%; }
+.room-layout-3::after { background-position: 100% 0%; }
+.room-layout-4::after { background-position: 0% 33.3333%; }
+.room-layout-5::after { background-position: 33.3333% 33.3333%; }
+.room-layout-6::after { background-position: 66.6667% 33.3333%; }
+.room-layout-7::after { background-position: 100% 33.3333%; }
+.room-layout-8::after { background-position: 0% 66.6667%; }
+.room-layout-9::after { background-position: 33.3333% 66.6667%; }
+.room-layout-10::after { background-position: 66.6667% 66.6667%; }
+.room-layout-11::after { background-position: 100% 66.6667%; }
+.room-layout-12::after { background-position: 0% 100%; }
+.room-layout-13::after { background-position: 33.3333% 100%; }
+.room-layout-14::after { background-position: 66.6667% 100%; }
+.room-layout-15::after { background-position: 100% 100%; }
 /* B85 FarmHand: selection frame and built stable icon rendered at the geometric
  * center of the 2x2 field (the central `post` cell). The post cell itself is
  * only fence×fence, so the overlay overflows into a 0.7×tile rounded-square hit
@@ -2934,20 +3046,28 @@
   }
 }
 .farm-tile.room {
-  background: #d9c2a3;
+  background: transparent;
 }
 .farm-tile.field {
-  background: #6faa4a;
+  background: transparent;
   color: #203912;
 }
+.farm-tile.farm-terrain-forest {
+  background: #3f7a47;
+  color: #f5ffe8;
+}
+.farm-tile.farm-terrain-moor {
+  background: #765f83;
+  color: #fff2dc;
+}
 .farm-tile.stable {
-  background: #f0d8a8;
+  background: transparent;
   color: #6a4a1f;
 }
 .stable-barn-icon {
   position: absolute;
-  top: calc(var(--tile, 60px) * 0.06);
-  left: calc(var(--tile, 60px) * 0.06);
+  top: calc(var(--tile, 60px) * 0.04);
+  right: calc(var(--tile, 60px) * 0.04);
   pointer-events: none;
   z-index: 1;
 }
@@ -3182,26 +3302,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
 }
-.farm-fence-h::before {
-  content: '';
-  display: block;
-  height: 4px;
-  width: 100%;
-  background: #cfae7c;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(120, 80, 45, 0.4);
-  opacity: 0;
-}
+.farm-fence-h::before,
 .farm-fence-v::before {
   content: '';
   display: block;
-  width: 4px;
-  height: 100%;
-  background: #cfae7c;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(120, 80, 45, 0.4);
+  background: transparent;
+  border: 1px solid #535050;
+  border-radius: 0;
+  box-shadow: 2px 2px 6px -2px black;
+  box-sizing: border-box;
   opacity: 0;
+}
+.farm-fence-h::before {
+  width: 100%;
+  height: calc(var(--tile, 60px) * 12 / 110);
+}
+.farm-fence-v::before {
+  width: calc(var(--tile, 60px) * 12 / 110);
+  height: 100%;
 }
 .farm-fence-h.active::before,
 .farm-fence-v.active::before {
@@ -3209,7 +3329,10 @@
 }
 .farm-fence-h.selected::before,
 .farm-fence-v.selected::before {
-  background: #ffd27b;
+  filter: brightness(1.18) saturate(1.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 231, 120, 0.85),
+    2px 2px 6px -2px black;
 }
 .farm-fence-h.selectable,
 .farm-fence-v.selectable {
@@ -3220,41 +3343,41 @@
 .farm-fence-v.selected {
   background: rgba(255, 255, 255, 0.35);
 }
-.farm-fence-h.active[data-player-color="red"]::before,
-.farm-fence-v.active[data-player-color="red"]::before,
-.farm-fence-h.selected[data-player-color="red"]::before,
-.farm-fence-v.selected[data-player-color="red"]::before {
-  background: var(--color-danger);
+.farm-fence-h.active[data-color="ff0000"]::before,
+.farm-fence-v.active[data-color="ff0000"]::before,
+.farm-fence-h.selected[data-color="ff0000"]::before,
+.farm-fence-v.selected[data-color="ff0000"]::before {
+  background: #ee0808;
 }
-.farm-fence-h.active[data-player-color="yellow"]::before,
-.farm-fence-v.active[data-player-color="yellow"]::before,
-.farm-fence-h.selected[data-player-color="yellow"]::before,
-.farm-fence-v.selected[data-player-color="yellow"]::before {
-  background: #d6b332;
+.farm-fence-h.active[data-color="ffa500"]::before,
+.farm-fence-v.active[data-color="ffa500"]::before,
+.farm-fence-h.selected[data-color="ffa500"]::before,
+.farm-fence-v.selected[data-color="ffa500"]::before {
+  background: #d6a006;
 }
-.farm-fence-h.active[data-player-color="blue"]::before,
-.farm-fence-v.active[data-player-color="blue"]::before,
-.farm-fence-h.selected[data-player-color="blue"]::before,
-.farm-fence-v.selected[data-player-color="blue"]::before {
-  background: #3f6ee8;
+.farm-fence-h.active[data-color="72c3b1"]::before,
+.farm-fence-v.active[data-color="72c3b1"]::before,
+.farm-fence-h.selected[data-color="72c3b1"]::before,
+.farm-fence-v.selected[data-color="72c3b1"]::before {
+  background: #2eb9b9;
 }
-.farm-fence-h.active[data-player-color="black"]::before,
-.farm-fence-v.active[data-player-color="black"]::before,
-.farm-fence-h.selected[data-player-color="black"]::before,
-.farm-fence-v.selected[data-player-color="black"]::before {
-  background: #1f2937;
+.farm-fence-h.active[data-color="7b7b7b"]::before,
+.farm-fence-v.active[data-color="7b7b7b"]::before,
+.farm-fence-h.selected[data-color="7b7b7b"]::before,
+.farm-fence-v.selected[data-color="7b7b7b"]::before {
+  background: #959393;
 }
-.farm-fence-h.active[data-player-color="green"]::before,
-.farm-fence-v.active[data-player-color="green"]::before,
-.farm-fence-h.selected[data-player-color="green"]::before,
-.farm-fence-v.selected[data-player-color="green"]::before {
-  background: #168a4a;
+.farm-fence-h.active[data-color="008000"]::before,
+.farm-fence-v.active[data-color="008000"]::before,
+.farm-fence-h.selected[data-color="008000"]::before,
+.farm-fence-v.selected[data-color="008000"]::before {
+  background: #2c8404;
 }
-.farm-fence-h.active[data-player-color="purple"]::before,
-.farm-fence-v.active[data-player-color="purple"]::before,
-.farm-fence-h.selected[data-player-color="purple"]::before,
-.farm-fence-v.selected[data-player-color="purple"]::before {
-  background: #7c3aed;
+.farm-fence-h.active[data-color="982fff"]::before,
+.farm-fence-v.active[data-color="982fff"]::before,
+.farm-fence-h.selected[data-color="982fff"]::before,
+.farm-fence-v.selected[data-color="982fff"]::before {
+  background: #803fb5;
 }
 /* Wood Palisade visual distinction (B30). */
 .farm-fence-h.active.palisade::before,
@@ -3626,6 +3749,18 @@
 .res-icon-sheep { width: 0.98em; height: 0.76em; background-position: 80.7692% 8.62069%; background-size: 2089.8%; }
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
+.res-icon-horse {
+  width: 0.9em;
+  height: 0.8em;
+  border-radius: 40% 55% 45% 45%;
+  background: #b77942;
+}
+.res-icon-fuel {
+  width: 0.72em;
+  height: 0.84em;
+  border-radius: 50% 50% 48% 48%;
+  background: radial-gradient(circle at 50% 35%, #ffd166 0 22%, #ef7b2d 23% 58%, #3a2a28 59%);
+}
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */

@@ -44,11 +44,11 @@ const applyPayPreview = (resources: Resource, params: Record<string, unknown> | 
   if (!cost) return false
   for (const key of RESOURCE_KEYS) {
     const amount = cost[key] ?? 0
-    if (amount > 0 && resources[key] < amount) return false
+    if (amount > 0 && (resources[key] ?? 0) < amount) return false
   }
   for (const key of RESOURCE_KEYS) {
     const amount = cost[key] ?? 0
-    if (amount > 0) resources[key] -= amount
+    if (amount > 0) resources[key] = (resources[key] ?? 0) - amount
   }
   return true
 }

@@ -10,7 +10,7 @@ import {
   resolveCardPreviewCostDetailedByProvider,
   type ResolvedCardCostWithMetadata,
 } from '../payment/internal'
-import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
+import { isMajorCardId, isFireplaceIdentityCard, isCookingHearthIdentityCard } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 import { getActiveCardRegistry } from '../../cards/active-registry'
 import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
@@ -71,6 +71,20 @@ export const getFireplaceReturnPool = (player: PlayerState): string[] => [
   ...player.minorPlayed.filter(isFireplaceIdentityCard),
 ]
 
+const getReturnCardPool = (
+  player: PlayerState,
+  list: readonly string[],
+): string[] => {
+  const listed = new Set(list)
+  const hasFireplaceSlot = list.some(isFireplaceIdentityCard)
+  const hasCookingHearthSlot = list.some(isCookingHearthIdentityCard)
+  return [...player.improvements, ...player.minorPlayed].filter((id) =>
+    listed.has(id) ||
+    (hasFireplaceSlot && isFireplaceIdentityCard(id)) ||
+    (hasCookingHearthSlot && isCookingHearthIdentityCard(id)),
+  )
+}
+
 export const getPlayedCardsForCost = (
   player: PlayerState,
   cost: PaymentResourceMap | ComplexCost | null,
@@ -78,8 +92,7 @@ export const getPlayedCardsForCost = (
   if (!cost || !PaymentSolver.isComplexCost(cost)) return player.improvements
   const list = cost.cards?.list
   if (!Array.isArray(list)) return player.improvements
-  if (!list.some(isFireplaceIdentityCard)) return player.improvements
-  return getFireplaceReturnPool(player)
+  return getReturnCardPool(player, list)
 }
 
 export const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | null; id: string } => {
