@@ -5,6 +5,14 @@ const RUN_ID = Date.now().toString(36)
 const PASSWORD = 'testpass123'
 
 type PlaywrightCookie = Parameters<BrowserContext['addCookies']>[0][number]
+type OAuthProvider = 'github' | 'google'
+type OAuthHelperProfile = {
+  providerUserId: string
+  providerLogin?: string
+  email?: string
+  displayName?: string
+  avatarUrl?: string
+}
 
 function setCookieHeaders(response: APIResponse): string[] {
   const headers = response.headersArray()
@@ -43,22 +51,41 @@ function cookieHeaderFromSetCookie(headers: string[], cookieName: string): strin
   return header.split(';')[0]!
 }
 
+async function callOAuthHelper(
+  request: APIRequestContext,
+  provider: OAuthProvider,
+  profile: OAuthHelperProfile,
+): Promise<{ helper: APIResponse; cookies: string[] }> {
+  const helper = await request.post(`${BACKEND_URL}/api/test/oauth/${provider}/callback`, {
+    data: profile,
+  })
+  expect(helper.ok()).toBe(true)
+  return { helper, cookies: setCookieHeaders(helper) }
+}
+
 async function createUserViaOAuth(
   request: APIRequestContext,
   username: string,
-  password = PASSWORD,
-  displayName = username,
-): Promise<{ cookieHeader: string; cookies: PlaywrightCookie[] }> {
-  const helper = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
-    data: {
-      providerUserId: `github-${username}-${RUN_ID}`,
-      providerLogin: username,
-      email: `${username}@example.com`,
-      displayName,
-    },
-  })
-  expect(helper.ok()).toBe(true)
-  const onboardingCookie = cookieHeaderFromSetCookie(setCookieHeaders(helper), 'oa_onboarding')
+  options: {
+    provider?: OAuthProvider
+    password?: string
+    displayName?: string
+    providerUserId?: string
+    providerLogin?: string
+    email?: string
+  } = {},
+): Promise<{ cookieHeader: string; cookies: PlaywrightCookie[]; profile: OAuthHelperProfile; provider: OAuthProvider }> {
+  const {
+    provider = 'github',
+    password = PASSWORD,
+    displayName = username,
+    providerUserId = `${provider}-${username}-${RUN_ID}`,
+    providerLogin = username,
+    email = `${username}@example.com`,
+  } = options
+  const profile: OAuthHelperProfile = { providerUserId, providerLogin, email, displayName }
+  const { cookies: helperCookies } = await callOAuthHelper(request, provider, profile)
+  const onboardingCookie = cookieHeaderFromSetCookie(helperCookies, 'oa_onboarding')
 
   const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
     data: { username, displayName, password, confirmPassword: password },
@@ -72,6 +99,8 @@ async function createUserViaOAuth(
   return {
     cookieHeader: cookieHeaderFromSetCookie(setCookieHeaders(complete), 'oa_session'),
     cookies: sessionCookies,
+    profile,
+    provider,
   }
 }
 
@@ -86,16 +115,13 @@ async function loginThroughPage(page: Page, username: string, password = PASSWOR
 test.describe('Platform: auth', () => {
   test('new user registers through GitHub helper, completes onboarding, then logs in with password', async ({ page, request }) => {
     const username = `e2e_oauth_${RUN_ID}`
-    const helper = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
-      data: {
-        providerUserId: `github-${RUN_ID}`,
-        providerLogin: `github-${RUN_ID}`,
-        email: `${username}@example.com`,
-        displayName: 'OAuth User',
-      },
+    const { cookies } = await callOAuthHelper(request, 'github', {
+      providerUserId: `github-${RUN_ID}`,
+      providerLogin: `github-${RUN_ID}`,
+      email: `${username}@example.com`,
+      displayName: 'OAuth User',
     })
-    expect(helper.ok()).toBe(true)
-    await page.context().addCookies(setCookieHeaders(helper).map(header => cookieFromSetCookie(header)))
+    await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
     await page.goto(`${FRONTEND_URL}/?page=onboarding`)
     await page.fill('#onboarding-username', username)
@@ -112,6 +138,27 @@ test.describe('Platform: auth', () => {
     await loginThroughPage(page, username)
   })
 
+  test('new user registers through Google helper and lands in lobby', async ({ page, request }) => {
+    const username = `e2e_google_${RUN_ID}`
+    const { cookies } = await callOAuthHelper(request, 'google', {
+      providerUserId: `google-${RUN_ID}`,
+      providerLogin: `google-${RUN_ID}`,
+      email: `${username}@example.com`,
+      displayName: 'Google OAuth User',
+    })
+    await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
+
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.fill('#onboarding-username', username)
+    await page.fill('#onboarding-password', PASSWORD)
+    await page.fill('#onboarding-confirm-password', PASSWORD)
+    await page.click('button[type="submit"]')
+    await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
+    expect(await page.context().cookies(FRONTEND_URL)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'oa_session', httpOnly: true })]),
+    )
+  })
+
   test('register tab only offers OAuth registration providers', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/?page=login`)
     await page.getByRole('tab', { name: '注册' }).click()
@@ -123,7 +170,7 @@ test.describe('Platform: auth', () => {
 
   test('wrong password is rejected with localized message', async ({ page, request }) => {
     const username = `e2e_badpw_${RUN_ID}`
-    await createUserViaOAuth(request, username, PASSWORD)
+    await createUserViaOAuth(request, username, { password: PASSWORD })
     await page.goto(`${FRONTEND_URL}/?page=login`)
     await page.fill('#username', username)
     await page.fill('#password', 'wrongpass123')
@@ -133,17 +180,14 @@ test.describe('Platform: auth', () => {
 
   test('duplicate username is rejected during OAuth onboarding', async ({ page, request }) => {
     const username = `e2e_dup_${RUN_ID}`
-    await createUserViaOAuth(request, username, PASSWORD)
-    const helper = await request.post(`${BACKEND_URL}/api/test/oauth/google/callback`, {
-      data: {
-        providerUserId: `google-${RUN_ID}`,
-        providerLogin: `google-${RUN_ID}`,
-        email: `${username}-google@example.com`,
-        displayName: 'Duplicate User',
-      },
+    await createUserViaOAuth(request, username, { password: PASSWORD })
+    const { cookies } = await callOAuthHelper(request, 'google', {
+      providerUserId: `google-dup-${RUN_ID}`,
+      providerLogin: `google-dup-${RUN_ID}`,
+      email: `${username}-google@example.com`,
+      displayName: 'Duplicate User',
     })
-    expect(helper.ok()).toBe(true)
-    await page.context().addCookies(setCookieHeaders(helper).map(header => cookieFromSetCookie(header)))
+    await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
     await page.goto(`${FRONTEND_URL}/?page=onboarding`)
     await page.fill('#onboarding-username', username)
@@ -155,12 +199,68 @@ test.describe('Platform: auth', () => {
 
   test('change display name through cookie-authenticated API', async ({ request }) => {
     const username = `e2e_name_${RUN_ID}`
-    const auth = await createUserViaOAuth(request, username, PASSWORD)
+    const auth = await createUserViaOAuth(request, username, { password: PASSWORD })
     const res = await request.patch(`${BACKEND_URL}/api/auth/profile`, {
       headers: { Cookie: auth.cookieHeader },
       data: { displayName: 'New Name' },
     })
     expect((await res.json()).ok).toBe(true)
+  })
+
+  test('existing linked-user can log in through OAuth helper without onboarding', async ({ page, request }) => {
+    const username = `e2e_linked_${RUN_ID}`
+    const auth = await createUserViaOAuth(request, username, {
+      provider: 'github',
+      password: PASSWORD,
+      displayName: 'Linked OAuth User',
+      providerUserId: `github-linked-${RUN_ID}`,
+      providerLogin: `linked-${RUN_ID}`,
+      email: `${username}@example.com`,
+    })
+    await page.context().clearCookies()
+
+    const { cookies } = await callOAuthHelper(request, auth.provider, auth.profile)
+    await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
+
+    await page.goto(`${FRONTEND_URL}/?page=lobby`)
+    await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('#onboarding-username')).toHaveCount(0)
+  })
+
+  test('logout-all invalidates another browser context session', async ({ browser, request }) => {
+    const username = `e2e_logoutall_${RUN_ID}`
+    const auth = await createUserViaOAuth(request, username, {
+      provider: 'github',
+      password: PASSWORD,
+      displayName: 'Logout All User',
+      providerUserId: `github-logoutall-${RUN_ID}`,
+      providerLogin: `logoutall-${RUN_ID}`,
+      email: `${username}@example.com`,
+    })
+    const secondSession = await callOAuthHelper(request, auth.provider, auth.profile)
+
+    const contextA = await browser.newContext()
+    const contextB = await browser.newContext()
+    const pageA = await contextA.newPage()
+    const pageB = await contextB.newPage()
+
+    try {
+      await contextA.addCookies(auth.cookies)
+      await contextB.addCookies(secondSession.cookies.map(header => cookieFromSetCookie(header)))
+
+      await pageA.goto(`${FRONTEND_URL}/?page=settings`)
+      await expect(pageA.getByRole('heading', { name: '账户设置' })).toBeVisible({ timeout: 15000 })
+      await pageA.getByRole('button', { name: '登出所有设备' }).click()
+      await pageA.getByRole('button', { name: '确认' }).click()
+      await expect(pageA.locator('#username')).toBeVisible({ timeout: 15000 })
+
+      await pageB.goto(`${FRONTEND_URL}/?page=lobby`)
+      await expect(pageB.locator('#username')).toBeVisible({ timeout: 15000 })
+      await expect(pageB.locator('text=创建多人游戏')).toHaveCount(0)
+    } finally {
+      await contextA.close()
+      await contextB.close()
+    }
   })
 
   test('non-fixed devMode url cannot bypass auth', async ({ page }) => {
@@ -177,7 +277,7 @@ test.describe('Platform: lobby page', () => {
 
   test('login and see lobby', async ({ page, request }) => {
     const username = `e2e_lobby_${RUN_ID}`
-    await createUserViaOAuth(request, username, 'lobby123')
+    await createUserViaOAuth(request, username, { password: 'lobby123' })
     await loginThroughPage(page, username, 'lobby123')
     await expect(page.locator('text=单人模式')).toBeVisible()
     await expect(page.locator('text=进入卡牌工坊')).toBeVisible()
@@ -187,7 +287,7 @@ test.describe('Platform: lobby page', () => {
 test.describe('Platform: single-player game', () => {
   test('starts and shows game board', async ({ page, request }) => {
     const username = `e2e_sp_${RUN_ID}`
-    await createUserViaOAuth(request, username, 'single123')
+    await createUserViaOAuth(request, username, { password: 'single123' })
     await loginThroughPage(page, username, 'single123')
 
     await page.click('text=单人模式')
@@ -201,7 +301,7 @@ test.describe('Platform: workshop', () => {
   let cookieHeader = ''
 
   test.beforeAll(async ({ request }) => {
-    const auth = await createUserViaOAuth(request, username, 'workshop123')
+    const auth = await createUserViaOAuth(request, username, { password: 'workshop123' })
     cookieHeader = auth.cookieHeader
   })
 
@@ -250,8 +350,8 @@ test.describe('Platform: sandbox game with custom cards', () => {
     const u1 = `e2e_sb1_${RUN_ID}`
     const u2 = `e2e_sb2_${RUN_ID}`
 
-    const auth1 = await createUserViaOAuth(request, u1, 'pass1234')
-    const auth2 = await createUserViaOAuth(request, u2, 'pass1234')
+    const auth1 = await createUserViaOAuth(request, u1, { password: 'pass1234' })
+    const auth2 = await createUserViaOAuth(request, u2, { password: 'pass1234' })
 
     const sb1 = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
       data: {},

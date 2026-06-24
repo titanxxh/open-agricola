@@ -271,8 +271,36 @@ describe('auth routes', () => {
       displayName: 'GH E2E',
     })
     expect(res.status).toBe(200)
-    expect(res.json).toMatchObject({ ok: true, provider: 'github' })
+    expect(res.json).toMatchObject({ ok: true, provider: 'github', mode: 'onboarding' })
     expect(res.headers['Set-Cookie']).toContain('oa_onboarding=')
+  })
+
+  it('test oauth helper logs in an existing linked user when identity already exists', async () => {
+    process.env.NODE_ENV = 'test'
+    process.env.ENABLE_AUTH_TEST_HELPERS = '1'
+    const user = await createLocalUserForTests('oauthlogin', 'password123', 'OAuth Login')
+    linkIdentity(user.id, {
+      provider: 'google',
+      providerUserId: 'google-existing',
+      providerLogin: 'google-existing',
+      email: 'existing@example.com',
+      emailVerified: true,
+      displayName: 'Existing Google',
+    })
+
+    const res = await requestJson('POST', '/api/test/oauth/google/callback', {
+      providerUserId: 'google-existing',
+      providerLogin: 'google-existing',
+      email: 'existing@example.com',
+      displayName: 'Existing Google',
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.json).toMatchObject({ ok: true, provider: 'google', mode: 'login' })
+    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    expect(validateSession(String(res.headers['Set-Cookie']).match(/oa_session=([^;]+)/)?.[1] ?? '')).toMatchObject({
+      username: 'oauthlogin',
+    })
   })
 
   it('test oauth helper remains unavailable in production', async () => {
