@@ -6,21 +6,11 @@
 
 import { API_BASE } from '../config'
 
-// Shared apiFetch-like wrapper. AuthContext's apiFetch is a hook value,
-// but these helpers are called from inside components that already have
-// a token — we read it from localStorage here to keep the service plain.
-const TOKEN_KEY = 'open-agricola-token'
-function readToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
-}
-
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const token = readToken()
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> ?? {}),
   }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return fetch(`${API_BASE}${path}`, { ...init, headers })
+  return fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers })
 }
 
 export type ProposeNeedsAuth = {
