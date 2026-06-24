@@ -11,6 +11,31 @@ export type AuthUser = {
   displayName: string
 }
 
+export type AuthErrorCode =
+  | 'invalid_login'
+  | 'invalid_username'
+  | 'invalid_password'
+  | 'password_mismatch'
+  | 'username_taken'
+  | 'oauth_registration_required'
+  | 'unsupported_oauth_provider'
+  | 'oauth_state_invalid'
+  | 'oauth_cancelled'
+  | 'oauth_profile_failed'
+  | 'oauth_identity_taken'
+  | 'oauth_onboarding_required'
+  | 'oauth_onboarding_expired'
+  | 'not_authenticated'
+  | 'too_many_requests'
+
+export type AuthResult =
+  | { ok: true; user: AuthUser; token?: string }
+  | { ok: false; code: AuthErrorCode; error: string }
+
+export type LoginResult =
+  | { ok: true; user: AuthUser; token: string }
+  | { ok: false; code: AuthErrorCode; error: string }
+
 function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const salt = randomBytes(16).toString('hex')
@@ -34,27 +59,36 @@ function verifyPassword(password: string, stored: string): Promise<boolean> {
   })
 }
 
-export type AuthResult =
-  | { ok: true; user: AuthUser; token: string }
-  | { ok: false; error: string }
-
 export async function register(username: string, password: string, displayName?: string): Promise<AuthResult> {
-  username = username.trim()
+  void username
+  void password
+  void displayName
+  return { ok: false, code: 'oauth_registration_required', error: 'Registration requires GitHub or Google' }
+}
+
+function validateUsername(username: string): string | null {
   if (!username || username.length < 2 || username.length > 30) {
-    return { ok: false, error: 'Username must be 2-30 characters' }
+    return 'Username must be 2-30 characters'
   }
   if (!/^[a-zA-Z0-9_\u4e00-\u9fff]+$/.test(username)) {
-    return { ok: false, error: 'Username can only contain letters, numbers, underscores, or Chinese characters' }
+    return 'Username can only contain letters, numbers, underscores, or Chinese characters'
   }
-  if (!password || password.length < 4) {
-    return { ok: false, error: 'Password must be at least 4 characters' }
-  }
+  return null
+}
+
+export async function createLocalUserForTests(
+  username: string,
+  password: string,
+  displayName?: string,
+): Promise<AuthUser> {
+  username = username.trim()
+  const usernameError = validateUsername(username)
+  if (usernameError) throw new Error(usernameError)
+  if (!password || password.length < 8) throw new Error('Password must be at least 8 characters')
 
   const db = getDb()
   const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
-  if (existing) {
-    return { ok: false, error: 'Username already taken' }
-  }
+  if (existing) throw new Error('Username already taken')
 
   const id = nanoid()
   const passwordHash = await hashPassword(password)
@@ -62,37 +96,41 @@ export async function register(username: string, password: string, displayName?:
   const name = displayName?.trim() || username
 
   db.prepare(
-    'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-  ).run(id, username, name, passwordHash, now)
+    'INSERT INTO users (id, username, display_name, password_hash, password_updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(id, username, name, passwordHash, now, now)
 
-  const token = randomUUID()
-  db.prepare(
-    'INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
-  ).run(token, id, now + SESSION_TTL_MS, now)
-
-  return { ok: true, user: { id, username, displayName: name }, token }
+  return { id, username, displayName: name }
 }
 
-export async function login(username: string, password: string): Promise<AuthResult> {
+export function createSession(userId: string): string {
+  const now = Date.now()
+  const token = randomUUID()
+  const db = getDb()
+  db.prepare(
+    'INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
+  ).run(token, userId, now + SESSION_TTL_MS, now)
+  return token
+}
+
+export async function login(username: string, password: string): Promise<LoginResult> {
+  if (!password) return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
+
   const db = getDb()
   const row = db.prepare(
     'SELECT id, username, display_name, password_hash FROM users WHERE username = ?',
   ).get(username) as { id: string; username: string; display_name: string; password_hash: string } | undefined
 
   if (!row) {
-    return { ok: false, error: 'Invalid username or password' }
+    return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
   }
 
   const valid = await verifyPassword(password, row.password_hash)
   if (!valid) {
-    return { ok: false, error: 'Invalid username or password' }
+    return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
   }
 
   const now = Date.now()
-  const token = randomUUID()
-  db.prepare(
-    'INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
-  ).run(token, row.id, now + SESSION_TTL_MS, now)
+  const token = createSession(row.id)
   db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id)
 
   return { ok: true, user: { id: row.id, username: row.username, displayName: row.display_name }, token }
@@ -101,6 +139,11 @@ export async function login(username: string, password: string): Promise<AuthRes
 export function logout(token: string): void {
   const db = getDb()
   db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+}
+
+export function logoutAll(userId: string): void {
+  const db = getDb()
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
 }
 
 export function validateSession(token: string): AuthUser | null {
@@ -146,7 +189,7 @@ export async function changePassword(
   oldPassword: string,
   newPassword: string,
 ): Promise<string | null> {
-  if (!newPassword || newPassword.length < 4) return 'Password must be at least 4 characters'
+  if (!newPassword || newPassword.length < 8) return 'Password must be at least 8 characters'
   const db = getDb()
   const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as
     | { password_hash: string } | undefined
@@ -154,7 +197,6 @@ export async function changePassword(
   const valid = await verifyPassword(oldPassword, row.password_hash)
   if (!valid) return 'Current password is incorrect'
   const newHash = await hashPassword(newPassword)
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId)
+  db.prepare('UPDATE users SET password_hash = ?, password_updated_at = ? WHERE id = ?').run(newHash, Date.now(), userId)
   return null
 }
-
