@@ -82,11 +82,20 @@ function frontendBaseUrl(): URL | undefined {
   }
 }
 
+function stripFrontendBasePath(path: string, baseUrl: URL): string {
+  const basePath = baseUrl.pathname.replace(/\/$/, '')
+  if (!basePath) return path
+  if (path === basePath) return '/'
+  if (path.startsWith(`${basePath}/`)) return path.slice(basePath.length) || '/'
+  return path
+}
+
 function appLocation(path: string): string {
   const safePath = safeReturnTo(path) ?? '/'
   const baseUrl = frontendBaseUrl()
   if (!baseUrl) return safePath
-  return new URL(safePath.replace(/^\//, ''), baseUrl).toString()
+  const appPath = stripFrontendBasePath(safePath, baseUrl)
+  return new URL(appPath.replace(/^\//, ''), baseUrl).toString()
 }
 
 function redirect(res: ServerResponse, location: string, headers: Record<string, string | string[]> = {}): void {

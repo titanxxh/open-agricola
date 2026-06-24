@@ -86,7 +86,7 @@ export function PageRouter() {
   const page = getPage()
 
   useEffect(() => {
-    if (!loading && user && page === 'onboarding') {
+    if (!loading && user && (page === 'onboarding' || page === 'login')) {
       setPage('lobby')
     }
   }, [loading, page, user])

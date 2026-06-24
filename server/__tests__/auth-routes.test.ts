@@ -240,6 +240,22 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain('Secure')
   })
 
+  it('keeps production-env cookies usable on http dev launch origins', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_ORIGIN = 'http://frontend.example:5173'
+    await createLocalUserForTests('httpcookie', 'password123', 'HTTP Cookie')
+    const res = await requestJson(
+      'POST',
+      '/api/auth/login',
+      { username: 'httpcookie', password: 'password123' },
+      { Host: 'frontend.example:5175', 'X-Forwarded-Proto': 'http' },
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
+    expect(res.headers['Set-Cookie']).not.toContain('Secure')
+  })
+
   it('direct register returns oauth_registration_required', async () => {
     const res = await requestJson('POST', '/api/auth/register', { username: 'blocked', password: 'password123' })
     expect(res.status).toBe(400)
@@ -505,6 +521,26 @@ describe('auth routes', () => {
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=settings')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
+  })
+
+  it('does not duplicate PUBLIC_APP_ORIGIN path base when OAuth returnTo already includes it', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+    const user = await createLocalUserForTests('baseredir', 'password123', 'Base Redir')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-baseredir',
+      providerLogin: 'baseredir-gh',
+      emailVerified: true,
+    }
+    linkIdentity(user.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=workshop')
   })
 
   it('returns stable auth error codes from representative cookie auth routes', async () => {

@@ -25,6 +25,17 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+const devAuthShortcutsEnabled = (): boolean =>
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTH_SHORTCUTS === '1'
+
+function devShortcutUserFromLocation(): AuthUser | null {
+  const params = new URLSearchParams(window.location.search)
+  const devPlayer = params.get('player')
+  if (!devAuthShortcutsEnabled() || !devPlayer || !isDevModeAllowedFromQuery(window.location.search)) return null
+  const displayName = devPlayer === 'p1' ? 'Player 1' : devPlayer === 'p2' ? 'Player 2' : devPlayer
+  return { id: devPlayer, username: devPlayer, displayName }
+}
+
 async function authFetch(path: string, body: Record<string, unknown>, retries = 2) {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -42,9 +53,17 @@ async function authFetch(path: string, body: Record<string, unknown>, retries = 
   }
 }
 
+function stripBasePath(pathname: string): string {
+  const basePath = new URL(import.meta.env.BASE_URL, window.location.origin).pathname.replace(/\/$/, '')
+  if (!basePath) return pathname
+  if (pathname === basePath) return '/'
+  if (pathname.startsWith(`${basePath}/`)) return pathname.slice(basePath.length) || '/'
+  return pathname
+}
+
 function currentReturnTo(intent: 'login' | 'register' | 'link'): string | undefined {
   if (intent === 'register') return undefined
-  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const current = `${stripBasePath(window.location.pathname)}${window.location.search}${window.location.hash}`
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
   if (page === 'login' || page === 'onboarding') return undefined
@@ -72,11 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check existing session on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const devPlayer = params.get('player')
-    if (import.meta.env.DEV && devPlayer && isDevModeAllowedFromQuery(window.location.search)) {
-      const displayName = devPlayer === 'p1' ? 'Player 1' : devPlayer === 'p2' ? 'Player 2' : devPlayer
-      setState({ user: { id: devPlayer, username: devPlayer, displayName }, loading: false })
+    const devUser = devShortcutUserFromLocation()
+    if (devUser) {
+      setState({ user: devUser, loading: false })
       return
     }
 
@@ -114,7 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const resp = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers })
     if (resp.status === 401) {
-      setState({ user: null, loading: false })
+      const devUser = devShortcutUserFromLocation()
+      setState({ user: devUser, loading: false })
     }
     return resp
   }, [])
