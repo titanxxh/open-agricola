@@ -629,6 +629,33 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-fence-v[^>]*data-player-color="blue"/)
   })
 
+  it('renders farm fences with BGA fence orientation classes and color tokens', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      fenceSegments: [
+        { edge: 'H-0-0', type: 'fence' as const },
+        { edge: 'V-0-0', type: 'fence' as const, source: { kind: 'borrowed' as const, ownerPlayerId: 'p2' } },
+      ],
+    }
+    const donor = createPlayer('p2', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          players: [player, donor],
+          farmCells: [
+            { key: 'fence-h-0-0', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: 'fence-v-0-0', type: 'fence-v', fenceId: 'V-0-0' },
+          ],
+          existingFenceSet: new Set(['H-0-0', 'V-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^"]*\bmeeple-fence\b[^"]*\bfence-hor\b[^>]*data-color="ff0000"/)
+    expect(html).toMatch(/farm-fence-v[^"]*\bmeeple-fence\b[^"]*\bfence-ver\b[^>]*data-color="72c3b1"/)
+  })
+
   it('previews pending borrowed fence edges with the selected donor color', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     const donor = createPlayer('p2', 'Player B', 'blue')
