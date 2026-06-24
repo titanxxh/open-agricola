@@ -30,6 +30,12 @@ function hashSecret(raw: string): string {
   return createHash('sha256').update(raw).digest('hex')
 }
 
+export function pruneExpiredOAuthRows(now: number = Date.now()): void {
+  const db = getDb()
+  db.prepare('DELETE FROM oauth_states WHERE used_at IS NOT NULL OR expires_at <= ?').run(now)
+  db.prepare('DELETE FROM oauth_onboarding_tickets WHERE used_at IS NOT NULL OR expires_at <= ?').run(now)
+}
+
 export function createOAuthState(input: {
   provider: OAuthProvider
   intent: OAuthIntent
@@ -38,6 +44,7 @@ export function createOAuthState(input: {
 }): string {
   const raw = createRawSecret()
   const now = Date.now()
+  pruneExpiredOAuthRows(now)
   getDb().prepare(`
     INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, expires_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -118,6 +125,7 @@ export function linkIdentity(userId: string, profile: OAuthProfile): void {
 export function createOnboardingTicket(profile: OAuthProfile): string {
   const raw = createRawSecret()
   const now = Date.now()
+  pruneExpiredOAuthRows(now)
   getDb().prepare(`
     INSERT INTO oauth_onboarding_tickets (
       ticket_hash, provider, provider_user_id, provider_login, provider_email,

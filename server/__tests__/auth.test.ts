@@ -210,6 +210,10 @@ describe('auth', () => {
       expect(clearSessionCookie()).toContain(`${SESSION_COOKIE}=;`)
       expect(clearOnboardingCookie()).toContain(`${ONBOARDING_COOKIE}=;`)
     })
+
+    it('treats malformed cookie values as missing', () => {
+      expect(readCookie(`${SESSION_COOKIE}=%`, SESSION_COOKIE)).toBe('')
+    })
   })
 
   describe('rate limit', () => {

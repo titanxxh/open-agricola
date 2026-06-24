@@ -1238,6 +1238,7 @@ export const en = {
       not_authenticated: 'Please sign in first',
       missing_fields: 'Please fill in all required fields',
       invalid_display_name: 'Display name must be 1-60 characters',
+      csrf_rejected: 'Request origin is not trusted',
       rate_limited: 'Too many requests. Please try again later',
       too_many_requests: 'Too many requests. Please try again later',
     },

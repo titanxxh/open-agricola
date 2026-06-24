@@ -23,6 +23,7 @@ import {
   filterInteractionForViewer,
   privateEventsForViewer,
 } from '../shared/session/interaction-privacy.ts'
+import { corsHeaders } from './http-origin.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -151,9 +152,10 @@ const readBody = (req: IncomingMessage): Promise<string> =>
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Viewer-Player',
+    ...corsHeaders({
+      methods: 'GET,POST,OPTIONS',
+      headers: 'Content-Type, Authorization, X-Viewer-Player',
+    }),
   })
   res.end(JSON.stringify(payload))
 }
