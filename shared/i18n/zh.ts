@@ -1216,6 +1216,9 @@ export const zh = {
       oauth_onboarding_required: '请先完成注册',
       oauth_onboarding_expired: '注册会话已过期，请重新使用 GitHub 或 Google 注册',
       not_authenticated: '请先登录',
+      missing_fields: '请填写所有必填项',
+      invalid_display_name: '显示名称需要 1-60 个字符',
+      rate_limited: '请求过多，请稍后再试',
       too_many_requests: '请求过多，请稍后再试',
     },
 

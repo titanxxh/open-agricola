@@ -23,6 +23,14 @@ async function readJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
+function clientId(): string {
+  return process.env.ACCOUNT_GITHUB_OAUTH_CLIENT_ID ?? process.env.GITHUB_OAUTH_CLIENT_ID ?? ''
+}
+
+function clientSecret(): string {
+  return process.env.ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET ?? process.env.GITHUB_OAUTH_CLIENT_SECRET ?? ''
+}
+
 export async function exchangeGitHubOAuthCode(
   code: string,
   redirectUri: string,
@@ -32,8 +40,8 @@ export async function exchangeGitHubOAuthCode(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      client_id: process.env.GITHUB_OAUTH_CLIENT_ID ?? '',
-      client_secret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? '',
+      client_id: clientId(),
+      client_secret: clientSecret(),
       code,
       redirect_uri: redirectUri,
     }),

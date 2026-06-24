@@ -16,6 +16,11 @@ function deriveBaseUrl(req: IncomingMessage): string {
   return `${proto}://${host}`
 }
 
+function accountOAuthClientId(provider: OAuthProvider): string {
+  if (provider === 'github') return process.env.ACCOUNT_GITHUB_OAUTH_CLIENT_ID ?? process.env.GITHUB_OAUTH_CLIENT_ID ?? ''
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? ''
+}
+
 export function buildOAuthCallbackUrl(provider: OAuthProvider, req: IncomingMessage): string {
   return `${deriveBaseUrl(req)}/api/auth/oauth/${provider}/callback`
 }
@@ -25,7 +30,7 @@ export function buildOAuthAuthorizationUrl(provider: OAuthProvider, state: strin
   const redirectUri = buildOAuthCallbackUrl(provider, req)
   if (provider === 'github') {
     const url = new URL('https://github.com/login/oauth/authorize')
-    url.searchParams.set('client_id', process.env.GITHUB_OAUTH_CLIENT_ID ?? '')
+    url.searchParams.set('client_id', accountOAuthClientId(provider))
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('scope', 'read:user user:email')
     url.searchParams.set('state', state)
@@ -33,7 +38,7 @@ export function buildOAuthAuthorizationUrl(provider: OAuthProvider, state: strin
   }
 
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-  url.searchParams.set('client_id', process.env.GOOGLE_OAUTH_CLIENT_ID ?? '')
+  url.searchParams.set('client_id', accountOAuthClientId(provider))
   url.searchParams.set('redirect_uri', redirectUri)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', 'openid profile email')

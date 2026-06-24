@@ -139,6 +139,30 @@ export function createOnboardingTicket(profile: OAuthProfile): string {
   return raw
 }
 
+function profileFromTicketRow(row: OnboardingTicketRow): OAuthProfile {
+  return {
+    provider: row.provider,
+    providerUserId: row.provider_user_id,
+    ...(row.provider_login ? { providerLogin: row.provider_login } : {}),
+    ...(row.provider_email ? { email: row.provider_email } : {}),
+    emailVerified: row.provider_email_verified === 1,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
+  }
+}
+
+export function getOnboardingTicket(rawTicket: string): OAuthProfile | null {
+  const ticketHash = hashSecret(rawTicket)
+  const row = getDb().prepare(`
+    SELECT provider, provider_user_id, provider_login, provider_email,
+      provider_email_verified, display_name, avatar_url
+    FROM oauth_onboarding_tickets
+    WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
+  `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
+
+  return row ? profileFromTicketRow(row) : null
+}
+
 export function consumeOnboardingTicket(rawTicket: string): OAuthProfile | null {
   const db = getDb()
   const ticketHash = hashSecret(rawTicket)
@@ -152,15 +176,7 @@ export function consumeOnboardingTicket(rawTicket: string): OAuthProfile | null 
 
   if (!row) return null
   db.prepare('UPDATE oauth_onboarding_tickets SET used_at = ? WHERE ticket_hash = ? AND used_at IS NULL').run(now, ticketHash)
-  return {
-    provider: row.provider,
-    providerUserId: row.provider_user_id,
-    ...(row.provider_login ? { providerLogin: row.provider_login } : {}),
-    ...(row.provider_email ? { email: row.provider_email } : {}),
-    emailVerified: row.provider_email_verified === 1,
-    ...(row.display_name ? { displayName: row.display_name } : {}),
-    ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
-  }
+  return profileFromTicketRow(row)
 }
 
 export function getLinkedIdentities(userId: string): Array<{
