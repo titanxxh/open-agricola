@@ -99,6 +99,7 @@ const { createLocalUserForTests, createSession, validateSession } = await import
 const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { getDb } = await import('../db.ts')
+const { OAUTH_STATE_COOKIE } = await import('../auth-cookies.ts')
 
 await import('../index.ts')
 
@@ -167,6 +168,22 @@ async function requestJson(
     ),
     json: res.body ? JSON.parse(res.body) as Record<string, unknown> : {},
   }
+}
+
+function cookiePairFromSetCookie(header: string | string[] | undefined, name: string): string {
+  const raw = Array.isArray(header) ? header.find(value => value.includes(`${name}=`)) : String(header ?? '')
+  const part = raw.split(', ').find(value => value.includes(`${name}=`)) ?? raw
+  const match = part.match(new RegExp(`${name}=[^;]*`))
+  if (!match) throw new Error(`missing ${name} cookie`)
+  return match[0]
+}
+
+function oauthCookieForState(state: string): string {
+  return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}`
+}
+
+function startOAuthCookie(res: JsonResponse): string {
+  return cookiePairFromSetCookie(res.headers['Set-Cookie'], OAUTH_STATE_COOKIE)
 }
 
 describe('auth routes', () => {
@@ -462,13 +479,14 @@ describe('auth routes', () => {
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${state}`,
       undefined,
-      { Cookie: `oa_session=${currentToken}` },
+      { Cookie: `${oauthCookieForState(state)}; oa_session=${currentToken}` },
     )
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toContain('page=settings')
     expect(res.headers.Location).toContain('authError=oauth_identity_taken')
-    expect(res.headers['Set-Cookie']).toBeUndefined()
+    expect(res.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
+    expect(res.headers['Set-Cookie']).not.toContain('oa_session=')
     expect(getDb().prepare('SELECT COUNT(*) AS count FROM sessions').get()).toMatchObject({ count: 1 })
   })
 
@@ -483,7 +501,12 @@ describe('auth routes', () => {
     }
     const state = createOAuthState({ provider: 'github', intent: 'link', userId: stateUser.id })
 
-    const noCookie = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    const noCookie = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: oauthCookieForState(state) },
+    )
     expect(noCookie.status).toBe(302)
     expect(noCookie.headers.Location).toContain('page=settings')
     expect(noCookie.headers.Location).toContain('authError=not_authenticated')
@@ -495,11 +518,42 @@ describe('auth routes', () => {
       'GET',
       `/api/auth/oauth/github/callback?code=ok&state=${secondState}`,
       undefined,
-      { Cookie: `oa_session=${otherToken}` },
+      { Cookie: `${oauthCookieForState(secondState)}; oa_session=${otherToken}` },
     )
     expect(mismatch.status).toBe(302)
     expect(mismatch.headers.Location).toContain('authError=not_authenticated')
     expect(findIdentity('github', 'gh-session-required')).toBeNull()
+  })
+
+  it('binds OAuth callback state to the initiating browser cookie', async () => {
+    const user = await createLocalUserForTests('statebound', 'password123', 'State Bound')
+    const profile = {
+      provider: 'github' as const,
+      providerUserId: 'gh-statebound',
+      providerLogin: 'statebound-gh',
+      emailVerified: true,
+    }
+    linkIdentity(user.id, profile)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+
+    const withoutCookie = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    expect(withoutCookie.status).toBe(302)
+    expect(withoutCookie.headers.Location).toContain('authError=oauth_state_invalid')
+    expect(withoutCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
+    expect(withoutCookie.headers['Set-Cookie']).not.toContain('oa_session=')
+
+    const withCookie = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+    expect(withCookie.status).toBe(302)
+    expect(withCookie.headers['Set-Cookie']).toContain('oa_session=')
+    expect(withCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
   })
 
   it('redirects OAuth app destinations to PUBLIC_APP_ORIGIN while preserving safe returnTo', async () => {
@@ -516,11 +570,17 @@ describe('auth routes', () => {
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2F%3Fpage%3Dsettings')
     const state = new URL(String(start.headers.Location)).searchParams.get('state')
-    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    const res = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=settings')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    expect(res.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
   })
 
   it('does not duplicate PUBLIC_APP_ORIGIN path base when OAuth returnTo already includes it', async () => {
@@ -537,7 +597,12 @@ describe('auth routes', () => {
 
     const start = await requestJson('GET', '/api/auth/oauth/github/start?returnTo=%2Fopen-agricola%2F%3Fpage%3Dworkshop')
     const state = new URL(String(start.headers.Location)).searchParams.get('state')
-    const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+    const res = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
 
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=workshop')
@@ -582,7 +647,12 @@ describe('auth routes', () => {
       vi.mocked(exchangeOAuthCode).mockResolvedValueOnce(profile)
       const start = await requestJson('GET', `/api/auth/oauth/github/start?returnTo=${encodeURIComponent(returnTo)}`)
       const state = new URL(String(start.headers.Location)).searchParams.get('state')
-      const res = await requestJson('GET', `/api/auth/oauth/github/callback?code=ok&state=${state}`)
+      const res = await requestJson(
+        'GET',
+        `/api/auth/oauth/github/callback?code=ok&state=${state}`,
+        undefined,
+        { Cookie: startOAuthCookie(start) },
+      )
 
       expect(res.status).toBe(302)
       expect(res.headers.Location).toBe('/')
