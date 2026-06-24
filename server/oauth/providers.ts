@@ -17,8 +17,8 @@ function deriveBaseUrl(req: IncomingMessage): string {
 }
 
 function accountOAuthClientId(provider: OAuthProvider): string {
-  if (provider === 'github') return process.env.ACCOUNT_GITHUB_OAUTH_CLIENT_ID ?? process.env.GITHUB_OAUTH_CLIENT_ID ?? ''
-  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? ''
+  if (provider === 'github') return process.env.ACCOUNT_GITHUB_OAUTH_CLIENT_ID ?? ''
+  return process.env.ACCOUNT_GOOGLE_OAUTH_CLIENT_ID ?? ''
 }
 
 export function buildOAuthCallbackUrl(provider: OAuthProvider, req: IncomingMessage): string {

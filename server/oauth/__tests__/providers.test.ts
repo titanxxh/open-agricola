@@ -45,10 +45,42 @@ describe('oauth providers', () => {
     expect(url.searchParams.get('state')).toBe('state-2')
   })
 
-  it('falls back to legacy OAuth client env names for account auth', () => {
-    process.env.GITHUB_OAUTH_CLIENT_ID = 'legacy-gh-client'
-    const url = new URL(buildOAuthAuthorizationUrl('github', 'state-legacy', fakeReq('https://app.test')))
-    expect(url.searchParams.get('client_id')).toBe('legacy-gh-client')
+  it('does not use workshop OAuth client env names for account auth', () => {
+    process.env.GITHUB_OAUTH_CLIENT_ID = 'workshop-gh-client'
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'workshop-google-client'
+    const githubUrl = new URL(buildOAuthAuthorizationUrl('github', 'state-gh', fakeReq('https://app.test')))
+    const googleUrl = new URL(buildOAuthAuthorizationUrl('google', 'state-google', fakeReq('https://app.test')))
+    expect(githubUrl.searchParams.get('client_id')).toBe('')
+    expect(googleUrl.searchParams.get('client_id')).toBe('')
+  })
+
+  it('does not exchange account OAuth codes with workshop credentials', async () => {
+    process.env.GITHUB_OAUTH_CLIENT_ID = 'workshop-gh-client'
+    process.env.GITHUB_OAUTH_CLIENT_SECRET = 'workshop-gh-secret'
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'workshop-google-client'
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'workshop-google-secret'
+    const bodies: string[] = []
+    const fakeFetch = async (url: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(String(init.body))
+      if (url === 'https://github.com/login/oauth/access_token') {
+        return new Response(JSON.stringify({ access_token: 'gh-token' }), { status: 200 })
+      }
+      if (url === 'https://api.github.com/user') {
+        return new Response(JSON.stringify({ id: 123, login: 'octo' }), { status: 200 })
+      }
+      if (url === 'https://api.github.com/user/emails') {
+        return new Response(JSON.stringify([{ email: 'octo@example.com', primary: true, verified: true }]), { status: 200 })
+      }
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return new Response(JSON.stringify({ access_token: 'google-token' }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ sub: 'g-123' }), { status: 200 })
+    }
+    await exchangeOAuthCode('github', 'code-gh', fakeReq('https://app.test'), fakeFetch as typeof fetch)
+    await exchangeOAuthCode('google', 'code-google', fakeReq('https://app.test'), fakeFetch as typeof fetch)
+    expect(JSON.parse(bodies[0]!)).toMatchObject({ client_id: '', client_secret: '' })
+    expect(new URLSearchParams(bodies[1]).get('client_id')).toBe('')
+    expect(new URLSearchParams(bodies[1]).get('client_secret')).toBe('')
   })
 
   it('uses PUBLIC_API_BASE for provider callback URL', () => {
