@@ -1,11 +1,35 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import Database from 'better-sqlite3'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
+
+vi.mock('../../db.ts', () => {
+  const db = new Database(':memory:')
+  db.pragma('foreign_keys = ON')
+  db.exec(`
+    CREATE TABLE users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      display_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      password_updated_at INTEGER,
+      created_at INTEGER NOT NULL,
+      last_login_at INTEGER
+    );
+    CREATE TABLE sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+  `)
+  return { getDb: () => db, cleanExpiredSessions: () => {} }
+})
 
 type TestSocket = WebSocket & {
   received: ServerEvent[]
@@ -26,6 +50,10 @@ const attachCollector = (ws: TestSocket) => {
   })
 }
 
+const waitForOpen = async (ws: WebSocket): Promise<void> => {
+  await new Promise<void>((resolve) => ws.once('open', () => resolve()))
+}
+
 const waitForEvent = async <T extends ServerEvent>(
   ws: TestSocket,
   predicate: (event: ServerEvent) => event is T,
@@ -33,14 +61,21 @@ const waitForEvent = async <T extends ServerEvent>(
   const existing = ws.received.find(predicate)
   if (existing) return existing
   return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      ws.off('message', onMessage)
+      ws.off('error', onError)
+      reject(new Error('timed out waiting for websocket event'))
+    }, 2000)
     const onMessage = () => {
       const event = ws.received.find(predicate)
       if (!event) return
+      clearTimeout(timeout)
       ws.off('message', onMessage)
       ws.off('error', onError)
       resolve(event)
     }
     const onError = (err: Error) => {
+      clearTimeout(timeout)
       ws.off('message', onMessage)
       ws.off('error', onError)
       reject(err)
@@ -104,12 +139,85 @@ describe('room-manager ws sync', () => {
     })
   })
 
+  it('accepts createRoom over websocket when oa_session cookie is valid', async () => {
+    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.resetModules()
+    const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
+    const persistence = new InMemoryRoomPersistence()
+    const isolatedServer = createServer()
+    const isolatedWsServerResult = createWsServerWithEnv(isolatedServer, { persistence })
+    await new Promise<void>((resolve) => {
+      isolatedServer.listen(0, '127.0.0.1', () => resolve())
+    })
+    const address = isolatedServer.address() as AddressInfo
+    const isolatedBaseUrl = `ws://127.0.0.1:${address.port}/ws`
+    try {
+      const { createLocalUserForTests, createSession } = await import('../../auth.ts')
+      const username = `wsuser_${Date.now()}`
+      const user = await createLocalUserForTests(username, 'password123', 'WS User')
+      const token = createSession(user.id)
+      const ws = new WebSocket(isolatedBaseUrl, { headers: { Cookie: `oa_session=${token}` } }) as TestSocket
+      ws.received = []
+      attachCollector(ws)
+      sockets.push(ws)
+      await waitForOpen(ws)
+
+      ws.send(JSON.stringify({ type: 'createRoom', maxPlayers: 2, name: 'WS User' }))
+
+      const msg = await waitForEvent(
+        ws,
+        (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
+          event.type === 'roomCreated',
+      )
+      expect(msg.roomId).toBeTruthy()
+    } finally {
+      clearInterval(isolatedWsServerResult.cleanupTimer)
+      isolatedWsServerResult.wss.close()
+      isolatedServer.close()
+      delete process.env.ALLOW_ANONYMOUS_WS
+    }
+  })
+
+  it('rejects non-fixed devMode-style unauthenticated room commands in production-like mode', async () => {
+    process.env.ALLOW_ANONYMOUS_WS = 'false'
+    vi.resetModules()
+    const { createWsServer: createWsServerWithEnv } = await import('../ws-server.ts')
+    const persistence = new InMemoryRoomPersistence()
+    const isolatedServer = createServer()
+    const isolatedWsServerResult = createWsServerWithEnv(isolatedServer, { persistence })
+    await new Promise<void>((resolve) => {
+      isolatedServer.listen(0, '127.0.0.1', () => resolve())
+    })
+    const address = isolatedServer.address() as AddressInfo
+    const isolatedBaseUrl = `ws://127.0.0.1:${address.port}/ws`
+    try {
+      const ws = new WebSocket(isolatedBaseUrl) as TestSocket
+      ws.received = []
+      attachCollector(ws)
+      sockets.push(ws)
+      await waitForOpen(ws)
+
+      ws.send(JSON.stringify({ type: 'createRoom', maxPlayers: 2 }))
+
+      const msg = await waitForEvent(
+        ws,
+        (event): event is Extract<ServerEvent, { type: 'error' }> => event.type === 'error',
+      )
+      expect(msg.error).toMatch(/not authenticated|authentication timeout/)
+    } finally {
+      clearInterval(isolatedWsServerResult.cleanupTimer)
+      isolatedWsServerResult.wss.close()
+      isolatedServer.close()
+      delete process.env.ALLOW_ANONYMOUS_WS
+    }
+  })
+
   it('broadcasts undo updates to both players and resyncs getState to the current version', async () => {
     const p1 = new WebSocket(baseUrl) as TestSocket
     p1.received = []
     attachCollector(p1)
     sockets.push(p1)
-    await new Promise<void>((resolve) => p1.once('open', () => resolve()))
+    await waitForOpen(p1)
 
     p1.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
     const roomCreated = await waitForEvent(

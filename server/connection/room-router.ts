@@ -127,6 +127,10 @@ const assertDevCommandAllowed = (ctx: ConnectionCtx, room: Room, requestId?: str
 type Handler<M extends ClientCommand = ClientCommand> = (ctx: ConnectionCtx, msg: M) => void
 
 function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'auth' }>): void {
+  if (!msg.token) {
+    sendCommandError(ctx, 'invalid or expired token', msg.requestId)
+    return
+  }
   const user = validateSession(msg.token)
   if (!user) {
     sendCommandError(ctx, 'invalid or expired token', msg.requestId)
