@@ -177,16 +177,13 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const existing = findIdentity(profile.provider, profile.providerUserId)
-  if (existing) {
-    const token = createSession(existing.userId)
-    redirect(res, state.returnTo ?? '/', { 'Set-Cookie': serializeSessionCookie(token) })
-    return
-  }
-
   if (state.intent === 'link') {
     if (!state.userId) {
       redirect(res, '/?page=settings&authError=not_authenticated')
+      return
+    }
+    if (findIdentity(profile.provider, profile.providerUserId)) {
+      redirect(res, '/?page=settings&authError=oauth_identity_taken')
       return
     }
     try {
@@ -195,6 +192,13 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     } catch {
       redirect(res, '/?page=settings&authError=oauth_identity_taken')
     }
+    return
+  }
+
+  const existing = findIdentity(profile.provider, profile.providerUserId)
+  if (existing) {
+    const token = createSession(existing.userId)
+    redirect(res, state.returnTo ?? '/', { 'Set-Cookie': serializeSessionCookie(token) })
     return
   }
 
