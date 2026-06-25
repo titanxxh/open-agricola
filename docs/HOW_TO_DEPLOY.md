@@ -434,6 +434,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
+| `ACCOUNT_REGISTRATION_POLICY` | `invite_only` | 账号注册策略：`invite_only` 需要一次性邀请码，`open` 开放 OAuth 注册，`disabled` 禁止新账号注册 |
 
 ### 前端（构建时注入）
 
