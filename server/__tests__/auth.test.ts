@@ -9,7 +9,9 @@ import {
   logout,
   logoutAll,
   register,
+  registerPasswordUser,
   validateSession,
+  verifyEmailToken,
 } from '../auth.ts'
 import {
   clearOnboardingCookie,
@@ -31,6 +33,9 @@ vi.mock('../db.ts', () => {
     CREATE TABLE users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      email TEXT COLLATE NOCASE,
+      email_verified_at INTEGER,
+      email_verification_sent_at INTEGER,
       display_name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_updated_at INTEGER,
@@ -43,6 +48,15 @@ vi.mock('../db.ts', () => {
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE email_verification_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX idx_email_verification_user ON email_verification_tokens(user_id);
+    CREATE INDEX idx_email_verification_expires ON email_verification_tokens(expires_at);
     CREATE TABLE auth_identities (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -181,6 +195,8 @@ import { vi } from 'vitest'
 describe('auth', () => {
   beforeEach(() => {
     delete process.env.ADMIN_USERS
+    delete process.env.ACCOUNT_REGISTRATION_POLICY
+    void verifyEmailToken
     const db = getDb()
     db.exec(`
       DELETE FROM github_propose_audit;
@@ -195,6 +211,7 @@ describe('auth', () => {
       DELETE FROM rooms;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
+      DELETE FROM email_verification_tokens;
       DELETE FROM reserved_usernames;
       DELETE FROM auth_identities;
       DELETE FROM sessions;
@@ -219,6 +236,51 @@ describe('auth', () => {
         code: 'oauth_registration_required',
         error: 'Registration requires GitHub or Google',
       })
+    })
+
+    it('password registration creates an unverified user without a session', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+
+      const result = await registerPasswordUser({
+        username: 'emailuser',
+        email: 'EmailUser@Example.COM',
+        password: 'password123',
+        confirmPassword: 'password123',
+        displayName: 'Email User',
+      })
+
+      expect(result).toMatchObject({ ok: true, status: 'verification_required' })
+      if (!result.ok) return
+
+      const row = getDb().prepare(`
+        SELECT username, email, email_verified_at
+        FROM users
+        WHERE id = ?
+      `).get(result.userId) as { username: string; email: string; email_verified_at: number | null }
+
+      expect(row.username).toBe('emailuser')
+      expect(row.email).toBe('emailuser@example.com')
+      expect(row.email_verified_at).toBeNull()
+      expect(validateSession('')).toBeNull()
+    })
+
+    it('rejects duplicate normalized emails', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      await registerPasswordUser({
+        username: 'emailone',
+        email: 'same@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      const result = await registerPasswordUser({
+        username: 'emailtwo',
+        email: 'SAME@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      expect(result).toMatchObject({ ok: false, code: 'email_taken' })
     })
   })
 
@@ -268,6 +330,20 @@ describe('auth', () => {
       if (!result.ok) return
       expect(result.token).toBeTruthy()
       expect(result.user.username).toBe('legacy')
+    })
+
+    it('blocks password login before email verification', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      await registerPasswordUser({
+        username: 'pendinglogin',
+        email: 'pending@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      const result = await login('pendinglogin', 'password123')
+
+      expect(result).toMatchObject({ ok: false, code: 'email_not_verified' })
     })
   })
 
