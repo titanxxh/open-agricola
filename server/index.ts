@@ -11,7 +11,6 @@ import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
 import {
-  register,
   login,
   logout,
   logoutAll,
