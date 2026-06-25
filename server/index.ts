@@ -10,7 +10,26 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, deleteAccount, getAccountDeletionRoomIds, type AuthErrorCode, type AuthUser } from './auth.ts'
+import {
+  register,
+  login,
+  logout,
+  logoutAll,
+  validateSession,
+  extractToken,
+  updateDisplayName,
+  changePassword,
+  isAdmin,
+  createSession,
+  deleteAccount,
+  getAccountDeletionRoomIds,
+  registerPasswordUser,
+  resendVerificationEmail,
+  sendVerificationEmail,
+  verifyEmailToken,
+  type AuthErrorCode,
+  type AuthUser,
+} from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
 import { createInvite, listInvites, revokeInvite } from './invites.ts'
@@ -190,13 +209,37 @@ const server = createServer(async (req, res) => {
       sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
-    const body = await parseBody<{ username?: string; password?: string; displayName?: string }>(req)
-    if (!body?.username || !body.password) {
-      sendJson(res, 400, authError('missing_fields', 'Missing username or password'))
+    const body = await parseBody<{
+      username?: string
+      email?: string
+      password?: string
+      confirmPassword?: string
+      displayName?: string
+      inviteCode?: string
+    }>(req)
+    if (!body?.username || !body.email || !body.password || !body.confirmPassword) {
+      sendJson(res, 400, authError('missing_fields', 'Missing registration fields'))
       return
     }
-    const result = await register(body.username, body.password, body.displayName)
-    sendJson(res, result.ok ? 200 : 400, result)
+    const result = await registerPasswordUser({
+      username: body.username,
+      email: body.email,
+      password: body.password,
+      confirmPassword: body.confirmPassword,
+      displayName: body.displayName,
+      inviteCode: body.inviteCode,
+    })
+    if (!result.ok) {
+      sendJson(res, 400, result)
+      return
+    }
+    try {
+      await sendVerificationEmail(result.userId, body.email)
+    } catch {
+      sendJson(res, 500, authError('email_delivery_failed', 'Failed to send verification email'))
+      return
+    }
+    sendJson(res, 200, { ok: true, status: 'verification_required' })
     return
   }
 
@@ -271,6 +314,40 @@ const server = createServer(async (req, res) => {
     const err = await changePassword(user.id, body.oldPassword, body.newPassword)
     if (err) { sendJson(res, 400, authError(changePasswordErrorCode(err), err)); return }
     sendJson(res, 200, { ok: true })
+    return
+  }
+
+  if (req.url?.startsWith('/api/auth/verify-email') && req.method === 'GET') {
+    const parsed = new URL(req.url, getRequestOrigin(req) || 'http://localhost')
+    const token = parsed.searchParams.get('token') ?? ''
+    const result = verifyEmailToken(token)
+    const appOrigin = process.env.PUBLIC_APP_ORIGIN || '/'
+    if (!result.ok) {
+      res.statusCode = 302
+      res.setHeader('Location', `${appOrigin.replace(/\/?$/, '/')}?page=verify-email&status=invalid`)
+      res.end()
+      return
+    }
+    res.statusCode = 302
+    res.setHeader('Location', appOrigin)
+    res.setHeader('Set-Cookie', serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }))
+    res.end()
+    return
+  }
+
+  if (req.url === '/api/auth/resend-verification' && req.method === 'POST') {
+    const ip = getClientIp(req)
+    if (!checkRateLimit(ip)) {
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
+      return
+    }
+    const body = await parseBody<{ email?: string }>(req)
+    if (!body?.email) {
+      sendJson(res, 400, authError('missing_fields', 'Missing email'))
+      return
+    }
+    const result = await resendVerificationEmail(body.email)
+    sendJson(res, result.ok ? 200 : 500, result)
     return
   }
 
