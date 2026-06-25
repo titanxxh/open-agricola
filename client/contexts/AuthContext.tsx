@@ -20,7 +20,11 @@ type AuthContextValue = AuthState & {
   logoutAll: () => Promise<void>
   refreshSession: () => Promise<void>
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
-  oauthStartUrl: (provider: 'github' | 'google', intent: 'login' | 'register' | 'link') => string
+  oauthStartUrl: (
+    provider: 'github' | 'google',
+    intent: 'login' | 'register' | 'link',
+    opts?: { inviteCode?: string },
+  ) => string
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -139,10 +143,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const oauthStartUrl = useCallback((
     provider: 'github' | 'google',
     intent: 'login' | 'register' | 'link',
+    opts?: { inviteCode?: string },
   ) => {
     const params = new URLSearchParams({ intent })
     const returnTo = currentReturnTo()
     if (returnTo) params.set('returnTo', returnTo)
+    const inviteCode = opts?.inviteCode?.trim()
+    if (intent === 'register' && inviteCode) params.set('inviteCode', inviteCode)
     return `${API_BASE}/api/auth/oauth/${provider}/start?${params.toString()}`
   }, [])
 

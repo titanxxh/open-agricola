@@ -7,12 +7,22 @@ import { LoginPage } from '../LoginPage'
 type LoginResult = { ok: boolean; code?: string; error?: string }
 
 const loginMock = vi.fn(async () => ({ ok: true }))
-const oauthStartUrlMock = vi.fn((provider: 'github' | 'google', intent: 'login' | 'register' | 'link') =>
-  `/api/auth/oauth/${provider}/start?intent=${intent}`,
-)
+const oauthStartUrlMock = vi.fn((
+  provider: 'github' | 'google',
+  intent: 'login' | 'register' | 'link',
+  opts?: { inviteCode?: string },
+) => {
+  const params = new URLSearchParams({ intent })
+  if (opts?.inviteCode) params.set('inviteCode', opts.inviteCode)
+  return `/api/auth/oauth/${provider}/start?${params.toString()}`
+})
 
 function mockUseAuthLoginResult(result: LoginResult) {
   loginMock.mockResolvedValueOnce(result)
+}
+
+function policyResponse(policy: 'invite_only' | 'open' | 'disabled' = 'invite_only'): Response {
+  return new Response(JSON.stringify({ ok: true, policy }))
 }
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -41,12 +51,18 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.oauthRegisterGoogle': '使用 Google 注册',
     'platform.oauthRegisterIntro': '新用户请先使用 GitHub 或 Google 注册。完成后你可以设置本地用户名和密码。',
     'platform.authErrors.invalid_login': '用户名或密码不正确',
+    'platform.inviteCode': '邀请码',
+    'platform.inviteCodePlaceholder': '输入一次性邀请码',
+    'platform.inviteOnlyNote': '当前只开放邀请注册',
+    'platform.authErrors.invalid_invite': '邀请码无效、已过期或已使用',
+    'platform.authErrors.registration_disabled': '当前暂不开放注册',
   }
+  const t = (key: string) => labels[key] ?? key
   return {
     useLocale: () => ({
       locale: 'zh',
       setLocale: vi.fn(),
-      t: (key: string) => labels[key] ?? key,
+      t,
     }),
   }
 })
@@ -58,6 +74,7 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
   window.history.replaceState(null, '', '/')
 })
 
@@ -83,6 +100,48 @@ describe('LoginPage auth UI', () => {
     expect(googleLink.querySelector('.oauth-provider-icon--google')).toBeTruthy()
     expect(screen.queryByLabelText('确认密码')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
+  })
+
+  it('requires invite code before oauth registration in invite-only mode', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('invite_only')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+
+    await screen.findByLabelText('邀请码')
+    expect(screen.getByRole('link', { name: '使用 GitHub 注册' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('link', { name: '使用 Google 注册' })).toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(screen.getByRole('link', { name: '使用 GitHub 注册' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('邀请码无效、已过期或已使用')
+  })
+
+  it('adds inviteCode to oauth register urls after invite entry', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('invite_only')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+    await user.type(await screen.findByLabelText('邀请码'), 'oa_valid_code')
+
+    expect(screen.getByRole('link', { name: '使用 GitHub 注册' }))
+      .toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register&inviteCode=oa_valid_code')
+    expect(screen.getByRole('link', { name: '使用 Google 注册' }))
+      .toHaveAttribute('href', '/api/auth/oauth/google/start?intent=register&inviteCode=oa_valid_code')
+  })
+
+  it('does not show invite code in open registration mode', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+
+    expect(screen.queryByLabelText('邀请码')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '使用 GitHub 注册' }))
+      .toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register')
   })
 
   it('localizes backend error codes instead of showing raw English', async () => {
