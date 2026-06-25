@@ -98,6 +98,16 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL,
       used_at INTEGER
     );
+    CREATE TABLE account_invites (
+      id TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      used_at INTEGER,
+      revoked_at INTEGER
+    );
     CREATE TABLE rooms (
       id TEXT PRIMARY KEY,
       created_by TEXT REFERENCES users(id),
@@ -188,6 +198,7 @@ vi.mock('../db.ts', () => {
 const { createLocalUserForTests, createSession, validateSession } = await import('../auth.ts')
 const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
+const { createInvite } = await import('../invites.ts')
 const { getDb } = await import('../db.ts')
 const { OAUTH_STATE_COOKIE, SESSION_COOKIE } = await import('../auth-cookies.ts')
 
@@ -280,6 +291,7 @@ describe('auth routes', () => {
   beforeEach(() => {
     wsServerMocks.endRoomsForUser.mockClear()
     wsServerMocks.closeUserConnections.mockClear()
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     getDb().exec(`
       DELETE FROM github_propose_audit;
       DELETE FROM github_propose_rate_limit;
@@ -291,6 +303,7 @@ describe('auth routes', () => {
       DELETE FROM workshop_cards;
       DELETE FROM room_players;
       DELETE FROM rooms;
+      DELETE FROM account_invites;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM auth_identities;
@@ -306,6 +319,8 @@ describe('auth routes', () => {
     delete process.env.PUBLIC_APP_ORIGIN
     delete process.env.PUBLIC_API_BASE
     delete process.env.CORS_ORIGIN
+    delete process.env.ACCOUNT_REGISTRATION_POLICY
+    delete process.env.ADMIN_USERS
   })
 
   it('login sets an HttpOnly session cookie and does not return token', async () => {
@@ -538,6 +553,127 @@ describe('auth routes', () => {
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('uniquename')
     expect(findIdentity('github', 'gh-retry')?.userId).toBe((retry.json.user as { id: string }).id)
+  })
+
+  it('reports the current registration policy', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+    const res = await requestJson('GET', '/api/auth/registration-policy')
+
+    expect(res.status).toBe(200)
+    expect(res.json).toMatchObject({ ok: true, policy: 'invite_only' })
+  })
+
+  it('requires an invite code for invite-only onboarding', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-no-invite', emailVerified: true })
+
+    const res = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'noinvite', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+    expect(findIdentity('github', 'gh-no-invite')).toBeNull()
+  })
+
+  it('consumes a valid invite during invite-only onboarding', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('admin_inviter', 'password123', 'Admin Inviter')
+    const invite = createInvite(admin.id, 7)
+    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-invited', emailVerified: true })
+
+    const res = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'invited', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+
+    expect(res.status).toBe(200)
+    const userId = (res.json.user as { id: string }).id
+    expect(findIdentity('github', 'gh-invited')?.userId).toBe(userId)
+    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string
+      used_at: number
+    }
+    expect(row.used_by).toBe(userId)
+    expect(row.used_at).toBeGreaterThan(0)
+  })
+
+  it('rejects a reused invite and keeps the onboarding ticket retryable', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('reuse_admin', 'password123', 'Reuse Admin')
+    const firstTicket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-first', emailVerified: true })
+    const secondTicket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true })
+    const invite = createInvite(admin.id, 7)
+
+    const first = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'firstinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
+      { Cookie: `oa_onboarding=${firstTicket}` },
+    )
+    expect(first.status).toBe(200)
+
+    const second = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'secondinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
+      { Cookie: `oa_onboarding=${secondTicket}` },
+    )
+
+    expect(second.status).toBe(400)
+    expect(second.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+    expect(findIdentity('github', 'gh-second')).toBeNull()
+  })
+
+  it('blocks new onboarding when registration is disabled', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
+    const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-disabled', emailVerified: true })
+
+    const res = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'disableduser', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.json).toMatchObject({ ok: false, code: 'registration_disabled' })
+    expect(findIdentity('google', 'g-disabled')).toBeNull()
+  })
+
+  it('allows existing OAuth users to log in when registration is disabled', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
+    const existing = await createLocalUserForTests('existing_oauth', 'password123', 'Existing OAuth')
+    linkIdentity(existing.id, {
+      provider: 'github',
+      providerUserId: 'gh-existing-disabled',
+      providerLogin: 'existing-gh',
+      emailVerified: true,
+    })
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
+      provider: 'github',
+      providerUserId: 'gh-existing-disabled',
+      providerLogin: 'existing-gh',
+      emailVerified: true,
+    })
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?intent=login')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+
+    const callback = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers['Set-Cookie']).toContain('oa_session=')
   })
 
   it('test oauth helper is unavailable by default', async () => {
