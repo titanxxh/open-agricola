@@ -65,11 +65,14 @@ function OAuthLink({
 }
 
 export function LoginPage() {
-  const { login, oauthStartUrl } = useAuth()
+  const { login, oauthStartUrl, registerWithPassword, resendVerification } = useAuth()
   const { t } = useLocale()
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState(() => {
     const code = new URLSearchParams(window.location.search).get('authError') ?? undefined
     return code ? authErrorMessage(code, undefined, t) : ''
@@ -78,6 +81,7 @@ export function LoginPage() {
   const [registrationPolicy, setRegistrationPolicy] = useState<RegistrationPolicy>('invite_only')
   const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
+  const [registrationSent, setRegistrationSent] = useState(false)
 
   useEffect(() => {
     if (mode !== 'register') return
@@ -110,6 +114,39 @@ export function LoginPage() {
       if (!result.ok) {
         setError(authErrorMessage(result.code, result.error, t))
       }
+    } catch {
+      setError(t('platform.networkError'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePasswordRegister = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    if (password !== confirmPassword) {
+      setError(authErrorMessage('password_mismatch', undefined, t))
+      return
+    }
+    if (inviteRequired && !trimmedInviteCode) {
+      setError(authErrorMessage('invalid_invite', undefined, t))
+      return
+    }
+    setLoading(true)
+    try {
+      const result = await registerWithPassword({
+        username,
+        email,
+        password,
+        confirmPassword,
+        displayName,
+        inviteCode: inviteRequired ? trimmedInviteCode : undefined,
+      })
+      if (!result.ok) {
+        setError(authErrorMessage(result.code, result.error, t))
+        return
+      }
+      setRegistrationSent(true)
     } catch {
       setError(t('platform.networkError'))
     } finally {
@@ -244,6 +281,88 @@ export function LoginPage() {
             >
               {t('platform.oauthRegisterGoogle')}
             </OAuthLink>
+            {registrationSent ? (
+              <div className="login-form">
+                <h2>{t('platform.checkEmailTitle')}</h2>
+                <p>{t('platform.checkEmailBody')}</p>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => { void resendVerification(email) }}
+                >
+                  {t('platform.resendVerification')}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handlePasswordRegister} className="login-form">
+                <div className="form-field">
+                  <label htmlFor="register-username">{t('platform.username')}</label>
+                  <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
+                  <input
+                    id="register-username"
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="register-email">{t('platform.email')}</label>
+                  <span className="form-hint">{t('platform.emailPlaceholder')}</span>
+                  <input
+                    id="register-email"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="register-display-name">{t('platform.displayName')}</label>
+                  <span className="form-hint">{t('platform.displayNamePlaceholder')}</span>
+                  <input
+                    id="register-display-name"
+                    type="text"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    autoComplete="nickname"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="register-password">{t('platform.password')}</label>
+                  <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
+                  <input
+                    id="register-password"
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="register-confirm-password">{t('platform.confirmPassword')}</label>
+                  <input
+                    id="register-confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+
+                <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
+                  {loading ? t('platform.loading') : t('platform.passwordRegisterBtn')}
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>
