@@ -27,7 +27,12 @@ import {
   linkIdentity,
 } from './store.ts'
 import type { OAuthIntent, OAuthProfile, OAuthProvider } from './types.ts'
-import { consumeInviteCode, getRegistrationPolicy } from '../invites.ts'
+import {
+  consumeInviteCodeHash,
+  getRegistrationPolicy,
+  hashInviteCode,
+  isInviteCodeAvailable,
+} from '../invites.ts'
 
 const SCRYPT_KEYLEN = 64
 
@@ -157,6 +162,7 @@ async function createLocalUserForOnboarding(input: {
   password: string
   displayName?: string
   inviteCode?: string
+  inviteCodeHash?: string
   profile: OAuthProfile
 }) {
   const name = input.username.trim()
@@ -171,7 +177,8 @@ async function createLocalUserForOnboarding(input: {
     return { ok: false as const, code: 'registration_disabled', error: 'Registration is disabled' }
   }
   const inviteCode = input.inviteCode?.trim() ?? ''
-  if (policy === 'invite_only' && !inviteCode) {
+  const inviteCodeHash = input.inviteCodeHash?.trim() || (inviteCode ? hashInviteCode(inviteCode) : '')
+  if (policy === 'invite_only' && !inviteCodeHash) {
     return { ok: false as const, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
   }
 
@@ -192,7 +199,7 @@ async function createLocalUserForOnboarding(input: {
         'INSERT INTO users (id, username, display_name, password_hash, password_updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       ).run(id, name, localDisplayName, passwordHash, now, now)
       linkIdentity(id, input.profile)
-      if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
+      if (policy === 'invite_only' && !consumeInviteCodeHash(db, inviteCodeHash, id, now)) {
         throw new Error('invalid invite')
       }
     })()
@@ -227,11 +234,28 @@ export function handleOAuthStart(req: IncomingMessage, res: ServerResponse, url:
   }
 
   const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
+  const policy = getRegistrationPolicy()
+  const inviteCode = url.searchParams.get('inviteCode')?.trim() ?? ''
+  let inviteCodeHash: string | undefined
+  if (intent === 'register') {
+    if (policy === 'disabled') {
+      redirect(res, appLocation('/?page=login&authError=registration_disabled'))
+      return
+    }
+    if (policy === 'invite_only') {
+      if (!inviteCode || !isInviteCodeAvailable(inviteCode)) {
+        redirect(res, appLocation('/?page=login&authError=invalid_invite'))
+        return
+      }
+      inviteCodeHash = hashInviteCode(inviteCode)
+    }
+  }
   const state = createOAuthState({
     provider,
     intent,
     ...(user ? { userId: user.id } : {}),
     ...(returnTo ? { returnTo } : {}),
+    ...(inviteCodeHash ? { inviteCodeHash } : {}),
   })
   redirect(res, buildOAuthAuthorizationUrl(provider, state, req), {
     'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
@@ -310,7 +334,7 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const ticket = createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo))
+  const ticket = createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo), state.inviteCodeHash)
   redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
     'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
   }))
@@ -339,6 +363,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     password: body.password,
     displayName: body.displayName,
     inviteCode: body.inviteCode,
+    inviteCodeHash: profile.inviteCodeHash,
     profile,
   })
   if (!result.ok) {

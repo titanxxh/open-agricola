@@ -301,6 +301,13 @@ function runMigrations(db: Database.Database): void {
         );
       `,
     },
+    {
+      version: 12,
+      sql: `
+        ALTER TABLE oauth_states ADD COLUMN invite_code_hash TEXT;
+        ALTER TABLE oauth_onboarding_tickets ADD COLUMN invite_code_hash TEXT;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
