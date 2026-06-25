@@ -401,7 +401,9 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 - [ ] `curl https://your-backend/api/health` 返回 `{"ok":true}`
 - [ ] 访问前端 URL，能看到登录页
-- [ ] 通过 GitHub 或 Google 注册新用户
+- [ ] 首次部署时先用 `ACCOUNT_REGISTRATION_POLICY=open` 注册 `ADMIN_USERS` 中的第一个管理员账号
+- [ ] 管理员能进入 Settings 生成邀请码后，将 `ACCOUNT_REGISTRATION_POLICY` 改为 `invite_only` 并重启后端
+- [ ] 通过 GitHub 或 Google + 邀请码注册新用户
 - [ ] 登录成功，进入大厅
 - [ ] 创建房间，开始游戏
 - [ ] WebSocket 连接正常（浏览器 Console 无 WS 错误）
@@ -434,7 +436,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
-| `ACCOUNT_REGISTRATION_POLICY` | `invite_only` | 账号注册策略：`invite_only` 需要一次性邀请码，`open` 开放 OAuth 注册，`disabled` 禁止新账号注册 |
+| `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
 
 ### 前端（构建时注入）
 

@@ -9,6 +9,7 @@ export type AuthUser = {
   id: string
   username: string
   displayName: string
+  isAdmin?: boolean
 }
 
 export type AuthErrorCode =
@@ -139,7 +140,7 @@ export async function login(username: string, password: string): Promise<LoginRe
   const token = createSession(row.id)
   db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id)
 
-  return { ok: true, user: { id: row.id, username: row.username, displayName: row.display_name }, token }
+  return { ok: true, user: { id: row.id, username: row.username, displayName: row.display_name, isAdmin: isAdmin(row.username) }, token }
 }
 
 export function logout(token: string): void {
@@ -157,15 +158,19 @@ const idPlaceholders = (ids: string[]): string => ids.map(() => '?').join(', ')
 export function deleteAccount(userId: string): { ok: true } {
   const db = getDb()
   const now = Date.now()
+  const userRow = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string } | undefined
   const authoredCardIds = (db.prepare('SELECT id FROM workshop_cards WHERE author_id = ?').all(userId) as Array<{ id: string }>)
     .map(row => row.id)
-  const affectedRoomIds = (db.prepare(`
-    SELECT id FROM rooms WHERE created_by = ?
-    UNION
-    SELECT room_id AS id FROM room_players WHERE user_id = ?
-  `).all(userId, userId) as Array<{ id: string }>).map(row => row.id)
+  const affectedRoomIds = getAccountDeletionRoomIds(userId)
 
   db.transaction(() => {
+    if (userRow && isAdmin(userRow.username)) {
+      db.prepare(`
+        INSERT OR IGNORE INTO reserved_usernames (username, reason, created_at)
+        VALUES (?, 'deleted_admin', ?)
+      `).run(userRow.username, now)
+    }
+
     if (affectedRoomIds.length > 0) {
       db.prepare(`
         UPDATE rooms
@@ -205,6 +210,14 @@ export function deleteAccount(userId: string): { ok: true } {
   return { ok: true }
 }
 
+export function getAccountDeletionRoomIds(userId: string): string[] {
+  return (getDb().prepare(`
+    SELECT id FROM rooms WHERE created_by = ?
+    UNION
+    SELECT room_id AS id FROM room_players WHERE user_id = ?
+  `).all(userId, userId) as Array<{ id: string }>).map(row => row.id)
+}
+
 export function validateSession(token: string): AuthUser | null {
   if (!token) return null
   const db = getDb()
@@ -240,6 +253,13 @@ export function isAdmin(username: string): boolean {
     .map(s => s.trim())
     .filter(Boolean)
     .includes(username)
+}
+
+export function isUsernameReserved(username: string): boolean {
+  const name = username.trim()
+  if (!name) return false
+  const row = getDb().prepare('SELECT 1 FROM reserved_usernames WHERE username = ?').get(name)
+  return Boolean(row)
 }
 
 /** Change password. Returns error string or null on success. */

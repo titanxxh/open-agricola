@@ -10,7 +10,7 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, deleteAccount, type AuthErrorCode, type AuthUser } from './auth.ts'
+import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, deleteAccount, getAccountDeletionRoomIds, type AuthErrorCode, type AuthUser } from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
 import { createInvite, listInvites, revokeInvite } from './invites.ts'
@@ -242,7 +242,7 @@ const server = createServer(async (req, res) => {
     const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
-    wssCtx?.lobby.endRoomsForUser(user.id)
+    wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
     const result = deleteAccount(user.id)
     wssCtx?.closeUserConnections(user.id)
     sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
