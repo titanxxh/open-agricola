@@ -88,6 +88,7 @@ describe('LoginPage auth UI', () => {
 
   it('register mode offers GitHub and Google instead of username password registration', async () => {
     const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
     render(<LoginPage />)
 
     await user.click(screen.getByRole('tab', { name: '注册' }))
@@ -110,10 +111,14 @@ describe('LoginPage auth UI', () => {
     await user.click(screen.getByRole('tab', { name: '注册' }))
 
     await screen.findByLabelText('邀请码')
-    expect(screen.getByRole('link', { name: '使用 GitHub 注册' })).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.getByRole('link', { name: '使用 Google 注册' })).toHaveAttribute('aria-disabled', 'true')
+    const githubControl = screen.getByRole('button', { name: '使用 GitHub 注册' })
+    const googleControl = screen.getByRole('button', { name: '使用 Google 注册' })
+    expect(githubControl).toHaveAttribute('aria-disabled', 'true')
+    expect(googleControl).toHaveAttribute('aria-disabled', 'true')
+    expect(githubControl).not.toHaveAttribute('href')
+    expect(googleControl).not.toHaveAttribute('href')
 
-    await user.click(screen.getByRole('link', { name: '使用 GitHub 注册' }))
+    await user.click(githubControl)
 
     expect(screen.getByRole('alert')).toHaveTextContent('邀请码无效、已过期或已使用')
   })

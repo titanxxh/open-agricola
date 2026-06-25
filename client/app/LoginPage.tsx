@@ -37,25 +37,22 @@ function OAuthLink({
   children,
 }: {
   provider: OAuthProvider
-  href: string
+  href?: string
   disabled?: boolean
   onDisabledClick?: () => void
   children: ReactNode
 }) {
   if (disabled) {
     return (
-      <a
+      <button
+        type="button"
         className="btn-primary oauth-provider-link is-disabled"
-        href={href}
         aria-disabled="true"
-        onClick={e => {
-          e.preventDefault()
-          onDisabledClick?.()
-        }}
+        onClick={() => { onDisabledClick?.() }}
       >
         <OAuthProviderIcon provider={provider} />
         <span>{children}</span>
-      </a>
+      </button>
     )
   }
 

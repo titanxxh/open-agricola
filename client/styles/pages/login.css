@@ -162,6 +162,14 @@
   text-decoration: none;
 }
 
+.login-form .oauth-provider-link.is-disabled,
+.login-form .oauth-provider-link.is-disabled:hover,
+.login-form .oauth-provider-link.is-disabled:active {
+  background: #93a68a;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .oauth-provider-icon {
   width: 20px;
   height: 20px;
