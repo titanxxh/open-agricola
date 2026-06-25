@@ -308,6 +308,26 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE oauth_onboarding_tickets ADD COLUMN invite_code_hash TEXT;
       `,
     },
+    {
+      version: 13,
+      sql: `
+        ALTER TABLE users ADD COLUMN email TEXT COLLATE NOCASE;
+        ALTER TABLE users ADD COLUMN email_verified_at INTEGER;
+        ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER;
+        UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL;
+        CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+
+        CREATE TABLE email_verification_tokens (
+          token_hash TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          expires_at INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          used_at INTEGER
+        );
+        CREATE INDEX idx_email_verification_user ON email_verification_tokens(user_id);
+        CREATE INDEX idx_email_verification_expires ON email_verification_tokens(expires_at);
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
