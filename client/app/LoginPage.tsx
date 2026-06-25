@@ -124,14 +124,15 @@ export function LoginPage() {
   const handlePasswordRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
+    if (registerDisabled) {
+      handleDisabledRegisterClick()
+      return
+    }
     if (password !== confirmPassword) {
       setError(authErrorMessage('password_mismatch', undefined, t))
       return
     }
-    if (inviteRequired && !trimmedInviteCode) {
-      setError(authErrorMessage('invalid_invite', undefined, t))
-      return
-    }
+    setRegistrationSent(false)
     setLoading(true)
     try {
       const result = await registerWithPassword({
@@ -151,6 +152,18 @@ export function LoginPage() {
       setError(t('platform.networkError'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    setError('')
+    try {
+      const result = await resendVerification(email)
+      if (!result.ok) {
+        setError(authErrorMessage(result.code, result.error, t))
+      }
+    } catch {
+      setError(t('platform.networkError'))
     }
   }
 
@@ -196,7 +209,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'login'}
             className={`login-mode-tabs__tab${mode === 'login' ? ' is-active' : ''}`}
-            onClick={() => { setMode('login'); setError(''); setPolicyLoadFailed(false) }}
+            onClick={() => { setMode('login'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false) }}
           >
             {t('platform.loginBtn')}
           </button>
@@ -205,7 +218,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'register'}
             className={`login-mode-tabs__tab${mode === 'register' ? ' is-active' : ''}`}
-            onClick={() => { setMode('register'); setError(''); setPolicyLoadFailed(false) }}
+            onClick={() => { setMode('register'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false) }}
           >
             {t('platform.registerBtn')}
           </button>
@@ -288,7 +301,7 @@ export function LoginPage() {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => { void resendVerification(email) }}
+                  onClick={() => { void handleResendVerification() }}
                 >
                   {t('platform.resendVerification')}
                 </button>
@@ -358,7 +371,7 @@ export function LoginPage() {
                   />
                 </div>
 
-                <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
+                <button type="submit" className="btn-primary" disabled={loading || registerDisabled} aria-busy={loading}>
                   {loading ? t('platform.loading') : t('platform.passwordRegisterBtn')}
                 </button>
               </form>
