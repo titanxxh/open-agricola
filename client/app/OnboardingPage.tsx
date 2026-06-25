@@ -43,7 +43,7 @@ export function OnboardingPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
-  const [policy, setPolicy] = useState<RegistrationPolicy>('invite_only')
+  const [policy, setPolicy] = useState<RegistrationPolicy | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
