@@ -5,6 +5,10 @@ import Database from 'better-sqlite3'
 
 let routeHandler: ((req: IncomingMessage, res: ServerResponse) => void | Promise<void>) | null = null
 const originalNodeEnv = process.env.NODE_ENV
+const wsServerMocks = vi.hoisted(() => ({
+  endRoomsForUser: vi.fn(() => ({ endedRoomIds: [] })),
+  closeUserConnections: vi.fn(),
+}))
 
 vi.mock('node:http', async () => {
   const actual = await vi.importActual<typeof import('node:http')>('node:http')
@@ -22,8 +26,9 @@ vi.mock('../connection/ws-server.ts', () => ({
     lobby: {
       getRooms: () => [],
       dissolveRoomById: () => ({ ok: true }),
+      endRoomsForUser: wsServerMocks.endRoomsForUser,
     },
-    closeUserConnections: vi.fn(),
+    closeUserConnections: wsServerMocks.closeUserConnections,
   }),
 }))
 
@@ -93,6 +98,89 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL,
       used_at INTEGER
     );
+    CREATE TABLE rooms (
+      id TEXT PRIMARY KEY,
+      created_by TEXT REFERENCES users(id),
+      state_json TEXT,
+      max_players INTEGER NOT NULL DEFAULT 2,
+      status TEXT NOT NULL DEFAULT 'waiting',
+      version INTEGER NOT NULL DEFAULT 0,
+      custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE room_players (
+      room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      player_index INTEGER NOT NULL,
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (room_id, user_id)
+    );
+    CREATE TABLE workshop_cards (
+      id TEXT PRIMARY KEY,
+      author_id TEXT NOT NULL REFERENCES users(id),
+      card_id TEXT NOT NULL,
+      card_type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      card_json TEXT NOT NULL,
+      code_manifest TEXT,
+      art_url TEXT,
+      art_prompt TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      featured INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE card_likes (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, card_id)
+    );
+    CREATE TABLE card_comments (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      author_id TEXT NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE sandbox_cards (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, workshop_card_id)
+    );
+    CREATE TABLE sandbox_settings (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      player_count INTEGER NOT NULL DEFAULT 2,
+      deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE workshop_card_versions (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      card_json TEXT NOT NULL,
+      code_manifest TEXT,
+      art_url TEXT,
+      version_number INTEGER NOT NULL,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE github_propose_rate_limit (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      last_propose_at INTEGER NOT NULL
+    );
+    CREATE TABLE github_propose_audit (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      workshop_card_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      pr_url TEXT,
+      error_code TEXT,
+      error_message TEXT,
+      created_at INTEGER NOT NULL
+    );
   `)
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
@@ -101,7 +189,7 @@ const { createLocalUserForTests, createSession, validateSession } = await import
 const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { getDb } = await import('../db.ts')
-const { OAUTH_STATE_COOKIE } = await import('../auth-cookies.ts')
+const { OAUTH_STATE_COOKIE, SESSION_COOKIE } = await import('../auth-cookies.ts')
 
 await import('../index.ts')
 
@@ -190,7 +278,19 @@ function startOAuthCookie(res: JsonResponse): string {
 
 describe('auth routes', () => {
   beforeEach(() => {
+    wsServerMocks.endRoomsForUser.mockClear()
+    wsServerMocks.closeUserConnections.mockClear()
     getDb().exec(`
+      DELETE FROM github_propose_audit;
+      DELETE FROM github_propose_rate_limit;
+      DELETE FROM workshop_card_versions;
+      DELETE FROM sandbox_cards;
+      DELETE FROM sandbox_settings;
+      DELETE FROM card_comments;
+      DELETE FROM card_likes;
+      DELETE FROM workshop_cards;
+      DELETE FROM room_players;
+      DELETE FROM rooms;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM auth_identities;
@@ -217,6 +317,38 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
     expect(res.headers['Set-Cookie']).toContain('HttpOnly')
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
+  })
+
+  it('delete account requires authentication', async () => {
+    const res = await requestJson('DELETE', '/api/auth/account')
+
+    expect(res.status).toBe(401)
+    expect(res.json).toMatchObject({ ok: false, code: 'not_authenticated' })
+    expect(wsServerMocks.endRoomsForUser).not.toHaveBeenCalled()
+  })
+
+  it('delete account removes the current user and clears the session cookie', async () => {
+    const user = await createLocalUserForTests('delete_route', 'password123', 'Delete Route')
+    const token = createSession(user.id)
+    const now = Date.now()
+    getDb().prepare(`
+      INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at)
+      VALUES (?, ?, ?, 2, 'playing', 1, '[]', ?, ?)
+    `).run('route-room', user.id, '{"private":"name"}', now, now)
+    getDb().prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
+      .run('route-room', user.id, 0, now)
+
+    const res = await requestJson('DELETE', '/api/auth/account', undefined, {
+      Cookie: `${SESSION_COOKIE}=${token}`,
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.json).toEqual({ ok: true })
+    expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
+    expect(validateSession(token)).toBeNull()
+    expect((getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n).toBe(0)
+    expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id)
+    expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
   })
 
   it('uses cross-site cookie attributes for production frontend and backend origins', async () => {

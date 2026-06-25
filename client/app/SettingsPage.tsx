@@ -25,7 +25,9 @@ export function SettingsPage() {
   const authError = new URLSearchParams(window.location.search).get('authError') ?? undefined
   const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [deleteMsg, setDeleteMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -91,6 +93,26 @@ export function SettingsPage() {
   const handleLogoutAll = async () => {
     await logoutAll()
     setPage('lobby')
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleteMsg(null)
+    setDeleting(true)
+    try {
+      const resp = await apiFetch('/api/auth/account', { method: 'DELETE' })
+      const d = await resp.json()
+      if (d.ok) {
+        setDeleteMsg({ ok: true, text: t('platform.accountDeleted') })
+        await logout()
+        setPage('lobby')
+      } else {
+        setDeleteMsg({ ok: false, text: authErrorMessage(d.code, d.error, t) })
+      }
+    } catch {
+      setDeleteMsg({ ok: false, text: t('platform.networkError') })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const githubIdentity = identities.find(identity => identity.provider === 'github')
@@ -208,6 +230,17 @@ export function SettingsPage() {
           {t('platform.logoutAllDevices')}
         </DangerButton>
         <p className="settings-hint">{t('platform.logoutNote')}</p>
+        <DangerButton
+          confirmText={t('platform.confirmDeleteAccount')}
+          onConfirm={handleDeleteAccount}
+          disabled={deleting}
+        >
+          {t('platform.deleteAccount')}
+        </DangerButton>
+        {deleteMsg && (
+          <div className={deleteMsg.ok ? 'settings-success' : 'form-error'}>{deleteMsg.text}</div>
+        )}
+        <p className="settings-hint">{t('platform.deleteAccountNote')}</p>
       </Section>
     </div>
   )
