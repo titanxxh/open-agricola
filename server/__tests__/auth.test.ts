@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import * as emailModule from '../email.ts'
 import {
   changePassword,
   createEmailVerificationToken,
@@ -11,6 +12,7 @@ import {
   logoutAll,
   register,
   registerPasswordUser,
+  sendVerificationEmail,
   validateSession,
   verifyEmailToken,
 } from '../auth.ts'
@@ -206,6 +208,11 @@ vi.mock('../db.ts', () => {
 import { vi } from 'vitest'
 
 describe('auth', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete process.env.PUBLIC_API_BASE
+  })
+
   beforeEach(() => {
     delete process.env.ADMIN_USERS
     delete process.env.ACCOUNT_REGISTRATION_POLICY
@@ -507,6 +514,28 @@ describe('auth', () => {
 
       const reused = verifyEmailToken(token)
       expect(reused).toMatchObject({ ok: false, code: 'invalid_or_expired_token' })
+    })
+
+    it('sends verification email using PUBLIC_API_BASE for the link', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      process.env.PUBLIC_API_BASE = 'https://api.example/'
+      const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue()
+      const created = await registerPasswordUser({
+        username: 'mailverify',
+        email: 'mailverify@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+
+      await sendVerificationEmail(created.userId, 'mailverify@example.com')
+
+      expect(sendEmailSpy).toHaveBeenCalledWith(expect.objectContaining({
+        to: 'mailverify@example.com',
+        text: expect.stringContaining('https://api.example/api/auth/verify-email?token='),
+        html: expect.stringContaining('href="https://api.example/api/auth/verify-email?token='),
+      }))
     })
   })
 

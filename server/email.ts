@@ -8,9 +8,10 @@ export type SendEmailInput = {
 export async function sendEmail(input: SendEmailInput): Promise<void> {
   const delivery = process.env.EMAIL_DELIVERY || 'log'
   if (delivery === 'log') {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[email] to=${input.to} subject=${input.subject}\n${input.text}`)
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('EMAIL_DELIVERY must be set to resend in production')
     }
+    console.log(`[email] to=${input.to} subject=${input.subject}\n${input.text}`)
     return
   }
 
