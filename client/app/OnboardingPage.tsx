@@ -44,19 +44,29 @@ export function OnboardingPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [policy, setPolicy] = useState<RegistrationPolicy | null>(null)
+  const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     fetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
-      .then(resp => resp.json())
+      .then(resp => {
+        if (!resp.ok) throw new Error('registration policy request failed')
+        return resp.json()
+      })
       .then(data => {
         if (!cancelled && (data.policy === 'invite_only' || data.policy === 'open' || data.policy === 'disabled')) {
           setPolicy(data.policy)
+          setPolicyLoadFailed(false)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) {
+          setPolicyLoadFailed(true)
+          setError(t('platform.networkError'))
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -79,6 +89,10 @@ export function OnboardingPage() {
     }
     if (policy === 'disabled') {
       setError(authErrorMessage('registration_disabled', undefined, t))
+      return
+    }
+    if (policyLoadFailed) {
+      setError(t('platform.networkError'))
       return
     }
     if (policy === 'invite_only' && !inviteCode.trim()) {
@@ -196,7 +210,7 @@ export function OnboardingPage() {
 
           {error && <div className="form-error" role="alert">{error}</div>}
 
-          <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
+          <button type="submit" className="btn-primary" disabled={loading || policyLoadFailed} aria-busy={loading}>
             {loading ? t('platform.loading') : t('platform.onboardingTitle')}
           </button>
         </form>
