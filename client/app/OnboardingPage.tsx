@@ -64,7 +64,6 @@ export function OnboardingPage() {
       .catch(() => {
         if (!cancelled) {
           setPolicyLoadFailed(true)
-          setError(t('platform.networkError'))
         }
       })
     return () => {
@@ -128,6 +127,8 @@ export function OnboardingPage() {
       setLoading(false)
     }
   }
+
+  const formError = error || (policyLoadFailed ? t('platform.networkError') : '')
 
   return (
     <div className="login-page">
@@ -208,7 +209,7 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {error && <div className="form-error" role="alert">{error}</div>}
+          {formError && <div className="form-error" role="alert">{formError}</div>}
 
           <button type="submit" className="btn-primary" disabled={loading || policyLoadFailed} aria-busy={loading}>
             {loading ? t('platform.loading') : t('platform.onboardingTitle')}

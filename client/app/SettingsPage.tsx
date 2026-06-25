@@ -68,8 +68,19 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!user?.isAdmin) return
-    void loadInvites()
-  }, [loadInvites, user?.isAdmin])
+    let cancelled = false
+    apiFetch('/api/admin/invites')
+      .then(resp => resp.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.ok) setInvites(data.invites ?? [])
+        else setInviteMsg({ ok: false, text: authErrorMessage(data.code, data.error, t) })
+      })
+      .catch(() => {
+        if (!cancelled) setInviteMsg({ ok: false, text: t('platform.networkError') })
+      })
+    return () => { cancelled = true }
+  }, [apiFetch, t, user?.isAdmin])
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault()
