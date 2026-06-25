@@ -273,6 +273,24 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE oauth_onboarding_tickets ADD COLUMN return_to TEXT;
       `,
     },
+    {
+      version: 10,
+      sql: `
+        CREATE TABLE account_invites (
+          id TEXT PRIMARY KEY,
+          code_hash TEXT NOT NULL UNIQUE,
+          created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER,
+          used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+          used_at INTEGER,
+          revoked_at INTEGER
+        );
+        CREATE INDEX idx_account_invites_created ON account_invites(created_at DESC);
+        CREATE INDEX idx_account_invites_used ON account_invites(used_at);
+        CREATE INDEX idx_account_invites_expires ON account_invites(expires_at);
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
