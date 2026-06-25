@@ -55,6 +55,14 @@ function policyResponse(policy: 'invite_only' | 'open' | 'disabled' = 'invite_on
   return new Response(JSON.stringify({ ok: true, policy }))
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>(res => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -168,5 +176,35 @@ describe('OnboardingPage', () => {
         }),
       )
     })
+  })
+
+  it('does not locally block open onboarding while registration policy is still loading', async () => {
+    const user = userEvent.setup()
+    const policyFetch = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(policyFetch.promise)
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'newuser', displayName: 'New User' },
+      })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OnboardingPage />)
+
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('/api/auth/onboarding/complete'),
+        expect.objectContaining({
+          body: expect.not.stringContaining('"inviteCode"'),
+        }),
+      )
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
