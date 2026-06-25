@@ -207,4 +207,22 @@ describe('OnboardingPage', () => {
     })
     expect(screen.queryByRole('alert')).toBeNull()
   })
+
+  it('shows a network error and blocks submit when registration policy fails to load', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error('offline'))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OnboardingPage />)
+
+    await screen.findByRole('alert')
+    expect(screen.getByRole('alert')).toHaveTextContent('网络错误')
+    expect(screen.getByRole('button', { name: '完成注册' })).toBeDisabled()
+
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

@@ -43,6 +43,7 @@ public/cards-manifest.json
 
 # superpowers skill artifacts (spec/plan/notes) — never commit
 docs/superpowers/
+.superpowers/
 
 # Claude Code: track shared settings (hooks) but keep personal/runtime out
 !.claude/
