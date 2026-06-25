@@ -1,22 +1,31 @@
-import { scrypt, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
+import { getRegistrationPolicy } from './invites.ts'
 
 const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 
 export type AuthUser = {
   id: string
   username: string
   displayName: string
+  email?: string | null
+  emailVerified?: boolean
   isAdmin?: boolean
 }
 
 export type AuthErrorCode =
   | 'invalid_login'
+  | 'invalid_email'
   | 'invalid_username'
   | 'invalid_password'
   | 'password_mismatch'
+  | 'email_taken'
+  | 'email_not_verified'
+  | 'invalid_or_expired_token'
+  | 'email_delivery_failed'
   | 'username_taken'
   | 'invalid_invite'
   | 'registration_disabled'
@@ -43,6 +52,19 @@ export type LoginResult =
   | { ok: true; user: AuthUser; token: string }
   | { ok: false; code: AuthErrorCode; error: string }
 
+export type RegisterPasswordInput = {
+  username: string
+  email: string
+  password: string
+  confirmPassword: string
+  displayName?: string
+  inviteCode?: string
+}
+
+export type RegisterPasswordResult =
+  | { ok: true; status: 'verification_required'; userId: string }
+  | { ok: false; code: AuthErrorCode; error: string }
+
 function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const salt = randomBytes(16).toString('hex')
@@ -66,11 +88,105 @@ function verifyPassword(password: string, stored: string): Promise<boolean> {
   })
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+function validateEmail(email: string): string | null {
+  const normalized = normalizeEmail(email)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return 'Email is invalid'
+  }
+  if (normalized.length > 254) return 'Email is invalid'
+  return null
+}
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
 export async function register(username: string, password: string, displayName?: string): Promise<AuthResult> {
   void username
   void password
   void displayName
   return { ok: false, code: 'oauth_registration_required', error: 'Registration requires GitHub or Google' }
+}
+
+export async function registerPasswordUser(input: RegisterPasswordInput): Promise<RegisterPasswordResult> {
+  const policy = getRegistrationPolicy()
+  if (policy === 'disabled') {
+    return { ok: false, code: 'registration_disabled', error: 'Registration is disabled' }
+  }
+  if (policy !== 'open') {
+    return { ok: false, code: 'invalid_invite', error: 'Invite code is required' }
+  }
+
+  const username = input.username.trim()
+  const email = normalizeEmail(input.email)
+  const usernameError = validateUsername(username)
+  if (usernameError) return { ok: false, code: 'invalid_username', error: usernameError }
+  const emailError = validateEmail(email)
+  if (emailError) return { ok: false, code: 'invalid_email', error: emailError }
+  if (!input.password || input.password.length < 8) {
+    return { ok: false, code: 'invalid_password', error: 'Password must be at least 8 characters' }
+  }
+  if (input.password !== input.confirmPassword) {
+    return { ok: false, code: 'password_mismatch', error: 'Passwords do not match' }
+  }
+
+  const db = getDb()
+  if (db.prepare('SELECT id FROM users WHERE username = ?').get(username) || isUsernameReserved(username)) {
+    return { ok: false, code: 'username_taken', error: 'Username already taken' }
+  }
+  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+    return { ok: false, code: 'email_taken', error: 'Email already taken' }
+  }
+
+  const id = nanoid()
+  const passwordHash = await hashPassword(input.password)
+  const now = Date.now()
+  const name = input.displayName?.trim() || username
+  db.prepare(`
+    INSERT INTO users (
+      id, username, email, email_verified_at, email_verification_sent_at,
+      display_name, password_hash, password_updated_at, created_at
+    )
+    VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+  `).run(id, username, email, name, passwordHash, now, now)
+
+  return { ok: true, status: 'verification_required', userId: id }
+}
+
+export async function verifyEmailToken(token: string): Promise<AuthResult> {
+  const tokenHash = hashToken(token)
+  const now = Date.now()
+  const row = getDb().prepare(`
+    SELECT u.id, u.username, u.display_name, u.email, u.email_verified_at
+    FROM email_verification_tokens t
+    JOIN users u ON u.id = t.user_id
+    WHERE t.token_hash = ?
+      AND t.used_at IS NULL
+      AND t.expires_at > ?
+      AND t.created_at >= ?
+  `).get(tokenHash, now, now - EMAIL_VERIFICATION_TTL_MS) as
+    | { id: string; username: string; display_name: string; email: string | null; email_verified_at: number | null }
+    | undefined
+
+  if (!row) {
+    return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
+  }
+
+  return {
+    ok: true,
+    user: {
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      email: row.email,
+      emailVerified: row.email_verified_at !== null,
+      isAdmin: isAdmin(row.username),
+    },
+  }
 }
 
 function validateUsername(username: string): string | null {
@@ -103,8 +219,11 @@ export async function createLocalUserForTests(
   const name = displayName?.trim() || username
 
   db.prepare(
-    'INSERT INTO users (id, username, display_name, password_hash, password_updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(id, username, name, passwordHash, now, now)
+    `INSERT INTO users (
+      id, username, email, email_verified_at, email_verification_sent_at,
+      display_name, password_hash, password_updated_at, created_at
+    ) VALUES (?, ?, NULL, ?, NULL, ?, ?, ?, ?)`,
+  ).run(id, username, now, name, passwordHash, now, now)
 
   return { id, username, displayName: name }
 }
@@ -124,8 +243,17 @@ export async function login(username: string, password: string): Promise<LoginRe
 
   const db = getDb()
   const row = db.prepare(
-    'SELECT id, username, display_name, password_hash FROM users WHERE username = ?',
-  ).get(username) as { id: string; username: string; display_name: string; password_hash: string } | undefined
+    'SELECT id, username, display_name, password_hash, email, email_verified_at FROM users WHERE username = ?',
+  ).get(username) as
+    | {
+      id: string
+      username: string
+      display_name: string
+      password_hash: string
+      email: string | null
+      email_verified_at: number | null
+    }
+    | undefined
 
   if (!row) {
     return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
@@ -135,12 +263,26 @@ export async function login(username: string, password: string): Promise<LoginRe
   if (!valid) {
     return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
   }
+  if (row.email && row.email_verified_at === null) {
+    return { ok: false, code: 'email_not_verified', error: 'Email is not verified' }
+  }
 
   const now = Date.now()
   const token = createSession(row.id)
   db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id)
 
-  return { ok: true, user: { id: row.id, username: row.username, displayName: row.display_name, isAdmin: isAdmin(row.username) }, token }
+  return {
+    ok: true,
+    user: {
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      email: row.email,
+      emailVerified: !row.email || row.email_verified_at !== null,
+      isAdmin: isAdmin(row.username),
+    },
+    token,
+  }
 }
 
 export function logout(token: string): void {
