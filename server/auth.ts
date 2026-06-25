@@ -2,9 +2,11 @@ import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'no
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
 import { consumeInviteCode, getRegistrationPolicy } from './invites.ts'
+import { sendEmail } from './email.ts'
 
 const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 
 export type AuthUser = {
   id: string
@@ -182,35 +184,81 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   return { ok: true, status: 'verification_required', userId: id }
 }
 
-export async function verifyEmailToken(token: string): Promise<AuthResult> {
-  const tokenHash = hashToken(token)
+export function createEmailVerificationToken(userId: string): string {
+  const db = getDb()
   const now = Date.now()
-  const row = getDb().prepare(`
-    SELECT u.id, u.username, u.display_name, u.email, u.email_verified_at
+  const token = randomBytes(32).toString('base64url')
+  const tokenHash = hashToken(token)
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE email_verification_tokens
+      SET used_at = ?
+      WHERE user_id = ? AND used_at IS NULL
+    `).run(now, userId)
+    db.prepare(`
+      INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at, used_at)
+      VALUES (?, ?, ?, ?, NULL)
+    `).run(tokenHash, userId, now + EMAIL_VERIFICATION_TTL_MS, now)
+    db.prepare('UPDATE users SET email_verification_sent_at = ? WHERE id = ?').run(now, userId)
+  })()
+  return token
+}
+
+export function verifyEmailToken(rawToken: string): LoginResult {
+  const token = rawToken.trim()
+  if (!token) {
+    return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
+  }
+  const db = getDb()
+  const now = Date.now()
+  const row = db.prepare(`
+    SELECT t.token_hash, t.user_id, u.username, u.display_name, u.email
     FROM email_verification_tokens t
     JOIN users u ON u.id = t.user_id
     WHERE t.token_hash = ?
       AND t.used_at IS NULL
       AND t.expires_at > ?
-  `).get(tokenHash, now) as
-    | { id: string; username: string; display_name: string; email: string | null; email_verified_at: number | null }
+  `).get(hashToken(token), now) as
+    | { token_hash: string; user_id: string; username: string; display_name: string; email: string | null }
     | undefined
 
   if (!row) {
     return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
   }
 
+  const session = db.transaction(() => {
+    db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').run(now, row.token_hash)
+    db.prepare('UPDATE users SET email_verified_at = ?, last_login_at = ? WHERE id = ?').run(now, now, row.user_id)
+    return createSession(row.user_id)
+  })()
+
   return {
     ok: true,
+    token: session,
     user: {
-      id: row.id,
+      id: row.user_id,
       username: row.username,
       displayName: row.display_name,
       email: row.email,
-      emailVerified: row.email_verified_at !== null,
+      emailVerified: true,
       isAdmin: isAdmin(row.username),
     },
   }
+}
+
+function publicApiBase(): string {
+  return (process.env.PUBLIC_API_BASE || 'http://localhost:5175').replace(/\/$/, '')
+}
+
+export async function sendVerificationEmail(userId: string, email: string): Promise<void> {
+  const token = createEmailVerificationToken(userId)
+  const link = `${publicApiBase()}/api/auth/verify-email?token=${encodeURIComponent(token)}`
+  await sendEmail({
+    to: email,
+    subject: 'Verify your Open Agricola email',
+    text: `Verify your Open Agricola email: ${link}`,
+    html: `<p>Verify your Open Agricola email:</p><p><a href="${link}">Verify email</a></p>`,
+  })
 }
 
 function validateUsername(username: string): string | null {
