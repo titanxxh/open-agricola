@@ -64,6 +64,7 @@ vi.mock('../db.ts', () => {
       intent TEXT NOT NULL,
       user_id TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -78,6 +79,7 @@ vi.mock('../db.ts', () => {
       display_name TEXT,
       avatar_url TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -198,6 +200,15 @@ describe('auth', () => {
       DELETE FROM sessions;
       DELETE FROM users;
     `)
+  })
+
+  it('test schema includes invite_code_hash columns for oauth temp tables', () => {
+    const db = getDb()
+    const stateColumns = db.prepare('PRAGMA table_info(oauth_states)').all() as Array<{ name: string }>
+    const ticketColumns = db.prepare('PRAGMA table_info(oauth_onboarding_tickets)').all() as Array<{ name: string }>
+
+    expect(stateColumns.map(column => column.name)).toContain('invite_code_hash')
+    expect(ticketColumns.map(column => column.name)).toContain('invite_code_hash')
   })
 
   describe('register', () => {
