@@ -80,6 +80,24 @@ export function listInvites(now: number = Date.now()): ListedInvite[] {
   }))
 }
 
+function isInviteHashAvailable(codeHash: string, now: number): boolean {
+  const row = getDb().prepare(`
+    SELECT id
+    FROM account_invites
+    WHERE code_hash = ?
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > ?)
+  `).get(codeHash, now)
+  return Boolean(row)
+}
+
+export function isInviteCodeAvailable(code: string, now: number = Date.now()): boolean {
+  const normalized = code.trim()
+  if (!normalized) return false
+  return isInviteHashAvailable(hashInviteCode(normalized), now)
+}
+
 export function revokeInvite(inviteId: string, now: number = Date.now()): boolean {
   const result = getDb().prepare(`
     UPDATE account_invites
@@ -105,5 +123,24 @@ export function consumeInviteCode(
       AND revoked_at IS NULL
       AND (expires_at IS NULL OR expires_at > ?)
   `).run(userId, now, hashInviteCode(normalized), now)
+  return result.changes === 1
+}
+
+export function consumeInviteCodeHash(
+  db: Database.Database,
+  codeHash: string,
+  userId: string,
+  now: number = Date.now(),
+): boolean {
+  const normalizedHash = codeHash.trim()
+  if (!normalizedHash) return false
+  const result = db.prepare(`
+    UPDATE account_invites
+    SET used_by = ?, used_at = ?
+    WHERE code_hash = ?
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > ?)
+  `).run(userId, now, normalizedHash, now)
   return result.changes === 1
 }
