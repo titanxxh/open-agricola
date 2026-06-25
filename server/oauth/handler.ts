@@ -12,7 +12,7 @@ import {
   serializeSessionCookie,
   SESSION_COOKIE,
 } from '../auth-cookies.ts'
-import { createSession, validateSession } from '../auth.ts'
+import { createSession, isUsernameReserved, validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import { corsHeaders, getRequestOrigin } from '../http-origin.ts'
 import { assertOAuthProvider, buildOAuthAuthorizationUrl, exchangeOAuthCode } from './providers.ts'
@@ -177,7 +177,9 @@ async function createLocalUserForOnboarding(input: {
 
   const db = getDb()
   const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(name)
-  if (existing) return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
+  if (existing || isUsernameReserved(name)) {
+    return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
+  }
 
   const id = nanoid()
   const passwordHash = await hashPassword(input.password)

@@ -240,4 +240,51 @@ describe('lobby.endRoomsForUser', () => {
     expect(persistence.load('joined-room')?.meta.status).toBe('finished')
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
   })
+
+  it('ends rooms by persisted affected ids when the deleted user is disconnected', () => {
+    const closeCalls: string[] = []
+    const fakeWs = (id: string) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'disconnected-joined-room',
+      createdBy: 'u2',
+      status: 'playing',
+      players: [
+        { ws: fakeWs('u2') as never, playerIndex: 0, name: 'p0', userId: 'u2' },
+      ],
+    }))
+    registry.set(fakeRoom({
+      id: 'unrelated-room',
+      createdBy: 'u2',
+      status: 'playing',
+      players: [
+        { ws: fakeWs('unrelated-u2') as never, playerIndex: 0, name: 'p0', userId: 'u2' },
+      ],
+    }))
+    registry.touchActivity('disconnected-joined-room', 1000)
+    const persistence = new InMemoryRoomPersistence()
+    for (const room of registry.iter()) {
+      persistence.save(room.id, { _stub: true } as never, {
+        createdBy: room.createdBy ?? null,
+        maxPlayers: room.maxPlayers,
+        customCardDbIds: [],
+        status: room.status,
+        players: room.id === 'disconnected-joined-room'
+          ? [{ userId: 'u1', playerIndex: 1 }, { userId: 'u2', playerIndex: 0 }]
+          : [{ userId: 'u2', playerIndex: 0 }],
+      })
+    }
+    const broadcaster = fakeBroadcaster()
+    const lobby = createLobby({ registry, persistence, broadcaster })
+
+    expect(lobby.endRoomsForUser('u1', ['disconnected-joined-room'])).toEqual({ endedRoomIds: ['disconnected-joined-room'] })
+    expect(closeCalls).toEqual(['u2'])
+    expect(broadcaster.calls.filter((event) => event.type === 'roomDissolved').map(event => event.roomId))
+      .toEqual(['disconnected-joined-room'])
+    expect(registry.has('disconnected-joined-room')).toBe(false)
+    expect(registry.has('unrelated-room')).toBe(true)
+    expect(registry.lastActivityOf('disconnected-joined-room')).toBeUndefined()
+    expect(persistence.load('disconnected-joined-room')?.meta.status).toBe('finished')
+    expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
+  })
 })

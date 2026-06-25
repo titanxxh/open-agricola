@@ -82,6 +82,11 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL,
       used_at INTEGER
     );
+    CREATE TABLE reserved_usernames (
+      username TEXT PRIMARY KEY COLLATE NOCASE,
+      reason TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
     CREATE TABLE rooms (
       id TEXT PRIMARY KEY,
       created_by TEXT REFERENCES users(id),
@@ -173,6 +178,7 @@ import { vi } from 'vitest'
 
 describe('auth', () => {
   beforeEach(() => {
+    delete process.env.ADMIN_USERS
     const db = getDb()
     db.exec(`
       DELETE FROM github_propose_audit;
@@ -187,6 +193,7 @@ describe('auth', () => {
       DELETE FROM rooms;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
+      DELETE FROM reserved_usernames;
       DELETE FROM auth_identities;
       DELETE FROM sessions;
       DELETE FROM users;
@@ -215,6 +222,14 @@ describe('auth', () => {
       if (!result.ok) return
       expect(result.user.username).toBe('logintest')
       expect(result.token).toBeTruthy()
+    })
+
+    it('includes admin status for password login responses', async () => {
+      process.env.ADMIN_USERS = 'logintest'
+      const result = await login('logintest', 'correctpass')
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.user).toMatchObject({ username: 'logintest', isAdmin: true })
     })
 
     it('rejects wrong password', async () => {
@@ -392,6 +407,16 @@ describe('auth', () => {
         { id: 'joined-room', created_by: other.id, state_json: null, status: 'finished' },
         { id: 'owned-room', created_by: null, state_json: null, status: 'finished' },
       ])
+    })
+
+    it('reserves deleted admin usernames after removing the user row', async () => {
+      process.env.ADMIN_USERS = 'deleteadmin'
+      const user = await createLocalUserForTests('deleteadmin', 'password123', 'Delete Admin')
+
+      expect(deleteAccount(user.id)).toEqual({ ok: true })
+
+      expect(count('SELECT COUNT(*) AS n FROM users WHERE username = ?', 'deleteadmin')).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM reserved_usernames WHERE username = ?', 'deleteadmin')).toBe(1)
     })
   })
 

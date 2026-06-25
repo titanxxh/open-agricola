@@ -291,6 +291,16 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX idx_account_invites_expires ON account_invites(expires_at);
       `,
     },
+    {
+      version: 11,
+      sql: `
+        CREATE TABLE reserved_usernames (
+          username TEXT PRIMARY KEY COLLATE NOCASE,
+          reason TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
