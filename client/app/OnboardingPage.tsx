@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { API_BASE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -33,6 +33,8 @@ function onboardingDestination(rawReturnTo: unknown): string {
   return `${basePath}${returnTo}`
 }
 
+type RegistrationPolicy = 'invite_only' | 'open' | 'disabled'
+
 export function OnboardingPage() {
   const { refreshSession } = useAuth()
   const { t } = useLocale()
@@ -40,8 +42,25 @@ export function OnboardingPage() {
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  const [policy, setPolicy] = useState<RegistrationPolicy>('invite_only')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
+      .then(resp => resp.json())
+      .then(data => {
+        if (!cancelled && (data.policy === 'invite_only' || data.policy === 'open' || data.policy === 'disabled')) {
+          setPolicy(data.policy)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -58,6 +77,14 @@ export function OnboardingPage() {
       setError(authErrorMessage('password_mismatch', undefined, t))
       return
     }
+    if (policy === 'disabled') {
+      setError(authErrorMessage('registration_disabled', undefined, t))
+      return
+    }
+    if (policy === 'invite_only' && !inviteCode.trim()) {
+      setError(authErrorMessage('invalid_invite', undefined, t))
+      return
+    }
 
     setLoading(true)
     try {
@@ -70,6 +97,7 @@ export function OnboardingPage() {
           displayName: displayName.trim() || undefined,
           password,
           confirmPassword,
+          inviteCode: inviteCode.trim() || undefined,
         }),
       })
       const data = await resp.json()
@@ -150,6 +178,21 @@ export function OnboardingPage() {
               required
             />
           </div>
+
+          {policy === 'invite_only' && (
+            <div className="form-field">
+              <label htmlFor="onboarding-invite-code">{t('platform.inviteCode')}</label>
+              <span className="form-hint">{t('platform.inviteOnlyNote')}</span>
+              <input
+                id="onboarding-invite-code"
+                type="text"
+                value={inviteCode}
+                onChange={e => setInviteCode(e.target.value)}
+                placeholder={t('platform.inviteCodePlaceholder')}
+                autoComplete="off"
+              />
+            </div>
+          )}
 
           {error && <div className="form-error" role="alert">{error}</div>}
 
