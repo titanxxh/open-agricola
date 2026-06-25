@@ -56,10 +56,14 @@ export function SettingsPage() {
   }, [apiFetch])
 
   const loadInvites = useCallback(async () => {
-    const resp = await apiFetch('/api/admin/invites')
-    const data = await resp.json()
-    if (data.ok) setInvites(data.invites ?? [])
-    else setInviteMsg({ ok: false, text: authErrorMessage(data.code, data.error, t) })
+    try {
+      const resp = await apiFetch('/api/admin/invites')
+      const data = await resp.json()
+      if (data.ok) setInvites(data.invites ?? [])
+      else setInviteMsg({ ok: false, text: authErrorMessage(data.code, data.error, t) })
+    } catch {
+      setInviteMsg({ ok: false, text: t('platform.networkError') })
+    }
   }, [apiFetch, t])
 
   useEffect(() => {
