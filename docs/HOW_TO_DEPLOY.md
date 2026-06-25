@@ -428,6 +428,10 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
 | `PUBLIC_APP_ORIGIN` | — | 前端公开地址；Pages 子路径部署要包含 `/open-agricola/` |
 | `PUBLIC_API_BASE` | — | 后端公开 origin，用于 OAuth provider callback URL |
+| `EMAIL_DELIVERY` | `log` | 邮件发送模式；生产用户名密码注册必须设为 `resend` |
+| `RESEND_API_KEY` | — | Resend API key，只给后端容器 |
+| `EMAIL_FROM` | — | 发信地址，例如 `Open Agricola <no-reply@mail.example.com>` |
+| `EMAIL_REPLY_TO` | — | 可选回复地址 |
 | `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` | — | 账号 GitHub OAuth App client id |
 | `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | 账号 GitHub OAuth App client secret |
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id |
@@ -437,6 +441,20 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
+
+### Resend 邮箱验证
+
+1. 在 Resend 添加并验证发信域名。
+2. 创建 Sending access API key。
+3. 在后端 `.env` 中设置：
+
+   ```bash
+   EMAIL_DELIVERY=resend
+   RESEND_API_KEY=re_xxx
+   EMAIL_FROM="Open Agricola <no-reply@mail.example.com>"
+   ```
+
+4. 确认 `PUBLIC_API_BASE` 是用户可访问的后端 HTTPS 地址，`PUBLIC_APP_ORIGIN` 是前端地址。
 
 ### 前端（构建时注入）
 
