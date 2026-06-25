@@ -7,6 +7,7 @@ import { sendEmail } from './email.ts'
 const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
+const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 5 * 60 * 1000
 
 export type AuthUser = {
   id: string
@@ -106,6 +107,27 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+function newEmailVerificationToken(): { token: string; tokenHash: string } {
+  const token = randomBytes(32).toString('base64url')
+  return { token, tokenHash: hashToken(token) }
+}
+
+function storeEmailVerificationToken(userId: string, tokenHash: string, now: number): void {
+  const db = getDb()
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE email_verification_tokens
+      SET used_at = ?
+      WHERE user_id = ? AND used_at IS NULL
+    `).run(now, userId)
+    db.prepare(`
+      INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at, used_at)
+      VALUES (?, ?, ?, ?, NULL)
+    `).run(tokenHash, userId, now + EMAIL_VERIFICATION_TTL_MS, now)
+    db.prepare('UPDATE users SET email_verification_sent_at = ? WHERE id = ?').run(now, userId)
+  })()
+}
+
 function mapRegistrationConstraintError(err: unknown): RegisterPasswordResult | null {
   if (!(err instanceof Error)) return null
   if (/users\.username/.test(err.message)) {
@@ -185,22 +207,9 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
 }
 
 export function createEmailVerificationToken(userId: string): string {
-  const db = getDb()
   const now = Date.now()
-  const token = randomBytes(32).toString('base64url')
-  const tokenHash = hashToken(token)
-  db.transaction(() => {
-    db.prepare(`
-      UPDATE email_verification_tokens
-      SET used_at = ?
-      WHERE user_id = ? AND used_at IS NULL
-    `).run(now, userId)
-    db.prepare(`
-      INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at, used_at)
-      VALUES (?, ?, ?, ?, NULL)
-    `).run(tokenHash, userId, now + EMAIL_VERIFICATION_TTL_MS, now)
-    db.prepare('UPDATE users SET email_verification_sent_at = ? WHERE id = ?').run(now, userId)
-  })()
+  const { token, tokenHash } = newEmailVerificationToken()
+  storeEmailVerificationToken(userId, tokenHash, now)
   return token
 }
 
@@ -247,11 +256,15 @@ export function verifyEmailToken(rawToken: string): LoginResult {
 }
 
 function publicApiBase(): string {
-  return (process.env.PUBLIC_API_BASE || 'http://localhost:5175').replace(/\/$/, '')
+  const configured = process.env.PUBLIC_API_BASE?.trim()
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('PUBLIC_API_BASE is required in production')
+  }
+  return (configured || 'http://localhost:5175').replace(/\/$/, '')
 }
 
 export async function sendVerificationEmail(userId: string, email: string): Promise<void> {
-  const token = createEmailVerificationToken(userId)
+  const { token, tokenHash } = newEmailVerificationToken()
   const link = `${publicApiBase()}/api/auth/verify-email?token=${encodeURIComponent(token)}`
   await sendEmail({
     to: email,
@@ -259,6 +272,27 @@ export async function sendVerificationEmail(userId: string, email: string): Prom
     text: `Verify your Open Agricola email: ${link}`,
     html: `<p>Verify your Open Agricola email:</p><p><a href="${link}">Verify email</a></p>`,
   })
+  storeEmailVerificationToken(userId, tokenHash, Date.now())
+}
+
+export function cleanupPendingPasswordUser(userId: string): boolean {
+  const db = getDb()
+  return db.transaction(() => {
+    const row = db.prepare(`
+      SELECT u.id
+      FROM users u
+      WHERE u.id = ?
+        AND u.email IS NOT NULL
+        AND u.email_verified_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id)
+        AND NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id)
+    `).get(userId)
+    if (!row) return false
+    db.prepare('UPDATE account_invites SET used_by = NULL, used_at = NULL WHERE used_by = ?').run(userId)
+    db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+    return true
+  })()
 }
 
 export async function resendVerificationEmail(
@@ -266,13 +300,19 @@ export async function resendVerificationEmail(
 ): Promise<{ ok: true } | { ok: false; code: AuthErrorCode; error: string }> {
   const normalized = normalizeEmail(email)
   const db = getDb()
+  const now = Date.now()
   const row = db.prepare(`
-    SELECT id, email, email_verified_at
+    SELECT id, email, email_verified_at, email_verification_sent_at
     FROM users
     WHERE email = ?
-  `).get(normalized) as { id: string; email: string; email_verified_at: number | null } | undefined
+  `).get(normalized) as
+    | { id: string; email: string; email_verified_at: number | null; email_verification_sent_at: number | null }
+    | undefined
 
   if (!row || row.email_verified_at !== null) return { ok: true }
+  if (row.email_verification_sent_at !== null && now - row.email_verification_sent_at < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
+    return { ok: true }
+  }
   try {
     await sendVerificationEmail(row.id, row.email)
     return { ok: true }

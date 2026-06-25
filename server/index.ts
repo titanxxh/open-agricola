@@ -18,6 +18,7 @@ import {
   extractToken,
   updateDisplayName,
   changePassword,
+  cleanupPendingPasswordUser,
   isAdmin,
   createSession,
   deleteAccount,
@@ -235,6 +236,7 @@ const server = createServer(async (req, res) => {
     try {
       await sendVerificationEmail(result.userId, body.email)
     } catch {
+      cleanupPendingPasswordUser(result.userId)
       sendJson(res, 500, authError('email_delivery_failed', 'Failed to send verification email'))
       return
     }

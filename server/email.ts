@@ -21,6 +21,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.EMAIL_FROM
+  const replyTo = process.env.EMAIL_REPLY_TO?.trim()
   if (!apiKey || !from) {
     throw new Error('Resend email delivery requires RESEND_API_KEY and EMAIL_FROM')
   }
@@ -37,6 +38,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       subject: input.subject,
       text: input.text,
       html: input.html,
+      ...(replyTo ? { reply_to: replyTo } : {}),
     }),
   })
 

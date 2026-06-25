@@ -12,6 +12,7 @@ import {
   logoutAll,
   register,
   registerPasswordUser,
+  resendVerificationEmail,
   sendVerificationEmail,
   validateSession,
   verifyEmailToken,
@@ -207,9 +208,14 @@ vi.mock('../db.ts', () => {
 
 import { vi } from 'vitest'
 
+const originalNodeEnv = process.env.NODE_ENV
+
 describe('auth', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
     delete process.env.PUBLIC_API_BASE
   })
 
@@ -536,6 +542,94 @@ describe('auth', () => {
         text: expect.stringContaining('https://api.example/api/auth/verify-email?token='),
         html: expect.stringContaining('href="https://api.example/api/auth/verify-email?token='),
       }))
+    })
+
+    it('does not send a new verification email during the user cooldown window', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      process.env.PUBLIC_API_BASE = 'https://api.example'
+      const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue()
+      const created = await registerPasswordUser({
+        username: 'cooldownuser',
+        email: 'cooldown@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+      await sendVerificationEmail(created.userId, 'cooldown@example.com')
+      const before = getDb().prepare(`
+        SELECT email_verification_sent_at
+        FROM users
+        WHERE id = ?
+      `).get(created.userId) as { email_verification_sent_at: number }
+      const tokenCountBefore = (getDb()
+        .prepare('SELECT COUNT(*) AS count FROM email_verification_tokens WHERE user_id = ? AND used_at IS NULL')
+        .get(created.userId) as { count: number }).count
+      sendEmailSpy.mockClear()
+
+      const resent = await resendVerificationEmail('cooldown@example.com')
+
+      expect(resent).toEqual({ ok: true })
+      expect(sendEmailSpy).not.toHaveBeenCalled()
+      const after = getDb().prepare(`
+        SELECT email_verification_sent_at
+        FROM users
+        WHERE id = ?
+      `).get(created.userId) as { email_verification_sent_at: number }
+      const tokenCountAfter = (getDb()
+        .prepare('SELECT COUNT(*) AS count FROM email_verification_tokens WHERE user_id = ? AND used_at IS NULL')
+        .get(created.userId) as { count: number }).count
+      expect(after.email_verification_sent_at).toBe(before.email_verification_sent_at)
+      expect(tokenCountAfter).toBe(tokenCountBefore)
+    })
+
+    it('keeps the previous valid verification token when sending a replacement email fails', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      process.env.PUBLIC_API_BASE = 'https://api.example'
+      const created = await registerPasswordUser({
+        username: 'keepoldtoken',
+        email: 'keepoldtoken@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+      const oldToken = createEmailVerificationToken(created.userId)
+      vi.spyOn(emailModule, 'sendEmail').mockRejectedValue(new Error('resend down'))
+
+      await expect(sendVerificationEmail(created.userId, 'keepoldtoken@example.com')).rejects.toThrow('resend down')
+
+      const activeTokens = (getDb()
+        .prepare('SELECT COUNT(*) AS count FROM email_verification_tokens WHERE user_id = ? AND used_at IS NULL')
+        .get(created.userId) as { count: number }).count
+      expect(activeTokens).toBe(1)
+      const verified = verifyEmailToken(oldToken)
+      expect(verified).toMatchObject({ ok: true, user: { username: 'keepoldtoken' } })
+    })
+
+    it('requires PUBLIC_API_BASE for production verification links', async () => {
+      process.env.NODE_ENV = 'production'
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      delete process.env.PUBLIC_API_BASE
+      const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue()
+      const created = await registerPasswordUser({
+        username: 'prodlink',
+        email: 'prodlink@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+
+      await expect(sendVerificationEmail(created.userId, 'prodlink@example.com')).rejects.toThrow(/PUBLIC_API_BASE/)
+
+      expect(sendEmailSpy).not.toHaveBeenCalled()
+      const tokenCount = (getDb()
+        .prepare('SELECT COUNT(*) AS count FROM email_verification_tokens WHERE user_id = ?')
+        .get(created.userId) as { count: number }).count
+      expect(tokenCount).toBe(0)
     })
   })
 
