@@ -24,6 +24,9 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.password': '密码',
     'platform.passwordPlaceholder': '至少 8 个字符',
     'platform.confirmPassword': '确认密码',
+    'platform.inviteCode': '邀请码',
+    'platform.inviteCodePlaceholder': '输入一次性邀请码',
+    'platform.inviteOnlyNote': '当前只开放邀请注册',
     'platform.registerBtn': '注册',
     'platform.loading': '加载中...',
     'platform.networkError': '网络错误',
@@ -31,6 +34,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.authErrors.invalid_password': '密码至少需要 8 个字符',
     'platform.authErrors.password_mismatch': '两次输入的密码不一致',
     'platform.authErrors.username_taken': '用户名已被占用',
+    'platform.authErrors.invalid_invite': '邀请码无效、已过期或已使用',
+    'platform.authErrors.registration_disabled': '当前暂不开放注册',
     'platform.authErrors.oauth_onboarding_expired': '注册会话已过期，请重新使用 GitHub 或 Google 注册',
   }
   return {
@@ -46,6 +51,10 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
   LocaleSwitcher: () => <div />,
 }))
 
+function policyResponse(policy: 'invite_only' | 'open' | 'disabled' = 'invite_only'): Response {
+  return new Response(JSON.stringify({ ok: true, policy }))
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -56,7 +65,7 @@ afterEach(() => {
 describe('OnboardingPage', () => {
   it('validates password confirmation before submitting onboarding', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn()
+    const fetchMock = vi.fn().mockResolvedValueOnce(policyResponse('open'))
     vi.stubGlobal('fetch', fetchMock)
     render(<OnboardingPage />)
 
@@ -66,15 +75,21 @@ describe('OnboardingPage', () => {
     await user.click(screen.getByRole('button', { name: '完成注册' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('两次输入的密码不一致')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/auth/registration-policy'),
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 
   it('completes onboarding and navigates to lobby', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      user: { id: 'u1', username: 'newuser', displayName: 'New User' },
-    })))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(policyResponse('open'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'newuser', displayName: 'New User' },
+      })))
     vi.stubGlobal('fetch', fetchMock)
     window.history.replaceState(null, '', '/?page=onboarding')
     render(<OnboardingPage />)
@@ -91,11 +106,13 @@ describe('OnboardingPage', () => {
 
   it('navigates to the onboarding return target when provided', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      user: { id: 'u1', username: 'newuser', displayName: 'New User' },
-      returnTo: '/?page=workshop',
-    })))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(policyResponse('open'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'newuser', displayName: 'New User' },
+        returnTo: '/?page=workshop',
+      })))
     vi.stubGlobal('fetch', fetchMock)
     window.history.replaceState(null, '', '/open-agricola/?page=onboarding')
     render(<OnboardingPage />)
@@ -107,5 +124,49 @@ describe('OnboardingPage', () => {
 
     expect(refreshSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=workshop'))
+  })
+
+  it('requires an invite code in invite-only mode before submitting onboarding', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockResolvedValueOnce(policyResponse('invite_only'))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OnboardingPage />)
+
+    await screen.findByLabelText('邀请码')
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('邀请码无效、已过期或已使用')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('submits inviteCode during invite-only onboarding', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(policyResponse('invite_only'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'newuser', displayName: 'New User' },
+      })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OnboardingPage />)
+
+    await screen.findByLabelText('邀请码')
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.type(screen.getByLabelText('邀请码'), 'oa_valid_code')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/auth/onboarding/complete'),
+        expect.objectContaining({
+          body: expect.stringContaining('"inviteCode":"oa_valid_code"'),
+        }),
+      )
+    })
   })
 })
