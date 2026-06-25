@@ -226,6 +226,7 @@ const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { createInvite, hashInviteCode } = await import('../invites.ts')
 const { getDb } = await import('../db.ts')
 const { OAUTH_STATE_COOKIE, SESSION_COOKIE } = await import('../auth-cookies.ts')
+const emailModule = await import('../email.ts')
 
 await import('../index.ts')
 
@@ -345,6 +346,7 @@ describe('auth routes', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV
     else process.env.NODE_ENV = originalNodeEnv
     delete process.env.ENABLE_AUTH_TEST_HELPERS
@@ -554,6 +556,52 @@ describe('auth routes', () => {
     }
     expect(row.used_by).toBe(user.id)
     expect(row.used_at).toBeGreaterThan(0)
+  })
+
+  it('rolls back password registration when verification email delivery fails', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    process.env.PUBLIC_API_BASE = 'https://api.example'
+    const admin = await createLocalUserForTests('rollback_admin', 'password123', 'Rollback Admin')
+    const invite = createInvite(admin.id, 7)
+    const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail')
+      .mockRejectedValueOnce(new Error('resend down'))
+      .mockResolvedValueOnce()
+
+    const failed = await requestJson('POST', '/api/auth/register', {
+      username: 'retryregister',
+      email: 'retryregister@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      inviteCode: invite.code,
+    })
+    expect(failed.status).toBe(500)
+    expect(failed.json).toMatchObject({ ok: false, code: 'email_delivery_failed' })
+    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister')).toBeUndefined()
+    expect(getDb().prepare('SELECT id FROM users WHERE email = ?').get('retryregister@example.com')).toBeUndefined()
+    expect((getDb().prepare('SELECT COUNT(*) AS count FROM email_verification_tokens').get() as { count: number }).count).toBe(0)
+    const releasedInvite = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string | null
+      used_at: number | null
+    }
+    expect(releasedInvite.used_by).toBeNull()
+    expect(releasedInvite.used_at).toBeNull()
+
+    const retried = await requestJson('POST', '/api/auth/register', {
+      username: 'retryregister',
+      email: 'retryregister@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      inviteCode: invite.code,
+    })
+    expect(retried.status).toBe(200)
+    expect(sendEmailSpy).toHaveBeenCalledTimes(2)
+    const user = getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister') as { id: string }
+    const usedInvite = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string | null
+      used_at: number | null
+    }
+    expect(usedInvite.used_by).toBe(user.id)
+    expect(usedInvite.used_at).toBeGreaterThan(0)
   })
 
   it('resends verification mail only for existing unverified accounts', async () => {
