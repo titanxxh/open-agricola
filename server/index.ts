@@ -87,10 +87,6 @@ function getAuthToken(req: IncomingMessage): string {
   return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
 }
 
-function isConfiguredAdmin(username: string): boolean {
-  return (process.env.ADMIN_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean).includes(username)
-}
-
 function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
   const token = getAuthToken(req)
   const user = validateSession(token)
@@ -98,7 +94,7 @@ function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | nul
     sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
     return null
   }
-  if (!isConfiguredAdmin(user.username)) {
+  if (!isAdmin(user.username)) {
     sendJson(res, 403, authError('admin_required', 'Admin only'))
     return null
   }
