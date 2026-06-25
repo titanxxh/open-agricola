@@ -631,6 +631,68 @@ describe('auth routes', () => {
     expect(findIdentity('github', 'gh-second')).toBeNull()
   })
 
+  it('requires admin access to create invites', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const nonAdmin = await createLocalUserForTests('regular_user', 'password123', 'Regular User')
+    const token = createSession(nonAdmin.id)
+
+    const unauthenticated = await requestJson('POST', '/api/admin/invites', { expiresInDays: 7 })
+    expect(unauthenticated.status).toBe(401)
+    expect(unauthenticated.json).toMatchObject({ ok: false, code: 'not_authenticated' })
+
+    const forbidden = await requestJson(
+      'POST',
+      '/api/admin/invites',
+      { expiresInDays: 7 },
+      { Cookie: `oa_session=${token}` },
+    )
+    expect(forbidden.status).toBe(403)
+    expect(forbidden.json).toMatchObject({ ok: false, code: 'admin_required' })
+  })
+
+  it('lets admins create and list invites without exposing plaintext codes in the list', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+
+    const created = await requestJson(
+      'POST',
+      '/api/admin/invites',
+      { expiresInDays: 7 },
+      { Cookie: `oa_session=${token}` },
+    )
+
+    expect(created.status).toBe(200)
+    expect(created.json).toMatchObject({ ok: true })
+    const code = ((created.json.invite as Record<string, unknown>).code as string)
+    expect(code).toMatch(/^oa_/)
+
+    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `oa_session=${token}` })
+    expect(listed.status).toBe(200)
+    expect(JSON.stringify(listed.json)).not.toContain(code)
+    expect((listed.json.invites as Array<{ status: string }>)[0].status).toBe('active')
+  })
+
+  it('lets admins revoke unused invites', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+    const invite = createInvite(admin.id, 7)
+
+    const revoked = await requestJson(
+      'POST',
+      `/api/admin/invites/${invite.id}/revoke`,
+      {},
+      { Cookie: `oa_session=${token}` },
+    )
+
+    expect(revoked.status).toBe(200)
+    expect(revoked.json).toMatchObject({ ok: true })
+    const listed = await requestJson('GET', '/api/admin/invites', undefined, { Cookie: `oa_session=${token}` })
+    const row = (listed.json.invites as Array<{ id: string; status: string }>).find(inviteRow => inviteRow.id === invite.id)
+    expect(row?.status).toBe('revoked')
+  })
+
   it('blocks new onboarding when registration is disabled', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
     const ticket = createOnboardingTicket({ provider: 'google', providerUserId: 'g-disabled', emailVerified: true })

@@ -10,9 +10,10 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, deleteAccount, type AuthErrorCode } from './auth.ts'
+import { register, login, logout, logoutAll, validateSession, extractToken, updateDisplayName, changePassword, isAdmin, createSession, deleteAccount, type AuthErrorCode, type AuthUser } from './auth.ts'
 import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
+import { createInvite, listInvites, revokeInvite } from './invites.ts'
 import {
   handleLinkedIdentities,
   handleOAuthCallback,
@@ -84,6 +85,24 @@ function getClientIp(req: IncomingMessage): string {
 
 function getAuthToken(req: IncomingMessage): string {
   return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+}
+
+function isConfiguredAdmin(username: string): boolean {
+  return (process.env.ADMIN_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean).includes(username)
+}
+
+function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
+  const token = getAuthToken(req)
+  const user = validateSession(token)
+  if (!user) {
+    sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
+    return null
+  }
+  if (!isConfiguredAdmin(user.username)) {
+    sendJson(res, 403, authError('admin_required', 'Admin only'))
+    return null
+  }
+  return user
 }
 
 function forwardCookieSessionAsBearer(req: IncomingMessage): void {
@@ -323,6 +342,35 @@ const server = createServer(async (req, res) => {
     const ticket = createOnboardingTicket(profile)
     sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
     return
+  }
+
+  if (req.url?.startsWith('/api/admin/invites')) {
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    const adminUser = requireAdmin(req, res)
+    if (!adminUser) return
+
+    if (req.method === 'GET' && url.pathname === '/api/admin/invites') {
+      sendJson(res, 200, { ok: true, invites: listInvites() })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/admin/invites') {
+      const body = await parseBody<{ expiresInDays?: number }>(req)
+      const rawDays = typeof body?.expiresInDays === 'number' && Number.isFinite(body.expiresInDays)
+        ? Math.floor(body.expiresInDays)
+        : 7
+      const expiresInDays = Math.min(365, Math.max(1, rawDays))
+      const invite = createInvite(adminUser.id, expiresInDays)
+      sendJson(res, 200, { ok: true, invite })
+      return
+    }
+
+    const revokeMatch = /^\/api\/admin\/invites\/([^/]+)\/revoke$/.exec(url.pathname)
+    if (req.method === 'POST' && revokeMatch) {
+      const ok = revokeInvite(decodeURIComponent(revokeMatch[1]!))
+      sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { ok: false, error: 'Invite not found' })
+      return
+    }
   }
 
   // ── Lobby routes ───────────────────────────────────────
