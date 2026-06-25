@@ -24,6 +24,7 @@ import {
 } from '../auth-cookies.ts'
 import { checkRateLimit, resetRateLimitsForTests } from '../rate-limit.ts'
 import { getDb } from '../db.ts'
+import { createInvite } from '../invites.ts'
 
 // Use an in-memory database for tests
 vi.mock('../db.ts', () => {
@@ -57,6 +58,17 @@ vi.mock('../db.ts', () => {
     );
     CREATE INDEX idx_email_verification_user ON email_verification_tokens(user_id);
     CREATE INDEX idx_email_verification_expires ON email_verification_tokens(expires_at);
+    CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+    CREATE TABLE account_invites (
+      id TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      used_at INTEGER,
+      revoked_at INTEGER
+    );
     CREATE TABLE auth_identities (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -212,6 +224,7 @@ describe('auth', () => {
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM email_verification_tokens;
+      DELETE FROM account_invites;
       DELETE FROM reserved_usernames;
       DELETE FROM auth_identities;
       DELETE FROM sessions;
@@ -281,6 +294,131 @@ describe('auth', () => {
       })
 
       expect(result).toMatchObject({ ok: false, code: 'email_taken' })
+    })
+
+    it('requires an invite for invite-only password registration', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+      const result = await registerPasswordUser({
+        username: 'needinvite',
+        email: 'needinvite@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      expect(result).toMatchObject({ ok: false, code: 'invalid_invite' })
+      expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('needinvite')).toBeUndefined()
+    })
+
+    it('consumes an invite during invite-only password registration', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+      const admin = await createLocalUserForTests('invite_admin', 'password123', 'Invite Admin')
+      const invite = createInvite(admin.id, 7)
+
+      const result = await registerPasswordUser({
+        username: 'inviteduser',
+        email: 'invited@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: invite.code,
+      })
+
+      expect(result).toMatchObject({ ok: true, status: 'verification_required' })
+      if (!result.ok) return
+
+      const inviteRow = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+        used_by: string | null
+        used_at: number | null
+      }
+      expect(inviteRow.used_by).toBe(result.userId)
+      expect(inviteRow.used_at).toBeGreaterThan(0)
+    })
+
+    it('returns invalid_invite and rolls back the user when invite consumption fails', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+      const result = await registerPasswordUser({
+        username: 'badinvite',
+        email: 'badinvite@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: 'oa_invalid',
+      })
+
+      expect(result).toMatchObject({ ok: false, code: 'invalid_invite' })
+      expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('badinvite')).toBeUndefined()
+    })
+
+    it('maps username unique conflicts back to username_taken', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      const db = getDb()
+      db.exec(`
+        CREATE TRIGGER users_username_race
+        BEFORE INSERT ON users
+        WHEN NEW.username = 'raceuser'
+        BEGIN
+          INSERT INTO users (
+            id, username, email, email_verified_at, email_verification_sent_at,
+            display_name, password_hash, password_updated_at, created_at
+          ) VALUES (
+            'race-username-existing',
+            'raceuser',
+            'race-existing@example.com',
+            NULL,
+            NULL,
+            'Race User Existing',
+            'seededhash',
+            1,
+            1
+          );
+        END;
+      `)
+
+      const result = await registerPasswordUser({
+        username: 'raceuser',
+        email: 'raceuser@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      expect(result).toMatchObject({ ok: false, code: 'username_taken' })
+      db.exec('DROP TRIGGER users_username_race')
+    })
+
+    it('maps email unique conflicts back to email_taken', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      const db = getDb()
+      db.exec(`
+        CREATE TRIGGER users_email_race
+        BEFORE INSERT ON users
+        WHEN NEW.username = 'emailrace'
+        BEGIN
+          INSERT INTO users (
+            id, username, email, email_verified_at, email_verification_sent_at,
+            display_name, password_hash, password_updated_at, created_at
+          ) VALUES (
+            'race-email-existing',
+            'emailraceexisting',
+            'emailrace@example.com',
+            NULL,
+            NULL,
+            'Email Race Existing',
+            'seededhash',
+            1,
+            1
+          );
+        END;
+      `)
+
+      const result = await registerPasswordUser({
+        username: 'emailrace',
+        email: 'emailrace@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+
+      expect(result).toMatchObject({ ok: false, code: 'email_taken' })
+      db.exec('DROP TRIGGER users_email_race')
     })
   })
 
