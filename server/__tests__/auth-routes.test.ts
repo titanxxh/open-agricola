@@ -481,6 +481,21 @@ describe('auth routes', () => {
     expect(tokenRow.user_id).toBe(user.id)
   })
 
+  it('returns email_delivery_failed when registration email delivery throws', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+    process.env.EMAIL_DELIVERY = 'broken'
+
+    const res = await requestJson('POST', '/api/auth/register', {
+      username: 'routefail',
+      email: 'routefail@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+
+    expect(res.status).toBe(500)
+    expect(res.json).toMatchObject({ ok: false, code: 'email_delivery_failed' })
+  })
+
   it('email verification activates user and sets session cookie', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
@@ -500,6 +515,11 @@ describe('auth routes', () => {
     expect(res.status).toBe(302)
     expect(res.headers.Location).toBe('https://frontend.example/open-agricola/')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    const verified = getDb().prepare('SELECT email_verified_at FROM users WHERE id = ?').get(created.userId) as {
+      email_verified_at: number | null
+    }
+    expect(verified.email_verified_at).toBeTypeOf('number')
+    expect(verified.email_verified_at).toBeGreaterThan(0)
     await expect(login('verifyroute', 'password123')).resolves.toMatchObject({ ok: true })
   })
 
@@ -573,6 +593,86 @@ describe('auth routes', () => {
     })
     expect(unknown.status).toBe(200)
     expect(unknown.json).toMatchObject({ ok: true })
+  })
+
+  it('returns generic success when resending verification for an already verified account', async () => {
+    process.env.EMAIL_DELIVERY = 'log'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+    const created = await registerPasswordUser({
+      username: 'verifiedresend',
+      email: 'verifiedresend@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const token = createEmailVerificationToken(created.userId)
+    const verified = await requestJson('GET', `/api/auth/verify-email?token=${encodeURIComponent(token)}`)
+    expect(verified.status).toBe(302)
+
+    const resend = await requestJson('POST', '/api/auth/resend-verification', {
+      email: 'verifiedresend@example.com',
+    })
+    expect(resend.status).toBe(200)
+    expect(resend.json).toMatchObject({ ok: true })
+  })
+
+  it('rate limits repeated register requests', async () => {
+    const previous = process.env.DISABLE_RATE_LIMIT
+    delete process.env.DISABLE_RATE_LIMIT
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+    try {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const res = await requestJson(
+          'POST',
+          '/api/auth/register',
+          {},
+          { 'X-Forwarded-For': '198.51.100.10' },
+        )
+        expect(res.status).toBe(400)
+      }
+
+      const limited = await requestJson(
+        'POST',
+        '/api/auth/register',
+        {},
+        { 'X-Forwarded-For': '198.51.100.10' },
+      )
+      expect(limited.status).toBe(429)
+      expect(limited.json).toMatchObject({ ok: false, code: 'rate_limited' })
+    } finally {
+      if (previous === undefined) delete process.env.DISABLE_RATE_LIMIT
+      else process.env.DISABLE_RATE_LIMIT = previous
+    }
+  })
+
+  it('rate limits repeated resend-verification requests', async () => {
+    const previous = process.env.DISABLE_RATE_LIMIT
+    delete process.env.DISABLE_RATE_LIMIT
+    try {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const res = await requestJson(
+          'POST',
+          '/api/auth/resend-verification',
+          {},
+          { 'X-Forwarded-For': '198.51.100.11' },
+        )
+        expect(res.status).toBe(400)
+      }
+
+      const limited = await requestJson(
+        'POST',
+        '/api/auth/resend-verification',
+        {},
+        { 'X-Forwarded-For': '198.51.100.11' },
+      )
+      expect(limited.status).toBe(429)
+      expect(limited.json).toMatchObject({ ok: false, code: 'rate_limited' })
+    } finally {
+      if (previous === undefined) delete process.env.DISABLE_RATE_LIMIT
+      else process.env.DISABLE_RATE_LIMIT = previous
+    }
   })
 
   it('me reads oa_session cookie', async () => {
