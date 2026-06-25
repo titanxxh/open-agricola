@@ -18,6 +18,9 @@ vi.mock('../../db.ts', () => {
       display_name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_updated_at INTEGER,
+      email TEXT COLLATE NOCASE,
+      email_verified_at INTEGER,
+      email_verification_sent_at INTEGER,
       created_at INTEGER NOT NULL,
       last_login_at INTEGER
     );
