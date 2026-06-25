@@ -149,6 +149,59 @@ export function logoutAll(userId: string): void {
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
 }
 
+const idPlaceholders = (ids: string[]): string => ids.map(() => '?').join(', ')
+
+export function deleteAccount(userId: string): { ok: true } {
+  const db = getDb()
+  const now = Date.now()
+  const authoredCardIds = (db.prepare('SELECT id FROM workshop_cards WHERE author_id = ?').all(userId) as Array<{ id: string }>)
+    .map(row => row.id)
+  const affectedRoomIds = (db.prepare(`
+    SELECT id FROM rooms WHERE created_by = ?
+    UNION
+    SELECT room_id AS id FROM room_players WHERE user_id = ?
+  `).all(userId, userId) as Array<{ id: string }>).map(row => row.id)
+
+  db.transaction(() => {
+    if (affectedRoomIds.length > 0) {
+      db.prepare(`
+        UPDATE rooms
+        SET status = 'finished',
+            state_json = NULL,
+            created_by = CASE WHEN created_by = ? THEN NULL ELSE created_by END,
+            updated_at = ?
+        WHERE id IN (${idPlaceholders(affectedRoomIds)})
+      `).run(userId, now, ...affectedRoomIds)
+    }
+
+    db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM github_propose_rate_limit WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM workshop_card_versions WHERE created_by = ?').run(userId)
+    db.prepare('DELETE FROM card_likes WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM card_comments WHERE author_id = ?').run(userId)
+    db.prepare('DELETE FROM sandbox_cards WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM sandbox_settings WHERE user_id = ?').run(userId)
+
+    if (authoredCardIds.length > 0) {
+      const placeholders = idPlaceholders(authoredCardIds)
+      db.prepare(`DELETE FROM github_propose_audit WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds)
+      db.prepare(`DELETE FROM workshop_card_versions WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
+      db.prepare(`DELETE FROM card_likes WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
+      db.prepare(`DELETE FROM card_comments WHERE card_id IN (${placeholders})`).run(...authoredCardIds)
+      db.prepare(`DELETE FROM sandbox_cards WHERE workshop_card_id IN (${placeholders})`).run(...authoredCardIds)
+      db.prepare(`DELETE FROM workshop_cards WHERE id IN (${placeholders})`).run(...authoredCardIds)
+    }
+
+    db.prepare('DELETE FROM room_players WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+  })()
+
+  return { ok: true }
+}
+
 export function validateSession(token: string): AuthUser | null {
   if (!token) return null
   const db = getDb()

@@ -45,6 +45,10 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.confirmLogoutAll': '确认退出所有设备',
     'platform.logoutAllDevices': '退出所有设备',
     'platform.logoutNote': '这会让其他设备重新登录',
+    'platform.deleteAccount': '删除账号',
+    'platform.confirmDeleteAccount': '确认删除账号',
+    'platform.deleteAccountNote': '删除后无法恢复',
+    'platform.accountDeleted': '账号已删除',
     'platform.networkError': '网络错误',
     'platform.unknownError': '未知错误',
     'platform.authErrors.invalid_display_name': '显示名称需要 1-60 个字符',
@@ -106,5 +110,22 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(screen.getByText('密码至少需要 8 个字符')).toBeInTheDocument())
     expect(screen.queryByText('Password must be at least 8 characters')).not.toBeInTheDocument()
+  })
+
+  it('deletes the account after danger-zone confirmation', async () => {
+    const user = userEvent.setup()
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
+    render(<SettingsPage />)
+
+    await user.click(screen.getByRole('button', { name: '删除账号' }))
+    expect(screen.getByText('确认删除账号')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '确认' }))
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith('/api/auth/account', expect.objectContaining({ method: 'DELETE' }))
+    })
+    expect(logoutMock).toHaveBeenCalled()
   })
 })
