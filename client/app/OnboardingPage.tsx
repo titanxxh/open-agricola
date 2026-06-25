@@ -42,7 +42,6 @@ export function OnboardingPage() {
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [inviteCode, setInviteCode] = useState('')
   const [policy, setPolicy] = useState<RegistrationPolicy | null>(null)
   const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [error, setError] = useState('')
@@ -94,11 +93,6 @@ export function OnboardingPage() {
       setError(t('platform.networkError'))
       return
     }
-    if (policy === 'invite_only' && !inviteCode.trim()) {
-      setError(authErrorMessage('invalid_invite', undefined, t))
-      return
-    }
-
     setLoading(true)
     try {
       const resp = await fetch(`${API_BASE}/api/auth/onboarding/complete`, {
@@ -110,7 +104,6 @@ export function OnboardingPage() {
           displayName: displayName.trim() || undefined,
           password,
           confirmPassword,
-          inviteCode: inviteCode.trim() || undefined,
         }),
       })
       const data = await resp.json()
@@ -193,21 +186,6 @@ export function OnboardingPage() {
               required
             />
           </div>
-
-          {policy === 'invite_only' && (
-            <div className="form-field">
-              <label htmlFor="onboarding-invite-code">{t('platform.inviteCode')}</label>
-              <span className="form-hint">{t('platform.inviteOnlyNote')}</span>
-              <input
-                id="onboarding-invite-code"
-                type="text"
-                value={inviteCode}
-                onChange={e => setInviteCode(e.target.value)}
-                placeholder={t('platform.inviteCodePlaceholder')}
-                autoComplete="off"
-              />
-            </div>
-          )}
 
           {formError && <div className="form-error" role="alert">{formError}</div>}
 
