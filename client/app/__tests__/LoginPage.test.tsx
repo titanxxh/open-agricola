@@ -7,6 +7,8 @@ import { LoginPage } from '../LoginPage'
 type LoginResult = { ok: boolean; code?: string; error?: string }
 
 const loginMock = vi.fn(async () => ({ ok: true }))
+const registerWithPasswordMock = vi.fn(async () => ({ ok: true, status: 'verification_required' as const }))
+const resendVerificationMock = vi.fn(async () => ({ ok: true }))
 const oauthStartUrlMock = vi.fn((
   provider: 'github' | 'google',
   intent: 'login' | 'register' | 'link',
@@ -28,6 +30,8 @@ function policyResponse(policy: 'invite_only' | 'open' | 'disabled' = 'invite_on
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     login: loginMock,
+    registerWithPassword: registerWithPasswordMock,
+    resendVerification: resendVerificationMock,
     oauthStartUrl: oauthStartUrlMock,
   }),
 }))
@@ -40,8 +44,13 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.registerBtn': '注册',
     'platform.username': '用户名',
     'platform.usernamePlaceholder': '2-30 字符',
+    'platform.email': '邮箱',
+    'platform.emailPlaceholder': '用于验证账号',
+    'platform.displayName': '显示名称',
+    'platform.displayNamePlaceholder': '可选',
     'platform.password': '密码',
     'platform.passwordPlaceholder': '至少 8 个字符',
+    'platform.confirmPassword': '确认密码',
     'platform.loading': '加载中...',
     'platform.unknownError': '未知错误',
     'platform.networkError': '网络错误',
@@ -50,12 +59,20 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.oauthRegisterGithub': '使用 GitHub 注册',
     'platform.oauthRegisterGoogle': '使用 Google 注册',
     'platform.oauthRegisterIntro': '新用户请先使用 GitHub 或 Google 注册。完成后你可以设置本地用户名和密码。',
+    'platform.passwordRegisterBtn': '用用户名注册',
+    'platform.checkEmailTitle': '验证邮件已发送',
+    'platform.checkEmailBody': '请打开邮件完成验证后继续使用。',
+    'platform.resendVerification': '重发验证邮件',
     'platform.authErrors.invalid_login': '用户名或密码不正确',
     'platform.inviteCode': '邀请码',
     'platform.inviteCodePlaceholder': '输入一次性邀请码',
     'platform.inviteOnlyNote': '当前只开放邀请注册',
     'platform.authErrors.invalid_invite': '邀请码无效、已过期或已使用',
     'platform.authErrors.registration_disabled': '当前暂不开放注册',
+    'platform.authErrors.invalid_email': '邮箱格式不正确',
+    'platform.authErrors.email_taken': '邮箱已被使用',
+    'platform.authErrors.email_not_verified': '邮箱尚未验证',
+    'platform.authErrors.email_delivery_failed': '验证邮件发送失败',
   }
   const t = (key: string) => labels[key] ?? key
   return {
@@ -86,21 +103,43 @@ describe('LoginPage auth UI', () => {
     expect(screen.getByRole('link', { name: '使用 Google 登录' }).querySelector('.oauth-provider-icon--google')).toBeTruthy()
   })
 
-  it('register mode offers GitHub and Google instead of username password registration', async () => {
+  it('register mode offers OAuth and password email registration', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
     render(<LoginPage />)
 
     await user.click(screen.getByRole('tab', { name: '注册' }))
 
-    const githubLink = screen.getByRole('link', { name: '使用 GitHub 注册' })
-    const googleLink = screen.getByRole('link', { name: '使用 Google 注册' })
-    expect(githubLink).toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register')
-    expect(googleLink).toHaveAttribute('href', '/api/auth/oauth/google/start?intent=register')
-    expect(githubLink.querySelector('.oauth-provider-icon--github')).toBeTruthy()
-    expect(googleLink.querySelector('.oauth-provider-icon--google')).toBeTruthy()
-    expect(screen.queryByLabelText('确认密码')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '使用 GitHub 注册' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '使用 Google 注册' })).toBeInTheDocument()
+    expect(screen.getByLabelText('用户名')).toBeInTheDocument()
+    expect(screen.getByLabelText('邮箱')).toBeInTheDocument()
+    expect(screen.getByLabelText('密码')).toBeInTheDocument()
+    expect(screen.getByLabelText('确认密码')).toBeInTheDocument()
+  })
+
+  it('submits password email registration with invite when required', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('invite_only')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+    await user.type(await screen.findByLabelText('邀请码'), 'oa_valid_code')
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('邮箱'), 'local@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '用用户名注册' }))
+
+    expect(registerWithPasswordMock).toHaveBeenCalledWith({
+      username: 'localuser',
+      email: 'local@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      displayName: '',
+      inviteCode: 'oa_valid_code',
+    })
+    expect(screen.getByText('验证邮件已发送')).toBeInTheDocument()
   })
 
   it('requires invite code before oauth registration in invite-only mode', async () => {

@@ -9,6 +9,15 @@ export type AuthUser = {
   isAdmin?: boolean
 }
 
+type RegisterPasswordInput = {
+  username: string
+  email: string
+  password: string
+  confirmPassword: string
+  displayName?: string
+  inviteCode?: string
+}
+
 type AuthState = {
   user: AuthUser | null
   loading: boolean
@@ -16,6 +25,10 @@ type AuthState = {
 
 type AuthContextValue = AuthState & {
   login: (username: string, password: string) => Promise<{ ok: boolean; code?: string; error?: string }>
+  registerWithPassword: (input: RegisterPasswordInput) => Promise<
+    { ok: true; status: 'verification_required' } | { ok: false; code?: string; error?: string }
+  >
+  resendVerification: (email: string) => Promise<{ ok: boolean; code?: string; error?: string }>
   logout: () => Promise<void>
   logoutAll: () => Promise<void>
   refreshSession: () => Promise<void>
@@ -112,6 +125,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: false, code: data.code, error: data.error || 'Login failed' }
   }, [])
 
+  const registerWithPasswordFn = useCallback(async (input: RegisterPasswordInput) => {
+    const resp = await fetch(`${API_BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    })
+    return await resp.json()
+  }, [])
+
+  const resendVerificationFn = useCallback(async (email: string) => {
+    const resp = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email }),
+    })
+    return await resp.json()
+  }, [])
+
   const logoutFn = useCallback(async () => {
     await fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
@@ -157,6 +190,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       ...state,
       login: loginFn,
+      registerWithPassword: registerWithPasswordFn,
+      resendVerification: resendVerificationFn,
       logout: logoutFn,
       logoutAll: logoutAllFn,
       refreshSession: refreshSessionFn,
