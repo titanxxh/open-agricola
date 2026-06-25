@@ -436,6 +436,25 @@ describe('auth routes', () => {
     expect((res.json.user as { username: string }).username).toBe('meuser')
   })
 
+  it('uses the same admin config for me and admin invite routes', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+
+    const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `oa_session=${token}` })
+    expect(me.status).toBe(200)
+    expect(me.json).toMatchObject({ ok: true, user: { username: 'admin', isAdmin: true } })
+
+    const created = await requestJson(
+      'POST',
+      '/api/admin/invites',
+      { expiresInDays: 7 },
+      { Cookie: `oa_session=${token}` },
+    )
+    expect(created.status).toBe(200)
+    expect(created.json).toMatchObject({ ok: true })
+  })
+
   it('logout-all clears every session and clears the browser cookie', async () => {
     const user = await createLocalUserForTests('allout', 'password123', 'All Out')
     const one = createSession(user.id)
