@@ -32,8 +32,10 @@ vi.mock('../db.ts', () => {
 const {
   consumeInviteCode,
   createInvite,
+  consumeInviteCodeHash,
   getRegistrationPolicy,
   hashInviteCode,
+  isInviteCodeAvailable,
   listInvites,
   revokeInvite,
 } = await import('../invites.ts')
@@ -98,6 +100,46 @@ describe('invites', () => {
     expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(false)
 
     const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as { used_by: string; used_at: number }
+    expect(row.used_by).toBe('new-user')
+    expect(row.used_at).toBeGreaterThan(0)
+  })
+
+  it('checks invite availability without consuming it', () => {
+    const invite = createInvite('admin', 7)
+
+    expect(isInviteCodeAvailable(invite.code)).toBe(true)
+    expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
+  })
+
+  it('checks invite availability rejects used expired and revoked codes', () => {
+    const used = createInvite('admin', 7)
+    const expired = createInvite('admin', 1)
+    const revoked = createInvite('admin', 7)
+    const now = Date.now()
+
+    insertUser('used-user', 'used-user')
+    expect(consumeInviteCode(getDb(), used.code, 'used-user', now)).toBe(true)
+    getDb().prepare('UPDATE account_invites SET expires_at = ? WHERE id = ?').run(now - 1, expired.id)
+    expect(revokeInvite(revoked.id, now)).toBe(true)
+
+    expect(isInviteCodeAvailable(used.code, now)).toBe(false)
+    expect(isInviteCodeAvailable(expired.code, now)).toBe(false)
+    expect(isInviteCodeAvailable(revoked.code, now)).toBe(false)
+    expect(isInviteCodeAvailable('oa_missing', now)).toBe(false)
+  })
+
+  it('consumes an invite by hash only once', () => {
+    const invite = createInvite('admin', 7)
+    const hash = hashInviteCode(invite.code)
+
+    insertUser('other-user', 'other-user')
+    expect(consumeInviteCodeHash(getDb(), hash, 'new-user')).toBe(true)
+    expect(consumeInviteCodeHash(getDb(), hash, 'other-user')).toBe(false)
+
+    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string
+      used_at: number
+    }
     expect(row.used_by).toBe('new-user')
     expect(row.used_at).toBeGreaterThan(0)
   })
