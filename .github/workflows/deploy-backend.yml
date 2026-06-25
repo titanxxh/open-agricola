@@ -19,6 +19,7 @@ env:
   DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
   DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/root/open-agricola' }}
   DEPLOY_BRANCH: main
+  ACCOUNT_REGISTRATION_POLICY: ${{ vars.ACCOUNT_REGISTRATION_POLICY }}
 
 jobs:
   check:
