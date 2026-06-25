@@ -108,6 +108,11 @@ vi.mock('../db.ts', () => {
       used_at INTEGER,
       revoked_at INTEGER
     );
+    CREATE TABLE reserved_usernames (
+      username TEXT PRIMARY KEY COLLATE NOCASE,
+      reason TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
     CREATE TABLE rooms (
       id TEXT PRIMARY KEY,
       created_by TEXT REFERENCES users(id),
@@ -195,7 +200,7 @@ vi.mock('../db.ts', () => {
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
 
-const { createLocalUserForTests, createSession, validateSession } = await import('../auth.ts')
+const { createLocalUserForTests, createSession, deleteAccount, validateSession } = await import('../auth.ts')
 const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { createInvite } = await import('../invites.ts')
@@ -304,6 +309,7 @@ describe('auth routes', () => {
       DELETE FROM room_players;
       DELETE FROM rooms;
       DELETE FROM account_invites;
+      DELETE FROM reserved_usernames;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM auth_identities;
@@ -362,7 +368,7 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
     expect(validateSession(token)).toBeNull()
     expect((getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n).toBe(0)
-    expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id)
+    expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id, ['route-room'])
     expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
   })
 
@@ -440,6 +446,10 @@ describe('auth routes', () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
     const token = createSession(admin.id)
+
+    const login = await requestJson('POST', '/api/auth/login', { username: 'admin', password: 'password123' })
+    expect(login.status).toBe(200)
+    expect(login.json).toMatchObject({ ok: true, user: { username: 'admin', isAdmin: true } })
 
     const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: `oa_session=${token}` })
     expect(me.status).toBe(200)
@@ -572,6 +582,25 @@ describe('auth routes', () => {
     expect(retry.status).toBe(200)
     expect((retry.json.user as { username: string }).username).toBe('uniquename')
     expect(findIdentity('github', 'gh-retry')?.userId).toBe((retry.json.user as { id: string }).id)
+  })
+
+  it('prevents reusing a deleted admin username during onboarding', async () => {
+    process.env.ADMIN_USERS = 'deleted_admin'
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+    const admin = await createLocalUserForTests('deleted_admin', 'password123', 'Deleted Admin')
+    expect(deleteAccount(admin.id)).toEqual({ ok: true })
+    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-deleted-admin', emailVerified: true })
+
+    const res = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'deleted_admin', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.json).toMatchObject({ ok: false, code: 'username_taken' })
+    expect(findIdentity('github', 'gh-deleted-admin')).toBeNull()
   })
 
   it('reports the current registration policy', async () => {
