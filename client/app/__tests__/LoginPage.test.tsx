@@ -142,6 +142,38 @@ describe('LoginPage auth UI', () => {
     expect(screen.getByText('验证邮件已发送')).toBeInTheDocument()
   })
 
+  it('disables password registration under the same policy gating as oauth', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('invite_only')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+
+    const submit = screen.getByRole('button', { name: '用用户名注册' })
+    expect(submit).toBeDisabled()
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('邮箱'), 'local@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(submit)
+
+    expect(registerWithPasswordMock).not.toHaveBeenCalled()
+  })
+
+  it('disables password registration when policy disables registration', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('disabled')))
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+
+    const submit = screen.getByRole('button', { name: '用用户名注册' })
+    expect(submit).toBeDisabled()
+    await user.click(submit)
+
+    expect(registerWithPasswordMock).not.toHaveBeenCalled()
+  })
+
   it('requires invite code before oauth registration in invite-only mode', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('invite_only')))
@@ -188,6 +220,49 @@ describe('LoginPage auth UI', () => {
       .toHaveAttribute('href', '/api/auth/oauth/github/start?intent=register')
   })
 
+  it('resends verification email and shows localized backend failure', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
+    registerWithPasswordMock.mockResolvedValueOnce({ ok: true, status: 'verification_required' })
+    resendVerificationMock.mockResolvedValueOnce({ ok: false, code: 'email_delivery_failed', error: 'send failed' })
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('邮箱'), 'local@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '用用户名注册' }))
+    await user.click(screen.getByRole('button', { name: '重发验证邮件' }))
+
+    expect(resendVerificationMock).toHaveBeenCalledWith('local@example.com')
+    expect(screen.getByRole('alert')).toHaveTextContent('验证邮件发送失败')
+  })
+
+  it('resets verification sent state when switching tabs', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(policyResponse('open'))
+      .mockResolvedValueOnce(policyResponse('open')))
+    registerWithPasswordMock.mockResolvedValueOnce({ ok: true, status: 'verification_required' })
+    render(<LoginPage />)
+
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('邮箱'), 'local@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '用用户名注册' }))
+
+    expect(screen.getByText('验证邮件已发送')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: '登录' }))
+    await user.click(screen.getByRole('tab', { name: '注册' }))
+
+    expect(screen.queryByText('验证邮件已发送')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '用用户名注册' })).toBeInTheDocument()
+  })
+
   it('localizes backend error codes instead of showing raw English', async () => {
     const user = userEvent.setup()
     mockUseAuthLoginResult({ ok: false, code: 'invalid_login', error: 'Invalid username or password' })
@@ -198,5 +273,17 @@ describe('LoginPage auth UI', () => {
     await user.click(screen.getByRole('button', { name: '登录' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('用户名或密码不正确')
+  })
+
+  it('localizes email_not_verified on login', async () => {
+    const user = userEvent.setup()
+    mockUseAuthLoginResult({ ok: false, code: 'email_not_verified', error: 'Email has not been verified' })
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '登录' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('邮箱尚未验证')
   })
 })
