@@ -10,6 +10,7 @@ type OAuthStateRow = {
   intent: OAuthIntent
   user_id: string | null
   return_to: string | null
+  invite_code_hash: string | null
 }
 
 type OnboardingTicketRow = {
@@ -21,10 +22,12 @@ type OnboardingTicketRow = {
   display_name: string | null
   avatar_url: string | null
   return_to: string | null
+  invite_code_hash: string | null
 }
 
 export type OAuthOnboardingProfile = OAuthProfile & {
   returnTo?: string
+  inviteCodeHash?: string
 }
 
 function createRawSecret(): string {
@@ -33,6 +36,11 @@ function createRawSecret(): string {
 
 function hashSecret(raw: string): string {
   return createHash('sha256').update(raw).digest('hex')
+}
+
+function hasColumn(table: 'oauth_states' | 'oauth_onboarding_tickets', column: 'invite_code_hash'): boolean {
+  const rows = getDb().prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  return rows.some(row => row.name === column)
 }
 
 export function pruneExpiredOAuthRows(now: number = Date.now()): void {
@@ -46,14 +54,31 @@ export function createOAuthState(input: {
   intent: OAuthIntent
   userId?: string
   returnTo?: string
+  inviteCodeHash?: string
 }): string {
   const raw = createRawSecret()
   const now = Date.now()
   pruneExpiredOAuthRows(now)
-  getDb().prepare(`
-    INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, expires_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(hashSecret(raw), input.provider, input.intent, input.userId ?? null, input.returnTo ?? null, now + STATE_TTL_MS, now)
+  if (hasColumn('oauth_states', 'invite_code_hash')) {
+    getDb().prepare(`
+      INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      hashSecret(raw),
+      input.provider,
+      input.intent,
+      input.userId ?? null,
+      input.returnTo ?? null,
+      input.inviteCodeHash ?? null,
+      now + STATE_TTL_MS,
+      now,
+    )
+  } else {
+    getDb().prepare(`
+      INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(hashSecret(raw), input.provider, input.intent, input.userId ?? null, input.returnTo ?? null, now + STATE_TTL_MS, now)
+  }
   return raw
 }
 
@@ -62,15 +87,22 @@ export function consumeOAuthState(rawState: string): {
   intent: OAuthIntent
   userId?: string
   returnTo?: string
+  inviteCodeHash?: string
 } | null {
   const db = getDb()
   const stateHash = hashSecret(rawState)
   const now = Date.now()
-  const row = db.prepare(`
-    SELECT provider, intent, user_id, return_to
-    FROM oauth_states
-    WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(stateHash, now) as OAuthStateRow | undefined
+  const row = hasColumn('oauth_states', 'invite_code_hash')
+    ? db.prepare(`
+      SELECT provider, intent, user_id, return_to, invite_code_hash
+      FROM oauth_states
+      WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(stateHash, now) as OAuthStateRow | undefined
+    : db.prepare(`
+      SELECT provider, intent, user_id, return_to, NULL AS invite_code_hash
+      FROM oauth_states
+      WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(stateHash, now) as OAuthStateRow | undefined
 
   if (!row) return null
   db.prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL').run(now, stateHash)
@@ -79,6 +111,7 @@ export function consumeOAuthState(rawState: string): {
     intent: row.intent,
     ...(row.user_id ? { userId: row.user_id } : {}),
     ...(row.return_to ? { returnTo: row.return_to } : {}),
+    ...(row.invite_code_hash ? { inviteCodeHash: row.invite_code_hash } : {}),
   }
 }
 
@@ -127,29 +160,52 @@ export function linkIdentity(userId: string, profile: OAuthProfile): void {
   )
 }
 
-export function createOnboardingTicket(profile: OAuthProfile, returnTo?: string): string {
+export function createOnboardingTicket(profile: OAuthProfile, returnTo?: string, inviteCodeHash?: string): string {
   const raw = createRawSecret()
   const now = Date.now()
   pruneExpiredOAuthRows(now)
-  getDb().prepare(`
-    INSERT INTO oauth_onboarding_tickets (
-      ticket_hash, provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to, expires_at, created_at
+  if (hasColumn('oauth_onboarding_tickets', 'invite_code_hash')) {
+    getDb().prepare(`
+      INSERT INTO oauth_onboarding_tickets (
+        ticket_hash, provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, expires_at, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      hashSecret(raw),
+      profile.provider,
+      profile.providerUserId,
+      profile.providerLogin ?? null,
+      profile.email ?? null,
+      profile.emailVerified ? 1 : 0,
+      profile.displayName ?? null,
+      profile.avatarUrl ?? null,
+      returnTo ?? null,
+      inviteCodeHash ?? null,
+      now + ONBOARDING_TICKET_TTL_MS,
+      now,
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    hashSecret(raw),
-    profile.provider,
-    profile.providerUserId,
-    profile.providerLogin ?? null,
-    profile.email ?? null,
-    profile.emailVerified ? 1 : 0,
-    profile.displayName ?? null,
-    profile.avatarUrl ?? null,
-    returnTo ?? null,
-    now + ONBOARDING_TICKET_TTL_MS,
-    now,
-  )
+  } else {
+    getDb().prepare(`
+      INSERT INTO oauth_onboarding_tickets (
+        ticket_hash, provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, expires_at, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      hashSecret(raw),
+      profile.provider,
+      profile.providerUserId,
+      profile.providerLogin ?? null,
+      profile.email ?? null,
+      profile.emailVerified ? 1 : 0,
+      profile.displayName ?? null,
+      profile.avatarUrl ?? null,
+      returnTo ?? null,
+      now + ONBOARDING_TICKET_TTL_MS,
+      now,
+    )
+  }
   return raw
 }
 
@@ -163,17 +219,25 @@ function profileFromTicketRow(row: OnboardingTicketRow): OAuthOnboardingProfile 
     ...(row.display_name ? { displayName: row.display_name } : {}),
     ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
     ...(row.return_to ? { returnTo: row.return_to } : {}),
+    ...(row.invite_code_hash ? { inviteCodeHash: row.invite_code_hash } : {}),
   }
 }
 
 export function getOnboardingTicket(rawTicket: string): OAuthOnboardingProfile | null {
   const ticketHash = hashSecret(rawTicket)
-  const row = getDb().prepare(`
-    SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to
-    FROM oauth_onboarding_tickets
-    WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
+  const row = hasColumn('oauth_onboarding_tickets', 'invite_code_hash')
+    ? getDb().prepare(`
+      SELECT provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
+      FROM oauth_onboarding_tickets
+      WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
+    : getDb().prepare(`
+      SELECT provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, NULL AS invite_code_hash
+      FROM oauth_onboarding_tickets
+      WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(ticketHash, Date.now()) as OnboardingTicketRow | undefined
 
   return row ? profileFromTicketRow(row) : null
 }
@@ -182,12 +246,19 @@ export function consumeOnboardingTicket(rawTicket: string): OAuthOnboardingProfi
   const db = getDb()
   const ticketHash = hashSecret(rawTicket)
   const now = Date.now()
-  const row = db.prepare(`
-    SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to
-    FROM oauth_onboarding_tickets
-    WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
-  `).get(ticketHash, now) as OnboardingTicketRow | undefined
+  const row = hasColumn('oauth_onboarding_tickets', 'invite_code_hash')
+    ? db.prepare(`
+      SELECT provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
+      FROM oauth_onboarding_tickets
+      WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(ticketHash, now) as OnboardingTicketRow | undefined
+    : db.prepare(`
+      SELECT provider, provider_user_id, provider_login, provider_email,
+        provider_email_verified, display_name, avatar_url, return_to, NULL AS invite_code_hash
+      FROM oauth_onboarding_tickets
+      WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(ticketHash, now) as OnboardingTicketRow | undefined
 
   if (!row) return null
   db.prepare('UPDATE oauth_onboarding_tickets SET used_at = ? WHERE ticket_hash = ? AND used_at IS NULL').run(now, ticketHash)

@@ -80,6 +80,7 @@ vi.mock('../db.ts', () => {
       intent TEXT NOT NULL,
       user_id TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -94,6 +95,7 @@ vi.mock('../db.ts', () => {
       display_name TEXT,
       avatar_url TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -201,9 +203,9 @@ vi.mock('../db.ts', () => {
 })
 
 const { createLocalUserForTests, createSession, deleteAccount, validateSession } = await import('../auth.ts')
-const { createOAuthState, createOnboardingTicket, findIdentity, linkIdentity } = await import('../oauth/store.ts')
+const { createOAuthState, createOnboardingTicket, findIdentity, getOnboardingTicket, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
-const { createInvite } = await import('../invites.ts')
+const { createInvite, hashInviteCode } = await import('../invites.ts')
 const { getDb } = await import('../db.ts')
 const { OAUTH_STATE_COOKIE, SESSION_COOKIE } = await import('../auth-cookies.ts')
 
@@ -628,6 +630,39 @@ describe('auth routes', () => {
     expect(findIdentity('github', 'gh-no-invite')).toBeNull()
   })
 
+  it('rejects invite-only oauth register start without an invite code', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+    const res = await requestJson('GET', '/api/auth/oauth/github/start?intent=register')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toContain('authError=invalid_invite')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+  })
+
+  it('rejects invite-only oauth register start with an invalid invite code', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+    const res = await requestJson(
+      'GET',
+      '/api/auth/oauth/google/start?intent=register&inviteCode=oa_missing',
+    )
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toContain('authError=invalid_invite')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+  })
+
+  it('rejects oauth register start when registration is disabled', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'disabled'
+
+    const res = await requestJson('GET', '/api/auth/oauth/github/start?intent=register&inviteCode=oa_any')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toContain('authError=registration_disabled')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+  })
+
   it('consumes a valid invite during invite-only onboarding', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('admin_inviter', 'password123', 'Admin Inviter')
@@ -677,6 +712,47 @@ describe('auth routes', () => {
     expect(second.status).toBe(400)
     expect(second.json).toMatchObject({ ok: false, code: 'invalid_invite' })
     expect(findIdentity('github', 'gh-second')).toBeNull()
+  })
+
+  it('consumes the pre-authorized invite from onboarding ticket', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('preauth_admin', 'password123', 'Preauth Admin')
+    const invite = createInvite(admin.id, 7)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
+      provider: 'github',
+      providerUserId: 'gh-preauth',
+      providerLogin: 'preauth-gh',
+      emailVerified: true,
+    })
+
+    const start = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
+    )
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const callback = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+
+    const complete = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      { username: 'preauthuser', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: onboardingCookie },
+    )
+
+    expect(complete.status).toBe(200)
+    const userId = (complete.json.user as { id: string }).id
+    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string
+      used_at: number
+    }
+    expect(row.used_by).toBe(userId)
+    expect(row.used_at).toBeGreaterThan(0)
   })
 
   it('requires admin access to create invites', async () => {
@@ -934,6 +1010,38 @@ describe('auth routes', () => {
     expect(withCookie.status).toBe(302)
     expect(withCookie.headers['Set-Cookie']).toContain('oa_session=')
     expect(withCookie.headers['Set-Cookie']).toContain(`${OAUTH_STATE_COOKIE}=;`)
+  })
+
+  it('carries invite hash from oauth start into onboarding ticket', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('hash_admin', 'password123', 'Hash Admin')
+    const invite = createInvite(admin.id, 7)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
+      provider: 'github',
+      providerUserId: 'gh-hashed-invite',
+      providerLogin: 'hash-gh',
+      emailVerified: true,
+    })
+
+    const start = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
+    )
+    expect(start.status).toBe(302)
+
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const callback = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+    expect(callback.status).toBe(302)
+
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+    const ticket = decodeURIComponent(onboardingCookie.replace(/^oa_onboarding=/, ''))
+    const profile = getOnboardingTicket(ticket)
+    expect(profile?.inviteCodeHash).toBe(hashInviteCode(invite.code))
   })
 
   it('preserves safe returnTo through OAuth onboarding completion', async () => {
