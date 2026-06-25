@@ -134,23 +134,21 @@ describe('OnboardingPage', () => {
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=workshop'))
   })
 
-  it('requires an invite code in invite-only mode before submitting onboarding', async () => {
-    const user = userEvent.setup()
+  it('does not ask for invite code during invite-only onboarding', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(policyResponse('invite_only'))
     vi.stubGlobal('fetch', fetchMock)
     render(<OnboardingPage />)
 
-    await screen.findByLabelText('邀请码')
-    await user.type(screen.getByLabelText('用户名'), 'newuser')
-    await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.type(screen.getByLabelText('确认密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '完成注册' }))
-
-    expect(screen.getByRole('alert')).toHaveTextContent('邀请码无效、已过期或已使用')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/auth/registration-policy'),
+        expect.objectContaining({ credentials: 'include' }),
+      )
+    })
+    expect(screen.queryByLabelText('邀请码')).not.toBeInTheDocument()
   })
 
-  it('submits inviteCode during invite-only onboarding', async () => {
+  it('does not submit inviteCode during invite-only onboarding', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(policyResponse('invite_only'))
@@ -161,18 +159,16 @@ describe('OnboardingPage', () => {
     vi.stubGlobal('fetch', fetchMock)
     render(<OnboardingPage />)
 
-    await screen.findByLabelText('邀请码')
     await user.type(screen.getByLabelText('用户名'), 'newuser')
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.type(screen.getByLabelText('确认密码'), 'password123')
-    await user.type(screen.getByLabelText('邀请码'), 'oa_valid_code')
     await user.click(screen.getByRole('button', { name: '完成注册' }))
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenLastCalledWith(
         expect.stringContaining('/api/auth/onboarding/complete'),
         expect.objectContaining({
-          body: expect.stringContaining('"inviteCode":"oa_valid_code"'),
+          body: expect.not.stringContaining('"inviteCode"'),
         }),
       )
     })
