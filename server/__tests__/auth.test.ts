@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import {
   changePassword,
+  createEmailVerificationToken,
   createLocalUserForTests,
   createSession,
   deleteAccount,
@@ -482,6 +483,30 @@ describe('auth', () => {
       const result = await login('pendinglogin', 'password123')
 
       expect(result).toMatchObject({ ok: false, code: 'email_not_verified' })
+    })
+
+    it('verifies an email token once and creates a session', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      const created = await registerPasswordUser({
+        username: 'verifyuser',
+        email: 'verify@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+
+      const token = createEmailVerificationToken(created.userId)
+      const verified = verifyEmailToken(token)
+
+      expect(verified.ok).toBe(true)
+      if (!verified.ok) return
+      expect(verified.user.username).toBe('verifyuser')
+      expect(verified.token).toBeTruthy()
+      expect(validateSession(verified.token)?.username).toBe('verifyuser')
+
+      const reused = verifyEmailToken(token)
+      expect(reused).toMatchObject({ ok: false, code: 'invalid_or_expired_token' })
     })
   })
 
