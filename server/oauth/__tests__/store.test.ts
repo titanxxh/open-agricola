@@ -51,6 +51,7 @@ vi.mock('../../db.ts', () => {
       intent TEXT NOT NULL,
       user_id TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -65,6 +66,7 @@ vi.mock('../../db.ts', () => {
       display_name TEXT,
       avatar_url TEXT,
       return_to TEXT,
+      invite_code_hash TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       used_at INTEGER
@@ -86,6 +88,14 @@ describe('oauth store', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('test schema includes invite_code_hash columns for oauth temp tables', () => {
+    const stateColumns = getDb().prepare('PRAGMA table_info(oauth_states)').all() as Array<{ name: string }>
+    const ticketColumns = getDb().prepare('PRAGMA table_info(oauth_onboarding_tickets)').all() as Array<{ name: string }>
+
+    expect(stateColumns.map(column => column.name)).toContain('invite_code_hash')
+    expect(ticketColumns.map(column => column.name)).toContain('invite_code_hash')
   })
 
   it('creates and consumes oauth state exactly once', () => {
@@ -115,6 +125,36 @@ describe('oauth store', () => {
         (SELECT COUNT(*) FROM oauth_onboarding_tickets) AS tickets
     `).get() as { states: number; tickets: number }
     expect(row).toEqual({ states: 1, tickets: 0 })
+  })
+
+  it('round-trips inviteCodeHash through oauth state and onboarding ticket', () => {
+    const raw = createOAuthState({
+      provider: 'github',
+      intent: 'register',
+      returnTo: '/?page=login',
+      inviteCodeHash: 'hashed-invite',
+    })
+
+    const state = consumeOAuthState(raw)
+    expect(state).toMatchObject({
+      provider: 'github',
+      intent: 'register',
+      returnTo: '/?page=login',
+      inviteCodeHash: 'hashed-invite',
+    })
+
+    const ticket = createOnboardingTicket({
+      provider: 'github',
+      providerUserId: 'gh-hash-roundtrip',
+      emailVerified: true,
+    }, '/?page=onboarding', state?.inviteCodeHash)
+
+    expect(consumeOnboardingTicket(ticket)).toMatchObject({
+      provider: 'github',
+      providerUserId: 'gh-hash-roundtrip',
+      returnTo: '/?page=onboarding',
+      inviteCodeHash: 'hashed-invite',
+    })
   })
 
   it('links one provider identity to one user', async () => {
