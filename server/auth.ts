@@ -125,15 +125,6 @@ export async function register(username: string, password: string, displayName?:
 }
 
 export async function registerPasswordUser(input: RegisterPasswordInput): Promise<RegisterPasswordResult> {
-  const policy = getRegistrationPolicy()
-  if (policy === 'disabled') {
-    return { ok: false, code: 'registration_disabled', error: 'Registration is disabled' }
-  }
-  const inviteCode = input.inviteCode?.trim() ?? ''
-  if (policy === 'invite_only' && !inviteCode) {
-    return { ok: false, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
-  }
-
   const username = input.username.trim()
   const email = normalizeEmail(input.email)
   const usernameError = validateUsername(username)
@@ -145,6 +136,15 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   }
   if (input.password !== input.confirmPassword) {
     return { ok: false, code: 'password_mismatch', error: 'Passwords do not match' }
+  }
+
+  const policy = getRegistrationPolicy()
+  const inviteCode = input.inviteCode?.trim() ?? ''
+  if (policy === 'disabled') {
+    return { ok: false, code: 'registration_disabled', error: 'Registration is disabled' }
+  }
+  if (policy === 'invite_only' && !inviteCode) {
+    return { ok: false, code: 'invalid_invite', error: 'Invalid invite code' }
   }
 
   const db = getDb()
@@ -160,7 +160,7 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   const now = Date.now()
   const name = input.displayName?.trim() || username
   try {
-    db.transaction(() => {
+    const result = db.transaction(() => {
       db.prepare(`
         INSERT INTO users (
           id, username, email, email_verified_at, email_verification_sent_at,
@@ -169,19 +169,19 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
         VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
       `).run(id, username, email, name, passwordHash, now, now)
       if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
-        throw new Error('invalid invite')
+        throw new Error('invalid_invite')
       }
+      return { ok: true as const, status: 'verification_required' as const, userId: id }
     })()
+    return result
   } catch (err) {
-    if (err instanceof Error && /invalid invite/.test(err.message)) {
-      return { ok: false, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
+    if (err instanceof Error && err.message === 'invalid_invite') {
+      return { ok: false, code: 'invalid_invite', error: 'Invalid invite code' }
     }
     const constraintResult = mapRegistrationConstraintError(err)
     if (constraintResult) return constraintResult
     throw err
   }
-
-  return { ok: true, status: 'verification_required', userId: id }
 }
 
 export function createEmailVerificationToken(userId: string): string {
@@ -259,6 +259,26 @@ export async function sendVerificationEmail(userId: string, email: string): Prom
     text: `Verify your Open Agricola email: ${link}`,
     html: `<p>Verify your Open Agricola email:</p><p><a href="${link}">Verify email</a></p>`,
   })
+}
+
+export async function resendVerificationEmail(
+  email: string,
+): Promise<{ ok: true } | { ok: false; code: AuthErrorCode; error: string }> {
+  const normalized = normalizeEmail(email)
+  const db = getDb()
+  const row = db.prepare(`
+    SELECT id, email, email_verified_at
+    FROM users
+    WHERE email = ?
+  `).get(normalized) as { id: string; email: string; email_verified_at: number | null } | undefined
+
+  if (!row || row.email_verified_at !== null) return { ok: true }
+  try {
+    await sendVerificationEmail(row.id, row.email)
+    return { ok: true }
+  } catch {
+    return { ok: false, code: 'email_delivery_failed', error: 'Failed to send verification email' }
+  }
 }
 
 function validateUsername(username: string): string | null {

@@ -47,6 +47,9 @@ vi.mock('../db.ts', () => {
     CREATE TABLE users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      email TEXT UNIQUE COLLATE NOCASE,
+      email_verified_at INTEGER,
+      email_verification_sent_at INTEGER,
       display_name TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_updated_at INTEGER,
@@ -58,6 +61,13 @@ vi.mock('../db.ts', () => {
       user_id TEXT NOT NULL REFERENCES users(id),
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
+    );
+    CREATE TABLE email_verification_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER
     );
     CREATE TABLE auth_identities (
       id TEXT PRIMARY KEY,
@@ -202,7 +212,15 @@ vi.mock('../db.ts', () => {
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
 
-const { createLocalUserForTests, createSession, deleteAccount, validateSession } = await import('../auth.ts')
+const {
+  createEmailVerificationToken,
+  createLocalUserForTests,
+  createSession,
+  deleteAccount,
+  login,
+  registerPasswordUser,
+  validateSession,
+} = await import('../auth.ts')
 const { createOAuthState, createOnboardingTicket, findIdentity, getOnboardingTicket, linkIdentity } = await import('../oauth/store.ts')
 const { exchangeOAuthCode } = await import('../oauth/providers.ts')
 const { createInvite, hashInviteCode } = await import('../invites.ts')
@@ -252,6 +270,10 @@ class MockRes {
     if (headers) Object.assign(this.headers, headers)
   }
 
+  setHeader(name: string, value: string | string[]): void {
+    this.headers[name] = value
+  }
+
   end(chunk?: string | Buffer): void {
     if (chunk) this.body += chunk.toString()
     this.finish()
@@ -298,6 +320,7 @@ describe('auth routes', () => {
   beforeEach(() => {
     wsServerMocks.endRoomsForUser.mockClear()
     wsServerMocks.closeUserConnections.mockClear()
+    process.env.DISABLE_RATE_LIMIT = '1'
     process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
     getDb().exec(`
       DELETE FROM github_propose_audit;
@@ -315,6 +338,7 @@ describe('auth routes', () => {
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM auth_identities;
+      DELETE FROM email_verification_tokens;
       DELETE FROM sessions;
       DELETE FROM users;
     `)
@@ -329,6 +353,8 @@ describe('auth routes', () => {
     delete process.env.CORS_ORIGIN
     delete process.env.ACCOUNT_REGISTRATION_POLICY
     delete process.env.ADMIN_USERS
+    delete process.env.EMAIL_DELIVERY
+    delete process.env.DISABLE_RATE_LIMIT
   })
 
   it('login sets an HttpOnly session cookie and does not return token', async () => {
@@ -430,10 +456,123 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).not.toContain('Secure')
   })
 
-  it('direct register returns oauth_registration_required', async () => {
-    const res = await requestJson('POST', '/api/auth/register', { username: 'blocked', password: 'password123' })
-    expect(res.status).toBe(400)
-    expect(res.json).toMatchObject({ ok: false, code: 'oauth_registration_required' })
+  it('password registration creates an unverified user and sends verification mail', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+    process.env.EMAIL_DELIVERY = 'log'
+    process.env.PUBLIC_API_BASE = 'https://api.example'
+
+    const res = await requestJson('POST', '/api/auth/register', {
+      username: 'routeuser',
+      email: 'route@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.json).toMatchObject({ ok: true, status: 'verification_required' })
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+
+    const user = getDb().prepare('SELECT id, email_verified_at FROM users WHERE username = ?').get('routeuser') as {
+      id: string
+      email_verified_at: number | null
+    }
+    expect(user.email_verified_at).toBeNull()
+    const tokenRow = getDb().prepare('SELECT user_id FROM email_verification_tokens').get() as { user_id: string }
+    expect(tokenRow.user_id).toBe(user.id)
+  })
+
+  it('email verification activates user and sets session cookie', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+
+    const created = await registerPasswordUser({
+      username: 'verifyroute',
+      email: 'verifyroute@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const token = createEmailVerificationToken(created.userId)
+
+    const res = await requestJson('GET', `/api/auth/verify-email?token=${encodeURIComponent(token)}`)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/')
+    expect(res.headers['Set-Cookie']).toContain('oa_session=')
+    await expect(login('verifyroute', 'password123')).resolves.toMatchObject({ ok: true })
+  })
+
+  it('requires and consumes invite for invite-only password registration', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    process.env.EMAIL_DELIVERY = 'log'
+    const admin = await createLocalUserForTests('invite_password_admin', 'password123', 'Invite Admin')
+    const invite = createInvite(admin.id, 7)
+
+    const missing = await requestJson('POST', '/api/auth/register', {
+      username: 'missinginvite',
+      email: 'missinginvite@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+    expect(missing.status).toBe(400)
+    expect(missing.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+
+    const created = await requestJson('POST', '/api/auth/register', {
+      username: 'invitedpassword',
+      email: 'invitedpassword@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      inviteCode: invite.code,
+    })
+    expect(created.status).toBe(200)
+
+    const user = getDb().prepare('SELECT id FROM users WHERE username = ?').get('invitedpassword') as { id: string }
+    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string
+      used_at: number
+    }
+    expect(row.used_by).toBe(user.id)
+    expect(row.used_at).toBeGreaterThan(0)
+  })
+
+  it('resends verification mail only for existing unverified accounts', async () => {
+    process.env.EMAIL_DELIVERY = 'log'
+    process.env.PUBLIC_API_BASE = 'https://api.example'
+    const created = await registerPasswordUser({
+      username: 'resendroute',
+      email: 'resendroute@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+    })
+    expect(created.ok).toBe(true)
+
+    const firstSentAt = (getDb()
+      .prepare('SELECT email_verification_sent_at FROM users WHERE username = ?')
+      .get('resendroute') as { email_verification_sent_at: number | null }).email_verification_sent_at
+
+    const resend = await requestJson('POST', '/api/auth/resend-verification', {
+      email: 'resendroute@example.com',
+    })
+    expect(resend.status).toBe(200)
+    expect(resend.json).toMatchObject({ ok: true })
+
+    const afterResend = getDb().prepare(`
+      SELECT email_verified_at, email_verification_sent_at
+      FROM users
+      WHERE username = ?
+    `).get('resendroute') as {
+      email_verified_at: number | null
+      email_verification_sent_at: number | null
+    }
+    expect(afterResend.email_verified_at).toBeNull()
+    expect(afterResend.email_verification_sent_at).toBeGreaterThan(firstSentAt ?? 0)
+
+    const unknown = await requestJson('POST', '/api/auth/resend-verification', {
+      email: 'missing@example.com',
+    })
+    expect(unknown.status).toBe(200)
+    expect(unknown.json).toMatchObject({ ok: true })
   })
 
   it('me reads oa_session cookie', async () => {
