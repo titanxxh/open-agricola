@@ -1,11 +1,10 @@
 import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
-import { getRegistrationPolicy } from './invites.ts'
+import { consumeInviteCode, getRegistrationPolicy } from './invites.ts'
 
 const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 
 export type AuthUser = {
   id: string
@@ -105,6 +104,17 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+function mapRegistrationConstraintError(err: unknown): RegisterPasswordResult | null {
+  if (!(err instanceof Error)) return null
+  if (/users\.username/.test(err.message)) {
+    return { ok: false, code: 'username_taken', error: 'Username already taken' }
+  }
+  if (/users\.email/.test(err.message)) {
+    return { ok: false, code: 'email_taken', error: 'Email already taken' }
+  }
+  return null
+}
+
 export async function register(username: string, password: string, displayName?: string): Promise<AuthResult> {
   void username
   void password
@@ -117,8 +127,9 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   if (policy === 'disabled') {
     return { ok: false, code: 'registration_disabled', error: 'Registration is disabled' }
   }
-  if (policy !== 'open') {
-    return { ok: false, code: 'invalid_invite', error: 'Invite code is required' }
+  const inviteCode = input.inviteCode?.trim() ?? ''
+  if (policy === 'invite_only' && !inviteCode) {
+    return { ok: false, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
   }
 
   const username = input.username.trim()
@@ -146,13 +157,27 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   const passwordHash = await hashPassword(input.password)
   const now = Date.now()
   const name = input.displayName?.trim() || username
-  db.prepare(`
-    INSERT INTO users (
-      id, username, email, email_verified_at, email_verification_sent_at,
-      display_name, password_hash, password_updated_at, created_at
-    )
-    VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
-  `).run(id, username, email, name, passwordHash, now, now)
+  try {
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO users (
+          id, username, email, email_verified_at, email_verification_sent_at,
+          display_name, password_hash, password_updated_at, created_at
+        )
+        VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+      `).run(id, username, email, name, passwordHash, now, now)
+      if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
+        throw new Error('invalid invite')
+      }
+    })()
+  } catch (err) {
+    if (err instanceof Error && /invalid invite/.test(err.message)) {
+      return { ok: false, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
+    }
+    const constraintResult = mapRegistrationConstraintError(err)
+    if (constraintResult) return constraintResult
+    throw err
+  }
 
   return { ok: true, status: 'verification_required', userId: id }
 }
@@ -167,8 +192,7 @@ export async function verifyEmailToken(token: string): Promise<AuthResult> {
     WHERE t.token_hash = ?
       AND t.used_at IS NULL
       AND t.expires_at > ?
-      AND t.created_at >= ?
-  `).get(tokenHash, now, now - EMAIL_VERIFICATION_TTL_MS) as
+  `).get(tokenHash, now) as
     | { id: string; username: string; display_name: string; email: string | null; email_verified_at: number | null }
     | undefined
 
