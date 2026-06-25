@@ -152,6 +152,18 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith('/api/auth/identities'))
     expect(screen.queryByText('邀请注册')).not.toBeInTheDocument()
+    expect(apiFetchMock.mock.calls.some(([url]) => url === '/api/admin/invites')).toBe(false)
+  })
+
+  it('shows a network error when the initial invite list load fails', async () => {
+    mockUser = { id: 'admin1', username: 'admin', displayName: 'Admin', isAdmin: true }
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    render(<SettingsPage />)
+
+    await waitFor(() => expect(screen.getByText('网络错误')).toBeInTheDocument())
   })
 
   it('lets admin generate an invite and displays the returned plaintext once', async () => {
@@ -176,6 +188,39 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(screen.getByText('oa_secret')).toBeInTheDocument())
     expect(screen.getByText('请立即复制，之后不会再次显示明文。')).toBeInTheDocument()
     expect(apiFetchMock).toHaveBeenCalledWith('/api/admin/invites', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('keeps plaintext invite codes sourced from create responses only', async () => {
+    const user = userEvent.setup()
+    mockUser = { id: 'admin1', username: 'admin', displayName: 'Admin', isAdmin: true }
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        invite: { id: 'inv1', code: 'oa_secret', createdAt: 1000, expiresAt: 2000 },
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+      })))
+
+    const { unmount } = render(<SettingsPage />)
+    await screen.findByText('邀请注册')
+    await user.click(screen.getByRole('button', { name: '生成邀请码' }))
+
+    await waitFor(() => expect(screen.getByText('oa_secret')).toBeInTheDocument())
+    unmount()
+
+    render(<SettingsPage />)
+    await screen.findByText('邀请注册')
+    await waitFor(() => expect(screen.queryByText('oa_secret')).not.toBeInTheDocument())
+    expect(screen.getByText('可用')).toBeInTheDocument()
   })
 
   it('lets admin revoke an active invite', async () => {
