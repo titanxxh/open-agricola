@@ -1,12 +1,14 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
+import { API_BASE } from '../config'
 
 type Mode = 'login' | 'register'
 type OAuthProvider = 'github' | 'google'
+type RegistrationPolicy = 'invite_only' | 'open' | 'disabled'
 
 function OAuthProviderIcon({ provider }: { provider: OAuthProvider }) {
   if (provider === 'github') {
@@ -27,7 +29,36 @@ function OAuthProviderIcon({ provider }: { provider: OAuthProvider }) {
   )
 }
 
-function OAuthLink({ provider, href, children }: { provider: OAuthProvider; href: string; children: ReactNode }) {
+function OAuthLink({
+  provider,
+  href,
+  disabled,
+  onDisabledClick,
+  children,
+}: {
+  provider: OAuthProvider
+  href: string
+  disabled?: boolean
+  onDisabledClick?: () => void
+  children: ReactNode
+}) {
+  if (disabled) {
+    return (
+      <a
+        className="btn-primary oauth-provider-link is-disabled"
+        href={href}
+        aria-disabled="true"
+        onClick={e => {
+          e.preventDefault()
+          onDisabledClick?.()
+        }}
+      >
+        <OAuthProviderIcon provider={provider} />
+        <span>{children}</span>
+      </a>
+    )
+  }
+
   return (
     <a className="btn-primary oauth-provider-link" href={href}>
       <OAuthProviderIcon provider={provider} />
@@ -47,6 +78,31 @@ export function LoginPage() {
     return code ? authErrorMessage(code, undefined, t) : ''
   })
   const [loading, setLoading] = useState(false)
+  const [registrationPolicy, setRegistrationPolicy] = useState<RegistrationPolicy>('invite_only')
+  const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+
+  useEffect(() => {
+    if (mode !== 'register') return
+    let cancelled = false
+    fetch(`${API_BASE}/api/auth/registration-policy`, { credentials: 'include' })
+      .then(async resp => {
+        if (!resp.ok) throw new Error('registration policy request failed')
+        return await resp.json()
+      })
+      .then(data => {
+        if (!cancelled && (data.policy === 'invite_only' || data.policy === 'open' || data.policy === 'disabled')) {
+          setRegistrationPolicy(data.policy)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPolicyLoadFailed(true)
+          setError(t('platform.networkError'))
+        }
+      })
+    return () => { cancelled = true }
+  }, [mode, t])
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -61,6 +117,28 @@ export function LoginPage() {
       setError(t('platform.networkError'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const trimmedInviteCode = inviteCode.trim()
+  const inviteRequired = mode === 'register' && registrationPolicy === 'invite_only'
+  const registerDisabled = policyLoadFailed || registrationPolicy === 'disabled' || (inviteRequired && !trimmedInviteCode)
+  const registerOAuthUrl = (provider: OAuthProvider) => oauthStartUrl(
+    provider,
+    'register',
+    inviteRequired ? { inviteCode: trimmedInviteCode } : undefined,
+  )
+  const handleDisabledRegisterClick = () => {
+    if (registrationPolicy === 'disabled') {
+      setError(authErrorMessage('registration_disabled', undefined, t))
+      return
+    }
+    if (policyLoadFailed) {
+      setError(t('platform.networkError'))
+      return
+    }
+    if (inviteRequired && !trimmedInviteCode) {
+      setError(authErrorMessage('invalid_invite', undefined, t))
     }
   }
 
@@ -84,7 +162,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'login'}
             className={`login-mode-tabs__tab${mode === 'login' ? ' is-active' : ''}`}
-            onClick={() => { setMode('login'); setError('') }}
+            onClick={() => { setMode('login'); setError(''); setPolicyLoadFailed(false) }}
           >
             {t('platform.loginBtn')}
           </button>
@@ -93,7 +171,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'register'}
             className={`login-mode-tabs__tab${mode === 'register' ? ' is-active' : ''}`}
-            onClick={() => { setMode('register'); setError('') }}
+            onClick={() => { setMode('register'); setError(''); setPolicyLoadFailed(false) }}
           >
             {t('platform.registerBtn')}
           </button>
@@ -138,9 +216,37 @@ export function LoginPage() {
         ) : (
           <div className="login-form">
             <p>{t('platform.oauthRegisterIntro')}</p>
+            {registrationPolicy === 'invite_only' && (
+              <div className="form-field">
+                <label htmlFor="register-invite-code">{t('platform.inviteCode')}</label>
+                <span className="form-hint">{t('platform.inviteOnlyNote')}</span>
+                <input
+                  id="register-invite-code"
+                  type="text"
+                  value={inviteCode}
+                  onChange={e => setInviteCode(e.target.value)}
+                  placeholder={t('platform.inviteCodePlaceholder')}
+                  autoComplete="off"
+                />
+              </div>
+            )}
             {error && <div className="form-error" role="alert">{error}</div>}
-            <OAuthLink provider="github" href={oauthStartUrl('github', 'register')}>{t('platform.oauthRegisterGithub')}</OAuthLink>
-            <OAuthLink provider="google" href={oauthStartUrl('google', 'register')}>{t('platform.oauthRegisterGoogle')}</OAuthLink>
+            <OAuthLink
+              provider="github"
+              href={registerOAuthUrl('github')}
+              disabled={registerDisabled}
+              onDisabledClick={handleDisabledRegisterClick}
+            >
+              {t('platform.oauthRegisterGithub')}
+            </OAuthLink>
+            <OAuthLink
+              provider="google"
+              href={registerOAuthUrl('google')}
+              disabled={registerDisabled}
+              onDisabledClick={handleDisabledRegisterClick}
+            >
+              {t('platform.oauthRegisterGoogle')}
+            </OAuthLink>
           </div>
         )}
       </div>
