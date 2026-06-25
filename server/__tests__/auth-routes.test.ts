@@ -663,7 +663,7 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
-  it('consumes a valid invite during invite-only onboarding', async () => {
+  it('rejects inviteCode body during invite-only onboarding without a pre-authorized invite', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('admin_inviter', 'password123', 'Admin Inviter')
     const invite = createInvite(admin.id, 7)
@@ -676,41 +676,41 @@ describe('auth routes', () => {
       { Cookie: `oa_onboarding=${ticket}` },
     )
 
-    expect(res.status).toBe(200)
-    const userId = (res.json.user as { id: string }).id
-    expect(findIdentity('github', 'gh-invited')?.userId).toBe(userId)
+    expect(res.status).toBe(400)
+    expect(res.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+    expect(findIdentity('github', 'gh-invited')).toBeNull()
     const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
-      used_by: string
-      used_at: number
+      used_by: string | null
+      used_at: number | null
     }
-    expect(row.used_by).toBe(userId)
-    expect(row.used_at).toBeGreaterThan(0)
+    expect(row.used_by).toBeNull()
+    expect(row.used_at).toBeNull()
   })
 
-  it('rejects a reused invite and keeps the onboarding ticket retryable', async () => {
+  it('keeps onboarding retryable after inviteCode body is rejected without pre-authorization', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('reuse_admin', 'password123', 'Reuse Admin')
-    const firstTicket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-first', emailVerified: true })
-    const secondTicket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true })
+    const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true })
     const invite = createInvite(admin.id, 7)
 
     const first = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
-      { username: 'firstinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
-      { Cookie: `oa_onboarding=${firstTicket}` },
+      { username: 'secondinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
+      { Cookie: `oa_onboarding=${ticket}` },
     )
-    expect(first.status).toBe(200)
+    expect(first.status).toBe(400)
+    expect(first.json).toMatchObject({ ok: false, code: 'invalid_invite' })
 
-    const second = await requestJson(
+    const retry = await requestJson(
       'POST',
       '/api/auth/onboarding/complete',
-      { username: 'secondinvite', password: 'password123', confirmPassword: 'password123', inviteCode: invite.code },
-      { Cookie: `oa_onboarding=${secondTicket}` },
+      { username: 'secondinvite', password: 'password123', confirmPassword: 'password123' },
+      { Cookie: `oa_onboarding=${ticket}` },
     )
 
-    expect(second.status).toBe(400)
-    expect(second.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+    expect(retry.status).toBe(400)
+    expect(retry.json).toMatchObject({ ok: false, code: 'invalid_invite' })
     expect(findIdentity('github', 'gh-second')).toBeNull()
   })
 
@@ -860,6 +860,50 @@ describe('auth routes', () => {
 
     expect(callback.status).toBe(302)
     expect(callback.headers['Set-Cookie']).toContain('oa_session=')
+  })
+
+  it('rejects inviteCode body after intent=login onboarding for an unlinked identity', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('login_invite_admin', 'password123', 'Login Invite Admin')
+    const invite = createInvite(admin.id, 7)
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
+      provider: 'github',
+      providerUserId: 'gh-login-unlinked',
+      providerLogin: 'login-unlinked-gh',
+      emailVerified: true,
+    })
+
+    const start = await requestJson('GET', '/api/auth/oauth/github/start?intent=login')
+    const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+    const callback = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
+      undefined,
+      { Cookie: startOAuthCookie(start) },
+    )
+    const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+
+    const complete = await requestJson(
+      'POST',
+      '/api/auth/onboarding/complete',
+      {
+        username: 'logininviteuser',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: invite.code,
+      },
+      { Cookie: onboardingCookie },
+    )
+
+    expect(complete.status).toBe(400)
+    expect(complete.json).toMatchObject({ ok: false, code: 'invalid_invite' })
+    expect(findIdentity('github', 'gh-login-unlinked')).toBeNull()
+    const row = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+      used_by: string | null
+      used_at: number | null
+    }
+    expect(row.used_by).toBeNull()
+    expect(row.used_at).toBeNull()
   })
 
   it('test oauth helper is unavailable by default', async () => {

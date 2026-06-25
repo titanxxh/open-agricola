@@ -161,7 +161,6 @@ async function createLocalUserForOnboarding(input: {
   username: string
   password: string
   displayName?: string
-  inviteCode?: string
   inviteCodeHash?: string
   profile: OAuthProfile
 }) {
@@ -176,8 +175,7 @@ async function createLocalUserForOnboarding(input: {
   if (policy === 'disabled') {
     return { ok: false as const, code: 'registration_disabled', error: 'Registration is disabled' }
   }
-  const inviteCode = input.inviteCode?.trim() ?? ''
-  const inviteCodeHash = input.inviteCodeHash?.trim() || (inviteCode ? hashInviteCode(inviteCode) : '')
+  const inviteCodeHash = input.inviteCodeHash?.trim() ?? ''
   if (policy === 'invite_only' && !inviteCodeHash) {
     return { ok: false as const, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
   }
@@ -348,7 +346,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     return
   }
 
-  const body = await parseBody<{ username?: string; displayName?: string; password?: string; confirmPassword?: string; inviteCode?: string }>(req)
+  const body = await parseBody<{ username?: string; displayName?: string; password?: string; confirmPassword?: string }>(req)
   if (!body?.username || !body.password) {
     sendJson(res, 400, { ok: false, code: 'invalid_username', error: 'Missing username or password' })
     return
@@ -362,7 +360,6 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     username: body.username,
     password: body.password,
     displayName: body.displayName,
-    inviteCode: body.inviteCode,
     inviteCodeHash: profile.inviteCodeHash,
     profile,
   })
