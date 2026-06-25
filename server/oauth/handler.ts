@@ -27,6 +27,7 @@ import {
   linkIdentity,
 } from './store.ts'
 import type { OAuthIntent, OAuthProfile, OAuthProvider } from './types.ts'
+import { consumeInviteCode, getRegistrationPolicy } from '../invites.ts'
 
 const SCRYPT_KEYLEN = 64
 
@@ -151,12 +152,27 @@ async function parseBody<T>(req: IncomingMessage): Promise<T | null> {
   }
 }
 
-async function createLocalUserForOnboarding(username: string, password: string, displayName: string | undefined, profile: OAuthProfile) {
-  const name = username.trim()
+async function createLocalUserForOnboarding(input: {
+  username: string
+  password: string
+  displayName?: string
+  inviteCode?: string
+  profile: OAuthProfile
+}) {
+  const name = input.username.trim()
   const usernameError = validateUsername(name)
   if (usernameError) return { ok: false as const, code: 'invalid_username', error: usernameError }
-  if (!password || password.length < 8) {
+  if (!input.password || input.password.length < 8) {
     return { ok: false as const, code: 'invalid_password', error: 'Password must be at least 8 characters' }
+  }
+
+  const policy = getRegistrationPolicy()
+  if (policy === 'disabled') {
+    return { ok: false as const, code: 'registration_disabled', error: 'Registration is disabled' }
+  }
+  const inviteCode = input.inviteCode?.trim() ?? ''
+  if (policy === 'invite_only' && !inviteCode) {
+    return { ok: false as const, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
   }
 
   const db = getDb()
@@ -164,18 +180,24 @@ async function createLocalUserForOnboarding(username: string, password: string, 
   if (existing) return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
 
   const id = nanoid()
-  const passwordHash = await hashPassword(password)
+  const passwordHash = await hashPassword(input.password)
   const now = Date.now()
-  const localDisplayName = displayName?.trim() || profile.displayName?.trim() || name
+  const localDisplayName = input.displayName?.trim() || input.profile.displayName?.trim() || name
 
   try {
     db.transaction(() => {
       db.prepare(
         'INSERT INTO users (id, username, display_name, password_hash, password_updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       ).run(id, name, localDisplayName, passwordHash, now, now)
-      linkIdentity(id, profile)
+      linkIdentity(id, input.profile)
+      if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
+        throw new Error('invalid invite')
+      }
     })()
   } catch (err) {
+    if (err instanceof Error && /invalid invite/.test(err.message)) {
+      return { ok: false as const, code: 'invalid_invite', error: 'Invite code is invalid, expired, or already used' }
+    }
     if (err instanceof Error && /linked/.test(err.message)) {
       return { ok: false as const, code: 'oauth_identity_taken', error: 'OAuth identity is already linked' }
     }
@@ -300,7 +322,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     return
   }
 
-  const body = await parseBody<{ username?: string; displayName?: string; password?: string; confirmPassword?: string }>(req)
+  const body = await parseBody<{ username?: string; displayName?: string; password?: string; confirmPassword?: string; inviteCode?: string }>(req)
   if (!body?.username || !body.password) {
     sendJson(res, 400, { ok: false, code: 'invalid_username', error: 'Missing username or password' })
     return
@@ -310,7 +332,13 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     return
   }
 
-  const result = await createLocalUserForOnboarding(body.username, body.password, body.displayName, profile)
+  const result = await createLocalUserForOnboarding({
+    username: body.username,
+    password: body.password,
+    displayName: body.displayName,
+    inviteCode: body.inviteCode,
+    profile,
+  })
   if (!result.ok) {
     sendJson(res, 400, result)
     return
@@ -338,4 +366,8 @@ export function handleLinkedIdentities(req: IncomingMessage, res: ServerResponse
     return
   }
   sendJson(res, 200, { ok: true, identities: getLinkedIdentities(user.id) })
+}
+
+export function handleRegistrationPolicy(_req: IncomingMessage, res: ServerResponse): void {
+  sendJson(res, 200, { ok: true, policy: getRegistrationPolicy() })
 }

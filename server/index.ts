@@ -18,6 +18,7 @@ import {
   handleOAuthCallback,
   handleOAuthStart,
   handleOnboardingComplete,
+  handleRegistrationPolicy,
 } from './oauth/handler.ts'
 import { assertOAuthProvider } from './oauth/providers.ts'
 import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
@@ -151,6 +152,11 @@ const server = createServer(async (req, res) => {
       await handleOAuthCallback(req, res, url)
       return
     }
+  }
+
+  if (req.url === '/api/auth/registration-policy' && req.method === 'GET') {
+    handleRegistrationPolicy(req, res)
+    return
   }
 
   if (req.url === '/api/auth/onboarding/complete' && req.method === 'POST') {
