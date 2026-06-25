@@ -4,6 +4,7 @@ import {
   changePassword,
   createLocalUserForTests,
   createSession,
+  deleteAccount,
   login,
   logout,
   logoutAll,
@@ -81,6 +82,89 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL,
       used_at INTEGER
     );
+    CREATE TABLE rooms (
+      id TEXT PRIMARY KEY,
+      created_by TEXT REFERENCES users(id),
+      state_json TEXT,
+      max_players INTEGER NOT NULL DEFAULT 2,
+      status TEXT NOT NULL DEFAULT 'waiting',
+      version INTEGER NOT NULL DEFAULT 0,
+      custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE room_players (
+      room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      player_index INTEGER NOT NULL,
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (room_id, user_id)
+    );
+    CREATE TABLE workshop_cards (
+      id TEXT PRIMARY KEY,
+      author_id TEXT NOT NULL REFERENCES users(id),
+      card_id TEXT NOT NULL,
+      card_type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      card_json TEXT NOT NULL,
+      code_manifest TEXT,
+      art_url TEXT,
+      art_prompt TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      featured INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE card_likes (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, card_id)
+    );
+    CREATE TABLE card_comments (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      author_id TEXT NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE sandbox_cards (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      workshop_card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, workshop_card_id)
+    );
+    CREATE TABLE sandbox_settings (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      player_count INTEGER NOT NULL DEFAULT 2,
+      deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE workshop_card_versions (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+      card_json TEXT NOT NULL,
+      code_manifest TEXT,
+      art_url TEXT,
+      version_number INTEGER NOT NULL,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE github_propose_rate_limit (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      last_propose_at INTEGER NOT NULL
+    );
+    CREATE TABLE github_propose_audit (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      workshop_card_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      pr_url TEXT,
+      error_code TEXT,
+      error_message TEXT,
+      created_at INTEGER NOT NULL
+    );
   `)
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
@@ -91,6 +175,16 @@ describe('auth', () => {
   beforeEach(() => {
     const db = getDb()
     db.exec(`
+      DELETE FROM github_propose_audit;
+      DELETE FROM github_propose_rate_limit;
+      DELETE FROM workshop_card_versions;
+      DELETE FROM sandbox_cards;
+      DELETE FROM sandbox_settings;
+      DELETE FROM card_comments;
+      DELETE FROM card_likes;
+      DELETE FROM workshop_cards;
+      DELETE FROM room_players;
+      DELETE FROM rooms;
       DELETE FROM oauth_onboarding_tickets;
       DELETE FROM oauth_states;
       DELETE FROM auth_identities;
@@ -197,6 +291,107 @@ describe('auth', () => {
       logoutAll(user.id)
       expect(validateSession(one)).toBeNull()
       expect(validateSession(two)).toBeNull()
+    })
+  })
+
+  describe('deleteAccount', () => {
+    const count = (sql: string, ...params: unknown[]): number =>
+      (getDb().prepare(sql).get(...params) as { n: number }).n
+
+    it('removes account-owned data and finishes persisted rooms involving the user', async () => {
+      const db = getDb()
+      const user = await createLocalUserForTests('deleteme', 'password123', 'Delete Me')
+      const other = await createLocalUserForTests('otheruser', 'password123', 'Other User')
+      const token = createSession(user.id)
+      const now = Date.now()
+
+      db.prepare(`
+        INSERT INTO auth_identities (
+          id, user_id, provider, provider_user_id, provider_login, provider_email,
+          provider_email_verified, display_name, avatar_url, linked_at
+        ) VALUES (?, ?, 'github', 'gh-delete', 'deleteme', 'delete@example.test', 1, 'Delete Me', NULL, ?)
+      `).run('identity-delete', user.id, now)
+      db.prepare('INSERT INTO oauth_states (state_hash, provider, intent, user_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('state-delete', 'github', 'link', user.id, now + 1000, now)
+
+      db.prepare(`
+        INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at)
+        VALUES (?, ?, ?, 2, 'playing', 1, '[]', ?, ?)
+      `).run('owned-room', user.id, '{"private":"name"}', now, now)
+      db.prepare(`
+        INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at)
+        VALUES (?, ?, ?, 2, 'playing', 1, '[]', ?, ?)
+      `).run('joined-room', other.id, '{"private":"name"}', now, now)
+      db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
+        .run('owned-room', user.id, 0, now)
+      db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
+        .run('joined-room', user.id, 1, now)
+      db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
+        .run('joined-room', other.id, 0, now)
+
+      db.prepare(`
+        INSERT INTO workshop_cards (
+          id, author_id, card_id, card_type, name, description, card_json, status, created_at, updated_at
+        ) VALUES (?, ?, ?, 'minor', ?, '', '{}', 'draft', ?, ?)
+      `).run('owned-card', user.id, 'CUSTOM_DELETE', 'Delete Card', now, now)
+      db.prepare(`
+        INSERT INTO workshop_cards (
+          id, author_id, card_id, card_type, name, description, card_json, status, created_at, updated_at
+        ) VALUES (?, ?, ?, 'minor', ?, '', '{}', 'draft', ?, ?)
+      `).run('other-card', other.id, 'CUSTOM_OTHER', 'Other Card', now, now)
+      db.prepare('INSERT INTO workshop_card_versions (id, card_id, card_json, version_number, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('owned-version', 'owned-card', '{}', 1, user.id, now)
+      db.prepare('INSERT INTO workshop_card_versions (id, card_id, card_json, version_number, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('other-card-user-version', 'other-card', '{}', 1, user.id, now)
+      db.prepare('INSERT INTO card_likes (user_id, card_id, created_at) VALUES (?, ?, ?)')
+        .run(user.id, 'other-card', now)
+      db.prepare('INSERT INTO card_likes (user_id, card_id, created_at) VALUES (?, ?, ?)')
+        .run(other.id, 'owned-card', now)
+      db.prepare('INSERT INTO card_comments (id, card_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run('user-comment', 'other-card', user.id, 'delete me', now)
+      db.prepare('INSERT INTO card_comments (id, card_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run('owned-card-comment', 'owned-card', other.id, 'deleted with card', now)
+      db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
+        .run(user.id, 'other-card', now)
+      db.prepare('INSERT INTO sandbox_cards (user_id, workshop_card_id, added_at) VALUES (?, ?, ?)')
+        .run(other.id, 'owned-card', now)
+      db.prepare('INSERT INTO sandbox_settings (user_id, player_count, deck_ids_json, updated_at) VALUES (?, 2, ?, ?)')
+        .run(user.id, '["A"]', now)
+      db.prepare('INSERT INTO github_propose_rate_limit (user_id, last_propose_at) VALUES (?, ?)')
+        .run(user.id, now)
+      db.prepare('INSERT INTO github_propose_audit (id, user_id, workshop_card_id, action, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run('audit-user', user.id, 'other-card', 'propose', now)
+      db.prepare('INSERT INTO github_propose_audit (id, user_id, workshop_card_id, action, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run('audit-owned-card', other.id, 'owned-card', 'propose', now)
+
+      expect(deleteAccount(user.id)).toEqual({ ok: true })
+
+      expect(validateSession(token)).toBeNull()
+      expect(count('SELECT COUNT(*) AS n FROM users WHERE id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM users WHERE id = ?', other.id)).toBe(1)
+      expect(count('SELECT COUNT(*) AS n FROM auth_identities WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM oauth_states WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM room_players WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'owned-card')).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'other-card')).toBe(1)
+      expect(count('SELECT COUNT(*) AS n FROM workshop_card_versions WHERE created_by = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM card_likes WHERE user_id = ? OR card_id = ?', user.id, 'owned-card')).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM card_comments WHERE author_id = ? OR card_id = ?', user.id, 'owned-card')).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM sandbox_cards WHERE user_id = ? OR workshop_card_id = ?', user.id, 'owned-card')).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM sandbox_settings WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM github_propose_rate_limit WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM github_propose_audit WHERE user_id = ? OR workshop_card_id = ?', user.id, 'owned-card')).toBe(0)
+
+      const rooms = db.prepare('SELECT id, created_by, state_json, status FROM rooms ORDER BY id').all() as Array<{
+        id: string
+        created_by: string | null
+        state_json: string | null
+        status: string
+      }>
+      expect(rooms).toEqual([
+        { id: 'joined-room', created_by: other.id, state_json: null, status: 'finished' },
+        { id: 'owned-room', created_by: null, state_json: null, status: 'finished' },
+      ])
     })
   })
 
