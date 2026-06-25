@@ -7,6 +7,30 @@ afterEach(() => {
 })
 
 describe('email delivery', () => {
+  it('fails in production when EMAIL_DELIVERY is unset', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('EMAIL_DELIVERY', '')
+
+    await expect(sendEmail({
+      to: 'user@example.com',
+      subject: 'Subject',
+      text: 'Text',
+      html: '<p>Text</p>',
+    })).rejects.toThrow('EMAIL_DELIVERY must be set to resend in production')
+  })
+
+  it('fails in production when EMAIL_DELIVERY=log', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('EMAIL_DELIVERY', 'log')
+
+    await expect(sendEmail({
+      to: 'user@example.com',
+      subject: 'Subject',
+      text: 'Text',
+      html: '<p>Text</p>',
+    })).rejects.toThrow('EMAIL_DELIVERY must be set to resend in production')
+  })
+
   it('sends through Resend with configured sender', async () => {
     vi.stubEnv('EMAIL_DELIVERY', 'resend')
     vi.stubEnv('RESEND_API_KEY', 're_test_key')
