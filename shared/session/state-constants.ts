@@ -167,7 +167,7 @@ export const applyFutureMeeples = (
     if (!player) return
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0
-      if (key === 'field' || key === 'stable') return
+      if (key === 'field' || key === 'stable' || key === 'forest' || key === 'moor') return
       if (options.skipResourceReceive) return
       player.resources[key as keyof Resource] += amount
     })

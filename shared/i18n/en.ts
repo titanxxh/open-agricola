@@ -602,6 +602,7 @@ export const en = {
     'moor-infirmary': { name: 'Infirmary', description: 'Gain 1 food. Sick workers may only use this space.' },
     'moor-resource-market-12': { name: 'Resource Market', description: 'Gain 1 food and 1 stone' },
     'moor-wood-to-fuel': { name: 'Convert wood to fuel', description: 'Convert 1 wood to 1 fuel' },
+    'moor-special-action-apply': { name: 'Moor special action', description: 'Resolve a Farmers of the Moor special action' },
     'meeting-place': {
       name: 'Meeting Place',
       description: 'Become start player and optionally play 1 improvement',

@@ -28,7 +28,12 @@ export type PaymentResource = Resource & Record<SupplyTokenKey, number>
 export type CardProvidedPaymentResourceKey = `${string}:${string}`
 export type PaymentResourceKey = keyof PaymentResource | CardProvidedPaymentResourceKey
 export type PaymentResourceMap = Partial<Record<PaymentResourceKey, number>>
-export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
+export type FutureMeepleResourceMap = Partial<Resource> & {
+  field?: number
+  stable?: number
+  forest?: number
+  moor?: number
+}
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
