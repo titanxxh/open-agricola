@@ -1511,6 +1511,7 @@ export const en = {
     A39_Chapel: { name: 'Chapel', desc: 'Get 3 bonus VP. Others pay 1 grain to owner.' },
     A162_ForestTallyman: { name: 'Forest Tallyman', desc: 'When Forest + Clay Pit occupied: get 2 clay + 3 wood.' },
     STUB_BeforeBakeGainClay: { name: 'STUB Before Bake Clay', desc: 'Test stub: before baking bread, gain 1 clay.' },
+    M040_MoorFire: { anytime: 'Moor Fire: Convert your last moor to a field' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
     D132_HideFarmer: {
       markSpaces: {
