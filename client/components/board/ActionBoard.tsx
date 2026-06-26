@@ -428,6 +428,8 @@ const getFutureResourceIconClass = (resource: keyof FutureMeepleResourceMap): st
 const getFutureResourceLabel = (locale: Locale, resource: keyof FutureMeepleResourceMap): string => {
   if (resource === 'field') return t(locale, 'log.parentMotherRewardField')
   if (resource === 'stable') return t(locale, 'log.parentMotherRewardStable')
+  if (resource === 'forest') return t(locale, 'ui.tileForest')
+  if (resource === 'moor') return t(locale, 'ui.tileMoor')
   return t(locale, `resources.${resource}`)
 }
 
