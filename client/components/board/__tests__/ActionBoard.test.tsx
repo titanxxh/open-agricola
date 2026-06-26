@@ -3,6 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
 import { ACTION_SPACE_ATTACHMENTS_KEY } from '../../../../shared/cards/helpers/card-state'
@@ -474,13 +476,29 @@ describe('ActionBoard', () => {
         actionId: null,
         resources: { field: 1 },
       },
+      {
+        id: 'fm-forest',
+        cardId: 'M045_TreeNursery',
+        playerId: 'p2',
+        round: 13,
+        actionId: null,
+        resources: { forest: 1 },
+      },
+      {
+        id: 'fm-moor',
+        cardId: 'M044_Swamp',
+        playerId: 'p1',
+        round: 13,
+        actionId: null,
+        resources: { moor: 1 },
+      },
     ]
 
     const html = renderToStaticMarkup(
       <ActionBoard
         locale="en"
         baseActions={[]}
-        roundSlots={[{ round: 4, action: sheepMarket }, { round: 12 }]}
+        roundSlots={[{ round: 4, action: sheepMarket }, { round: 12 }, { round: 13 }]}
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
@@ -497,6 +515,19 @@ describe('ActionBoard', () => {
     expect(html).toContain('res-icon-sheep')
     expect(html).toContain('title="PlayerA: Field"')
     expect(html).toContain('res-icon-field')
+    expect(html).toContain('title="PlayerB: Forest"')
+    expect(html).toContain('res-icon-forest')
+    expect(html).toContain('title="PlayerA: Moor"')
+    expect(html).toContain('res-icon-moor')
+  })
+
+  it('defines future terrain resource icon classes', () => {
+    const css = readFileSync(join(process.cwd(), 'client/styles/pages/game.css'), 'utf8')
+
+    expect(css).toMatch(/\.res-icon-forest\s*\{/)
+    expect(css).toMatch(/\.res-icon-moor\s*\{/)
+    expect(css).toContain('/assets/moor/terrain/forest.webp')
+    expect(css).toContain('/assets/moor/terrain/moor.webp')
   })
 
   it('renders exclusive-use round slot as locked for non-owner before its normal round', () => {
