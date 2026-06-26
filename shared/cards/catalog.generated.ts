@@ -13656,7 +13656,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "prerequisite": "2 Major Improvements",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14390,7 +14390,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "reed": 1
     },
     "extraVp": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14406,7 +14406,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "extraVp": true,
     "prerequisite": "2 Major Improvements",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14498,7 +14498,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "returnCards": [
       "Major_Moor_VillageChurch"
     ],
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15303,11 +15303,74 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "vp": 3,
+    "isCookery": true,
+    "exchanges": [
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "M106_HorseButchery",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M106_HorseButchery",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "M106_HorseButchery",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M106_HorseButchery",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 2
+        },
+        "to": {
+          "food": 5
+        },
+        "sourceId": "M106_HorseButchery",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
     "returnCards": [
       "Major_Moor_HorseSlaughterhouse1",
       "Major_Moor_HorseSlaughterhouse2"
     ],
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15441,7 +15504,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "returnCards": [
       "Major_Moor_MuseumOfTheMoors"
     ],
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

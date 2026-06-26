@@ -28,7 +28,7 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
-import { swapMajorImprovementWithSupply } from '../../cards/major/supply'
+import { moveMajorImprovementToSupplyTop, swapMajorImprovementWithSupply } from '../../cards/major/supply'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { consumePendingExtraTurns } from '../../cards/card-effects'
@@ -60,6 +60,7 @@ export type SpecialEffectParams =
   | { kind: 'increment-counter'; key: string; amount: number }
   | { kind: 'set-counter'; key: string; value: number }
   | { kind: 'pop-card-stack-top' }
+  | { kind: 'move-major-improvement-to-top'; cardId: string }
   | { kind: 'swap-improvement-with-board'; from: string; to: string }
   | { kind: 'return-card-to-board'; cardId: string }
   | { kind: 'set-flag'; flag: boolean }
@@ -279,6 +280,10 @@ export const specialEffectAction: ActionDefinition = {
         })
         return { type: 'ok' }
       }
+      case 'move-major-improvement-to-top':
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        moveMajorImprovementToSupplyTop(state, p.cardId)
+        return { type: 'ok' }
       case 'swap-improvement-with-board': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const playerIndex = target.improvements.indexOf(p.from)
