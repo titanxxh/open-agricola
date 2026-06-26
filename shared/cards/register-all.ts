@@ -893,6 +893,18 @@ import { M029_Tinker } from './M/M029_Tinker'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M100_Pheromones } from './M/M100_Pheromones'
+import { M075_FuelStorage } from './M/M075_FuelStorage'
+import { M076_Flatboat } from './M/M076_Flatboat'
+import { M078_Barge } from './M/M078_Barge'
+import { M079_PeatSled } from './M/M079_PeatSled'
+import { M087_PeatBarge } from './M/M087_PeatBarge'
+import { M110_FarmCart } from './M/M110_FarmCart'
+import { M114_RiversideWoods } from './M/M114_RiversideWoods'
+import { M120_RiverClay } from './M/M120_RiverClay'
+import { M124_StoneWagon } from './M/M124_StoneWagon'
+import { M128_Workbench } from './M/M128_Workbench'
+import { M129_PlowhorseMarket } from './M/M129_PlowhorseMarket'
+import { M130_Nosebag } from './M/M130_Nosebag'
 import { STUB_BeforeBakeGainClay } from './__stubs__/STUB_BeforeBakeGainClay'
 import { Major_ClayOven } from './major/clay-oven'
 import { Major_StoneOven } from './major/stone-oven'
@@ -1805,6 +1817,18 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M065_FireBrigade': M065_FireBrigade.impl,
   'M080_AdvancePayment': M080_AdvancePayment.impl,
   'M100_Pheromones': M100_Pheromones.impl,
+  'M075_FuelStorage': M075_FuelStorage.impl,
+  'M076_Flatboat': M076_Flatboat.impl,
+  'M078_Barge': M078_Barge.impl,
+  'M079_PeatSled': M079_PeatSled.impl,
+  'M087_PeatBarge': M087_PeatBarge.impl,
+  'M110_FarmCart': M110_FarmCart.impl,
+  'M114_RiversideWoods': M114_RiversideWoods.impl,
+  'M120_RiverClay': M120_RiverClay.impl,
+  'M124_StoneWagon': M124_StoneWagon.impl,
+  'M128_Workbench': M128_Workbench.impl,
+  'M129_PlowhorseMarket': M129_PlowhorseMarket.impl,
+  'M130_Nosebag': M130_Nosebag.impl,
   'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay.impl,
   'Major_ClayOven': Major_ClayOven.impl,
   'Major_StoneOven': Major_StoneOven.impl,
