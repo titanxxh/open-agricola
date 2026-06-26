@@ -74,6 +74,24 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('<WOOD>')
   })
 
+  it('uses a local player56 portrait when the card numbering has one', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
+    )
+
+    expect(html).toContain('/assets/player56/A169.png')
+    expect(html).not.toContain('/bga-img/deckA/A169.png')
+  })
+
+  it('uses the local player56 portrait range beyond A169 on first render', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="B180_GameTeaser" cardType="occupation" />,
+    )
+
+    expect(html).toContain('/assets/player56/B180.png')
+    expect(html).not.toContain('/bga-img/deckB/B180.png')
+  })
+
   it('renders globally registered custom cards even though they are absent from the static manifest', () => {
     registerCustomCardMetadata({
       cardType: 'minor',
