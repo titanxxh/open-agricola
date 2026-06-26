@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { familySize, markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { Scoring } from '../../shared/domain'
-import { computeHeatingRequirement } from '../../shared/moor/heating'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { applyHeatingPayment, computeHeatingRequirement } from '../../shared/moor/heating'
+import { getExtraRoomCapacity, runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
 const prepareHands = (session: GameSession) => {
@@ -49,6 +49,38 @@ const confirmNext = (session: GameSession) => {
   expect(pending.stateId).toBe('wait')
   expect(pending.request.kind).toBe('confirm-next-player')
   return session.resolveChoice(pending.playerIndex, 'confirm')
+}
+
+const prepareMoorHeatingSession = () => {
+  const session = new GameSession(382, undefined, {
+    playerCount: 2,
+    enableFarmersOfTheMoor: true,
+    allowIncompleteFarmersOfTheMoorMinorDeal: true,
+  })
+  prepareHands(session)
+  const player = session.state.players[0]!
+  player.resources = {
+    ...player.resources,
+    wood: 0,
+    clay: 0,
+    reed: 0,
+    stone: 0,
+    food: 10,
+    fuel: 0,
+    sheep: 0,
+  }
+  player.houseType = 'wood'
+  player.rooms = 2
+  player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+  setWorkersAtHome(session.state, player, 2)
+  session.state.currentPlayerIndex = 0
+  session.state.round = 6
+  return session
+}
+
+const setRooms = (player: ReturnType<typeof prepareMoorHeatingSession>['state']['players'][number], count: number) => {
+  player.rooms = count
+  player.roomTiles = Array.from({ length: count }, (_, col) => ({ row: 0, col }))
 }
 
 const prepareMajorPurchaseSession = (cardId: string) => {
@@ -373,6 +405,99 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     player.rooms = 2
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     expect(computeHeatingRequirement(session.state, player)).toBe(0)
+  })
+
+  it('scans Farmers of the Moor minor heating metadata and card-local harvest discounts', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+
+    player.minorPlayed = ['M032_PeatHut']
+    expect(computeHeatingRequirement(session.state, player)).toBe(3)
+    expect(getExtraRoomCapacity(player)).toBe(1)
+
+    player.minorPlayed = ['M085_OvenInstallation']
+    setRooms(player, 5)
+    expect(computeHeatingRequirement(session.state, player)).toBe(0)
+
+    player.minorPlayed = ['M086_SpinningMill']
+    player.pastures = [{
+      id: 'sheep',
+      size: 3,
+      tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 5,
+    }]
+    expect(runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')).toBeNull()
+    expect(computeHeatingRequirement(session.state, player)).toBe(3)
+
+    player.pastures[0]!.animalCount = 1
+    runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')
+    expect(computeHeatingRequirement(session.state, player)).toBe(5)
+  })
+
+  it('applies Firewood fuel gain and wood-conversion heating discount only when wood is converted', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M082_Firewood']
+
+    expect(runCardEffectHook(session.state, player, 'M082_Firewood', 'onBuy')).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { fuel: 1 },
+    })
+
+    player.resources.fuel = 1
+    player.resources.wood = 1
+    const withWood = applyHeatingPayment(session.state, player, { fuelUsed: 1, woodToFuel: 1 })
+    expect(withWood.required).toBe(1)
+    expect(withWood.sickWorkerIds).toEqual([])
+    expect(player.resources.wood).toBe(0)
+    expect(player.resources.fuel).toBe(1)
+
+    const withoutWoodSession = prepareMoorHeatingSession()
+    const withoutWood = withoutWoodSession.state.players[0]!
+    withoutWood.minorPlayed = ['M082_Firewood']
+    withoutWood.resources.fuel = 1
+    const noWood = applyHeatingPayment(withoutWoodSession.state, withoutWood, { fuelUsed: 1, woodToFuel: 0 })
+    expect(noWood.required).toBe(2)
+    expect(noWood.sickWorkerIds).toEqual(['2'])
+  })
+
+  it('lets Peat Hut replace a Renovation action with removing the card and building one free wooden room', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M032_PeatHut']
+    player.resources.fuel = 0
+    expect(getExtraRoomCapacity(player)).toBe(1)
+    expect(familySize(player)).toBe(2)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const peatHutOption = resp.interaction.options?.find((option) => option.sourceCard === 'M032_PeatHut')
+    expect(peatHutOption).toBeDefined()
+    resp = session.resolveChoice(0, peatHutOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm?.farmType).toBe('room')
+    const room = resp.interaction.farm?.selectableTiles[0]
+    expect(room).toBeDefined()
+
+    resp = session.commitSelectionChoice(0, { rooms: [room!] })
+
+    expect(resp.ok).toBe(true)
+    const after = resp.state.players[0]!
+    expect(after.minorPlayed).not.toContain('M032_PeatHut')
+    expect(after.rooms).toBe(3)
+    expect(after.roomTiles).toContainEqual(room)
+    expect(after.houseType).toBe('wood')
+    expect(after.resources.wood).toBe(0)
+    expect(after.resources.clay).toBe(0)
+    expect(after.resources.reed).toBe(0)
+    expect(getExtraRoomCapacity(after)).toBe(0)
   })
 
   it('offers Farmers of the Moor stall anytime conversions while owned', () => {

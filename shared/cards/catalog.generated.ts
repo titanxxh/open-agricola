@@ -13891,8 +13891,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "reed": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
+    "heatingRoomDiscount": -1,
     "kind": "minor"
   },
   {
@@ -14817,8 +14818,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 1
     },
     "prerequisite": "1 Major Improvement",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
+    "heatingWoodToFuelDiscount": 1,
     "kind": "minor"
   },
   {
@@ -14868,8 +14870,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "returnCards": [
       "Major_Moor_HeatingOven"
     ],
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
+    "heatingFuelCap": 0,
     "kind": "minor"
   },
   {
@@ -14887,7 +14890,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 2,
     "prerequisite": "1 Sheep",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

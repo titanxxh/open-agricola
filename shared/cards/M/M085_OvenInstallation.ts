@@ -17,7 +17,8 @@ export const M085_OvenInstallation = defineMinorCard({
     returnCards: [
         "Major_Moor_HeatingOven"
     ],
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
+    heatingFuelCap: 0,
   },
 })

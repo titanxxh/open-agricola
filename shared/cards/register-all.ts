@@ -896,6 +896,7 @@ import { M026_ChimneyHood } from './M/M026_ChimneyHood'
 import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
 import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
+import { M032_PeatHut } from './M/M032_PeatHut'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
@@ -912,7 +913,9 @@ import { M077_DryingField } from './M/M077_DryingField'
 import { M078_Barge } from './M/M078_Barge'
 import { M079_PeatSled } from './M/M079_PeatSled'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
+import { M082_Firewood } from './M/M082_Firewood'
 import { M083_CoalSeam } from './M/M083_CoalSeam'
+import { M086_SpinningMill } from './M/M086_SpinningMill'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M088_PeatIron } from './M/M088_PeatIron'
 import { M089_BirthingHouse } from './M/M089_BirthingHouse'
@@ -1859,6 +1862,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M028_OutOnTheWallaby': M028_OutOnTheWallaby.impl,
   'M029_Tinker': M029_Tinker.impl,
   'M030_FarmAnimalMarket': M030_FarmAnimalMarket.impl,
+  'M032_PeatHut': M032_PeatHut.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
@@ -1875,7 +1879,9 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M078_Barge': M078_Barge.impl,
   'M079_PeatSled': M079_PeatSled.impl,
   'M080_AdvancePayment': M080_AdvancePayment.impl,
+  'M082_Firewood': M082_Firewood.impl,
   'M083_CoalSeam': M083_CoalSeam.impl,
+  'M086_SpinningMill': M086_SpinningMill.impl,
   'M087_PeatBarge': M087_PeatBarge.impl,
   'M088_PeatIron': M088_PeatIron.impl,
   'M089_BirthingHouse': M089_BirthingHouse.impl,
