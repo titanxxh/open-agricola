@@ -1324,8 +1324,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M074_Administration` | 已对齐 | 需要手牌不超过 4 张；onBuy 给 2 food，round 14 feeding 可按 major 数量上限把 food 换 bonus VP；session 测试覆盖前置和延迟选择。 |
 | `M080_AdvancePayment` | 已对齐 | onBuy 一次性给 fuel / food / wood / clay / reed / stone / sheep / grain 各 1；session 测试覆盖完整资源包。 |
 | `M081_PeatBoat` | 已对齐 | metadata anytime exchange 支持 fuel 换 wood / clay / reed / stone / sheep / food；session 测试覆盖注册的 exact exchange。 |
-| `M082_Firewood` | 已对齐 | onBuy 给 1 fuel；供暖支付中本次 wood-to-fuel 转换大于 0 时总需求 -1；session 测试覆盖动态折扣。 |
-| `M085_OvenInstallation` | 已对齐 | 用 `heatingFuelCap: 0` 表达无需供暖；Heating Oven stack 仍由 major supply / returnCards metadata 表达；session 测试覆盖 cap 0。 |
+| `M082_Firewood` | 已对齐 | onBuy 给 1 fuel；供暖支付中本次 wood-to-fuel 转换大于 0 时总需求 -1，wood 转 fuel 只作为本次供暖支付，不落入持久 fuel；session 测试覆盖动态折扣和折后 0 需求不造 fuel。 |
+| `M085_OvenInstallation` | 已对齐 | 用 `heatingFuelCap: 0` 表达无需供暖；Heating Oven stack 仍由 major supply / returnCards metadata 表达；session 测试覆盖 cap 0、真实购买并把 Heating Oven 归还 FoM stack。 |
 | `M086_SpinningMill` | 已对齐 | 需要 1 sheep；harvest field phase 按已安置 sheep 的 `floor(sheep / 2)` 写入 `cardStates` heating 折扣，feeding/heating phase 读取；session 测试覆盖 sheep 数变化。 |
 | `M100_Pheromones` | 已对齐 | 需要已打出 improvement 不超过 2 张，onBuy 拥有者得 1 food，所有有 stable 或 pasture 的玩家得 2 food；session 测试覆盖跨玩家奖励与前置限制。 |
 | `M104_WildHarvest` | 已对齐 | onBuy 给 1 food；每次 harvest start 以缓存起始卡牌序号对比 visible forest 数，命中得 1 food；session 测试覆盖命中与未命中。 |
