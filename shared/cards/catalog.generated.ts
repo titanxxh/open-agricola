@@ -14656,7 +14656,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "vegetable": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14835,7 +14835,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 1
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15024,7 +15024,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 1
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15071,7 +15071,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15106,7 +15106,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 1
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15488,7 +15488,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "prerequisite": "3 Rooms",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15520,7 +15520,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "stone": 2
     },
     "vp": 3,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15538,7 +15538,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "prerequisite": "2 Improvements",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15568,7 +15568,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "1 Improvement",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15583,7 +15583,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "1 Major Improvement",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15600,7 +15600,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "vegetable": 3
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15669,7 +15669,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 2
     },
     "prerequisite": "1 Major Improvement",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

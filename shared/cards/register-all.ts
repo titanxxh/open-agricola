@@ -908,14 +908,19 @@ import { M073_StockBreedingPrize } from './M/M073_StockBreedingPrize'
 import { M074_Administration } from './M/M074_Administration'
 import { M075_FuelStorage } from './M/M075_FuelStorage'
 import { M076_Flatboat } from './M/M076_Flatboat'
+import { M077_DryingField } from './M/M077_DryingField'
 import { M078_Barge } from './M/M078_Barge'
 import { M079_PeatSled } from './M/M079_PeatSled'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
+import { M083_CoalSeam } from './M/M083_CoalSeam'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M088_PeatIron } from './M/M088_PeatIron'
 import { M089_BirthingHouse } from './M/M089_BirthingHouse'
 import { M090_WinterStorehouse } from './M/M090_WinterStorehouse'
+import { M094_PeatBath } from './M/M094_PeatBath'
+import { M097_VillageHall } from './M/M097_VillageHall'
 import { M098_FishSmokehouse } from './M/M098_FishSmokehouse'
+import { M099_HealingClay } from './M/M099_HealingClay'
 import { M100_Pheromones } from './M/M100_Pheromones'
 import { M103_ForestKindergarten } from './M/M103_ForestKindergarten'
 import { M104_WildHarvest } from './M/M104_WildHarvest'
@@ -924,11 +929,18 @@ import { M108_GrainDistillery } from './M/M108_GrainDistillery'
 import { M110_FarmCart } from './M/M110_FarmCart'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
 import { M115_OakBark } from './M/M115_OakBark'
+import { M116_MoorBirchTrees } from './M/M116_MoorBirchTrees'
 import { M117_DraughtHorses } from './M/M117_DraughtHorses'
+import { M118_TimberMill } from './M/M118_TimberMill'
+import { M119_AlderSwamp } from './M/M119_AlderSwamp'
 import { M120_RiverClay } from './M/M120_RiverClay'
+import { M121_Loam } from './M/M121_Loam'
+import { M122_WillowBank } from './M/M122_WillowBank'
+import { M123_StoneQuarry } from './M/M123_StoneQuarry'
 import { M124_StoneWagon } from './M/M124_StoneWagon'
 import { M125_HardwareStore } from './M/M125_HardwareStore'
 import { M126_CooperativeStore } from './M/M126_CooperativeStore'
+import { M127_Wheelbarrow } from './M/M127_Wheelbarrow'
 import { M128_Workbench } from './M/M128_Workbench'
 import { M129_PlowhorseMarket } from './M/M129_PlowhorseMarket'
 import { M130_Nosebag } from './M/M130_Nosebag'
@@ -1859,14 +1871,19 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M074_Administration': M074_Administration.impl,
   'M075_FuelStorage': M075_FuelStorage.impl,
   'M076_Flatboat': M076_Flatboat.impl,
+  'M077_DryingField': M077_DryingField.impl,
   'M078_Barge': M078_Barge.impl,
   'M079_PeatSled': M079_PeatSled.impl,
   'M080_AdvancePayment': M080_AdvancePayment.impl,
+  'M083_CoalSeam': M083_CoalSeam.impl,
   'M087_PeatBarge': M087_PeatBarge.impl,
   'M088_PeatIron': M088_PeatIron.impl,
   'M089_BirthingHouse': M089_BirthingHouse.impl,
   'M090_WinterStorehouse': M090_WinterStorehouse.impl,
+  'M094_PeatBath': M094_PeatBath.impl,
+  'M097_VillageHall': M097_VillageHall.impl,
   'M098_FishSmokehouse': M098_FishSmokehouse.impl,
+  'M099_HealingClay': M099_HealingClay.impl,
   'M100_Pheromones': M100_Pheromones.impl,
   'M103_ForestKindergarten': M103_ForestKindergarten.impl,
   'M104_WildHarvest': M104_WildHarvest.impl,
@@ -1875,11 +1892,18 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M110_FarmCart': M110_FarmCart.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
   'M115_OakBark': M115_OakBark.impl,
+  'M116_MoorBirchTrees': M116_MoorBirchTrees.impl,
   'M117_DraughtHorses': M117_DraughtHorses.impl,
+  'M118_TimberMill': M118_TimberMill.impl,
+  'M119_AlderSwamp': M119_AlderSwamp.impl,
   'M120_RiverClay': M120_RiverClay.impl,
+  'M121_Loam': M121_Loam.impl,
+  'M122_WillowBank': M122_WillowBank.impl,
+  'M123_StoneQuarry': M123_StoneQuarry.impl,
   'M124_StoneWagon': M124_StoneWagon.impl,
   'M125_HardwareStore': M125_HardwareStore.impl,
   'M126_CooperativeStore': M126_CooperativeStore.impl,
+  'M127_Wheelbarrow': M127_Wheelbarrow.impl,
   'M128_Workbench': M128_Workbench.impl,
   'M129_PlowhorseMarket': M129_PlowhorseMarket.impl,
   'M130_Nosebag': M130_Nosebag.impl,
