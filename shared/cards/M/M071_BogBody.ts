@@ -1,6 +1,24 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M071_BogBody'
+const MUSEUM = 'Major_Moor_MuseumOfTheMoors'
+const LIVING_HISTORY = 'M113_LivingHistoryMuseum'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    computeSharedPostScore: (state, _owner, summaries) =>
+      summaries.flatMap((summary) => {
+        const player = state.players.find((entry) => entry.id === summary.playerId)
+        if (!player) return []
+        const hasMuseum = player.improvements.includes(MUSEUM)
+        const hasLivingHistory = player.minorPlayed.includes(LIVING_HISTORY)
+        return hasMuseum || hasLivingHistory ? [{ playerId: player.id, score: 1 }] : []
+      }),
+  },
+  reaches: [MUSEUM, LIVING_HISTORY] as readonly string[],
+} satisfies CardImpl
 
 export const M071_BogBody = defineMinorCard({
   meta: {
@@ -16,7 +34,10 @@ export const M071_BogBody = defineMinorCard({
     vp: 1,
     extraVp: true,
     prerequisite: "At Least 1 Moor",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M071_BogBody_impl = M071_BogBody.impl

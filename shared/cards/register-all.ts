@@ -895,10 +895,17 @@ import { M025_HouseholdInventory } from './M/M025_HouseholdInventory'
 import { M026_ChimneyHood } from './M/M026_ChimneyHood'
 import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
+import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
 import { M066_LandParcel } from './M/M066_LandParcel'
+import { M067_ChamberOfCommerce } from './M/M067_ChamberOfCommerce'
+import { M069_LeatherSaddle } from './M/M069_LeatherSaddle'
+import { M071_BogBody } from './M/M071_BogBody'
+import { M072_OvenDamper } from './M/M072_OvenDamper'
+import { M073_StockBreedingPrize } from './M/M073_StockBreedingPrize'
+import { M074_Administration } from './M/M074_Administration'
 import { M075_FuelStorage } from './M/M075_FuelStorage'
 import { M076_Flatboat } from './M/M076_Flatboat'
 import { M078_Barge } from './M/M078_Barge'
@@ -907,8 +914,13 @@ import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M100_Pheromones } from './M/M100_Pheromones'
 import { M103_ForestKindergarten } from './M/M103_ForestKindergarten'
+import { M104_WildHarvest } from './M/M104_WildHarvest'
+import { M107_PotRoastRecipe } from './M/M107_PotRoastRecipe'
+import { M108_GrainDistillery } from './M/M108_GrainDistillery'
 import { M110_FarmCart } from './M/M110_FarmCart'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
+import { M115_OakBark } from './M/M115_OakBark'
+import { M117_DraughtHorses } from './M/M117_DraughtHorses'
 import { M120_RiverClay } from './M/M120_RiverClay'
 import { M124_StoneWagon } from './M/M124_StoneWagon'
 import { M128_Workbench } from './M/M128_Workbench'
@@ -1828,10 +1840,17 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M026_ChimneyHood': M026_ChimneyHood.impl,
   'M028_OutOnTheWallaby': M028_OutOnTheWallaby.impl,
   'M029_Tinker': M029_Tinker.impl,
+  'M030_FarmAnimalMarket': M030_FarmAnimalMarket.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
   'M066_LandParcel': M066_LandParcel.impl,
+  'M067_ChamberOfCommerce': M067_ChamberOfCommerce.impl,
+  'M069_LeatherSaddle': M069_LeatherSaddle.impl,
+  'M071_BogBody': M071_BogBody.impl,
+  'M072_OvenDamper': M072_OvenDamper.impl,
+  'M073_StockBreedingPrize': M073_StockBreedingPrize.impl,
+  'M074_Administration': M074_Administration.impl,
   'M075_FuelStorage': M075_FuelStorage.impl,
   'M076_Flatboat': M076_Flatboat.impl,
   'M078_Barge': M078_Barge.impl,
@@ -1840,8 +1859,13 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M087_PeatBarge': M087_PeatBarge.impl,
   'M100_Pheromones': M100_Pheromones.impl,
   'M103_ForestKindergarten': M103_ForestKindergarten.impl,
+  'M104_WildHarvest': M104_WildHarvest.impl,
+  'M107_PotRoastRecipe': M107_PotRoastRecipe.impl,
+  'M108_GrainDistillery': M108_GrainDistillery.impl,
   'M110_FarmCart': M110_FarmCart.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
+  'M115_OakBark': M115_OakBark.impl,
+  'M117_DraughtHorses': M117_DraughtHorses.impl,
   'M120_RiverClay': M120_RiverClay.impl,
   'M124_StoneWagon': M124_StoneWagon.impl,
   'M128_Workbench': M128_Workbench.impl,

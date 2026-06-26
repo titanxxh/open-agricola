@@ -52,3 +52,6 @@ export const craftResourceGain = (player: PlayerState): Partial<Resource> => {
 
 export const hasCraftBuilding = (player: PlayerState) =>
   Object.keys(craftResourceGain(player)).length > 0
+
+export const craftBuildingCount = (player: PlayerState) =>
+  CRAFT_REWARDS.filter((reward) => reward.ids.some((id) => player.improvements.includes(id))).length
