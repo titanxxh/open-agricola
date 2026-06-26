@@ -15,7 +15,7 @@ const cardImpl = {
 export const Major_Moor_HeatingOven = defineMajorCard({
   meta: {
     id: CARD_ID,
-    name: 'Furnace',
+    name: 'Heating Oven',
     deck: 'major',
     number: 109,
     cost: { clay: 1, stone: 1 },

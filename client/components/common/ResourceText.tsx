@@ -29,6 +29,8 @@ const RESOURCE_TAGS: Record<string, string> = {
   BOAR: 'boar',
   PIG: 'boar', // desc text uses PIG; CSS class is .res-icon-boar
   CATTLE: 'cattle',
+  HORSE: 'horse',
+  FUEL: 'fuel',
   STABLE: 'barn', // desc text uses STABLE; reuses .res-icon-barn (stables.png gray column)
   BEGGING: 'begging',
   SCORE: 'score', // CSS class .res-icon-score is an alias for .res-icon-bonusVp (game.css)

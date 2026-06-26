@@ -3642,12 +3642,14 @@
 }
 .major-card-wrapper {
   position: relative;
+  padding-right: 18px;
+  padding-bottom: 22px;
 }
 .major-stack-count {
   position: absolute;
   top: 4px;
   right: 4px;
-  z-index: 2;
+  z-index: 6;
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
@@ -3658,6 +3660,29 @@
   font-weight: 700;
   line-height: 20px;
   text-align: center;
+}
+.major-stack {
+  position: relative;
+  min-height: 0;
+}
+.major-stack .player-card.major-stack-card {
+  position: relative;
+  z-index: 3;
+}
+.major-stack .player-card.major-stack-card-covered {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform: translate(14px, 18px);
+  z-index: 1;
+}
+.major-stack .player-card.major-stack-card-covered:hover {
+  z-index: 7;
+}
+.major-stack .player-card.major-stack-card-top {
+  z-index: 4;
+}
+.major-stack .player-card.major-stack-card-top:hover {
+  z-index: 8;
 }
 .major-card {
   background: #fff4e5;
@@ -3782,10 +3807,12 @@
 .res-icon-boar { width: 1.118em; height: 0.78em; background-position: 63.8342% 21.7766%; background-size: 1735.59%; }
 .res-icon-cattle { width: 1.104em; height: 0.82em; background-position: 18.57% 21.821%; background-size: 1969.23%; }
 .res-icon-horse {
-  width: 0.9em;
-  height: 0.8em;
-  border-radius: 40% 55% 45% 45%;
-  background: #b77942;
+  width: 1.08em;
+  height: 0.86em;
+  background-image: url('/assets/moor/icons/horse.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .res-icon-fuel {
   width: 0.72em;

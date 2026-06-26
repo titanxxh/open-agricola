@@ -702,6 +702,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": false,
     "isCookery": true,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",
@@ -785,6 +786,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "isCookery": true,
     "isBaking": true,
     "cookingHearthIdentity": true,
+    "requiresFarmersOfTheMoor": true,
     "returnCards": [
       "Major_Fireplace1",
       "Major_Fireplace2",
@@ -971,7 +973,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
   },
   {
     "id": "Major_Moor_HeatingOven",
-    "name": "Furnace",
+    "name": "Heating Oven",
     "deck": "major",
     "number": 109,
     "cost": {
@@ -991,7 +993,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
   },
   {
     "id": "Major_Moor_TiledOven",
-    "name": "Heating Stove",
+    "name": "Tiled Oven",
     "deck": "major",
     "number": 110,
     "cost": {
@@ -1355,6 +1357,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "isCookery": true,
     "isBaking": true,
     "cookingHearthIdentity": true,
+    "requiresFarmersOfTheMoor": true,
     "returnCards": [
       "Major_Fireplace1",
       "Major_Fireplace2",
@@ -1459,6 +1462,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": false,
     "isCookery": true,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",

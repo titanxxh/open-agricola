@@ -69,6 +69,7 @@ export const MajorImprovements = ({
               ? !isPendingSelectable
               : !canBuy || !isPendingSelectable
             const futureEntries = futureCardResources[cardId] ?? []
+            const coveredCardIds = stack?.cardIds.filter((id) => id !== cardId) ?? []
             return (
               <div key={`major-${cardId}`} className="major-card-wrapper">
                 {stack && stack.cardIds.length > 1 ? (
@@ -80,20 +81,32 @@ export const MajorImprovements = ({
                     {stack.cardIds.length}
                   </span>
                 ) : null}
-                <PlayerCard
-                  locale={locale}
-                  cardId={cardId}
-                  cardType="major"
-                  devMode={devMode}
-                  onClick={() => {
-                    if (canInteract) {
-                      resolveChoice(`major:${cardId}`)
-                    }
-                  }}
-                  disabled={isDisabled}
-                  selectable={isSelectingMajor && isPendingSelectable}
-                  className={isDisabled ? 'disabled' : ''}
-                />
+                <div className={coveredCardIds.length > 0 ? 'major-stack' : 'major-stack single'}>
+                  {coveredCardIds.map((coveredCardId) => (
+                    <PlayerCard
+                      key={`covered-${cardId}-${coveredCardId}`}
+                      locale={locale}
+                      cardId={coveredCardId}
+                      cardType="major"
+                      devMode={devMode}
+                      className="major-stack-card major-stack-card-covered"
+                    />
+                  ))}
+                  <PlayerCard
+                    locale={locale}
+                    cardId={cardId}
+                    cardType="major"
+                    devMode={devMode}
+                    onClick={() => {
+                      if (canInteract) {
+                        resolveChoice(`major:${cardId}`)
+                      }
+                    }}
+                    disabled={isDisabled}
+                    selectable={isSelectingMajor && isPendingSelectable}
+                    className={`${isDisabled ? 'disabled ' : ''}major-stack-card major-stack-card-top`}
+                  />
+                </div>
                 {futureEntries.length > 0 ? (
                   <div className="card-future">
                     {futureEntries.map((entry, index) => {

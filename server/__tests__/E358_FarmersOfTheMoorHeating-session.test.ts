@@ -414,6 +414,18 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(false)
   })
 
+  it.each([
+    'Major_Moor_HorseSlaughterhouse1',
+    'Major_Moor_Cookhouse1',
+  ])('gates %s conversions when Farmers of the Moor is disabled', (cardId) => {
+    const session = prepareAnytimeExchangeSession(cardId, { sheep: 1, food: 1 }, false)
+    expect(session.takeAction(0, 'farmland').ok).toBe(true)
+
+    const resp = session.takeAnytimeAction(0, 'exchange')
+
+    expect(resp.ok).toBe(false)
+  })
+
   it('applies Village Church purchase food and optional harvest fuel-to-bonus-vp flow', () => {
     const session = prepareMajorPurchaseSession('Major_Moor_VillageChurch')
 

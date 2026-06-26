@@ -37,4 +37,10 @@ describe('restart-intranet preview mode', () => {
     expect(script).toContain('DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)"')
     expect(script).toContain('&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true')
   })
+
+  it('does not require incomplete-minor startup options from serialized Moor game state', () => {
+    const resetScanner = script.match(/dev_rooms_without_farmers_of_the_moor\(\) \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(resetScanner).toContain('state.enableFarmersOfTheMoor !== true')
+    expect(resetScanner).not.toContain('state.allowIncompleteFarmersOfTheMoorMinorDeal')
+  })
 })

@@ -8,22 +8,21 @@ import type { ActionHookPhase } from '../../actions/hooks'
 const CARD_ID = 'Major_Moor_MuseumOfTheMoors'
 const FORESTERS_LODGE = 'Major_Moor_ForestersLodge'
 
-const discountTargets = new Set([
-  'Major_Well',
-  'Major_Well2',
-  'Major_Joinery',
-  'Major_Joinery2',
-  'Major_Pottery',
-  'Major_Pottery2',
-  'Major_Basket',
-  'Major_Basket2',
-  'Major_ClayOven',
-  'Major_ClayOven2',
-  'Major_StoneOven',
-  'Major_StoneOven2',
-  FORESTERS_LODGE,
-])
-const buildingResources = ['wood', 'clay', 'reed', 'stone'] as const
+const discountByTarget = {
+  Major_Well: 'stone',
+  Major_Well2: 'stone',
+  Major_Joinery: 'wood',
+  Major_Joinery2: 'wood',
+  Major_Pottery: 'clay',
+  Major_Pottery2: 'clay',
+  Major_Basket: 'reed',
+  Major_Basket2: 'reed',
+  Major_ClayOven: 'clay',
+  Major_ClayOven2: 'clay',
+  Major_StoneOven: 'stone',
+  Major_StoneOven2: 'stone',
+  [FORESTERS_LODGE]: 'clay',
+} as const
 
 const museumCostListener: CardListenerRegistration = {
   id: 'moor-museum-of-the-moors-compute-costs',
@@ -32,10 +31,10 @@ const museumCostListener: CardListenerRegistration = {
   actions: ['improvement'],
   deriveCardCostCandidate: (context, candidate) => {
     if (context.state.enableFarmersOfTheMoor !== true) return null
-    if (!context.cardId || !discountTargets.has(context.cardId)) return null
-    return buildingResources
-      .map((resource) => discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 }))
-      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+    if (!context.cardId) return null
+    const resource = discountByTarget[context.cardId as keyof typeof discountByTarget]
+    if (!resource) return null
+    return discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 })
   },
 }
 
@@ -55,6 +54,6 @@ export const Major_Moor_MuseumOfTheMoors = defineMajorCard({
   } satisfies CardSourceMetaInput,
   impl: {
     listeners: [museumCostListener],
-    reaches: [...discountTargets] as readonly string[],
+    reaches: Object.keys(discountByTarget),
   } satisfies CardImpl,
 })

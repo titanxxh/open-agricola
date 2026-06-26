@@ -142,4 +142,37 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('card-cost-separator')
     expect(html).toContain('card-cost-separator">/</span>')
   })
+
+  it('renders Moor major cards with local Moor art and M numbering', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_HorseSlaughterhouse1" cardType="major" />,
+    )
+
+    expect(html).toContain('data-numbering="M001"')
+    expect(html).toContain('data-moor-major="true"')
+    expect(html).toContain('data-deck="M"')
+    expect(html).toContain('/assets/moor/major/M001.png')
+  })
+
+  it('renders Cookhouse return cost as both Fireplace and Cooking Hearth families', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_Cookhouse1" cardType="major" />,
+    )
+
+    expect(html).toContain('Return Fireplace/Cooking Hearth or')
+  })
+
+  it('renders current Moor oven names from i18n', () => {
+    const heatingOven = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_HeatingOven" cardType="major" />,
+    )
+    const tiledOven = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_TiledOven" cardType="major" />,
+    )
+
+    expect(heatingOven).toContain('Heating Oven')
+    expect(heatingOven).not.toContain('Furnace')
+    expect(tiledOven).toContain('Tiled Oven')
+    expect(tiledOven).not.toContain('Heating Stove')
+  })
 })

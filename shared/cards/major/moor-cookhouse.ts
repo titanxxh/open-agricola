@@ -25,6 +25,7 @@ const cookhouse1: CardSourceMetaInput = {
   isCookery: true,
   isBaking: true,
   cookingHearthIdentity: true,
+  requiresFarmersOfTheMoor: true,
   returnCards: [
     'Major_Fireplace1',
     'Major_Fireplace2',
