@@ -16,7 +16,7 @@ export const Major_Moor_BasketStall = defineMajorCard({
     requiresFarmersOfTheMoor: true,
     desc: [
       '[Anytime]',
-      'Exchange reed for the same amount of other building resources.',
+      '1<REED> <ARROW> 1<WOOD> / <CLAY> / <STONE>',
     ],
     exchanges: [
       { from: { reed: 1 }, to: { wood: 1 }, sourceId: CARD_ID, triggers: ['anytime'] },

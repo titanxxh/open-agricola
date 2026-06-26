@@ -16,7 +16,7 @@ export const Major_Moor_FurnitureStall = defineMajorCard({
     requiresFarmersOfTheMoor: true,
     desc: [
       '[Anytime]',
-      'Exchange wood for the same amount of clay.',
+      '1<WOOD> <ARROW> 1<CLAY>',
     ],
     exchanges: [
       { from: { wood: 1 }, to: { clay: 1 }, sourceId: CARD_ID, triggers: ['anytime'] },

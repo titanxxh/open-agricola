@@ -36,9 +36,9 @@ export const Major_Moor_VillageChurch = defineMajorCard({
     extraVp: true,
     requiresFarmersOfTheMoor: true,
     desc: [
-      'Immediately gain 2 food.',
       '[Harvest]',
-      'Once each harvest, you may pay 1 fuel to gain 1 bonus point.',
+      '1<FUEL> <ARROW-1X> 1<SCORE>',
+      'Immediately gain 2 food.',
     ],
   } satisfies CardSourceMetaInput,
   impl: cardImpl,

@@ -35,9 +35,9 @@ export const Major_Moor_PeatCharcoalKiln = defineMajorCard({
     ],
     desc: [
       '[Special action: Cut Peat]',
-      'Gain 1 extra fuel, or 2 extra fuel if you have at least 1 horse.',
+      '+1<FUEL> if you have 0 horses; +2<FUEL> if you have at least 1 horse.',
       '[Scoring]',
-      '3/5 fuel <ARROW> 1/2 bonus points.',
+      '3/5<FUEL> <ARROW-1X> 1/2<SCORE>',
     ],
   } satisfies CardSourceMetaInput,
   impl: cardImpl,
