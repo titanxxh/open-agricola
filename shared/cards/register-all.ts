@@ -895,12 +895,12 @@ import { Major_StoneOven2 } from './major/stone-oven'
 import { Major_Joinery2 } from './major/joinery'
 import { Major_Pottery2 } from './major/pottery'
 import { Major_Basket2 } from './major/basketmaker'
-import { Major_Moor_PeatCharcoalKiln } from './major/moor-major-improvements'
-import { Major_Moor_ForestersLodge } from './major/moor-major-improvements'
-import { Major_Moor_RidingStables } from './major/moor-major-improvements'
-import { Major_Moor_MuseumOfTheMoors } from './major/moor-major-improvements'
-import { Major_Moor_HeatingOven } from './major/moor-major-improvements'
-import { Major_Moor_VillageChurch } from './major/moor-major-improvements'
+import { Major_Moor_PeatCharcoalKiln } from './major/moor-peat-charcoal-kiln'
+import { Major_Moor_ForestersLodge } from './major/moor-foresters-lodge'
+import { Major_Moor_RidingStables } from './major/moor-riding-stables'
+import { Major_Moor_MuseumOfTheMoors } from './major/moor-museum-of-the-moors'
+import { Major_Moor_HeatingOven } from './major/moor-heating-oven'
+import { Major_Moor_VillageChurch } from './major/moor-village-church'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A1_Shelter': A1_Shelter.impl,

@@ -2,7 +2,7 @@
 /**
  * Build cards manifest for lazy loading.
  *
- * Scans shared/cards/{A,B,C,D,E,major,community}/*.ts plus dev/test stubs in
+ * Scans shared/cards/{A,B,C,D,E,M,major,community}/*.ts plus dev/test stubs in
  * shared/cards/__stubs__/*.ts and extracts meta fields from Card Source files.
  *
  * Output: public/cards-manifest.json
@@ -468,7 +468,7 @@ export function parseCardFile(filePath: string, options: ParseCardFileOptions = 
 
 export function buildCardsManifest(cardsRoot: string): CardsManifest {
   const manifest: CardsManifest = {}
-  const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community']
+  const decks = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community']
   const repoRoot = path.resolve(cardsRoot, '..', '..')
   const scanDir = (deckDir: string, parseOptions?: ParseCardFileOptions) => {
     if (!fs.existsSync(deckDir)) return

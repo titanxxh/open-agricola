@@ -13597,6 +13597,1983 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "extraVp": true,
     "kind": "occupation"
   },
+  {
+    "id": "M015_PeatBurnOff",
+    "name": "Peat Burn-off",
+    "deck": "M",
+    "number": 15,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 moor for 1 field tile."
+    ],
+    "cost": {},
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M016_ClearFelling",
+    "name": "Clear Felling",
+    "deck": "M",
+    "number": 16,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You immediately get 2 <WOOD>. On each of up to 2 farmyard spaces containing nothing but exactly 1 forest, you can immediately turn that forest to the moor side."
+    ],
+    "cost": {},
+    "prerequisite": "At Most 3 Forests",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M017_Reforestation",
+    "name": "Reforestation",
+    "deck": "M",
+    "number": 17,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place 1 forest on an unused farmyard space."
+    ],
+    "cost": {},
+    "prerequisite": "3 Major Improvements",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M018_RegisterOfCraftsmen",
+    "name": "Register of Craftsmen",
+    "deck": "M",
+    "number": 18,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Immediately acquire your choice of the Joinery, Pottery, or Basketmaker's Workshop without placing a person. You pay 1 stone less for it."
+    ],
+    "cost": {},
+    "prerequisite": "2 Major Improvements",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M019_LawnTurf",
+    "name": "Lawn Turf",
+    "deck": "M",
+    "number": 19,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "If you have exactly 3/4/5/6/7 unused farmyard spaces, you immediately get 1/2/3/4/5 <FUEL>."
+    ],
+    "cost": {},
+    "prerequisite": "4 Improvements",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M020_PeatPellets",
+    "name": "Peat Pellets",
+    "deck": "M",
+    "number": 20,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You immediately get 1 <FUEL> for each visible moor that you have."
+    ],
+    "cost": {},
+    "prerequisite": "1 Major Improvement",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M021_PeatCuttingExpedition",
+    "name": "Peat-Cutting Expedition",
+    "deck": "M",
+    "number": 21,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Immediately remove any number of visible moors from your farmyard and get 1 bonus point and 2 <FUEL> each. Additionally, if you have at least 2/4/5/6 horses, you immediately get 1/2/3/4 <FUEL>."
+    ],
+    "cost": {
+      "food": 4
+    },
+    "extraVp": true,
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M022_EcologicalNiche",
+    "name": "Ecological Niche",
+    "deck": "M",
+    "number": 22,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You immediately get 2 <FOOD> if you have an animal type that no one else has; 1 <FOOD> each if only you are growing grain and/or vegetables; 1 <FUEL> each if you have the single most forests and/or moors."
+    ],
+    "cost": {},
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M023_EdgeOfTheForest",
+    "name": "Edge of the Forest",
+    "deck": "M",
+    "number": 23,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You immediately get 1 <FOOD> for each of your fence spaces between a forest and a field, and 1 <FUEL> for each of your fence spaces between a forest and a moor."
+    ],
+    "cost": {},
+    "prerequisite": "3 Improvements",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M024_BasicSupplies",
+    "name": "Basic Supplies",
+    "deck": "M",
+    "number": 24,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You immediately get goods until you have at least 1 <FUEL>, 1 <FOOD>, 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, and 1 <GRAIN> in your supply."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M025_HouseholdInventory",
+    "name": "Household Inventory",
+    "deck": "M",
+    "number": 25,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "If you have exactly 5/6/7/8/9/10 unused farmyard spaces, you immediately get the following 1/2/3/4/5/6 goods (in this order): 1 <REED>, 1 <GRAIN>, 1 <CATTLE>, 1 <STONE>, 1 <VEGETABLE>, 1 <HORSE>."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "prerequisite": "1 Field, 1 Pasture or 1 Stable",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M026_ChimneyHood",
+    "name": "Chimney Hood",
+    "deck": "M",
+    "number": 26,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "You immediately get as much <FOOD> as you would get from one of your baking improvements if you baked 1 <GRAIN>."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M027_GardenPath",
+    "name": "Garden Path",
+    "deck": "M",
+    "number": 27,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "You immediately get 3 <WOOD>. The player to your left must immediately place the \"Garden Path\" token in front of them."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "prerequisite": "At Least 1 Forest",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M028_OutOnTheWallaby",
+    "name": "Out on the Wallaby",
+    "deck": "M",
+    "number": 28,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "You immediately get goods for each craft building that you have: 3 <WOOD> for the Joinery, 3 <CLAY> for the Pottery, 2 <REED> for the Basketmaker's Workshop."
+    ],
+    "cost": {},
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M029_Tinker",
+    "name": "Tinker",
+    "deck": "M",
+    "number": 29,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "If you have at least one of the \"Joinery\", \"Pottery\", or \"Basketmaker's Workshop\" major improvements, you immediately get 1 <WOOD>, 1 <CLAY>, 1 <REED>, and 1 <STONE>."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "prerequisite": "3 Major Improvements",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M030_FarmAnimalMarket",
+    "name": "Farm Animal Market",
+    "deck": "M",
+    "number": 30,
+    "category": "LIVESTOCK_PROVIDER",
+    "desc": [
+      "You can immediately exchange exactly 2 <SHEEP> for 1 <CATTLE> and 1 <HORSE>. You may not exchange only 1 sheep."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M031_LivestockMarket",
+    "name": "Livestock Market",
+    "deck": "M",
+    "number": 31,
+    "category": "LIVESTOCK_PROVIDER",
+    "desc": [
+      "You can immediately exchange up to 3 animals of any type at the same time, if you can accommodate them: <SHEEP> <ARROW> <PIG> <ARROW> <CATTLE> <ARROW> <HORSE>."
+    ],
+    "cost": {},
+    "prerequisite": "5 Animals",
+    "passing": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M032_PeatHut",
+    "name": "Peat Hut",
+    "deck": "M",
+    "number": 32,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "This card provides room for one person. In the feeding phase of each harvest, it must be heated with 1 <FUEL>. Instead of a \"Renovation\" action, you can remove this card from play and add 1 wooden room to your wood house at no cost."
+    ],
+    "cost": {
+      "fuel": 5,
+      "reed": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M033_NightPasture",
+    "name": "Night Pasture",
+    "deck": "M",
+    "number": 33,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You can keep up to 3 animals of any type on this card; the other players can each keep an additional 1 animal on it. The animals on this card count as only yours when animals breed. You are always the last player to breed in the breeding phase."
+    ],
+    "cost": {
+      "clay": 2
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M034_HomeWood",
+    "name": "Home Wood",
+    "deck": "M",
+    "number": 34,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You can keep exactly 1 animal, except sheep, on each farmyard space containing at least 1 forest."
+    ],
+    "cost": {},
+    "prerequisite": "3 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M035_HorseTrough",
+    "name": "Horse Trough",
+    "deck": "M",
+    "number": 35,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You can keep up to 2 horses in an unused farmyard space adjacent to your house. Even if you do, this farmyard space is still considered unused. You can change in which farmyard space you keep the horses."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M036_PeatMoss",
+    "name": "Peat Moss",
+    "deck": "M",
+    "number": 36,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Wooden rooms only cost you 3 <WOOD> and 1 <REED> each."
+    ],
+    "cost": {},
+    "prerequisite": "No Moors",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M037_BuildingPlan",
+    "name": "Building Plan",
+    "deck": "M",
+    "number": 37,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Each time after you build at least 2 rooms at once, you can build up to 2 stables without paying wood."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M038_NatureReserve",
+    "name": "Nature Reserve",
+    "deck": "M",
+    "number": 38,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Immediately fence a farmyard space containing at least 1 forest or moor that is adjacent to a pasture, without paying wood for the fences. Once there are no tiles left in the fenced area, the farmyard space becomes a pasture."
+    ],
+    "cost": {
+      "food": 1
+    },
+    "prerequisite": "1 Pasture",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M039_SpecialPasture",
+    "name": "Special Pasture",
+    "deck": "M",
+    "number": 39,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Immediately fence a farmyard space that is not adjacent to an existing pasture, without paying wood for the fences. You can connect your pastures later. All future pastures must be adjacent to at least one existing pasture."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "prerequisite": "1 Pasture",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M040_MoorFire",
+    "name": "Moor Fire",
+    "deck": "M",
+    "number": 40,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Once you only have 1 remaining moor, at any time, you can exchange it for 1 field tile."
+    ],
+    "cost": {},
+    "prerequisite": "2 Moors",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M041_CattleCollar",
+    "name": "Cattle Collar",
+    "deck": "M",
+    "number": 41,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Each time after you use the \"Farmland\" or \"Cultivation\" action space or take the \"Slash and Burn\" special action, if you have at least 1 cattle, you can plow 1 additional field."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 1,
+    "prerequisite": "Play in Round 8 or Later",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M042_DeepPlow",
+    "name": "Deep Plow",
+    "deck": "M",
+    "number": 42,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You can immediately place 1 moor on an unused farmyard space. Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also exchange 1 moor for 1 field tile."
+    ],
+    "cost": {
+      "wood": 3
+    },
+    "vp": 2,
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M043_WildFields",
+    "name": "Wild Fields",
+    "deck": "M",
+    "number": 43,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "You can immediately place up to 2 field tiles, one at a time, on unused farmyard spaces that are not adjacent to existing fields. You can connect your fields later. All future fields must be adjacent to at least one existing field."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "prerequisite": "2 Fields",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M044_Swamp",
+    "name": "Swamp",
+    "deck": "M",
+    "number": 44,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place 1 moor on round space 12. At the start of that round, you can place the moor on an unused farmyard space."
+    ],
+    "cost": {},
+    "prerequisite": "Play in Round 4 or Before",
+    "maxRound": 4,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M045_TreeNursery",
+    "name": "Tree Nursery",
+    "deck": "M",
+    "number": 45,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place 1 forest each on the round spaces 12 and 13. At the start of these rounds, you can place the forest on an unused farmyard space."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "prerequisite": "No Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M046_Thicket",
+    "name": "Thicket",
+    "deck": "M",
+    "number": 46,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Choose up to 2 of your forests and place 1 additional forest on top of each of them. You cannot take the \"Slash and Burn\" special action on these farmyard spaces unless you remove a tile with a \"Fell Trees\" special action first."
+    ],
+    "cost": {},
+    "prerequisite": "4 Forests",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M047_BogForest",
+    "name": "Bog Forest",
+    "deck": "M",
+    "number": 47,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place 1 forest each on as many of your moors as you wish. You cannot take the \"Slash and Burn\" special action or use the covered moor on these farmyard spaces unless you remove the forest with a \"Fell Trees\" special action first."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "prerequisite": "3 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M048_ForestSwamp",
+    "name": "Forest Swamp",
+    "deck": "M",
+    "number": 48,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, add 4 to the current round and place 1 forest on the corresponding round space. At the start of that round, you can place the forest on an unused farmyard space."
+    ],
+    "cost": {},
+    "prerequisite": "2 Major Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M049_SurveyorsMap",
+    "name": "Surveyor's Map",
+    "deck": "M",
+    "number": 49,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place a field tile on round space 11, a moor on round space 12, and a forest on round space 13. At the start of these rounds, you can place the respective tile on an unused farmyard space per the normal rules."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "prerequisite": "Play in Round 2 or Before",
+    "maxRound": 2,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M050_FarmExtension",
+    "name": "Farm Extension",
+    "deck": "M",
+    "number": 50,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place a farmyard extension at one of the four sides of your farmyard board. Both new farmyard spaces must be adjacent to existing farmyard spaces."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M051_MoorEnclosures",
+    "name": "Moor Enclosures",
+    "deck": "M",
+    "number": 51,
+    "category": "FARM_PLANNER",
+    "desc": [
+      "Place a farmyard extension at one of the four sides of your farmyard board and place 1 moor on each of the 2 new farmyard spaces. Both new farmyard spaces must be adjacent to existing farmyard spaces."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 1,
+    "prerequisite": "Clay House",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M052_WeddingCoach",
+    "name": "Wedding Coach",
+    "deck": "M",
+    "number": 52,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "When you play this card, you can immediately take a \"Family Growth without Room\" action without placing a person. Place the newborn on this card until the returning home phase."
+    ],
+    "cost": {
+      "wood": 2,
+      "food": 1
+    },
+    "prerequisite": "4 Horses",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M053_ForestHut",
+    "name": "Forest Hut",
+    "deck": "M",
+    "number": 53,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Place 1 person from your supply on a forest. Once you remove the forest, you can place the person that round. In the returning home phase of that round, return the person to your supply. Until then, you cannot use it for family growth."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M054_AgriculturalImplement",
+    "name": "Agricultural Implement",
+    "deck": "M",
+    "number": 54,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Immediately after each time you use the \"Farmland\" or \"Cultivation\" action space, you can take a face-up special action card. The special action card costs 0 or 2 food, as usual."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M055_ToolShed",
+    "name": "Tool Shed",
+    "deck": "M",
+    "number": 55,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Once per round, immediately before or after you take the \"Slash and Burn\" or \"Cut Peat\" special action, you can also take the respective other special action."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M056_PeatCuttingRights",
+    "name": "Peat-Cutting Rights",
+    "deck": "M",
+    "number": 56,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Add 4 and 7 to the current round and place 1 fuel on each corresponding round space. At the start of these rounds, you can discard the fuel and take the \"Cut Peat\" special action by taking the appropriate special action card."
+    ],
+    "cost": {},
+    "prerequisite": "1 Horse",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M057_Taps",
+    "name": "Taps",
+    "deck": "M",
+    "number": 57,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "In each work phase, after you have placed all of your people, when it would be your turn again, you get exactly one more turn in which you can take a face-up special action card. The special action card costs 0 or 2 food, as usual."
+    ],
+    "cost": {},
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M058_PeatFertilizer",
+    "name": "Peat Fertilizer",
+    "deck": "M",
+    "number": 58,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time after you take the \"Cut Peat\" special action, you can also take a \"Sow\" action."
+    ],
+    "cost": {},
+    "prerequisite": "2 Fields",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M059_NaturesFertilizer",
+    "name": "Nature's Fertilizer",
+    "deck": "M",
+    "number": 59,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time after you take the \"Slash and Burn\" special action, you also get a \"Sow\" action for the new field only. This also applies when you exchange 1 moor for 1 field tile via a minor improvement."
+    ],
+    "cost": {
+      "vegetable": 2,
+      "boar": 1
+    },
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M060_SowingMachine",
+    "name": "Sowing Machine",
+    "deck": "M",
+    "number": 60,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time after you take a special action, if you then have at least 2 horses, you can also take a \"Sow\" action."
+    ],
+    "cost": {
+      "wood": 3
+    },
+    "prerequisite": "1 Horse",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M061_HayWagon",
+    "name": "Hay Wagon",
+    "deck": "M",
+    "number": 61,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time after you take at least 3 wood, 3 clay, 2 reed, or 2 stone from an accumulation space, you can take a \"Build Rooms\" or \"Renovation\" action without placing a person."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 1,
+    "prerequisite": "2 Horses",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M062_HearthBrush",
+    "name": "Hearth Brush",
+    "deck": "M",
+    "number": 62,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "You can immediately move up the Tiled Oven. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, it is worth 1 additional bonus point for you."
+    ],
+    "cost": {
+      "reed": 1
+    },
+    "extraVp": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M063_PastoralLetter",
+    "name": "Pastoral Letter",
+    "deck": "M",
+    "number": 63,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "You can immediately move up the Village Church. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, the Church and Village Church are each worth 1 additional bonus point for you."
+    ],
+    "cost": {},
+    "extraVp": true,
+    "prerequisite": "2 Major Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M064_FamilyBurialPlot",
+    "name": "Family Burial Plot",
+    "deck": "M",
+    "number": 64,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "When you play this card, you can immediately place the \"Tombstone\" token on an unused farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+    ],
+    "cost": {
+      "stone": 1
+    },
+    "vp": 1,
+    "extraVp": true,
+    "prerequisite": "Stone House",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M065_FireBrigade",
+    "name": "Fire Brigade",
+    "deck": "M",
+    "number": 65,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 2 food. Additionally, if there are forests on at least 2/3/4/5 of your farmyard spaces, you immediately get 1/2/3/4 bonus points. Crops and wood do not count but you can exchange them."
+    ],
+    "cost": {
+      "clay": 1,
+      "stone": 1
+    },
+    "extraVp": true,
+    "prerequisite": "4 Food and 4 Fuel",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M066_LandParcel",
+    "name": "Land Parcel",
+    "deck": "M",
+    "number": 66,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "Place 1 forest on an unused farmyard space. During scoring, if you have 1/2/3+ unused farmyard spaces, you get +2/-1/-3 bonus points on top of the negative points for the unused spaces."
+    ],
+    "cost": {},
+    "extraVp": true,
+    "prerequisite": "At Most 2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M067_ChamberOfCommerce",
+    "name": "Chamber of Commerce",
+    "deck": "M",
+    "number": 67,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 1 wood and 1 reed. During scoring, you get 1 additional bonus point for each of the \"Joinery\", \"Pottery\", and \"Basketmaker's Workshop\" major improvements that you have."
+    ],
+    "cost": {
+      "clay": 2,
+      "stone": 1
+    },
+    "vp": 1,
+    "extraVp": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M068_Church",
+    "name": "Church",
+    "deck": "M",
+    "number": 68,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "Returning home phase: once, you can pay 1 <FUEL> to get 1 bonus point. When you build this upgrade, you immediately get 2 food. The Village Church starts under the Well."
+    ],
+    "cost": {},
+    "vp": 5,
+    "extraVp": true,
+    "returnCards": [
+      "Major_Moor_VillageChurch"
+    ],
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M069_LeatherSaddle",
+    "name": "Leather Saddle",
+    "deck": "M",
+    "number": 69,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "Each time you have at least 3 horses, you get 1 bonus point for each cattle that you turn into food."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "vp": 1,
+    "extraVp": true,
+    "prerequisite": "2 Horses",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M070_MoorArchaeology",
+    "name": "Moor Archaeology",
+    "deck": "M",
+    "number": 70,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, you can place 1 fence from your supply on the emptied farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+    ],
+    "cost": {},
+    "vp": 1,
+    "extraVp": true,
+    "prerequisite": "Clay House",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M071_BogBody",
+    "name": "Bog Body",
+    "deck": "M",
+    "number": 71,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "During scoring, the owner of the Museum of the Moors and the owner of the Living History Museum each get 1 bonus point. The Museum of the Moors is a major improvement; the Living History Museum is a minor improvement."
+    ],
+    "cost": {},
+    "vp": 1,
+    "extraVp": true,
+    "prerequisite": "At Least 1 Moor",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M072_OvenDamper",
+    "name": "Oven Damper",
+    "deck": "M",
+    "number": 72,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 3 fuel. During scoring, you get 1 additional bonus point each for the \"Clay Oven\", \"Stone Oven\", \"Heating Oven\", and \"Tiled Oven\" major improvements and the \"Oven Installation\" upgrade."
+    ],
+    "cost": {
+      "stone": 2
+    },
+    "vp": 1,
+    "extraVp": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M073_StockBreedingPrize",
+    "name": "Stock-Breeding Prize",
+    "deck": "M",
+    "number": 73,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "During scoring, if you have at least 1 animal of each of the 4 types, you get 1 bonus point for each other player in the game. These points are doubled or tripled if you have 2 or 3 animals of each type, respectively."
+    ],
+    "cost": {
+      "sheep": 1
+    },
+    "extraVp": true,
+    "prerequisite": "No Unused Farmyard Spaces",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M074_Administration",
+    "name": "Administration",
+    "deck": "M",
+    "number": 74,
+    "category": "POINTS_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 2 food. In the harvest at the end of round 14, for each major improvement you have, you can exchange 1 food for 1 bonus point. This card counts as an improvement in hand for its prerequisite."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 2
+    },
+    "extraVp": true,
+    "prerequisite": "At Most 4 Improvements in Hand",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M075_FuelStorage",
+    "name": "Fuel Storage",
+    "deck": "M",
+    "number": 75,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Add 1, 3, 5, 7, 9, and 11 to the current round. Alternate placing 1 wood and 1 fuel on the corresponding round spaces, starting with wood. At the start of these rounds, you get the good."
+    ],
+    "cost": {
+      "clay": 1,
+      "reed": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M076_Flatboat",
+    "name": "Flatboat",
+    "deck": "M",
+    "number": 76,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Alternate placing 1 fuel and 1 horse on each of the next 7 round spaces, starting with fuel. At the start of these rounds, you get the respective good."
+    ],
+    "cost": {
+      "wood": 4
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M077_DryingField",
+    "name": "Drying Field",
+    "deck": "M",
+    "number": 77,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, add 3 to the current round and place 2 fuel on the corresponding round space. At the start of that round, you get the fuel."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M078_Barge",
+    "name": "Barge",
+    "deck": "M",
+    "number": 78,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Alternate placing 1 fuel and 1 food on each remaining round space, starting with fuel. At the start of these rounds, you get the respective good."
+    ],
+    "cost": {
+      "wood": 3
+    },
+    "vp": 1,
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M079_PeatSled",
+    "name": "Peat Sled",
+    "deck": "M",
+    "number": 79,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Add your choice of 2/4/7/10 to the current round and place 3/4/5/6 fuel on the corresponding round space. At the start of that round, you get the fuel."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M080_AdvancePayment",
+    "name": "Advance Payment",
+    "deck": "M",
+    "number": 80,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You immediately get 1 fuel, 1 food, 1 wood, 1 clay, 1 reed, 1 stone, 1 sheep, and 1 grain."
+    ],
+    "cost": {},
+    "vp": -4,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M081_PeatBoat",
+    "name": "Peat Boat",
+    "deck": "M",
+    "number": 81,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "At any time: 3 <FUEL> <ARROW> 2 <WOOD> or 2 <CLAY>; 4 <FUEL> <ARROW> 2 <REED> or 2 <STONE>; 2 <FUEL> <ARROW> 1 <SHEEP>; 3 <FUEL> <ARROW> 1 <FOOD>. You cannot get only one of a building resource from this."
+    ],
+    "cost": {
+      "wood": 3,
+      "reed": 2
+    },
+    "vp": 3,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M082_Firewood",
+    "name": "Firewood",
+    "deck": "M",
+    "number": 82,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 1 fuel. During each harvest, if you exchange at least 1 wood for 1 fuel to heat your house, you need a total of 1 fuel less to heat it."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M083_CoalSeam",
+    "name": "Coal Seam",
+    "deck": "M",
+    "number": 83,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "When you play this card, you immediately get 1 fuel. Each time you take the \"Hiring Fair\" special action or use the \"Day Laborer\" action space, you also get 1 fuel."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M084_BogPony",
+    "name": "Bog Pony",
+    "deck": "M",
+    "number": 84,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "At any time, you can lie a standing horse on its side to get 2 fuel. Lying horses do not count for breeding and are only worth 1/2 point during scoring. They can, however, be turned into food with an appropriate improvement."
+    ],
+    "cost": {},
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M085_OvenInstallation",
+    "name": "Oven Installation",
+    "deck": "M",
+    "number": 85,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "You no longer need to heat your house. The Heating Oven starts under the Clay Oven."
+    ],
+    "cost": {},
+    "vp": -1,
+    "returnCards": [
+      "Major_Moor_HeatingOven"
+    ],
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M086_SpinningMill",
+    "name": "Spinning Mill",
+    "deck": "M",
+    "number": 86,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "For every 2 sheep that you have in the field phase of each harvest, you pay 1 fuel less to heat your house in the feeding phase of that harvest, but not less than 0 fuel."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 2,
+    "prerequisite": "1 Sheep",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M087_PeatBarge",
+    "name": "Peat Barge",
+    "deck": "M",
+    "number": 87,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Each time you use the \"Fishing\" accumulation space, you also get 2 fuel."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M088_PeatIron",
+    "name": "Peat Iron",
+    "deck": "M",
+    "number": 88,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "At the start of each harvest, if you have at least 2 moors, you get 1 fuel."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M089_BirthingHouse",
+    "name": "Birthing House",
+    "deck": "M",
+    "number": 89,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 fuel, 1 food, and 1 bonus point."
+    ],
+    "cost": {
+      "clay": 2,
+      "stone": 1
+    },
+    "vp": 2,
+    "extraVp": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M090_WinterStorehouse",
+    "name": "Winter Storehouse",
+    "deck": "M",
+    "number": 90,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to get as much fuel and food until you have at least 2 fuel and 2 food."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M091_RoutineWork",
+    "name": "Routine Work",
+    "deck": "M",
+    "number": 91,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Each harvest, you get your choice of 1 fuel or 1 food for each of your craft buildings (Joinery, Pottery, and Basketmaker's Workshop) that you choose not to use to turn a building resource into food."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "prerequisite": "No Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M092_AridField",
+    "name": "Arid Field",
+    "deck": "M",
+    "number": 92,
+    "category": "ACTIONS_BOOSTER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, place 1 fuel and 1 food on the emptied farmyard space. This farmyard space is still considered unused. You get the goods once the farmyard space is no longer unused."
+    ],
+    "cost": {},
+    "prerequisite": "3 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M093_FarmhandsQuarters",
+    "name": "Farmhands' Quarters",
+    "deck": "M",
+    "number": 93,
+    "category": "GOODS_PROVIDER",
+    "desc": [
+      "Each time you build a major improvement, you can replace 1 building resource of your choice with 1 fuel. Each time you get an improvement in your hand from the player to your right, you also get 1 food."
+    ],
+    "cost": {
+      "wood": 1,
+      "reed": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M094_PeatBath",
+    "name": "Peat Bath",
+    "deck": "M",
+    "number": 94,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Each time you use the \"Infirmary\" action space, place 1 food on as many of the next round spaces as there are moors visible on your farmyard board. At the start of these rounds, you get the food."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M095_FallowFields",
+    "name": "Fallow Fields",
+    "deck": "M",
+    "number": 95,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Place 2 food on each of up to 3 of your empty fields. You cannot harvest the food. You get it when you sow in these fields."
+    ],
+    "cost": {},
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M096_FallowLand",
+    "name": "Fallow Land",
+    "deck": "M",
+    "number": 96,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Each time you take the \"Fell Trees\" or \"Cut Peat\" special action, place 1 food on the emptied farmyard space. This farmyard space is still considered unused. Once the farmyard space is no longer unused, you get the food."
+    ],
+    "cost": {},
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M097_VillageHall",
+    "name": "Village Hall",
+    "deck": "M",
+    "number": 97,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "At the start of each returning home phase in which there is no special action card in front of you, you get 2 food."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M098_FishSmokehouse",
+    "name": "Fish Smoke-house",
+    "deck": "M",
+    "number": 98,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Each time you use the \"Fishing\" accumulation space, you can pay 1 fuel to get an additional 3 food."
+    ],
+    "cost": {
+      "wood": 1,
+      "clay": 2
+    },
+    "vp": 2,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M099_HealingClay",
+    "name": "Healing Clay",
+    "deck": "M",
+    "number": 99,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 1 food. Each time you use the \"Infirmary\" action space with a person lying in bed, you get 1 additional food."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M100_Pheromones",
+    "name": "Pheromones",
+    "deck": "M",
+    "number": 100,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 1 food. Additionally, each player, including you, with at least 1 stable or pasture immediately gets 2 food."
+    ],
+    "cost": {},
+    "prerequisite": "At Most 2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M101_ButchersBlock",
+    "name": "Butcher's Block",
+    "deck": "M",
+    "number": 101,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "You cannot play this card in rounds 4, 7, 9, 11, 13, and 14. All other players must and you can turn any 1 animal into food: <SHEEP> <ARROW> 1 <FOOD>, <PIG> <ARROW> 2 <FOOD>, <CATTLE> <ARROW> 3 <FOOD>, <HORSE> <ARROW> 2 <FOOD>."
+    ],
+    "cost": {
+      "wood": 1
+    },
+    "vp": 1,
+    "prerequisite": "see below",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M102_SavingsDeposit",
+    "name": "Savings Deposit",
+    "deck": "M",
+    "number": 102,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the amount of clay you have, you immediately get 6 food. Then pass this card to the player on your left, who adds it to their hand."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M103_ForestKindergarten",
+    "name": "Forest Kindergarten",
+    "deck": "M",
+    "number": 103,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 food for each of your farmyard spaces containing at least 1 forest."
+    ],
+    "cost": {
+      "wood": 1,
+      "stone": 2
+    },
+    "vp": 1,
+    "prerequisite": "At Most 3 Forests",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M104_WildHarvest",
+    "name": "Wild Harvest",
+    "deck": "M",
+    "number": 104,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 1 food. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of forests you have, you immediately get 1 food."
+    ],
+    "cost": {},
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M105_OpenGrill",
+    "name": "Open Grill",
+    "deck": "M",
+    "number": 105,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "At any time: <VEGETABLE> <ARROW> 2 <FOOD>; <SHEEP> <ARROW> 2 <FOOD>; <PIG> <ARROW> 3 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>. \"Bake Bread\" action: <GRAIN> <ARROW> 2 <FOOD>."
+    ],
+    "cost": {},
+    "vp": 2,
+    "returnCards": [
+      "Major_Fireplace1",
+      "Major_Fireplace2",
+      "Major_Fireplace3"
+    ],
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M106_HorseButchery",
+    "name": "Horse Butchery",
+    "deck": "M",
+    "number": 106,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "At any time: <SHEEP> <ARROW> 1 <FOOD>; <PIG> <ARROW> 2 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>; 2 <HORSE> <ARROW> 5 <FOOD>. The Horse Slaughterhouses start under the Fireplaces."
+    ],
+    "cost": {},
+    "vp": 3,
+    "returnCards": [
+      "Major_Moor_HorseSlaughterhouse1",
+      "Major_Moor_HorseSlaughterhouse2"
+    ],
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M107_PotRoastRecipe",
+    "name": "Pot Roast Recipe",
+    "deck": "M",
+    "number": 107,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "At any time, you can use your \"Fireplace\" and \"Cooking Hearth\" major improvements to turn 1 horse into 2 food."
+    ],
+    "cost": {},
+    "prerequisite": "2 Horses",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M108_GrainDistillery",
+    "name": "Grain Distillery",
+    "deck": "M",
+    "number": 108,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Harvest: once, you can turn 1 <FUEL> and 1 <GRAIN> into 5 <FOOD>. Any number of times during scoring: 1 <FUEL> and 1 <GRAIN> <ARROW> 1 bonus point."
+    ],
+    "cost": {
+      "stone": 2,
+      "sheep": 1
+    },
+    "vp": 1,
+    "extraVp": true,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M109_Malthouse",
+    "name": "Malthouse",
+    "deck": "M",
+    "number": 109,
+    "category": "FOOD_PROVIDER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, you can also turn exactly 1 grain into 4 food."
+    ],
+    "cost": {
+      "clay": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M110_FarmCart",
+    "name": "Farm Cart",
+    "deck": "M",
+    "number": 110,
+    "category": "CROP_PROVIDER",
+    "desc": [
+      "Each time you take at least 5 wood, 4 clay, 3 reed, or 2 stone from an accumulation space, you also get 1 grain."
+    ],
+    "cost": {
+      "wood": 3
+    },
+    "prerequisite": "2 Horses",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M111_NoTillFarming",
+    "name": "No-Till Farming",
+    "deck": "M",
+    "number": 111,
+    "category": "CROP_PROVIDER",
+    "desc": [
+      "You can plant grain or vegetables on up to 2 unused farmyard spaces. Even if you do, these farmyard spaces are not considered fields but still unused. You can discard crops from these farmyard spaces at any time."
+    ],
+    "cost": {},
+    "prerequisite": "2 Fields",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M112_PeatAshFertilizer",
+    "name": "Peat Ash Fertilizer",
+    "deck": "M",
+    "number": 112,
+    "category": "CROP_PROVIDER",
+    "desc": [
+      "Each time before you take the \"Cut Peat\" special action, you can place 1 additional crop of the same type on all fields and farmyard spaces containing grain or vegetables. Do not place any crops on empty fields and farmyard spaces."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M113_LivingHistoryMuseum",
+    "name": "Living History Museum",
+    "deck": "M",
+    "number": 113,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "These major improvements cost you 1 building resource less: Heating Oven 1 <CLAY>, Tiled Oven 1 <STONE>, Riding Stables 1 <WOOD>, Village Church 1 <STONE>, Furniture Stall 1 <WOOD>, Basket Stall 1 <REED>, Ceramics Stall 1 <CLAY>. It starts under the Peat-charcoal Kiln."
+    ],
+    "cost": {},
+    "vp": 4,
+    "prerequisite": "Clay House",
+    "returnCards": [
+      "Major_Moor_MuseumOfTheMoors"
+    ],
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M114_RiversideWoods",
+    "name": "Riverside Woods",
+    "deck": "M",
+    "number": 114,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "With this card, each time you use the \"Fishing\" accumulation space, you also get 1 wood for each of your farmyard spaces containing at least 1 forest, up to a maximum of 3 wood."
+    ],
+    "cost": {},
+    "prerequisite": "3 Major Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M115_OakBark",
+    "name": "Oak Bark",
+    "deck": "M",
+    "number": 115,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "When you play this card, you immediately get 2 wood. Each time you turn wild boar, cattle, or horses into food, you get 1 additional wood for each of these animals that you turn."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "prerequisite": "2 Major Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M116_MoorBirchTrees",
+    "name": "Moor Birch Trees",
+    "deck": "M",
+    "number": 116,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take the \"Cut Peat\" special action, you also get 2 wood."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "vp": 1,
+    "prerequisite": "3 Rooms",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M117_DraughtHorses",
+    "name": "Draught-horses",
+    "deck": "M",
+    "number": 117,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take exactly 3 or at least 4 wood from an accumulation space, if you have at least 1 horse, you can pay exactly 1 food to get 1 or 2 additional wood, respectively."
+    ],
+    "cost": {},
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M118_TimberMill",
+    "name": "Timber Mill",
+    "deck": "M",
+    "number": 118,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take the \"Fell Trees\" special action or take at least 4 wood from an accumulation space, you get 1 additional wood. If you pay 1 fuel, you get 2 additional wood instead of 1."
+    ],
+    "cost": {
+      "clay": 3,
+      "stone": 2
+    },
+    "vp": 3,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M119_AlderSwamp",
+    "name": "Alder Swamp",
+    "deck": "M",
+    "number": 119,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take the \"Fell Trees\" special action, you also get your choice of 1 wood or 1 reed."
+    ],
+    "cost": {
+      "vegetable": 2
+    },
+    "vp": 1,
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M120_RiverClay",
+    "name": "River Clay",
+    "deck": "M",
+    "number": 120,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you use the \"Fishing\" accumulation space, you also get 2 clay."
+    ],
+    "cost": {},
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M121_Loam",
+    "name": "Loam",
+    "deck": "M",
+    "number": 121,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "In each work phase, if you have placed all but one of your people when taking the \"Hiring Fair\" special action, you also get 1 clay."
+    ],
+    "cost": {},
+    "prerequisite": "1 Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M122_WillowBank",
+    "name": "Willow Bank",
+    "deck": "M",
+    "number": 122,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take the \"Fell Trees\" special action, you also get 1 reed."
+    ],
+    "cost": {},
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M123_StoneQuarry",
+    "name": "Stone Quarry",
+    "deck": "M",
+    "number": 123,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Place 5 stone--only 3 stone in 3-player games--on this card. Each time you take the \"Hiring Fair\" special action, you also get 1 stone from this card."
+    ],
+    "cost": {
+      "vegetable": 3
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M124_StoneWagon",
+    "name": "Stone Wagon",
+    "deck": "M",
+    "number": 124,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you use the \"Day Laborer\" action space, you also get 1 stone."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M125_HardwareStore",
+    "name": "Hardware Store",
+    "deck": "M",
+    "number": 125,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to take 1 of each building resource that you have none of in your supply."
+    ],
+    "cost": {
+      "clay": 2,
+      "reed": 1
+    },
+    "prerequisite": "2 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M126_CooperativeStore",
+    "name": "Cooperative Store",
+    "deck": "M",
+    "number": 126,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Place 4 usage counters on this card. At any time, you can return 1 usage counter from this card plus 1 building resource of your choice to get 1 of any other building resource except stone."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 1
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M127_Wheelbarrow",
+    "name": "Wheelbarrow",
+    "deck": "M",
+    "number": 127,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "Each time you take at least 4 of the same building resource from an accumulation space, you also get 1 fuel. Each time you take the \"Cut Peat\" special action, you also get 1 building resource of your choice."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M128_Workbench",
+    "name": "Workbench",
+    "deck": "M",
+    "number": 128,
+    "category": "BUILDING_RESOURCE_PROVIDER",
+    "desc": [
+      "In the field phase of each harvest at the end of rounds 13 and 14, you get 3 wood, 2 clay, and 1 reed. You can use these, for example, to earn bonus points from the Joinery, Pottery, or Basketmaker's Workshop."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "prerequisite": "At Most 4 Improvements",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M129_PlowhorseMarket",
+    "name": "Plowhorse Market",
+    "deck": "M",
+    "number": 129,
+    "category": "LIVESTOCK_PROVIDER",
+    "desc": [
+      "Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also buy exactly 1 horse for 1 food."
+    ],
+    "cost": {
+      "clay": 1
+    },
+    "vp": 1,
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M130_Nosebag",
+    "name": "Nosebag",
+    "deck": "M",
+    "number": 130,
+    "category": "LIVESTOCK_PROVIDER",
+    "desc": [
+      "Each time you use the \"Grain Seeds\" action space, you also get 1 horse."
+    ],
+    "cost": {
+      "vegetable": 1
+    },
+    "prerequisite": "1 Major Improvement",
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
+  {
+    "id": "M131_CattleStall",
+    "name": "Cattle Stall",
+    "deck": "M",
+    "number": 131,
+    "category": "LIVESTOCK_PROVIDER",
+    "desc": [
+      "Add 2, 4, 6, and 8 to the current round and place 1 animal of your choice on each corresponding round space. All the animals must be different. At the start of these rounds, you can buy the respective animal for 1 food."
+    ],
+    "cost": {
+      "wood": 2,
+      "clay": 2
+    },
+    "vp": 1,
+    "implemented": false,
+    "requiresFarmersOfTheMoor": true,
+    "kind": "minor"
+  },
 ]
 
 const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
