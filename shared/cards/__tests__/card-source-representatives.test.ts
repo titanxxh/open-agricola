@@ -179,12 +179,12 @@ describe('Card Source representative migrations', () => {
     })
   })
 
-  it('projects Farmers of the Moor minor cards with implemented Batch 1 runtime definitions', () => {
+  it('projects Farmers of the Moor minor cards and keeps remaining cards metadata-only', () => {
     const entries = manifest()
     const moorMinors = Object.values(entries)
       .filter((entry) => entry.meta.type === 'minor' && entry.meta.deck === 'M')
       .sort((a, b) => a.meta.number - b.meta.number)
-    const implementedBatch1 = [
+    const implementedMoorMinorIds = [
       'M019_LawnTurf',
       'M020_PeatPellets',
       'M022_EcologicalNiche',
@@ -196,14 +196,30 @@ describe('Card Source representative migrations', () => {
       'M065_FireBrigade',
       'M080_AdvancePayment',
       'M100_Pheromones',
-    ]
+      'M075_FuelStorage',
+      'M076_Flatboat',
+      'M078_Barge',
+      'M079_PeatSled',
+      'M087_PeatBarge',
+      'M110_FarmCart',
+      'M114_RiversideWoods',
+      'M120_RiverClay',
+      'M124_StoneWagon',
+      'M128_Workbench',
+      'M129_PlowhorseMarket',
+      'M130_Nosebag',
+    ].sort()
 
     expect(moorMinors.map((entry) => entry.meta.number)).toEqual(
       Array.from({ length: 117 }, (_, index) => index + 15),
     )
     expect(moorMinors.every((entry) => entry.meta.requiresFarmersOfTheMoor === true)).toBe(true)
-    expect(moorMinors.filter((entry) => entry.meta.implemented).map((entry) => entry.meta.id)).toEqual(implementedBatch1)
-    expect(moorMinors.filter((entry) => entry.meta.implemented === false)).toHaveLength(106)
+    expect(moorMinors.filter((entry) => entry.meta.implemented).map((entry) => entry.meta.id).sort()).toEqual(
+      implementedMoorMinorIds,
+    )
+    expect(moorMinors
+      .filter((entry) => !implementedMoorMinorIds.includes(entry.meta.id))
+      .every((entry) => entry.meta.implemented === false)).toBe(true)
     expect(moorMinors.every((entry) => entry.module.startsWith('shared/cards/M/'))).toBe(true)
 
     expect(entries['M015_PeatBurnOff']?.meta).toMatchObject({
@@ -231,6 +247,9 @@ describe('Card Source representative migrations', () => {
       vp: 1,
     })
     expect(minorImprovementCardsList.filter((card) => card.deck === 'M')).toHaveLength(117)
-    expect(implementedMinorImprovementCardsList.filter((card) => card.deck === 'M').map((card) => card.id)).toEqual(implementedBatch1)
+    expect(implementedMinorImprovementCardsList
+      .filter((card) => card.deck === 'M')
+      .map((card) => card.id)
+      .sort()).toEqual(implementedMoorMinorIds)
   })
 })
