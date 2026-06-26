@@ -35,7 +35,8 @@ const cardImpl = {
         },
       ],
     }),
-    onEndTurn: (state, player) => {
+    onEndTurn: (state, player, ctx) => {
+      if (ctx?.triggerActionId !== 'place-farmer') return
       const playedRound = readCardExtraData<number>(player, CARD_ID, 'playedRound')
       if (playedRound === undefined || state.round <= playedRound) return
       if (!isMajorImprovementPlayable(state, player, TARGET, CARD_ID, [TARGET])) return

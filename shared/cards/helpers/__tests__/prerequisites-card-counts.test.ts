@@ -30,7 +30,16 @@ registerAdHocMinorImprovement(
 
 type MinimalPlayer = Pick<
   PlayerState,
-  'occupationPlayed' | 'extraOccupationsFromCards' | 'fields' | 'pastures' | 'improvements' | 'minorPlayed' | 'cardStates'
+  | 'occupationPlayed'
+  | 'extraOccupationsFromCards'
+  | 'fields'
+  | 'pastures'
+  | 'improvements'
+  | 'minorPlayed'
+  | 'cardStates'
+  | 'roomTiles'
+  | 'stableTiles'
+  | 'farmTerrain'
 >
 
 function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
@@ -42,6 +51,9 @@ function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
     improvements: [],
     minorPlayed: [],
     cardStates: {},
+    roomTiles: [],
+    stableTiles: [],
+    farmTerrain: [],
     ...overrides,
   } as unknown as PlayerState
 }
@@ -118,6 +130,40 @@ describe('C70 Lettuce Patch as providesField', () => {
     })
     const card = { prerequisite: '2 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(true)
+  })
+})
+
+describe('prerequisites: Farmers of the Moor text clauses', () => {
+  it('counts all improvements for generic improvement prerequisites', () => {
+    const player = makePlayer({
+      improvements: ['Major_Well'],
+      minorPlayed: ['A37_Bucksaw'],
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Improvements' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: '3 Improvements' })).toBe(false)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'At Most 2 Improvements' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'At Most 1 Improvement' })).toBe(false)
+  })
+
+  it('supports terrain and unused farmyard clauses', () => {
+    const fullFarm = makePlayer({
+      roomTiles: Array.from({ length: 15 }, (_, index) => ({
+        row: Math.floor(index / 5),
+        col: index % 5,
+      })),
+      farmTerrain: [{ row: 0, col: 0, kind: 'moor' }],
+    })
+    const openFarm = makePlayer({
+      roomTiles: [{ row: 0, col: 0 }],
+      farmTerrain: [{ row: 1, col: 0, kind: 'forest' }],
+    })
+
+    expect(meetsCardPrerequisites(fullFarm, { prerequisite: 'No Unused Farmyard Spaces' })).toBe(true)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'No Unused Farmyard Spaces' })).toBe(false)
+    expect(meetsCardPrerequisites(fullFarm, { prerequisite: 'At Least 1 Moor' })).toBe(true)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'At Least 1 Moor' })).toBe(false)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'At Least 1 Forest' })).toBe(true)
   })
 })
 

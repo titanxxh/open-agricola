@@ -104,60 +104,18 @@ const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
 
 const farmersOfTheMoorMinorHandSize = 4
 const farmersOfTheMoorPublishedMinorHandSize = 3
-const implementedFarmersOfTheMoorMinorIds: readonly string[] = [
-  'M015_PeatBurnOff',
-  'M016_ClearFelling',
-  'M017_Reforestation',
-  'M019_LawnTurf',
-  'M020_PeatPellets',
-  'M021_PeatCuttingExpedition',
-  'M022_EcologicalNiche',
-  'M023_EdgeOfTheForest',
-  'M024_BasicSupplies',
-  'M025_HouseholdInventory',
-  'M026_ChimneyHood',
-  'M028_OutOnTheWallaby',
-  'M029_Tinker',
-  'M030_FarmAnimalMarket',
-  'M040_MoorFire',
-  'M042_DeepPlow',
-  'M065_FireBrigade',
-  'M066_LandParcel',
-  'M067_ChamberOfCommerce',
-  'M069_LeatherSaddle',
-  'M071_BogBody',
-  'M072_OvenDamper',
-  'M073_StockBreedingPrize',
-  'M074_Administration',
-  'M075_FuelStorage',
-  'M076_Flatboat',
-  'M078_Barge',
-  'M079_PeatSled',
-  'M080_AdvancePayment',
-  'M081_PeatBoat',
-  'M087_PeatBarge',
-  'M100_Pheromones',
-  'M103_ForestKindergarten',
-  'M104_WildHarvest',
-  'M105_OpenGrill',
-  'M107_PotRoastRecipe',
-  'M108_GrainDistillery',
-  'M110_FarmCart',
-  'M114_RiversideWoods',
-  'M115_OakBark',
-  'M117_DraughtHorses',
-  'M120_RiverClay',
-  'M124_StoneWagon',
-  'M128_Workbench',
-  'M129_PlowhorseMarket',
-  'M130_Nosebag',
-]
+
+export const getImplementedFarmersOfTheMoorMinorIds = (playerCount: number): readonly string[] =>
+  implementedMinorImprovementCards
+    .filter((card) => card.requiresFarmersOfTheMoor)
+    .filter((card) => cardAllowedForPlayerCount(card.players, playerCount))
+    .map((card) => card.id)
 
 const resolveFarmersOfTheMoorMinorHandSize = (
   playerCount: number,
   allowIncomplete: boolean,
 ): number => {
-  const available = implementedFarmersOfTheMoorMinorIds.length
+  const available = getImplementedFarmersOfTheMoorMinorIds(playerCount).length
   const required = playerCount * farmersOfTheMoorMinorHandSize
   if (available >= required) return farmersOfTheMoorMinorHandSize
   if (!allowIncomplete) {
@@ -179,7 +137,7 @@ const dealFarmersOfTheMoorMinorHands = (
   if (handSize <= 0) {
     return Array.from({ length: playerCount }, () => [])
   }
-  const shuffled = shuffleWithRng([...implementedFarmersOfTheMoorMinorIds], createRng(seed))
+  const shuffled = shuffleWithRng([...getImplementedFarmersOfTheMoorMinorIds(playerCount)], createRng(seed))
   return Array.from({ length: playerCount }, (_, index) =>
     shuffled.slice(index * handSize, index * handSize + handSize),
   )

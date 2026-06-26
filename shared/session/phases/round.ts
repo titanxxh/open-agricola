@@ -389,9 +389,10 @@ export const continueAfterReorganizeRoundEnd = (
   core: GameCore,
   playerIndex: number,
   originPlayerIndex: number | null,
+  triggerActionId?: string | null,
 ): void => {
   if (originPlayerIndex !== null) {
-    core.invokeEndTurnHooks(originPlayerIndex)
+    core.invokeEndTurnHooks(originPlayerIndex, triggerActionId)
     return
   }
   const player = core.state.players[playerIndex]!

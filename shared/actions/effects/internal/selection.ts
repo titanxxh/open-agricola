@@ -1,6 +1,7 @@
 import type { ActionDefinition, GameState, PlayerState } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { playerBoard } from '../../../domain'
+import { getUsedFarmyardTileKeys } from '../../../domain/farm'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
@@ -23,9 +24,14 @@ const validateFarmPositions = (
   }
 
   const selected = new Set<string>()
+  const requireUnusedTerrainTile = actionContext?.terrainMode === 'place'
+  const usedFarmyardTiles = requireUnusedTerrainTile
+    ? getUsedFarmyardTileKeys(player)
+    : null
   for (const position of positions) {
     if (selected.has(position)) return 'duplicate selection position'
     selected.add(position)
+    if (usedFarmyardTiles?.has(position)) return 'invalid selection position'
   }
 
   const playerIndex = state?.players.indexOf(player) ?? -1

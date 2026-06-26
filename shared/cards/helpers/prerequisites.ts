@@ -4,6 +4,7 @@ import { getRegisteredMinorImprovement } from '../registry-display'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { fieldHasCrop } from '../../domain/field'
+import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import { getActiveCardRegistry } from '../active-registry'
 import { readCardExtraData } from './card-state'
 
@@ -101,6 +102,16 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
     return countMajorImprovements(player) >= Number(majorImprovementsMatch[1])
   }
 
+  const atMostImprovementsMatch = trimmed.match(/^At Most\s+(\d+)\s+Improvements?$/i)
+  if (atMostImprovementsMatch) {
+    return countAllImprovements(player) <= Number(atMostImprovementsMatch[1])
+  }
+
+  const improvementsMatch = trimmed.match(/^(\d+)\s+Improvements?$/i)
+  if (improvementsMatch) {
+    return countAllImprovements(player) >= Number(improvementsMatch[1])
+  }
+
   const bakingMatch = trimmed.match(/^(\d+)\s+Baking Improvements?$/i)
   if (bakingMatch) {
     return countBakingImprovements(player) >= Number(bakingMatch[1])
@@ -112,6 +123,10 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
 
   if (/^No Occupations$/i.test(trimmed)) {
     return countOccupations(player) === 0
+  }
+
+  if (/^No Improvements$/i.test(trimmed)) {
+    return countAllImprovements(player) === 0
   }
 
   const atMostOccupationsMatch = trimmed.match(/^At Most\s+(\d+)\s+Occupations?$/i)
@@ -126,6 +141,16 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
 
   if (/^No Field Tiles$/i.test(trimmed)) {
     return countFields(player) === 0
+  }
+
+  if (/^No Unused Farmyard Spaces$/i.test(trimmed)) {
+    return countUnusedFarmyardSpaces(player) === 0
+  }
+
+  const atLeastTerrainMatch = trimmed.match(/^At Least\s+(\d+)\s+(Moor|Forest)s?$/i)
+  if (atLeastTerrainMatch) {
+    const kind = atLeastTerrainMatch[2]!.toLowerCase()
+    return (player.farmTerrain ?? []).filter((tile) => tile.kind === kind).length >= Number(atLeastTerrainMatch[1])
   }
 
   const exactFieldTilesMatch = trimmed.match(/^Exactly\s+(\d+)\s+Field Tiles?$/i)

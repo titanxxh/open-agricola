@@ -38,6 +38,12 @@ export const resourceKeyList: (keyof Resource)[] = [
   'begging',
 ]
 
+export const extendedResourceKeyList: (keyof Resource)[] = [
+  ...resourceKeyList,
+  'horse',
+  'fuel',
+]
+
 export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 export const createRoundOpenById = (order: (string | null)[]) =>

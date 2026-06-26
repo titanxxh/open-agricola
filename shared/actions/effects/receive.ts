@@ -2,7 +2,7 @@ import type { ActionDefinition, FutureMeepleResourceMap, PlayerState, Resource }
 import type { EventSink } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
-import { resourceKeyList } from '../../contract/state-constants'
+import { extendedResourceKeyList } from '../../contract/state-constants'
 
 type FutureReceiveEntry = {
   cardId: string
@@ -12,7 +12,7 @@ type FutureReceiveEntry = {
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}
-  for (const key of resourceKeyList) {
+  for (const key of extendedResourceKeyList) {
     const amount = resources[key] ?? 0
     if (amount > 0) out[key] = amount
   }
@@ -20,9 +20,9 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
 }
 
 const addResources = (player: PlayerState, resources: Partial<Resource>) => {
-  for (const key of resourceKeyList) {
+  for (const key of extendedResourceKeyList) {
     const amount = resources[key] ?? 0
-    if (amount > 0) player.resources[key] += amount
+    if (amount > 0) player.resources[key] = (player.resources[key] ?? 0) + amount
   }
 }
 
@@ -62,7 +62,7 @@ export const receiveAction: ActionDefinition = {
       addResourcesFromCards(player, resources)
       addCardResourceGained(player, entry.cardId, resources)
       emitReceivedResources(eventSink, player, entry, resources)
-      for (const key of resourceKeyList) {
+      for (const key of extendedResourceKeyList) {
         const amount = resources[key] ?? 0
         if (amount > 0) gained[key] = (gained[key] ?? 0) + amount
       }
