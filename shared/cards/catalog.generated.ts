@@ -13737,7 +13737,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "prerequisite": "3 Improvements",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15101,7 +15101,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "prerequisite": "At Most 3 Forests",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

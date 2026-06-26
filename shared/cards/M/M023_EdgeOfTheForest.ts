@@ -1,6 +1,21 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import { countFencedTerrainAdjacencies } from '../../moor/terrain-adjacency'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'M023_EdgeOfTheForest'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      const { forestField, forestMoor } = countFencedTerrainAdjacencies(player)
+      if (forestField === 0 && forestMoor === 0) return
+      return gainLeaf(CARD_ID, { food: forestField, fuel: forestMoor })
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M023_EdgeOfTheForest = defineMinorCard({
   meta: {
@@ -15,7 +30,10 @@ export const M023_EdgeOfTheForest = defineMinorCard({
     cost: {},
     prerequisite: "3 Improvements",
     passing: true,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M023_EdgeOfTheForest_impl = M023_EdgeOfTheForest.impl
