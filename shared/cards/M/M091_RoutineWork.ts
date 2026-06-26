@@ -86,7 +86,6 @@ const rewardChoice = (): ActionFlow => ({
 
 const cardImpl = {
   listeners: [afterExchangeListener, tradeAppliedListener],
-  prerequisiteCheck: (player) => player.improvements.length === 0,
   effect: {
     id: CARD_ID,
     onStartHarvest: (_state, player) => {

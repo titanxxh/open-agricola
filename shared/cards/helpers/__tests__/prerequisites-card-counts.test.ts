@@ -40,6 +40,7 @@ type MinimalPlayer = Pick<
   | 'roomTiles'
   | 'stableTiles'
   | 'farmTerrain'
+  | 'resources'
 >
 
 function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
@@ -54,6 +55,7 @@ function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
     roomTiles: [],
     stableTiles: [],
     farmTerrain: [],
+    resources: {},
     ...overrides,
   } as unknown as PlayerState
 }
@@ -87,6 +89,16 @@ describe('prerequisites: providesField card-provided fields', () => {
     })
     const card = { prerequisite: '1 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(false)
+  })
+
+  it('supports animal count clauses', () => {
+    const player = makePlayer({
+      resources: { sheep: 1 },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '1 Sheep' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Sheep' })).toBe(false)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'Exactly 1 Sheep' })).toBe(true)
   })
 })
 

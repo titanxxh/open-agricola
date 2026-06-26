@@ -123,8 +123,10 @@ export const applyHeatingPayment = (
   payload: HeatingPaymentPayload,
 ): HeatingPaymentResult => {
   const requestedWoodToFuel = Math.min(wholeNonNegative(payload.woodToFuel), player.resources.wood)
+  const preDiscountRequired = computeHeatingRequirement(state, player)
   const required = computeHeatingRequirement(state, player, { woodToFuel: requestedWoodToFuel })
-  const woodToFuel = Math.min(requestedWoodToFuel, required)
+  const minWoodToActivateDiscount = requestedWoodToFuel > 0 && required < preDiscountRequired ? 1 : 0
+  const woodToFuel = Math.min(requestedWoodToFuel, Math.max(required, minWoodToActivateDiscount))
   const storedFuelUsed = Math.min(
     Math.max(0, wholeNonNegative(payload.fuelUsed) - woodToFuel),
     Math.max(0, required - woodToFuel),

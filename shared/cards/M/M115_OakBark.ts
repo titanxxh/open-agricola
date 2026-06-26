@@ -29,7 +29,6 @@ const afterExchangeListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [afterExchangeListener],
-  prerequisiteCheck: (player) => player.improvements.length >= 2,
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),

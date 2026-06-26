@@ -7,6 +7,7 @@ import { fieldHasCrop } from '../../domain/field'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import { getActiveCardRegistry } from '../active-registry'
 import { readCardExtraData } from './card-state'
+import type { AnimalKey } from '../../contract/animals'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -63,6 +64,22 @@ const countBakingImprovements = (player: PlayerState) =>
 const countCookingImprovements = (player: PlayerState) =>
   collectCardsAs(player, 'major').filter(cardHasCookery).length
 
+const animalKeyFromText = (text: string): AnimalKey | null => {
+  switch (text.toLowerCase()) {
+    case 'sheep':
+      return 'sheep'
+    case 'boar':
+      return 'boar'
+    case 'cattle':
+      return 'cattle'
+    case 'horse':
+    case 'horses':
+      return 'horse'
+    default:
+      return null
+  }
+}
+
 const meetsNumericPrerequisite = (
   count: number,
   prerequisite?: { min?: number; max?: number },
@@ -95,6 +112,18 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
   const pastureMatch = trimmed.match(/^(\d+)\s+Pastures?$/i)
   if (pastureMatch) {
     return player.pastures.length >= Number(pastureMatch[1])
+  }
+
+  const animalMatch = trimmed.match(/^(\d+)\s+(Sheep|Boar|Cattle|Horses?)$/i)
+  if (animalMatch) {
+    const key = animalKeyFromText(animalMatch[2]!)
+    return key !== null && (player.resources[key] ?? 0) >= Number(animalMatch[1])
+  }
+
+  const exactAnimalMatch = trimmed.match(/^Exactly\s+(\d+)\s+(Sheep|Boar|Cattle|Horses?)$/i)
+  if (exactAnimalMatch) {
+    const key = animalKeyFromText(exactAnimalMatch[2]!)
+    return key !== null && (player.resources[key] ?? 0) === Number(exactAnimalMatch[1])
   }
 
   const majorImprovementsMatch = trimmed.match(/^(\d+)\s+Major Improvements?$/i)
