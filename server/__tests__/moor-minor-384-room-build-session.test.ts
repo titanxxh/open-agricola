@@ -307,6 +307,16 @@ describe('M061 Hay Wagon', () => {
 })
 
 describe('M091 Routine Work', () => {
+  it('requires no major or minor improvements', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+
+    expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(true)
+
+    player.minorPlayed = ['A1_Shelter']
+    expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(false)
+  })
+
   it('marks craft buildings used from resource.exchanged exchangeSource', () => {
     const session = setup()
     const state = session.state

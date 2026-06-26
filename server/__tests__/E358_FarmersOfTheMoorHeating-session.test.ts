@@ -483,10 +483,25 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(noWood.required).toBe(2)
     expect(noWood.sickWorkerIds).toEqual(['2'])
 
+    const oneFuelSession = prepareMoorHeatingSession()
+    const oneFuel = oneFuelSession.state.players[0]!
+    oneFuel.minorPlayed = ['M082_Firewood']
+    setRooms(oneFuel, 1)
+    oneFuel.resources.fuel = 0
+    oneFuel.resources.wood = 1
+
+    const oneWoodPayment = applyHeatingPayment(oneFuelSession.state, oneFuel, { fuelUsed: 1, woodToFuel: 1 })
+
+    expect(oneWoodPayment.required).toBe(0)
+    expect(oneWoodPayment.fuelUsed).toBe(1)
+    expect(oneWoodPayment.woodToFuel).toBe(1)
+    expect(oneFuel.resources.wood).toBe(0)
+
     const zeroNeedSession = prepareMoorHeatingSession()
     const zeroNeed = zeroNeedSession.state.players[0]!
     zeroNeed.minorPlayed = ['M082_Firewood']
     setRooms(zeroNeed, 1)
+    zeroNeed.houseType = 'stone'
     zeroNeed.resources.fuel = 0
     zeroNeed.resources.wood = 1
 
