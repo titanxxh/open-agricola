@@ -123,6 +123,26 @@ const buyMajor = (session: GameSession, cardId: string) => {
   return resp
 }
 
+const resetMajorActionForPlayer0 = (session: GameSession) => {
+  const state = session.getState().state
+  const player = state.players[0]!
+  state.currentPlayerIndex = 0
+  for (const space of state.actionSpaces) {
+    space.takenBy = space.takenBy.filter((worker) => worker.playerId !== player.id)
+  }
+  setWorkersAtHome(state, player, 4)
+  session.loadState(state)
+}
+
+const chooseFirstPayment = (session: GameSession, resp: ReturnType<GameSession['takeAction']>) => {
+  if (resp.interaction.stateId !== 'wait' || resp.interaction.promptKey !== 'prompt.selectPayment') return resp
+  const option = resp.interaction.options?.[0]
+  expect(option).toBeDefined()
+  const next = session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
+  expect(next.ok).toBe(true)
+  return next
+}
+
 const prepareAnytimeExchangeSession = (
   cardId: string,
   resources: Partial<typeof sessionResourceShape>,
@@ -462,6 +482,70 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const noWood = applyHeatingPayment(withoutWoodSession.state, withoutWood, { fuelUsed: 1, woodToFuel: 0 })
     expect(noWood.required).toBe(2)
     expect(noWood.sickWorkerIds).toEqual(['2'])
+
+    const zeroNeedSession = prepareMoorHeatingSession()
+    const zeroNeed = zeroNeedSession.state.players[0]!
+    zeroNeed.minorPlayed = ['M082_Firewood']
+    setRooms(zeroNeed, 1)
+    zeroNeed.resources.fuel = 0
+    zeroNeed.resources.wood = 1
+
+    const noPayment = applyHeatingPayment(zeroNeedSession.state, zeroNeed, { fuelUsed: 1, woodToFuel: 1 })
+
+    expect(noPayment.required).toBe(0)
+    expect(noPayment.fuelUsed).toBe(0)
+    expect(noPayment.woodToFuel).toBe(0)
+    expect(zeroNeed.resources.wood).toBe(1)
+    expect(zeroNeed.resources.fuel).toBe(0)
+  })
+
+  it('buys Oven Installation by returning Heating Oven to its Farmers of the Moor stack', () => {
+    const session = new GameSession(38285, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    prepareHands(session)
+    const player = session.state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 10,
+      clay: 10,
+      reed: 10,
+      stone: 10,
+      food: 0,
+      fuel: 0,
+    }
+    setWorkersAtHome(session.state, player, 4)
+    session.state.currentPlayerIndex = 0
+    session.state.round = 1
+
+    buyMajor(session, 'Major_ClayOven')
+    resetMajorActionForPlayer0(session)
+    buyMajor(session, 'Major_Moor_HeatingOven')
+    expect(session.state.players[0]!.improvements).toContain('Major_Moor_HeatingOven')
+
+    session.state.players[0]!.minorHand = ['M085_OvenInstallation']
+    resetMajorActionForPlayer0(session)
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const m085Option = resp.interaction.options?.find((option) => option.value === 'minor:M085_OvenInstallation')
+    expect(m085Option).toBeDefined()
+
+    resp = session.resolveChoice(0, m085Option!.value)
+    expect(resp.ok).toBe(true)
+    resp = chooseFirstPayment(session, resp)
+
+    const after = resp.state.players[0]!
+    const heatingStack = resp.state.majorImprovementSupply?.find((stack) => stack.stackId === 'moor-clay-oven')
+    expect(after.minorPlayed).toContain('M085_OvenInstallation')
+    expect(after.improvements).not.toContain('Major_Moor_HeatingOven')
+    expect(resp.state.availableMajorImprovements).toContain('Major_Moor_HeatingOven')
+    expect(heatingStack?.visibleId).toBe('Major_Moor_HeatingOven')
+    expect(heatingStack?.cardIds).toEqual(['Major_Moor_HeatingOven'])
+    expect(computeHeatingRequirement(resp.state, after)).toBe(0)
   })
 
   it('lets Peat Hut replace a Renovation action with removing the card and building one free wooden room', () => {
