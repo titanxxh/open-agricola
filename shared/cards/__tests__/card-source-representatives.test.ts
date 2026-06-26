@@ -8,6 +8,7 @@ import { setWorkersAtHome } from '../../domain/player'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal'
 import { runCardEffectHook } from '../card-effects'
 import { getCardDefinition } from '../catalog'
+import { implementedMinorImprovementCardsList, minorImprovementCardsList } from '../catalog.generated'
 import { confirmPlayerSwitch } from '../../../server/__tests__/_helpers/pending-confirms'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -140,5 +141,82 @@ describe('Card Source representative migrations', () => {
         resources: { food: 1 },
       },
     ])
+  })
+
+  it('projects Farmers of the Moor major cards from split source files', () => {
+    const entries = manifest()
+
+    expect(Object.fromEntries([
+      'Major_Moor_HorseSlaughterhouse1',
+      'Major_Moor_HorseSlaughterhouse2',
+      'Major_Moor_Cookhouse1',
+      'Major_Moor_Cookhouse2',
+      'Major_Moor_PeatCharcoalKiln',
+      'Major_Moor_ForestersLodge',
+      'Major_Moor_RidingStables',
+      'Major_Moor_MuseumOfTheMoors',
+      'Major_Moor_HeatingOven',
+      'Major_Moor_TiledOven',
+      'Major_Moor_VillageChurch',
+      'Major_Moor_FurnitureStall',
+      'Major_Moor_CeramicsStall',
+      'Major_Moor_BasketStall',
+    ].map((id) => [id, entries[id]?.module]))).toEqual({
+      Major_Moor_HorseSlaughterhouse1: 'shared/cards/major/moor-horse-slaughterhouse',
+      Major_Moor_HorseSlaughterhouse2: 'shared/cards/major/moor-horse-slaughterhouse',
+      Major_Moor_Cookhouse1: 'shared/cards/major/moor-cookhouse',
+      Major_Moor_Cookhouse2: 'shared/cards/major/moor-cookhouse',
+      Major_Moor_PeatCharcoalKiln: 'shared/cards/major/moor-peat-charcoal-kiln',
+      Major_Moor_ForestersLodge: 'shared/cards/major/moor-foresters-lodge',
+      Major_Moor_RidingStables: 'shared/cards/major/moor-riding-stables',
+      Major_Moor_MuseumOfTheMoors: 'shared/cards/major/moor-museum-of-the-moors',
+      Major_Moor_HeatingOven: 'shared/cards/major/moor-heating-oven',
+      Major_Moor_TiledOven: 'shared/cards/major/moor-tiled-oven',
+      Major_Moor_VillageChurch: 'shared/cards/major/moor-village-church',
+      Major_Moor_FurnitureStall: 'shared/cards/major/moor-furniture-stall',
+      Major_Moor_CeramicsStall: 'shared/cards/major/moor-ceramics-stall',
+      Major_Moor_BasketStall: 'shared/cards/major/moor-basket-stall',
+    })
+  })
+
+  it('projects Farmers of the Moor minor cards as metadata-only definitions', () => {
+    const entries = manifest()
+    const moorMinors = Object.values(entries)
+      .filter((entry) => entry.meta.type === 'minor' && entry.meta.deck === 'M')
+      .sort((a, b) => a.meta.number - b.meta.number)
+
+    expect(moorMinors.map((entry) => entry.meta.number)).toEqual(
+      Array.from({ length: 117 }, (_, index) => index + 15),
+    )
+    expect(moorMinors.every((entry) => entry.meta.requiresFarmersOfTheMoor === true)).toBe(true)
+    expect(moorMinors.every((entry) => entry.meta.implemented === false)).toBe(true)
+    expect(moorMinors.every((entry) => entry.module.startsWith('shared/cards/M/'))).toBe(true)
+
+    expect(entries['M015_PeatBurnOff']?.meta).toMatchObject({
+      id: 'M015_PeatBurnOff',
+      name: 'Peat Burn-off',
+      category: 'FARM_PLANNER',
+      passing: true,
+      desc: [
+        'You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 moor for 1 field tile.',
+      ],
+    })
+    expect(entries['M032_PeatHut']?.meta).toMatchObject({
+      id: 'M032_PeatHut',
+      name: 'Peat Hut',
+      category: 'FARM_PLANNER',
+      cost: { fuel: 5, reed: 2 },
+      vp: 1,
+    })
+    expect(entries['M032_PeatHut']?.meta.passing).toBeUndefined()
+    expect(entries['M131_CattleStall']?.meta).toMatchObject({
+      id: 'M131_CattleStall',
+      name: 'Cattle Stall',
+      category: 'LIVESTOCK_PROVIDER',
+      cost: { wood: 2, clay: 2 },
+      vp: 1,
+    })
+    expect(minorImprovementCardsList.filter((card) => card.deck === 'M')).toHaveLength(117)
+    expect(implementedMinorImprovementCardsList.filter((card) => card.deck === 'M')).toHaveLength(0)
   })
 })
