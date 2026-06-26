@@ -736,7 +736,6 @@ export const zh = {
     selection: { name: '选择', description: '从手牌或农场中选择位置或卡牌' },
     'set-first-player': { name: '设为先手', description: '将该玩家设为新的先手玩家' },
     'moor-special-action-choice': { name: '沼泽特殊行动选择', description: '选择并执行沼泽特殊行动后续效果' },
-    'moor-special-action-apply': { name: '沼泽特殊行动', description: '执行沼泽特殊行动' },
     'build-farmhand-room': {
       description: '建造帮工房',
           name: '建造帮工房',
