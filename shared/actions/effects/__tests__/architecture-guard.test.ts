@@ -68,6 +68,7 @@ describe('effects architecture guard', () => {
       'gain',
       'improvement',
       'moor-special-action-apply',
+      'moor-special-action-choice',
       'moor-wood-to-fuel',
       'move-farmer-to-space',
       'occupation',
