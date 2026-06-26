@@ -1,7 +1,6 @@
 import type { GameState, PlayerState, Worker } from '../contract/types'
 import type { CardDefinition } from '../contract/cards'
-import { getMajorCard } from '../cards/major'
-import { getRegisteredMinorImprovement } from '../cards/registry-display'
+import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
 import { workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
@@ -36,13 +35,17 @@ const wholeNumber = (value: unknown): number =>
 const sickSet = (player: PlayerState): Set<string> =>
   new Set(player.sickWorkerIds ?? [])
 
-const playedHeatingCards = (player: PlayerState): CardDefinition[] => [
-  ...player.improvements.map((cardId) => getMajorCard(cardId)),
-  ...player.minorPlayed.map((cardId) => getRegisteredMinorImprovement(cardId)),
-].filter((card): card is CardDefinition => card !== undefined)
-
 const cardStateHeatingRoomDiscount = (player: PlayerState, cardId: string): number =>
   wholeNumber(player.cardStates?.[cardId]?.extraData?.heatingRoomDiscount)
+
+const hasHeatingMetadata = (player: PlayerState, card: CardDefinition): boolean =>
+  card.heatingRoomDiscount !== undefined ||
+  card.heatingFuelCap !== undefined ||
+  card.heatingWoodToFuelDiscount !== undefined ||
+  cardStateHeatingRoomDiscount(player, card.id) !== 0
+
+const playedHeatingCards = (player: PlayerState): CardDefinition[] =>
+  getPlayedCardDefinitions(player).filter((card) => hasHeatingMetadata(player, card))
 
 export const computeHeatingRequirement = (
   state: GameState,
@@ -119,17 +122,18 @@ export const applyHeatingPayment = (
   player: PlayerState,
   payload: HeatingPaymentPayload,
 ): HeatingPaymentResult => {
-  const woodToFuel = Math.min(wholeNonNegative(payload.woodToFuel), player.resources.wood)
-  player.resources.wood -= woodToFuel
-  player.resources.fuel = (player.resources.fuel ?? 0) + woodToFuel
-  const required = computeHeatingRequirement(state, player, { woodToFuel })
-
-  const fuelUsed = Math.min(
-    wholeNonNegative(payload.fuelUsed),
-    required,
+  const requestedWoodToFuel = Math.min(wholeNonNegative(payload.woodToFuel), player.resources.wood)
+  const required = computeHeatingRequirement(state, player, { woodToFuel: requestedWoodToFuel })
+  const woodToFuel = Math.min(requestedWoodToFuel, required)
+  const storedFuelUsed = Math.min(
+    Math.max(0, wholeNonNegative(payload.fuelUsed) - woodToFuel),
+    Math.max(0, required - woodToFuel),
     player.resources.fuel ?? 0,
   )
-  player.resources.fuel = (player.resources.fuel ?? 0) - fuelUsed
+  const fuelUsed = woodToFuel + storedFuelUsed
+
+  player.resources.wood -= woodToFuel
+  player.resources.fuel = (player.resources.fuel ?? 0) - storedFuelUsed
 
   const deficit = Math.max(0, required - fuelUsed)
   const sick = sickSet(player)
