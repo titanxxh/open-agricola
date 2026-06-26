@@ -35,8 +35,8 @@ export const Major_Moor_RidingStables = defineMajorCard({
     extraVp: false,
     requiresFarmersOfTheMoor: true,
     desc: [
-      'Place 1 food on each remaining round space.',
-      'At the start of each round, gain that food if you have at least 2 horses.',
+      'Place 1 <FOOD> on each remaining round space.',
+      'At the start of each round, gain that <FOOD> if you have at least 2<HORSE>.',
     ],
   } satisfies CardSourceMetaInput,
   impl: cardImpl,
