@@ -10,6 +10,7 @@ import { M060_SowingMachine } from '../../shared/cards/M/M060_SowingMachine'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import type { FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
+import '../../shared/cards/B/B68_Beanfield'
 
 const FILLER = '__test_placeholder__'
 const FOREST_A = { row: 0, col: 0, kind: 'forest' as const }
@@ -238,9 +239,10 @@ describe('Moor complex special-action minors', () => {
   })
 
   it('M059 Nature\'s Fertilizer sows only the field created by Slash and Burn', () => {
-    const { session, player } = setup(['M059_NaturesFertilizer'])
+    const { session, player } = setup(['M059_NaturesFertilizer', 'B68_Beanfield'])
     player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.resources.grain = 1
+    player.resources.vegetable = 1
     session.loadState(session.state)
 
     const resp = takeSpecial(session, 'slash-and-burn', { row: FOREST_A.row, col: FOREST_A.col })
@@ -282,6 +284,52 @@ describe('Moor complex special-action minors', () => {
     const hidden = takeSpecial(noHorse.session, 'fell-trees', { row: FOREST_A.row, col: FOREST_A.col })
     expect(hidden.interaction.stateId === 'wait' ? hidden.interaction.sourceCard : undefined)
       .not.toBe('M060_SowingMachine')
+
+    const dropped = setup(['M060_SowingMachine'])
+    dropped.player.resources.food = 1
+    dropped.player.resources.horse = 1
+    dropped.player.resources.grain = 1
+    dropped.player.houseAnimalType = 'horse'
+    dropped.player.houseAnimalCount = 1
+    dropped.player.fields = [{ row: 0, col: 1, stacks: [] }]
+    dropped.session.loadState(dropped.state)
+    let horseMarket = takeSpecial(dropped.session, 'horse-market')
+    expect(horseMarket.interaction.stateId).toBe('wait')
+    if (horseMarket.interaction.stateId !== 'wait') throw new Error('expected horse reorg')
+    expect(horseMarket.interaction.request.kind).toBe('animal-reorg')
+    horseMarket = dropped.session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
+    })
+    expect(horseMarket.state.players[0]!.resources.horse).toBe(1)
+    expect(horseMarket.interaction.stateId === 'wait' ? horseMarket.interaction.sourceCard : undefined)
+      .not.toBe('M060_SowingMachine')
+
+    const retained = setup(['M060_SowingMachine'])
+    retained.player.resources.food = 1
+    retained.player.resources.horse = 1
+    retained.player.resources.grain = 1
+    retained.player.fields = [{ row: 0, col: 1, stacks: [] }]
+    retained.player.pastures = [{
+      id: 'horse-pasture',
+      size: 2,
+      tiles: [{ row: 1, col: 3 }, { row: 1, col: 4 }],
+      stables: 0,
+      animalType: 'horse',
+      animalCount: 1,
+    }]
+    retained.session.loadState(retained.state)
+    horseMarket = takeSpecial(retained.session, 'horse-market')
+    expect(horseMarket.interaction.stateId).toBe('wait')
+    if (horseMarket.interaction.stateId !== 'wait') throw new Error('expected horse reorg')
+    horseMarket = retained.session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'horse-pasture', zoneType: 'pasture', animalType: 'horse', animalCount: 2 }],
+    })
+    expect(horseMarket.state.players[0]!.resources.horse).toBe(2)
+    expect(horseMarket.interaction.stateId === 'wait' ? horseMarket.interaction.sourceCard : undefined)
+      .toBe('M060_SowingMachine')
+    horseMarket = acceptOptional(retained.session, horseMarket)
+    horseMarket = sowFirstField(retained.session, horseMarket)
+    expect(horseMarket.state.players[0]!.resources.grain).toBe(0)
   })
 
   it('M109 Malthouse optionally pays exactly 1 grain for 4 food after Cut Peat', () => {

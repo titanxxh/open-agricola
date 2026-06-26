@@ -6,6 +6,7 @@ import { parsePositionKey, positionKey } from '../../domain/farm'
 import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { majorImprovementCount } from './moor-batch1-helpers'
+import { writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'M059_NaturesFertilizer'
 
@@ -35,13 +36,12 @@ const terrainSelectionFields = (context: CardListenerContext): FarmTilePosition[
 
 const sowFlow = (context: CardListenerContext, fields: FarmTilePosition[]) => {
   if (fields.length === 0) return
-  const allowed = new Set(fields.map(positionKey))
+  writeCardExtraData(context.player, CARD_ID, 'selectedPositions', fields.map(positionKey))
   const actionContext = {
     minSelections: 1,
     maxSelections: fields.length,
-    excludedFields: context.player.fields
-      .filter((field) => !allowed.has(positionKey(field)))
-      .map(({ row, col }) => ({ row, col })),
+    allowedFields: 'fromSelectedFields',
+    sourceCard: CARD_ID,
   }
   const farm = buildSowFarmInteraction(context.player, actionContext)
   if (farm.farmType !== 'sow' || farm.selectableFields.length === 0) return
