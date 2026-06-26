@@ -57,6 +57,17 @@ export const hasCraftBuilding = (player: PlayerState) =>
 export const craftBuildingCount = (player: PlayerState) =>
   CRAFT_REWARDS.filter((reward) => reward.ids.some((id) => player.improvements.includes(id))).length
 
+export const craftBuildingResource = (cardId: string) =>
+  CRAFT_REWARDS.find((reward) => reward.ids.includes(cardId))?.resource
+
+export const isCraftBuilding = (cardId: string) =>
+  craftBuildingResource(cardId) !== undefined
+
+export const playerCraftBuildingIds = (player: PlayerState) =>
+  CRAFT_REWARDS.flatMap((reward) =>
+    reward.ids.filter((id) => player.improvements.includes(id)),
+  )
+
 export const initUsageCounters = (player: PlayerState, cardId: string, amount: number) => {
   const counters = initCardState(player, cardId)
   counters.usage = amount
