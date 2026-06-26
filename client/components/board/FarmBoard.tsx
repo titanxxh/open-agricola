@@ -1046,6 +1046,8 @@ export const FarmBoard = ({
                   <div className={`${roomSpriteClass(displayPlayer.houseType)} ${roomLayoutClass(displayPlayer.color, tileRow, tileCol)}`} />
                 ) : isField ? (
                   <div className="meeple-field" />
+                ) : terrain ? (
+                  <div className={`farm-terrain-sprite farm-terrain-sprite-${terrain.kind}`} />
                 ) : (
                   <div className={`empty-node ${emptySlotClass(tileRow, tileCol)}`} />
                 )}

@@ -10,12 +10,14 @@ const cards: MoorSpecialActionCardState[] = [
     id: 'moor-special-cut-peat',
     players: [2, 3, 4, 5, 6],
     actions: ['cut-peat'],
+    image: '/assets/moor/special-action-card/moor-special-cut-peat.webp',
     location: { kind: 'market' },
   },
   {
     id: 'moor-special-hiring-fair',
     players: [2, 3, 4, 5, 6],
     actions: ['hiring-fair'],
+    image: '/assets/moor/special-action-card/moor-special-hiring-fair.webp',
     location: { kind: 'playerFaceUp', playerId: 'p2' },
   },
 ]
@@ -38,6 +40,10 @@ describe('SpecialActionsPanel', () => {
 
     expect(screen.getByText('Cut Peat')).toBeTruthy()
     expect(screen.getByText('Hiring Fair')).toBeTruthy()
+    expect(screen.getByAltText('Cut Peat')).toHaveAttribute(
+      'src',
+      '/assets/moor/special-action-card/moor-special-cut-peat.webp',
+    )
     fireEvent.click(screen.getByRole('button', { name: /Hiring Fair/ }))
 
     expect(onTake).toHaveBeenCalledWith('moor-special-hiring-fair', 'hiring-fair')

@@ -17,22 +17,25 @@ const confirmNext = (session: GameSession) => {
 }
 
 describe('Farmers of the Moor special actions', () => {
-  it('sets up public special action cards for the first implemented actions', () => {
+  it('sets up public special action cards for the two-player scanned cards', () => {
     const session = new GameSession(41, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
 
-    expect(session.state.farmersOfTheMoor?.specialActionCards).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ actions: ['cut-peat'], location: { kind: 'market' } }),
-        expect.objectContaining({ actions: ['fell-trees'], location: { kind: 'market' } }),
-        expect.objectContaining({ actions: ['slash-and-burn'], location: { kind: 'market' } }),
-        expect.objectContaining({ actions: ['hiring-fair'], location: { kind: 'market' } }),
-        expect.objectContaining({ actions: ['horse-market'], location: { kind: 'market' } }),
-      ]),
-    )
+    expect(session.state.farmersOfTheMoor?.specialActionCards).toEqual([
+      expect.objectContaining({
+        id: 'moor-special-1-2-terrain',
+        actions: ['fell-trees', 'slash-and-burn', 'cut-peat'],
+        location: { kind: 'market' },
+      }),
+      expect.objectContaining({
+        id: 'moor-special-1-2-market-work',
+        actions: ['horse-market', 'hiring-fair', 'black-market', 'illicit-work'],
+        location: { kind: 'market' },
+      }),
+    ])
   })
 
   it('takes Cut Peat without placing a worker and moves the public card face-up', () => {
@@ -173,6 +176,73 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.state.players[0]!.resources.horse).toBe(0)
+  })
+
+  it('Black Market pays 1 fuel and opens a minor improvement purchase', () => {
+    const session = new GameSession(41, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const player = session.state.players[0]!
+    player.resources.fuel = 1
+    player.resources.food = 0
+    player.resources.wood = 1
+    player.minorHand = ['E60_WorkingGloves', 'A37_Bucksaw']
+    session.state.players[1]!.minorHand = ['__test_placeholder__']
+    const card = findCardFor(session, 'black-market')
+
+    let resp = session.takeSpecialAction(0, card.id, 'black-market')
+
+    expect(resp.ok).toBe(true)
+    expect(player.resources.fuel).toBe(0)
+    expect(card.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('choice')
+    const option = resp.interaction.options?.find((entry) => entry.value === 'E60_WorkingGloves')
+    expect(option).toBeDefined()
+
+    resp = session.resolveChoice(0, option!.value)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorHand).not.toContain('E60_WorkingGloves')
+    expect(resp.state.players[0]!.minorPlayed).toContain('E60_WorkingGloves')
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+  })
+
+  it('Illicit Work pays 1 food and 1 fuel and opens a major improvement purchase', () => {
+    const session = new GameSession(41, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const player = session.state.players[0]!
+    player.resources.food = 1
+    player.resources.fuel = 1
+    player.resources.clay = 5
+    player.minorHand = ['__test_placeholder__']
+    session.state.players[1]!.minorHand = ['__test_placeholder__']
+    const card = findCardFor(session, 'illicit-work')
+
+    let resp = session.takeSpecialAction(0, card.id, 'illicit-work')
+
+    expect(resp.ok).toBe(true)
+    expect(player.resources.food).toBe(0)
+    expect(player.resources.fuel).toBe(0)
+    expect(card.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('choice')
+    const option = resp.interaction.options?.find((entry) => entry.value === 'major:Major_Fireplace1')
+    expect(option).toBeDefined()
+
+    resp = session.resolveChoice(0, option!.value)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.clay).toBe(3)
+    expect(resp.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(resp.state.availableMajorImprovements).not.toContain('Major_Fireplace1')
   })
 
   it('requires an unplaced healthy worker and returns special action cards home at return-home', () => {

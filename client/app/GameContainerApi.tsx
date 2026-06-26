@@ -674,14 +674,20 @@ export const GameContainerApi = () => {
     })
   }, [state, transport, isInteractive, interaction])
 
-  const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState) => {
+  const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId !== 'idle') return false
     if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
-    if (card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id) {
-      return currentPlayer.resources.food >= 2
-    }
-    return true
+    const borrowFood = card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id ? 2 : 0
+    const actionFood =
+      actionId === 'horse-market' && [2, 5, 6].includes(state.players.length) ? 1
+        : actionId === 'illicit-work' ? 1
+          : 0
+    const actionFuel = actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+    return (
+      currentPlayer.resources.food >= borrowFood + actionFood &&
+      (currentPlayer.resources.fuel ?? 0) >= actionFuel
+    )
   }, [currentPlayer, interaction.stateId, isInteractive, state])
 
   const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {

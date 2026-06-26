@@ -1,6 +1,7 @@
-import type { FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
 import { getMajorCard } from '../cards/major'
 import { positionKey } from '../domain/farm'
+import { improvementAction } from '../actions/effects/improvement'
 import { replaceTerrainWithField } from './farm-terrain'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
 
@@ -57,6 +58,21 @@ const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boo
 const horseMarketFoodCost = (state: GameState): number =>
   [2, 5, 6].includes(state.players.length) ? 1 : 0
 
+const improvementFlow = (types: readonly ('major' | 'minor')[]): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'improvement',
+  actionContext: { types: [...types] },
+})
+
+const canExecuteImprovementFlow = (
+  state: GameState,
+  player: PlayerState,
+  types: readonly ('major' | 'minor')[],
+): boolean =>
+  improvementAction.canBeExecutedByPlayer(state, player, {
+    actionContext: { types: [...types] },
+  })
+
 const applyMoorSpecialActionBonuses = (
   state: GameState,
   player: PlayerState,
@@ -94,9 +110,15 @@ export const validateMoorSpecialAction = (
   }
   const requiredFood =
     (card.location.kind === 'playerFaceUp' ? 2 : 0) +
-    (actionId === 'horse-market' ? horseMarketFoodCost(state) : 0)
+    (actionId === 'horse-market' ? horseMarketFoodCost(state) : 0) +
+    (actionId === 'illicit-work' ? 1 : 0)
   if (player.resources.food < requiredFood) {
     return { ok: false, error: 'not enough food' }
+  }
+  const requiredFuel =
+    actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+  if ((player.resources.fuel ?? 0) < requiredFuel) {
+    return { ok: false, error: 'not enough fuel' }
   }
 
   switch (actionId) {
@@ -118,6 +140,16 @@ export const validateMoorSpecialAction = (
       break
     case 'horse-market':
       break
+    case 'black-market':
+      if (!canExecuteImprovementFlow(state, player, ['minor'])) {
+        return { ok: false, error: 'special action unavailable' }
+      }
+      break
+    case 'illicit-work':
+      if (!canExecuteImprovementFlow(state, player, ['major'])) {
+        return { ok: false, error: 'special action unavailable' }
+      }
+      break
     default:
       return { ok: false, error: 'special action unavailable' }
   }
@@ -130,11 +162,12 @@ export const applyMoorSpecialAction = (
   cardId: string,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
-): { ok: true } | { ok: false; error: string } => {
+): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
   const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!validation.ok) return validation
   const player = state.players[playerIndex]!
   const card = state.farmersOfTheMoor!.specialActionCards.find((candidate) => candidate.id === cardId)!
+  let followUpFlow: ActionFlow | undefined
 
   switch (actionId) {
     case 'cut-peat':
@@ -160,6 +193,15 @@ export const applyMoorSpecialAction = (
       player.resources.food -= horseMarketFoodCost(state)
       player.resources.horse = (player.resources.horse ?? 0) + 1
       break
+    case 'black-market':
+      player.resources.fuel = (player.resources.fuel ?? 0) - 1
+      followUpFlow = improvementFlow(['minor'])
+      break
+    case 'illicit-work':
+      player.resources.food -= 1
+      player.resources.fuel = (player.resources.fuel ?? 0) - 1
+      followUpFlow = improvementFlow(['major'])
+      break
     default:
       return { ok: false, error: 'special action unavailable' }
   }
@@ -170,7 +212,7 @@ export const applyMoorSpecialAction = (
     player.resources.food -= 2
     card.location = { kind: 'playerFaceDown', playerId: player.id }
   }
-  return { ok: true }
+  return followUpFlow ? { ok: true, followUpFlow } : { ok: true }
 }
 
 export const resetMoorSpecialActionCards = (state: GameState): void => {
