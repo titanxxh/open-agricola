@@ -898,8 +898,11 @@ import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
 import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
 import { M032_PeatHut } from './M/M032_PeatHut'
+import { M036_PeatMoss } from './M/M036_PeatMoss'
+import { M037_BuildingPlan } from './M/M037_BuildingPlan'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
+import { M061_HayWagon } from './M/M061_HayWagon'
 import { M062_HearthBrush } from './M/M062_HearthBrush'
 import { M063_PastoralLetter } from './M/M063_PastoralLetter'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
@@ -924,6 +927,7 @@ import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M088_PeatIron } from './M/M088_PeatIron'
 import { M089_BirthingHouse } from './M/M089_BirthingHouse'
 import { M090_WinterStorehouse } from './M/M090_WinterStorehouse'
+import { M091_RoutineWork } from './M/M091_RoutineWork'
 import { M094_PeatBath } from './M/M094_PeatBath'
 import { M097_VillageHall } from './M/M097_VillageHall'
 import { M098_FishSmokehouse } from './M/M098_FishSmokehouse'
@@ -1869,8 +1873,11 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M029_Tinker': M029_Tinker.impl,
   'M030_FarmAnimalMarket': M030_FarmAnimalMarket.impl,
   'M032_PeatHut': M032_PeatHut.impl,
+  'M036_PeatMoss': M036_PeatMoss.impl,
+  'M037_BuildingPlan': M037_BuildingPlan.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
+  'M061_HayWagon': M061_HayWagon.impl,
   'M062_HearthBrush': M062_HearthBrush.impl,
   'M063_PastoralLetter': M063_PastoralLetter.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
@@ -1895,6 +1902,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M088_PeatIron': M088_PeatIron.impl,
   'M089_BirthingHouse': M089_BirthingHouse.impl,
   'M090_WinterStorehouse': M090_WinterStorehouse.impl,
+  'M091_RoutineWork': M091_RoutineWork.impl,
   'M094_PeatBath': M094_PeatBath.impl,
   'M097_VillageHall': M097_VillageHall.impl,
   'M098_FishSmokehouse': M098_FishSmokehouse.impl,
