@@ -154,6 +154,17 @@ export const validateMoorSpecialAction = (
     return { ok: false, error: 'not enough fuel' }
   }
 
+  return validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+}
+
+export const validateMoorSpecialActionEffect = (
+  state: GameState,
+  playerIndex: number,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload = {},
+): { ok: true } | { ok: false; error: string } => {
+  const player = state.players[playerIndex]
+  if (!player || !state.farmersOfTheMoor) return { ok: false, error: 'farmers of the moor unavailable' }
   switch (actionId) {
     case 'cut-peat':
       if (!hasTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
@@ -189,17 +200,13 @@ export const validateMoorSpecialAction = (
   return { ok: true }
 }
 
-export const applyMoorSpecialAction = (
+const executeMoorSpecialActionEffect = (
   state: GameState,
   playerIndex: number,
-  cardId: string,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
 ): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
-  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
-  if (!validation.ok) return validation
   const player = state.players[playerIndex]!
-  const card = state.farmersOfTheMoor!.specialActionCards.find((candidate) => candidate.id === cardId)!
   let followUpFlow: ActionFlow | undefined
 
   switch (actionId) {
@@ -239,13 +246,41 @@ export const applyMoorSpecialAction = (
       return { ok: false, error: 'special action unavailable' }
   }
 
+  return followUpFlow ? { ok: true, followUpFlow } : { ok: true }
+}
+
+export const applyMoorSpecialActionEffect = (
+  state: GameState,
+  playerIndex: number,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload = {},
+): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
+  const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  if (!validation.ok) return validation
+  return executeMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+}
+
+export const applyMoorSpecialAction = (
+  state: GameState,
+  playerIndex: number,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload = {},
+): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
+  const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
+  if (!validation.ok) return validation
+  const player = state.players[playerIndex]!
+  const card = state.farmersOfTheMoor!.specialActionCards.find((candidate) => candidate.id === cardId)!
+  const result = executeMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  if (!result.ok) return result
+
   if (card.location.kind === 'market') {
     card.location = { kind: 'playerFaceUp', playerId: player.id }
   } else {
     player.resources.food -= 2
     card.location = { kind: 'playerFaceDown', playerId: player.id }
   }
-  return followUpFlow ? { ok: true, followUpFlow } : { ok: true }
+  return result
 }
 
 export const resetMoorSpecialActionCards = (state: GameState): void => {
