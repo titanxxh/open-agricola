@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EngineStack } from '../../engine'
 import { rehydrateState, serializeState, serializeStateForPlayer } from '../serialization'
-import { createInitialState } from '../state-bootstrap'
+import { createInitialState, getImplementedFarmersOfTheMoorMinorIds } from '../state-bootstrap'
 
 const countTerrain = (
   terrain: NonNullable<ReturnType<typeof createInitialState>['players'][number]['farmTerrain']>,
@@ -112,6 +112,20 @@ describe('Farmers of the Moor setup', () => {
       expect(player.minorHand.filter((id) => id.startsWith('M'))).toHaveLength(4)
       expect(player.minorHand.filter((id) => !id.startsWith('M'))).toHaveLength(3)
     }
+  })
+
+  it('derives the Farmers of the Moor minor deal pool from all implemented FoM minors', () => {
+    const pool = getImplementedFarmersOfTheMoorMinorIds(2)
+
+    expect(pool.length).toBeGreaterThan(80)
+    expect(pool).toEqual(expect.arrayContaining([
+      'M018_RegisterOfCraftsmen',
+      'M032_PeatHut',
+      'M044_Swamp',
+      'M055_ToolShed',
+      'M082_Firewood',
+      'M106_HorseButchery',
+    ]))
   })
 
   it('keeps the incomplete-pool option compatible while the pool is sufficient', () => {

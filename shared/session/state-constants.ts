@@ -18,12 +18,13 @@ import { createRng, shuffleWithRng } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 import {
   emptyResources,
+  extendedResourceKeyList,
   resourceKeyList,
   harvestRounds,
   createRoundOpenById,
 } from '../contract/state-constants'
 
-export { emptyResources, resourceKeyList, harvestRounds, createRoundOpenById }
+export { emptyResources, extendedResourceKeyList, resourceKeyList, harvestRounds, createRoundOpenById }
 
 const ownFenceSource = (ownerPlayerId: string): FenceSegmentSource => ({
   kind: 'own',

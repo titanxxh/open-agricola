@@ -72,6 +72,7 @@ import {
   createRoundOpenById,
   cloneState,
   emptyResources,
+  extendedResourceKeyList,
   harvestRounds,
   type InitialStateOptions,
   normalizeState,
@@ -110,7 +111,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
-import { positionKey } from '../domain/farm.ts'
+import { getUsedFarmyardTileKeys, positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
@@ -384,6 +385,7 @@ type StageResumeState = {
   extra?: {
     trigger?: import('../actions/effects/reorganize').ReorganizeTrigger
     originPlayerIndex?: number | null
+    triggerActionId?: string | null
   }
 }
 
@@ -633,7 +635,11 @@ export class GameCore {
   /** @internal phase access — animal-reorg pivot detection used by Harvest/Round. */
   hasPendingAnimalsCheck(player: PlayerState): boolean { return this.hasPendingAnimals(player) }
   /** @internal phase access — start a reorganize sub-flow frame. */
-  startReorgSubFlow(playerIndex: number, trigger: ReorganizeTrigger, options?: { originPlayerIndex?: number }): void {
+  startReorgSubFlow(
+    playerIndex: number,
+    trigger: ReorganizeTrigger,
+    options?: { originPlayerIndex?: number; triggerActionId?: string | null },
+  ): void {
     this.startReorganizeSubFlow(playerIndex, trigger, options)
   }
   /** @internal phase access — synthetic pending id generator. */
@@ -692,7 +698,9 @@ export class GameCore {
   /** @internal Round phase — `state.round` after-harvest finalization. */
   invokeFinalizeRound(): void { this.finalizeRound() }
   /** @internal Round phase — onEndTurn stage hook trampoline. */
-  invokeEndTurnHooks(playerIndex: number): SessionResponse { return this.continueEndTurnHooks(playerIndex) }
+  invokeEndTurnHooks(playerIndex: number, triggerActionId?: string | null): SessionResponse {
+    return this.continueEndTurnHooks(playerIndex, 0, triggerActionId)
+  }
   /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
   isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
   /** @internal Harvest phase — find next player still owing a harvest-breed reorg. */
@@ -1047,7 +1055,7 @@ export class GameCore {
   private startReorganizeSubFlow(
     playerIndex: number,
     trigger: import('../actions/effects/reorganize').ReorganizeTrigger,
-    resumeExtra: { originPlayerIndex?: number | null } = {},
+    resumeExtra: { originPlayerIndex?: number | null; triggerActionId?: string | null } = {},
   ): void {
     const player = this.state.players[playerIndex]
     if (!player) return
@@ -1065,7 +1073,11 @@ export class GameCore {
         hook: 'onReorganizeComplete',
         playerIndex,
         cardIndex: 0,
-        extra: { trigger, originPlayerIndex: resumeExtra.originPlayerIndex ?? null },
+        extra: {
+          trigger,
+          originPlayerIndex: resumeExtra.originPlayerIndex ?? null,
+          triggerActionId: resumeExtra.triggerActionId ?? null,
+        },
       },
       deferredPlayerSwitch: null,
       reason: 'reorganize',
@@ -2452,7 +2464,7 @@ export class GameCore {
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
       const receiveResources: Partial<Resource> = {}
       if (this.futureMeepleResourceConditionMet(entry)) {
-        for (const key of resourceKeyList) {
+        for (const key of extendedResourceKeyList) {
           const amount = entry.resources[key] ?? 0
           if (amount > 0) receiveResources[key] = amount
         }
@@ -2563,6 +2575,7 @@ export class GameCore {
     playerIndex: number,
     nextCardIndex: number,
     resumePlayerIndex = playerIndex,
+    extra?: StageResumeState['extra'],
   ) {
     const stageSwitchFromPlayerIndex = this.pendingStageSwitchFromPlayerIndex
     this.pendingStageSwitchFromPlayerIndex = null
@@ -2574,7 +2587,7 @@ export class GameCore {
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
-      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex },
+      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex, ...(extra ? { extra } : {}) },
       deferredPlayerSwitch,
       reason: 'stage-hook',
     })
@@ -2773,6 +2786,7 @@ export class GameCore {
     hook: StageCardEffectHook,
     playerIndex: number,
     cardIndex = 0,
+    extra?: StageResumeState['extra'],
   ) {
     const player = this.state.players[playerIndex]
     if (!player) return false
@@ -2780,9 +2794,11 @@ export class GameCore {
     for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
       const cardId = cards[currentCardIndex]
       if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook)
+      const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
+        triggerActionId: extra?.triggerActionId ?? undefined,
+      })
       if (!flow) continue
-      this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
+      this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1, playerIndex, extra)
       return true
     }
     return false
@@ -2793,8 +2809,17 @@ export class GameCore {
     return roundPhase.finishCompletedActionTurn(this, playerIndex)
   }
 
-  private continueEndTurnHooks(playerIndex: number, cardIndex = 0): SessionResponse {
-    if (this.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex)) {
+  private endTurnTriggerActionId(frame: EngineFrame): string | null {
+    return frame.source.kind === 'action' ? 'place-farmer' : null
+  }
+
+  private continueEndTurnHooks(
+    playerIndex: number,
+    cardIndex = 0,
+    triggerActionId?: string | null,
+  ): SessionResponse {
+    const extra = triggerActionId ? { triggerActionId } : undefined
+    if (this.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
     return this.finishCompletedActionTurn(playerIndex)
@@ -3219,8 +3244,9 @@ export class GameCore {
   private continueAfterReorganize_roundEnd(
     playerIndex: number,
     originPlayerIndex: number | null,
+    triggerActionId?: string | null,
   ): void {
-    return roundPhase.continueAfterReorganizeRoundEnd(this, playerIndex, originPlayerIndex)
+    return roundPhase.continueAfterReorganizeRoundEnd(this, playerIndex, originPlayerIndex, triggerActionId)
   }
 
   private resumeStageFlow(stageResume: StageResumeState) {
@@ -3256,7 +3282,11 @@ export class GameCore {
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onEndTurn':
-        this.continueEndTurnHooks(stageResume.playerIndex, stageResume.cardIndex)
+        this.continueEndTurnHooks(
+          stageResume.playerIndex,
+          stageResume.cardIndex,
+          stageResume.extra?.triggerActionId ?? null,
+        )
         return
       case 'onBeforeReturnHome':
         this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
@@ -3332,6 +3362,7 @@ export class GameCore {
         return this.continueAfterReorganize_roundEnd(
           stageResume.playerIndex,
           stageResume.extra?.originPlayerIndex ?? null,
+          stageResume.extra?.triggerActionId ?? null,
         )
       }
       // 'anytime': the reorganize frame has already been popped in
@@ -3346,6 +3377,7 @@ export class GameCore {
       return this.continueAfterReorganize_roundEnd(
         stageResume.playerIndex,
         stageResume.extra?.originPlayerIndex ?? null,
+        stageResume.extra?.triggerActionId ?? null,
       )
     }
     // Fall-through: delegate to the stage flow resolver for hooks
@@ -3483,14 +3515,18 @@ export class GameCore {
         if (this.hasPendingAnimals(frameOwnerPlayer)) {
           const originIdx = this.turnOwnerPlayerIndex ?? ownerIdx
           this.engineStack.pop()
-          this.startReorganizeSubFlow(ownerIdx, 'anytime', { originPlayerIndex: originIdx })
+          this.startReorganizeSubFlow(ownerIdx, 'anytime', {
+            originPlayerIndex: originIdx,
+            triggerActionId: this.endTurnTriggerActionId(frame),
+          })
           return
         }
         if (this.turnOwnerPlayerIndex !== null) {
           const ownerIndexLocal = this.turnOwnerPlayerIndex
+          const triggerActionId = this.endTurnTriggerActionId(frame)
           this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
-          this.continueEndTurnHooks(ownerIndexLocal)
+          this.continueEndTurnHooks(ownerIndexLocal, 0, triggerActionId)
           return
         }
         this.finalizeActionLog(frameOwnerPlayer)
@@ -4886,8 +4922,14 @@ export class GameCore {
       ? selectionInteraction.selectablePositions
       : []
     const selectableKeys = new Set(selectablePositions.map(positionKey))
+    const usedFarmyardTiles = interactionContext?.terrainMode === 'place'
+      ? getUsedFarmyardTileKeys(player)
+      : null
     for (const pos of positions) {
       if (!selectableKeys.has(positionKey(pos))) {
+        return this.respond(false, 'invalid selection position')
+      }
+      if (usedFarmyardTiles?.has(positionKey(pos))) {
         return this.respond(false, 'invalid selection position')
       }
     }

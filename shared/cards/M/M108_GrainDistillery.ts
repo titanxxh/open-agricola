@@ -1,4 +1,5 @@
 import { defineMinorCard } from '../card-source'
+import type { BonusScoreLevel } from '../card-effects'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M108_GrainDistillery'
@@ -6,8 +7,17 @@ const CARD_ID = 'M108_GrainDistillery'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) =>
-      Math.min(player.resources.fuel ?? 0, player.resources.grain ?? 0),
+    computeCostedBonus: (_state, player) => {
+      const maxPairs = Math.min(player.resources.fuel ?? 0, player.resources.grain ?? 0)
+      const levels: BonusScoreLevel[] = []
+      for (let pairs = 0; pairs <= maxPairs; pairs += 1) {
+        levels.push({
+          cost: pairs === 0 ? {} : { fuel: pairs, grain: pairs },
+          score: pairs,
+        })
+      }
+      return levels
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

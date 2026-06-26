@@ -147,8 +147,33 @@ describe('Moor major-supply and upgrade minors', () => {
 
     expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
     resp.state.round = 6
-    const flow = runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')
+    expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
+    expect(runCardEffectHook(
+      resp.state,
+      resp.state.players[0]!,
+      'M062_HearthBrush',
+      'onEndTurn',
+      undefined,
+      { triggerActionId: 'cut-peat' },
+    )).toBeNull()
+    const flow = runCardEffectHook(
+      resp.state,
+      resp.state.players[0]!,
+      'M062_HearthBrush',
+      'onEndTurn',
+      undefined,
+      { triggerActionId: 'place-farmer' },
+    )
     expect(actionIds(flow)).toEqual(['improvement'])
+
+    resp.state.players[0]!.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
+    resp.state.currentPlayerIndex = 0
+    session.loadState(resp.state)
+    const actionResp = session.takeAction(0, 'forest')
+    expect(actionResp.ok).toBe(true)
+    expect(actionResp.interaction.stateId).toBe('wait')
+    expect(actionResp.interaction.stateId === 'wait' ? actionResp.interaction.sourceCard : undefined)
+      .toBe('M062_HearthBrush')
 
     resp.state.players[0]!.resources = fullResources()
     expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
@@ -166,6 +191,18 @@ describe('Moor major-supply and upgrade minors', () => {
       cardIds: ['Major_Moor_VillageChurch', 'Major_Well'],
     })
     const owner = resp.state.players[0]!
+    resp.state.round = 6
+    owner.resources = fullResources({ wood: 2, stone: 4 })
+    expect(runCardEffectHook(resp.state, owner, 'M063_PastoralLetter', 'onEndTurn')).toBeNull()
+    expect(runCardEffectHook(
+      resp.state,
+      owner,
+      'M063_PastoralLetter',
+      'onEndTurn',
+      undefined,
+      { triggerActionId: 'place-farmer' },
+    )).not.toBeNull()
+
     owner.minorPlayed.push('M068_Church')
     owner.improvements.push('Major_Moor_VillageChurch')
     expect(bonusVp(resp.state)).toBe(2)

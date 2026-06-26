@@ -210,6 +210,7 @@ describe('Moor action listener minors', () => {
   it('M023 Edge of the Forest gives food and fuel for fenced forest adjacencies when played', () => {
     const { session, state, player } = setup()
     player.minorHand = ['M023_EdgeOfTheForest']
+    player.improvements = ['Major_Fireplace1', 'Major_ClayOven', 'Major_Joinery']
     player.resources.food = 0
     player.resources.fuel = 0
     player.fields = [{ row: 0, col: 1, stacks: [] }]
