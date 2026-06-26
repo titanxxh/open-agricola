@@ -222,7 +222,8 @@ describe('Farmers of the Moor compatibility regressions', () => {
 
     expect(session.state.phase).toBe('parent-selection')
     expect(session.state.parentSelection).not.toBeNull()
-    expect(session.state.players[0]!.minorHand).toHaveLength(3)
+    expect(session.state.players[0]!.minorHand).toHaveLength(6)
+    expect(session.state.players[0]!.minorHand.filter((id) => id.startsWith('M'))).toHaveLength(3)
     expect(session.state.players[0]!.farmTerrain).toHaveLength(8)
 
     const p1Candidates = session.state.parentSelection!.candidates.p1

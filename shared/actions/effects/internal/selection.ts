@@ -137,7 +137,7 @@ export const selectionAction: ActionDefinition = {
     const extraData: Record<string, unknown> = { selectedPositions: positions }
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
-      const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state })
+      const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state, actionContext })
       if (followup) {
         return { type: 'flow', flow: followup, extraData }
       }
