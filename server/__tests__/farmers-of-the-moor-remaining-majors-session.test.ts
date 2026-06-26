@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { Scoring } from '../../shared/domain'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { getMajorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
 import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
 
 const findCardFor = (
@@ -142,10 +143,10 @@ describe('Farmers of the Moor remaining major improvements', () => {
 
   it('Museum of the Moors discounts only the specified major improvements', () => {
     const discountedSession = prepareMajorPurchaseSession('Major_Well', {
-      wood: 0,
+      wood: 1,
       clay: 0,
       reed: 0,
-      stone: 3,
+      stone: 2,
       food: 0,
     })
     discountedSession.state.players[0]!.improvements = ['Major_Moor_MuseumOfTheMoors']
@@ -153,7 +154,20 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const discounted = buyMajor(discountedSession, 'Major_Well')
 
     expect(discounted.state.players[0]!.improvements).toContain('Major_Well')
+    expect(discounted.state.players[0]!.resources.wood).toBe(0)
     expect(discounted.state.players[0]!.resources.stone).toBe(0)
+
+    const joinerySession = prepareMajorPurchaseSession('Major_Joinery')
+    const player = joinerySession.state.players[0]!
+    player.improvements = ['Major_Moor_MuseumOfTheMoors']
+    const cost = getMajorImprovementPreviewCostDetailed(
+      joinerySession.state,
+      player,
+      'Major_Joinery',
+      'major-improvement',
+    )?.cost as { fees?: Array<Record<string, number>> } | undefined
+    expect(cost?.fees).toContainEqual({ wood: 1, stone: 2 })
+    expect(cost?.fees).not.toContainEqual({ wood: 2, stone: 1 })
 
     const blockedSession = prepareMajorPurchaseSession('Major_Fireplace1', {
       wood: 0,

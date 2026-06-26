@@ -317,10 +317,7 @@ try {
     if (!row.state_json) return true
     try {
       const state = JSON.parse(row.state_json)
-      return (
-        state.enableFarmersOfTheMoor !== true ||
-        state.allowIncompleteFarmersOfTheMoorMinorDeal !== true
-      )
+      return state.enableFarmersOfTheMoor !== true
     } catch {
       return true
     }

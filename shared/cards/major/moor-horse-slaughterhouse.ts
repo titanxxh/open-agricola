@@ -10,6 +10,7 @@ const horseSlaughterhouse1: CardSourceMetaInput = {
   vp: 2,
   extraVp: false,
   isCookery: true,
+  requiresFarmersOfTheMoor: true,
   desc: [
     '[Anytime]',
     '<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>',

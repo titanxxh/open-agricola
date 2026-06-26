@@ -53,6 +53,38 @@ const attachCollector = (ws: TestSocket) => {
   })
 }
 
+describe('fixed dev room startup persistence', () => {
+  it('persists serialized Farmers of the Moor state for fixed dev rooms at startup', () => {
+    const previousMoor = process.env.DEV_ENABLE_FARMERS_OF_THE_MOOR
+    const previousIncomplete = process.env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL
+    process.env.DEV_ENABLE_FARMERS_OF_THE_MOOR = 'true'
+    process.env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL = 'true'
+    const persistence = new InMemoryRoomPersistence()
+    const server = createServer()
+    const wsServerResult = createWsServer(server, { persistence })
+
+    try {
+      const snap = persistence.load('dev2')
+      expect(snap?.serialized).toMatchObject({
+        enableFarmersOfTheMoor: true,
+      })
+      expect(snap?.meta).toMatchObject({
+        maxPlayers: 2,
+        status: 'playing',
+        enableFarmersOfTheMoor: true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      })
+    } finally {
+      clearInterval(wsServerResult.cleanupTimer)
+      wsServerResult.wss.close()
+      if (previousMoor === undefined) delete process.env.DEV_ENABLE_FARMERS_OF_THE_MOOR
+      else process.env.DEV_ENABLE_FARMERS_OF_THE_MOOR = previousMoor
+      if (previousIncomplete === undefined) delete process.env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL
+      else process.env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL = previousIncomplete
+    }
+  })
+})
+
 const waitForOpen = async (ws: WebSocket): Promise<void> => {
   await new Promise<void>((resolve) => ws.once('open', () => resolve()))
 }
