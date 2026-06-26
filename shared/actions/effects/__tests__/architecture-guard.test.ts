@@ -67,6 +67,7 @@ describe('effects architecture guard', () => {
       'future-meeples',
       'gain',
       'improvement',
+      'moor-special-action-apply',
       'moor-wood-to-fuel',
       'move-farmer-to-space',
       'occupation',
