@@ -755,7 +755,6 @@ export const en = {
     selection: { name: 'Selection', description: 'Select positions or cards from hand' },
     'set-first-player': { name: 'Set First Player', description: 'Mark this player as the new starting player' },
     'moor-special-action-choice': { name: 'Moor Special Action Choice', description: 'Choose and resolve a Moor special action follow-up' },
-    'moor-special-action-apply': { name: 'Moor Special Action', description: 'Resolve a Moor special action' },
     'build-farmhand-room': {
       description: 'Build Farm Hand Room',
           name: 'Build Farm Hand Room',
