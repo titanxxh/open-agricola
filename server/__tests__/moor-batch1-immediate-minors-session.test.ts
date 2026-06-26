@@ -262,7 +262,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     expect(noReward.state.players[0]!.resources.reed).toBe(0)
   })
 
-  it('M029 Tinker requires 3 majors plus craft building and gives four building resources', () => {
+  it('M029 Tinker requires 3 majors and only rewards craft building owners', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.minorHand = ['M029_Tinker']
@@ -281,7 +281,17 @@ describe('Moor Batch 1 immediate resource minors', () => {
 
     const blocked = setup()
     blocked.state.players[0]!.improvements = ['Major_Well', 'Major_ClayOven', 'Major_StoneOven']
-    expect(meetsCardPrerequisites(blocked.state.players[0]!, M029_Tinker, blocked.state.round, blocked.state)).toBe(false)
+    blocked.state.players[0]!.minorHand = ['M029_Tinker']
+    blocked.state.players[0]!.resources.food = 1
+    expect(meetsCardPrerequisites(blocked.state.players[0]!, M029_Tinker, blocked.state.round, blocked.state)).toBe(true)
+
+    const noReward = playMinor(blocked, 'M029_Tinker', false)
+    expect(noReward.state.players[0]!.resources).toMatchObject({
+      wood: 0,
+      clay: 0,
+      reed: 0,
+      stone: 0,
+    })
   })
 
   it('M065 Fire Brigade requires food and fuel, gives food and forest-threshold bonus VP', () => {

@@ -7,10 +7,11 @@ const CARD_ID = 'M029_Tinker'
 
 const cardImpl = {
   prerequisiteCheck: (player) =>
-    majorImprovementCount(player) >= 3 && hasCraftBuilding(player),
+    majorImprovementCount(player) >= 3,
   effect: {
     id: CARD_ID,
-    onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1, reed: 1, stone: 1 }),
+    onBuy: (_state, player) =>
+      hasCraftBuilding(player) ? gainLeaf(CARD_ID, { wood: 1, clay: 1, reed: 1, stone: 1 }) : undefined,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
