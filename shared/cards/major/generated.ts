@@ -695,6 +695,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Horse Slaughterhouse",
     "deck": "major",
     "number": 102,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -765,6 +766,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Cookhouse",
     "deck": "major",
     "number": 104,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "fee": {
         "clay": 6
@@ -884,6 +886,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Peat-charcoal Kiln",
     "deck": "major",
     "number": 105,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "stone": 1
     },
@@ -911,6 +914,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Forester's Lodge",
     "deck": "major",
     "number": 106,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "wood": 1,
       "clay": 2
@@ -939,6 +943,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Riding Stables",
     "deck": "major",
     "number": 107,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "wood": 2,
       "clay": 1,
@@ -958,6 +963,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Museum of the Moors",
     "deck": "major",
     "number": 108,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "clay": 1,
       "reed": 1,
@@ -967,7 +973,11 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": false,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Selected major improvements cost you 1 fewer matching building resource."
+      "These major improvements cost you 1 building resource less:",
+      "Well 1 <STONE>      Clay Oven 1 <CLAY>",
+      "Joinery 1 <WOOD>      Stone Oven 1 <STONE>",
+      "Pottery 1 <CLAY>      Forester's Lodge 1 <CLAY>",
+      "Basketmaker's Workshop 1 <REED>"
     ],
     "kind": "major"
   },
@@ -976,6 +986,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Heating Oven",
     "deck": "major",
     "number": 109,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -996,6 +1007,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Tiled Oven",
     "deck": "major",
     "number": 110,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "clay": 2,
       "stone": 1
@@ -1015,6 +1027,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Village Church",
     "deck": "major",
     "number": 111,
+    "category": "POINTS_PROVIDER",
     "cost": {
       "wood": 2,
       "stone": 4
@@ -1034,6 +1047,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Furniture Stall",
     "deck": "major",
     "number": 112,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "wood": 1,
       "stone": 1
@@ -1066,6 +1080,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Ceramics Stall",
     "deck": "major",
     "number": 113,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -1098,6 +1113,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Basket Stall",
     "deck": "major",
     "number": 114,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "reed": 1,
       "stone": 1
@@ -1336,6 +1352,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Cookhouse",
     "deck": "major",
     "number": 103,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "fee": {
         "clay": 6
@@ -1455,6 +1472,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Horse Slaughterhouse",
     "deck": "major",
     "number": 101,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1

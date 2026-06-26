@@ -18,4 +18,20 @@ describe('Farmers of the Moor horse icon asset', () => {
       colorType: 6,
     })
   })
+
+  it('uses the transparent Farmers of the Moor major deck icon asset', () => {
+    expect(readPngHeader('public/assets/moor/icons/major-deck-m.png')).toEqual({
+      width: 96,
+      height: 96,
+      colorType: 6,
+    })
+  })
+
+  it('uses the transparent 5+ player badge extracted from the five-six player card scans', () => {
+    expect(readPngHeader('public/assets/player56/players-5-plus.png')).toEqual({
+      width: 72,
+      height: 72,
+      colorType: 6,
+    })
+  })
 })

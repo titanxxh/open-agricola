@@ -44,12 +44,17 @@ export const Major_Moor_MuseumOfTheMoors = defineMajorCard({
     name: 'Museum of the Moors',
     deck: 'major',
     number: 108,
+    category: 'BUILDING_RESOURCE_PROVIDER',
     cost: { clay: 1, reed: 1, stone: 1 },
     vp: 3,
     extraVp: false,
     requiresFarmersOfTheMoor: true,
     desc: [
-      'Selected major improvements cost you 1 fewer matching building resource.',
+      'These major improvements cost you 1 building resource less:',
+      'Well 1 <STONE>      Clay Oven 1 <CLAY>',
+      'Joinery 1 <WOOD>      Stone Oven 1 <STONE>',
+      "Pottery 1 <CLAY>      Forester's Lodge 1 <CLAY>",
+      "Basketmaker's Workshop 1 <REED>",
     ],
   } satisfies CardSourceMetaInput,
   impl: {

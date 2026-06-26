@@ -805,7 +805,7 @@ export const zh = {
     Major_Moor_PeatCharcoalKiln: { name: '泥炭炭窑', description: 'Cut Peat 额外获得燃料，并在计分时用燃料得分。' },
     Major_Moor_ForestersLodge: { name: '护林人小屋', description: 'Fell Trees 额外获得木材，并按森林计分。' },
     Major_Moor_RidingStables: { name: '骑术马厩', description: '在未来回合放置食物，拥有至少 2 匹马时领取。' },
-    Major_Moor_MuseumOfTheMoors: { name: '沼泽博物馆', description: '指定主要改良少花 1 个建筑资源。' },
+    Major_Moor_MuseumOfTheMoors: { name: '沼泽博物馆', description: '水井、黏土烤炉、木工坊、石制烤炉、陶工坊、护林人小屋、篮子编织坊少花 1 个对应建筑资源。' },
     Major_Moor_HeatingOven: { name: '供暖炉', description: '获得 2 燃料，供暖时少供暖 1 个房间。' },
     Major_Moor_TiledOven: { name: '瓷砖炉', description: '整个房屋供暖最多只需 1 燃料。' },
     Major_Moor_VillageChurch: { name: '乡村教堂', description: '获得 2 食物，并在收获时把燃料换成奖励分。' },

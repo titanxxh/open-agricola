@@ -19,6 +19,7 @@ export const Major_Moor_ForestersLodge = defineMajorCard({
     name: "Forester's Lodge",
     deck: 'major',
     number: 106,
+    category: 'BUILDING_RESOURCE_PROVIDER',
     cost: { wood: 1, clay: 2 },
     vp: 1,
     extraVp: true,

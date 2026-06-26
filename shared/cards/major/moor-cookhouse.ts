@@ -6,6 +6,7 @@ const cookhouse1: CardSourceMetaInput = {
   name: 'Cookhouse',
   deck: 'major',
   number: 103,
+  category: 'FOOD_PROVIDER',
   cost: {
     fee: { clay: 6 },
     cards: {

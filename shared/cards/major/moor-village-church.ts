@@ -30,6 +30,7 @@ export const Major_Moor_VillageChurch = defineMajorCard({
     name: 'Village Church',
     deck: 'major',
     number: 111,
+    category: 'POINTS_PROVIDER',
     cost: { wood: 2, stone: 4 },
     vp: 4,
     extraVp: true,

@@ -6,6 +6,7 @@ const horseSlaughterhouse1: CardSourceMetaInput = {
   name: 'Horse Slaughterhouse',
   deck: 'major',
   number: 101,
+  category: 'FOOD_PROVIDER',
   cost: { clay: 1, stone: 1 },
   vp: 2,
   extraVp: false,
