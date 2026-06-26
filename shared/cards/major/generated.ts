@@ -903,9 +903,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     ],
     "desc": [
       "[Special action: Cut Peat]",
-      "Gain 1 extra fuel, or 2 extra fuel if you have at least 1 horse.",
+      "+1<FUEL> if you have 0 horses; +2<FUEL> if you have at least 1 horse.",
       "[Scoring]",
-      "3/5 fuel <ARROW> 1/2 bonus points."
+      "3/5<FUEL> <ARROW-1X> 1/2<SCORE>"
     ],
     "kind": "major"
   },
@@ -1036,9 +1036,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": true,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Immediately gain 2 food.",
       "[Harvest]",
-      "Once each harvest, you may pay 1 fuel to gain 1 bonus point."
+      "1<FUEL> <ARROW-1X> 1<SCORE>",
+      "Immediately gain 2 food."
     ],
     "kind": "major"
   },
@@ -1057,7 +1057,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange wood for the same amount of clay."
+      "1<WOOD> <ARROW> 1<CLAY>"
     ],
     "exchanges": [
       {
@@ -1090,7 +1090,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange clay for the same amount of wood."
+      "1<CLAY> <ARROW> 1<WOOD>"
     ],
     "exchanges": [
       {
@@ -1123,7 +1123,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange reed for the same amount of other building resources."
+      "1<REED> <ARROW> 1<WOOD> / <CLAY> / <STONE>"
     ],
     "exchanges": [
       {
