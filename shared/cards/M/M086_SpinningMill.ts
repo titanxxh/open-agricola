@@ -1,6 +1,19 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import { getAssignedAnimalsByType } from '../../domain/animals'
+import { writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'M086_SpinningMill'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onHarvestFieldPhase: (_state, player) => {
+      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscount', Math.floor(getAssignedAnimalsByType(player).sheep / 2))
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M086_SpinningMill = defineMinorCard({
   meta: {
@@ -18,7 +31,10 @@ export const M086_SpinningMill = defineMinorCard({
     },
     vp: 2,
     prerequisite: "1 Sheep",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M086_SpinningMill_impl = M086_SpinningMill.impl

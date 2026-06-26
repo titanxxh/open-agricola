@@ -79,6 +79,7 @@ export type CardDefinition = {
   requiresFarmersOfTheMoor?: boolean
   heatingRoomDiscount?: number
   heatingFuelCap?: number
+  heatingWoodToFuelDiscount?: number
   moorSpecialActionBonuses?: readonly {
     actionId: 'cut-peat' | 'fell-trees'
     resource: keyof Resource

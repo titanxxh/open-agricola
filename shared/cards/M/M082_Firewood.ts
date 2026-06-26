@@ -1,6 +1,16 @@
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M082_Firewood'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { fuel: 1 }),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M082_Firewood = defineMinorCard({
   meta: {
@@ -16,7 +26,11 @@ export const M082_Firewood = defineMinorCard({
         "wood": 1
     },
     prerequisite: "1 Major Improvement",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
+    heatingWoodToFuelDiscount: 1,
   },
+  impl: cardImpl,
 })
+
+export const M082_Firewood_impl = M082_Firewood.impl

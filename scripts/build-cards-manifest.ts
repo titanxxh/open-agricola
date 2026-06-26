@@ -59,6 +59,7 @@ export type CardMeta = {
   requiresFarmersOfTheMoor?: boolean
   heatingRoomDiscount?: number
   heatingFuelCap?: number
+  heatingWoodToFuelDiscount?: number
   moorSpecialActionBonuses?: unknown
   mustBePlayedViaMajorImprovementAction?: boolean
   alsoCountsAs?: string[]
@@ -85,6 +86,7 @@ const META_FIELDS = new Set([
   'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
   'waresSalesmanGains', 'mustBePlayedViaMinorAction',
   'requiresFarmersOfTheMoor', 'heatingRoomDiscount', 'heatingFuelCap',
+  'heatingWoodToFuelDiscount',
   'moorSpecialActionBonuses',
   'mustBePlayedViaMajorImprovementAction', 'alsoCountsAs', 'cardField',
   'enablesPalisades', 'locales',
