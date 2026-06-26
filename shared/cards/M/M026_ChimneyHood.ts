@@ -1,6 +1,21 @@
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
+import { bestBakeFood } from './moor-batch1-helpers'
 
 const CARD_ID = 'M026_ChimneyHood'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      const food = bestBakeFood(player)
+      if (food === 0) return
+      return gainLeaf(CARD_ID, { food })
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M026_ChimneyHood = defineMinorCard({
   meta: {
@@ -16,7 +31,10 @@ export const M026_ChimneyHood = defineMinorCard({
         "clay": 1
     },
     passing: true,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M026_ChimneyHood_impl = M026_ChimneyHood.impl

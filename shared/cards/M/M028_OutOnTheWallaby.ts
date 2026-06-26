@@ -1,6 +1,21 @@
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
+import { craftResourceGain } from './moor-batch1-helpers'
 
 const CARD_ID = 'M028_OutOnTheWallaby'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      const gain = craftResourceGain(player)
+      if (Object.keys(gain).length === 0) return
+      return gainLeaf(CARD_ID, gain)
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M028_OutOnTheWallaby = defineMinorCard({
   meta: {
@@ -14,7 +29,10 @@ export const M028_OutOnTheWallaby = defineMinorCard({
     ],
     cost: {},
     passing: true,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M028_OutOnTheWallaby_impl = M028_OutOnTheWallaby.impl
