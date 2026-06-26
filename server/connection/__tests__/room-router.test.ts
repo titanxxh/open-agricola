@@ -119,16 +119,16 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
   })
 
-  it('rejects enableFarmersOfTheMoor by default while its minor pool is incomplete', () => {
+  it('allows enableFarmersOfTheMoor by default once its minor pool is sufficient', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableFarmersOfTheMoor: true } as never)
 
-    expect(ctx.currentRoom).toBeNull()
-    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
-      type: 'error',
-      error: expect.stringMatching(/Farmers of the Moor minor pool/),
-    }))
+    expect(ctx.currentRoom!.session.state.enableFarmersOfTheMoor).toBe(true)
+    expect(ctx.currentRoom!.session.state.players.every((player) =>
+      player.minorHand.filter((id) => id.startsWith('M')).length === 4,
+    )).toBe(true)
+    expect(ctx.currentRoom!.allowIncompleteFarmersOfTheMoorMinorDeal).toBe(false)
   })
 
   it('preserves enableFarmersOfTheMoor when starting a new game', () => {
