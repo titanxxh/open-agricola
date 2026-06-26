@@ -329,6 +329,28 @@ describe('M091 Routine Work', () => {
     })
   })
 
+  it('does not mark FoM stalls as used food craft buildings', () => {
+    const session = setup()
+    const state = session.state
+    state.roundPhase = 'feeding'
+    const player = state.players[0]!
+    player.id = 'p1'
+    player.minorPlayed = ['M091_RoutineWork']
+    const events = [exchanged('Major_Moor_FurnitureStall')]
+
+    const exchangeResult = executeCardListener(listenerById('M091-routine-work-after-exchange'), context('M091_RoutineWork', 'exchange', player, state, {
+      actionEvents: events,
+      transactionEvents: events,
+    }))
+    const tradeAppliedResult = executeCardListener(listenerById('M091-routine-work-trade-applied'), context('M091_RoutineWork', 'trade-applied', player, state, {
+      phase: 'immediatelyAfter',
+      extraData: { sourceId: 'Major_Moor_FurnitureStall' },
+    }))
+
+    expect(exchangeResult).toBeUndefined()
+    expect(tradeAppliedResult).toBeUndefined()
+  })
+
   it('offers fuel or food for each unused craft building', () => {
     const session = setup()
     const state = session.state
@@ -361,6 +383,18 @@ describe('M091 Routine Work', () => {
     player.minorPlayed = ['M091_RoutineWork']
     player.improvements = ['Major_Joinery', 'Major_Pottery']
     writeCardExtraData(player, 'M091_RoutineWork', 'usedCraftBuildingIds', ['Major_Joinery', 'Major_Pottery'])
+
+    const flow = getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player)
+
+    expect(flow).toBeUndefined()
+  })
+
+  it('does not offer rewards for FoM stalls', () => {
+    const session = setup()
+    const state = session.state
+    const player = state.players[0]!
+    player.minorPlayed = ['M091_RoutineWork']
+    player.improvements = ['Major_Moor_FurnitureStall', 'Major_Moor_CeramicsStall', 'Major_Moor_BasketStall']
 
     const flow = getCardEffect('M091_RoutineWork')?.onEndHarvestFeedingPhase?.(state, player)
 
