@@ -7,8 +7,9 @@ import {
   setWorkersAtHome,
 } from '../../shared/domain/player'
 import { createInitialState } from '../../shared/session/state-bootstrap'
-import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
+import type { ActionChoiceOption, GameState, PlayerState } from '../../shared/contract/types'
 import { sixPlayerDuplicateMajorImprovementIds } from '../../shared/cards/major/supply'
+import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 
@@ -18,6 +19,18 @@ const oneCellFences = (row: number, col: number) => [
   `V-${row}-${col}`,
   `V-${row}-${col + 1}`,
 ]
+
+const firstEmptyFarmyardTile = (player: PlayerState) => {
+  const occupied = new Set<string>()
+  player.roomTiles.forEach((tile) => occupied.add(positionKey(tile)))
+  player.farmTerrain?.forEach((tile) => occupied.add(positionKey(tile)))
+  player.fields.forEach((field) => occupied.add(positionKey(field)))
+  player.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
+  player.pastures.forEach((pasture) => pasture.tiles.forEach((tile) => occupied.add(positionKey(tile))))
+  const tile = getAllTilePositions().find((tile) => !occupied.has(positionKey(tile)))
+  expect(tile).toBeDefined()
+  return tile!
+}
 
 const prepareHands = (session: GameSession) => {
   for (const player of session.state.players) {
@@ -186,8 +199,9 @@ describe('Farmers of the Moor compatibility regressions', () => {
     expect(availableIds(session)).toContain('fencing')
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    const tile = firstEmptyFarmyardTile(player)
     resp = session.commitSelectionChoice(0, {
-      edges: oneCellFences(0, 0),
+      edges: oneCellFences(tile.row, tile.col),
       extraWood: 0,
     })
 

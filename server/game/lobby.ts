@@ -14,6 +14,7 @@ export type RoomBroadcaster = {
 export type Lobby = {
   getRooms(limit?: number): RoomSummary[]
   dissolveRoomById(roomId: string, userId: string | undefined): { ok: boolean; error?: string }
+  endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): { endedRoomIds: string[] }
 }
 
 export function createLobby(deps: {
@@ -39,6 +40,25 @@ export function createLobby(deps: {
       registry.clearActivity(roomId)
       persistence.delete(roomId)
       return { ok: true }
+    },
+    endRoomsForUser(userId, affectedRoomIds = []) {
+      const endedRoomIds: string[] = []
+      const now = Date.now()
+      const affected = new Set(affectedRoomIds)
+      for (const room of [...registry.iter()]) {
+        if (isFixedDevRoom(room.id)) continue
+        const belongsToUser = affected.has(room.id) || room.createdBy === userId || room.players.some((player) => player.userId === userId)
+        if (!belongsToUser) continue
+        broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id })
+        for (const p of room.players) {
+          try { p.ws.close() } catch { /* ignore close errors */ }
+        }
+        registry.delete(room.id)
+        registry.clearActivity(room.id)
+        persistence.markFinished(room.id, now)
+        endedRoomIds.push(room.id)
+      }
+      return { endedRoomIds }
     },
   }
 }

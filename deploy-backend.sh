@@ -27,7 +27,12 @@ fi
 
 echo ">>> 部署后端到 $HOST:$REMOTE_DIR (分支: $BRANCH)"
 
-ssh "$HOST" bash -s "$REMOTE_DIR" "$BRANCH" << 'REMOTE_SCRIPT'
+REMOTE_ENV=()
+if [ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]; then
+  REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")
+fi
+
+ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$BRANCH" << 'REMOTE_SCRIPT'
   set -e
   REMOTE_DIR="$1"
   BRANCH="$2"

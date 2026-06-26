@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import { getDb } from '../db.ts'
 import { validateSession, extractToken } from '../auth.ts'
+import { corsHeaders } from '../http-origin.ts'
 import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
@@ -28,9 +29,7 @@ type WorkshopCardRow = {
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? '*',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    ...corsHeaders({ methods: 'GET,POST,DELETE,OPTIONS' }),
   })
   res.end(JSON.stringify(payload))
 }

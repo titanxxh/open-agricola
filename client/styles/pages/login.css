@@ -154,6 +154,34 @@
   transform: translateY(1px);
 }
 
+.login-form .oauth-provider-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.login-form .oauth-provider-link.is-disabled,
+.login-form .oauth-provider-link.is-disabled:hover,
+.login-form .oauth-provider-link.is-disabled:active {
+  background: #93a68a;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.oauth-provider-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.oauth-provider-icon--google {
+  background: #fff;
+  border-radius: 50%;
+  padding: 2px;
+}
+
 .login-form .form-field {
   display: flex;
   flex-direction: column;

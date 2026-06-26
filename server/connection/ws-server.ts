@@ -1,4 +1,4 @@
-import type { Server as HttpServer } from 'node:http'
+import type { IncomingMessage, Server as HttpServer } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession } from '../game/authoritative-session.ts'
 import { RoomRegistry } from '../game/room-registry.ts'
@@ -20,6 +20,9 @@ import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { dispatch } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
+import { validateSession } from '../auth.ts'
+import { isTrustedOrigin } from '../http-origin.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -117,13 +120,35 @@ type ConnectionDeps = {
   persistence: RoomPersistence
   broadcaster: Broadcaster
   lobby: Lobby
+  activeUserSockets: Map<string, Set<WebSocket>>
 }
 
-const handleConnection = (ws: WebSocket, deps: ConnectionDeps): void => {
-  const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS)
+const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionDeps): void => {
+  if (!isTrustedOrigin(req)) {
+    ws.close(1008, 'invalid origin')
+    return
+  }
+
+  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const user = validateSession(token)
+  const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS || !!user, user?.id)
+  let trackedUserId = user?.id
+
+  const untrack = (userId: string): void => {
+    const sockets = deps.activeUserSockets.get(userId)
+    if (!sockets) return
+    sockets.delete(ws)
+    if (sockets.size === 0) deps.activeUserSockets.delete(userId)
+  }
+
+  if (trackedUserId) {
+    const sockets = deps.activeUserSockets.get(trackedUserId) ?? new Set<WebSocket>()
+    sockets.add(ws)
+    deps.activeUserSockets.set(trackedUserId, sockets)
+  }
 
   let authTimer: ReturnType<typeof setTimeout> | undefined
-  if (!ALLOW_ANONYMOUS_WS) {
+  if (!ctx.authenticated) {
     authTimer = setTimeout(() => {
       if (!ctx.authenticated) {
         deps.broadcaster.sendTo(ws, { type: 'error', error: 'authentication timeout' })
@@ -144,6 +169,13 @@ const handleConnection = (ws: WebSocket, deps: ConnectionDeps): void => {
       return
     }
     dispatch(ctx, msg)
+    if (ctx.currentUserId && ctx.currentUserId !== trackedUserId) {
+      if (trackedUserId) untrack(trackedUserId)
+      trackedUserId = ctx.currentUserId
+      const sockets = deps.activeUserSockets.get(trackedUserId) ?? new Set<WebSocket>()
+      sockets.add(ws)
+      deps.activeUserSockets.set(trackedUserId, sockets)
+    }
     if (ctx.authenticated && authTimer) {
       clearTimeout(authTimer)
       authTimer = undefined
@@ -152,6 +184,7 @@ const handleConnection = (ws: WebSocket, deps: ConnectionDeps): void => {
 
   ws.on('close', () => {
     clearTimeout(authTimer)
+    if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
@@ -174,6 +207,7 @@ export type CreateWsServerResult = {
   broadcaster: Broadcaster
   lobby: Lobby
   cleanupTimer: NodeJS.Timeout
+  closeUserConnections: (userId: string) => void
 }
 
 export function createWsServer(
@@ -188,6 +222,7 @@ export function createWsServer(
     persistence: deps.persistence,
     shouldPersist: deps.shouldPersist,
   })
+  const activeUserSockets = new Map<string, Set<WebSocket>>()
   const lobby = createLobby({ registry, persistence: deps.persistence, broadcaster })
 
   ensureFixedDevRooms(registry, deps.persistence)
@@ -195,14 +230,24 @@ export function createWsServer(
   const cleanupTimer = startRoomCleanup(registry, deps.persistence)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
-  wss.on('connection', (ws) =>
-    handleConnection(ws, {
+  wss.on('connection', (ws, req) =>
+    handleConnection(ws, req, {
       registry,
       persistence: deps.persistence,
       broadcaster,
       lobby,
+      activeUserSockets,
     }),
   )
 
-  return { wss, registry, broadcaster, lobby, cleanupTimer }
+  const closeUserConnections = (userId: string): void => {
+    const sockets = activeUserSockets.get(userId)
+    if (!sockets) return
+    for (const ws of [...sockets]) {
+      ws.close(1008, 'session revoked')
+    }
+    activeUserSockets.delete(userId)
+  }
+
+  return { wss, registry, broadcaster, lobby, cleanupTimer, closeUserConnections }
 }

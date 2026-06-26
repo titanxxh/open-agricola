@@ -75,7 +75,7 @@ vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
 
 // ── After mocks are in place, import the modules under test ────────────────
 
-import { handleProposeRequest } from '../workshop-pr/propose-handler.ts'
+import { handleProposeRequest, handleRefreshPrStatus } from '../workshop-pr/propose-handler.ts'
 import { handleOAuthCallback } from '../workshop-pr/oauth-handler.ts'
 import { tokenCache } from '../workshop-pr/token-cache.ts'
 import { workshopPrConfig } from '../workshop-pr/config.ts'
@@ -364,6 +364,7 @@ describe('workshop PR propose — session', () => {
   const origClientId = workshopPrConfig.clientId
   const origSecret = workshopPrConfig.clientSecret
   const origEnabled = workshopPrConfig.enabled
+  const origCorsOrigin = process.env.CORS_ORIGIN
 
   let userId: string
   let userToken: string
@@ -423,6 +424,8 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = origClientId
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = origSecret
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = origEnabled
+    if (origCorsOrigin === undefined) delete process.env.CORS_ORIGIN
+    else process.env.CORS_ORIGIN = origCorsOrigin
 
     vi.unstubAllGlobals()
   })
@@ -430,6 +433,7 @@ describe('workshop PR propose — session', () => {
   // ── C-24: happy path ─────────────────────────────────────────────────────
 
   it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {
+    process.env.CORS_ORIGIN = 'https://frontend.example'
     // Phase 1 — no handshakeId yet → 200 { needsAuth: true, handshakeId }
     const req1 = fakeReq({
       method: 'POST',
@@ -440,6 +444,8 @@ describe('workshop PR propose — session', () => {
     const res1 = fakeRes()
     await handleProposeRequest(req1, res1, cardDbId)
     expect(res1.statusCode).toBe(200)
+    expect(res1.headers['Access-Control-Allow-Origin']).toBe('https://frontend.example')
+    expect(res1.headers['Access-Control-Allow-Credentials']).toBe('true')
     const j1 = JSON.parse(res1.body) as {
       ok: false
       needsAuth: true
@@ -626,5 +632,22 @@ describe('workshop PR propose — session', () => {
     expect(j.code).toBe('rate_limited')
     expect(j.retryAfter).toBeGreaterThan(0)
     expect(j.retryAfter).toBeLessThanOrEqual(600) // 10 minutes
+  })
+
+  it('refresh status responses use credentialed CORS headers', async () => {
+    process.env.CORS_ORIGIN = 'https://frontend.example'
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/refresh-pr-status`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+    await handleRefreshPrStatus(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('https://frontend.example')
+    expect(res.headers['Access-Control-Allow-Credentials']).toBe('true')
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, error: 'no PR' })
   })
 })

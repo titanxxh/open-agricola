@@ -369,13 +369,41 @@ Push 到 `platform` 分支即可自动重新部署。
 
 ---
 
+## Auth OAuth
+
+生产环境必须配置 OAuth 登录/注册。直接调用 `/api/auth/register` 已禁用。
+
+必需后端环境变量：
+
+- `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端地址；GitHub Pages 子路径部署要包含 base path，例如 `https://your-user.github.io/open-agricola/`。
+- `PUBLIC_API_BASE`：用户浏览器可访问的后端 origin，例如 `https://api.your-domain.com`，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填。
+- `CORS_ORIGIN`：前后端不同源时必须等于前端 origin。
+- `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`：账号登录/注册用 GitHub OAuth App 凭据。
+- `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` / `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET`：账号登录/注册用 Google OAuth Client 凭据。
+
+OAuth callback URL 填后端 origin：
+
+```text
+https://<backend-origin>/api/auth/oauth/github/callback
+https://<backend-origin>/api/auth/oauth/google/callback
+```
+
+生产环境不要设置：
+
+- `ALLOW_ANONYMOUS_WS=true`
+- `ENABLE_AUTH_TEST_HELPERS=1`
+
+---
+
 ## 四、验证清单
 
 部署完成后逐项验证：
 
 - [ ] `curl https://your-backend/api/health` 返回 `{"ok":true}`
 - [ ] 访问前端 URL，能看到登录页
-- [ ] 注册新用户
+- [ ] 首次部署时先用 `ACCOUNT_REGISTRATION_POLICY=open` 注册 `ADMIN_USERS` 中的第一个管理员账号
+- [ ] 管理员能进入 Settings 生成邀请码后，将 `ACCOUNT_REGISTRATION_POLICY` 改为 `invite_only` 并重启后端
+- [ ] 通过 GitHub 或 Google + 邀请码注册新用户
 - [ ] 登录成功，进入大厅
 - [ ] 创建房间，开始游戏
 - [ ] WebSocket 连接正常（浏览器 Console 无 WS 错误）
@@ -398,9 +426,35 @@ Push 到 `platform` 分支即可自动重新部署。
 | `PERSIST_ROOMS` | `sqlite` | 房间持久化方式 (`sqlite` / `json`) |
 | `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
 | `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
+| `PUBLIC_APP_ORIGIN` | — | 前端公开地址；Pages 子路径部署要包含 `/open-agricola/` |
+| `PUBLIC_API_BASE` | — | 后端公开 origin，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填 |
+| `EMAIL_DELIVERY` | `log` | 邮件发送模式；生产用户名密码注册必须设为 `resend` |
+| `RESEND_API_KEY` | — | Resend API key，只给后端容器 |
+| `EMAIL_FROM` | — | 发信地址，例如 `Open Agricola <no-reply@mail.example.com>` |
+| `EMAIL_REPLY_TO` | — | 可选回复地址 |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` | — | 账号 GitHub OAuth App client id |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | 账号 GitHub OAuth App client secret |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | 账号 Google OAuth client secret |
+| `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
+| `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
+
+### Resend 邮箱验证
+
+1. 在 Resend 添加并验证发信域名。
+2. 创建 Sending access API key。
+3. 在后端 `.env` 中设置：
+
+   ```bash
+   EMAIL_DELIVERY=resend
+   RESEND_API_KEY=re_xxx
+   EMAIL_FROM="Open Agricola <no-reply@mail.example.com>"
+   ```
+
+4. 确认 `PUBLIC_API_BASE` 是用户可访问的后端 HTTPS 地址，`PUBLIC_APP_ORIGIN` 是前端地址。
 
 ### 前端（构建时注入）
 

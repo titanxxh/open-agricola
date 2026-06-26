@@ -10,23 +10,57 @@ import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
-import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
+import {
+  login,
+  logout,
+  logoutAll,
+  validateSession,
+  extractToken,
+  updateDisplayName,
+  changePassword,
+  cleanupPendingPasswordUser,
+  isAdmin,
+  createSession,
+  deleteAccount,
+  getAccountDeletionRoomIds,
+  registerPasswordUser,
+  resendVerificationEmail,
+  sendVerificationEmail,
+  verifyEmailToken,
+  type AuthErrorCode,
+  type AuthUser,
+} from './auth.ts'
+import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
+import { createInvite, listInvites, revokeInvite } from './invites.ts'
+import {
+  handleLinkedIdentities,
+  handleOAuthCallback,
+  handleOAuthStart,
+  handleOnboardingComplete,
+  handleRegistrationPolicy,
+} from './oauth/handler.ts'
+import { assertOAuthProvider } from './oauth/providers.ts'
+import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': CORS_ORIGIN,
-  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-}
+const serverCorsHeaders = () => corsHeaders({
+  methods: 'GET,POST,PATCH,DELETE,OPTIONS',
+  headers: 'Content-Type, Authorization',
+})
 
-const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS })
+const sendJson = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string | string[]> = {}) => {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...serverCorsHeaders(), ...headers })
   res.end(JSON.stringify(payload))
 }
+
+const authError = (code: AuthErrorCode, error: string) => ({ ok: false, code, error })
+
+const changePasswordErrorCode = (error: string): AuthErrorCode =>
+  error === 'User not found' ? 'not_authenticated' : 'invalid_password'
 
 const readBody = (req: IncomingMessage): Promise<string> =>
   new Promise((resolve) => {
@@ -68,6 +102,40 @@ function getClientIp(req: IncomingMessage): string {
   return req.socket.remoteAddress ?? 'unknown'
 }
 
+function getAuthToken(req: IncomingMessage): string {
+  return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+}
+
+function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
+  const token = getAuthToken(req)
+  const user = validateSession(token)
+  if (!user) {
+    sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
+    return null
+  }
+  if (!isAdmin(user.username)) {
+    sendJson(res, 403, authError('admin_required', 'Admin only'))
+    return null
+  }
+  return user
+}
+
+function forwardCookieSessionAsBearer(req: IncomingMessage): void {
+  if (req.headers.authorization) return
+  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  if (token) req.headers.authorization = `Bearer ${token}`
+}
+
+function isMutatingRequest(req: IncomingMessage): boolean {
+  return req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE'
+}
+
+function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!isMutatingRequest(req) || isTrustedOrigin(req)) return false
+  sendJson(res, 403, authError('csrf_rejected', 'Untrusted origin'))
+  return true
+}
+
 // Initialize database on import
 getDb()
 
@@ -94,10 +162,12 @@ const server = createServer(async (req, res) => {
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS)
+    res.writeHead(204, serverCorsHeaders())
     res.end()
     return
   }
+
+  if (rejectUntrustedOrigin(req, res)) return
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
@@ -106,79 +176,275 @@ const server = createServer(async (req, res) => {
   }
 
   // ── Auth routes ────────────────────────────────────────
+  if (req.url?.startsWith('/api/auth/oauth/')) {
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    if (req.method === 'GET' && url.pathname.endsWith('/start')) {
+      handleOAuthStart(req, res, url)
+      return
+    }
+    if (req.method === 'GET' && url.pathname.endsWith('/callback')) {
+      await handleOAuthCallback(req, res, url)
+      return
+    }
+  }
+
+  if (req.url === '/api/auth/registration-policy' && req.method === 'GET') {
+    handleRegistrationPolicy(req, res)
+    return
+  }
+
+  if (req.url === '/api/auth/onboarding/complete' && req.method === 'POST') {
+    await handleOnboardingComplete(req, res)
+    return
+  }
+
+  if (req.url === '/api/auth/identities' && req.method === 'GET') {
+    handleLinkedIdentities(req, res)
+    return
+  }
+
   if (req.url === '/api/auth/register' && req.method === 'POST') {
     const ip = getClientIp(req)
     if (!checkRateLimit(ip)) {
-      sendJson(res, 429, { ok: false, error: 'Too many requests' })
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
-    const body = await parseBody<{ username?: string; password?: string; displayName?: string }>(req)
-    if (!body?.username || !body.password) {
-      sendJson(res, 400, { ok: false, error: 'Missing username or password' })
+    const body = await parseBody<{
+      username?: string
+      email?: string
+      password?: string
+      confirmPassword?: string
+      displayName?: string
+      inviteCode?: string
+    }>(req)
+    if (!body?.username || !body.email || !body.password || !body.confirmPassword) {
+      sendJson(res, 400, authError('missing_fields', 'Missing registration fields'))
       return
     }
-    const result = await register(body.username, body.password, body.displayName)
-    sendJson(res, result.ok ? 200 : 400, result)
+    const result = await registerPasswordUser({
+      username: body.username,
+      email: body.email,
+      password: body.password,
+      confirmPassword: body.confirmPassword,
+      displayName: body.displayName,
+      inviteCode: body.inviteCode,
+    })
+    if (!result.ok) {
+      sendJson(res, 400, result)
+      return
+    }
+    try {
+      await sendVerificationEmail(result.userId, body.email)
+    } catch {
+      cleanupPendingPasswordUser(result.userId)
+      sendJson(res, 500, authError('email_delivery_failed', 'Failed to send verification email'))
+      return
+    }
+    sendJson(res, 200, { ok: true, status: 'verification_required' })
     return
   }
 
   if (req.url === '/api/auth/login' && req.method === 'POST') {
     const ip = getClientIp(req)
     if (!checkRateLimit(ip)) {
-      sendJson(res, 429, { ok: false, error: 'Too many requests' })
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
       return
     }
     const body = await parseBody<{ username?: string; password?: string }>(req)
     if (!body?.username || !body.password) {
-      sendJson(res, 400, { ok: false, error: 'Missing username or password' })
+      sendJson(res, 400, authError('missing_fields', 'Missing username or password'))
       return
     }
     const result = await login(body.username, body.password)
-    sendJson(res, result.ok ? 200 : 400, result)
+    if (!result.ok) {
+      sendJson(res, 400, result)
+      return
+    }
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     if (token) logout(token)
-    sendJson(res, 200, { ok: true })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    return
+  }
+
+  if (req.url === '/api/auth/logout-all' && req.method === 'POST') {
+    const token = getAuthToken(req)
+    const user = validateSession(token)
+    if (user) {
+      logoutAll(user.id)
+      wssCtx?.closeUserConnections(user.id)
+    }
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    return
+  }
+
+  if (req.url === '/api/auth/account' && req.method === 'DELETE') {
+    const token = getAuthToken(req)
+    const user = validateSession(token)
+    if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
+    wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
+    const result = deleteAccount(user.id)
+    wssCtx?.closeUserConnections(user.id)
+    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
     return
   }
 
   if (req.url === '/api/auth/profile' && req.method === 'PATCH') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ displayName?: string }>(req)
     const err = updateDisplayName(user.id, body?.displayName ?? '')
-    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
+    if (err) { sendJson(res, 400, authError('invalid_display_name', err)); return }
     sendJson(res, 200, { ok: true })
     return
   }
 
   if (req.url === '/api/auth/change-password' && req.method === 'POST') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
     const body = await parseBody<{ oldPassword?: string; newPassword?: string }>(req)
     if (!body?.oldPassword || !body.newPassword) {
-      sendJson(res, 400, { ok: false, error: 'Missing oldPassword or newPassword' }); return
+      sendJson(res, 400, authError('missing_fields', 'Missing oldPassword or newPassword')); return
     }
     const err = await changePassword(user.id, body.oldPassword, body.newPassword)
-    if (err) { sendJson(res, 400, { ok: false, error: err }); return }
+    if (err) { sendJson(res, 400, authError(changePasswordErrorCode(err), err)); return }
     sendJson(res, 200, { ok: true })
     return
   }
 
+  if (req.url?.startsWith('/api/auth/verify-email') && req.method === 'GET') {
+    const parsed = new URL(req.url, getRequestOrigin(req) || 'http://localhost')
+    const token = parsed.searchParams.get('token') ?? ''
+    const result = verifyEmailToken(token)
+    const appOrigin = process.env.PUBLIC_APP_ORIGIN || '/'
+    if (!result.ok) {
+      res.statusCode = 302
+      res.setHeader('Location', `${appOrigin.replace(/\/?$/, '/')}?page=login&authError=invalid_or_expired_token`)
+      res.end()
+      return
+    }
+    res.statusCode = 302
+    res.setHeader('Location', appOrigin)
+    res.setHeader('Set-Cookie', serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }))
+    res.end()
+    return
+  }
+
+  if (req.url === '/api/auth/resend-verification' && req.method === 'POST') {
+    const ip = getClientIp(req)
+    if (!checkRateLimit(ip)) {
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
+      return
+    }
+    const body = await parseBody<{ email?: string }>(req)
+    if (!body?.email) {
+      sendJson(res, 400, authError('missing_fields', 'Missing email'))
+      return
+    }
+    const result = await resendVerificationEmail(body.email)
+    sendJson(res, result.ok ? 200 : 500, result)
+    return
+  }
+
   if (req.url === '/api/auth/me' && req.method === 'GET') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) {
-      sendJson(res, 401, { ok: false, error: 'Not authenticated' })
+      sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
     sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username) } })
     return
+  }
+
+  if (req.url?.startsWith('/api/test/oauth/') && req.method === 'POST') {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTH_TEST_HELPERS !== '1') {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    const parts = url.pathname.split('/')
+    const provider = parts[4] ?? ''
+    if (parts.length !== 6 || parts[5] !== 'callback') {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+
+    try {
+      assertOAuthProvider(provider)
+    } catch {
+      sendJson(res, 400, { ok: false, code: 'unsupported_oauth_provider', error: 'Unsupported OAuth provider' })
+      return
+    }
+
+    const body = await parseBody<{
+      provider?: string
+      providerUserId?: string
+      providerLogin?: string
+      email?: string
+      displayName?: string
+      avatarUrl?: string
+    }>(req)
+    if (!body?.providerUserId || (body.provider && body.provider !== provider)) {
+      sendJson(res, 400, { ok: false, error: 'Invalid OAuth test profile' })
+      return
+    }
+
+    const profile = {
+      provider,
+      providerUserId: body.providerUserId,
+      emailVerified: true,
+      ...(body.providerLogin ? { providerLogin: body.providerLogin } : {}),
+      ...(body.email ? { email: body.email } : {}),
+      ...(body.displayName ? { displayName: body.displayName } : {}),
+      ...(body.avatarUrl ? { avatarUrl: body.avatarUrl } : {}),
+    }
+    const existing = findIdentity(provider, body.providerUserId)
+    if (existing) {
+      const token = createSession(existing.userId)
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
+      return
+    }
+
+    const ticket = createOnboardingTicket(profile)
+    sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
+    return
+  }
+
+  if (req.url?.startsWith('/api/admin/invites')) {
+    const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+    const adminUser = requireAdmin(req, res)
+    if (!adminUser) return
+
+    if (req.method === 'GET' && url.pathname === '/api/admin/invites') {
+      sendJson(res, 200, { ok: true, invites: listInvites() })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/admin/invites') {
+      const body = await parseBody<{ expiresInDays?: number }>(req)
+      const rawDays = typeof body?.expiresInDays === 'number' && Number.isFinite(body.expiresInDays)
+        ? Math.floor(body.expiresInDays)
+        : 7
+      const expiresInDays = Math.min(365, Math.max(1, rawDays))
+      const invite = createInvite(adminUser.id, expiresInDays)
+      sendJson(res, 200, { ok: true, invite })
+      return
+    }
+
+    const revokeMatch = /^\/api\/admin\/invites\/([^/]+)\/revoke$/.exec(url.pathname)
+    if (req.method === 'POST' && revokeMatch) {
+      const ok = revokeInvite(decodeURIComponent(revokeMatch[1]!))
+      sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { ok: false, error: 'Invite not found' })
+      return
+    }
   }
 
   // ── Lobby routes ───────────────────────────────────────
@@ -194,7 +460,7 @@ const server = createServer(async (req, res) => {
 
   // Dissolve a room (HTTP, for lobby use)
   if (req.method === 'POST' && req.url?.startsWith('/api/rooms/') && req.url.endsWith('/dissolve')) {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
@@ -205,7 +471,7 @@ const server = createServer(async (req, res) => {
 
   // Rooms the current user has participated in (SQLite mode only)
   if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     try {
@@ -233,7 +499,7 @@ const server = createServer(async (req, res) => {
       if (existsSync(filePath)) {
         const ext = extname(filePath).toLowerCase()
         const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : ext === '.woff2' ? 'font/woff2' : ext === '.woff' ? 'font/woff' : ext === '.ttf' ? 'font/ttf' : 'application/octet-stream'
-        res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
         res.end(readFileSync(filePath))
         return
       }
@@ -244,7 +510,7 @@ const server = createServer(async (req, res) => {
       if (cdnRes.ok) {
         const contentType = cdnRes.headers.get('content-type') || 'application/octet-stream'
         const buf = await cdnRes.arrayBuffer()
-        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
         res.end(Buffer.from(buf))
         return
       }
@@ -260,7 +526,7 @@ const server = createServer(async (req, res) => {
     if (filename && existsSync(filePath)) {
       const ext = extname(filename).toLowerCase()
       const mime = ext === '.png' ? 'image/png' : ext === '.jpg' ? 'image/jpeg' : 'application/octet-stream'
-      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS })
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400', ...serverCorsHeaders() })
       res.end(readFileSync(filePath))
     } else {
       sendJson(res, 404, { error: 'Not found' })
@@ -270,7 +536,7 @@ const server = createServer(async (req, res) => {
 
   // ── Art upload ─────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/workshop/art') {
-    const token = extractToken(req.headers.authorization)
+    const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const contentLength = parseInt(req.headers['content-length'] ?? '0', 10)
@@ -295,12 +561,14 @@ const server = createServer(async (req, res) => {
 
   // ── Workshop routes ────────────────────────────────────
   if (req.url?.startsWith('/api/workshop/') || req.url?.startsWith('/api/admin/')) {
+    forwardCookieSessionAsBearer(req)
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return
   }
 
   // ── Game routes (existing) ─────────────────────────────
   if (req.url?.startsWith('/api/game/')) {
+    forwardCookieSessionAsBearer(req)
     const handled = await handleGameRoute(req, res)
     if (handled) return
   }

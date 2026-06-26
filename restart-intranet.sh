@@ -419,6 +419,7 @@ if [ -n "$RESET_REASON" ]; then
 fi
 
 echo "Using LAN IP: $LAN_IP"
+PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$LAN_IP:$BACKEND_PORT}"
 echo "Stopping existing processes..."
 stop_port_listeners "$FRONTEND_PORT" "frontend"
 stop_port_listeners "$BACKEND_PORT" "backend"
@@ -453,9 +454,14 @@ fi
 
 echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
+  NODE_ENV=development \
   PERSIST_ROOMS=sqlite \
   ALLOW_ANONYMOUS_WS=true \
+  ENABLE_AUTH_TEST_HELPERS=1 \
   BACKEND_HOST="$LAN_IP" \
+  CORS_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
+  PUBLIC_API_BASE="$PUBLIC_API_BASE" \
+  PUBLIC_APP_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
@@ -477,7 +483,9 @@ if [ "$PREVIEW_ENABLED" -eq 1 ]; then
 else
   echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
+    NODE_ENV=development \
     BACKEND_HOST="$LAN_IP" \
+    VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
     "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 fi
