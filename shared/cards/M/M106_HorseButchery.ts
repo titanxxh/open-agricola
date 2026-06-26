@@ -14,11 +14,19 @@ export const M106_HorseButchery = defineMinorCard({
     ],
     cost: {},
     vp: 3,
+    isCookery: true,
+    exchanges: [
+        { from: { sheep: 1 }, to: { food: 1 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { boar: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { cattle: 1 }, to: { food: 3 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { horse: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { horse: 2 }, to: { food: 5 }, sourceId: CARD_ID, triggers: ['anytime'] },
+    ],
     returnCards: [
         "Major_Moor_HorseSlaughterhouse1",
         "Major_Moor_HorseSlaughterhouse2"
     ],
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
 })

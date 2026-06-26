@@ -885,6 +885,7 @@ import { E99_UncaringParents } from './E/E99_UncaringParents'
 import { M015_PeatBurnOff } from './M/M015_PeatBurnOff'
 import { M016_ClearFelling } from './M/M016_ClearFelling'
 import { M017_Reforestation } from './M/M017_Reforestation'
+import { M018_RegisterOfCraftsmen } from './M/M018_RegisterOfCraftsmen'
 import { M019_LawnTurf } from './M/M019_LawnTurf'
 import { M020_PeatPellets } from './M/M020_PeatPellets'
 import { M021_PeatCuttingExpedition } from './M/M021_PeatCuttingExpedition'
@@ -899,9 +900,12 @@ import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
 import { M032_PeatHut } from './M/M032_PeatHut'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
+import { M062_HearthBrush } from './M/M062_HearthBrush'
+import { M063_PastoralLetter } from './M/M063_PastoralLetter'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
 import { M066_LandParcel } from './M/M066_LandParcel'
 import { M067_ChamberOfCommerce } from './M/M067_ChamberOfCommerce'
+import { M068_Church } from './M/M068_Church'
 import { M069_LeatherSaddle } from './M/M069_LeatherSaddle'
 import { M071_BogBody } from './M/M071_BogBody'
 import { M072_OvenDamper } from './M/M072_OvenDamper'
@@ -930,6 +934,7 @@ import { M104_WildHarvest } from './M/M104_WildHarvest'
 import { M107_PotRoastRecipe } from './M/M107_PotRoastRecipe'
 import { M108_GrainDistillery } from './M/M108_GrainDistillery'
 import { M110_FarmCart } from './M/M110_FarmCart'
+import { M113_LivingHistoryMuseum } from './M/M113_LivingHistoryMuseum'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
 import { M115_OakBark } from './M/M115_OakBark'
 import { M116_MoorBirchTrees } from './M/M116_MoorBirchTrees'
@@ -1851,6 +1856,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M015_PeatBurnOff': M015_PeatBurnOff.impl,
   'M016_ClearFelling': M016_ClearFelling.impl,
   'M017_Reforestation': M017_Reforestation.impl,
+  'M018_RegisterOfCraftsmen': M018_RegisterOfCraftsmen.impl,
   'M019_LawnTurf': M019_LawnTurf.impl,
   'M020_PeatPellets': M020_PeatPellets.impl,
   'M021_PeatCuttingExpedition': M021_PeatCuttingExpedition.impl,
@@ -1865,9 +1871,12 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M032_PeatHut': M032_PeatHut.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
+  'M062_HearthBrush': M062_HearthBrush.impl,
+  'M063_PastoralLetter': M063_PastoralLetter.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
   'M066_LandParcel': M066_LandParcel.impl,
   'M067_ChamberOfCommerce': M067_ChamberOfCommerce.impl,
+  'M068_Church': M068_Church.impl,
   'M069_LeatherSaddle': M069_LeatherSaddle.impl,
   'M071_BogBody': M071_BogBody.impl,
   'M072_OvenDamper': M072_OvenDamper.impl,
@@ -1896,6 +1905,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M107_PotRoastRecipe': M107_PotRoastRecipe.impl,
   'M108_GrainDistillery': M108_GrainDistillery.impl,
   'M110_FarmCart': M110_FarmCart.impl,
+  'M113_LivingHistoryMuseum': M113_LivingHistoryMuseum.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
   'M115_OakBark': M115_OakBark.impl,
   'M116_MoorBirchTrees': M116_MoorBirchTrees.impl,
