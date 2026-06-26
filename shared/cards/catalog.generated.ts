@@ -15490,6 +15490,13 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "prerequisite": "3 Rooms",
     "implemented": true,
     "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "cut-peat",
+        "resource": "wood",
+        "amount": 2
+      }
+    ],
     "kind": "minor"
   },
   {
@@ -15585,6 +15592,13 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "prerequisite": "1 Major Improvement",
     "implemented": true,
     "requiresFarmersOfTheMoor": true,
+    "moorSpecialActionBonuses": [
+      {
+        "actionId": "fell-trees",
+        "resource": "reed",
+        "amount": 1
+      }
+    ],
     "kind": "minor"
   },
   {
