@@ -63,6 +63,14 @@ const getDeckFromId = (cardId: string): string | undefined => {
   return match ? match[1] : undefined
 }
 
+const getPlayer56PortraitUrl = (numbering: string): string => `/assets/player56/${numbering}.png`
+
+const PLAYER56_PORTRAITS = new Set(
+  ['A', 'B', 'C', 'D'].flatMap((deck) =>
+    Array.from({ length: 12 }, (_, index) => `${deck}${169 + index}`),
+  ),
+)
+
 const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   const positions: Record<string, { x: string; y: string }> = {
     Major_Fireplace1: { x: '0%', y: '0%' },
@@ -190,6 +198,8 @@ export const PlayerCard = ({
 
   const numbering = getCardNumbering(cardId)
   const deck = getDeckFromId(cardId)
+  const customArt = getCustomCardArtUrl(cardId)
+  const hasPlayer56Portrait = cardType !== 'major' && !customArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
     if (cardType === 'major') {
@@ -199,7 +209,6 @@ export const PlayerCard = ({
       }
     }
     // Custom card art: use the uploaded image URL
-    const customArt = getCustomCardArtUrl(cardId)
     if (customArt) {
       // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
       const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
@@ -218,10 +227,15 @@ export const PlayerCard = ({
       E: 'deckE',
     }
     const deckName = deck ? deckMap[deck] : 'deckA'
+    if (hasPlayer56Portrait) {
+      return {
+        backgroundImage: `url(${getPlayer56PortraitUrl(numbering)})`,
+      }
+    }
     return {
       backgroundImage: `url(/bga-img/${deckName}/${numbering}.png)`,
     }
-  }, [cardType, cardId, deck, numbering])
+  }, [cardType, cardId, customArt, deck, hasPlayer56Portrait, numbering])
 
   if (!cardData) return null
 
