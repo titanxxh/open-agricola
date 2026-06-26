@@ -14,6 +14,7 @@ describe('restart-intranet preview mode', () => {
   it('builds the frontend and serves dist through vite preview', () => {
     expect(script).toContain('VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT"')
     expect(script).toContain('VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws"')
+    expect(script).toMatch(/VITE_ENABLE_DEV_AUTH_SHORTCUTS=1[\s\\]+"?\$PNPM_BIN"? run build/)
     expect(script).toContain('"$PNPM_BIN" run build')
     expect(script).toContain('"$FRONTEND_BIN" preview')
   })
@@ -25,5 +26,15 @@ describe('restart-intranet preview mode', () => {
     expect(script).toContain('BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL"')
     expect(script).toContain('"$SCRIPT_DIR/dist/bga-img"')
     expect(script).toContain('cp -R "$BGA_IMAGE_DIR"/. "$SCRIPT_DIR/dist/bga-img"/')
+  })
+
+  it('documents and wires --moor for fixed dev rooms', () => {
+    expect(script).toContain('[--parents] [--seasons] [--moor] [--draft] [--preview]')
+    expect(script).toContain('--moor')
+    expect(script).toMatch(/MOOR_ENABLED=0/)
+    expect(script).toMatch(/--moor\)\s*MOOR_ENABLED=1/s)
+    expect(script).toContain('DEV_ENABLE_FARMERS_OF_THE_MOOR="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)"')
+    expect(script).toContain('DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)"')
+    expect(script).toContain('&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true')
   })
 })

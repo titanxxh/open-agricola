@@ -203,6 +203,8 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('farm-terrain-forest')
     expect(html).toContain('farm-terrain-moor')
+    expect(html).toContain('farm-terrain-sprite-forest')
+    expect(html).toContain('farm-terrain-sprite-moor')
     expect(html).toContain('Forest')
     expect(html).toContain('Moor')
     expect(html).toContain('res-icon-fuel')

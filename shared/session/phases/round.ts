@@ -220,6 +220,19 @@ export const takeSpecialAction = (
 
   const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!result.ok) return core.emitResponse(false, result.error)
+  if (result.followUpFlow) {
+    const frame = core.buildAdhocEngineFrame('improvement', undefined, result.followUpFlow)
+    core.pushEngineFrame({
+      ...frame,
+      ownerPlayerIndex: playerIndex,
+      spaceId: '__subflow:top-level',
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason: 'top-level',
+    })
+    core.driveEngineSteps()
+    return core.emitResponse()
+  }
   if (core.hasPendingAnimalsCheck(player)) {
     core.startReorgSubFlow(playerIndex, 'anytime', { originPlayerIndex: playerIndex })
     return core.emitResponse()

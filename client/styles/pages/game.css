@@ -885,42 +885,62 @@
 }
 .special-actions-panel__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 8px;
 }
 .special-action-card {
-  min-height: 56px;
   border: 1px solid #b7c3a8;
   border-radius: 8px;
-  background: #f6fbf0;
+  background: #f7f4e7;
   color: #1f2d20;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  padding: 8px 10px;
-  cursor: pointer;
-  text-align: left;
+  gap: 6px;
+  padding: 6px;
 }
-.special-action-card:hover:not(:disabled) {
+.special-action-card--disabled {
+  opacity: 0.62;
+}
+.special-action-card__image {
+  width: 100%;
+  aspect-ratio: 690 / 1063;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: 5px;
+  display: block;
+}
+.special-action-card__actions {
+  display: grid;
+  gap: 4px;
+}
+.special-action-card__action {
+  min-height: 28px;
+  border: 1px solid #b7c3a8;
+  border-radius: 6px;
+  background: #f6fbf0;
+  color: #1f2d20;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  padding: 5px 6px;
+}
+.special-action-card__action:hover:not(:disabled) {
   border-color: #5f7d52;
   background: #eef7e5;
 }
-.special-action-card:disabled {
+.special-action-card__action:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.special-action-card.selected {
+.special-action-card__action.selected {
   border-color: #245e47;
   box-shadow: inset 0 0 0 1px #245e47;
-}
-.special-action-card__name {
-  font-size: 13px;
-  font-weight: 700;
 }
 .special-action-card__status {
   font-size: 11px;
   color: #516050;
+  text-align: center;
 }
 .game-layout__center {
   min-width: 0;
@@ -2913,6 +2933,7 @@
   pointer-events: none;
 }
 .farm-node-background .empty-node,
+.farm-node-background .farm-terrain-sprite,
 .farm-node-background .meeple-field,
 .farm-node-background .meeple-roomWood,
 .farm-node-background .meeple-roomClay,
@@ -2924,6 +2945,17 @@
   background-image: url('/bga-img/empty_slots.png');
   background-repeat: no-repeat;
   background-size: 700% 100%;
+}
+.farm-node-background .farm-terrain-sprite {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+.farm-node-background .farm-terrain-sprite-forest {
+  background-image: url('/assets/moor/terrain/forest.webp');
+}
+.farm-node-background .farm-terrain-sprite-moor {
+  background-image: url('/assets/moor/terrain/moor.webp');
 }
 .empty-node-0 { background-position-x: 0%; }
 .empty-node-1 { background-position-x: 16.6667%; }
@@ -3053,11 +3085,11 @@
   color: #203912;
 }
 .farm-tile.farm-terrain-forest {
-  background: #3f7a47;
+  background: transparent;
   color: #f5ffe8;
 }
 .farm-tile.farm-terrain-moor {
-  background: #765f83;
+  background: transparent;
   color: #fff2dc;
 }
 .farm-tile.stable {

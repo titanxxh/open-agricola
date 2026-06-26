@@ -35,6 +35,7 @@ export type MoorSpecialActionCardState = {
   id: string
   players: number[]
   actions: MoorSpecialActionId[]
+  image: string
   location: MoorSpecialActionCardLocation
 }
 
