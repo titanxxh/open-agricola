@@ -1,6 +1,22 @@
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
+import { allImprovementCount, unusedFarmyardSpaces } from './moor-batch1-helpers'
 
 const CARD_ID = 'M019_LawnTurf'
+
+const cardImpl = {
+  prerequisiteCheck: (player) => allImprovementCount(player) >= 4,
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      const fuel = unusedFarmyardSpaces(player) - 2
+      if (fuel < 1 || fuel > 5) return
+      return gainLeaf(CARD_ID, { fuel })
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M019_LawnTurf = defineMinorCard({
   meta: {
@@ -15,7 +31,10 @@ export const M019_LawnTurf = defineMinorCard({
     cost: {},
     prerequisite: "4 Improvements",
     passing: true,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M019_LawnTurf_impl = M019_LawnTurf.impl
