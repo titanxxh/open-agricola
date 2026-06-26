@@ -8,6 +8,7 @@ export type SelectionEffectContext = {
   cards: string[]
   sourceCard: string | undefined
   state: GameState
+  actionContext?: Record<string, unknown>
 }
 
 export type SelectionEffectHandler = (

@@ -882,15 +882,22 @@ import { E96_Elder } from './E/E96_Elder'
 import { E97_Beneficiary } from './E/E97_Beneficiary'
 import { E98_Prodigy } from './E/E98_Prodigy'
 import { E99_UncaringParents } from './E/E99_UncaringParents'
+import { M015_PeatBurnOff } from './M/M015_PeatBurnOff'
+import { M016_ClearFelling } from './M/M016_ClearFelling'
+import { M017_Reforestation } from './M/M017_Reforestation'
 import { M019_LawnTurf } from './M/M019_LawnTurf'
 import { M020_PeatPellets } from './M/M020_PeatPellets'
+import { M021_PeatCuttingExpedition } from './M/M021_PeatCuttingExpedition'
 import { M022_EcologicalNiche } from './M/M022_EcologicalNiche'
 import { M024_BasicSupplies } from './M/M024_BasicSupplies'
 import { M025_HouseholdInventory } from './M/M025_HouseholdInventory'
 import { M026_ChimneyHood } from './M/M026_ChimneyHood'
 import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
+import { M040_MoorFire } from './M/M040_MoorFire'
+import { M042_DeepPlow } from './M/M042_DeepPlow'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
+import { M066_LandParcel } from './M/M066_LandParcel'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M100_Pheromones } from './M/M100_Pheromones'
 import { M075_FuelStorage } from './M/M075_FuelStorage'
@@ -1806,15 +1813,22 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E97_Beneficiary': E97_Beneficiary.impl,
   'E98_Prodigy': E98_Prodigy.impl,
   'E99_UncaringParents': E99_UncaringParents.impl,
+  'M015_PeatBurnOff': M015_PeatBurnOff.impl,
+  'M016_ClearFelling': M016_ClearFelling.impl,
+  'M017_Reforestation': M017_Reforestation.impl,
   'M019_LawnTurf': M019_LawnTurf.impl,
   'M020_PeatPellets': M020_PeatPellets.impl,
+  'M021_PeatCuttingExpedition': M021_PeatCuttingExpedition.impl,
   'M022_EcologicalNiche': M022_EcologicalNiche.impl,
   'M024_BasicSupplies': M024_BasicSupplies.impl,
   'M025_HouseholdInventory': M025_HouseholdInventory.impl,
   'M026_ChimneyHood': M026_ChimneyHood.impl,
   'M028_OutOnTheWallaby': M028_OutOnTheWallaby.impl,
   'M029_Tinker': M029_Tinker.impl,
+  'M040_MoorFire': M040_MoorFire.impl,
+  'M042_DeepPlow': M042_DeepPlow.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
+  'M066_LandParcel': M066_LandParcel.impl,
   'M080_AdvancePayment': M080_AdvancePayment.impl,
   'M100_Pheromones': M100_Pheromones.impl,
   'M075_FuelStorage': M075_FuelStorage.impl,

@@ -185,15 +185,22 @@ describe('Card Source representative migrations', () => {
       .filter((entry) => entry.meta.type === 'minor' && entry.meta.deck === 'M')
       .sort((a, b) => a.meta.number - b.meta.number)
     const implementedMoorMinorIds = [
+      'M015_PeatBurnOff',
+      'M016_ClearFelling',
+      'M017_Reforestation',
       'M019_LawnTurf',
       'M020_PeatPellets',
+      'M021_PeatCuttingExpedition',
       'M022_EcologicalNiche',
       'M024_BasicSupplies',
       'M025_HouseholdInventory',
       'M026_ChimneyHood',
       'M028_OutOnTheWallaby',
       'M029_Tinker',
+      'M040_MoorFire',
+      'M042_DeepPlow',
       'M065_FireBrigade',
+      'M066_LandParcel',
       'M080_AdvancePayment',
       'M100_Pheromones',
       'M075_FuelStorage',

@@ -32,6 +32,7 @@ const getOccupiedKeys = (player: PlayerState) => {
   player.fields.forEach((field) =>
     keys.add(positionKey({ row: field.row, col: field.col })),
   )
+  player.farmTerrain?.forEach((tile) => keys.add(positionKey(tile)))
   player.stableTiles.forEach((tile) => keys.add(positionKey(tile)))
   player.pastures.forEach((pasture) => {
     pasture.tiles.forEach((tile) => keys.add(positionKey(tile)))

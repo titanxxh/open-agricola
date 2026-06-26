@@ -4851,13 +4851,19 @@ export class GameCore {
     if (positions.length > maxSelections) {
       return this.respond(false, 'too many selection positions')
     }
+    const hasExplicitSelectableTiles = Array.isArray(interactionContext?.selectableTiles)
     const selectedKeys = new Set<string>()
     for (const pos of positions) {
+      if (!Number.isInteger(pos.row) || !Number.isInteger(pos.col)) {
+        return this.respond(false, 'invalid selection position')
+      }
       const key = `${pos.row}-${pos.col}`
       if (selectedKeys.has(key)) return this.respond(false, 'duplicate selection position')
       selectedKeys.add(key)
-      const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
-      if (!exists) return this.respond(false, 'invalid field position')
+      if (!hasExplicitSelectableTiles) {
+        const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
+        if (!exists) return this.respond(false, 'invalid field position')
+      }
     }
     const selectionInteraction = playerBoard(this.state, playerIndex)
       .farmyard
