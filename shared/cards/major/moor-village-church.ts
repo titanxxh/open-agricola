@@ -38,7 +38,7 @@ export const Major_Moor_VillageChurch = defineMajorCard({
     desc: [
       '[Harvest]',
       '1<FUEL> <ARROW-1X> 1<SCORE>',
-      'Immediately gain 2 food.',
+      'Immediately gain 2<FOOD>.',
     ],
   } satisfies CardSourceMetaInput,
   impl: cardImpl,

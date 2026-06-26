@@ -29,9 +29,9 @@ export const Major_Moor_ForestersLodge = defineMajorCard({
     ],
     desc: [
       '[Special action: Fell Trees]',
-      'Gain 1 extra wood, or 2 extra wood if you have at least 1 horse.',
+      'Gain 1 extra <WOOD>, or 2 extra <WOOD> if you have at least 1<HORSE>.',
       '[Scoring]',
-      'Gain 1 bonus point for each forest in your farmyard.',
+      'Gain 1 <SCORE> for each forest in your farmyard.',
     ],
   } satisfies CardSourceMetaInput,
   impl: cardImpl,

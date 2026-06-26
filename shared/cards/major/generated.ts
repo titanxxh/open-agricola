@@ -903,7 +903,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     ],
     "desc": [
       "[Special action: Cut Peat]",
-      "+1<FUEL> if you have 0 horses; +2<FUEL> if you have at least 1 horse.",
+      "+1<FUEL> if you have 0<HORSE>; +2<FUEL> if you have at least 1<HORSE>.",
       "[Scoring]",
       "3/5<FUEL> <ARROW-1X> 1/2<SCORE>"
     ],
@@ -932,9 +932,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     ],
     "desc": [
       "[Special action: Fell Trees]",
-      "Gain 1 extra wood, or 2 extra wood if you have at least 1 horse.",
+      "Gain 1 extra <WOOD>, or 2 extra <WOOD> if you have at least 1<HORSE>.",
       "[Scoring]",
-      "Gain 1 bonus point for each forest in your farmyard."
+      "Gain 1 <SCORE> for each forest in your farmyard."
     ],
     "kind": "major"
   },
@@ -953,8 +953,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": false,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Place 1 food on each remaining round space.",
-      "At the start of each round, gain that food if you have at least 2 horses."
+      "Place 1 <FOOD> on each remaining round space.",
+      "At the start of each round, gain that <FOOD> if you have at least 2<HORSE>."
     ],
     "kind": "major"
   },
@@ -997,7 +997,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "heatingRoomDiscount": 1,
     "desc": [
-      "Immediately gain 2 fuel.",
+      "Immediately gain 2<FUEL>.",
       "When heating, heat 1 fewer room than you have."
     ],
     "kind": "major"
@@ -1018,7 +1018,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "heatingFuelCap": 1,
     "desc": [
-      "Regardless of house size, you need at most 1 fuel to heat your entire home."
+      "Regardless of house size, you need at most 1<FUEL> to heat your entire home."
     ],
     "kind": "major"
   },
@@ -1038,7 +1038,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "desc": [
       "[Harvest]",
       "1<FUEL> <ARROW-1X> 1<SCORE>",
-      "Immediately gain 2 food."
+      "Immediately gain 2<FOOD>."
     ],
     "kind": "major"
   },

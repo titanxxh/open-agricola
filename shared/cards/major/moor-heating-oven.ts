@@ -26,7 +26,7 @@ export const Major_Moor_HeatingOven = defineMajorCard({
     requiresFarmersOfTheMoor: true,
     heatingRoomDiscount: 1,
     desc: [
-      'Immediately gain 2 fuel.',
+      'Immediately gain 2<FUEL>.',
       'When heating, heat 1 fewer room than you have.',
     ],
   } satisfies CardSourceMetaInput,

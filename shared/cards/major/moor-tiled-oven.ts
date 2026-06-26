@@ -17,7 +17,7 @@ export const Major_Moor_TiledOven = defineMajorCard({
     requiresFarmersOfTheMoor: true,
     heatingFuelCap: 1,
     desc: [
-      'Regardless of house size, you need at most 1 fuel to heat your entire home.',
+      'Regardless of house size, you need at most 1<FUEL> to heat your entire home.',
     ],
   } satisfies CardSourceMetaInput,
 })
