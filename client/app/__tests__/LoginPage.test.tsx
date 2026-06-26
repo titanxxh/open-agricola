@@ -286,4 +286,18 @@ describe('LoginPage auth UI', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('邮箱尚未验证')
   })
+
+  it('lets unverified users request another verification email after login fails', async () => {
+    const user = userEvent.setup()
+    mockUseAuthLoginResult({ ok: false, code: 'email_not_verified', error: 'Email has not been verified' })
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('用户名'), 'localuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '登录' }))
+    await user.type(screen.getByLabelText('邮箱'), 'local@example.com')
+    await user.click(screen.getByRole('button', { name: '重发验证邮件' }))
+
+    expect(resendVerificationMock).toHaveBeenCalledWith('local@example.com')
+  })
 })
