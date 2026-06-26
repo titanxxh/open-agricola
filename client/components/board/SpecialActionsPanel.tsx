@@ -60,34 +60,36 @@ export function SpecialActionsPanel({
               key={card.id}
               className={`special-action-card${cardUsable ? '' : ' special-action-card--disabled'}`}
             >
-              <img className="special-action-card__image" src={card.image} alt={cardLabel} />
+              <div className="special-action-card__image-wrap">
+                <img className="special-action-card__image" src={card.image} alt={cardLabel} />
+                <div className={`special-action-card__image-actions action-count-${card.actions.length}`}>
+                  {card.actions.map((actionId) => {
+                    const label = specialActionLabel(locale, actionId)
+                    const available = cardUsable && canTakeSpecialAction(card, actionId)
+                    const isSelected = selected?.cardId === card.id && selected.actionId === actionId
+                    return (
+                      <button
+                        key={`${card.id}:${actionId}`}
+                        type="button"
+                        className={`special-action-card__image-action${isSelected ? ' selected' : ''}`}
+                        disabled={!available}
+                        aria-label={label}
+                        aria-pressed={isSelected}
+                        title={label}
+                        onClick={() => {
+                          if (isMoorTerrainAction(actionId)) {
+                            onSelectTerrainAction(card.id, actionId)
+                            return
+                          }
+                          onTakeImmediateAction(card.id, actionId)
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
               <div className="special-action-card__status">
                 {locationLabel(locale, card, currentPlayerId)}
-              </div>
-              <div className="special-action-card__actions">
-                {card.actions.map((actionId) => {
-                  const label = specialActionLabel(locale, actionId)
-                  const available = cardUsable && canTakeSpecialAction(card, actionId)
-                  const isSelected = selected?.cardId === card.id && selected.actionId === actionId
-                  return (
-                    <button
-                      key={`${card.id}:${actionId}`}
-                      type="button"
-                      className={`special-action-card__action${isSelected ? ' selected' : ''}`}
-                      disabled={!available}
-                      aria-pressed={isSelected}
-                      onClick={() => {
-                        if (isMoorTerrainAction(actionId)) {
-                          onSelectTerrainAction(card.id, actionId)
-                          return
-                        }
-                        onTakeImmediateAction(card.id, actionId)
-                      }}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
               </div>
             </div>
           )
