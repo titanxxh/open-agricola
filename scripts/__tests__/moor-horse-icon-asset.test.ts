@@ -19,6 +19,14 @@ describe('Farmers of the Moor horse icon asset', () => {
     })
   })
 
+  it('uses the transparent fuel icon extracted from the rulebook components list', () => {
+    expect(readPngHeader('public/assets/moor/icons/fuel.png')).toEqual({
+      width: 96,
+      height: 96,
+      colorType: 6,
+    })
+  })
+
   it('uses the transparent Farmers of the Moor major deck icon asset', () => {
     expect(readPngHeader('public/assets/moor/icons/major-deck-m.png')).toEqual({
       width: 96,

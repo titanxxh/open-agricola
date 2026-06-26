@@ -3815,10 +3815,12 @@
   background-repeat: no-repeat;
 }
 .res-icon-fuel {
-  width: 0.72em;
-  height: 0.84em;
-  border-radius: 50% 50% 48% 48%;
-  background: radial-gradient(circle at 50% 35%, #ffd166 0 22%, #ef7b2d 23% 58%, #3a2a28 59%);
+  width: 0.8em;
+  height: 0.8em;
+  background-image: url('/assets/moor/icons/fuel.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
