@@ -29,6 +29,7 @@ export const Major_Moor_RidingStables = defineMajorCard({
     name: 'Riding Stables',
     deck: 'major',
     number: 107,
+    category: 'FOOD_PROVIDER',
     cost: { wood: 2, clay: 1, reed: 1 },
     vp: 3,
     extraVp: false,

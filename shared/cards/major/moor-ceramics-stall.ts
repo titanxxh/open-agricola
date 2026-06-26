@@ -9,6 +9,7 @@ export const Major_Moor_CeramicsStall = defineMajorCard({
     name: 'Ceramics Stall',
     deck: 'major',
     number: 113,
+    category: 'BUILDING_RESOURCE_PROVIDER',
     cost: { clay: 1, stone: 1 },
     vp: 2,
     extraVp: false,

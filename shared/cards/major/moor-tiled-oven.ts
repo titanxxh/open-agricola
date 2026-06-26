@@ -9,6 +9,7 @@ export const Major_Moor_TiledOven = defineMajorCard({
     name: 'Tiled Oven',
     deck: 'major',
     number: 110,
+    category: 'GOODS_PROVIDER',
     cost: { clay: 2, stone: 1 },
     vp: 1,
     extraVp: false,

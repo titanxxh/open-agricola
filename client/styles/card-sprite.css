@@ -299,6 +299,12 @@
 .card-players[data-n='2+'] { background-position: 86.8205% 14.8718%; background-size: 2089.8%; }
 .card-players[data-n='3+'] { background-position: 92.359% 14.8718%; background-size: 2089.8%; }
 .card-players[data-n='4+'] { background-position: 97.8974% 14.8718%; background-size: 2089.8%; }
+.card-players[data-n='5+'] {
+  background-image: url('/assets/player56/players-5-plus.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
 
 /* Card deck indicator */
 .card-deck {
@@ -336,24 +342,10 @@
 }
 
 .card-deck[data-deck="M"] {
-  background-image: none;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4c7f3a 0%, #7fa64a 100%);
-  border: 1px solid #23451f;
-  box-shadow: inset 0 0 0 2px rgba(255, 242, 170, 0.55);
-  color: #f8f4d8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-family: Georgia, serif;
-  font-weight: 700;
-  line-height: 1;
-  text-shadow: 0 1px 1px #1f3117;
-}
-
-.card-deck[data-deck="M"]::before {
-  content: "M";
+  background-image: url('/assets/moor/icons/major-deck-m.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 /* Card category icon */

@@ -55,21 +55,26 @@ type MoorMajorDisplay = {
   imageUrl?: string
 }
 
+const moorMajorDisplay = (numbering: string, hasArt = true): MoorMajorDisplay => ({
+  numbering,
+  imageUrl: hasArt ? `/assets/moor/major/${numbering}.png` : undefined,
+})
+
 const MOOR_MAJOR_DISPLAY: Record<string, MoorMajorDisplay> = {
-  Major_Moor_HorseSlaughterhouse1: { numbering: 'M001', imageUrl: '/assets/moor/major/M001.png' },
-  Major_Moor_HorseSlaughterhouse2: { numbering: 'M002', imageUrl: '/assets/moor/major/M002.png' },
-  Major_Moor_Cookhouse1: { numbering: 'M003', imageUrl: '/assets/moor/major/M003.png' },
-  Major_Moor_Cookhouse2: { numbering: 'M004', imageUrl: '/assets/moor/major/M004.png' },
-  Major_Moor_VillageChurch: { numbering: 'M005', imageUrl: '/assets/moor/major/M005.png' },
-  Major_Moor_HeatingOven: { numbering: 'M006', imageUrl: '/assets/moor/major/M006.png' },
-  Major_Moor_TiledOven: { numbering: 'M007', imageUrl: '/assets/moor/major/M007.png' },
-  Major_Moor_FurnitureStall: { numbering: 'M008', imageUrl: '/assets/moor/major/M008.png' },
-  Major_Moor_CeramicsStall: { numbering: 'M009', imageUrl: '/assets/moor/major/M009.png' },
-  Major_Moor_BasketStall: { numbering: 'M010', imageUrl: '/assets/moor/major/M010.png' },
-  Major_Moor_PeatCharcoalKiln: { numbering: 'M011', imageUrl: '/assets/moor/major/M011.png' },
-  Major_Moor_ForestersLodge: { numbering: 'M012' },
-  Major_Moor_MuseumOfTheMoors: { numbering: 'M013', imageUrl: '/assets/moor/major/M013.png' },
-  Major_Moor_RidingStables: { numbering: 'M014', imageUrl: '/assets/moor/major/M014.png' },
+  Major_Moor_HorseSlaughterhouse1: moorMajorDisplay('M001'),
+  Major_Moor_HorseSlaughterhouse2: moorMajorDisplay('M002'),
+  Major_Moor_Cookhouse1: moorMajorDisplay('M003'),
+  Major_Moor_Cookhouse2: moorMajorDisplay('M004'),
+  Major_Moor_VillageChurch: moorMajorDisplay('M005'),
+  Major_Moor_HeatingOven: moorMajorDisplay('M006'),
+  Major_Moor_TiledOven: moorMajorDisplay('M007'),
+  Major_Moor_FurnitureStall: moorMajorDisplay('M008'),
+  Major_Moor_CeramicsStall: moorMajorDisplay('M009'),
+  Major_Moor_BasketStall: moorMajorDisplay('M010'),
+  Major_Moor_PeatCharcoalKiln: moorMajorDisplay('M011'),
+  Major_Moor_ForestersLodge: moorMajorDisplay('M012', false),
+  Major_Moor_MuseumOfTheMoors: moorMajorDisplay('M013'),
+  Major_Moor_RidingStables: moorMajorDisplay('M014'),
 }
 
 const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => MOOR_MAJOR_DISPLAY[cardId]
@@ -183,6 +188,7 @@ export const PlayerCard = ({
         name: t(locale, `improvements.${cardId}.name`),
         description: (meta.desc ?? []).join('\n'),
         cost: { ...emptyResources, ...baseCost },
+        category: meta.category,
         returnCards: meta.returnCards,
         vp: meta.vp,
         isCookery: meta.isCookery,

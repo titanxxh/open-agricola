@@ -18,6 +18,7 @@ export const Major_Moor_HeatingOven = defineMajorCard({
     name: 'Heating Oven',
     deck: 'major',
     number: 109,
+    category: 'GOODS_PROVIDER',
     cost: { clay: 1, stone: 1 },
     vp: 1,
     extraVp: false,

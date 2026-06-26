@@ -824,7 +824,7 @@ export const en = {
     Major_Moor_PeatCharcoalKiln: { name: 'Peat-charcoal Kiln', description: 'Gain extra fuel from Cut Peat and score fuel bonus points.' },
     Major_Moor_ForestersLodge: { name: "Forester's Lodge", description: 'Gain extra wood from Fell Trees and score forests.' },
     Major_Moor_RidingStables: { name: 'Riding Stables', description: 'Place future food that pays out while you have at least 2 horses.' },
-    Major_Moor_MuseumOfTheMoors: { name: 'Museum of the Moors', description: 'Selected major improvements cost 1 fewer building resource.' },
+    Major_Moor_MuseumOfTheMoors: { name: 'Museum of the Moors', description: 'Well, Clay Oven, Joinery, Stone Oven, Pottery, Forester\'s Lodge, and Basketmaker\'s Workshop cost 1 listed building resource less.' },
     Major_Moor_HeatingOven: { name: 'Heating Oven', description: 'Gain 2 fuel and heat 1 fewer room.' },
     Major_Moor_TiledOven: { name: 'Tiled Oven', description: 'Heat your entire home for at most 1 fuel.' },
     Major_Moor_VillageChurch: { name: 'Village Church', description: 'Gain 2 food and convert fuel to bonus points during harvest.' },

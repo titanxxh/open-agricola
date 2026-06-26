@@ -25,6 +25,7 @@ export const Major_Moor_PeatCharcoalKiln = defineMajorCard({
     name: 'Peat-charcoal Kiln',
     deck: 'major',
     number: 105,
+    category: 'GOODS_PROVIDER',
     cost: { stone: 1 },
     vp: 1,
     extraVp: true,

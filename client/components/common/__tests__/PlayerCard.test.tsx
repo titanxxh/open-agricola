@@ -81,6 +81,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
     expect(html).toContain('/assets/player56/A169.png')
     expect(html).not.toContain('/bga-img/deckA/A169.png')
+    expect(html).toContain('data-n="5+"')
   })
 
   it('uses the local player56 portrait range beyond A169 on first render', () => {
@@ -152,6 +153,36 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-moor-major="true"')
     expect(html).toContain('data-deck="M"')
     expect(html).toContain('/assets/moor/major/M001.png')
+  })
+
+  it('renders Moor major printed marker icons from BGA category sprite metadata', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_MuseumOfTheMoors" cardType="major" />,
+    )
+
+    expect(html).toContain('class="card-category"')
+    expect(html).toContain('data-category="BUILDING_RESOURCE_PROVIDER"')
+    expect(html).not.toContain('card-moor-major-marker')
+    expect(html).not.toContain('/assets/moor/icons/M013-marker.png')
+  })
+
+  it('renders Museum of the Moors discount list like the scanned card', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_MuseumOfTheMoors" cardType="major" />,
+    )
+
+    expect(html).toContain('These major improvements cost you 1 building resource less:')
+    expect(html).toContain('Well')
+    expect(html).toContain('Clay Oven')
+    expect(html).toContain('Joinery')
+    expect(html).toContain('Stone Oven')
+    expect(html).toContain('Pottery')
+    expect(html).toContain('Forester')
+    expect(html).toContain('Basketmaker')
+    expect(html).toContain('res-icon-stone')
+    expect(html).toContain('res-icon-clay')
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-reed')
   })
 
   it('renders Cookhouse return cost as both Fireplace and Cooking Hearth families', () => {

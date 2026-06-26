@@ -9,6 +9,7 @@ export const Major_Moor_BasketStall = defineMajorCard({
     name: 'Basket Stall',
     deck: 'major',
     number: 114,
+    category: 'BUILDING_RESOURCE_PROVIDER',
     cost: { reed: 1, stone: 1 },
     vp: 2,
     extraVp: false,
