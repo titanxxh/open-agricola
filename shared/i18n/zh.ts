@@ -589,6 +589,7 @@ export const zh = {
     'moor-infirmary': { name: '医务室', description: '获得 1 食物。病床人物只能使用这里。' },
     'moor-resource-market-12': { name: '资源市场', description: '获得 1 食物和 1 石料' },
     'moor-wood-to-fuel': { name: '木材换燃料', description: '将 1 木材转换为 1 燃料' },
+    'moor-special-action-apply': { name: '沼泽特殊行动', description: '结算沼泽农夫特殊行动' },
     'meeting-place': { name: '集会所', description: '成为起始玩家并可打出 1 张改良' },
     lessons: { name: '课程', description: '打出 1 张职业（首次免费）' },
     'lessons-3': { name: '课程（3人）', description: '打出 1 张职业（支付 2 食物）' },

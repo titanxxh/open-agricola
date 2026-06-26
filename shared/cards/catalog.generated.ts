@@ -14088,7 +14088,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "prerequisite": "Play in Round 4 or Before",
     "maxRound": 4,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14105,7 +14105,10 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 1
     },
     "prerequisite": "No Improvements",
-    "implemented": false,
+    "improvementPrerequisites": {
+      "max": 0
+    },
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14152,7 +14155,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "2 Major Improvements",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14170,7 +14173,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "prerequisite": "Play in Round 2 or Before",
     "maxRound": 2,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

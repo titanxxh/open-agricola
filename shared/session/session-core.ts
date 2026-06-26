@@ -170,6 +170,7 @@ import {
   canEnterSpace,
   computeAllowedPlacementSpaces,
 } from '../actions/helpers/placement-availability.ts'
+import { buildPlaceTerrainFlow } from '../moor/terrain-flow.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 import {
   computeAnytimePolicy,
@@ -306,7 +307,7 @@ const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
   'onEndHarvestFieldPhase',
 ])
 
-type FutureMeepleActionKey = 'field' | 'stable'
+type FutureMeepleActionKey = 'field' | 'stable' | 'forest' | 'moor'
 
 const futureMeepleActionCount = (
   entry: GameState['futureMeeples'][number],
@@ -2447,6 +2448,7 @@ export class GameCore {
       if (entry.round !== this.state.round) continue
       const playerIndex = this.state.players.findIndex((player) => player.id === entry.playerId)
       if (playerIndex === -1) continue
+      const player = this.state.players[playerIndex]!
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
       const receiveResources: Partial<Resource> = {}
       if (this.futureMeepleResourceConditionMet(entry)) {
@@ -2490,6 +2492,18 @@ export class GameCore {
             actionContext: { max: 1, exactCost: { max: 1 }, ...actionContext, trueAction: false },
           }],
         })
+      }
+      for (const kind of ['forest', 'moor'] as const) {
+        for (let i = 0; i < futureMeepleActionCount(entry, kind); i += 1) {
+          const flow = buildPlaceTerrainFlow(entry.cardId, player, kind)
+          if (!flow) continue
+          children.push({
+            type: 'seq',
+            optional: true,
+            targetPlayerId: entry.playerId,
+            children: [flow],
+          })
+        }
       }
     }
     for (const [playerId, entries] of [...receiveEntriesByPlayer.entries()].reverse()) {

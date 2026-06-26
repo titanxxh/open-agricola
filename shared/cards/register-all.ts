@@ -902,6 +902,10 @@ import { M036_PeatMoss } from './M/M036_PeatMoss'
 import { M037_BuildingPlan } from './M/M037_BuildingPlan'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
+import { M044_Swamp } from './M/M044_Swamp'
+import { M045_TreeNursery } from './M/M045_TreeNursery'
+import { M048_ForestSwamp } from './M/M048_ForestSwamp'
+import { M049_SurveyorsMap } from './M/M049_SurveyorsMap'
 import { M061_HayWagon } from './M/M061_HayWagon'
 import { M062_HearthBrush } from './M/M062_HearthBrush'
 import { M063_PastoralLetter } from './M/M063_PastoralLetter'
@@ -1877,6 +1881,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M037_BuildingPlan': M037_BuildingPlan.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
+  'M044_Swamp': M044_Swamp.impl,
+  'M045_TreeNursery': M045_TreeNursery.impl,
+  'M048_ForestSwamp': M048_ForestSwamp.impl,
+  'M049_SurveyorsMap': M049_SurveyorsMap.impl,
   'M061_HayWagon': M061_HayWagon.impl,
   'M062_HearthBrush': M062_HearthBrush.impl,
   'M063_PastoralLetter': M063_PastoralLetter.impl,
