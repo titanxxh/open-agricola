@@ -17,6 +17,8 @@ import { M127_Wheelbarrow } from '../../shared/cards/M/M127_Wheelbarrow'
 const FILLER = '__test_placeholder__'
 const TEST_PLACE_FARMER_CARD = 'TEST_PlaceFarmerProbe'
 const TEST_ACTION_HOOK_ID = 'test-special-action-ordinary-hook-probe'
+const TEST_BEFORE_LISTENER_ID = 'test-special-action-before-probe'
+const TEST_PLACE_FARMER_LISTENER_ID = 'test-place-farmer-probe-after'
 
 const baseResources = (): Resource => ({
   wood: 0,
@@ -121,12 +123,17 @@ const executeGainLeaf = (flow: ActionFlow | null, session: GameSession, player: 
 
 afterEach(() => {
   unregisterActionHook(TEST_ACTION_HOOK_ID)
+  requireActiveCardRegistry('moor-special-action-test-cleanup')
+    .removeListenersWhere((listener) =>
+      listener.id === TEST_BEFORE_LISTENER_ID ||
+      listener.id === TEST_PLACE_FARMER_LISTENER_ID)
 })
 
 describe('FoM special action listener minors', () => {
   it('dispatches special action listeners without ordinary place-farmer/action-space hooks', () => {
     const { session, player } = setup()
     player.minorPlayed.push('M116_MoorBirchTrees', TEST_PLACE_FARMER_CARD)
+    player.improvements.push('Major_Moor_PeatCharcoalKiln')
     player.rooms = 3
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }]
     let beforeListenerCalls = 0
@@ -140,7 +147,7 @@ describe('FoM special action listener minors', () => {
       },
     })
     const placeFarmerProbe: CardListenerRegistration = {
-      id: 'test-place-farmer-probe-after',
+      id: TEST_PLACE_FARMER_LISTENER_ID,
       cardIds: [TEST_PLACE_FARMER_CARD],
       actions: ['place-farmer'],
       phases: ['after'],
@@ -154,7 +161,7 @@ describe('FoM special action listener minors', () => {
       }),
     }
     const beforeProbe: CardListenerRegistration = {
-      id: 'test-special-action-before-probe',
+      id: TEST_BEFORE_LISTENER_ID,
       cardIds: [TEST_PLACE_FARMER_CARD],
       actions: ['cut-peat'],
       phases: ['before'],
@@ -162,6 +169,14 @@ describe('FoM special action listener minors', () => {
         expect(context.actionId).toBe('cut-peat')
         expect(context.extraData?.specialActionCardId).toEqual(expect.any(String))
         beforeListenerCalls += 1
+        return {
+          flow: {
+            type: 'leaf',
+            actionId: 'gain',
+            params: { stone: 1 },
+            sourceCard: context.ownerCardId,
+          },
+        }
       },
     }
     requireActiveCardRegistry('moor-special-action-test').registerListener(beforeProbe)
@@ -171,9 +186,9 @@ describe('FoM special action listener minors', () => {
     const resp = takeSpecial(session, 'cut-peat')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.fuel).toBe(3)
+    expect(resp.state.players[0]!.resources.fuel).toBe(4)
     expect(resp.state.players[0]!.resources.wood).toBe(2)
-    expect(resp.state.players[0]!.resources.stone).toBe(0)
+    expect(resp.state.players[0]!.resources.stone).toBe(1)
     expect(beforeListenerCalls).toBe(1)
     expect(actionHookCalls).toBe(0)
   })

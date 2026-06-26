@@ -11,14 +11,15 @@
  * full inventory.
  */
 
-import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types.ts'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
-  applyMoorSpecialAction,
+  createMoorSpecialActionSpace,
   validateMoorSpecialAction,
   type MoorSpecialActionPayload,
 } from '../../moor/special-actions.ts'
+import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import {
@@ -66,34 +67,6 @@ export const nextSeatedPlayerIdx = (
  */
 const roundWorkComplete = (state: GameState): boolean =>
   state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
-
-const emptyResources = (): Resource => ({
-  wood: 0,
-  clay: 0,
-  reed: 0,
-  stone: 0,
-  food: 0,
-  grain: 0,
-  vegetable: 0,
-  sheep: 0,
-  boar: 0,
-  cattle: 0,
-  begging: 0,
-  fuel: 0,
-  horse: 0,
-})
-
-const moorSpecialActionSpace = (actionId: MoorSpecialActionId): ActionSpace => ({
-  id: actionId,
-  nameKey: `actions.${actionId}.name`,
-  descriptionKey: `actions.${actionId}.description`,
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: () => ({ type: 'ok' }),
-  resources: emptyResources(),
-  takenBy: [],
-})
 
 const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
   if (flows.length === 0) return undefined
@@ -252,9 +225,9 @@ export const takeSpecialAction = (
   core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
 
-  const space = moorSpecialActionSpace(actionId)
+  const space = createMoorSpecialActionSpace(actionId)
   const listenerExtraData = { specialActionCardId: cardId, payload }
-  runCardListeners({
+  const beforeFlows = runCardListeners({
     state,
     player,
     space,
@@ -262,42 +235,28 @@ export const takeSpecialAction = (
     phase: 'before',
     extraData: listenerExtraData,
   }, undefined, { stampFlowOwner: true })
-
-  const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
-  if (!result.ok) return core.emitResponse(false, result.error)
-  const listenerFlows = runCardListeners({
-    state,
-    player,
-    space,
-    actionId,
-    phase: 'after',
-    result: { type: 'ok' },
-    extraData: listenerExtraData,
-  }, undefined, { stampFlowOwner: true })
     .map((entry) => entry.flow)
     .filter((flow): flow is ActionFlow => !!flow)
-  const followUpFlow = combineFlows([
-    ...listenerFlows,
-    ...(result.followUpFlow ? [result.followUpFlow] : []),
-  ])
-  if (followUpFlow) {
-    const frame = core.buildAdhocEngineFrame(actionId, undefined, followUpFlow)
-    core.pushEngineFrame({
-      ...frame,
-      ownerPlayerIndex: playerIndex,
-      spaceId: '__subflow:top-level',
-      stageResume: null,
-      deferredPlayerSwitch: null,
-      reason: 'top-level',
-    })
-    core.driveEngineSteps()
-    return core.emitResponse()
+  const applyFlow: ActionFlow = {
+    type: 'leaf',
+    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    params: payload ? { cardId, actionId, payload } : { cardId, actionId },
   }
-  if (core.hasPendingAnimalsCheck(player)) {
-    core.startReorgSubFlow(playerIndex, 'anytime', { originPlayerIndex: playerIndex })
-    return core.emitResponse()
-  }
-  return core.invokeEndTurnHooks(playerIndex)
+  const flow = combineFlows([
+    ...beforeFlows,
+    applyFlow,
+  ]) ?? applyFlow
+  const frame = core.buildAdhocEngineFrame(actionId, undefined, flow)
+  core.pushEngineFrame({
+    ...frame,
+    ownerPlayerIndex: playerIndex,
+    spaceId: '__subflow:top-level',
+    stageResume: null,
+    deferredPlayerSwitch: null,
+    reason: 'top-level',
+  })
+  core.driveEngineSteps()
+  return core.emitResponse()
 }
 
 /**

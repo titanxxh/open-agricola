@@ -1,5 +1,6 @@
-import type { ActionFlow, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, ActionSpace, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
 import { getMajorCard } from '../cards/major'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { positionKey } from '../domain/farm'
 import { improvementAction } from '../actions/effects/improvement'
 import { replaceTerrainWithField } from './farm-terrain'
@@ -11,6 +12,34 @@ export type MoorSpecialActionPayload = {
 
 export const isMoorTerrainAction = (actionId: MoorSpecialActionId): boolean =>
   actionId === 'cut-peat' || actionId === 'fell-trees' || actionId === 'slash-and-burn'
+
+const emptyResources = (): Resource => ({
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+  fuel: 0,
+  horse: 0,
+})
+
+export const createMoorSpecialActionSpace = (actionId: MoorSpecialActionId): ActionSpace => ({
+  id: actionId,
+  nameKey: `actions.${actionId}.name`,
+  descriptionKey: `actions.${actionId}.description`,
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: () => ({ type: 'ok' }),
+  resources: emptyResources(),
+  takenBy: [],
+})
 
 export const isMoorSpecialActionCardUsableByPlayer = (
   card: MoorSpecialActionCardState,
@@ -80,8 +109,12 @@ const applyMoorSpecialActionBonuses = (
 ): void => {
   if (state.enableFarmersOfTheMoor !== true) return
   const resources = player.resources as Record<keyof Resource, number | undefined>
-  for (const cardId of player.improvements ?? []) {
-    const card = getMajorCard(cardId)
+  const cards = [
+    ...(player.improvements ?? []).map((cardId) => getMajorCard(cardId)),
+    ...(player.minorPlayed ?? []).map((cardId) => getRegisteredMinorImprovement(cardId)),
+    ...(player.occupationPlayed ?? []).map((cardId) => getRegisteredOccupation(cardId)),
+  ]
+  for (const card of cards) {
     for (const bonus of card?.moorSpecialActionBonuses ?? []) {
       if (bonus.actionId !== actionId) continue
       const amount = (resources.horse ?? 0) > 0 && bonus.horseAmount !== undefined
