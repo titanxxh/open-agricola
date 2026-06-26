@@ -159,15 +159,15 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     expect(moorMinorStage.phase).toBe('draft')
     expect(moorMinorStage.draft!.stage).toBe('farmersOfTheMoorMinor')
     expect(moorMinorStage.draft!.round).toBe(1)
-    expect(moorMinorStage.draft!.totalRounds).toBe(3)
+    expect(moorMinorStage.draft!.totalRounds).toBe(4)
     for (const pid of ['p1', 'p2']) {
       expect(moorMinorStage.draft!.pools[pid].occ).toEqual([])
-      expect(moorMinorStage.draft!.pools[pid].minor).toHaveLength(3)
+      expect(moorMinorStage.draft!.pools[pid].minor).toHaveLength(4)
       expect(moorMinorStage.draft!.kept[pid].occ).toHaveLength(7)
       expect(moorMinorStage.draft!.kept[pid].minor).toHaveLength(0)
     }
 
-    for (let round = 1; round <= 2; round += 1) {
+    for (let round = 1; round <= 3; round += 1) {
       for (const pid of ['p1', 'p2']) {
         const resp = session.submitDraftPick(pid, firstMinorPick(session, pid))
         expect(resp.ok).toBe(true)
@@ -183,7 +183,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
       expect(publishedStage.draft!.pools[pid].occ).toEqual([])
       expect(publishedStage.draft!.pools[pid].minor).toHaveLength(3)
       expect(publishedStage.draft!.kept[pid].occ).toHaveLength(7)
-      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(3)
+      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(4)
     }
 
     for (let round = 1; round <= 2; round += 1) {
@@ -198,7 +198,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     expect(final.draft).toBeNull()
     for (const player of final.players) {
       expect(player.occupationHand).toHaveLength(7)
-      expect(player.minorHand).toHaveLength(6)
+      expect(player.minorHand).toHaveLength(7)
     }
   })
 

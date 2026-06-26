@@ -898,13 +898,13 @@ import { M040_MoorFire } from './M/M040_MoorFire'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
 import { M066_LandParcel } from './M/M066_LandParcel'
-import { M080_AdvancePayment } from './M/M080_AdvancePayment'
-import { M100_Pheromones } from './M/M100_Pheromones'
 import { M075_FuelStorage } from './M/M075_FuelStorage'
 import { M076_Flatboat } from './M/M076_Flatboat'
 import { M078_Barge } from './M/M078_Barge'
 import { M079_PeatSled } from './M/M079_PeatSled'
+import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
+import { M100_Pheromones } from './M/M100_Pheromones'
 import { M110_FarmCart } from './M/M110_FarmCart'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
 import { M120_RiverClay } from './M/M120_RiverClay'
@@ -1829,13 +1829,13 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M042_DeepPlow': M042_DeepPlow.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
   'M066_LandParcel': M066_LandParcel.impl,
-  'M080_AdvancePayment': M080_AdvancePayment.impl,
-  'M100_Pheromones': M100_Pheromones.impl,
   'M075_FuelStorage': M075_FuelStorage.impl,
   'M076_Flatboat': M076_Flatboat.impl,
   'M078_Barge': M078_Barge.impl,
   'M079_PeatSled': M079_PeatSled.impl,
+  'M080_AdvancePayment': M080_AdvancePayment.impl,
   'M087_PeatBarge': M087_PeatBarge.impl,
+  'M100_Pheromones': M100_Pheromones.impl,
   'M110_FarmCart': M110_FarmCart.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
   'M120_RiverClay': M120_RiverClay.impl,
