@@ -1,6 +1,24 @@
 import { defineMinorCard } from '../card-source'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M049_SurveyorsMap'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => futureMeeplesNode({
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: [
+        { round: 11, resources: { field: 1 } },
+        { round: 12, resources: { moor: 1 } },
+        { round: 13, resources: { forest: 1 } },
+      ],
+    }),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M049_SurveyorsMap = defineMinorCard({
   meta: {
@@ -17,7 +35,10 @@ export const M049_SurveyorsMap = defineMinorCard({
     },
     prerequisite: "Play in Round 2 or Before",
     maxRound: 2,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M049_SurveyorsMap_impl = M049_SurveyorsMap.impl

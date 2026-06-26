@@ -1,6 +1,20 @@
 import { defineMinorCard } from '../card-source'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M044_Swamp'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => futureMeeplesNode({
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: [{ round: 12, resources: { moor: 1 } }],
+    }),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M044_Swamp = defineMinorCard({
   meta: {
@@ -15,7 +29,10 @@ export const M044_Swamp = defineMinorCard({
     cost: {},
     prerequisite: "Play in Round 4 or Before",
     maxRound: 4,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M044_Swamp_impl = M044_Swamp.impl
