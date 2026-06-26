@@ -1,7 +1,8 @@
-import type { PlayerState, Resource } from '../../contract/types'
+import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
 import { countFieldsWithCrop } from '../../domain/field'
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { getStableCountForCards } from '../../domain/stables'
+import { initCardState } from '../__stubs__/helpers'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import { collectCardsAs } from '../helpers/card-type'
 
@@ -55,3 +56,18 @@ export const hasCraftBuilding = (player: PlayerState) =>
 
 export const craftBuildingCount = (player: PlayerState) =>
   CRAFT_REWARDS.filter((reward) => reward.ids.some((id) => player.improvements.includes(id))).length
+
+export const initUsageCounters = (player: PlayerState, cardId: string, amount: number) => {
+  const counters = initCardState(player, cardId)
+  counters.usage = amount
+}
+
+export const usageCounters = (player: PlayerState, cardId: string) =>
+  player.cardStates?.[cardId]?.counters?.usage ?? 0
+
+export const setUsageCounterLeaf = (cardId: string, value: number): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: cardId,
+  params: { kind: 'set-counter', key: 'usage', value },
+})
