@@ -8,14 +8,15 @@ import { collectCardsAs } from '../helpers/card-type'
 
 type CraftReward = {
   ids: readonly string[]
+  foodExchangeIds?: readonly string[]
   resource: 'wood' | 'clay' | 'reed'
   amount: number
 }
 
 const CRAFT_REWARDS: readonly CraftReward[] = [
-  { ids: ['Major_Joinery', 'Major_Joinery2', 'Major_Moor_FurnitureStall'], resource: 'wood', amount: 3 },
-  { ids: ['Major_Pottery', 'Major_Pottery2', 'Major_Moor_CeramicsStall'], resource: 'clay', amount: 3 },
-  { ids: ['Major_Basket', 'Major_Basket2', 'Major_Moor_BasketStall'], resource: 'reed', amount: 2 },
+  { ids: ['Major_Joinery', 'Major_Joinery2', 'Major_Moor_FurnitureStall'], foodExchangeIds: ['Major_Joinery', 'Major_Joinery2'], resource: 'wood', amount: 3 },
+  { ids: ['Major_Pottery', 'Major_Pottery2', 'Major_Moor_CeramicsStall'], foodExchangeIds: ['Major_Pottery', 'Major_Pottery2'], resource: 'clay', amount: 3 },
+  { ids: ['Major_Basket', 'Major_Basket2', 'Major_Moor_BasketStall'], foodExchangeIds: ['Major_Basket', 'Major_Basket2'], resource: 'reed', amount: 2 },
 ]
 
 export const allImprovementCount = (player: PlayerState) =>
@@ -66,6 +67,17 @@ export const isCraftBuilding = (cardId: string) =>
 export const playerCraftBuildingIds = (player: PlayerState) =>
   CRAFT_REWARDS.flatMap((reward) =>
     reward.ids.filter((id) => player.improvements.includes(id)),
+  )
+
+export const foodCraftBuildingResource = (cardId: string) =>
+  CRAFT_REWARDS.find((reward) => (reward.foodExchangeIds ?? reward.ids).includes(cardId))?.resource
+
+export const isFoodCraftBuilding = (cardId: string) =>
+  foodCraftBuildingResource(cardId) !== undefined
+
+export const playerFoodCraftBuildingIds = (player: PlayerState) =>
+  CRAFT_REWARDS.flatMap((reward) =>
+    (reward.foodExchangeIds ?? reward.ids).filter((id) => player.improvements.includes(id)),
   )
 
 export const initUsageCounters = (player: PlayerState, cardId: string, amount: number) => {
