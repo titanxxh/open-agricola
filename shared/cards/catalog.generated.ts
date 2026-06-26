@@ -13857,7 +13857,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "food": 1
     },
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14478,7 +14478,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "extraVp": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14516,7 +14516,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "vp": 1,
     "extraVp": true,
     "prerequisite": "2 Horses",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14550,7 +14550,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "vp": 1,
     "extraVp": true,
     "prerequisite": "At Least 1 Moor",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14568,7 +14568,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "extraVp": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14586,7 +14586,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "extraVp": true,
     "prerequisite": "No Unused Farmyard Spaces",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14605,7 +14605,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "extraVp": true,
     "prerequisite": "At Most 4 Improvements in Hand",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14726,7 +14726,81 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "reed": 2
     },
     "vp": 3,
-    "implemented": false,
+    "exchanges": [
+      {
+        "from": {
+          "fuel": 3
+        },
+        "to": {
+          "wood": 2
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "fuel": 3
+        },
+        "to": {
+          "clay": 2
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "fuel": 4
+        },
+        "to": {
+          "reed": 2
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "fuel": 4
+        },
+        "to": {
+          "stone": 2
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "fuel": 2
+        },
+        "to": {
+          "sheep": 1
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "fuel": 3
+        },
+        "to": {
+          "food": 1
+        },
+        "sourceId": "M081_PeatBoat",
+        "triggers": [
+          "anytime"
+        ]
+      }
+    ],
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15115,7 +15189,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "When you play this card, you immediately get 1 food. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of forests you have, you immediately get 1 food."
     ],
     "cost": {},
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15130,12 +15204,88 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "vp": 2,
+    "isCookery": true,
+    "isBaking": true,
     "returnCards": [
       "Major_Fireplace1",
       "Major_Fireplace2",
       "Major_Fireplace3"
     ],
-    "implemented": false,
+    "exchanges": [
+      {
+        "from": {
+          "vegetable": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "sheep": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "boar": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "cattle": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "horse": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "anytime"
+        ]
+      },
+      {
+        "from": {
+          "grain": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "sourceId": "M105_OpenGrill",
+        "triggers": [
+          "bake-bread"
+        ]
+      }
+    ],
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15169,7 +15319,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "2 Horses",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15188,7 +15338,23 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "extraVp": true,
-    "implemented": false,
+    "exchanges": [
+      {
+        "from": {
+          "fuel": 1,
+          "grain": 1
+        },
+        "to": {
+          "food": 5
+        },
+        "max": 1,
+        "sourceId": "M108_GrainDistillery",
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15304,7 +15470,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "vegetable": 1
     },
     "prerequisite": "2 Major Improvements",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15336,7 +15502,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "Each time you take exactly 3 or at least 4 wood from an accumulation space, if you have at least 1 horse, you can pay exactly 1 food to get 1 or 2 additional wood, respectively."
     ],
     "cost": {},
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

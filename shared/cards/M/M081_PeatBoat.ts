@@ -17,7 +17,15 @@ export const M081_PeatBoat = defineMinorCard({
         "reed": 2
     },
     vp: 3,
-    implemented: false,
+    exchanges: [
+        { from: { fuel: 3 }, to: { wood: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { fuel: 3 }, to: { clay: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { fuel: 4 }, to: { reed: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { fuel: 4 }, to: { stone: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { fuel: 2 }, to: { sheep: 1 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { fuel: 3 }, to: { food: 1 }, sourceId: CARD_ID, triggers: ['anytime'] },
+      ],
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
 })

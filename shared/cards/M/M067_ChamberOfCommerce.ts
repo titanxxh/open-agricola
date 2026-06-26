@@ -1,6 +1,18 @@
 import { defineMinorCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
+import { craftBuildingCount } from './moor-batch1-helpers'
 
 const CARD_ID = 'M067_ChamberOfCommerce'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 1, reed: 1 }),
+    computeBonusScore: (_state, player) => craftBuildingCount(player),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M067_ChamberOfCommerce = defineMinorCard({
   meta: {
@@ -18,7 +30,10 @@ export const M067_ChamberOfCommerce = defineMinorCard({
     },
     vp: 1,
     extraVp: true,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M067_ChamberOfCommerce_impl = M067_ChamberOfCommerce.impl

@@ -14,12 +14,22 @@ export const M105_OpenGrill = defineMinorCard({
     ],
     cost: {},
     vp: 2,
+    isCookery: true,
+    isBaking: true,
     returnCards: [
         "Major_Fireplace1",
         "Major_Fireplace2",
         "Major_Fireplace3"
     ],
-    implemented: false,
+    exchanges: [
+        { from: { vegetable: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { sheep: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { boar: 1 }, to: { food: 3 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { cattle: 1 }, to: { food: 3 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { horse: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['anytime'] },
+        { from: { grain: 1 }, to: { food: 2 }, sourceId: CARD_ID, triggers: ['bake-bread'] },
+      ],
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
 })
