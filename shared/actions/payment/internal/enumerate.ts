@@ -31,6 +31,7 @@ import {
   hasValidResources,
 } from '../../effects/exchange-resources'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
+import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { solutionCache, makeCacheKey } from './cache'
 import {
   canPayResources,
@@ -70,25 +71,11 @@ const mergePaymentResources = (
 
 const RESOURCE_ID: Record<string, number> = {
   wood: 1, food: 2, reed: 3, clay: 4, stone: 5,
-  sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10,
-  begging: 11, fence: 12, stable: 13,
+  sheep: 6, pig: 7, boar: 7, cattle: 8, grain: 9, vegetable: 10,
+  horse: 11, fuel: 12, begging: 13, fence: 14, stable: 15,
 }
 
-const PAYMENT_RESOURCE_ORDER: PaymentResourceKey[] = [
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-  'fence',
-  'stable',
-]
+const PAYMENT_RESOURCE_ORDER: readonly PaymentResourceKey[] = PAYMENT_RESOURCE_KEYS
 
 const paymentResourceOrderIndex = (key: string): number => {
   const index = PAYMENT_RESOURCE_ORDER.indexOf(key as PaymentResourceKey)

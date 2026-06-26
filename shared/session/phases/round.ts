@@ -11,7 +11,7 @@
  * full inventory.
  */
 
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
+import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
@@ -28,7 +28,7 @@ import {
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners.ts'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -66,6 +66,40 @@ export const nextSeatedPlayerIdx = (
  */
 const roundWorkComplete = (state: GameState): boolean =>
   state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
+
+const emptyResources = (): Resource => ({
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+  fuel: 0,
+  horse: 0,
+})
+
+const moorSpecialActionSpace = (actionId: MoorSpecialActionId): ActionSpace => ({
+  id: actionId,
+  nameKey: `actions.${actionId}.name`,
+  descriptionKey: `actions.${actionId}.description`,
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: () => ({ type: 'ok' }),
+  resources: emptyResources(),
+  takenBy: [],
+})
+
+const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
+  if (flows.length === 0) return undefined
+  if (flows.length === 1) return flows[0]
+  return { type: 'seq', children: flows }
+}
 
 /**
  * Resolve the starting-player seat index. Returns 0 when no player owns
@@ -218,10 +252,36 @@ export const takeSpecialAction = (
   core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
 
+  const space = moorSpecialActionSpace(actionId)
+  const listenerExtraData = { specialActionCardId: cardId, payload }
+  runCardListeners({
+    state,
+    player,
+    space,
+    actionId,
+    phase: 'before',
+    extraData: listenerExtraData,
+  }, undefined, { stampFlowOwner: true })
+
   const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!result.ok) return core.emitResponse(false, result.error)
-  if (result.followUpFlow) {
-    const frame = core.buildAdhocEngineFrame('improvement', undefined, result.followUpFlow)
+  const listenerFlows = runCardListeners({
+    state,
+    player,
+    space,
+    actionId,
+    phase: 'after',
+    result: { type: 'ok' },
+    extraData: listenerExtraData,
+  }, undefined, { stampFlowOwner: true })
+    .map((entry) => entry.flow)
+    .filter((flow): flow is ActionFlow => !!flow)
+  const followUpFlow = combineFlows([
+    ...listenerFlows,
+    ...(result.followUpFlow ? [result.followUpFlow] : []),
+  ])
+  if (followUpFlow) {
+    const frame = core.buildAdhocEngineFrame(actionId, undefined, followUpFlow)
     core.pushEngineFrame({
       ...frame,
       ownerPlayerIndex: playerIndex,

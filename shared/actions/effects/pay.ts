@@ -34,6 +34,7 @@ import {
   resolveCostPaymentSelection,
   resolvePaymentSolutionSelection,
 } from '../payment/internal'
+import { isPaymentResourceKey } from '../../contract/resource-keys'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -78,22 +79,6 @@ export type PayParams = {
  * New listeners should not depend on it.
  */
 
-const RESOURCE_KEYS = new Set([
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-  'fence',
-  'stable',
-])
-
 const PAY_PARAM_KEYS = new Set([
   'cost',
   'costType',
@@ -114,7 +99,7 @@ const looksLikeFlatResource = (
   const keys = Object.keys(raw)
   if (keys.length === 0) return false
   if (keys.some((k) => PAY_PARAM_KEYS.has(k))) return false
-  return keys.every((k) => RESOURCE_KEYS.has(k))
+  return keys.every((k) => isPaymentResourceKey(k))
 }
 
 const normalizePayParams = (

@@ -9,23 +9,8 @@ import type {
   PaymentSolution,
   Resource,
 } from '../../../contract/types'
+import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { isComplexCost } from './affordability'
-
-const PAYMENT_RESOURCE_KEYS: PaymentResourceKey[] = [
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-  'fence',
-  'stable',
-]
 
 const cloneResources = (resources: PaymentResourceMap): PaymentResourceMap => ({ ...resources })
 
