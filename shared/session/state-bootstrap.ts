@@ -104,7 +104,38 @@ const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
 
 const farmersOfTheMoorMinorHandSize = 4
 const farmersOfTheMoorPublishedMinorHandSize = 3
-const implementedFarmersOfTheMoorMinorIds: readonly string[] = []
+const implementedFarmersOfTheMoorMinorIds: readonly string[] = [
+  'M015_PeatBurnOff',
+  'M016_ClearFelling',
+  'M017_Reforestation',
+  'M019_LawnTurf',
+  'M020_PeatPellets',
+  'M021_PeatCuttingExpedition',
+  'M022_EcologicalNiche',
+  'M024_BasicSupplies',
+  'M025_HouseholdInventory',
+  'M026_ChimneyHood',
+  'M028_OutOnTheWallaby',
+  'M029_Tinker',
+  'M040_MoorFire',
+  'M042_DeepPlow',
+  'M065_FireBrigade',
+  'M066_LandParcel',
+  'M075_FuelStorage',
+  'M076_Flatboat',
+  'M078_Barge',
+  'M079_PeatSled',
+  'M080_AdvancePayment',
+  'M087_PeatBarge',
+  'M100_Pheromones',
+  'M110_FarmCart',
+  'M114_RiversideWoods',
+  'M120_RiverClay',
+  'M124_StoneWagon',
+  'M128_Workbench',
+  'M129_PlowhorseMarket',
+  'M130_Nosebag',
+]
 
 const resolveFarmersOfTheMoorMinorHandSize = (
   playerCount: number,

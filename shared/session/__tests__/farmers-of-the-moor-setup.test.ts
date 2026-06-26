@@ -107,7 +107,7 @@ describe('Farmers of the Moor setup', () => {
     })).toThrow(/Farmers of the Moor minor pool/)
   })
 
-  it('allows zero Farmers of the Moor minors and still deals three published-pool minors', () => {
+  it('allows incomplete Farmers of the Moor minors and still deals published-pool minors', () => {
     const state = createInitialState(321, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
@@ -116,7 +116,9 @@ describe('Farmers of the Moor setup', () => {
 
     for (const player of state.players) {
       expect(player.occupationHand).toHaveLength(7)
-      expect(player.minorHand).toHaveLength(3)
+      expect(player.minorHand).toHaveLength(6)
+      expect(player.minorHand.filter((id) => id.startsWith('M'))).toHaveLength(3)
+      expect(player.minorHand.filter((id) => !id.startsWith('M'))).toHaveLength(3)
     }
   })
 })
