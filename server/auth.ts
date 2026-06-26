@@ -1,7 +1,7 @@
 import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
-import { consumeInviteCode, getRegistrationPolicy } from './invites.ts'
+import { consumeInviteCode, getRegistrationPolicy, isInviteCodeAvailable } from './invites.ts'
 import { sendEmail } from './email.ts'
 
 const SCRYPT_KEYLEN = 64
@@ -170,6 +170,9 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
   }
 
   const db = getDb()
+  if (policy === 'invite_only' && !isInviteCodeAvailable(inviteCode)) {
+    return { ok: false, code: 'invalid_invite', error: 'Invalid invite code' }
+  }
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(username) || isUsernameReserved(username)) {
     return { ok: false, code: 'username_taken', error: 'Username already taken' }
   }

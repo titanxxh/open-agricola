@@ -363,6 +363,36 @@ describe('auth', () => {
       expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('badinvite')).toBeUndefined()
     })
 
+    it('does not expose duplicate account fields before invite validation succeeds', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
+      await createLocalUserForTests('existinginviteuser', 'password123', 'Existing Invite User')
+      await registerPasswordUser({
+        username: 'existinginviteemail',
+        email: 'existinginvite@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+      })
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+
+      const duplicateUsername = await registerPasswordUser({
+        username: 'existinginviteuser',
+        email: 'unique-invite@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: 'oa_invalid',
+      })
+      const duplicateEmail = await registerPasswordUser({
+        username: 'uniqueinviteuser',
+        email: 'existinginvite@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: 'oa_invalid',
+      })
+
+      expect(duplicateUsername).toMatchObject({ ok: false, code: 'invalid_invite' })
+      expect(duplicateEmail).toMatchObject({ ok: false, code: 'invalid_invite' })
+    })
+
     it('maps username unique conflicts back to username_taken', async () => {
       process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
       const db = getDb()
