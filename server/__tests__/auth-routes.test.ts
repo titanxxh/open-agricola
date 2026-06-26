@@ -525,6 +525,16 @@ describe('auth routes', () => {
     await expect(login('verifyroute', 'password123')).resolves.toMatchObject({ ok: true })
   })
 
+  it('redirects invalid email verification links to a handled login auth error', async () => {
+    process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+
+    const res = await requestJson('GET', '/api/auth/verify-email?token=bad-token')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.Location).toBe('https://frontend.example/open-agricola/?page=login&authError=invalid_or_expired_token')
+    expect(res.headers['Set-Cookie']).toBeUndefined()
+  })
+
   it('requires and consumes invite for invite-only password registration', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.EMAIL_DELIVERY = 'log'

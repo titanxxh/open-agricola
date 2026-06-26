@@ -325,7 +325,7 @@ const server = createServer(async (req, res) => {
     const appOrigin = process.env.PUBLIC_APP_ORIGIN || '/'
     if (!result.ok) {
       res.statusCode = 302
-      res.setHeader('Location', `${appOrigin.replace(/\/?$/, '/')}?page=verify-email&status=invalid`)
+      res.setHeader('Location', `${appOrigin.replace(/\/?$/, '/')}?page=login&authError=invalid_or_expired_token`)
       res.end()
       return
     }

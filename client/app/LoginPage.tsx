@@ -82,6 +82,7 @@ export function LoginPage() {
   const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [registrationSent, setRegistrationSent] = useState(false)
+  const [loginNeedsVerification, setLoginNeedsVerification] = useState(false)
 
   useEffect(() => {
     if (mode !== 'register') return
@@ -113,8 +114,12 @@ export function LoginPage() {
       const result = await login(username, password)
       if (!result.ok) {
         setError(authErrorMessage(result.code, result.error, t))
+        setLoginNeedsVerification(result.code === 'email_not_verified')
+      } else {
+        setLoginNeedsVerification(false)
       }
     } catch {
+      setLoginNeedsVerification(false)
       setError(t('platform.networkError'))
     } finally {
       setLoading(false)
@@ -209,7 +214,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'login'}
             className={`login-mode-tabs__tab${mode === 'login' ? ' is-active' : ''}`}
-            onClick={() => { setMode('login'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false) }}
+            onClick={() => { setMode('login'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false); setLoginNeedsVerification(false) }}
           >
             {t('platform.loginBtn')}
           </button>
@@ -218,7 +223,7 @@ export function LoginPage() {
             role="tab"
             aria-selected={mode === 'register'}
             className={`login-mode-tabs__tab${mode === 'register' ? ' is-active' : ''}`}
-            onClick={() => { setMode('register'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false) }}
+            onClick={() => { setMode('register'); setError(''); setPolicyLoadFailed(false); setRegistrationSent(false); setLoginNeedsVerification(false) }}
           >
             {t('platform.registerBtn')}
           </button>
@@ -255,6 +260,29 @@ export function LoginPage() {
             </div>
 
             {error && <div className="form-error" role="alert">{error}</div>}
+            {loginNeedsVerification && (
+              <>
+                <div className="form-field">
+                  <label htmlFor="login-verification-email">{t('platform.email')}</label>
+                  <span className="form-hint">{t('platform.emailPlaceholder')}</span>
+                  <input
+                    id="login-verification-email"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!email.trim()}
+                  onClick={() => { void handleResendVerification() }}
+                >
+                  {t('platform.resendVerification')}
+                </button>
+              </>
+            )}
 
             <button type="submit" className="btn-primary" disabled={loading} aria-busy={loading}>
               {loading ? t('platform.loading') : t('platform.loginBtn')}
