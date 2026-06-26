@@ -9,10 +9,12 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import { M079_PeatSled_impl } from '../../shared/cards/M/M079_PeatSled'
+import '../../shared/cards/M/M023_EdgeOfTheForest'
 import '../../shared/cards/M/M075_FuelStorage'
 import '../../shared/cards/M/M076_Flatboat'
 import '../../shared/cards/M/M078_Barge'
 import '../../shared/cards/M/M087_PeatBarge'
+import '../../shared/cards/M/M103_ForestKindergarten'
 import '../../shared/cards/M/M110_FarmCart'
 import '../../shared/cards/M/M114_RiversideWoods'
 import '../../shared/cards/M/M120_RiverClay'
@@ -68,6 +70,42 @@ const findListener = (id: string) => {
   const listener = getRegisteredCardListeners().find((entry) => entry.id === id)
   expect(listener).toBeDefined()
   return listener!
+}
+
+const enterMinorPrompt = (
+  session: GameSession,
+  playerIndex: number,
+  response: ReturnType<GameSession['takeAction']>,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  const improvementOption = response.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  expect(improvementOption).toBeDefined()
+  const cardPrompt = session.resolveChoice(playerIndex, improvementOption!.value)
+  expect(cardPrompt.ok).toBe(true)
+  return cardPrompt
+}
+
+const buyMinor = (
+  session: GameSession,
+  playerIndex: number,
+  response: ReturnType<GameSession['takeAction']>,
+  cardId: string,
+) => {
+  const cardPrompt = enterMinorPrompt(session, playerIndex, response)
+  if (
+    cardPrompt.state.players.some((player) =>
+      player.minorPlayed.includes(cardId) || player.minorHand.includes(cardId),
+    ) &&
+    !cardPrompt.state.players[playerIndex]!.minorHand.includes(cardId)
+  ) {
+    return cardPrompt
+  }
+  expect(cardPrompt.interaction.stateId).toBe('wait')
+  if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(playerIndex, cardOption!.value)
 }
 
 const collectContext = (
@@ -169,6 +207,107 @@ describe('Moor future resource minors', () => {
 })
 
 describe('Moor action listener minors', () => {
+  it('M023 Edge of the Forest gives food and fuel for fenced forest adjacencies when played', () => {
+    const { session, state, player } = setup()
+    player.minorHand = ['M023_EdgeOfTheForest']
+    player.resources.food = 0
+    player.resources.fuel = 0
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 1, col: 0, kind: 'moor' },
+      { row: 1, col: 1, kind: 'forest' },
+    ]
+    player.fenceSegments = [
+      { edge: 'V-0-1', type: 'fence' },
+      { edge: 'H-1-0', type: 'fence' },
+      { edge: 'V-1-1', type: 'fence' },
+    ]
+    session.loadState(state)
+    const foodBefore = player.resources.food
+    const fuelBefore = player.resources.fuel ?? 0
+
+    const resp = buyMinor(session, 0, session.takeAction(0, 'meeting-place'), 'M023_EdgeOfTheForest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 1)
+    expect(resp.state.players[0]!.resources.fuel).toBe(fuelBefore + 2)
+    expect(resp.state.players[1]!.minorHand).toContain('M023_EdgeOfTheForest')
+  })
+
+  it('M103 Forest Kindergarten is playable with at most 3 forests only', () => {
+    const { session, state, player } = setup()
+    player.minorHand = ['M103_ForestKindergarten']
+    player.resources.wood = 1
+    player.resources.stone = 2
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+      { row: 0, col: 2, kind: 'forest' },
+      { row: 1, col: 2, kind: 'forest' },
+    ]
+    session.loadState(state)
+
+    const prompt = session.takeAction(0, 'meeting-place')
+
+    expect(prompt.ok).toBe(true)
+    expect(prompt.state.players[0]!.minorHand).toContain('M103_ForestKindergarten')
+    expect(prompt.state.players[0]!.minorPlayed).not.toContain('M103_ForestKindergarten')
+    expect((prompt.interaction.options ?? []).some((option) => option.value === 'minor:M103_ForestKindergarten')).toBe(false)
+  })
+
+  it('M103 Forest Kindergarten gives food after Family Growth with room', () => {
+    const { session, state, player } = setup(2)
+    player.minorPlayed.push('M103_ForestKindergarten')
+    player.rooms = 3
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+      { row: 1, col: 0, kind: 'moor' },
+    ]
+    session.loadState(state)
+    const foodBefore = player.resources.food
+
+    const resp = session.takeAction(0, 'wish-children')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
+  })
+
+  it('M103 Forest Kindergarten gives food after Family Growth without room', () => {
+    const { session, state, player } = setup(5)
+    player.minorPlayed.push('M103_ForestKindergarten')
+    player.rooms = 2
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+      { row: 1, col: 1, kind: 'forest' },
+    ]
+    session.loadState(state)
+    const foodBefore = player.resources.food
+
+    const resp = session.takeAction(0, 'urgent-wish-children')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 3)
+  })
+
+  it('M103 Forest Kindergarten does not trigger on non Family Growth actions', () => {
+    const { session, state, player } = setup()
+    player.minorPlayed.push('M103_ForestKindergarten')
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+    ]
+    session.loadState(state)
+    const foodBefore = player.resources.food
+
+    const resp = session.takeAction(0, 'day-laborer')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
+  })
+
   it('M087 Peat Barge gives 2 fuel after Fishing only', () => {
     const { session, state, player } = setup()
     player.minorPlayed.push('M087_PeatBarge')

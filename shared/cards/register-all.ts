@@ -889,6 +889,7 @@ import { M019_LawnTurf } from './M/M019_LawnTurf'
 import { M020_PeatPellets } from './M/M020_PeatPellets'
 import { M021_PeatCuttingExpedition } from './M/M021_PeatCuttingExpedition'
 import { M022_EcologicalNiche } from './M/M022_EcologicalNiche'
+import { M023_EdgeOfTheForest } from './M/M023_EdgeOfTheForest'
 import { M024_BasicSupplies } from './M/M024_BasicSupplies'
 import { M025_HouseholdInventory } from './M/M025_HouseholdInventory'
 import { M026_ChimneyHood } from './M/M026_ChimneyHood'
@@ -905,6 +906,7 @@ import { M079_PeatSled } from './M/M079_PeatSled'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M100_Pheromones } from './M/M100_Pheromones'
+import { M103_ForestKindergarten } from './M/M103_ForestKindergarten'
 import { M110_FarmCart } from './M/M110_FarmCart'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
 import { M120_RiverClay } from './M/M120_RiverClay'
@@ -1820,6 +1822,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M020_PeatPellets': M020_PeatPellets.impl,
   'M021_PeatCuttingExpedition': M021_PeatCuttingExpedition.impl,
   'M022_EcologicalNiche': M022_EcologicalNiche.impl,
+  'M023_EdgeOfTheForest': M023_EdgeOfTheForest.impl,
   'M024_BasicSupplies': M024_BasicSupplies.impl,
   'M025_HouseholdInventory': M025_HouseholdInventory.impl,
   'M026_ChimneyHood': M026_ChimneyHood.impl,
@@ -1836,6 +1839,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M080_AdvancePayment': M080_AdvancePayment.impl,
   'M087_PeatBarge': M087_PeatBarge.impl,
   'M100_Pheromones': M100_Pheromones.impl,
+  'M103_ForestKindergarten': M103_ForestKindergarten.impl,
   'M110_FarmCart': M110_FarmCart.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
   'M120_RiverClay': M120_RiverClay.impl,
