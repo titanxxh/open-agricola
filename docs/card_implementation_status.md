@@ -205,7 +205,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 
 ## 10. Hook 点清单
 
-下表从当前 `ALL_CARD_IMPLS` 机械抽取。`*` 表示 action id 通配；动态 listener 已按运行时 `actions` 展开。本轮新增 FoM special action listener runtime：`M077` / `M116` / `M127` 使用 `after.cut-peat`，`M118` / `M119` / `M122` 使用 `after.fell-trees`，`M083` / `M121` / `M123` 使用 `after.hiring-fair`，并继续复用 `after.place-farmer` / `after.collect` / `onBuy` / `onStartReturnHome` 等既有 hook。
+下表从当前 `ALL_CARD_IMPLS` 机械抽取。`*` 表示 action id 通配；动态 listener 已按运行时 `actions` 展开。本轮新增 FoM special action listener runtime：`M077` / `M127` 使用 `after.cut-peat`，`M118` / `M119` 使用 `after.fell-trees`，`M083` / `M121` / `M123` 使用 `after.hiring-fair`，`M116` / `M122` 走 `moorSpecialActionBonuses` metadata，并继续复用 `after.place-farmer` / `after.collect` / `onBuy` / `onStartReturnHome` 等既有 hook。
 
 Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前被拒绝，不触发 `before` / `during` / `immediatelyAfter` / `after` listener；本表只描述真实成功路径和 guard 之后的 recoverable failure。
 
@@ -257,10 +257,10 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `after.bake-bread` | `A30_BakingSheet`, `A63_DutchWindmill`, `C61_BeerStein`, `E57_CheeseFondue` |
 | listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A175_HollowGardener`, `A179_MountainShepherd`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B174_RiverbankGardener`, `B180_GameTeaser`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C177_MountainHiker`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D169_Plowsmith`, `D174_LoessGardener`, `D180_PartTimeWorker`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E53_BoarSpear`, `E77_Mattock`, `M098_FishSmokehouse`, `M110_FarmCart`, `M117_DraughtHorses`, `M118_TimberMill`, `M127_Wheelbarrow` |
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A178_CarpentersBoy`, `A21_FamilyFriendHome`, `A40_PottersYard`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
-| listener | `after.cut-peat` | `M077_DryingField`, `M116_MoorBirchTrees`, `M127_Wheelbarrow` |
+| listener | `after.cut-peat` | `M077_DryingField`, `M127_Wheelbarrow` |
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E103_Wolf`, `E53_BoarSpear`, `E85_MasterTanner`, `M069_LeatherSaddle`, `M115_OakBark` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother`, `M089_BirthingHouse`, `M103_ForestKindergarten` |
-| listener | `after.fell-trees` | `M118_TimberMill`, `M119_AlderSwamp`, `M122_WillowBank` |
+| listener | `after.fell-trees` | `M118_TimberMill`, `M119_AlderSwamp` |
 | listener | `after.fence` | `A144_Sequestrator`, `A34_Loppers`, `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox`, `B94_StockProtector`, `C179_BovinePioneer`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `D36_BreedRegistry`, `E103_Wolf`, `E118_KindlingGatherer`, `E53_BoarSpear` |
 | listener | `after.hiring-fair` | `M083_CoalSeam`, `M121_Loam`, `M123_StoneQuarry` |
