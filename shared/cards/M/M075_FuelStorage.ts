@@ -1,6 +1,29 @@
 import { defineMinorCard } from '../card-source'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M075_FuelStorage'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const entries = [1, 3, 5, 7, 9, 11]
+        .map((offset, index) => ({
+          round: state.round + offset,
+          resources: index % 2 === 0 ? { wood: 1 } : { fuel: 1 },
+        }))
+        .filter((entry) => entry.round <= 14)
+      if (entries.length === 0) return
+      return queueFutureMeeplesFlow(state, {
+        cardId: CARD_ID,
+        playerId: player.id,
+        entries,
+      })
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M075_FuelStorage = defineMinorCard({
   meta: {
@@ -17,7 +40,10 @@ export const M075_FuelStorage = defineMinorCard({
         "reed": 1
     },
     vp: 1,
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M075_FuelStorage_impl = M075_FuelStorage.impl
