@@ -3822,6 +3822,20 @@
   background-position: center;
   background-repeat: no-repeat;
 }
+.res-icon-forest,
+.res-icon-moor {
+  width: 0.9em;
+  height: 0.9em;
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.res-icon-forest {
+  background-image: url('/assets/moor/terrain/forest.webp');
+}
+.res-icon-moor {
+  background-image: url('/assets/moor/terrain/moor.webp');
+}
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */
