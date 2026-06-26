@@ -79,6 +79,9 @@ const terrain = (row: number, col: number, kind: 'forest' | 'moor'): FarmTerrain
 const bonusVp = (state: GameState, playerIndex = 0) =>
   Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
+const bonusVpEntries = (state: GameState, playerIndex = 0) =>
+  Scoring.breakdown(state, playerIndex).categories.find((category) => category.key === 'cardBonusVp')?.entries ?? []
+
 const effect = (cardId: string) => {
   const found = getCardEffect(cardId)
   expect(found).toBeDefined()
@@ -362,9 +365,26 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     expect(harvestTrades).toHaveLength(1)
     expect(harvestTrades[0]).toMatchObject({ from: { fuel: 1, grain: 1 }, to: { food: 5 }, max: 1 })
     expect(bonusVp(session.state)).toBe(2)
+    expect(bonusVpEntries(session.state)).toEqual([
+      expect.objectContaining({
+        cardId: 'M108_GrainDistillery',
+        score: 2,
+      }),
+    ])
 
     player.resources.grain = 0
     expect(bonusVp(session.state)).toBe(0)
+
+    player.resources = fullResources({ fuel: 3, grain: 2 })
+    player.improvements = ['Major_Moor_PeatCharcoalKiln']
+    expect(bonusVp(session.state)).toBe(2)
+    expect(bonusVpEntries(session.state)).toEqual([
+      expect.objectContaining({
+        cardId: 'M108_GrainDistillery',
+        score: 2,
+      }),
+    ])
+    expect(bonusVpEntries(session.state).some((entry) => entry.cardId === 'Major_Moor_PeatCharcoalKiln')).toBe(false)
   })
 
   it('M115 gives 2 wood on play and extra wood for converted boar, cattle, and horses only', () => {

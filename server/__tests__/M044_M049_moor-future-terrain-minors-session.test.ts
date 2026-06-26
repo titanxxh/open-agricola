@@ -258,6 +258,62 @@ describe('Moor future terrain minor cards', () => {
     expect(rejected.state.players[0]!.farmTerrain).not.toContainEqual({ row: 0, col: 0, kind: 'moor' })
   })
 
+  it('revalidates future terrain positions after an earlier same-round placement', () => {
+    const { session, state, player } = setup(1)
+    state.futureMeeples = [
+      {
+        id: 'future-moor',
+        cardId: 'M044_Swamp',
+        playerId: player.id,
+        round: 2,
+        actionId: null,
+        resources: { moor: 1 },
+      },
+      {
+        id: 'future-forest',
+        cardId: 'M049_SurveyorsMap',
+        playerId: player.id,
+        round: 2,
+        actionId: null,
+        resources: { forest: 1 },
+      },
+    ]
+    readyForRoundEnd(state)
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    resp = commitTerrain(session, acceptFuture(session, resp), [{ row: 1, col: 2 }])
+    expect(resp.state.players[0]!.farmTerrain).toContainEqual({ row: 1, col: 2, kind: 'moor' })
+
+    resp = acceptFuture(session, resp)
+    const rejected = session.commitSelectionChoice(0, { positions: [{ row: 1, col: 2 }] })
+    expect(rejected.ok).toBe(false)
+    resp = commitTerrain(session, resp, [{ row: 1, col: 3 }])
+    expect(resp.state.players[0]!.farmTerrain).toContainEqual({ row: 1, col: 3, kind: 'forest' })
+    expect(resp.state.futureMeeples).toEqual([])
+  })
+
+  it('delivers future fuel and horses through the round-start receive flow', () => {
+    const { session, state, player } = setup(1)
+    state.futureMeeples = [
+      {
+        id: 'future-fom-resources',
+        cardId: 'M075_FuelStorage',
+        playerId: player.id,
+        round: 2,
+        actionId: null,
+        resources: { fuel: 1, horse: 1 },
+      },
+    ]
+    readyForRoundEnd(state)
+    session.loadState(state)
+
+    const resp = session.performRoundEnd()
+    expect(resp.state.players[0]!.resources.fuel).toBe(1)
+    expect(resp.state.players[0]!.resources.horse).toBe(1)
+    expect(resp.state.futureMeeples).toEqual([])
+  })
+
   it('M048 schedules a future forest from the Cut Peat special-action dispatcher and drops past round 14', () => {
     const { session, player } = setup(10)
     player.minorPlayed.push('M048_ForestSwamp')

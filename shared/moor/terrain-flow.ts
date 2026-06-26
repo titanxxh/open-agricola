@@ -182,10 +182,13 @@ registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCa
   if (typeof mode !== 'string') return
   const selected = parsePositions(positions)
   let changed = 0
+  const used = mode === 'place' ? getUsedFarmyardTileKeys(player) : null
 
   for (const tile of selected) {
     if (mode === 'place' && isTerrainKind(kind)) {
+      if (used?.has(positionKey(tile))) continue
       player.farmTerrain = [...(player.farmTerrain ?? []), { ...tile, kind }]
+      used?.add(positionKey(tile))
       changed += 1
     } else if (mode === 'remove' && isTerrainKind(kind)) {
       if (removeTerrain(player, tile, kind)) changed += 1
