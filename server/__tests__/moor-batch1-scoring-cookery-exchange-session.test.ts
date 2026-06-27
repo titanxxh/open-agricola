@@ -4,9 +4,9 @@ import { executeCardListener } from '../../shared/cards/card-listeners'
 import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
+import { anytimeExchangeAction, getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { Scoring } from '../../shared/domain'
-import type { ActionFlow, GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionFlow, ActionMutationContext, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { FarmTerrainTile } from '../../shared/moor/types'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -212,7 +212,11 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
 
     const result = executeCardListener(reg, ctx)
 
-    expect(actionIds(result?.flow)).toEqual(['bonus-vp', 'bonus-vp'])
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'special-effect',
+      params: { kind: 'increment-counter', key: 'bonusVp', amount: 2 },
+    })
 
     const noHorses = executeCardListener(reg, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 1 })], {
       resources: fullResources({ horse: 3 }),
@@ -229,6 +233,33 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
       extraData: { sourceId: 'Major_Fireplace1', times: 1, preResources: fullResources({ horse: 3 }) },
     }))
     expect(nonCattle).toBeUndefined()
+  })
+
+  it('M069 applies Leather Saddle bonus VP during real cattle cookery exchanges', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M069_LeatherSaddle']
+    player.improvements = ['Major_Fireplace1']
+    player.resources = fullResources({ cattle: 2, horse: 3 })
+    const cattleTradeIndex = getExchangesInWindow(player, 'anytime', session.state)
+      .findIndex((trade) =>
+        trade.sourceId === 'Major_Fireplace1' &&
+        (trade.from.cattle ?? 0) === 1 &&
+        (trade.to.food ?? 0) > 0,
+      )
+    expect(cattleTradeIndex).toBeGreaterThanOrEqual(0)
+
+    const result = anytimeExchangeAction.resolveChoice!(
+      {
+        state: session.state,
+        player,
+        space: { id: 'exchange' } as ActionSpace,
+      } as ActionMutationContext,
+      `trade:${cattleTradeIndex}:2`,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(bonusVp(session.state)).toBe(2)
   })
 
   it('M071 gives Museum of the Moors and Living History Museum owners one shared post-score point each', () => {
