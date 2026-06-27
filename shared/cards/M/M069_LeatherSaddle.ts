@@ -6,12 +6,16 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M069_LeatherSaddle'
 
-const bonusLeaves = (count: number): ActionFlow[] =>
-  Array.from({ length: count }, () => ({
-    type: 'leaf' as const,
-    actionId: 'bonus-vp' as const,
-    sourceCard: CARD_ID,
-  }))
+const bonusFlow = (count: number): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: {
+    kind: 'increment-counter',
+    key: 'bonusVp',
+    amount: count,
+  },
+})
 
 const readPreResources = (value: unknown): Partial<Resource> | undefined =>
   value && typeof value === 'object' ? value as Partial<Resource> : undefined
@@ -29,7 +33,7 @@ const tradeAppliedListener: CardListenerRegistration = {
     ).reduce((sum, event) => sum + (event.paid.cattle ?? 0), 0)
     if (cattle <= 0) return
     return {
-      flow: { type: 'seq', children: bonusLeaves(cattle) },
+      flow: bonusFlow(cattle),
       sourceCard: CARD_ID,
     }
   },
