@@ -43,8 +43,9 @@ describe('Private Field Phase cards', () => {
       children: [
         {
           type: 'leaf',
-          actionId: 'private-field-phase',
+          actionId: 'reap',
           sourceCard: 'C72_FestivalPlanning',
+          actionContext: { trigger: { phase: 'private-field-phase' } },
         },
         {
           type: 'leaf',
@@ -87,8 +88,9 @@ describe('Private Field Phase cards', () => {
 
     expect(flow.children[0]).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
+      actionId: 'reap',
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 
@@ -101,8 +103,9 @@ describe('Private Field Phase cards', () => {
 
     expect(flow).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
+      actionId: 'reap',
       sourceCard: 'E25_BumperCrop',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 
@@ -123,8 +126,9 @@ describe('Private Field Phase cards', () => {
 
     expect(E25_BumperCrop_impl.effect.onBuy!(state(player), player)).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
+      actionId: 'reap',
       sourceCard: 'E25_BumperCrop',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 })

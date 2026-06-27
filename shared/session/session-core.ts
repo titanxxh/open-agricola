@@ -59,6 +59,7 @@ import {
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
 import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
+import { attachChoiceLabel } from '../engine/nodes/interaction-helpers.ts'
 import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import {
   isPendingChoiceValueAllowed,
@@ -930,10 +931,12 @@ export class GameCore {
     flow: ActionFlow,
     counter: { value: number },
     ownerPlayerId?: string,
+    inheritedOptionId?: string,
   ): EngineNode {
+    const optionId = flow.optionId ?? inheritedOptionId
     if (flow.targetPlayerId) {
       const { targetPlayerId, ...innerFlow } = flow
-      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId)
+      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId, optionId)
       return stampOwner(scopedNode, targetPlayerId)
     }
     if (flow.type === 'leaf') {
@@ -944,22 +947,25 @@ export class GameCore {
         flow.params,
         flow.choiceLabelKey,
         flow.choiceLabelParams,
-        flow.actionContext,
+        optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
       )
       const def = this.registry.get(flow.actionId)
       if (def?.resolveChoice && !def.skipChoiceWrap) {
         const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
           actionNode,
         ])
-        return flow.optional ? markOptional(seq, flow.promptKey) : seq
+        const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
+        return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
       }
-      return flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
+      const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
 
-    const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId))
+    const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId, optionId))
     if (flow.type === 'seq') {
       const seq = new SequenceNode(`seq-${counter.value++}`, children)
-      return flow.optional ? markOptional(seq, flow.promptKey) : seq
+      const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
+      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
@@ -973,14 +979,17 @@ export class GameCore {
           mandatory: flow.children[index]?.optional !== true,
         }))
       }
-      return flow.optional ? markOptional(parallel, flow.promptKey) : parallel
+      const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
+      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
-      return flow.optional ? markOptional(xor, flow.promptKey) : xor
+      const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
+      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
     }
     const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
-    return flow.optional ? markOptional(or, flow.promptKey) : or
+    const node = flow.optional ? markOptional(or, flow.promptKey) : or
+    return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
   }
 
   private runPlaceFarmerAfterHooks(

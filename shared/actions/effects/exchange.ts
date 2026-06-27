@@ -28,12 +28,9 @@ import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
-import { dispatchTradeAppliedListener } from './trade-applied-listener'
-import { exchangeToTrade } from './exchange-to-trade'
+import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
+import { exchangeToTrade } from '../helpers/trades'
 import { subtractAnimalsFromBoard } from '../../domain/animals'
-
-export { dispatchTradeAppliedListener } from './trade-applied-listener'
-export { exchangeToTrade } from './exchange-to-trade'
 
 type AnimalResourceKey = AnimalKey
 type CardCounterAnimalSource = {
@@ -350,15 +347,6 @@ export const getMaxTradeTimes = (player: PlayerState, trade: Trade): number => {
 }
 
 /**
- * Dispatch a 'trade-applied' synthetic event to card listeners after a trade
- * is applied. Mirrors `dispatchReapListener`. Cards that need to know which
- * specific trade source fired (e.g. E91 PlowBuilder gating on Joinery use)
- * register a listener with `actions: ['trade-applied']`.
- *
- * Listener context includes `extraData.sourceId` (trade.sourceId or .source)
- * and `extraData.times`.
- */
-/**
  * Apply a trade to player resources (mutates player state)
  * @param player - Player state to mutate
  * @param trade - Trade definition
@@ -395,15 +383,6 @@ export const applyTrade = (
     player.resources[key] += amount
   }
 }
-
-/**
- * Convert resources according to a trade without mutating player state
- * @param resources - Current resources
- * @param trade - Trade definition
- * @param times - Number of times to apply the trade (default 1)
- * @returns New resources after conversion
- */
-export { convertResources, hasValidResources } from './exchange-resources'
 
 /**
  * Get all possible trade application counts (0 to max times)

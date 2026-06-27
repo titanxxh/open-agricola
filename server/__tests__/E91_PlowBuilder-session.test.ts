@@ -6,7 +6,7 @@ import {
   setCardFlag,
 } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { dispatchTradeAppliedListener } from '../../shared/actions/effects/exchange'
+import { dispatchTradeAppliedListener } from '../../shared/actions/helpers/trade-applied-listener'
 
 import '../../shared/cards/E/E91_PlowBuilder'
 import type { AnytimeAction } from '../../shared/contract/types'

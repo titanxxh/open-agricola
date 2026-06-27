@@ -99,6 +99,16 @@ const nextCounterValueFromIds = (nodes: EngineNode[]): number =>
 
 const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
+  const labeledNode = node as EngineNode & {
+    choiceLabelKey?: string
+    choiceLabelParams?: Record<string, unknown>
+  }
+  if (typeof data.choiceLabelKey === 'string') {
+    labeledNode.choiceLabelKey = data.choiceLabelKey
+  }
+  if (data.choiceLabelParams && typeof data.choiceLabelParams === 'object') {
+    labeledNode.choiceLabelParams = data.choiceLabelParams as Record<string, unknown>
+  }
   if (typeof data.optional === 'boolean') node.optional = data.optional
   if (typeof data.optionalActive === 'boolean') node.optionalActive = data.optionalActive
   if (typeof data.optionalPromptKey === 'string') {

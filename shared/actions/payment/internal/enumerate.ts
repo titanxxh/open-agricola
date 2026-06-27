@@ -29,7 +29,7 @@ import type {
 import {
   convertResources,
   hasValidResources,
-} from '../../effects/exchange-resources'
+} from '../../helpers/trades'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { solutionCache, makeCacheKey } from './cache'

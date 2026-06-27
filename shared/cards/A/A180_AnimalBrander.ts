@@ -2,63 +2,60 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { payLeaf } from '../helpers/pay-gain-node'
+import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A180_AnimalBrander'
+type AnimalMarketOptionId = 'animal-market-56:sheep' | 'animal-market-56:boar' | 'animal-market-56:cattle'
 
-const sheepBranch = (): ActionFlow => ({
+const isAnimalMarketOptionId = (value: unknown): value is AnimalMarketOptionId =>
+  value === 'animal-market-56:sheep' ||
+  value === 'animal-market-56:boar' ||
+  value === 'animal-market-56:cattle'
+
+const requiredFoodAfterOriginal = (optionId: AnimalMarketOptionId) =>
+  optionId === 'animal-market-56:sheep'
+    ? 2
+    : optionId === 'animal-market-56:cattle'
+      ? 2
+      : 1
+
+const replayBranch = (optionId: AnimalMarketOptionId): ActionFlow => {
+  if (optionId === 'animal-market-56:sheep') return gainLeaf(CARD_ID, { sheep: 1, food: 1 })
+  if (optionId === 'animal-market-56:boar') return gainLeaf(CARD_ID, { boar: 1 })
+  return {
+    type: 'seq',
+    children: [
+      payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+      gainLeaf(CARD_ID, { cattle: 1 }),
+    ],
+  }
+}
+
+const replayFlow = (optionId: AnimalMarketOptionId): ActionFlow => ({
   type: 'seq',
-  choiceLabelKey: 'actions.animal-market-56.option-sheep',
+  optional: true,
+  promptKey: 'ui.interactionOptionalAction',
+  choiceLabelKey: 'ui.interactionUseCard',
+  choiceLabelParams: { cardNameKey: `occupations.${CARD_ID}.name` },
   children: [
     payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-    { type: 'leaf', actionId: 'gain', params: { sheep: 1, food: 1 }, sourceCard: CARD_ID },
-    { type: 'leaf', actionId: 'gain', params: { sheep: 1, food: 1 }, sourceCard: CARD_ID },
-  ],
-})
-
-const boarBranch = (): ActionFlow => ({
-  type: 'seq',
-  choiceLabelKey: 'actions.animal-market-56.option-boar',
-  children: [
-    payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-    { type: 'leaf', actionId: 'gain', params: { boar: 1 }, sourceCard: CARD_ID },
-    { type: 'leaf', actionId: 'gain', params: { boar: 1 }, sourceCard: CARD_ID },
+    replayBranch(optionId),
   ],
 })
 
 const listener: CardListenerRegistration = {
-  id: 'A180-animal-brander-replace-animal-market',
+  id: 'A180-animal-brander-replay-animal-market',
   cardIds: [CARD_ID],
-  actions: ['gain', 'animal-market-cattle-56'],
-  phases: ['computeReplace' as ActionHookPhase],
+  actions: ['gain'],
+  phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'animal-market-56') return
-    if (context.actionContext?.checkedReplaceAction === true) return
-    if ((context.player.resources.food ?? 0) < 1) return
-    const params = context.params ?? {}
-    if (context.actionId === 'gain' && params.sheep === 1 && params.food === 1) {
-      return { decline: true, sourceCard: CARD_ID, alternativeFlow: sheepBranch() }
-    }
-    if (context.actionId === 'gain' && params.boar === 1) {
-      return { decline: true, sourceCard: CARD_ID, alternativeFlow: boarBranch() }
-    }
-    if (context.actionId === 'animal-market-cattle-56') {
-      if ((context.player.resources.food ?? 0) < 3) return
-      return {
-        decline: true,
-        sourceCard: CARD_ID,
-        alternativeFlow: {
-          type: 'seq',
-          choiceLabelKey: 'actions.animal-market-56.option-cattle',
-          children: [
-            payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-            { type: 'leaf', actionId: 'animal-market-cattle-56', sourceCard: CARD_ID },
-            { type: 'leaf', actionId: 'animal-market-cattle-56', sourceCard: CARD_ID },
-          ],
-        },
-      }
-    }
+    if (context.sourceCard === CARD_ID) return
+    const optionId = context.actionContext?.optionId
+    if (!isAnimalMarketOptionId(optionId)) return
+    if ((context.player.resources.food ?? 0) < requiredFoodAfterOriginal(optionId)) return
+    return { flow: replayFlow(optionId), sourceCard: CARD_ID }
   },
 }
 

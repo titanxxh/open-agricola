@@ -112,7 +112,7 @@ registerCardListener({
 - 官方卡：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`
 - 自定义卡沙盒：仅 `before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`（`computeChoiceCandidates` / `anytime` 会被沙盒过滤，详见 §7.4）
 
-**可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（合成 action，由 `dispatchReapListener` 派发，B132 EstateMaster 等用）
+**可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（可由 ActionFlow 执行；也作为 `dispatchReapListener` 派发给 B132 EstateMaster 等 listener 的 actionId）
 
 ### 5. 可用 actionId（最常用项）
 
@@ -125,7 +125,7 @@ registerCardListener({
 | `bake-bread` | 烤面包 | `{}` |
 | `store-on-card` | 在卡上存放资源（写入 `cardStates[id].counters[resource]`） | `{ grain: 6 }` |
 | `take-from-card` | 从卡上取出资源（从 `counters` 扣除） | `{ grain: 1 }` |
-| `reap` | 收割合成 action（由 `dispatchReapListener` 派发，B132 等订阅；官方卡使用） | `{ crop, amount }` |
+| `reap` | 收获普通田；私人田地收获通过 `actionContext.trigger.phase='private-field-phase'` 复用它，listener 仍通过 `dispatchReapListener` 收到 crop/amount metadata | `{ actionContext: { trigger: { phase: 'private-field-phase' } } }` |
 
 ### 6. 可访问的游戏状态
 
