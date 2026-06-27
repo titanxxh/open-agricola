@@ -423,7 +423,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M055_ToolShed` | 已对齐 | 每轮一次，Cut Peat / Slash and Burn 后可执行另一种 special action，不移动额外 worker 或 special action card。 |
 | `M058_PeatFertilizer` | 已对齐 | 2+ fields 前置；Cut Peat 后可选普通 `sow`，复用 sow farm interaction。 |
 | `M059_NaturesFertilizer` | 已对齐 | Slash and Burn 或小改良把 moor 换 field 后，可选只在新 field sow；通过 `allowedFields:'fromSelectedFields'` 同时排除普通旧田和 card field。 |
-| `M060_SowingMachine` | 已对齐 | 1 horse 前置；任意 FoM special action 后若最终有 2+ horses 可选 `sow`；Horse Market 路径按动物重整后的 horse count 再检查。 |
+| `M060_SowingMachine` | 已对齐 | 1 horse 前置；任意 FoM special action 后若最终有 2+ horses 可选 `sow`；Horse Market 路径按动物重整后的 horse count 再检查；Black Market / Illicit Work follow-up 前冻结 listener 名单，follow-up 新买的本卡不会追溯触发同一次 special action。 |
 | `M061_HayWagon` | 已对齐 | 2 horses 前置；从 accumulation space 拿 wood 3 / clay 3 / reed 2 / stone 2 后，可选 `trueAction:false` Build Rooms 或 Renovation，不额外消耗工人。 |
 | `M066_LandParcel` | 已对齐 | 前置 at most 2 improvements；onBuy 放 1 个 forest；按 unused farmyard spaces 1/2/3+ 计 +2/-1/-3 card bonus VP。 |
 | `M103_ForestKindergarten` | 已对齐 | 前置 at most 3 forests；after family-growth listener 按 visible forest count 给 food，覆盖有房 / 无房 family growth，非 family-growth 不触发。 |
