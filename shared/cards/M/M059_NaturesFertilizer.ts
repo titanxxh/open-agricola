@@ -49,6 +49,7 @@ const sowFlow = (context: CardListenerContext, fields: FarmTilePosition[]) => {
     type: 'leaf' as const,
     actionId: 'sow',
     sourceCard: CARD_ID,
+    optional: true,
     actionContext,
   }
 }

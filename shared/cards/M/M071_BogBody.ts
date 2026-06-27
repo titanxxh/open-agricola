@@ -14,7 +14,8 @@ const cardImpl = {
         if (!player) return []
         const hasMuseum = player.improvements.includes(MUSEUM)
         const hasLivingHistory = player.minorPlayed.includes(LIVING_HISTORY)
-        return hasMuseum || hasLivingHistory ? [{ playerId: player.id, score: 1 }] : []
+        const score = (hasMuseum ? 1 : 0) + (hasLivingHistory ? 1 : 0)
+        return score > 0 ? [{ playerId: player.id, score }] : []
       }),
   },
   reaches: [MUSEUM, LIVING_HISTORY] as readonly string[],
