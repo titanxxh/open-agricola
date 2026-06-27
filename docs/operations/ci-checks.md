@@ -66,6 +66,13 @@ curl -s -H "Authorization: Bearer $GH_TOKEN" \
 
 关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
 
+## 切换 GitHub Actions runner
+
+```bash
+pnpm run set-runner-label -- github       # RUNNER_LABEL=ubuntu-latest
+pnpm run set-runner-label -- self-hosted  # RUNNER_LABEL=self-hosted
+```
+
 ## 引用
 
 - GitHub Actions 页面：https://github.com/titanxxh/open-agricola/actions
