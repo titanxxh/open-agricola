@@ -5,6 +5,7 @@ import { getStableCountForCards } from '../../domain/stables'
 import { initCardState } from '../__stubs__/helpers'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import { collectCardsAs } from '../helpers/card-type'
+import { hasCardFieldCrop } from '../helpers/card-field'
 
 type CraftReward = {
   ids: readonly string[]
@@ -37,7 +38,7 @@ export const hasStableOrPasture = (player: PlayerState) =>
   getStableCountForCards(player) > 0 || player.pastures.length > 0
 
 export const hasGrowingCrop = (player: PlayerState, crop: 'grain' | 'vegetable') =>
-  countFieldsWithCrop(player.fields, crop) > 0
+  countFieldsWithCrop(player.fields, crop) > 0 || hasCardFieldCrop(player, crop)
 
 export const bestBakeFood = (player: PlayerState) =>
   Math.max(0, ...getPlayerBakeRates(player).map((rate) => rate.rate))

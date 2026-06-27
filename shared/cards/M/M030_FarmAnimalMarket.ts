@@ -1,5 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M030_FarmAnimalMarket'
@@ -10,12 +9,17 @@ const cardImpl = {
     onBuy: (_state, player) => {
       if ((player.resources.sheep ?? 0) < 2) return
       return {
-        type: 'seq' as const,
+        type: 'leaf' as const,
         optional: true,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { sheep: 2 } }),
-          gainLeaf(CARD_ID, { cattle: 1, horse: 1 }),
-        ],
+        actionId: 'exchange',
+        sourceCard: CARD_ID,
+        actionContext: {
+          directTrade: {
+            from: { sheep: 2 },
+            to: { cattle: 1, horse: 1 },
+            sourceId: CARD_ID,
+          },
+        },
       }
     },
   },
