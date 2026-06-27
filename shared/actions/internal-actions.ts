@@ -42,7 +42,7 @@ import { animalMarketCattleAction } from './effects/animal-market-cattle'
 import { completeParentFatherAction } from '../parents/father-completion'
 import { summerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
 import { moorWoodToFuelAction } from '../moor/wood-to-fuel'
-import { moorSpecialActionApplyAction, moorSpecialActionChoiceAction } from '../moor/special-action-flow'
+import { moorSpecialActionAfterListenersAction, moorSpecialActionApplyAction, moorSpecialActionChoiceAction } from '../moor/special-action-flow'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -92,6 +92,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   summerSellGrainAction,
   summerBreadOrSellAction,
   moorWoodToFuelAction,
+  moorSpecialActionAfterListenersAction,
   moorSpecialActionApplyAction,
   moorSpecialActionChoiceAction,
 ]

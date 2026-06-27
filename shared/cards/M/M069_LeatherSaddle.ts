@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import type { ActionFlow } from '../../contract/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
@@ -13,13 +13,17 @@ const bonusLeaves = (count: number): ActionFlow[] =>
     sourceCard: CARD_ID,
   }))
 
-const afterExchangeListener: CardListenerRegistration = {
-  id: 'M069-leather-saddle-after-exchange',
+const readPreResources = (value: unknown): Partial<Resource> | undefined =>
+  value && typeof value === 'object' ? value as Partial<Resource> : undefined
+
+const tradeAppliedListener: CardListenerRegistration = {
+  id: 'M069-leather-saddle-trade-applied',
   cardIds: [CARD_ID],
-  actions: ['exchange'],
-  phases: ['after' as ActionHookPhase],
+  actions: ['trade-applied'],
+  phases: ['immediatelyAfter' as ActionHookPhase],
   handler: (context) => {
-    if ((context.player.resources.horse ?? 0) < 3) return
+    const preResources = readPreResources(context.extraData?.preResources)
+    if ((preResources?.horse ?? context.player.resources.horse ?? 0) < 3) return
     const cattle = context.eventQuery.filter('resource.exchanged', (event) =>
       (event.gained.food ?? 0) > 0,
     ).reduce((sum, event) => sum + (event.paid.cattle ?? 0), 0)
@@ -32,7 +36,7 @@ const afterExchangeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterExchangeListener],
+  listeners: [tradeAppliedListener],
   prerequisiteCheck: (player) => (player.resources.horse ?? 0) >= 2,
   reaches: [] as readonly string[],
 } satisfies CardImpl
