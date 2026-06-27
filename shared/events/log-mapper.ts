@@ -58,8 +58,20 @@ const cropsToResources = (
 const playerName = (ctx: EventLogMapperContext, playerId?: string): string | undefined =>
   playerId ? ctx.playerNames[playerId] ?? playerId : undefined
 
+const MOOR_SPECIAL_ACTION_IDS = new Set([
+  'cut-peat',
+  'fell-trees',
+  'slash-and-burn',
+  'horse-market',
+  'hiring-fair',
+  'black-market',
+  'illicit-work',
+])
+
 const actionName = (ctx: EventLogMapperContext, actionId?: string): string | undefined =>
-  actionId ? ctx.actionNames?.[actionId] ?? actionId : undefined
+  actionId
+    ? ctx.actionNames?.[actionId] ?? (MOOR_SPECIAL_ACTION_IDS.has(actionId) ? `moor.specialActions.${actionId}` : actionId)
+    : undefined
 
 const mapActionAccumulated = (
   event: ActionAccumulatedEvent,

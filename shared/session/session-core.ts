@@ -183,7 +183,12 @@ import {
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
-import { resetMoorSpecialActionCards, type MoorSpecialActionPayload } from '../moor/special-actions'
+import {
+  createMoorSpecialActionSpace,
+  isMoorSpecialActionId,
+  resetMoorSpecialActionCards,
+  type MoorSpecialActionPayload,
+} from '../moor/special-actions'
 import type { MoorSpecialActionId } from '../moor/types'
 import {
   applyHeatingPayment,
@@ -1315,6 +1320,7 @@ export class GameCore {
   private getSpaceById(spaceId: string | null): ActionSpace | null {
     if (!spaceId) return null
     return this.state.actionSpaces.find((item) => item.id === spaceId)
+      ?? (isMoorSpecialActionId(spaceId) ? createMoorSpecialActionSpace(spaceId) : null)
       ?? (spaceId.startsWith(SUBFLOW_SPACE_PREFIX) || spaceId.startsWith('__stage:')
         ? this.createSyntheticSpace(spaceId)
         : null)

@@ -1,4 +1,5 @@
 import type { ActionFlow, ActionSpace, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
+import type { EventSink } from '../contract/events'
 import { getMajorCard } from '../cards/major'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { positionKey } from '../domain/farm'
@@ -9,6 +10,19 @@ import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
 export type MoorSpecialActionPayload = {
   tile?: FarmTilePosition
 }
+
+const MOOR_SPECIAL_ACTION_IDS = new Set<string>([
+  'cut-peat',
+  'fell-trees',
+  'slash-and-burn',
+  'horse-market',
+  'hiring-fair',
+  'black-market',
+  'illicit-work',
+])
+
+export const isMoorSpecialActionId = (value: string): value is MoorSpecialActionId =>
+  MOOR_SPECIAL_ACTION_IDS.has(value)
 
 export const isMoorTerrainAction = (actionId: MoorSpecialActionId): boolean =>
   actionId === 'cut-peat' || actionId === 'fell-trees' || actionId === 'slash-and-burn'
@@ -31,8 +45,8 @@ const emptyResources = (): Resource => ({
 
 export const createMoorSpecialActionSpace = (actionId: MoorSpecialActionId): ActionSpace => ({
   id: actionId,
-  nameKey: `actions.${actionId}.name`,
-  descriptionKey: `actions.${actionId}.description`,
+  nameKey: `moor.specialActions.${actionId}`,
+  descriptionKey: `moor.specialActions.${actionId}`,
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
@@ -101,6 +115,57 @@ const canExecuteImprovementFlow = (
   improvementAction.canBeExecutedByPlayer(state, player, {
     actionContext: { types: [...types] },
   })
+
+const positiveResources = (resources: Partial<Resource>): Partial<Resource> =>
+  Object.fromEntries(Object.entries(resources).filter(([, amount]) =>
+    typeof amount === 'number' && amount > 0,
+  )) as Partial<Resource>
+
+const resourceDelta = (before: Partial<Resource>, after: Partial<Resource>): Partial<Resource> => {
+  const delta: Partial<Resource> = {}
+  for (const key of Object.keys(emptyResources()) as (keyof Resource)[]) {
+    const amount = (after[key] ?? 0) - (before[key] ?? 0)
+    if (amount > 0) delta[key] = amount
+  }
+  return delta
+}
+
+const emitGain = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  resources: Partial<Resource>,
+): void => {
+  const gain = positiveResources(resources)
+  if (Object.keys(gain).length === 0) return
+  eventSink?.emit<'resource.moved'>({
+    type: 'resource.moved',
+    actorPlayerId: player.id,
+    sourceActionId: actionId,
+    resources: gain,
+    from: { kind: 'supply' },
+    to: { kind: 'player', playerId: player.id },
+    reason: 'gain',
+  })
+}
+
+const emitPayment = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  resources: Partial<Resource>,
+): void => {
+  const paid = positiveResources(resources)
+  if (Object.keys(paid).length === 0) return
+  eventSink?.emit<'resource.paid'>({
+    type: 'resource.paid',
+    actorPlayerId: player.id,
+    sourceActionId: actionId,
+    resources: paid,
+    to: { kind: 'supply' },
+    paymentFor: 'bonus',
+  })
+}
 
 const applyMoorSpecialActionBonuses = (
   state: GameState,
@@ -205,41 +270,63 @@ const executeMoorSpecialActionEffect = (
   playerIndex: number,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
+  eventSink?: EventSink,
 ): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
   const player = state.players[playerIndex]!
   let followUpFlow: ActionFlow | undefined
 
   switch (actionId) {
-    case 'cut-peat':
+    case 'cut-peat': {
+      const before = { ...player.resources }
       if (!removeTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
       player.resources.fuel = (player.resources.fuel ?? 0) + 3
       applyMoorSpecialActionBonuses(state, player, actionId)
+      emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
-    case 'fell-trees':
+    }
+    case 'fell-trees': {
+      const before = { ...player.resources }
       if (!removeTerrain(player, payload.tile, 'forest')) return { ok: false, error: 'terrain unavailable' }
       player.resources.wood += 2
       applyMoorSpecialActionBonuses(state, player, actionId)
+      emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
+    }
     case 'slash-and-burn': {
       if (!payload.tile) return { ok: false, error: 'terrain unavailable' }
       const result = replaceTerrainWithField(player, payload.tile, 'forest')
       if (!result.ok) return { ok: false, error: 'terrain unavailable' }
+      eventSink?.emit<'farm.fieldPlowed'>({
+        type: 'farm.fieldPlowed',
+        actorPlayerId: player.id,
+        sourceActionId: actionId,
+        fields: [{ playerId: player.id, row: payload.tile.row, col: payload.tile.col }],
+      })
       break
     }
-    case 'hiring-fair':
+    case 'hiring-fair': {
+      const before = { ...player.resources }
       player.resources.food += state.players.length === 3 ? 2 : 1
+      emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
       break
-    case 'horse-market':
-      player.resources.food -= horseMarketFoodCost(state)
+    }
+    case 'horse-market': {
+      const foodCost = horseMarketFoodCost(state)
+      player.resources.food -= foodCost
       player.resources.horse = (player.resources.horse ?? 0) + 1
+      emitPayment(eventSink, player, actionId, { food: foodCost })
+      emitGain(eventSink, player, actionId, { horse: 1 })
       break
+    }
     case 'black-market':
       player.resources.fuel = (player.resources.fuel ?? 0) - 1
+      emitPayment(eventSink, player, actionId, { fuel: 1 })
       followUpFlow = improvementFlow(['minor'])
       break
     case 'illicit-work':
       player.resources.food -= 1
       player.resources.fuel = (player.resources.fuel ?? 0) - 1
+      emitPayment(eventSink, player, actionId, { food: 1, fuel: 1 })
       followUpFlow = improvementFlow(['major'])
       break
     default:
@@ -254,10 +341,11 @@ export const applyMoorSpecialActionEffect = (
   playerIndex: number,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
+  eventSink?: EventSink,
 ): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
   const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
   if (!validation.ok) return validation
-  return executeMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  return executeMoorSpecialActionEffect(state, playerIndex, actionId, payload, eventSink)
 }
 
 export const applyMoorSpecialAction = (
@@ -266,18 +354,20 @@ export const applyMoorSpecialAction = (
   cardId: string,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
+  eventSink?: EventSink,
 ): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
   const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!validation.ok) return validation
   const player = state.players[playerIndex]!
   const card = state.farmersOfTheMoor!.specialActionCards.find((candidate) => candidate.id === cardId)!
-  const result = executeMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+  const result = executeMoorSpecialActionEffect(state, playerIndex, actionId, payload, eventSink)
   if (!result.ok) return result
 
   if (card.location.kind === 'market') {
     card.location = { kind: 'playerFaceUp', playerId: player.id }
   } else {
     player.resources.food -= 2
+    emitPayment(eventSink, player, actionId, { food: 2 })
     card.location = { kind: 'playerFaceDown', playerId: player.id }
   }
   return result

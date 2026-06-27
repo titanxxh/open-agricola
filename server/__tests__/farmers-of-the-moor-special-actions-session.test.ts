@@ -16,6 +16,12 @@ const confirmNext = (session: GameSession) => {
   return session.resolveChoice(pending.playerIndex, 'confirm')
 }
 
+const actionDetailFor = (session: GameSession, action: string) =>
+  session.state.log.find((entry) =>
+    entry.key === 'log.actionDetail' &&
+    entry.params?.action === `moor.specialActions.${action}`
+  )
+
 describe('Farmers of the Moor special actions', () => {
   it('sets up public special action cards for the two-player scanned cards', () => {
     const session = new GameSession(41, undefined, {
@@ -55,6 +61,21 @@ describe('Farmers of the Moor special actions', () => {
     expect(player.farmTerrain!.some((tile) => tile.row === moor.row && tile.col === moor.col)).toBe(false)
     expect(card.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
     expect(session.state.actionSpaces.flatMap((space) => space.takenBy)).toEqual([])
+    expect(session.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.moved',
+      actorPlayerId: player.id,
+      sourceActionId: 'cut-peat',
+      resources: { fuel: 3 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'gain',
+    }))
+    expect(session.state.events.some((event) => event.type === 'worker.placed')).toBe(false)
+    expect(actionDetailFor(session, 'cut-peat')).toEqual(expect.objectContaining({
+      params: expect.objectContaining({
+        detailParts: { gains: { fuel: 3 } },
+      }),
+    }))
   })
 
   it('resolves Fell Trees and Slash and Burn through terrain mutation rules', () => {
@@ -83,6 +104,17 @@ describe('Farmers of the Moor special actions', () => {
     expect(slashSession.takeSpecialAction(0, slashCard.id, 'slash-and-burn', { tile: slashForest }).ok).toBe(true)
     expect(slashPlayer.fields).toContainEqual({ row: slashForest.row, col: slashForest.col, stacks: [] })
     expect(slashPlayer.farmTerrain!.some((tile) => tile.row === slashForest.row && tile.col === slashForest.col)).toBe(false)
+    expect(slashSession.state.events).toContainEqual(expect.objectContaining({
+      type: 'farm.fieldPlowed',
+      actorPlayerId: slashPlayer.id,
+      sourceActionId: 'slash-and-burn',
+      fields: [{ playerId: slashPlayer.id, row: slashForest.row, col: slashForest.col }],
+    }))
+    expect(actionDetailFor(slashSession, 'slash-and-burn')).toEqual(expect.objectContaining({
+      params: expect.objectContaining({
+        detailParts: { effects: { plow: 1 } },
+      }),
+    }))
   })
 
   it('borrows an opponent face-up special action for 2 food and turns it face-down', () => {
@@ -126,6 +158,22 @@ describe('Farmers of the Moor special actions', () => {
     expect(player.resources.food).toBe(0)
     expect(player.resources.horse).toBe(1)
     expect(card.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
+    expect(session.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.paid',
+      actorPlayerId: player.id,
+      sourceActionId: 'horse-market',
+      resources: { food: 1 },
+      paymentFor: 'bonus',
+    }))
+    expect(session.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.moved',
+      actorPlayerId: player.id,
+      sourceActionId: 'horse-market',
+      resources: { horse: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'gain',
+    }))
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('animal-reorg')
