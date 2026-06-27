@@ -366,7 +366,7 @@ export const PlayerCard = ({
 
         <div className="card-title">{cardData.name}</div>
         
-        {'vp' in cardData && cardData.vp !== undefined && cardData.vp > 0 && (
+        {'vp' in cardData && cardData.vp !== undefined && cardData.vp !== 0 && (
           <div className="card-score">{cardData.vp}</div>
         )}
 
