@@ -155,6 +155,16 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('/assets/moor/major/M001.png')
   })
 
+  it('renders Moor minor cards with local Moor art and M numbering', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="M068_Church" cardType="minor" />,
+    )
+
+    expect(html).toContain('data-numbering="M068"')
+    expect(html).toContain('data-deck="M"')
+    expect(html).toContain('/assets/moor/minor/M068.png')
+  })
+
   it('renders Moor major printed marker icons from BGA category sprite metadata', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_MuseumOfTheMoors" cardType="major" />,
