@@ -154,6 +154,14 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const player = session.state.players[0]!
     player.minorHand = ['M030_FarmAnimalMarket']
     player.resources = fullResources({ food: 1, sheep: 2 })
+    player.pastures = [{
+      id: 'sheep-pasture',
+      size: 2,
+      tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 2,
+    }]
 
     let resp = playMinor(session, 'M030_FarmAnimalMarket')
     expect(resp.interaction.stateId).toBe('wait')
@@ -164,6 +172,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     resp = session.resolveChoice(0, accept!.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, cattle: 1, horse: 1 })
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
 
     const blocked = setup()
     blocked.state.players[0]!.minorHand = ['M030_FarmAnimalMarket']

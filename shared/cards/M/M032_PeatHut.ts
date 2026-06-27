@@ -3,27 +3,32 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { constructAction } from '../../actions/effects/construct'
 
 const CARD_ID = 'M032_PeatHut'
+const CONVERSION_ACTION_CONTEXT = { maxRooms: 1, exactCost: {}, trueAction: false }
 
 const canConvert = (context: CardListenerContext) =>
   context.player.houseType === 'wood' &&
-  context.player.minorPlayed.includes(CARD_ID)
+  context.player.minorPlayed.includes(CARD_ID) &&
+  constructAction.canBeExecutedByPlayer?.(context.state, context.player, {
+    actionContext: CONVERSION_ACTION_CONTEXT,
+  }) === true
 
 const conversionFlow = (): ActionFlow => ({
   type: 'seq',
   children: [
     {
       type: 'leaf',
-      actionId: 'special-effect',
+      actionId: 'construct',
       sourceCard: CARD_ID,
-      params: { kind: 'return-card-to-board', cardId: CARD_ID },
+      actionContext: CONVERSION_ACTION_CONTEXT,
     },
     {
       type: 'leaf',
-      actionId: 'construct',
+      actionId: 'special-effect',
       sourceCard: CARD_ID,
-      actionContext: { maxRooms: 1, exactCost: {}, trueAction: false },
+      params: { kind: 'return-card-to-board', cardId: CARD_ID },
     },
   ],
 })

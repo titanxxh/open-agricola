@@ -99,6 +99,11 @@ export const hasAnyCardFieldCrops = (player: PlayerState): boolean =>
     readStacks(player, cardId).some((stack) => stack.remaining > 0),
   )
 
+export const hasCardFieldCrop = (player: PlayerState, crop: Crop): boolean =>
+  playedCardIds(player).some((cardId) =>
+    readStacks(player, cardId).some((stack) => stack.crop === crop && stack.remaining > 0),
+  )
+
 export const reapAllCardFields = (
   state: GameState,
   player: PlayerState,

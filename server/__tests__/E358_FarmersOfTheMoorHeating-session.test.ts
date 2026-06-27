@@ -599,6 +599,24 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(getExtraRoomCapacity(after)).toBe(0)
   })
 
+  it('does not offer Peat Hut replacement when no wooden room can be built', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M032_PeatHut']
+    player.rooms = 15
+    player.roomTiles = Array.from({ length: 15 }, (_, index) => ({
+      row: Math.floor(index / 5),
+      col: index % 5,
+    }))
+
+    const resp = session.takeAction(0, 'house-redevelopment')
+
+    if (resp.interaction.stateId === 'wait') {
+      expect((resp.interaction.options ?? []).some((option) => option.sourceCard === 'M032_PeatHut')).toBe(false)
+    }
+    expect(session.state.players[0]!.minorPlayed).toContain('M032_PeatHut')
+  })
+
   it('offers Farmers of the Moor stall anytime conversions while owned', () => {
     let resp = exchangeOnce(
       prepareAnytimeExchangeSession('Major_Moor_FurnitureStall', { wood: 1, food: 1 }),

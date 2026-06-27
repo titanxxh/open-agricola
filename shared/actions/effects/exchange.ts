@@ -30,6 +30,7 @@ import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from './trade-applied-listener'
 import { exchangeToTrade } from './exchange-to-trade'
+import { subtractAnimalsFromBoard } from '../../domain/animals'
 
 export { dispatchTradeAppliedListener } from './trade-applied-listener'
 export { exchangeToTrade } from './exchange-to-trade'
@@ -378,6 +379,8 @@ export const applyTrade = (
       animalPaymentPreference.animal === key
     ) {
       deductAnimalWithPreference(player, key, amount, animalPaymentPreference)
+    } else if (amount > 0 && isAnimalResourceKey(key)) {
+      subtractAnimalsFromBoard(player, { [key]: amount })
     } else {
       player.resources[key] -= amount
     }
