@@ -250,7 +250,7 @@ export const takeSpecialAction = (
   core.pushEngineFrame({
     ...frame,
     ownerPlayerIndex: playerIndex,
-    spaceId: '__subflow:top-level',
+    spaceId: actionId,
     stageResume: null,
     deferredPlayerSwitch: null,
     reason: 'top-level',
