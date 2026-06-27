@@ -115,7 +115,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice` | 新增交互必须显式暴露 command / options 并由后端校验；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
-| 事件与支付 provenance | `resource.paid`、`paymentSources`、`sumActualPaidResource()`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。 |
+| 事件与支付 provenance | `resource.paid`、`paymentSources`、`sumActualPaidResource()`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。动物 exchange 必须通过 exchange/trade 路径扣减，默认同步 pasture / house / stable / animal-holder 中已安置动物，避免只改 `player.resources` 留下 phantom animal。 |
 | Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 improvement payment glue 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats。 |
@@ -1325,14 +1325,14 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M018_RegisterOfCraftsmen` | 已对齐 | 打出后从当前 visible Joinery / Pottery / Basketmaker 中选择可支付的一张，不放人购买并少付 1 stone；passing 后仍由 `actionCardId` 作用域折扣；session 测试覆盖 hidden stack 不可选与资源不足过滤。 |
 | `M019_LawnTurf` | 已对齐 | onBuy 按 unused farmyard spaces - 2 获得 fuel，4+ improvement 前置由 `prerequisiteCheck` 守卫；session 测试覆盖奖励上限与不可打出路径。 |
 | `M020_PeatPellets` | 已对齐 | onBuy 按 visible moor 数获得 fuel，major improvement 前置由 metadata 守卫；session 测试覆盖公开 `farmTerrain` 计数。 |
-| `M022_EcologicalNiche` | 已对齐 | onBuy 按唯一最多动物种类、已生长 grain/vegetable、唯一最多 forest/moor 结算 food/fuel；session 测试覆盖平局不触发。 |
+| `M022_EcologicalNiche` | 已对齐 | onBuy 按唯一最多动物种类、已生长 grain/vegetable、唯一最多 forest/moor 结算 food/fuel；grain/vegetable 同时统计普通田和 card field；session 测试覆盖平局不触发与 card field 作物。 |
 | `M024_BasicSupplies` | 已对齐 | onBuy 将 fuel / food / wood / clay / reed / stone / grain 补到至少 1；session 测试覆盖已有资源不重复给。 |
 | `M025_HouseholdInventory` | 已对齐 | 需要至少 1 field / pasture / stable，onBuy 按 unused farmyard spaces 依序给 reed / grain / cattle / stone / vegetable / horse；session 测试覆盖前置条件与奖励截断。 |
 | `M026_ChimneyHood` | 已对齐 | onBuy 按当前最佳 bake rate 给 food，不消耗 grain；session 测试覆盖无 baking improvement 时不触发。 |
 | `M028_OutOnTheWallaby` | 已对齐 | onBuy 根据已拥有 Joinery / Pottery / Basketmaker 家族 major 给 wood / clay / reed；session 测试覆盖无 craft building 时不触发。 |
 | `M029_Tinker` | 已对齐 | 需要 3+ major improvement；只有拥有 craft building 时 onBuy 给 wood / clay / reed / stone 各 1；session 测试覆盖无 craft building 可打出但无奖励。 |
-| `M030_FarmAnimalMarket` | 已对齐 | onBuy 可选支付 2 sheep 获得 1 cattle 和 1 horse；session 测试覆盖无 sheep 时不弹选择。 |
-| `M032_PeatHut` | 已对齐 | 提供 1 点 extra room capacity，供暖需求 +1；可替代 Renovation action 移除此牌并免费给 wood house 加 1 wooden room；session 测试覆盖 capacity 与转换 room flow。 |
+| `M030_FarmAnimalMarket` | 已对齐 | onBuy 可选通过 exchange 支付 2 sheep 获得 1 cattle 和 1 horse，已安置 sheep 会从 pasture / house / stable / animal-holder 同步移除；session 测试覆盖无 sheep 时不弹选择与已安置 sheep。 |
+| `M032_PeatHut` | 已对齐 | 提供 1 点 extra room capacity，供暖需求 +1；可替代 Renovation action 免费给 wood house 加 1 wooden room，只有存在合法 room tile 时才暴露，且建房成功后才移除此牌；session 测试覆盖 capacity、转换 room flow 与满农场不退牌。 |
 | `M036_PeatMoss` | 已对齐 | no visible moors 前置；木房建房成本通过 active construct `scope:'unit'` trade modifier 降为每房 3 wood + 1 reed，覆盖 action-space 可行动性、单房和多房支付。 |
 | `M037_BuildingPlan` | 已对齐 | after construct 读取 action snapshot，本次至少建 2 rooms 才触发；可选以 `trueAction:false` 建最多 2 个免费 stables。 |
 | `M061_HayWagon` | 已对齐 | 2 horses 前置；after collect 只统计本次从 actionSpace 移给玩家的 building resources，达到 wood 3 / clay 3 / reed 2 / stone 2 后可选非 worker Build Rooms 或 Renovation。 |

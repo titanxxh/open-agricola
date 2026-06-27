@@ -177,6 +177,35 @@ describe('Moor Batch 1 immediate resource minors', () => {
     expect(noReward.state.players[0]!.resources.fuel).toBe(0)
   })
 
+  it('M022 Ecological Niche counts crops growing on card fields', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorHand = ['M022_EcologicalNiche']
+    player.minorPlayed = ['B68_Beanfield']
+    player.cardStates = {
+      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+    }
+
+    const resp = playMinor(session, 'M022_EcologicalNiche')
+
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+
+    const tied = setup()
+    tied.state.players[0]!.minorHand = ['M022_EcologicalNiche']
+    tied.state.players[0]!.minorPlayed = ['B68_Beanfield']
+    tied.state.players[0]!.cardStates = {
+      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+    }
+    tied.state.players[1]!.minorPlayed = ['B68_Beanfield']
+    tied.state.players[1]!.cardStates = {
+      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+    }
+
+    const noReward = playMinor(tied, 'M022_EcologicalNiche', false)
+
+    expect(noReward.state.players[0]!.resources.food).toBe(0)
+  })
+
   it('M024 Basic Supplies tops missing printed goods up to one', () => {
     const session = setup()
     const player = session.state.players[0]!
