@@ -245,9 +245,9 @@ describe('Moor complex special-action minors', () => {
     player.resources.vegetable = 1
     session.loadState(session.state)
 
-    const resp = takeSpecial(session, 'slash-and-burn', { row: FOREST_A.row, col: FOREST_A.col })
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected sow')
+    let resp = takeSpecial(session, 'slash-and-burn', { row: FOREST_A.row, col: FOREST_A.col })
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M059_NaturesFertilizer')
+    resp = acceptOptional(session, resp)
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
     expect(resp.interaction.farm?.selectableFields.map((field) => field.tile)).toEqual([
       { row: FOREST_A.row, col: FOREST_A.col },
@@ -256,6 +256,20 @@ describe('Moor complex special-action minors', () => {
     const sown = sowFirstField(session, resp)
     expect(sown.state.players[0]!.fields.find((field) => field.row === FOREST_A.row && field.col === FOREST_A.col)?.stacks)
       .toEqual([{ kind: 'grain', remaining: 3 }])
+  })
+
+  it('M059 Nature\'s Fertilizer can skip the new-field sow', () => {
+    const { session, player } = setup(['M059_NaturesFertilizer'])
+    player.resources.grain = 1
+    session.loadState(session.state)
+
+    const resp = takeSpecial(session, 'slash-and-burn', { row: FOREST_A.row, col: FOREST_A.col })
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M059_NaturesFertilizer')
+    const skipped = session.resolveChoice(0, '__skip__')
+
+    expect(skipped.state.players[0]!.fields.find((field) => field.row === FOREST_A.row && field.col === FOREST_A.col)?.stacks)
+      .toEqual([])
+    expect(skipped.state.players[0]!.resources.grain).toBe(1)
   })
 
   it('M060 Sowing Machine offers Sow after any special action only with 2 horses after resolution', () => {
@@ -330,6 +344,27 @@ describe('Moor complex special-action minors', () => {
     horseMarket = acceptOptional(retained.session, horseMarket)
     horseMarket = sowFirstField(retained.session, horseMarket)
     expect(horseMarket.state.players[0]!.resources.grain).toBe(0)
+  })
+
+  it('M060 Sowing Machine checks sowability after Black Market minor follow-up resolves', () => {
+    const { session, player } = setup(['M060_SowingMachine'])
+    player.resources.fuel = 1
+    player.resources.horse = 2
+    player.resources.grain = 1
+    player.fields = []
+    player.minorHand = ['M015_PeatBurnOff']
+    session.state.players[1]!.minorHand = [FILLER]
+    session.loadState(session.state)
+
+    let resp = takeSpecial(session, 'black-market')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M015_PeatBurnOff')
+    resp = acceptOptional(session, resp)
+    resp = session.commitSelectionChoice(0, { positions: [{ row: MOOR_A.row, col: MOOR_A.col }] })
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M060_SowingMachine')
+    resp = acceptOptional(session, resp)
+    resp = sowFirstField(session, resp)
+
+    expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 
   it('M109 Malthouse optionally pays exactly 1 grain for 4 food after Cut Peat', () => {

@@ -264,6 +264,7 @@ const resolveBatchExchange = (
   if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) {
     return { type: 'ok' }
   }
+  const preResources = { ...player.resources }
   for (const [key, amount] of Object.entries(paid)) {
     player.resources[key as keyof Resource] -= amount ?? 0
   }
@@ -290,6 +291,7 @@ const resolveBatchExchange = (
     1,
     eventSink,
     [event],
+    preResources,
   )
   trackWorkPhaseBuildingResources(state, player.id, gained)
   return { type: 'ok', resourcesPaid: paid, resourcesGained: gained }
@@ -637,6 +639,7 @@ const resolveExchangeChoice = (
       const max = Math.min(getMaxTradeTimes(player, trade), contextMax ?? Infinity)
       const times = Math.min(count, max)
       if (times > 0) {
+        const preResources = { ...player.resources }
         applyTrade(player, trade, times, animalPaymentPreference)
         recordCookeryConversion(player, trade, times)
         if (trade.sideEffect) {
@@ -656,6 +659,7 @@ const resolveExchangeChoice = (
           times,
           eventSink,
           exchangeEvent ? [exchangeEvent] : [],
+          preResources,
         )
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
@@ -676,6 +680,7 @@ const resolveExchangeChoice = (
     const boundedMax = Math.min(max, contextMax ?? Infinity)
     const times = Math.min(count, boundedMax)
     if (times > 0) {
+      const preResources = { ...player.resources }
       applyTrade(player, trade, times, animalPaymentPreference)
       recordCookeryConversion(player, trade, times)
       if (trade.sideEffect) {
@@ -695,6 +700,7 @@ const resolveExchangeChoice = (
         times,
         eventSink,
         exchangeEvent ? [exchangeEvent] : [],
+        preResources,
       )
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
@@ -753,6 +759,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       if (!canAffordTrade(player, directTrade, 1)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
+      const preResources = { ...player.resources }
       applyTrade(player, directTrade, 1)
       recordCookeryConversion(player, directTrade, 1)
       if (directTrade.sideEffect) {
@@ -772,6 +779,7 @@ export const anytimeExchangeAction: ActionDefinition = {
         1,
         eventSink,
         exchangeEvent ? [exchangeEvent] : [],
+        preResources,
       )
       const gained = scaleResources(directTrade.to, 1)
       const paid = scaleResources(directTrade.from, 1)

@@ -122,6 +122,7 @@ const directContext = (
   actionId: string,
   events: DraftGameEvent[],
   playerOverrides: Partial<PlayerState> = {},
+  contextOverrides: Record<string, unknown> = {},
 ) => {
   const session = setup()
   const state = session.state
@@ -138,6 +139,7 @@ const directContext = (
     transactionEvents: events,
     actionEvents: events,
     result: { type: 'ok' },
+    ...contextOverrides,
   } as never
 }
 
@@ -200,22 +202,31 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
 
   it('M069 awards bonus VP for cattle converted while the owner has at least 3 horses', () => {
     setup()
-    const reg = listener('M069-leather-saddle-after-exchange')
-    const ctx = directContext('M069_LeatherSaddle', 'exchange', [exchangeEvent({ cattle: 2 })], {
-      resources: fullResources({ horse: 3 }),
+    const reg = listener('M069-leather-saddle-trade-applied')
+    const ctx = directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 2 })], {
+      resources: fullResources({ horse: 2 }),
+    }, {
+      phase: 'immediatelyAfter',
+      extraData: { sourceId: 'Major_Fireplace1', times: 2, preResources: fullResources({ horse: 3 }) },
     })
 
     const result = executeCardListener(reg, ctx)
 
     expect(actionIds(result?.flow)).toEqual(['bonus-vp', 'bonus-vp'])
 
-    const noHorses = executeCardListener(reg, directContext('M069_LeatherSaddle', 'exchange', [exchangeEvent({ cattle: 1 })], {
-      resources: fullResources({ horse: 2 }),
+    const noHorses = executeCardListener(reg, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ cattle: 1 })], {
+      resources: fullResources({ horse: 3 }),
+    }, {
+      phase: 'immediatelyAfter',
+      extraData: { sourceId: 'Major_Fireplace1', times: 1, preResources: fullResources({ horse: 2 }) },
     }))
     expect(noHorses).toBeUndefined()
 
-    const nonCattle = executeCardListener(reg, directContext('M069_LeatherSaddle', 'exchange', [exchangeEvent({ sheep: 1 })], {
+    const nonCattle = executeCardListener(reg, directContext('M069_LeatherSaddle', 'trade-applied', [exchangeEvent({ sheep: 1 })], {
       resources: fullResources({ horse: 3 }),
+    }, {
+      phase: 'immediatelyAfter',
+      extraData: { sourceId: 'Major_Fireplace1', times: 1, preResources: fullResources({ horse: 3 }) },
     }))
     expect(nonCattle).toBeUndefined()
   })
@@ -231,7 +242,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     expect(bonusVp(session.state, 2)).toBe(1)
 
     session.state.players[1]!.minorPlayed = ['M113_LivingHistoryMuseum']
-    expect(bonusVp(session.state, 1)).toBe(1)
+    expect(bonusVp(session.state, 1)).toBe(2)
   })
 
   it('M072 gives 3 fuel and scores the four target ovens plus Oven Installation', () => {

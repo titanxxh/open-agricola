@@ -12,6 +12,7 @@ import type { MoorSpecialActionId } from './types'
 
 export const MOOR_SPECIAL_ACTION_APPLY_ACTION_ID = 'moor-special-action-apply'
 export const MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID = 'moor-special-action-choice'
+export const MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID = 'moor-special-action-after-listeners'
 
 const MOOR_SPECIAL_ACTION_IDS = new Set<string>([
   'cut-peat',
@@ -164,12 +165,11 @@ const takeSpecialActionCard = (
   return { type: 'ok' as const }
 }
 
-const runAfterSpecialActionListeners = (
+const runAfterSpecialActionListenersNow = (
   state: GameState,
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
-  result: { followUpFlow?: ActionFlow },
 ) => {
   const listenerFlows = runCardListeners({
     state,
@@ -182,10 +182,50 @@ const runAfterSpecialActionListeners = (
   }, undefined, { stampFlowOwner: true })
     .map((entry) => entry.flow)
     .filter((flow): flow is ActionFlow => !!flow)
-  return combineFlows([
-    ...listenerFlows,
-    ...(result.followUpFlow ? [result.followUpFlow] : []),
-  ])
+  return combineFlows(listenerFlows)
+}
+
+const afterSpecialActionListenersLeaf = (
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+): ActionFlow => ({
+  type: 'leaf',
+  actionId: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
+  actionContext: { actionId, payload },
+})
+
+const runAfterSpecialActionListeners = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+  result: { followUpFlow?: ActionFlow },
+) => {
+  if (result.followUpFlow) {
+    return combineFlows([
+      result.followUpFlow,
+      afterSpecialActionListenersLeaf(actionId, payload),
+    ])
+  }
+  return runAfterSpecialActionListenersNow(state, player, actionId, payload)
+}
+
+export const moorSpecialActionAfterListenersAction: ActionDefinition = {
+  id: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player, actionContext }) => {
+    const actionId = actionContext?.actionId
+    if (typeof actionId !== 'string' || !MOOR_SPECIAL_ACTION_IDS.has(actionId)) {
+      return { type: 'ok' }
+    }
+    const payload = (actionContext?.payload ?? {}) as MoorSpecialActionPayload
+    const followUpFlow = runAfterSpecialActionListenersNow(state, player, actionId as MoorSpecialActionId, payload)
+    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+  },
 }
 
 export const moorSpecialActionChoiceAction: ActionDefinition = {
@@ -248,24 +288,7 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
     )
     if (!result.ok) return { type: 'fail', errorKey: result.error }
 
-    const listenerFlows = runCardListeners({
-      state,
-      player,
-      space: createMoorSpecialActionSpace(parsed.actionId),
-      actionId: parsed.actionId,
-      phase: 'after',
-      result: { type: 'ok' },
-      extraData: {
-        specialActionCardId: parsed.cardId,
-        payload: parsed.payload,
-      },
-    }, undefined, { stampFlowOwner: true })
-      .map((entry) => entry.flow)
-      .filter((flow): flow is ActionFlow => !!flow)
-    const followUpFlow = combineFlows([
-      ...listenerFlows,
-      ...(result.followUpFlow ? [result.followUpFlow] : []),
-    ])
+    const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result)
     return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
   },
 }
