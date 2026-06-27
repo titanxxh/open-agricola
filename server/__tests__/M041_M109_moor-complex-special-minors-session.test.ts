@@ -367,6 +367,28 @@ describe('Moor complex special-action minors', () => {
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 
+  it('M060 Sowing Machine bought by Black Market does not trigger retroactively', () => {
+    const { session, player } = setup()
+    player.resources.fuel = 1
+    player.resources.wood = 3
+    player.resources.horse = 2
+    player.resources.grain = 1
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
+    player.minorHand = ['M060_SowingMachine']
+    session.state.players[1]!.minorHand = [FILLER]
+    session.loadState(session.state)
+
+    let resp = takeSpecial(session, 'black-market')
+    if (resp.interaction.stateId === 'wait') {
+      resp = acceptOptional(session, resp)
+    }
+
+    expect(resp.state.players[0]!.minorPlayed).toContain('M060_SowingMachine')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .not.toBe('M060_SowingMachine')
+    expect(resp.state.players[0]!.resources.grain).toBe(1)
+  })
+
   it('M109 Malthouse optionally pays exactly 1 grain for 4 food after Cut Peat', () => {
     const { session, player } = setup(['M109_Malthouse'])
     player.resources.grain = 1
