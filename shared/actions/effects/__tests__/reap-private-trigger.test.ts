@@ -20,14 +20,16 @@ const emptyResources = (): Resource => ({
   begging: 0,
 })
 
-describe('private-field-phase action', () => {
+const privateReapContext = { trigger: { phase: 'private-field-phase' } }
+
+describe('reap action private-field-phase trigger', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it('reaps ordinary fields with private-field-phase trigger metadata', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const events: unknown[] = []
     const player = {
@@ -47,8 +49,9 @@ describe('private-field-phase action', () => {
     const result = action!.execute({
       state,
       player,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
       eventSink: { emit: (event: unknown) => events.push(event) },
     } as never)
 
@@ -76,7 +79,7 @@ describe('private-field-phase action', () => {
   })
 
   it('is not executable and does not no-op when the current player has no harvestable crops', () => {
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const player = {
       id: 'p1',
@@ -89,18 +92,19 @@ describe('private-field-phase action', () => {
     } as unknown as PlayerState
     const state = { players: [player] } as unknown as GameState
 
-    expect(action!.canBeExecutedByPlayer(state, player)).toBe(false)
+    expect(action!.canBeExecutedByPlayer(state, player, { actionContext: privateReapContext })).toBe(false)
     expect(action!.execute({
       state,
       player,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
     } as never)).toEqual({ type: 'fail', errorKey: 'log.action' })
   })
 
   it('reaps Card Fields after ordinary fields and returns onReap flow in the same parallel reaction', () => {
     const listenerSpy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const events: unknown[] = []
     const player = {
@@ -123,8 +127,9 @@ describe('private-field-phase action', () => {
     const result = action!.execute({
       state,
       player,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
       eventSink: { emit: (event: unknown) => events.push(event) },
     } as never)
 
@@ -168,7 +173,7 @@ describe('private-field-phase action', () => {
 
   it('reaps only the current player ordinary fields and Card Fields', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const actor = {
       id: 'p1',
@@ -205,8 +210,9 @@ describe('private-field-phase action', () => {
     action!.execute({
       state,
       player: actor,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
     } as never)
 
     expect(actor.resources.grain).toBe(1)
@@ -228,7 +234,7 @@ describe('private-field-phase action', () => {
           ? { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: harvestOnlyCard }
           : undefined,
     })
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const player = {
       id: 'p1',
@@ -248,8 +254,9 @@ describe('private-field-phase action', () => {
     const result = action!.execute({
       state,
       player,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
     } as never)
 
     expect(player.resources.grain).toBe(1)
@@ -258,7 +265,7 @@ describe('private-field-phase action', () => {
 
   it('reaps E72 Artichoke Field in private-field-phase without harvest-only bonus food', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
-    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const player = {
       id: 'p1',
@@ -278,8 +285,9 @@ describe('private-field-phase action', () => {
     const result = action!.execute({
       state,
       player,
-      space: { id: 'private-field-phase' },
+      space: { id: 'reap' },
       sourceCard: 'C72_FestivalPlanning',
+      actionContext: privateReapContext,
     } as never)
 
     expect(player.resources.grain).toBe(1)

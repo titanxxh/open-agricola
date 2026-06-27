@@ -727,6 +727,7 @@ export type ActionFlow =
       params?: Record<string, unknown>
       sourceCard?: string
       actionContext?: Record<string, unknown>
+      optionId?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
       effectPreview?: ChoiceEffectPreview
@@ -750,6 +751,7 @@ export type ActionFlow =
       type: 'seq' | 'or' | 'xor' | 'parallel'
       promptKey?: PromptKey
       children: ActionFlow[]
+      optionId?: string
       optional?: boolean
       mode?: 'all' | 'trigger-select'
       sourceCard?: string

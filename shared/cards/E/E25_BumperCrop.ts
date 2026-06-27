@@ -14,8 +14,9 @@ const cardImpl = {
     if (!hasCrops) return
     return {
       type: 'leaf' as const,
-      actionId: 'private-field-phase',
+      actionId: 'reap',
       sourceCard: CARD_ID,
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     }
   },
 },

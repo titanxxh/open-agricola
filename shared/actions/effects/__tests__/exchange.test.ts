@@ -4,11 +4,10 @@ import {
   canAffordTrade,
   getMaxTradeTimes,
   applyTrade,
-  convertResources,
-  hasValidResources,
   getPossibleTradeTimes,
   reverseTrade,
 } from '../exchange'
+import { convertResources, hasValidResources } from '../../helpers/trades'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import type { ActionMutationContext, ActionSpace, GameState, PlayerState, Resource, Trade } from '../../../contract/types'
 import { SessionCardContext, withSessionContext } from '../../../cards/session-card-context'
