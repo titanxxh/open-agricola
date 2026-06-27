@@ -79,9 +79,16 @@ const MOOR_MAJOR_DISPLAY: Record<string, MoorMajorDisplay> = {
 
 const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => MOOR_MAJOR_DISPLAY[cardId]
 
+const getMoorMinorNumbering = (cardId: string): string | undefined => {
+  const match = cardId.match(/^M(\d{3})_/)
+  return match ? `M${match[1]}` : undefined
+}
+
 const getCardNumbering = (cardId: string): string => {
   const moorMajor = getMoorMajorDisplay(cardId)
   if (moorMajor) return moorMajor.numbering
+  const moorMinor = getMoorMinorNumbering(cardId)
+  if (moorMinor) return moorMinor
   const match = cardId.match(/^([A-E])(\d+)/)
   if (match) return `${match[1]}${match[2].padStart(3, '0')}`
   // Custom cards: O-series numbering (minor O001+, occupation O500+)
@@ -91,9 +98,12 @@ const getCardNumbering = (cardId: string): string => {
 
 const getDeckFromId = (cardId: string): string | undefined => {
   if (getMoorMajorDisplay(cardId)) return 'M'
+  if (getMoorMinorNumbering(cardId)) return 'M'
   const match = cardId.match(/^([A-E])/)
   return match ? match[1] : undefined
 }
+
+const getMoorMinorArtUrl = (numbering: string): string => `/assets/moor/minor/${numbering}.png`
 
 const getPlayer56PortraitUrl = (numbering: string): string => `/assets/player56/${numbering}.png`
 
@@ -269,6 +279,13 @@ export const PlayerCard = ({
       return {
         backgroundImage: `url(${fullUrl})`,
         backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    }
+    if (cardType === 'minor' && deck === 'M') {
+      return {
+        backgroundImage: `url(${getMoorMinorArtUrl(numbering)})`,
+        backgroundSize: 'contain',
         backgroundPosition: 'center',
       }
     }
