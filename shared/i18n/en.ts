@@ -697,7 +697,7 @@ export const en = {
     'complete-parent-father': { name: 'Complete Father', description: 'Complete a satisfied father side quest' },
     plow: { name: 'Plow', description: 'Plow 1 field' },
     sow: { name: 'Sow', description: 'Sow in empty fields' },
-    'private-field-phase': { name: 'Private Field Phase', description: 'Reap your own fields without starting a Harvest' },
+    reap: { name: 'Reap', description: 'Reap fields' },
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
     'anytime-reorg': { name: 'Reorganize Animals', description: 'Reorganize animals at any time' },
     reorganize: { name: 'Reorganize Animals', description: 'Reassign animals among pastures, house, and stables.' },

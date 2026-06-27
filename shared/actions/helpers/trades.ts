@@ -1,3 +1,4 @@
+import type { CardExchange } from '../../contract/cards'
 import type { Resource, ResourceKey, Trade } from '../../contract/types'
 
 export const convertResources = (
@@ -26,3 +27,11 @@ export const hasValidResources = (resources: Partial<Resource>): boolean => {
   const keys = Object.keys(resources) as ResourceKey[]
   return keys.every((key) => (resources[key] ?? 0) >= 0)
 }
+
+export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
+  from: ex.from,
+  to: ex.to,
+  max: ex.max,
+  sourceId: ex.sourceId ?? fallbackId,
+  sideEffect: ex.sideEffect,
+})

@@ -2,7 +2,7 @@ import type { ActionSpace, GameState, PlayerState, Resource } from '../../contra
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { Trade } from '../../contract/types'
 import { runCardListeners } from '../../cards/card-listeners'
-import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
+import { executeImmediateSpecialEffectFlows } from '../effects/internal/immediate-special-effect-flow'
 
 export const dispatchTradeAppliedListener = (
   state: GameState,

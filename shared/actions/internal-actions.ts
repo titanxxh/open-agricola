@@ -37,8 +37,7 @@ import { activateCardEffectAction } from './effects/internal/activate-card-effec
 import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { specialEffectAction } from './effects/special-effect'
-import { privateFieldPhaseAction } from './effects/private-field-phase'
-import { animalMarketCattleAction } from './effects/animal-market-cattle'
+import { reapAction } from './effects/reap'
 import { completeParentFatherAction } from '../parents/father-completion'
 import { summerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
 import { moorWoodToFuelAction } from '../moor/wood-to-fuel'
@@ -86,8 +85,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   drawOrdinaryCardsAction,
   placeFarmerOnSpaceAction,
   specialEffectAction,
-  privateFieldPhaseAction,
-  animalMarketCattleAction,
+  reapAction,
   completeParentFatherAction,
   summerSellGrainAction,
   summerBreadOrSellAction,

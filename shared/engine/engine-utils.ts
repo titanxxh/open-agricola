@@ -652,11 +652,13 @@ export function buildFlowNode(
   int: EngineInternals,
   flow: ActionFlow,
   ownerPlayerId?: string,
+  inheritedOptionId?: string,
 ): EngineNode {
+  const optionId = flow.optionId ?? inheritedOptionId
   const nextId = () => `flow-${int.counterRef.value++}`
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
-    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId)
+    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId, optionId)
     return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
@@ -668,7 +670,7 @@ export function buildFlowNode(
           flow.actionContext,
           flow.sourceCard,
         )
-        return buildFlowNode(int, inner, ownerPlayerId)
+        return buildFlowNode(int, inner, ownerPlayerId, optionId)
       }
       // Fallback: action has no inner flow (plain leaf action like
       // grain-seeds / day-laborer / traveling-players). Drop into the
@@ -681,7 +683,7 @@ export function buildFlowNode(
       flow.params,
       flow.choiceLabelKey,
       flow.choiceLabelParams,
-      flow.actionContext,
+      optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
       flow.effectPreview,
     )
     const definition = int.registry.get(flow.actionId)
@@ -693,7 +695,7 @@ export function buildFlowNode(
     const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
-  const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId))
+  const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId, optionId))
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextId(), children)
     const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence

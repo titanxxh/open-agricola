@@ -7,7 +7,7 @@ import type {
 import type { EventSink } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { canSow } from '../../actions/effects/sow'
-import { dispatchReapListener, type ReapTrigger } from '../../actions/effects/reap'
+import { defaultReapTrigger, dispatchReapListener, type ReapTrigger } from '../../actions/helpers/reap-listener'
 import { appendImmediateEvents } from '../../events/append'
 
 type Crop = ExtraSowableCrop
@@ -73,8 +73,6 @@ type CardFieldReaper = (
 ) => ActionFlow | undefined
 
 const cardFieldReapers = new Map<string, CardFieldReaper>()
-
-const defaultReapTrigger = (): ReapTrigger => ({ phase: 'harvest' })
 
 const appendFlowChildren = (children: ActionFlow[], flow: ActionFlow | undefined) => {
   if (!flow) return

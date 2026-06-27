@@ -166,12 +166,28 @@ export const animalMarket56: ActionDefinition = {
     type: 'xor',
     promptKey: 'ui.interactionFlowSelect',
     children: [
-      { type: 'leaf', actionId: 'gain', params: { sheep: 1, food: 1 }, choiceLabelKey: 'actions.animal-market-56.option-sheep' },
-      { type: 'leaf', actionId: 'gain', params: { boar: 1 }, choiceLabelKey: 'actions.animal-market-56.option-boar' },
       {
         type: 'leaf',
-        actionId: 'animal-market-cattle-56',
+        actionId: 'gain',
+        params: { sheep: 1, food: 1 },
+        optionId: 'animal-market-56:sheep',
+        choiceLabelKey: 'actions.animal-market-56.option-sheep',
+      },
+      {
+        type: 'leaf',
+        actionId: 'gain',
+        params: { boar: 1 },
+        optionId: 'animal-market-56:boar',
+        choiceLabelKey: 'actions.animal-market-56.option-boar',
+      },
+      {
+        type: 'seq',
+        optionId: 'animal-market-56:cattle',
         choiceLabelKey: 'actions.animal-market-56.option-cattle',
+        children: [
+          { type: 'leaf', actionId: 'pay', params: { food: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { cattle: 1 } },
+        ],
       },
     ],
   },

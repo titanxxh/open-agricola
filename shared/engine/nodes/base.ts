@@ -87,6 +87,8 @@ export abstract class BaseNode implements EngineNode {
   private sharedCursorData(): Record<string, unknown> {
     const data: Record<string, unknown> = {}
     if (this.ownerPlayerId !== undefined) data.ownerPlayerId = this.ownerPlayerId
+    if (this.choiceLabelKey !== undefined) data.choiceLabelKey = this.choiceLabelKey
+    if (this.choiceLabelParams !== undefined) data.choiceLabelParams = this.choiceLabelParams
     if (this.optional !== undefined) data.optional = this.optional
     if (this.optionalActive !== undefined) data.optionalActive = this.optionalActive
     if (this.optionalPromptKey !== undefined) data.optionalPromptKey = this.optionalPromptKey

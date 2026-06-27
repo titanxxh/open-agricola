@@ -678,7 +678,7 @@ export const zh = {
     'complete-parent-father': { name: '完成父亲牌', description: '完成一个已满足的父亲支线任务' },
     plow: { name: '开垦', description: '开垦 1 块田地' },
     sow: { name: '播种', description: '在空田播种作物' },
-    'private-field-phase': { name: '私人田地阶段', description: '收获自己的田地，不开始收获阶段' },
+    reap: { name: '收获田地', description: '收获田地里的作物' },
     'bake-bread': { name: '烤面包', description: '使用改良烤面包' },
     'anytime-reorg': { name: '重整动物', description: '随时调整动物摆放' },
     reorganize: { name: '动物重组', description: '在牧场/房屋/畜栏间重新分配动物。' },

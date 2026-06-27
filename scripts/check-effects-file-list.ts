@@ -5,14 +5,11 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export const ALLOWED_EFFECT_FILES = [
-  'animal-market-cattle.ts',
   'bake-bread.ts',
   'bonus-vp.ts',
   'breed.ts',
   'collect.ts',
   'construct.ts',
-  'exchange-resources.ts',
-  'exchange-to-trade.ts',
   'exchange.ts',
   'family-growth.ts',
   'fencing.ts',
@@ -23,7 +20,6 @@ export const ALLOWED_EFFECT_FILES = [
   'pay.ts',
   'place-farmer.ts',
   'plow.ts',
-  'private-field-phase.ts',
   'reap.ts',
   'receive.ts',
   'renovation.ts',
@@ -31,7 +27,6 @@ export const ALLOWED_EFFECT_FILES = [
   'sow.ts',
   'special-effect.ts',
   'stables.ts',
-  'trade-applied-listener.ts',
 ] as const
 
 export type EffectsFileListCheck = {

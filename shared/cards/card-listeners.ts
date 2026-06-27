@@ -2,7 +2,7 @@ import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionS
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
-import { exchangeToTrade } from '../actions/effects/exchange-to-trade'
+import { exchangeToTrade } from '../actions/helpers/trades'
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 import type { TriggerSnapshot } from './helpers/trigger-snapshot'
