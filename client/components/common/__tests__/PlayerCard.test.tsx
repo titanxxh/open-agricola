@@ -165,6 +165,21 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('/assets/moor/minor/M068.png')
   })
 
+  it.each([
+    ['B33_Mantlepiece', -3],
+    ['B40_BreweryPond', -1],
+    ['C83_EarlyCattle', -3],
+    ['D40_Cesspit', -1],
+    ['M080_AdvancePayment', -4],
+    ['M085_OvenInstallation', -1],
+  ])('renders printed negative VP for %s', (cardId, vp) => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId={cardId} cardType="minor" />,
+    )
+
+    expect(html).toContain(`class="card-score">${vp}</div>`)
+  })
+
   it('renders Moor major printed marker icons from BGA category sprite metadata', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_MuseumOfTheMoors" cardType="major" />,
