@@ -292,6 +292,72 @@ describe('buildActionLogTimelineRows', () => {
     })
   })
 
+  it('dedupes internal leaf action logs from replay events', () => {
+    const renovated: GameEvent = {
+      schemaVersion: 1,
+      id: 'evt-renovated',
+      seq: 4,
+      round: 14,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'renovate-house',
+      type: 'farm.renovated',
+      playerId: 'p1',
+      from: 'wood',
+      to: 'clay',
+      rooms: [{ row: 0, col: 0 }],
+    }
+    const fenceBuilt: GameEvent = {
+      schemaVersion: 1,
+      id: 'evt-fence',
+      seq: 5,
+      round: 14,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'fence',
+      type: 'farm.fenceBuilt',
+      fences: Array.from({ length: 7 }, (_, index) => ({ edge: `e-${index}`, type: 'fence' })),
+    }
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(renovated, 5, 0),
+        replayEntryForEvent(fenceBuilt, 6, 0),
+      ],
+      stateLog: [
+        {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'actions.fencing.name',
+            detailParts: { effects: { fencing: 7 } },
+          },
+        },
+        {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'actions.renovate-house.name',
+            detailParts: { costs: {}, effects: { renovate: { from: 'wood', to: 'clay' } } },
+          },
+        },
+      ],
+      currentRound: 14,
+      locale: 'zh',
+      playerNames: { p1: 'Alice' },
+      actionNames: { 'farm-redevelopment': 'actions.farm-redevelopment.name' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    expect(rows.map((row) => row.kind)).toEqual(['event', 'event'])
+    expect(rows.map((row) => row.logEntry?.params?.action)).toEqual([
+      'actions.fencing.name',
+      'actions.renovate-house.name',
+    ])
+  })
+
   it('uses context-aware event logs for replay rows before removing derived state log rows', () => {
     const paid = paidEvent('evt-pay', 1)
     const played = playedEvent('evt-play', 2)
