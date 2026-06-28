@@ -56,10 +56,10 @@ const buyMajor = (session: GameSession, cardId: string) => {
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseImprovement') {
     const option = resp.interaction.options?.find(
-      (candidate: ActionChoiceOption) => candidate.value === `major:${cardId}`,
+      (candidate: ActionChoiceOption) => candidate.value === cardId,
     )
     expect(option).toBeDefined()
-    resp = session.resolveChoice(0, `major:${cardId}`)
+    resp = session.resolveChoice(0, cardId)
     expect(resp.ok).toBe(true)
   }
   return choosePaymentIfNeeded(session, resp)
@@ -181,7 +181,7 @@ describe('Farmers of the Moor remaining major improvements', () => {
     const blocked = blockedSession.takeAction(0, 'major-improvement')
 
     if (blocked.ok && blocked.interaction.stateId === 'wait' && blocked.interaction.options) {
-      expect(blocked.interaction.options?.map((option) => option.value)).not.toContain('major:Major_Fireplace1')
+      expect(blocked.interaction.options?.map((option) => option.value)).not.toContain('Major_Fireplace1')
     } else {
       expect(blockedSession.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
       expect(blockedSession.state.players[0]!.resources.clay).toBe(1)

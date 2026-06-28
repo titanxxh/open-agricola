@@ -136,7 +136,7 @@ const buyC1 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
   if (!cardOption) return resp
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)

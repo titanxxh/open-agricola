@@ -53,6 +53,7 @@ export const D127_HardworkingMan = definePlayerActionCard({
     name: "Hardworking Man",
     deck: "D",
     number: 127,
+    playerActionCardType: 'occupation',
     category: "FARM_PLANNER",
     desc: ["This card is an action space for you only. If each other player has more rooms than you, it provides the __Day Laborer__, __Building Rooms__, and __Major Improvement__ actions (all three)."],
     cost: {},

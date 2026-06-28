@@ -55,7 +55,7 @@ const enterImprovementChoice = (session: GameSession) => {
 const playA4 = (session: GameSession) => {
   const resp = enterImprovementChoice(session)
   if (resp.interaction.stateId !== 'wait') return resp
-  const a4Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+  const a4Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
   expect(a4Option).toBeDefined()
   return session.resolveChoice(0, a4Option!.value)
 }
@@ -103,7 +103,7 @@ describe('A004_Baseboards session — altCosts', () => {
     const resp = enterImprovementChoice(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const a4Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+    const a4Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
     expect(a4Option).toBeUndefined()
   })
 })

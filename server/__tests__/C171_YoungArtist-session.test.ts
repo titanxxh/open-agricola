@@ -47,7 +47,7 @@ const resolveMinorIfPrompt = (
   cardId: string,
 ) => {
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  const option = resp.interaction.options?.find((entry) => entry.value === cardId)
   if (!option) return resp
   return session.resolveChoice(resp.interaction.playerIndex, option.value)
 }

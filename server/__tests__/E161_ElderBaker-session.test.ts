@@ -76,7 +76,7 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
 
     expect(result?.extraOptions).toBeDefined()
     const values = result!.extraOptions!.map((o) => o.value)
-    expect(values).toContain(`major:${STONE_OVEN_ID}`)
+    expect(values).toContain(STONE_OVEN_ID)
     expect(result!.extraOptions![0]!.sourceCard).toBe(CARD_ID)
   })
 
@@ -134,7 +134,7 @@ describe('E161_ElderBaker session integration', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     const values = (resp.interaction.options ?? []).map((o) => o.value)
-    expect(values).toContain(`major:${STONE_OVEN_ID}`)
+    expect(values).toContain(STONE_OVEN_ID)
   })
 
   it('selecting Major_StoneOven via minor-improvement plays it as a major', () => {
@@ -146,7 +146,7 @@ describe('E161_ElderBaker session integration', () => {
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const stoneOvenOption = resp.interaction.options?.find((o) => o.value === `major:${STONE_OVEN_ID}`)
+    const stoneOvenOption = resp.interaction.options?.find((o) => o.value === STONE_OVEN_ID)
     expect(stoneOvenOption).toBeDefined()
     resp = session.resolveChoice(0, stoneOvenOption!.value)
 
@@ -172,6 +172,6 @@ describe('E161_ElderBaker session integration', () => {
     const resp = enterMinorChoice(session)
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
     const values = (resp.interaction.options ?? []).map((o) => o.value)
-    expect(values).not.toContain(`major:${STONE_OVEN_ID}`)
+    expect(values).not.toContain(STONE_OVEN_ID)
   })
 })

@@ -103,7 +103,7 @@ const resolveMinorFromPrompt = (
     if (resp.interaction.stateId !== 'wait') return resp
   }
   if (resp.interaction.sourceCard === cardId) return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  const cardOption = resp.interaction.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   return session.resolveChoice(0, cardOption!.value)
 }
@@ -325,7 +325,7 @@ describe('card effect hand notification events', () => {
     resp = session.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
       const hasMinorChoice = resp.interaction.options?.some(
-        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A006_MINOR_ID}`,
+        (option) => option.value.startsWith('action-improvement-') || option.value === A006_MINOR_ID,
       )
       if (hasMinorChoice) {
         resp = resolveMinorFromPrompt(session, resp, A006_MINOR_ID)
@@ -373,7 +373,7 @@ describe('card effect hand notification events', () => {
     resp = minorSession.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
       const hasMinorChoice = resp.interaction.options?.some(
-        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A006_MINOR_ID}`,
+        (option) => option.value.startsWith('action-improvement-') || option.value === A006_MINOR_ID,
       )
       if (hasMinorChoice) {
         resp = resolveMinorFromPrompt(minorSession, resp, A006_MINOR_ID)

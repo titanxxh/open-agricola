@@ -66,7 +66,7 @@ describe('D095_SiteManager session', () => {
     while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
       const options = resp.interaction.options ?? []
-      if (options.some((o) => o.value === 'major:Major_Fireplace1')) {
+      if (options.some((o) => o.value === 'Major_Fireplace1')) {
         foundFireplace = true
         break
       }
@@ -111,7 +111,7 @@ describe('D095_SiteManager session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const fireplace = options.find(
-        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o) => o.value === 'Major_Fireplace1',
       )
       if (fireplace && !bought) {
         resp = session.resolveChoice(0, fireplace.value)
@@ -174,7 +174,7 @@ describe('D095_SiteManager session', () => {
       }
       const options = resp.interaction.options ?? []
       const joinery = options.find(
-        (o) => o.value === 'major:Major_Joinery' || o.value === 'Major_Joinery',
+        (o) => o.value === 'Major_Joinery',
       )
       if (joinery) {
         resp = session.resolveChoice(0, joinery.value)
@@ -236,7 +236,7 @@ describe('D095_SiteManager session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const fireplace = options.find(
-        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o) => o.value === 'Major_Fireplace1',
       )
       if (fireplace && !bought) {
         resp = session.resolveChoice(0, fireplace.value)
@@ -288,7 +288,7 @@ describe('D095_SiteManager session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const fireplace = options.find(
-        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o) => o.value === 'Major_Fireplace1',
       )
       if (fireplace && !bought) {
         resp = session.resolveChoice(0, fireplace.value)
@@ -346,7 +346,7 @@ describe('D095_SiteManager session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const fireplace = options.find(
-        (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o) => o.value === 'Major_Fireplace1',
       )
       if (fireplace && !bought) {
         resp = session.resolveChoice(0, fireplace.value)

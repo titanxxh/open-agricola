@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isMajorCardId } from '../helpers/card-type'
 
 const CARD_ID = 'E165_MasterHuntsman'
 /**
@@ -34,7 +35,8 @@ const majorImprovementListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice
-    if (!choice || !choice.startsWith('major:')) return
+    const cardId = choice?.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!cardId || !isMajorCardId(cardId)) return
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
   },
 }

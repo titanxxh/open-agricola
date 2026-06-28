@@ -49,7 +49,7 @@ const playD83 = (session: GameSession) => {
   const resp = enterImprovementChoice(session)
   if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
   if (resp.interaction.stateId !== 'wait') return resp
-  const d83Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+  const d83Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
   expect(d83Option).toBeDefined()
   return session.resolveChoice(0, d83Option!.value)
 }
@@ -82,7 +82,7 @@ describe('D083_Pigswill session — altCosts', () => {
     const session = setup({ food: 1, grain: 0 })
     const resp = enterImprovementChoice(session)
     if (resp.interaction.stateId !== 'wait') return
-    const d83Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+    const d83Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
     expect(d83Option).toBeUndefined()
   })
 })

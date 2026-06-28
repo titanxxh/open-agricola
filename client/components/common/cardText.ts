@@ -16,7 +16,7 @@ const humanizeCardId = (cardId: string): string =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .trim()
 
-const inferCardType = (cardId: string, locale?: Locale): CardType | null => {
+const inferCardType = (cardId: string): CardType | null => {
   const meta = getCardMeta(cardId)
   if (!meta) return null
   switch (meta.type) {
@@ -27,16 +27,7 @@ const inferCardType = (cardId: string, locale?: Locale): CardType | null => {
     case 'major':
       return 'major'
     case 'playerAction': {
-      // PlayerActionCards can live in either the occupation or minor catalog
-      // array depending on history. Probe i18n to decide which prefix has a
-      // translation; default to occupation if neither matches.
-      if (locale) {
-        const occKey = `occupations.${cardId}.name`
-        if (t(locale, occKey) !== occKey) return 'occupation'
-        const minorKey = `minorImprovements.${cardId}.name`
-        if (t(locale, minorKey) !== minorKey) return 'minor'
-      }
-      return 'occupation'
+      return meta.playerActionCardType ?? 'occupation'
     }
     default:
       return null
@@ -46,7 +37,7 @@ const inferCardType = (cardId: string, locale?: Locale): CardType | null => {
 export const getAnyCardDisplayName = (
   locale: Locale,
   cardId: string,
-): string => getCardDisplayName(locale, inferCardType(cardId, locale), cardId)
+): string => getCardDisplayName(locale, inferCardType(cardId), cardId)
 
 export const getCardDisplayName = (
   locale: Locale,
@@ -93,14 +84,14 @@ export const translateCardText = (
           ? 'minor'
           : prefix === 'improvements'
             ? 'major'
-            : inferCardType(cardId, locale)
+            : inferCardType(cardId)
     return getCardDisplayName(locale, cardType, cardId)
   }
 
   const anytimeMatch = cardAnytimeKeyPattern.exec(key)
   if (anytimeMatch) {
     const [, cardId] = anytimeMatch
-    return getCardDisplayName(locale, inferCardType(cardId, locale), cardId)
+    return getCardDisplayName(locale, inferCardType(cardId), cardId)
   }
 
   return translated

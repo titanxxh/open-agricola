@@ -381,7 +381,7 @@ describe('FarmBoard', () => {
 
     fireEvent.click(container.querySelector('[data-id="B034_SpecialFood"]')!)
 
-    expect(resolveChoice).toHaveBeenCalledWith('minor:B034_SpecialFood')
+    expect(resolveChoice).toHaveBeenCalledWith('B034_SpecialFood')
   })
 
   it('renders reorg controls for card animal zones', () => {

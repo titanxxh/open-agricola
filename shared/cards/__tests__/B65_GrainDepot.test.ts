@@ -54,7 +54,7 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
@@ -141,7 +141,7 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

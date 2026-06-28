@@ -1,4 +1,4 @@
-import type { CardDefinition } from '../contract/cards'
+import type { CardDefinition, PlayerActionCardType } from '../contract/cards'
 import type { CardImpl } from './registry'
 
 export type CardSourceKind = 'minor' | 'occupation' | 'playerAction' | 'major'
@@ -35,6 +35,19 @@ type CardSourceWithoutImplInput = {
 }
 
 type CardSourceInput = CardSourceWithImplInput | CardSourceWithoutImplInput
+type PlayerActionCardSourceMetaInput =
+  CardSourceMetaInput & { playerActionCardType: PlayerActionCardType }
+type PlayerActionCardSourceWithImplInput = {
+  meta: PlayerActionCardSourceMetaInput
+  impl: CardImpl
+}
+type PlayerActionCardSourceWithoutImplInput = {
+  meta: PlayerActionCardSourceMetaInput
+  impl?: undefined
+}
+type PlayerActionCardSourceInput =
+  | PlayerActionCardSourceWithImplInput
+  | PlayerActionCardSourceWithoutImplInput
 
 const defineCardSource = <K extends CardSourceKind>(
   kind: K,
@@ -63,9 +76,9 @@ export function defineOccupationCard(input: CardSourceInput): CardSource<'occupa
   return defineCardSource('occupation', input)
 }
 
-export function definePlayerActionCard(input: CardSourceWithImplInput): CardSourceWithImpl<'playerAction'>
-export function definePlayerActionCard(input: CardSourceWithoutImplInput): CardSourceWithoutImpl<'playerAction'>
-export function definePlayerActionCard(input: CardSourceInput): CardSource<'playerAction'> {
+export function definePlayerActionCard(input: PlayerActionCardSourceWithImplInput): CardSourceWithImpl<'playerAction'>
+export function definePlayerActionCard(input: PlayerActionCardSourceWithoutImplInput): CardSourceWithoutImpl<'playerAction'>
+export function definePlayerActionCard(input: PlayerActionCardSourceInput): CardSource<'playerAction'> {
   return defineCardSource('playerAction', input)
 }
 

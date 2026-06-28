@@ -94,11 +94,11 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
 
     expect(result?.extraOptions).toBeDefined()
     const values = result!.extraOptions!.map((o) => o.value).sort()
-    expect(values).toContain('major:Major_Pottery')
-    expect(values).toContain('major:Major_Joinery')
-    expect(values).toContain('major:Major_Basket')
-    expect(values).toContain('major:Major_ClayOven')
-    expect(values).toContain('major:Major_StoneOven')
+    expect(values).toContain('Major_Pottery')
+    expect(values).toContain('Major_Joinery')
+    expect(values).toContain('Major_Basket')
+    expect(values).toContain('Major_ClayOven')
+    expect(values).toContain('Major_StoneOven')
     for (const opt of result!.extraOptions!) {
       expect(opt.sourceCard).toBe(CARD_ID)
     }
@@ -148,20 +148,20 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     const values = (resp.interaction.options ?? []).map((o) => o.value)
-    expect(values).toContain('major:Major_Pottery')
-    expect(values).toContain('major:Major_Joinery')
-    expect(values).toContain('major:Major_Basket')
-    expect(values).toContain('major:Major_ClayOven')
-    expect(values).toContain('major:Major_StoneOven')
+    expect(values).toContain('Major_Pottery')
+    expect(values).toContain('Major_Joinery')
+    expect(values).toContain('Major_Basket')
+    expect(values).toContain('Major_ClayOven')
+    expect(values).toContain('Major_StoneOven')
   })
 
-  it('selecting major:Major_Pottery on minor-improvement plays it as a major', () => {
+  it('selecting Major_Pottery on minor-improvement plays it as a major', () => {
     const session = setup({ minorHand: [] })
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const potteryOption = resp.interaction.options?.find((option) => option.value === 'major:Major_Pottery')
+    const potteryOption = resp.interaction.options?.find((option) => option.value === 'Major_Pottery')
     expect(potteryOption).toBeDefined()
     resp = session.resolveChoice(0, potteryOption!.value)
 
@@ -181,13 +181,13 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     expect(resp.state.availableMajorImprovements).not.toContain('Major_Pottery')
   })
 
-  it('non-D131 owner: minor-improvement has no major: candidates', () => {
+  it('non-D131 owner: minor-improvement has no major candidates', () => {
     const session = setup({ playD131: false })
     const resp = enterMinorChoice(session)
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
     const values = (resp.interaction.options ?? []).map((o) => o.value)
     for (const v of values) {
-      expect(v.startsWith('major:')).toBe(false)
+      expect(v.startsWith('Major_')).toBe(false)
     }
   })
 
@@ -202,11 +202,11 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     // All bottom-row majors require either clay or stone — none should
     // remain when the player has zero of either resource.
     for (const v of values) {
-      expect(v).not.toBe('major:Major_Pottery')
-      expect(v).not.toBe('major:Major_Joinery')
-      expect(v).not.toBe('major:Major_Basket')
-      expect(v).not.toBe('major:Major_ClayOven')
-      expect(v).not.toBe('major:Major_StoneOven')
+      expect(v).not.toBe('Major_Pottery')
+      expect(v).not.toBe('Major_Joinery')
+      expect(v).not.toBe('Major_Basket')
+      expect(v).not.toBe('Major_ClayOven')
+      expect(v).not.toBe('Major_StoneOven')
     }
   })
 })

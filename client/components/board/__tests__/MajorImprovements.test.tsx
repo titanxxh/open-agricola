@@ -60,7 +60,7 @@ describe('MajorImprovements', () => {
     fireEvent.click(covered!)
     expect(resolveChoice).not.toHaveBeenCalled()
     fireEvent.click(visible!)
-    expect(resolveChoice).toHaveBeenCalledWith('major:Major_Well')
+    expect(resolveChoice).toHaveBeenCalledWith('Major_Well')
   })
 
   it('preserves flat fallback when stack supply is absent', () => {

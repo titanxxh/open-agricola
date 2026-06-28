@@ -66,7 +66,7 @@ const playPassingMinor = (session: GameSession, cardId: string) => {
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
   if (cardPrompt.interaction.sourceCard === cardId) return cardPrompt
-  const cardOption = cardPrompt.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  const cardOption = cardPrompt.interaction.options?.find((entry) => entry.value === cardId)
   expect(cardOption).toBeDefined()
   const played = session.resolveChoice(0, cardOption!.value)
   expect(played.ok).toBe(true)

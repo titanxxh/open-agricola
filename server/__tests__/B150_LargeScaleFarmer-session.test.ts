@@ -60,7 +60,7 @@ describe('B150_LargeScaleFarmer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Pick Fireplace1 (costs 2 clay) — player has 10 clay
-    const fireplace = resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
+    const fireplace = resp.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
     expect(fireplace).toBeDefined()
     resp = session.resolveChoice(0, fireplace!.value)
     // Potentially there's a payment sub-choice; keep draining valid options

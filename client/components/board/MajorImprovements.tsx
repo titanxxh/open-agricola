@@ -99,7 +99,7 @@ export const MajorImprovements = ({
                     devMode={devMode}
                     onClick={() => {
                       if (canInteract) {
-                        resolveChoice(`major:${cardId}`)
+                        resolveChoice(cardId)
                       }
                     }}
                     disabled={isDisabled}

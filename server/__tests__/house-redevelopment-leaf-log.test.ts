@@ -47,7 +47,7 @@ describe('house-redevelopment leaf-flush logging', () => {
 
     expect(resp2.interaction.promptKey).toBe('ui.interactionChooseImprovement')
     expect(resp2.interaction.options?.map((option) => option.value)).toEqual(
-      expect.arrayContaining(['major:Major_Fireplace1', 'minor:A055_JunkRoom']),
+      expect.arrayContaining(['Major_Fireplace1', 'A055_JunkRoom']),
     )
   })
 

@@ -234,7 +234,7 @@ describe('E095_Miller session', () => {
       const options = resp.interaction.options ?? []
       // Find fireplace option
       const fireplaceOption = options.find(
-        (o: ActionChoiceOption) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o: ActionChoiceOption) => o.value === 'Major_Fireplace1',
       )
       // Find activate (non-skip) option
       const activateOption = options.find(

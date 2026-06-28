@@ -239,7 +239,7 @@ const playA3 = (session: GameSession) => {
     return cardPrompt
   }
   const cardOption = cardPrompt.interaction.options?.find(
-    (option) => option.value === `minor:${SESSION_CARD_ID}`,
+    (option) => option.value === SESSION_CARD_ID,
   )
   expect(cardOption).toBeDefined()
   return session.resolveChoice(0, cardOption!.value)
@@ -412,7 +412,7 @@ describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
       return
     }
 
-    const a3Option = cardPrompt.interaction.options?.find(o => o.value === `minor:${SESSION_CARD_ID}`)
+    const a3Option = cardPrompt.interaction.options?.find(o => o.value === SESSION_CARD_ID)
     if (!a3Option) {
       // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
       return

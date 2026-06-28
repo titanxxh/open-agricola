@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isMinorCardId } from '../helpers/card-type'
 
 const CARD_ID = 'E018_SeedAlmanac'
 const listener: CardListenerRegistration = {
@@ -12,10 +13,8 @@ const listener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice ?? ''
-    // Only trigger for minor improvements, not this card itself
-    if (choice.startsWith('major:')) return
-    const builtId = choice.replace(/^minor:/, '')
-    if (!builtId || builtId === CARD_ID) return
+    const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!builtId || builtId === CARD_ID || !isMinorCardId(builtId)) return
     return {
       flow: {
         type: 'seq',

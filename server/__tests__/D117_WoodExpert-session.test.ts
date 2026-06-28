@@ -51,7 +51,7 @@ const chooseMinor = (
 ) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  const option = response.interaction.options?.find((entry) => entry.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }

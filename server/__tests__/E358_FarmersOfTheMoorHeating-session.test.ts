@@ -110,8 +110,8 @@ const prepareMajorPurchaseSession = (cardId: string) => {
 const buyMajor = (session: GameSession, cardId: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
-  if (resp.interaction.stateId === 'wait' && resp.interaction.options?.some((option) => option.value === `major:${cardId}`)) {
-    resp = session.resolveChoice(0, `major:${cardId}`)
+  if (resp.interaction.stateId === 'wait' && resp.interaction.options?.some((option) => option.value === cardId)) {
+    resp = session.resolveChoice(0, cardId)
     expect(resp.ok).toBe(true)
   }
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
@@ -546,7 +546,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const m085Option = resp.interaction.options?.find((option) => option.value === 'minor:M085_OvenInstallation')
+    const m085Option = resp.interaction.options?.find((option) => option.value === 'M085_OvenInstallation')
     expect(m085Option).toBeDefined()
 
     resp = session.resolveChoice(0, m085Option!.value)

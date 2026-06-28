@@ -65,7 +65,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     const c60Option = resp.interaction.options?.find(
-      (option) => option.value === 'minor:C060_SmallPottersOven',
+      (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
 
@@ -112,7 +112,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     const c60Option = resp.interaction.options?.find(
-      (option) => option.value === 'minor:C060_SmallPottersOven',
+      (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
 
@@ -197,7 +197,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseImprovement')
     const stoneOption = resp.interaction.options?.find(
-      (option) => option.value === 'major:Major_StoneOven',
+      (option) => option.value === 'Major_StoneOven',
     )
     expect(stoneOption).toBeDefined()
 

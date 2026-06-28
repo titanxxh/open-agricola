@@ -77,7 +77,7 @@ const playB3 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
   expect(cardOption).toBeDefined()
   // Choose to play B003_Moonshine
   return session.resolveChoice(0, cardOption!.value)

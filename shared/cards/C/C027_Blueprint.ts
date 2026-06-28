@@ -46,7 +46,7 @@ const choiceCandidateListener: CardListenerRegistration = {
     const extraOptions: ActionChoiceOption[] = ALLOWED_MAJORS
       .filter((id) => available.includes(id))
       .map((id) => ({
-        value: `major:${id}`,
+        value: id,
         labelKey: `improvements.${id}.name`,
         sourceCard: CARD_ID,
       }))

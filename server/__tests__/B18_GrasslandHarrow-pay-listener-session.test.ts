@@ -251,7 +251,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       } else {
         expect(resp.interaction.stateId).toBe('wait')
         if (resp.interaction.stateId !== 'wait') return
-        const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+        const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
         expect(cardOption).toBeDefined()
         resp = session.resolveChoice(0, cardOption!.value)
       }

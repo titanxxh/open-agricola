@@ -103,7 +103,7 @@ const buyMinor = (
   }
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
-  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   return session.resolveChoice(playerIndex, cardOption!.value)
 }
@@ -254,7 +254,7 @@ describe('Moor action listener minors', () => {
     expect(prompt.ok).toBe(true)
     expect(prompt.state.players[0]!.minorHand).toContain('M103_ForestKindergarten')
     expect(prompt.state.players[0]!.minorPlayed).not.toContain('M103_ForestKindergarten')
-    expect((prompt.interaction.options ?? []).some((option) => option.value === 'minor:M103_ForestKindergarten')).toBe(false)
+    expect((prompt.interaction.options ?? []).some((option) => option.value === 'M103_ForestKindergarten')).toBe(false)
   })
 
   it('M103 Forest Kindergarten gives food after Family Growth with room', () => {

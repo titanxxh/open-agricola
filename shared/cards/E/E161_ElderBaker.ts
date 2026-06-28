@@ -10,9 +10,7 @@ const CARD_ID = 'E161_ElderBaker'
 
 /**
  * BGA Desc: "You can build the Stone Oven major improvement even when taking a
- * Minor Improvement action." Pattern mirrors D131 CraftsmanshipPromoter — inject
- * a `major:` candidate into the minor-improvement choice list when owner has
- * the card in play.
+ * Minor Improvement action." Pattern mirrors D131 CraftsmanshipPromoter.
  */
 const STONE_OVEN_ID = 'Major_StoneOven'
 
@@ -33,7 +31,7 @@ const stoneOvenCandidateListener: CardListenerRegistration = {
     if (!available.includes(STONE_OVEN_ID)) return
     const extraOptions: ActionChoiceOption[] = [
       {
-        value: `major:${STONE_OVEN_ID}`,
+        value: STONE_OVEN_ID,
         labelKey: `improvements.${STONE_OVEN_ID}.name`,
         sourceCard: CARD_ID,
       },
@@ -79,6 +77,7 @@ export const E161_ElderBaker = definePlayerActionCard({
     name: "Elder Baker",
     deck: "E",
     number: 161,
+    playerActionCardType: 'occupation',
     desc: ["This card is an action space for you only. When you use it, you get 3 <GRAIN>. You can build the __Stone Oven__ major improvement even when taking a __Minor Improvement__ action."],
     cost: {},
     players: "4+",

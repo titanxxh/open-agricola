@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { isMajorCardId } from '../helpers/card-type'
 
 const CARD_ID = 'C043_FarmBuilding'
 const listener: CardListenerRegistration = {
@@ -12,7 +13,8 @@ const listener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice ?? ''
-    if (!choice.startsWith('major:')) return
+    const cardId = choice.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!isMajorCardId(cardId)) return
     queueFutureMeeples(context.state, {
       cardId: CARD_ID,
       playerId: context.player.id,
