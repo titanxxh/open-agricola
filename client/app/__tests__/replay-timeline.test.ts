@@ -26,7 +26,7 @@ const metadataOnlyEvent = (id: string, seq: number): GameEvent => ({
   visibility: 'public',
   targetPlayerId: 'p1',
   type: 'card.stateChanged',
-  cardId: 'B21_HayloftBarn',
+  cardId: 'B021_HayloftBarn',
   key: 'food',
   value: 3,
 })

@@ -4,14 +4,14 @@ import { getCardDefinition } from '../catalog'
 
 describe('getCardDefinition', () => {
   it('returns occupation definition by id', () => {
-    const def = getCardDefinition('A93_BedMaker')
-    expect(def?.id).toBe('A93_BedMaker')
+    const def = getCardDefinition('A093_BedMaker')
+    expect(def?.id).toBe('A093_BedMaker')
     expect(def?.name).toBeDefined()
   })
 
   it('returns minor improvement definition by id', () => {
-    const def = getCardDefinition('A28_ForestSchool')
-    expect(def?.id).toBe('A28_ForestSchool')
+    const def = getCardDefinition('A028_ForestSchool')
+    expect(def?.id).toBe('A028_ForestSchool')
     expect(def?.name).toBeDefined()
   })
 

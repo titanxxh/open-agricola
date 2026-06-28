@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
-import '../D/D26_CarpentersYard'
+import '../D/D026_CarpentersYard'
 
-const CARD_ID = 'D26_CarpentersYard'
+const CARD_ID = 'D026_CarpentersYard'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -53,7 +53,7 @@ const createState = (...players: PlayerState[]): GameState =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('D26_CarpentersYard', () => {
+describe('D026_CarpentersYard', () => {
   it('listener triggers after playing Major_Well, offering Major_Joinery', () => {
     const listener = findListener('D26-carpenters-yard-immediately-after-improvement')
     expect(listener).toBeDefined()

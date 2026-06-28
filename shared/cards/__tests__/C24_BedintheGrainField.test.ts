@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
-import { C24_BedintheGrainField_impl } from '../C/C24_BedintheGrainField'
+import { C024_BedintheGrainField_impl } from '../C/C024_BedintheGrainField'
 
-const CARD_ID = 'C24_BedintheGrainField'
+const CARD_ID = 'C024_BedintheGrainField'
 
 const resource = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -89,9 +89,9 @@ const state = (p: PlayerState): GameState => ({
   workPhaseObtainedResources: {},
 } as unknown as GameState)
 
-const effect = C24_BedintheGrainField_impl.effect!
+const effect = C024_BedintheGrainField_impl.effect!
 
-describe('C24_BedintheGrainField', () => {
+describe('C024_BedintheGrainField', () => {
   it('onBuy marks the next harvest as ready', () => {
     const p = player()
 

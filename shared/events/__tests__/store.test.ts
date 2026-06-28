@@ -439,7 +439,7 @@ describe('EventStore', () => {
     internals.inTransaction = true
     internals.transactionEvents = [
       makeEvent({
-        to: { kind: 'player', playerId: 'p1', minorHand: ['E1_PrivateCard'] } as never,
+        to: { kind: 'player', playerId: 'p1', minorHand: ['E001_PrivateCard'] } as never,
       }),
     ]
 

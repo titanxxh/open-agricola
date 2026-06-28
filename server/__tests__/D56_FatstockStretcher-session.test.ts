@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/D/D56_FatstockStretcher'
+import '../../shared/cards/D/D056_FatstockStretcher'
 
-describe('D56_FatstockStretcher session', () => {
+describe('D056_FatstockStretcher session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,7 +13,7 @@ describe('D56_FatstockStretcher session', () => {
 
     const player = state.players[0]!
     // Place card directly
-    player.minorPlayed.push('D56_FatstockStretcher')
+    player.minorPlayed.push('D056_FatstockStretcher')
     // Give player a Fireplace for cooking
     player.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(

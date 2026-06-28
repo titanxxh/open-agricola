@@ -1440,7 +1440,7 @@ describe('Engine flow nodes', () => {
             type: 'leaf',
             actionId: 'plow',
             choiceLabelKey: 'ui.interactionUseCard',
-            choiceLabelParams: { cardNameKey: 'occupations.A94_LazySowman.name' },
+            choiceLabelParams: { cardNameKey: 'occupations.A094_LazySowman.name' },
           },
         }
       },
@@ -1509,7 +1509,7 @@ describe('Engine flow nodes', () => {
     const optional = new ActionNode(
       'action-d1-plow',
       'plow',
-      'D1_ZigzagHarrow',
+      'D001_ZigzagHarrow',
       undefined,
       undefined,
       undefined,
@@ -1760,12 +1760,12 @@ describe('Engine flow nodes', () => {
     registry.register(gainAction)
     const root = new XorNode('xor-studio', [
       new SequenceNode('seq-wood', [
-        new ActionNode('pay-w', 'pay', 'C55_Studio', { wood: 1 }),
-        new ActionNode('gain-w', 'gain', 'C55_Studio', { food: 2 }),
+        new ActionNode('pay-w', 'pay', 'C055_Studio', { wood: 1 }),
+        new ActionNode('gain-w', 'gain', 'C055_Studio', { food: 2 }),
       ]),
       new SequenceNode('seq-clay', [
-        new ActionNode('pay-c', 'pay', 'C55_Studio', { clay: 1 }),
-        new ActionNode('gain-c', 'gain', 'C55_Studio', { food: 2 }),
+        new ActionNode('pay-c', 'pay', 'C055_Studio', { clay: 1 }),
+        new ActionNode('gain-c', 'gain', 'C055_Studio', { food: 2 }),
       ]),
     ])
     const engine = new Engine({
@@ -1798,12 +1798,12 @@ describe('Engine flow nodes', () => {
     registry.register(bonusVpAction)
     const root = new XorNode('xor-paint', [
       new SequenceNode('seq-food', [
-        new ActionNode('pay-f', 'pay', 'E39_Paintbrush', { clay: 1 }),
-        new ActionNode('gain-f', 'gain', 'E39_Paintbrush', { food: 2 }),
+        new ActionNode('pay-f', 'pay', 'E039_Paintbrush', { clay: 1 }),
+        new ActionNode('gain-f', 'gain', 'E039_Paintbrush', { food: 2 }),
       ]),
       new SequenceNode('seq-vp', [
-        new ActionNode('pay-v', 'pay', 'E39_Paintbrush', { clay: 1 }),
-        new ActionNode('bv', 'bonus-vp', 'E39_Paintbrush'),
+        new ActionNode('pay-v', 'pay', 'E039_Paintbrush', { clay: 1 }),
+        new ActionNode('bv', 'bonus-vp', 'E039_Paintbrush'),
       ]),
     ])
     const engine = new Engine({
@@ -1851,9 +1851,9 @@ describe('Engine flow nodes', () => {
     const optional = new ActionNode(
       'e53-exchange',
       'test-e53-exchange',
-      'E53_BoarSpear',
+      'E053_BoarSpear',
       undefined,
-      'cards.E53_BoarSpear.choice',
+      'cards.E053_BoarSpear.choice',
     )
     optional.optional = true
     optional.optionalActive = false
@@ -1873,7 +1873,7 @@ describe('Engine flow nodes', () => {
     expect(first.type).toBe('choice')
     if (first.type !== 'choice') return
     const accept = first.choice.options.find((option) => option.value === 'e53-exchange')
-    expect(accept?.labelKey).toBe('cards.E53_BoarSpear.choice')
+    expect(accept?.labelKey).toBe('cards.E053_BoarSpear.choice')
     expect(accept?.descriptionPreview).toMatchObject({
       kind: 'action',
       labelKey: 'actions.exchange.description',
@@ -1891,14 +1891,14 @@ describe('Engine flow nodes', () => {
       execute: () => ({ type: 'ok' }),
     }
     const useBranch = new SequenceNode('use-offspring', [
-      new ActionNode('pay-food', 'pay', 'A92_AdoptiveParents', { food: 1 }),
-      new ActionNode('promote-newborn', 'special-effect', 'A92_AdoptiveParents', { kind: 'promote-first-newborn' }),
-      new ActionNode('place-newborn', 'place-farmer', 'A92_AdoptiveParents'),
+      new ActionNode('pay-food', 'pay', 'A092_AdoptiveParents', { food: 1 }),
+      new ActionNode('promote-newborn', 'special-effect', 'A092_AdoptiveParents', { kind: 'promote-first-newborn' }),
+      new ActionNode('place-newborn', 'place-farmer', 'A092_AdoptiveParents'),
     ])
     useBranch.choiceLabelKey = 'ui.interactionUseAbility'
     const declineBranch = new SequenceNode('decline-offspring', [
-      new ActionNode('emit-decline', 'special-effect', 'A92_AdoptiveParents', { kind: 'emit-card-triggered', accepted: false, optional: true }),
-      new ActionNode('mark-decline', 'special-effect', 'A92_AdoptiveParents', { kind: 'set-extra-data', key: 'forfeitedThisRound', value: true }),
+      new ActionNode('emit-decline', 'special-effect', 'A092_AdoptiveParents', { kind: 'emit-card-triggered', accepted: false, optional: true }),
+      new ActionNode('mark-decline', 'special-effect', 'A092_AdoptiveParents', { kind: 'set-extra-data', key: 'forfeitedThisRound', value: true }),
     ])
     declineBranch.choiceLabelKey = 'ui.interactionDecline'
     const registry = new ActionRegistry()

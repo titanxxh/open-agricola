@@ -4,11 +4,11 @@ import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 
-import '../D/D96_Furnisher'
+import '../D/D096_Furnisher'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'D96_Furnisher'
+const CARD_ID = 'D096_Furnisher'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -53,7 +53,7 @@ const createSpace = (id: string): ActionSpace =>
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('D96_Furnisher', () => {
+describe('D096_Furnisher', () => {
   it('onBuy returns gain flow for 2 wood', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).not.toBeNull()
@@ -120,7 +120,7 @@ describe('D96_Furnisher', () => {
     expect(result).toBeUndefined()
   })
 
-  it('deriveCardCostCandidate derives a wood discount when actionCardId is D96_Furnisher', () => {
+  it('deriveCardCostCandidate derives a wood discount when actionCardId is D096_Furnisher', () => {
     const listener = findListener('D96-furnisher-compute-costs-improvement')!
     expect(listener).toBeDefined()
     const player = createPlayer()

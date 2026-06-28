@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/A/A4_Baseboards'
+import '../../shared/cards/A/A004_Baseboards'
 
-const CARD_ID = 'A4_Baseboards'
+const CARD_ID = 'A004_Baseboards'
 
 const setup = (opts?: { food?: number; grain?: number }) => {
   const session = new GameSession(/* seed */ 1)
@@ -60,7 +60,7 @@ const playA4 = (session: GameSession) => {
   return session.resolveChoice(0, a4Option!.value)
 }
 
-describe('A4_Baseboards session — altCosts', () => {
+describe('A004_Baseboards session — altCosts', () => {
   it('food=2, grain=0 → auto-pay food (single solution, no choice prompt)', () => {
     const session = setup({ food: 2, grain: 0 })
     const resp = playA4(session)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types.ts'
 import { buildRoomFarmInteraction } from '../../shared/domain/farmyard'
-import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
@@ -122,7 +122,7 @@ describe('farm choice', () => {
     player.resources.wood = 8
     player.resources.reed = 2
     player.activeModifiers = [
-      ...(A14_CarpentersHammer.impl.modifiers ?? []),
+      ...(A014_CarpentersHammer.impl.modifiers ?? []),
     ]
 
     const interaction = buildRoomFarmInteraction(player)

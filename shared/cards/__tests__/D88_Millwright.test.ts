@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
-import { D88_Millwright } from '../D/D88_Millwright'
+import { D088_Millwright } from '../D/D088_Millwright'
 import type { CostModifier, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 
 const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
@@ -53,14 +53,14 @@ const makePlayer = (): PlayerState => ({
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
-  activeModifiers: [...(D88_Millwright.impl.modifiers ?? [])] as CostModifier[],
+  activeModifiers: [...(D088_Millwright.impl.modifiers ?? [])] as CostModifier[],
   cardStates: {},
   stats: {} as never,
 })
 
-describe('D88_Millwright', () => {
+describe('D088_Millwright', () => {
   it('uses two optional bonus choice sets per supported cost type', () => {
-    const modifiers = D88_Millwright.impl.modifiers ?? []
+    const modifiers = D088_Millwright.impl.modifiers ?? []
 
     expect(modifiers).toHaveLength(8)
     expect(modifiers.every((modifier) => modifier.type === 'bonus')).toBe(true)
@@ -70,7 +70,7 @@ describe('D88_Millwright', () => {
       for (const modifier of scoped) {
         expect(modifier).toMatchObject({
           type: 'bonus',
-          cardId: 'D88_Millwright',
+          cardId: 'D088_Millwright',
           appliesTo: [costType],
           optional: true,
           trackChoiceIndex: false,

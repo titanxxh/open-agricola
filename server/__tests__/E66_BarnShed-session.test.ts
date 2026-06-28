@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
-import '../../shared/cards/E/E66_BarnShed'
+import '../../shared/cards/E/E066_BarnShed'
 
-describe('E66_BarnShed session', () => {
+describe('E066_BarnShed session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
@@ -13,7 +13,7 @@ describe('E66_BarnShed session', () => {
     state.round = 1
 
     const owner = state.players[0]!
-    owner.minorPlayed.push('E66_BarnShed')
+    owner.minorPlayed.push('E066_BarnShed')
     setWorkersAtHome(state, owner, 2)
     owner.resources.grain = 0
 

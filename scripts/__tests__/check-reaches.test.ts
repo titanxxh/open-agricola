@@ -21,8 +21,8 @@ describe('check-reaches', () => {
     const result = checkReaches([path.join(fixtures, 'C_impl_missing.ts')])
     expect(result.violations.length).toBeGreaterThan(0)
     expect(result.violations[0]).toMatchObject({
-      cardId: 'C1_Missing',
-      missingReach: 'D99_SomeOtherCard',
+      cardId: 'C001_Missing',
+      missingReach: 'D099_SomeOtherCard',
     })
   })
 })

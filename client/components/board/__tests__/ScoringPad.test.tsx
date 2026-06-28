@@ -20,7 +20,7 @@ const mockScores: PlayerScoreSummary[] = [
         entries: [
           {
             type: 'card',
-            cardId: 'A92_AdoptiveParents',
+            cardId: 'A092_AdoptiveParents',
             cardType: 'occupation',
             score: 1,
           },
@@ -46,7 +46,7 @@ const scoreRowsWithCardBonuses = [
         total: 2,
         entries: [
           { type: 'card', cardId: 'Major_Pottery', cardType: 'major', score: 2 },
-          { type: 'card', cardId: 'A37_Bucksaw', cardType: 'minor', score: 0 },
+          { type: 'card', cardId: 'A037_Bucksaw', cardType: 'minor', score: 0 },
         ],
       },
       {
@@ -81,7 +81,7 @@ const scoreRowsWithCardBonuses = [
           },
           {
             type: 'bonus',
-            cardId: 'A37_Bucksaw',
+            cardId: 'A037_Bucksaw',
             cardType: 'minor',
             score: 0,
           },
@@ -91,14 +91,14 @@ const scoreRowsWithCardBonuses = [
         key: 'cardsBonus',
         total: 4,
         entries: [
-          { type: 'bonus', cardId: 'A37_Bucksaw', cardType: 'minor', score: 4 },
+          { type: 'bonus', cardId: 'A037_Bucksaw', cardType: 'minor', score: 4 },
         ],
       },
       {
         key: 'cardStateBonusVp',
         total: 1,
         entries: [
-          { type: 'bonus', cardId: 'B48_ForestStone', cardType: 'minor', score: 1 },
+          { type: 'bonus', cardId: 'B048_ForestStone', cardType: 'minor', score: 1 },
         ],
       },
     ],
@@ -136,7 +136,7 @@ describe('ScoringPad', () => {
     )
 
     expect(html).toContain('Adoptive Parents')
-    expect(html).not.toContain('occupations.A92_AdoptiveParents.name')
+    expect(html).not.toContain('occupations.A092_AdoptiveParents.name')
   })
 
   it('hides Draft tab during the game and Score is active by default', () => {
@@ -167,10 +167,10 @@ describe('ScoringPad', () => {
         stats: {
           ...createInitialPlayerStats({ isFirstPlayer: true }),
           draftHistory: [
-            { cardId: 'A92_AdoptiveParents', draftTurn: 1, playedTurn: 3 },
-            { cardId: 'B79_Corf', draftTurn: 2 },
+            { cardId: 'A092_AdoptiveParents', draftTurn: 1, playedTurn: 3 },
+            { cardId: 'B079_Corf', draftTurn: 2 },
           ],
-          draftDiscarded: ['D1_Foo'],
+          draftDiscarded: ['D001_Foo'],
         },
       },
       { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },

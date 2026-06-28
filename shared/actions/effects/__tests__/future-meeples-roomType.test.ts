@@ -76,7 +76,7 @@ const createState = (player: PlayerState, round = 1): GameState =>
 
 const queueRoomTypeRequest = (state: GameState, playerId: string) => {
   queueFutureMeeples(state, {
-    cardId: 'B14_Hawktower',
+    cardId: 'B014_Hawktower',
     playerId,
     entries: [{ round: 12, roomType: 'stone' }],
   })
@@ -93,7 +93,7 @@ describe('future-meeples roomType resolution', () => {
     expect(state.pendingFutureMeeples).toHaveLength(0)
     expect(state.futureMeeples).toHaveLength(1)
     const entry = state.futureMeeples[0]!
-    expect(entry.cardId).toBe('B14_Hawktower')
+    expect(entry.cardId).toBe('B014_Hawktower')
     expect(entry.round).toBe(12)
     expect(entry.roomType).toBe('stone')
   })
@@ -115,7 +115,7 @@ describe('future-meeples roomType resolution', () => {
     // entry consumed
     expect(
       state.futureMeeples.some(
-        (e) => e.cardId === 'B14_Hawktower' && e.playerId === player.id,
+        (e) => e.cardId === 'B014_Hawktower' && e.playerId === player.id,
       ),
     ).toBe(false)
   })
@@ -137,7 +137,7 @@ describe('future-meeples roomType resolution', () => {
     // entry still consumed (dropped)
     expect(
       state.futureMeeples.some(
-        (e) => e.cardId === 'B14_Hawktower' && e.playerId === player.id,
+        (e) => e.cardId === 'B014_Hawktower' && e.playerId === player.id,
       ),
     ).toBe(false)
   })

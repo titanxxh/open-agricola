@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/B/B10_Caravan'
+import '../../shared/cards/B/B010_Caravan'
 import '../../shared/cards/register-all'
 
-const CARD_ID = 'B10_Caravan'
+const CARD_ID = 'B010_Caravan'
 
-describe('B10_Caravan — provides room for 1 person via computeExtraRoomCapacity', () => {
+describe('B010_Caravan — provides room for 1 person via computeExtraRoomCapacity', () => {
   it('exposes computeExtraRoomCapacity on the effect', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()

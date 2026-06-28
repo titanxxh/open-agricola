@@ -8,21 +8,21 @@ describe('devDrawCard', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-    state.players[1]!.minorHand = ['D25_WitchesDanceFloor']
+    state.players[1]!.minorHand = ['D025_WitchesDanceFloor']
     session.loadState(state)
 
-    const played = session.devPlayCard(1, 'D25_WitchesDanceFloor')
+    const played = session.devPlayCard(1, 'D025_WitchesDanceFloor')
 
     expect(played.ok).toBe(true)
-    expect(played.state.players[1]!.minorPlayed).toContain('D25_WitchesDanceFloor')
-    expect(played.state.players[1]!.extraOccupationsFromCards).toContain('D25_WitchesDanceFloor')
+    expect(played.state.players[1]!.minorPlayed).toContain('D025_WitchesDanceFloor')
+    expect(played.state.players[1]!.extraOccupationsFromCards).toContain('D025_WitchesDanceFloor')
 
-    const drawn = session.devDrawCard(0, 'D25_WitchesDanceFloor')
+    const drawn = session.devDrawCard(0, 'D025_WitchesDanceFloor')
 
     expect(drawn.ok).toBe(true)
-    expect(drawn.state.players[0]!.minorHand).toContain('D25_WitchesDanceFloor')
-    expect(drawn.state.players[1]!.minorPlayed).not.toContain('D25_WitchesDanceFloor')
-    expect(drawn.state.players[1]!.extraOccupationsFromCards).not.toContain('D25_WitchesDanceFloor')
+    expect(drawn.state.players[0]!.minorHand).toContain('D025_WitchesDanceFloor')
+    expect(drawn.state.players[1]!.minorPlayed).not.toContain('D025_WitchesDanceFloor')
+    expect(drawn.state.players[1]!.extraOccupationsFromCards).not.toContain('D025_WitchesDanceFloor')
   })
 
   it('removes card-derived active modifiers from the former minor owner', () => {
@@ -32,7 +32,7 @@ describe('devDrawCard', () => {
     const owner = state.players[1]!
     const staleModifier: CostModifier = {
       type: 'trade',
-      cardId: 'D15_ClaySupports',
+      cardId: 'D015_ClaySupports',
       appliesTo: ['construct'],
       from: { wood: 1 },
       to: { clay: 3, reed: 1 },
@@ -43,15 +43,15 @@ describe('devDrawCard', () => {
       appliesTo: ['construct'],
       discount: { wood: 1 },
     }
-    owner.minorPlayed = ['D15_ClaySupports']
+    owner.minorPlayed = ['D015_ClaySupports']
     owner.activeModifiers = [staleModifier, retainedModifier]
     session.loadState(state)
 
-    const resp = session.devDrawCard(0, 'D15_ClaySupports')
+    const resp = session.devDrawCard(0, 'D015_ClaySupports')
 
     expect(resp.ok).toBe(true)
     expect(
-      resp.state.players[1]!.activeModifiers.some((m) => m.cardId === 'D15_ClaySupports'),
+      resp.state.players[1]!.activeModifiers.some((m) => m.cardId === 'D015_ClaySupports'),
     ).toBe(false)
     expect(resp.state.players[1]!.activeModifiers).toContainEqual(retainedModifier)
   })
@@ -61,32 +61,32 @@ describe('devDrawCard', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const owner = state.players[1]!
-    owner.minorPlayed = ['D25_WitchesDanceFloor']
-    owner.extraOccupationsFromCards = ['D25_WitchesDanceFloor']
+    owner.minorPlayed = ['D025_WitchesDanceFloor']
+    owner.extraOccupationsFromCards = ['D025_WitchesDanceFloor']
     session.loadState(state)
 
-    const resp = session.devDrawCard(0, 'D25_WitchesDanceFloor')
+    const resp = session.devDrawCard(0, 'D025_WitchesDanceFloor')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).toContain('D25_WitchesDanceFloor')
-    expect(resp.state.players[1]!.extraOccupationsFromCards).not.toContain('D25_WitchesDanceFloor')
+    expect(resp.state.players[0]!.minorHand).toContain('D025_WitchesDanceFloor')
+    expect(resp.state.players[1]!.extraOccupationsFromCards).not.toContain('D025_WitchesDanceFloor')
   })
 
   it('removes dynamic action spaces created by the former minor owner', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
-    state.players[1]!.minorHand = ['D51_Archway']
+    state.players[1]!.minorHand = ['D051_Archway']
     session.loadState(state)
-    const played = session.devPlayCard(1, 'D51_Archway')
-    expect(played.state.actionSpaces.some((space) => space.id === 'D51_Archway')).toBe(true)
+    const played = session.devPlayCard(1, 'D051_Archway')
+    expect(played.state.actionSpaces.some((space) => space.id === 'D051_Archway')).toBe(true)
 
-    const resp = session.devDrawCard(0, 'D51_Archway')
+    const resp = session.devDrawCard(0, 'D051_Archway')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).toContain('D51_Archway')
-    expect(resp.state.players[1]!.minorPlayed).not.toContain('D51_Archway')
-    expect(resp.state.actionSpaces.some((space) => space.id === 'D51_Archway')).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain('D051_Archway')
+    expect(resp.state.players[1]!.minorPlayed).not.toContain('D051_Archway')
+    expect(resp.state.actionSpaces.some((space) => space.id === 'D051_Archway')).toBe(false)
   })
 
   it('pulls a played minor from any player back to the target hand and clears its state', () => {
@@ -96,19 +96,19 @@ describe('devDrawCard', () => {
     const target = state.players[0]!
     const owner = state.players[1]!
     target.minorHand = []
-    owner.minorPlayed = ['C57_Crudite']
+    owner.minorPlayed = ['C057_Crudite']
     owner.cardStates = {
-      C57_Crudite: { counters: { food: 1 }, extraData: { used: true } },
+      C057_Crudite: { counters: { food: 1 }, extraData: { used: true } },
     }
     session.loadState(state)
 
-    const resp = session.devDrawCard(0, 'C57_Crudite')
+    const resp = session.devDrawCard(0, 'C057_Crudite')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).toContain('C57_Crudite')
-    expect(resp.state.players[1]!.minorPlayed).not.toContain('C57_Crudite')
-    expect(resp.state.players[1]!.cardStates?.C57_Crudite).toBeUndefined()
-    expect(getPlayedCardKeys(resp.state.players[1]!)).not.toContain('minor:C57_Crudite')
+    expect(resp.state.players[0]!.minorHand).toContain('C057_Crudite')
+    expect(resp.state.players[1]!.minorPlayed).not.toContain('C057_Crudite')
+    expect(resp.state.players[1]!.cardStates?.C057_Crudite).toBeUndefined()
+    expect(getPlayedCardKeys(resp.state.players[1]!)).not.toContain('minor:C057_Crudite')
   })
 
   it('pulls a played occupation from any player back to the target hand and clears its state', () => {

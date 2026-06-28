@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/E/E24_Ambition'
-import '../../shared/cards/A/A55_JunkRoom'
+import '../../shared/cards/E/E024_Ambition'
+import '../../shared/cards/A/A055_JunkRoom'
 
-const CARD_ID = 'E24_Ambition'
+const CARD_ID = 'E024_Ambition'
 
 const setup = (options?: { minorHand?: string[] }) => {
   const session = new GameSession()
@@ -17,7 +17,7 @@ const setup = (options?: { minorHand?: string[] }) => {
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
   player.minorPlayed.push(CARD_ID)
-  player.minorHand = options?.minorHand ?? ['A55_JunkRoom']
+  player.minorHand = options?.minorHand ?? ['A055_JunkRoom']
   player.resources = {
     ...player.resources,
     wood: 10,
@@ -31,7 +31,7 @@ const setup = (options?: { minorHand?: string[] }) => {
   return session
 }
 
-describe('E24_Ambition session', () => {
+describe('E024_Ambition session', () => {
   it('preserves sourceCard after computeReplace swaps meeting-place minor-improvement to improvement-any', () => {
     const session = setup()
 

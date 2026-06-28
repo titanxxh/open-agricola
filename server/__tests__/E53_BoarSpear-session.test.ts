@@ -3,19 +3,19 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
-import { E53_BoarSpear_impl } from '../../shared/cards/E/E53_BoarSpear'
+import { E053_BoarSpear_impl } from '../../shared/cards/E/E053_BoarSpear'
 import { executeCardListener } from '../../shared/cards/card-listeners'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-import '../../shared/cards/E/E53_BoarSpear'
-import '../../shared/cards/E/E85_MasterTanner'
+import '../../shared/cards/E/E053_BoarSpear'
+import '../../shared/cards/E/E085_MasterTanner'
 import '../../shared/cards/C/C148_MudWallower'
 import '../../shared/cards/B/B137_Wholesaler'
 
-const CARD_ID = 'E53_BoarSpear'
-const E85_ID = 'E85_MasterTanner'
+const CARD_ID = 'E053_BoarSpear'
+const E085_ID = 'E085_MasterTanner'
 const C148_ID = 'C148_MudWallower'
 const B137_ID = 'B137_Wholesaler'
 
@@ -77,7 +77,7 @@ const setup = (opts?: { boar?: number; food?: number; withE85?: boolean }) => {
   }
   player.minorPlayed.push(CARD_ID)
   if (opts?.withE85) {
-    player.occupationPlayed.push(E85_ID)
+    player.occupationPlayed.push(E085_ID)
   }
 
   session.loadState(state)
@@ -159,7 +159,7 @@ const driveToCompletion = (
   return resp
 }
 
-describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
+describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
   it('does not fire on non-boar-yielding action', () => {
     const { session } = setup()
     const resp = session.takeAction(0, 'grain-seeds')
@@ -354,7 +354,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     player.id = 'p1'
     recordActionSnapshot(player, 99)
 
-    const listener = E53_BoarSpear_impl.listeners[0]!
+    const listener = E053_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,
@@ -385,7 +385,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     state.roundPhase = 'breeding'
     recordActionSnapshot(player, 200)
 
-    const listener = E53_BoarSpear_impl.listeners[0]!
+    const listener = E053_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,
@@ -404,7 +404,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const player = state.players[0]!
     player.id = 'p1'
 
-    const listener = E53_BoarSpear_impl.listeners[0]!
+    const listener = E053_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,
@@ -428,7 +428,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       moved() as never,
     ]
 
-    const listener = E53_BoarSpear_impl.listeners[0]!
+    const listener = E053_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,

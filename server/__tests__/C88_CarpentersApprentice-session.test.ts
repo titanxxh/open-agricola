@@ -5,14 +5,14 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { PlayerState, GameState } from '../../shared/contract/types'
 import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 
-import '../../shared/cards/C/C88_CarpentersApprentice'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/C/C088_CarpentersApprentice'
+import '../../shared/cards/B/B030_WoodPalisades'
 
 const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
   const session = new GameSession()
   const state = session.getState().state
   const p = state.players[0]!
-  p.occupationPlayed.push('C88_CarpentersApprentice')
+  p.occupationPlayed.push('C088_CarpentersApprentice')
   p.fenceSegments = Array.from({ length: fenceCount }, (_, i) => ({
     edge: `fence-stub-${i}`,
     type: 'fence' as const,
@@ -24,7 +24,7 @@ const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
 const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => {
   const listener = getRegisteredCardListeners().find(
     (l) =>
-      l.cardIds?.includes('C88_CarpentersApprentice') &&
+      l.cardIds?.includes('C088_CarpentersApprentice') &&
       l.actions?.includes('fence') &&
       l.phases?.includes('computeCosts'),
   )
@@ -47,7 +47,7 @@ const fenceEdges = (n: number): string[] =>
 
 const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
   const listeners = getRegisteredCardListeners().filter((l) =>
-    l.cardIds?.includes('C88_CarpentersApprentice'),
+    l.cardIds?.includes('C088_CarpentersApprentice'),
   )
   const stableListener = listeners.find(
     (l) =>
@@ -80,8 +80,8 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     // 0 fence: 第 1、2 个 fence 不在 13-15 区间 → 不免费。
     // 2 fence × 1 wood = 2,2 palisade × 2 wood = 4,total = 6 wood。
     player.resources.wood = 6
-    player.occupationPlayed.push('C88_CarpentersApprentice')
-    player.minorPlayed.push('B30_WoodPalisades')
+    player.occupationPlayed.push('C088_CarpentersApprentice')
+    player.minorPlayed.push('B030_WoodPalisades')
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
 
@@ -111,8 +111,8 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     const player = state.players[0]!
     // 需 6 wood(2 fence 全额 + 2 palisade 全额);只有 5 → 不足。
     player.resources.wood = 5
-    player.occupationPlayed.push('C88_CarpentersApprentice')
-    player.minorPlayed.push('B30_WoodPalisades')
+    player.occupationPlayed.push('C088_CarpentersApprentice')
+    player.minorPlayed.push('B030_WoodPalisades')
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
 
@@ -135,12 +135,12 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
       const session = new GameSession()
       const state = session.getState().state
       const p = state.players[0]!
-      p.occupationPlayed.push('C88_CarpentersApprentice')
+      p.occupationPlayed.push('C088_CarpentersApprentice')
       p.stableTiles = Array.from({ length: stables }, (_, i) => ({ row: 0, col: i }))
       if (farmHand) {
         p.cardStates = {
           ...p.cardStates,
-          B85_FarmHand: { extraData: { position: { row: 2, col: 2 } } },
+          B085_FarmHand: { extraData: { position: { row: 2, col: 2 } } },
         }
       }
       return p
@@ -217,7 +217,7 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
 const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
   const listener = getRegisteredCardListeners().find(
     (l) =>
-      l.cardIds?.includes('C88_CarpentersApprentice') &&
+      l.cardIds?.includes('C088_CarpentersApprentice') &&
       l.actions?.includes('fence') &&
       l.phases?.includes('isDoable'),
   )
@@ -251,7 +251,7 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
       { row: 1, col: 1 },
     ]
     const roomKeys = new Set(roomTiles.map(positionKey))
-    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.occupationPlayed.push('C088_CarpentersApprentice')
     player.resources.wood = 0
     player.roomTiles = roomTiles
     player.fields = getAllTilePositions()
@@ -327,7 +327,7 @@ describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
     // 14 个普通 fence 围 row 0-2, col 1-4 的 3×4 矩形(col 0 是初始房间):
     // 第 1-12 个付 12 wood,第 13、14 个免费。
     player.resources.wood = 12
-    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.occupationPlayed.push('C088_CarpentersApprentice')
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
 

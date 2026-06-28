@@ -21,7 +21,7 @@ const player = (overrides: {
   base.stableAnimals = overrides.stableAnimals ?? {}
   if (overrides.farmHandPosition) {
     base.cardStates = {
-      B85_FarmHand: { extraData: { position: overrides.farmHandPosition } },
+      B085_FarmHand: { extraData: { position: overrides.farmHandPosition } },
     }
   }
   return base

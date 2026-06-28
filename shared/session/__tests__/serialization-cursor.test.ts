@@ -173,7 +173,7 @@ describe('serialization cursor round-trip', () => {
   })
 
   it.each([
-    'minor:A1_Shelter',
+    'minor:A001_Shelter',
     'major:Major_Fireplace1',
     'occupation:A123_FrameBuilder',
   ])('rejects non-advertised card shortcut value %s', (value) => {

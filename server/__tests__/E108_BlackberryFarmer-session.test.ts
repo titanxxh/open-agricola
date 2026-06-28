@@ -4,7 +4,7 @@ import { executeCardListener, getRegisteredCardListeners, type CardListenerConte
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/E/E108_BlackberryFarmer'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/B/B030_WoodPalisades'
 
 const CARD_ID = 'E108_BlackberryFarmer'
 
@@ -32,7 +32,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
     // 2 fences × 1 wood + 2 palisades × 2 wood = 6
     player.resources.wood = 6
     player.occupationPlayed.push(CARD_ID)
-    player.minorPlayed.push('B30_WoodPalisades')
+    player.minorPlayed.push('B030_WoodPalisades')
 
     session.loadState(state)
 

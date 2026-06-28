@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { AnimalZone } from '../../domain/animal-zones'
-import { D86_SheepAgent_impl } from '../D/D86_SheepAgent'
+import { D086_SheepAgent_impl } from '../D/D086_SheepAgent'
 import { getCardDefinitionById } from '../helpers/card-type'
 
-const CARD_ID = 'D86_SheepAgent'
+const CARD_ID = 'D086_SheepAgent'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -17,28 +17,28 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
 
 const sheepAgentCapacity = (player: PlayerState): number => {
   const zones: AnimalZone[] = []
-  D86_SheepAgent_impl.effect.onComputeAnimalZones!(player, zones, {} as GameState)
+  D086_SheepAgent_impl.effect.onComputeAnimalZones!(player, zones, {} as GameState)
   return zones.find((zone) => zone.id === `card:${CARD_ID}`)?.capacity ?? 0
 }
 
-describe('D86_SheepAgent animal-holder identity filtering', () => {
+describe('D086_SheepAgent animal-holder identity filtering', () => {
   it('counts itself as one occupation even though it is an animal holder', () => {
     expect(getCardDefinitionById(CARD_ID)?.animalHolder).toBe(true)
     expect(sheepAgentCapacity(makePlayer({ occupationPlayed: [CARD_ID] }))).toBe(1)
   })
 
   it('subtracts played animal-holder cards with occupation identity', () => {
-    expect(getCardDefinitionById('E86_PenBuilder')?.animalHolder).toBe(true)
+    expect(getCardDefinitionById('E086_PenBuilder')?.animalHolder).toBe(true)
     expect(sheepAgentCapacity(makePlayer({
-      occupationPlayed: [CARD_ID, 'E144_WaresSalesman', 'E86_PenBuilder'],
+      occupationPlayed: [CARD_ID, 'E144_WaresSalesman', 'E086_PenBuilder'],
     }))).toBe(2)
   })
 
   it('does not subtract played animal-holder cards without occupation identity', () => {
-    expect(getCardDefinitionById('E11_PettingZoo')?.animalHolder).toBe(true)
+    expect(getCardDefinitionById('E011_PettingZoo')?.animalHolder).toBe(true)
     expect(sheepAgentCapacity(makePlayer({
       occupationPlayed: [CARD_ID, 'E144_WaresSalesman'],
-      minorPlayed: ['E11_PettingZoo'],
+      minorPlayed: ['E011_PettingZoo'],
     }))).toBe(2)
   })
 

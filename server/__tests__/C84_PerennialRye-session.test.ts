@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import '../../shared/cards/C/C84_PerennialRye'
+import '../../shared/cards/C/C084_PerennialRye'
 import type { AnytimeAction } from '../../shared/contract/types';
 
-describe('C84_PerennialRye session', () => {
+describe('C084_PerennialRye session', () => {
   const setup = (round = 2) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -35,7 +35,7 @@ describe('C84_PerennialRye session', () => {
       { row: 0, col: 1, side: 'bottom' },
     ]
     // Directly place card
-    player.minorPlayed.push('C84_PerennialRye')
+    player.minorPlayed.push('C084_PerennialRye')
     session.loadState(state)
     return session
   }
@@ -77,7 +77,7 @@ describe('C84_PerennialRye session', () => {
     const p = resp2.state.players[0]!
     expect(p.resources.grain).toBe(2)
     expect(p.resources.sheep).toBe(4)
-    expect(isCardFlagged(p, 'C84_PerennialRye')).toBe(true)
+    expect(isCardFlagged(p, 'C084_PerennialRye')).toBe(true)
   })
 
   it('not available without grain', () => {

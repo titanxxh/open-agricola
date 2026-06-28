@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { A88_HedgeKeeper } from '../../cards/A/A88_HedgeKeeper'
+import { A088_HedgeKeeper } from '../../cards/A/A088_HedgeKeeper'
 import {
   canStartFencing,
   getFenceCount,
@@ -23,7 +23,7 @@ const createPlayer = (): PlayerState => ({
   activeModifiers: [], cardStates: {},
 })
 
-const hedgeKeeperModifier = { ...A88_HedgeKeeper.impl.modifiers![0] } as TradeModifier
+const hedgeKeeperModifier = { ...A088_HedgeKeeper.impl.modifiers![0] } as TradeModifier
 
 const fakeState = { actionSpaces: [], players: [] } as unknown as GameState
 

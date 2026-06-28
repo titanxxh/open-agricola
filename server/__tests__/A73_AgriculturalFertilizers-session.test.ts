@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A73_AgriculturalFertilizers'
+import '../../shared/cards/A/A073_AgriculturalFertilizers'
 
-const CARD_ID = 'A73_AgriculturalFertilizers'
+const CARD_ID = 'A073_AgriculturalFertilizers'
 
 const edgesForTwoTiles = [
   'H-1-1',
@@ -21,7 +21,7 @@ const edgesForOneTile = [
   'V-1-2',
 ]
 
-describe('A73_AgriculturalFertilizers session', () => {
+describe('A073_AgriculturalFertilizers session', () => {
   const setupFencing = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -135,7 +135,7 @@ describe('A73_AgriculturalFertilizers session', () => {
     // playable — skipping the choice prompt and making this test flaky.
     // Pinning the hand to a known-playable card plus A73 removes the RNG
     // dependency.
-    player.minorHand = ['A25_Bassinet', CARD_ID]
+    player.minorHand = ['A025_Bassinet', CARD_ID]
 
     session.loadState(state)
 

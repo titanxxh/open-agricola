@@ -2,7 +2,7 @@ import type { PlayerState } from '../contract/types'
 import { getLooseStableKeys } from './animal-zones'
 
 export const getFarmHandStableInUseCount = (player: PlayerState): number =>
-  player.cardStates?.B85_FarmHand?.extraData?.position ? 1 : 0
+  player.cardStates?.B085_FarmHand?.extraData?.position ? 1 : 0
 
 export const getOrdinaryStableCount = (player: PlayerState): number =>
   player.stableTiles.length

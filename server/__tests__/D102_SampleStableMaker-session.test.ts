@@ -5,7 +5,7 @@ import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens
 import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D102_SampleStableMaker'
-import '../../shared/cards/B/B85_FarmHand'
+import '../../shared/cards/B/B085_FarmHand'
 
 const CARD_ID = 'D102_SampleStableMaker'
 const FIELD_EFFECT = 'sample-stable-maker-return'
@@ -129,7 +129,7 @@ describe('D102_SampleStableMaker card effect', () => {
     const player = createOwner()
     player.stableTiles = []
     player.cardStates = {
-      B85_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
+      B085_FarmHand: { extraData: { position: { row: 2, col: 1 } } },
     }
     const state = createState([player])
     const flow = getCardEffect(CARD_ID)!.onStartReturnHome!(state, player) as Extract<ActionFlow, { type: 'seq' }>
@@ -140,10 +140,10 @@ describe('D102_SampleStableMaker card effect', () => {
 
   it('returns the B85 FarmHand tile and pays the normal resource reward', () => {
     const player = createOwner()
-    player.occupationPlayed.push('B85_FarmHand')
+    player.occupationPlayed.push('B085_FarmHand')
     player.stableTiles = []
     player.cardStates = {
-      B85_FarmHand: {
+      B085_FarmHand: {
         flagged: true,
         extraData: { position: { row: 2, col: 1 } },
       },
@@ -161,8 +161,8 @@ describe('D102_SampleStableMaker card effect', () => {
     })
     // FarmHand tile cleared from cardStates, but `flagged` stays true so
     // the player cannot rebuild it.
-    expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
-    expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
+    expect(player.cardStates!.B085_FarmHand!.extraData?.position).toBeUndefined()
+    expect(player.cardStates!.B085_FarmHand!.flagged).toBe(true)
     expect(player.stableTiles).toEqual([])
     expect(getExtraRoomCapacity(player)).toBe(0)
     expect(player.resources.wood).toBe(initial.wood + 1)
@@ -178,7 +178,7 @@ describe('D102_SampleStableMaker card effect', () => {
       { row: 2, col: 0 },
     ]
     player.cardStates = {
-      B85_FarmHand: {
+      B085_FarmHand: {
         flagged: true,
         extraData: { position: { row: 2, col: 1 } },
       },

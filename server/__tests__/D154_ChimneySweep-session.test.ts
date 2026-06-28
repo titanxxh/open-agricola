@@ -4,7 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D154_ChimneySweep'
-import '../../shared/cards/A/A87_Conservator'
+import '../../shared/cards/A/A087_Conservator'
 import { D154_ChimneySweep } from '../../shared/cards/D/D154_ChimneySweep'
 
 const CARD_ID = 'D154_ChimneySweep'
@@ -103,7 +103,7 @@ describe('D154_ChimneySweep renovation cost hook', () => {
       houseType: 'wood',
       rooms: 2,
       resources: { stone: 2, reed: 1, clay: 0 },
-      occupationsP1: [CARD_ID, 'A87_Conservator'],
+      occupationsP1: [CARD_ID, 'A087_Conservator'],
     })
 
     // With placeholder hands the renovation path has a single affordable

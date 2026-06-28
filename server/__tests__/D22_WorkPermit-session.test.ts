@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
-import { D22_WorkPermit } from '../../shared/cards/D/D22_WorkPermit'
+import { D022_WorkPermit } from '../../shared/cards/D/D022_WorkPermit'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D22_WorkPermit'
+const CARD_ID = 'D022_WorkPermit'
 
 const createPlayer = (
   id = 'p1',
@@ -48,7 +48,7 @@ const createState = (round: number, players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D22_WorkPermit card effect', () => {
+describe('D022_WorkPermit card effect', () => {
   it('onBuy queues a future-meeple at current + building resources', () => {
     const player = createPlayer('p1', { wood: 1, clay: 2, stone: 0, reed: 1, food: 1 })
     const state = createState(3, [player])
@@ -133,7 +133,7 @@ describe('D22_WorkPermit card effect', () => {
       player.resources.stone = 0
       player.resources.clay = 0
       player.resources.reed = 0
-      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(false)
     })
 
     it('blocks when no worker is available even with resources', () => {
@@ -144,7 +144,7 @@ describe('D22_WorkPermit card effect', () => {
       // Place all workers on action spaces
       const space = state.actionSpaces[0]!
       space.takenBy = player.workers.map((w) => ({ playerId: player.id, workerId: w.id }))
-      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(false)
     })
 
     it('allows when player has at least 1 resource and a worker in reserve', () => {
@@ -152,7 +152,7 @@ describe('D22_WorkPermit card effect', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.resources.wood = 1
-      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(true)
     })
   })
 })

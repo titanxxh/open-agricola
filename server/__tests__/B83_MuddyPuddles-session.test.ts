@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/B/B83_MuddyPuddles'
+import '../../shared/cards/B/B083_MuddyPuddles'
 
-describe('B83_MuddyPuddles session', () => {
+describe('B083_MuddyPuddles session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,10 +13,10 @@ describe('B83_MuddyPuddles session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorHand.push('B83_MuddyPuddles')
+    player.minorHand.push('B083_MuddyPuddles')
     player.resources.clay = 5
     session.loadState(state)
-    session.devPlayCard(0, 'B83_MuddyPuddles')
+    session.devPlayCard(0, 'B083_MuddyPuddles')
     return session
   }
 
@@ -31,7 +31,7 @@ describe('B83_MuddyPuddles session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const stack = getCardStack(player, 'B83_MuddyPuddles')
+    const stack = getCardStack(player, 'B083_MuddyPuddles')
     expect(stack).toEqual(['boar', 'food', 'cattle', 'food', 'sheep'])
     expect(stack.length).toBe(5)
   })
@@ -52,7 +52,7 @@ describe('B83_MuddyPuddles session', () => {
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.clay).toBe(2) // 3 - 1
     expect(updatedPlayer.resources.sheep).toBe(1) // top was sheep
-    const stack = getCardStack(updatedPlayer, 'B83_MuddyPuddles')
+    const stack = getCardStack(updatedPlayer, 'B083_MuddyPuddles')
     expect(stack.length).toBe(4)
     expect(stack[stack.length - 1]).toBe('food') // new top
   })
@@ -75,7 +75,7 @@ describe('B83_MuddyPuddles session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.clay = 5
-    player.cardStates!['B83_MuddyPuddles']!.stack = []
+    player.cardStates!['B083_MuddyPuddles']!.stack = []
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)

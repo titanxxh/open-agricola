@@ -6,9 +6,9 @@ import {
 } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C39_StudioBoat'
+import '../../shared/cards/C/C039_StudioBoat'
 
-const CARD_ID = 'C39_StudioBoat'
+const CARD_ID = 'C039_StudioBoat'
 const LISTENER_ID = 'C39-studio-boat-traveling-players-vp'
 
 const createPlayer = (id = 'p1', minorPlayed: string[] = []): PlayerState =>
@@ -62,7 +62,7 @@ const createState = (players: PlayerState[], spaces: ActionSpace[]): GameState =
 const findListener = () =>
   getRegisteredCardListeners().find((l) => l.id === LISTENER_ID)
 
-describe('C39_StudioBoat — traveling-players bonus VP listener', () => {
+describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
   it('is registered with the expected shape', () => {
     const listener = findListener()
     expect(listener).toBeDefined()

@@ -160,7 +160,7 @@ describe('applyCostModifiers propagates nb-aware conditions to Bonus', () => {
     const baseCost: ComplexCost = { fee: { stone: 4 } }
     const modifier: BonusModifier = {
       type: 'bonus',
-      cardId: 'C13_WoodSlideHammer',
+      cardId: 'C013_WoodSlideHammer',
       appliesTo: ['renovation'],
       discount: { stone: 2 },
       conditions: { houseTypeWood: 1, minNumRooms: 5 },

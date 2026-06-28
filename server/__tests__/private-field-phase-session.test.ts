@@ -4,7 +4,7 @@ import type { PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/catalog'
 import '../../shared/cards/B/B132_EstateMaster'
-import '../../shared/cards/C/C72_FestivalPlanning'
+import '../../shared/cards/C/C072_FestivalPlanning'
 
 const fillSaturatedFarmWithVegetable = (player: PlayerState) => {
   player.rooms = 4
@@ -45,7 +45,7 @@ const setupFestivalPlanning = () => {
   player.resources.food = 3
   player.resources.wood = 1
   player.occupationPlayed = ['B132_EstateMaster', 'TEST_Occupation']
-  player.minorHand = ['C72_FestivalPlanning', 'A37_Bucksaw']
+  player.minorHand = ['C072_FestivalPlanning', 'A037_Bucksaw']
   player.occupationHand = ['__test_placeholder__']
   opponent.minorHand = ['__test_placeholder__']
   opponent.occupationHand = ['__test_placeholder__']
@@ -67,10 +67,10 @@ const buyFestivalPlanning = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   expect(resp.interaction.stateId === 'wait'
-    ? resp.interaction.options?.some((option) => option.value === 'C72_FestivalPlanning')
+    ? resp.interaction.options?.some((option) => option.value === 'C072_FestivalPlanning')
     : false).toBe(true)
 
-  return session.resolveChoice(0, 'C72_FestivalPlanning')
+  return session.resolveChoice(0, 'C072_FestivalPlanning')
 }
 
 describe('Private Field Phase session flow', () => {
@@ -81,7 +81,7 @@ describe('Private Field Phase session flow', () => {
 
     expect(resp.ok).toBe(true)
     const player = resp.state.players[0]!
-    expect(player.minorPlayed).toContain('C72_FestivalPlanning')
+    expect(player.minorPlayed).toContain('C072_FestivalPlanning')
     expect(player.resources.vegetable).toBe(1)
     expect(player.cardStates.B132_EstateMaster?.counters?.bonusVp).toBe(1)
     expect(resp.state.round).toBe(1)

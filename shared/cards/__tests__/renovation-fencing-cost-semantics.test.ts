@@ -233,12 +233,12 @@ const cases: CostCase[] = [
   },
   {
     name: 'Wood Slide Hammer stone renovation discount is mandatory',
-    cardId: 'C13_WoodSlideHammer',
+    cardId: 'C013_WoodSlideHammer',
     zone: 'minorPlayed',
     kind: 'renovation',
     rooms: 5,
     target: 'stone',
-    expected: [{ resources: { reed: 1, stone: 3 }, sources: ['C13_WoodSlideHammer'] }],
+    expected: [{ resources: { reed: 1, stone: 3 }, sources: ['C013_WoodSlideHammer'] }],
   },
   {
     name: 'Plumber uses the selected renovation target and offers both sourced discounts',
@@ -261,12 +261,12 @@ const cases: CostCase[] = [
   },
   {
     name: 'Trowel sources its wood to stone fixed renovation cost',
-    cardId: 'D13_Trowel',
+    cardId: 'D013_Trowel',
     zone: 'minorPlayed',
     kind: 'renovation',
     target: 'stone',
-    sourceCard: 'D13_Trowel',
-    expected: [{ resources: { reed: 3, stone: 3, food: 3 }, sources: ['D13_Trowel'] }],
+    sourceCard: 'D013_Trowel',
+    expected: [{ resources: { reed: 3, stone: 3, food: 3 }, sources: ['D013_Trowel'] }],
   },
   {
     name: 'Chimney Sweep sources its stone renovation discount',
@@ -278,22 +278,22 @@ const cases: CostCase[] = [
   },
   {
     name: 'Roof Ladder sources its reed renovation discount',
-    cardId: 'D81_RoofLadder',
+    cardId: 'D081_RoofLadder',
     zone: 'minorPlayed',
     kind: 'renovation',
     target: 'clay',
-    expected: [{ resources: { clay: 3 }, sources: ['D81_RoofLadder'] }],
+    expected: [{ resources: { clay: 3 }, sources: ['D081_RoofLadder'] }],
   },
   {
     // ADR 0004 amendment: the undiscounted {wood:1} row is strictly
     // dominated by the sourced free row and is pruned, matching BGA.
     name: 'Hunting Trophy surfaces only the sourced Farm Redevelopment fence discount',
-    cardId: 'D82_HuntingTrophy',
+    cardId: 'D082_HuntingTrophy',
     zone: 'minorPlayed',
     kind: 'fencing',
     spaceId: 'farm-redevelopment',
     expected: [
-      { resources: {}, sources: ['D82_HuntingTrophy'] },
+      { resources: {}, sources: ['D082_HuntingTrophy'] },
     ],
   },
 ]

@@ -12,13 +12,13 @@ const CARD_ID = 'A139_HollowWarden'
  * Each time you use the Hollow accumulation space, you also get 1 Food.
  *
  * BGA: onBuy → optional improvement action for fireplaces (Major_Fireplace1, Major_Fireplace2,
- *      A60_OrientalFireplace). isListeningTo → isActionCardEvent(Hollow).
+ *      A060_OrientalFireplace). isListeningTo → isActionCardEvent(Hollow).
  *      onPlayerPlaceFarmer → gain 1 food.
  *
  * Occupation onBuy flows must use a occupation listener (engine does not
  * process onBuy flows for occupations — only for improvements).
  */
-const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A60_OrientalFireplace']
+const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A060_OrientalFireplace']
 
 const onBuyListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-onbuy',

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import '../../shared/cards/C/C46_Mandoline'
+import '../../shared/cards/C/C046_Mandoline'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { FutureMeeple } from '../../shared/contract/types'
 
-describe('C46_Mandoline session', () => {
+describe('C046_Mandoline session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -17,7 +17,7 @@ describe('C46_Mandoline session', () => {
     player.resources.vegetable = 3
     player.resources.food = 0
     // Directly place card (avoids catalog lookup issue in devPlayCard)
-    player.minorPlayed.push('C46_Mandoline')
+    player.minorPlayed.push('C046_Mandoline')
     session.loadState(state)
     return session
   }
@@ -33,9 +33,9 @@ describe('C46_Mandoline session', () => {
     expect(resp2.ok).toBe(true)
     const p = resp2.state.players[0]!
     expect(p.resources.vegetable).toBe(2)
-    expect(p.cardStates?.['C46_Mandoline']?.counters?.bonusVp).toBe(1)
-    expect(isCardFlagged(p, 'C46_Mandoline')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C46_Mandoline')
+    expect(p.cardStates?.['C046_Mandoline']?.counters?.bonusVp).toBe(1)
+    expect(isCardFlagged(p, 'C046_Mandoline')).toBe(true)
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C046_Mandoline')
     expect(fm).toHaveLength(2)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)

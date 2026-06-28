@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/C/C11_WildlifeReserve'
+import '../../shared/cards/C/C011_WildlifeReserve'
 
-describe('C11_WildlifeReserve session', () => {
+describe('C011_WildlifeReserve session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,7 +13,7 @@ describe('C11_WildlifeReserve session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorPlayed.push('C11_WildlifeReserve')
+    player.minorPlayed.push('C011_WildlifeReserve')
     session.loadState(state)
     return session
   }
@@ -24,7 +24,7 @@ describe('C11_WildlifeReserve session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:C11_WildlifeReserve')
+    const cardZone = zones.find(z => z.id === 'card:C011_WildlifeReserve')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(3)
@@ -39,7 +39,7 @@ describe('C11_WildlifeReserve session', () => {
 
     const player = state.players[0]!
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:C11_WildlifeReserve')
+    const cardZone = zones.find(z => z.id === 'card:C011_WildlifeReserve')
     expect(cardZone).toBeUndefined()
   })
 })

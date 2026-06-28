@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { createInitialState } from '../../shared/session/state-bootstrap'
 import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D27_Retraining'
+import '../../shared/cards/D/D027_Retraining'
 
 type MajorSupplyStack = {
   familyId: string
@@ -246,8 +246,8 @@ describe('major improvement supply stacks', () => {
 
     state = session.getState().state
     const player = state.players[0]!
-    player.minorPlayed.push('D27_Retraining')
-    setCardFlag(player, 'D27_Retraining', true)
+    player.minorPlayed.push('D027_Retraining')
+    setCardFlag(player, 'D027_Retraining', true)
     resetMajorActionForPlayer0(session)
 
     let resp = session.takeAction(0, 'forest')

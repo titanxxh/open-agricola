@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/D/D71_Changeover'
+import '../../shared/cards/D/D071_Changeover'
 import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
 
-describe('D71_Changeover session', () => {
+describe('D071_Changeover session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -20,7 +20,7 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.minorPlayed.push('D71_Changeover')
+    player.minorPlayed.push('D071_Changeover')
 
     // One eligible field (remaining === 1), one not eligible (remaining === 2)
     player.fields = [
@@ -116,7 +116,7 @@ describe('D71_Changeover session', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.minorPlayed.push('D71_Changeover')
+    player.minorPlayed.push('D071_Changeover')
 
     // No field with remaining === 1
     player.fields = [

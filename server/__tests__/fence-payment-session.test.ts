@@ -112,7 +112,7 @@ describe('fence payment session', () => {
       stone: 4,
     }
     player.activeModifiers = [...fenceTradeModifiers]
-    player.minorPlayed = [...player.minorPlayed, 'B30_WoodPalisades']
+    player.minorPlayed = [...player.minorPlayed, 'B030_WoodPalisades']
 
     session.loadState(state)
 

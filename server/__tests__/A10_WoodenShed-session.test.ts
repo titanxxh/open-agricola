@@ -4,12 +4,12 @@ import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { isMinorImprovementPlayable, playMinorImprovement } from '../../shared/actions/effects/improvement'
 
-import '../../shared/cards/A/A10_WoodenShed'
-import { A10_WoodenShed } from '../../shared/cards/A/A10_WoodenShed'
+import '../../shared/cards/A/A010_WoodenShed'
+import { A010_WoodenShed } from '../../shared/cards/A/A010_WoodenShed'
 
-const CARD_ID = 'A10_WoodenShed'
+const CARD_ID = 'A010_WoodenShed'
 
-describe('A10_WoodenShed session', () => {
+describe('A010_WoodenShed session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -23,7 +23,7 @@ describe('A10_WoodenShed session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     expect(player.houseType).toBe('wood')
-    expect(meetsCardPrerequisites(player, A10_WoodenShed, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, A010_WoodenShed, state.round, state)).toBe(true)
   })
 
   it('prerequisite fails when house is clay', () => {
@@ -31,7 +31,7 @@ describe('A10_WoodenShed session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.houseType = 'clay'
-    expect(meetsCardPrerequisites(player, A10_WoodenShed, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, A010_WoodenShed, state.round, state)).toBe(false)
   })
 
   it('adds +1 extra room capacity when played', () => {

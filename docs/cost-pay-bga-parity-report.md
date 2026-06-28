@@ -119,7 +119,7 @@ OA:
 ### combo card-purchase basket fixed price plus stone and wood modifiers
 
 Kind: card-purchase
-Paying for: card-purchase Major_Basket with fixture cost {wood:2, reed:2, stone:2}, actionCard=C95_BasketWeaver
+Paying for: card-purchase Major_Basket with fixture cost {wood:2, reed:2, stone:2}, actionCard=C095_BasketWeaver
 Difference type: payment-diff
 Accepted reason: Accepted: the payable resources are equivalent; OA collapses equivalent fixed-price source-attribution rows that have no distinct payment consequence.
 
@@ -132,7 +132,7 @@ BGA:
     },
     "sources": [
       "A143_Stonecutter",
-      "C95_BasketWeaver",
+      "C095_BasketWeaver",
       "E109_BraidMaker"
     ]
   },
@@ -142,7 +142,7 @@ BGA:
     },
     "sources": [
       "A143_Stonecutter",
-      "C95_BasketWeaver"
+      "C095_BasketWeaver"
     ]
   },
   {
@@ -166,7 +166,7 @@ OA:
     },
     "sources": [
       "A143_Stonecutter",
-      "C95_BasketWeaver"
+      "C095_BasketWeaver"
     ]
   }
 ]

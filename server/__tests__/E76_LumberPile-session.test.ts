@@ -4,10 +4,10 @@ import { runSelectionEffect } from '../../shared/actions/helpers/selection-effec
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/E/E76_LumberPile'
-import '../../shared/cards/B/B85_FarmHand'
+import '../../shared/cards/E/E076_LumberPile'
+import '../../shared/cards/B/B085_FarmHand'
 
-const CARD_ID = 'E76_LumberPile'
+const CARD_ID = 'E076_LumberPile'
 const FIELD_EFFECT = 'lumber-pile-return-stables'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -45,7 +45,7 @@ const createState = (players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('E76_LumberPile card effect', () => {
+describe('E076_LumberPile card effect', () => {
   it('onBuy returns undefined when the player has no stables', () => {
     const player = createPlayer('p1')
     player.stableTiles = []
@@ -124,10 +124,10 @@ describe('E76_LumberPile card effect', () => {
 
   it('lists the B85 FarmHand tile alongside normal stables and returns it for 3 wood', () => {
     const player = createPlayer('p1')
-    player.occupationPlayed.push('B85_FarmHand')
+    player.occupationPlayed.push('B085_FarmHand')
     player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     player.cardStates = {
-      B85_FarmHand: {
+      B085_FarmHand: {
         flagged: true,
         extraData: { position: { row: 3, col: 2 } },
       },
@@ -150,9 +150,9 @@ describe('E76_LumberPile card effect', () => {
     })
     expect(player.resources.wood).toBe(initialWood + 9)
     expect(player.stableTiles).toEqual([])
-    expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
+    expect(player.cardStates!.B085_FarmHand!.extraData?.position).toBeUndefined()
     // once-per-game flag persists so B85 cannot be re-used.
-    expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
+    expect(player.cardStates!.B085_FarmHand!.flagged).toBe(true)
     expect(getExtraRoomCapacity(player)).toBe(0)
   })
 
@@ -164,7 +164,7 @@ describe('E76_LumberPile card effect', () => {
       { row: 2, col: 0 },
     ]
     player.cardStates = {
-      B85_FarmHand: {
+      B085_FarmHand: {
         flagged: true,
         extraData: { position: { row: 3, col: 2 } },
       },

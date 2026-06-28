@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C63_CraftBrewery'
+import '../../shared/cards/C/C063_CraftBrewery'
 
 /**
  * C63 Craft Brewery — Sprint 7b2 F2 update.
  *
- * BGA `C63_CraftBrewery::onPlayerHarvestFeedingPhase`:
+ * BGA `C063_CraftBrewery::onPlayerHarvestFeedingPhase`:
  *   - 1 grain field on the board: auto SE eatSingleFieldGrain($field) +
  *     payGain GRAIN -> FOOD 4 + SCORE 2.
  *   - 2+ grain fields: SE eatFieldGrain prompts the player to pick which
@@ -21,7 +21,7 @@ import '../../shared/cards/C/C63_CraftBrewery'
  * implemented; first matching field is auto-chosen. Implementing the
  * picker requires a new `eat-field-grain` SE kind + UI plumbing.
  */
-describe('C63_CraftBrewery session (verify-only)', () => {
+describe('C063_CraftBrewery session (verify-only)', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -29,7 +29,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.minorPlayed.push('C63_CraftBrewery')
+    player.minorPlayed.push('C063_CraftBrewery')
     player.fields = []
     return { session, state, player }
   }
@@ -47,7 +47,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     const flow = runCardEffectHook(
       state,
       player,
-      'C63_CraftBrewery',
+      'C063_CraftBrewery',
       'onHarvestFeedingPhase',
     )
     expect(flow).not.toBeNull()
@@ -63,7 +63,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     ])
     const se = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
     expect(se.actionId).toBe('special-effect')
-    expect(se.sourceCard).toBe('C63_CraftBrewery')
+    expect(se.sourceCard).toBe('C063_CraftBrewery')
     expect(se.params).toEqual({ kind: 'remove-field-crop', crop: 'grain', minRemaining: 1 })
     const pay = seq.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect(pay.params).toEqual({ grain: 1 })
@@ -88,7 +88,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     const flow = runCardEffectHook(
       state,
       player,
-      'C63_CraftBrewery',
+      'C063_CraftBrewery',
       'onHarvestFeedingPhase',
     )
     expect(flow).toBeNull()
@@ -110,7 +110,7 @@ describe('C63_CraftBrewery session (verify-only)', () => {
     const flow = runCardEffectHook(
       state,
       player,
-      'C63_CraftBrewery',
+      'C063_CraftBrewery',
       'onHarvestFeedingPhase',
     )
     expect(flow).toBeNull()

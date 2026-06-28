@@ -5,7 +5,7 @@ import { payAction as payResourcesAction } from '../../actions/effects/pay'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { gainAction } from '../../actions/effects/gain'
 
-import '../A/A29_AleBenches'
+import '../A/A029_AleBenches'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -40,7 +40,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
     stableTiles: [],
     improvements: [],
     minorHand: [],
-    minorPlayed: ['A29_AleBenches'],
+    minorPlayed: ['A029_AleBenches'],
     occupationHand: [],
     occupationPlayed: [],houseAnimalType: null,
     houseAnimalCount: 0,
@@ -95,7 +95,7 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-describe('A29_AleBenches', () => {
+describe('A029_AleBenches', () => {
   it('tracks paid grain and food granted to other players', () => {
     const owner = createPlayer('p1', 'Owner')
     const opponent = createPlayer('p2', 'Opponent')
@@ -108,7 +108,7 @@ describe('A29_AleBenches', () => {
       player: owner,
       space,
       params: { grain: 1 },
-      sourceCard: 'A29_AleBenches',
+      sourceCard: 'A029_AleBenches',
     })
     expect(payResult.type).toBe('ok')
 
@@ -116,7 +116,7 @@ describe('A29_AleBenches', () => {
       state,
       player: owner,
       space,
-      sourceCard: 'A29_AleBenches',
+      sourceCard: 'A029_AleBenches',
     })
     expect(vpResult.type).toBe('ok')
 
@@ -125,14 +125,14 @@ describe('A29_AleBenches', () => {
       player: owner,
       space,
       params: { recipientMode: 'others', food: 1 },
-      sourceCard: 'A29_AleBenches',
+      sourceCard: 'A029_AleBenches',
     })
     expect(gainResult.type).toBe('ok')
 
     expect(owner.resources.grain).toBe(0)
     expect(opponent.resources.food).toBe(1)
-    expect(owner.cardStates?.A29_AleBenches?.counters?.bonusVp).toBe(1)
-    expect(readCardResourceStats(owner, 'A29_AleBenches')).toMatchObject({
+    expect(owner.cardStates?.A029_AleBenches?.counters?.bonusVp).toBe(1)
+    expect(readCardResourceStats(owner, 'A029_AleBenches')).toMatchObject({
       paid: { grain: 1 },
       gained: { food: 1 },
     })

@@ -5,9 +5,9 @@ import { specialEffectAction } from '../../actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState, ActionSpace } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
-import { D36_BreedRegistry_impl } from '../D/D36_BreedRegistry'
+import { D036_BreedRegistry_impl } from '../D/D036_BreedRegistry'
 
-import '../D/D36_BreedRegistry'
+import '../D/D036_BreedRegistry'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -17,7 +17,7 @@ const createPlayer = (id = 'p1'): PlayerState =>
       vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
     cardStates: {},
-    minorPlayed: ['D36_BreedRegistry'],
+    minorPlayed: ['D036_BreedRegistry'],
   } as unknown as PlayerState)
 
 const createState = (player: PlayerState): GameState =>
@@ -77,12 +77,12 @@ const executeSpecialEffectLeaves = (
   })
 }
 
-describe('D36_BreedRegistry infobox', () => {
+describe('D036_BreedRegistry infobox', () => {
   it('tracks hand sheep gains without writing an infobox', () => {
     const listener = findListener('D36-breed-registry-after-sheep-gain')
     const player = createPlayer()
     player.minorPlayed = []
-    player.minorHand = ['D36_BreedRegistry']
+    player.minorHand = ['D036_BreedRegistry']
 
     const state = createState(player)
     const result = executeCardListener(listener, {
@@ -99,8 +99,8 @@ describe('D36_BreedRegistry infobox', () => {
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardExtraData<number>(player, 'D36_BreedRegistry', 'boardSheep')).toBe(1)
-    expect(readCardInfobox(player, 'D36_BreedRegistry')).toBeUndefined()
+    expect(readCardExtraData<number>(player, 'D036_BreedRegistry', 'boardSheep')).toBe(1)
+    expect(readCardInfobox(player, 'D036_BreedRegistry')).toBeUndefined()
   })
 
   it('tracks sheep gained by another player for the owner in hand', () => {
@@ -108,7 +108,7 @@ describe('D36_BreedRegistry infobox', () => {
     const owner = createPlayer('p2')
     actor.minorPlayed = []
     owner.minorPlayed = []
-    owner.minorHand = ['D36_BreedRegistry']
+    owner.minorHand = ['D036_BreedRegistry']
     const state = { players: [actor, owner], log: [] } as unknown as GameState
     const actionEvents: DraftGameEvent<'resource.moved'>[] = [{
       ...sheepMoved(1),
@@ -125,11 +125,11 @@ describe('D36_BreedRegistry infobox', () => {
       phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext, D36_BreedRegistry_impl.listeners)
+    } as unknown as CardListenerContext, D036_BreedRegistry_impl.listeners)
     executeSpecialEffectLeaves(result?.flow, state, actor)
 
-    expect(readCardExtraData<number>(owner, 'D36_BreedRegistry', 'cardSheep')).toBe(1)
-    expect(readCardInfobox(owner, 'D36_BreedRegistry')).toBeUndefined()
+    expect(readCardExtraData<number>(owner, 'D036_BreedRegistry', 'cardSheep')).toBe(1)
+    expect(readCardInfobox(owner, 'D036_BreedRegistry')).toBeUndefined()
   })
 
   it('writes infobox "n / 2" after played-card sheep gains', () => {
@@ -151,7 +151,7 @@ describe('D36_BreedRegistry infobox', () => {
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardInfobox(player, 'D36_BreedRegistry')).toBe('1 / 2')
+    expect(readCardInfobox(player, 'D036_BreedRegistry')).toBe('1 / 2')
 
     state = createState(player)
     result = executeCardListener(listener, {
@@ -168,7 +168,7 @@ describe('D36_BreedRegistry infobox', () => {
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardInfobox(player, 'D36_BreedRegistry')).toBe('3 / 2')
+    expect(readCardInfobox(player, 'D036_BreedRegistry')).toBe('3 / 2')
   })
 
   it('tracks sheep taken from card stacks through the listener action filter', () => {
@@ -184,17 +184,17 @@ describe('D36_BreedRegistry infobox', () => {
       phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext, D36_BreedRegistry_impl.listeners)
+    } as unknown as CardListenerContext, D036_BreedRegistry_impl.listeners)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardExtraData<number>(player, 'D36_BreedRegistry', 'cardSheep')).toBe(1)
-    expect(readCardInfobox(player, 'D36_BreedRegistry')).toBe('1 / 2')
+    expect(readCardExtraData<number>(player, 'D036_BreedRegistry', 'cardSheep')).toBe(1)
+    expect(readCardInfobox(player, 'D036_BreedRegistry')).toBe('1 / 2')
   })
 
   it('tracks future meeple sheep through immediatelyAfter synthetic dispatch', () => {
     const player = createPlayer()
     player.minorPlayed = []
-    player.minorHand = ['D36_BreedRegistry']
+    player.minorHand = ['D036_BreedRegistry']
     const state = createState(player)
     const actionEvents = [futureSheepResolved(1)]
 
@@ -206,10 +206,10 @@ describe('D36_BreedRegistry infobox', () => {
       phase: 'immediatelyAfter',
       transactionEvents: actionEvents,
       actionEvents,
-    } as unknown as CardListenerContext, D36_BreedRegistry_impl.listeners)
+    } as unknown as CardListenerContext, D036_BreedRegistry_impl.listeners)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardExtraData<number>(player, 'D36_BreedRegistry', 'cardSheep')).toBe(1)
-    expect(readCardInfobox(player, 'D36_BreedRegistry')).toBeUndefined()
+    expect(readCardExtraData<number>(player, 'D036_BreedRegistry', 'cardSheep')).toBe(1)
+    expect(readCardInfobox(player, 'D036_BreedRegistry')).toBeUndefined()
   })
 })

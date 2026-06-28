@@ -14,30 +14,30 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     clearCustomCardMetadata()
   })
 
-  it('marks D60_LargePottery with data-also-counts-as="major"', () => {
+  it('marks D060_LargePottery with data-also-counts-as="major"', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="D60_LargePottery" cardType="minor" />,
+      <PlayerCard locale="en" cardId="D060_LargePottery" cardType="minor" />,
     )
     expect(html).toContain('data-also-counts-as="major"')
   })
 
-  it('marks D59_EarthOven with data-also-counts-as="major"', () => {
+  it('marks D059_EarthOven with data-also-counts-as="major"', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="D59_EarthOven" cardType="minor" />,
+      <PlayerCard locale="en" cardId="D059_EarthOven" cardType="minor" />,
     )
     expect(html).toContain('data-also-counts-as="major"')
   })
 
-  it('marks A60_OrientalFireplace with data-also-counts-as="major"', () => {
+  it('marks A060_OrientalFireplace with data-also-counts-as="major"', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="A60_OrientalFireplace" cardType="minor" />,
+      <PlayerCard locale="en" cardId="A060_OrientalFireplace" cardType="minor" />,
     )
     expect(html).toContain('data-also-counts-as="major"')
   })
 
   it('renders D60 prerequisite separately and keeps the cost area resource-only', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="D60_LargePottery" cardType="minor" />,
+      <PlayerCard locale="en" cardId="D060_LargePottery" cardType="minor" />,
     )
     expect(html).toContain('Return the Pottery')
     expect(html).not.toContain('card-cost-return')
@@ -47,7 +47,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
   it('renders C60 prerequisite separately and keeps the cost area resource-only', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="C60_SmallPottersOven" cardType="minor" />,
+      <PlayerCard locale="en" cardId="C060_SmallPottersOven" cardType="minor" />,
     )
     expect(html).toContain('Return the Clay / Stone Oven')
     expect(html).not.toContain('card-cost-return')
@@ -58,15 +58,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     const html = renderToStaticMarkup(
       // D34 is a plain minor with no alsoCountsAs; picking it keeps this
       // test independent of any dual-type flag regressions on other cards.
-      <PlayerCard locale="en" cardId="D34_LuxuriousHostel" cardType="minor" />,
+      <PlayerCard locale="en" cardId="D034_LuxuriousHostel" cardType="minor" />,
     )
     expect(html).not.toContain('data-also-counts-as=')
   })
 
   it('renders desc placeholders as inline icons (no literal <WOOD> text)', () => {
-    // E76_LumberPile description contains <WOOD> and <STABLE> placeholders.
+    // E076_LumberPile description contains <WOOD> and <STABLE> placeholders.
     const html = renderToStaticMarkup(
-      <PlayerCard locale="zh" cardId="E76_LumberPile" cardType="minor" />,
+      <PlayerCard locale="zh" cardId="E076_LumberPile" cardType="minor" />,
     )
     expect(html).toContain('res-icon-wood')
     expect(html).toContain('res-icon-barn')
@@ -119,24 +119,24 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
   it('renders C54 stable printed cost from card metadata', async () => {
     const manifest = await loadCardsManifest()
-    const originalCost = manifest.C54_MarketBooth?.cost
-    manifest.C54_MarketBooth.cost = { stable: 1 }
+    const originalCost = manifest.C054_MarketBooth?.cost
+    manifest.C054_MarketBooth.cost = { stable: 1 }
 
     try {
       const html = renderToStaticMarkup(
-        <PlayerCard locale="en" cardId="C54_MarketBooth" cardType="minor" />,
+        <PlayerCard locale="en" cardId="C054_MarketBooth" cardType="minor" />,
       )
 
       expect(html).toContain('card-cost')
       expect(html).toContain('res-icon-barn')
     } finally {
-      manifest.C54_MarketBooth.cost = originalCost
+      manifest.C054_MarketBooth.cost = originalCost
     }
   })
 
   it('renders alternative costs with a visible slash separator', () => {
     const html = renderToStaticMarkup(
-      <PlayerCard locale="en" cardId="D80_BrickHammer" cardType="minor" />,
+      <PlayerCard locale="en" cardId="D080_BrickHammer" cardType="minor" />,
     )
 
     expect(html).toContain('card-cost-alt')
@@ -166,10 +166,10 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   })
 
   it.each([
-    ['B33_Mantlepiece', -3],
-    ['B40_BreweryPond', -1],
-    ['C83_EarlyCattle', -3],
-    ['D40_Cesspit', -1],
+    ['B033_Mantlepiece', -3],
+    ['B040_BreweryPond', -1],
+    ['C083_EarlyCattle', -3],
+    ['D040_Cesspit', -1],
     ['M080_AdvancePayment', -4],
     ['M085_OvenInstallation', -1],
   ])('renders printed negative VP for %s', (cardId, vp) => {

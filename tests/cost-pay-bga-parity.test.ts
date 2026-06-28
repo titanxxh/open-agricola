@@ -149,22 +149,22 @@ const richResources = {
 }
 
 const minorCards = new Set([
-  'A16_RammedClay',
-  'A27_OvenSite',
-  'A75_LumberMill',
-  'A14_CarpentersHammer',
-  'B13_CarpentersParlor',
-  'B15_CarpentersBench',
-  'C14_StrawThatchedRoof',
-  'C27_Blueprint',
-  'C56_FeedFence',
+  'A016_RammedClay',
+  'A027_OvenSite',
+  'A075_LumberMill',
+  'A014_CarpentersHammer',
+  'B013_CarpentersParlor',
+  'B015_CarpentersBench',
+  'C014_StrawThatchedRoof',
+  'C027_Blueprint',
+  'C056_FeedFence',
   'C128_WoodenHutExtender',
-  'C13_WoodSlideHammer',
-  'D13_Trowel',
-  'D15_ClaySupports',
-  'D81_RoofLadder',
-  'D82_HuntingTrophy',
-  'E27_PiggyBank',
+  'C013_WoodSlideHammer',
+  'D013_Trowel',
+  'D015_ClaySupports',
+  'D081_RoofLadder',
+  'D082_HuntingTrophy',
+  'E027_PiggyBank',
 ])
 
 const play = (id: string): PlayedCard => ({
@@ -232,39 +232,39 @@ const fullBase = { fees: [{ wood: 2, clay: 2, reed: 2, stone: 2 }] }
 
 const cardPurchaseScenarios: CardPurchaseScenario[] = [
   { name: 'A143 card-purchase stone discount', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('A143_Stonecutter')], baseCost: fullBase },
-  { name: 'A27 oven fixed cost', kind: 'card-purchase', targetId: 'Major_ClayOven', cards: [play('A27_OvenSite')], actionCardId: 'A27_OvenSite', baseCost: { fees: [{ clay: 3, stone: 1 }] }, flaggedCards: ['A27_OvenSite'] },
-  { name: 'A75 card-purchase wood bonus', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('A75_LumberMill')], baseCost: fullBase },
-  { name: 'B95 major stone discount by rooms', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('B95_MasterBricklayer')], baseCost: fullBase, rooms: 4 },
+  { name: 'A27 oven fixed cost', kind: 'card-purchase', targetId: 'Major_ClayOven', cards: [play('A027_OvenSite')], actionCardId: 'A027_OvenSite', baseCost: { fees: [{ clay: 3, stone: 1 }] }, flaggedCards: ['A027_OvenSite'] },
+  { name: 'A75 card-purchase wood bonus', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('A075_LumberMill')], baseCost: fullBase },
+  { name: 'B95 major stone discount by rooms', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('B095_MasterBricklayer')], baseCost: fullBase, rooms: 4 },
   { name: 'C122 card-purchase clay discount', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('C122_Bricklayer')], baseCost: fullBase },
-  { name: 'C27 blueprint major discount', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C27_Blueprint')], baseCost: fullBase },
-  { name: 'C95 basket fixed cost', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C95_BasketWeaver')], actionCardId: 'C95_BasketWeaver', baseCost: { fees: [{ reed: 2, stone: 2 }] }, flaggedCards: ['C95_BasketWeaver'] },
+  { name: 'C27 blueprint major discount', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C027_Blueprint')], baseCost: fullBase },
+  { name: 'C95 basket fixed cost', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C095_BasketWeaver')], actionCardId: 'C095_BasketWeaver', baseCost: { fees: [{ reed: 2, stone: 2 }] }, flaggedCards: ['C095_BasketWeaver'] },
   { name: 'D117 wood for food candidates', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D117_WoodExpert')], baseCost: fullBase },
-  { name: 'D82 house redevelopment improvement discount choice', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D82_HuntingTrophy')], baseCost: fullBase, spaceId: 'house-redevelopment' },
-  { name: 'D95 site manager replacement candidates', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D95_SiteManager')], actionCardId: 'D95_SiteManager', baseCost: fullBase, flaggedCards: ['D95_SiteManager'] },
-  { name: 'D96 furnisher wood discount', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D96_Furnisher')], actionCardId: 'D96_Furnisher', baseCost: fullBase },
+  { name: 'D82 house redevelopment improvement discount choice', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D082_HuntingTrophy')], baseCost: fullBase, spaceId: 'house-redevelopment' },
+  { name: 'D95 site manager replacement candidates', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D095_SiteManager')], actionCardId: 'D095_SiteManager', baseCost: fullBase, flaggedCards: ['D095_SiteManager'] },
+  { name: 'D96 furnisher wood discount', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('D096_Furnisher')], actionCardId: 'D096_Furnisher', baseCost: fullBase },
   { name: 'E109 basket fixed cost', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('E109_BraidMaker')], baseCost: { fees: [{ reed: 2, stone: 2 }] } },
   { name: 'E123 card-purchase top resource choices', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('E123_ResourceHoarder')], baseCost: fullBase },
   { name: 'E130 overachiever resource choice discount', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('E130_Overachiever')], actionCardId: 'E130_Overachiever', baseCost: fullBase },
-  { name: 'E27 piggy bank free major candidate', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('E27_PiggyBank')], baseCost: fullBase, flaggedCards: ['E27_PiggyBank'] },
-  { name: 'combo card-purchase basket fixed price plus stone and wood modifiers', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C95_BasketWeaver'), play('E109_BraidMaker'), play('A143_Stonecutter'), play('D117_WoodExpert')], actionCardId: 'C95_BasketWeaver', baseCost: { fees: [{ wood: 2, reed: 2, stone: 2 }] }, flaggedCards: ['C95_BasketWeaver'] },
+  { name: 'E27 piggy bank free major candidate', kind: 'card-purchase', targetId: 'Major_Joinery', cards: [play('E027_PiggyBank')], baseCost: fullBase, flaggedCards: ['E027_PiggyBank'] },
+  { name: 'combo card-purchase basket fixed price plus stone and wood modifiers', kind: 'card-purchase', targetId: 'Major_Basket', cards: [play('C095_BasketWeaver'), play('E109_BraidMaker'), play('A143_Stonecutter'), play('D117_WoodExpert')], actionCardId: 'C095_BasketWeaver', baseCost: { fees: [{ wood: 2, reed: 2, stone: 2 }] }, flaggedCards: ['C095_BasketWeaver'] },
 ]
 
 const actionScenarios: ActionScenario[] = [
   { name: 'A123 construct frame replacement', kind: 'construct', cards: [play('A123_FrameBuilder')], houseType: 'clay' },
   { name: 'A128 riparian construct discount', kind: 'construct', cards: [play('A128_RiparianBuilder')], houseType: 'clay', sourceCard: 'A128_RiparianBuilder' },
   { name: 'A149 house artist reed discount', kind: 'construct', cards: [play('A149_HouseArtist')], houseType: 'wood', sourceCard: 'A149_HouseArtist' },
-  { name: 'A14 carpenter hammer construct bonuses', kind: 'construct', cards: [play('A14_CarpentersHammer')], houseType: 'wood', units: 2 },
+  { name: 'A14 carpenter hammer construct bonuses', kind: 'construct', cards: [play('A014_CarpentersHammer')], houseType: 'wood', units: 2 },
   { name: 'A143 construct stone discount', kind: 'construct', cards: [play('A143_Stonecutter')], houseType: 'stone' },
   { name: 'B126 carpenter fixed room cost', kind: 'construct', cards: [play('B126_Carpenter')], houseType: 'wood' },
-  { name: 'B13 carpenter parlor fixed wood room cost', kind: 'construct', cards: [play('B13_CarpentersParlor')], houseType: 'wood' },
+  { name: 'B13 carpenter parlor fixed wood room cost', kind: 'construct', cards: [play('B013_CarpentersParlor')], houseType: 'wood' },
   { name: 'B145 brushwood construct reed replacement', kind: 'construct', cards: [play('B145_BrushwoodCollector')], houseType: 'wood' },
   { name: 'C122 construct clay discount', kind: 'construct', cards: [play('C122_Bricklayer')], houseType: 'clay' },
   { name: 'C128 wooden hut extender round cost', kind: 'construct', cards: [play('C128_WoodenHutExtender')], houseType: 'wood', round: 8 },
-  { name: 'C14 straw roof removes construct reed', kind: 'construct', cards: [play('C14_StrawThatchedRoof')], houseType: 'wood' },
-  { name: 'C88 apprentice wood room discount', kind: 'construct', cards: [play('C88_CarpentersApprentice')], houseType: 'wood' },
+  { name: 'C14 straw roof removes construct reed', kind: 'construct', cards: [play('C014_StrawThatchedRoof')], houseType: 'wood' },
+  { name: 'C88 apprentice wood room discount', kind: 'construct', cards: [play('C088_CarpentersApprentice')], houseType: 'wood' },
   { name: 'D121 clay plasterer fixed clay room cost', kind: 'construct', cards: [play('D121_ClayPlasterer')], houseType: 'clay' },
-  { name: 'D15 clay supports alternative clay room cost', kind: 'construct', cards: [play('D15_ClaySupports')], houseType: 'clay' },
-  { name: 'D88 millwright construct bonuses', kind: 'construct', cards: [play('D88_Millwright')], houseType: 'wood' },
+  { name: 'D15 clay supports alternative clay room cost', kind: 'construct', cards: [play('D015_ClaySupports')], houseType: 'clay' },
+  { name: 'D88 millwright construct bonuses', kind: 'construct', cards: [play('D088_Millwright')], houseType: 'wood' },
   { name: 'E123 construct top resource choices', kind: 'construct', cards: [play('E123_ResourceHoarder')], houseType: 'clay' },
   { name: 'E150 rock beater stone room discount', kind: 'construct', cards: [play('E150_RockBeater')], houseType: 'stone' },
   { name: 'A123 renovation frame replacement', kind: 'renovation', cards: [play('A123_FrameBuilder')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
@@ -272,26 +272,26 @@ const actionScenarios: ActionScenario[] = [
   { name: 'B128 plumber renovation choices', kind: 'renovation', cards: [play('B128_Plumber')], houseType: 'wood', targetHouseType: 'stone', sourceCard: 'B128_Plumber', rooms: 3 },
   { name: 'B145 brushwood renovation reed replacement', kind: 'renovation', cards: [play('B145_BrushwoodCollector')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
   { name: 'C122 renovation clay discount', kind: 'renovation', cards: [play('C122_Bricklayer')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
-  { name: 'C13 wood slide hammer stone discount', kind: 'renovation', cards: [play('C13_WoodSlideHammer')], houseType: 'wood', targetHouseType: 'stone', rooms: 5 },
-  { name: 'C14 straw roof removes renovation reed', kind: 'renovation', cards: [play('C14_StrawThatchedRoof')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
+  { name: 'C13 wood slide hammer stone discount', kind: 'renovation', cards: [play('C013_WoodSlideHammer')], houseType: 'wood', targetHouseType: 'stone', rooms: 5 },
+  { name: 'C14 straw roof removes renovation reed', kind: 'renovation', cards: [play('C014_StrawThatchedRoof')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
   { name: 'D121 clay plasterer fixed clay renovation', kind: 'renovation', cards: [play('D121_ClayPlasterer')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
-  { name: 'D13 trowel wood to stone fixed cost', kind: 'renovation', cards: [play('D13_Trowel')], houseType: 'wood', targetHouseType: 'stone', sourceCard: 'D13_Trowel', params: { selectedOption: 'stone' }, rooms: 3 },
+  { name: 'D13 trowel wood to stone fixed cost', kind: 'renovation', cards: [play('D013_Trowel')], houseType: 'wood', targetHouseType: 'stone', sourceCard: 'D013_Trowel', params: { selectedOption: 'stone' }, rooms: 3 },
   { name: 'D154 chimney sweep stone discount', kind: 'renovation', cards: [play('D154_ChimneySweep')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
-  { name: 'D81 roof ladder reed discount', kind: 'renovation', cards: [play('D81_RoofLadder')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
-  { name: 'D88 millwright renovation bonuses', kind: 'renovation', cards: [play('D88_Millwright')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
+  { name: 'D81 roof ladder reed discount', kind: 'renovation', cards: [play('D081_RoofLadder')], houseType: 'wood', targetHouseType: 'clay', rooms: 3 },
+  { name: 'D88 millwright renovation bonuses', kind: 'renovation', cards: [play('D088_Millwright')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
   { name: 'E123 renovation top resource choices', kind: 'renovation', cards: [play('E123_ResourceHoarder')], houseType: 'wood', targetHouseType: 'stone', rooms: 3 },
-  { name: 'E87 master renovator flagged choices', kind: 'renovation', cards: [play('E87_MasterRenovator')], houseType: 'wood', targetHouseType: 'stone', rooms: 3, round: 7 },
-  { name: 'A16 rammed clay fence trade', kind: 'fencing', cards: [play('A16_RammedClay')] },
-  { name: 'A88 hedge keeper free fences', kind: 'fencing', cards: [play('A88_HedgeKeeper')] },
-  { name: 'B15 carpenters bench constrained free fence', kind: 'fencing', cards: [play('B15_CarpentersBench')], pendingFenceBonus: { sourceCard: 'B15_CarpentersBench', freeFences: 1 } },
-  { name: 'D82 farm redevelopment fence discount', kind: 'fencing', cards: [play('D82_HuntingTrophy')], spaceId: 'farm-redevelopment' },
-  { name: 'D88 millwright fence bonuses', kind: 'fencing', cards: [play('D88_Millwright')] },
-  { name: 'C56 feed fence stable clay alternative', kind: 'stables', cards: [play('C56_FeedFence')] },
-  { name: 'D88 millwright stable bonuses', kind: 'stables', cards: [play('D88_Millwright')] },
-  { name: 'combo construct clay room replacement plus grain substitution', kind: 'construct', cards: [play('D121_ClayPlasterer'), play('A123_FrameBuilder'), play('D88_Millwright')], houseType: 'clay' },
-  { name: 'combo renovation trowel brushwood and millwright', kind: 'renovation', cards: [play('D13_Trowel'), play('B145_BrushwoodCollector'), play('D88_Millwright')], houseType: 'wood', targetHouseType: 'stone', sourceCard: 'D13_Trowel', params: { selectedOption: 'stone' }, rooms: 2 },
-  { name: 'combo fencing clay/free/grain alternatives', kind: 'fencing', cards: [play('A16_RammedClay'), play('A88_HedgeKeeper'), play('D88_Millwright')] },
-  { name: 'combo stables clay alternative plus grain substitution', kind: 'stables', cards: [play('C56_FeedFence'), play('D88_Millwright')] },
+  { name: 'E87 master renovator flagged choices', kind: 'renovation', cards: [play('E087_MasterRenovator')], houseType: 'wood', targetHouseType: 'stone', rooms: 3, round: 7 },
+  { name: 'A16 rammed clay fence trade', kind: 'fencing', cards: [play('A016_RammedClay')] },
+  { name: 'A88 hedge keeper free fences', kind: 'fencing', cards: [play('A088_HedgeKeeper')] },
+  { name: 'B15 carpenters bench constrained free fence', kind: 'fencing', cards: [play('B015_CarpentersBench')], pendingFenceBonus: { sourceCard: 'B015_CarpentersBench', freeFences: 1 } },
+  { name: 'D82 farm redevelopment fence discount', kind: 'fencing', cards: [play('D082_HuntingTrophy')], spaceId: 'farm-redevelopment' },
+  { name: 'D88 millwright fence bonuses', kind: 'fencing', cards: [play('D088_Millwright')] },
+  { name: 'C56 feed fence stable clay alternative', kind: 'stables', cards: [play('C056_FeedFence')] },
+  { name: 'D88 millwright stable bonuses', kind: 'stables', cards: [play('D088_Millwright')] },
+  { name: 'combo construct clay room replacement plus grain substitution', kind: 'construct', cards: [play('D121_ClayPlasterer'), play('A123_FrameBuilder'), play('D088_Millwright')], houseType: 'clay' },
+  { name: 'combo renovation trowel brushwood and millwright', kind: 'renovation', cards: [play('D013_Trowel'), play('B145_BrushwoodCollector'), play('D088_Millwright')], houseType: 'wood', targetHouseType: 'stone', sourceCard: 'D013_Trowel', params: { selectedOption: 'stone' }, rooms: 2 },
+  { name: 'combo fencing clay/free/grain alternatives', kind: 'fencing', cards: [play('A016_RammedClay'), play('A088_HedgeKeeper'), play('D088_Millwright')] },
+  { name: 'combo stables clay alternative plus grain substitution', kind: 'stables', cards: [play('C056_FeedFence'), play('D088_Millwright')] },
 ]
 
 const scenarios: Scenario[] = [...cardPurchaseScenarios, ...actionScenarios]
@@ -329,8 +329,14 @@ const stripResources = (raw: Record<string, unknown>, multiplier = 1): Record<st
   return out
 }
 
+const normalizeCardId = (id: string): string =>
+  id.replace(/^([A-E])([1-9][0-9]?)([a-z]?_)/, (_match, deck: string, number: string, suffix: string) =>
+    `${deck}${number.padStart(3, '0')}${suffix}`)
+
 const normalizeSources = (sources: unknown): string[] =>
-  Array.isArray(sources) ? [...new Set(sources.filter((value): value is string => typeof value === 'string'))].sort() : []
+  Array.isArray(sources)
+    ? [...new Set(sources.filter((value): value is string => typeof value === 'string').map(normalizeCardId))].sort()
+    : []
 
 const normalizeResources = (resources: Record<string, number>): Record<string, number> => {
   const out: Record<string, number> = {}
@@ -564,8 +570,8 @@ const playScenarioCards = (player: PlayerState, state: GameState, scenario: Scen
   for (const cardId of scenario.flaggedCards ?? []) {
     player.cardStates[cardId] = { ...(player.cardStates[cardId] ?? {}), flagged: true }
   }
-  if (scenario.cards.some((card) => card.id === 'E87_MasterRenovator')) {
-    getActiveCardRegistry()?.getEffect('E87_MasterRenovator')?.onStartReturnHome?.(state, player)
+  if (scenario.cards.some((card) => card.id === 'E087_MasterRenovator')) {
+    getActiveCardRegistry()?.getEffect('E087_MasterRenovator')?.onStartReturnHome?.(state, player)
   }
 }
 

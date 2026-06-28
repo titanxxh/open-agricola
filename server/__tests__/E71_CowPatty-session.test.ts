@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
-import { E71_CowPatty } from '../../shared/cards/E/E71_CowPatty'
+import { E071_CowPatty } from '../../shared/cards/E/E071_CowPatty'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'E71_CowPatty'
+const CARD_ID = 'E071_CowPatty'
 
-describe('E71_CowPatty session', () => {
+describe('E071_CowPatty session', () => {
   // Default rooms are at (2,0) and (1,0) — avoid those positions for fields/pastures
   const setup = (options?: {
     withCard?: boolean
@@ -418,7 +418,7 @@ describe('E71_CowPatty session', () => {
       player.houseAnimalType = null
       player.houseAnimalCount = 0
       player.stableAnimals = {}
-      expect(meetsCardPrerequisites(player, E71_CowPatty, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, E071_CowPatty, state.round, state)).toBe(false)
     })
 
     it('allows when player has at least 1 cattle on board', () => {
@@ -433,7 +433,7 @@ describe('E71_CowPatty session', () => {
         size: 1,
         stables: 0,
       }]
-      expect(meetsCardPrerequisites(player, E71_CowPatty, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, E071_CowPatty, state.round, state)).toBe(true)
     })
   })
 })

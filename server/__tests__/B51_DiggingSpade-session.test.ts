@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { B51_DiggingSpade } from '../../shared/cards/B/B51_DiggingSpade'
+import { B051_DiggingSpade } from '../../shared/cards/B/B051_DiggingSpade'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'B51_DiggingSpade'
+const CARD_ID = 'B051_DiggingSpade'
 
-describe('B51_DiggingSpade session', () => {
+describe('B051_DiggingSpade session', () => {
   const setup = (pigsInPasture: number) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -76,7 +76,7 @@ describe('B51_DiggingSpade session', () => {
       const state = session.getState().state
       state.round = 6
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B51_DiggingSpade, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state)).toBe(false)
     })
 
     it('allows when round >= 7', () => {
@@ -84,7 +84,7 @@ describe('B51_DiggingSpade session', () => {
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B51_DiggingSpade, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state)).toBe(true)
     })
   })
 })

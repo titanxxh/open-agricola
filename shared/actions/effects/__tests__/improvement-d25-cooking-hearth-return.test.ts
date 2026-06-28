@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
-import '../../../cards/D/D25_WitchesDanceFloor'
+import '../../../cards/D/D025_WitchesDanceFloor'
 
 describe('D25 — CookingHearth accepts fireplaceIdentity minor as return-cost', () => {
   const setup = () => {
@@ -9,9 +9,9 @@ describe('D25 — CookingHearth accepts fireplaceIdentity minor as return-cost',
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push('D25_WitchesDanceFloor')
+    player.minorPlayed.push('D025_WitchesDanceFloor')
     player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
-    player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     player.resources.clay = 10
     return { session, state, player }
   }
@@ -19,14 +19,14 @@ describe('D25 — CookingHearth accepts fireplaceIdentity minor as return-cost',
   it('candidate resolver: D25 counts as a valid return-Fireplace', async () => {
     const { player } = setup()
     // Assert the state shape was set up correctly:
-    expect(player.minorPlayed).toContain('D25_WitchesDanceFloor')
-    expect(player.extraOccupationsFromCards).toContain('D25_WitchesDanceFloor')
+    expect(player.minorPlayed).toContain('D025_WitchesDanceFloor')
+    expect(player.extraOccupationsFromCards).toContain('D025_WitchesDanceFloor')
   })
 
   it('return-handler removes D25 from all three places', () => {
     const { player } = setup()
     // Simulate the return-handler directly on a fresh player:
-    const returnedId = 'D25_WitchesDanceFloor'
+    const returnedId = 'D025_WitchesDanceFloor'
     // Minimal handler inline that mirrors the production logic we added:
     if (player.minorPlayed.includes(returnedId)) {
       player.minorPlayed = player.minorPlayed.filter((id) => id !== returnedId)

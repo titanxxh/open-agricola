@@ -4,13 +4,13 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C8_PlantFertilizer'
-import '../../shared/cards/D/D75_WoodField'
-import '../../shared/cards/E/E80_RockGarden'
-import '../../shared/cards/A/A11_MudPatch'
-import { A11_MudPatch_impl } from '../../shared/cards/A/A11_MudPatch'
+import '../../shared/cards/C/C008_PlantFertilizer'
+import '../../shared/cards/D/D075_WoodField'
+import '../../shared/cards/E/E080_RockGarden'
+import '../../shared/cards/A/A011_MudPatch'
+import { A011_MudPatch_impl } from '../../shared/cards/A/A011_MudPatch'
 
-const CARD_ID = 'C8_PlantFertilizer'
+const CARD_ID = 'C008_PlantFertilizer'
 
 const setupSession = () => {
   const session = new GameSession()
@@ -95,8 +95,8 @@ describe('C8 PlantFertilizer session', () => {
   it('accept path multi-location: normal field + D75 both grow to 2', () => {
     const { session, state, player } = setupSession()
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
-    player.minorPlayed.push('D75_WoodField')
-    player.cardStates['D75_WoodField'] = {
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates['D075_WoodField'] = {
       extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
     session.loadState(state)
@@ -114,7 +114,7 @@ describe('C8 PlantFertilizer session', () => {
     })
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(2)
-    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
+    const woodStacks = player.cardStates['D075_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
     expect(woodStacks[0]!.remaining).toBe(2)
     expect(player.resources.grain ?? 0).toBe(0)
     expect(player.resources.wood ?? 0).toBe(0)
@@ -123,8 +123,8 @@ describe('C8 PlantFertilizer session', () => {
   it('decline path multi-location: nothing changes', () => {
     const { session, state, player } = setupSession()
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
-    player.minorPlayed.push('D75_WoodField')
-    player.cardStates['D75_WoodField'] = {
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates['D075_WoodField'] = {
       extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
     session.loadState(state)
@@ -132,7 +132,7 @@ describe('C8 PlantFertilizer session', () => {
     runCardEffectHook(state, player, CARD_ID, 'onBuy')
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(1)
-    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
+    const woodStacks = player.cardStates['D075_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
     expect(woodStacks[0]!.remaining).toBe(1)
     expect(player.minorPlayed.includes(CARD_ID)).toBe(true)
   })
@@ -140,16 +140,16 @@ describe('C8 PlantFertilizer session', () => {
   it('A11 Mud Patch boar zone does NOT inject PIG into field.stacks (G6 invariant)', () => {
     const { session, state, player } = setupSession()
     player.fields = [{ row: 0, col: 0, stacks: [] }]
-    player.minorPlayed.push('A11_MudPatch')
+    player.minorPlayed.push('A011_MudPatch')
     session.loadState(state)
 
     // Drive A11's onComputeAnimalZones — it should push a card-zone, NOT
-    // mutate field.stacks. A11_MudPatch_impl is statically imported at
+    // mutate field.stacks. A011_MudPatch_impl is statically imported at
     // the top of the file (same convention used in other session tests
-    // that need impl-level access, e.g. C6_StoneClearing-session test).
-    const zones: Parameters<NonNullable<typeof A11_MudPatch_impl.effect.onComputeAnimalZones>>[1] =
+    // that need impl-level access, e.g. C006_StoneClearing-session test).
+    const zones: Parameters<NonNullable<typeof A011_MudPatch_impl.effect.onComputeAnimalZones>>[1] =
       []
-    A11_MudPatch_impl.effect.onComputeAnimalZones?.(player, zones, state)
+    A011_MudPatch_impl.effect.onComputeAnimalZones?.(player, zones, state)
 
     // The single empty field stays empty (no stack injected).
     expect(player.fields[0]!.stacks).toEqual([])

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { D92_ChildOmbudsman_impl } from '../../shared/cards/D/D92_ChildOmbudsman'
+import { D092_ChildOmbudsman_impl } from '../../shared/cards/D/D092_ChildOmbudsman'
 import {
   setActiveWorkerCount,
   setNewbornCount,
@@ -12,7 +12,7 @@ import {
 import type { ActionHookPhase, ActionHookResult } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
-const CARD_ID = 'D92_ChildOmbudsman'
+const CARD_ID = 'D092_ChildOmbudsman'
 
 const makeCtx = (round: number, rooms: number, family: number) => {
   const session = new GameSession()
@@ -29,7 +29,7 @@ const makeCtx = (round: number, rooms: number, family: number) => {
 describe('D92 Child Ombudsman — listener', () => {
   it('does not offer SEQ in round 4 (round < 5)', () => {
     const { state, player } = makeCtx(4, 3, 2)
-    const handler = D92_ChildOmbudsman_impl.listeners[0]!.handler
+    const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -41,7 +41,7 @@ describe('D92 Child Ombudsman — listener', () => {
 
   it('does not offer SEQ when no free room (rooms === familySize)', () => {
     const { state, player } = makeCtx(5, 2, 2)
-    const handler = D92_ChildOmbudsman_impl.listeners[0]!.handler
+    const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -53,7 +53,7 @@ describe('D92 Child Ombudsman — listener', () => {
 
   it('offers SEQ optional with [special-effect, family-growth] in round 5 with free room', () => {
     const { state, player } = makeCtx(5, 3, 2)
-    const handler = D92_ChildOmbudsman_impl.listeners[0]!.handler
+    const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -85,7 +85,7 @@ describe('D92 Child Ombudsman — listener', () => {
 
   it('listener handler does NOT mutate negativeScore directly (engine-mediated)', () => {
     const { state, player } = makeCtx(5, 3, 2)
-    const handler = D92_ChildOmbudsman_impl.listeners[0]!.handler
+    const handler = D092_ChildOmbudsman_impl.listeners[0]!.handler
     const before = readCardExtraData<number>(player, CARD_ID, 'negativeScore') ?? 0
     handler({
       state,
@@ -100,13 +100,13 @@ describe('D92 Child Ombudsman — listener', () => {
   it('computeBonusScore: returns -negativeScore (post-mutation total)', () => {
     const { state, player } = makeCtx(5, 3, 2)
     writeCardExtraData(player, CARD_ID, 'negativeScore', 6)
-    const compute = D92_ChildOmbudsman_impl.effect.computeBonusScore!
+    const compute = D092_ChildOmbudsman_impl.effect.computeBonusScore!
     expect(compute(state, player)).toBe(-6)
   })
 
   it('computeBonusScore: 0 when no mutation has happened', () => {
     const { state, player } = makeCtx(5, 3, 2)
-    const compute = D92_ChildOmbudsman_impl.effect.computeBonusScore!
+    const compute = D092_ChildOmbudsman_impl.effect.computeBonusScore!
     expect(Math.abs(compute(state, player))).toBe(0)
   })
 })

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/C/C67_MineralFeeder'
+import '../../shared/cards/C/C067_MineralFeeder'
 
-const CARD_ID = 'C67_MineralFeeder'
+const CARD_ID = 'C067_MineralFeeder'
 
 const setupRoundStartSession = (round = 1) => {
   const session = new GameSession()
@@ -36,7 +36,7 @@ const addEmptyPasture = (player: ReturnType<typeof setupRoundStartSession>['play
   }]
 }
 
-describe('C67_MineralFeeder session', () => {
+describe('C067_MineralFeeder session', () => {
   it('skipping reorganize leaves grain unchanged when sheep is outside pasture', () => {
     const { session, player } = setupRoundStartSession()
     addEmptyPasture(player)

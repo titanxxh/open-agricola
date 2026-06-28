@@ -2,11 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-05-30
-- 关联设计文档: `docs/superpowers/specs/2026-05-30-A92_AdoptiveParents-bga-alignment-design.md`
+- 关联设计文档: `docs/superpowers/specs/2026-05-30-A092_AdoptiveParents-bga-alignment-design.md`
 
 ## Context
 
-`A92_AdoptiveParents` 的规则是"付 1 food 让本轮新出生的后代当轮就能行动一次"。这本质上要给玩家一次**额外放工机会**。
+`A092_AdoptiveParents` 的规则是"付 1 food 让本轮新出生的后代当轮就能行动一次"。这本质上要给玩家一次**额外放工机会**。
 
 OA 原实现是 **push 模型**：在每次 place-farmer 的 `after`-hook 里内联追加 `seq[pay, gain(死代码), place-farmer]`，连续执行、不经过轮转。这与 BGA 的 **pull 模型**根本不符，导致玩家放完一个普通工人后立即连放第二个，**破坏 Agricola 严格交替放工规则**（双人对战中会让 A92 玩家插队抢行动格）。
 

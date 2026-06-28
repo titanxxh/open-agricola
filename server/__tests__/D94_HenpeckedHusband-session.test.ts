@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { D94_HenpeckedHusband_impl } from '../../shared/cards/D/D94_HenpeckedHusband'
+import { D094_HenpeckedHusband_impl } from '../../shared/cards/D/D094_HenpeckedHusband'
 import { recordRoundPlacement, getRoundPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import type { ActionHookPhase, ActionHookResult } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
-const CARD_ID = 'D94_HenpeckedHusband'
+const CARD_ID = 'D094_HenpeckedHusband'
 
 const setup = () => {
   const session = new GameSession()
@@ -27,7 +27,7 @@ describe('D94 HenpeckedHusband — listener', () => {
     recordRoundPlacement(player, 'forest', '1')
     recordRoundPlacement(player, 'farm-expansion', '2')
 
-    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const handler = D094_HenpeckedHusband_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -50,7 +50,7 @@ describe('D94 HenpeckedHusband — listener', () => {
     recordRoundPlacement(player, 'forest', '1')
     recordRoundPlacement(player, 'farm-expansion', '2')
 
-    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const handler = D094_HenpeckedHusband_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -65,7 +65,7 @@ describe('D94 HenpeckedHusband — listener', () => {
     const { state, player } = setup()
     recordRoundPlacement(player, 'farm-expansion', '1')
 
-    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const handler = D094_HenpeckedHusband_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -81,7 +81,7 @@ describe('D94 HenpeckedHusband — listener', () => {
     recordRoundPlacement(player, 'grove', '2')
     recordRoundPlacement(player, 'farm-expansion', '3')
 
-    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const handler = D094_HenpeckedHusband_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,
@@ -99,7 +99,7 @@ describe('D94 HenpeckedHusband — listener', () => {
     recordRoundPlacement(player, 'meeting-place', '1')
     recordRoundPlacement(player, 'farm-expansion', '2')
 
-    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const handler = D094_HenpeckedHusband_impl.listeners[0]!.handler
     const ctx = {
       state,
       player,

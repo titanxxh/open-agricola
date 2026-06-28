@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
-import { D15_ClaySupports } from '../../shared/cards/D/D15_ClaySupports'
+import { D015_ClaySupports } from '../../shared/cards/D/D015_ClaySupports'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
-void D15_ClaySupports
+void D015_ClaySupports
 
 describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () => {
   it('D15 trade modifier is registered via play-path with scope:unit, surfaces in construct enumeration', () => {
@@ -30,7 +30,7 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationPlayed = ['A143_Stonecutter']
-    player.minorPlayed = ['D15_ClaySupports']
+    player.minorPlayed = ['D015_ClaySupports']
     player.houseType = 'clay'
     player.resources = {
       ...player.resources,
@@ -42,7 +42,7 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
     session.loadState(state)
 
     const after = session.getState().state.players[0]!
-    expect(after.minorPlayed).toContain('D15_ClaySupports')
+    expect(after.minorPlayed).toContain('D015_ClaySupports')
     expect(after.occupationPlayed).toContain('A143_Stonecutter')
     expect(after.houseType).toBe('clay')
 
@@ -52,7 +52,7 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
       expect.arrayContaining([
         expect.objectContaining({
           type: 'trade',
-          cardId: 'D15_ClaySupports',
+          cardId: 'D015_ClaySupports',
           appliesTo: ['construct'],
           scope: 'unit',
           from: { wood: 1 },

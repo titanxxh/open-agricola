@@ -1,0 +1,38 @@
+import { defineMinorCard } from '../card-source'
+import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'B084_AcornsBasket'
+
+const cardImpl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: (state, player) => {
+    return queueFutureMeeplesFlow(state, {
+      cardId: CARD_ID,
+      playerId: player.id,
+      startRound: state.round + 1,
+      count: 2,
+      resources: { boar: 1 },
+    })
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl
+
+export const B084_AcornsBasket = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Acorns Basket',
+    deck: 'B',
+    number: 84,
+    category: 'LIVESTOCK_PROVIDER',
+    desc: ['Place 1 <PIG> on each of the next 2 round spaces. At the start of these rounds, you get the <PIG>.'],
+    cost: { reed: 1 },
+    prerequisite: '3 Occupations',
+    occupationPrerequisites: { min: 3 },
+  },
+  impl: cardImpl,
+})
+
+export const B084_AcornsBasket_impl = B084_AcornsBasket.impl

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { buildEnvelope } from '../connection/envelope-builder'
 import { appendImmediateEvents } from '../../shared/events/append'
 
-import '../../shared/cards/E/E78_SleightofHand'
+import '../../shared/cards/E/E078_SleightofHand'
 
 const maxEventSeq = (events: Array<{ seq: number }>): number =>
   events.reduce((max, event) => Math.max(max, event.seq), 0)
@@ -28,7 +28,7 @@ describe('provenance undo/replay reconstruction', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
-    player.minorHand = ['E78_SleightofHand']
+    player.minorHand = ['E078_SleightofHand']
     player.occupationPlayed = ['occ-1', 'occ-2', 'occ-3']
     player.resources.wood = 2
     player.resources.clay = 1
@@ -62,7 +62,7 @@ describe('provenance undo/replay reconstruction', () => {
       emittedAt: 0,
     })
     expect(beforeUndoEnvelope.payload.privateEvents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'private.promptShown', sourceCard: 'E78_SleightofHand' }),
+      expect.objectContaining({ type: 'private.promptShown', sourceCard: 'E078_SleightofHand' }),
     ]))
 
     resp = session.commitSelectionChoice(0, {
@@ -75,12 +75,12 @@ describe('provenance undo/replay reconstruction', () => {
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.exchanged',
-        sourceCardId: 'E78_SleightofHand',
+        sourceCardId: 'E078_SleightofHand',
       }),
     ]))
     const exchangedEvent = resp.state.events.find((event) =>
       event.type === 'resource.exchanged' &&
-      event.sourceCardId === 'E78_SleightofHand'
+      event.sourceCardId === 'E078_SleightofHand'
     )
     expect(exchangedEvent).toBeDefined()
     const previousMaxSeq = maxEventSeq(resp.state.events)
@@ -125,7 +125,7 @@ describe('provenance undo/replay reconstruction', () => {
     expect(resp.state.events).not.toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.exchanged',
-        sourceCardId: 'E78_SleightofHand',
+        sourceCardId: 'E078_SleightofHand',
       }),
     ]))
     expect(resp.interaction.stateId).not.toBe('wait')

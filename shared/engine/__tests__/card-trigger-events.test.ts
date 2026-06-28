@@ -13,7 +13,7 @@ const context = (
   state: { players: [] } as unknown as ActionExecutionContext['state'],
   player: { id: 'p1' } as unknown as ActionExecutionContext['player'],
   space: { id: actionId } as unknown as ActionExecutionContext['space'],
-  sourceCard: 'A1_TestCard',
+  sourceCard: 'A001_TestCard',
   actionContext,
   params,
 })
@@ -33,7 +33,7 @@ describe('emitCardTriggered', () => {
     expect(emitted).toEqual([
       expect.objectContaining({
         type: 'card.triggered',
-        sourceCardId: 'A1_TestCard',
+        sourceCardId: 'A001_TestCard',
         triggerActionId: 'apply-improvement',
       }),
     ])

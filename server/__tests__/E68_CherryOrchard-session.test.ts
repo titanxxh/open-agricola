@@ -3,21 +3,21 @@ import { GameSession } from '../game/authoritative-session'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { validateSowSelection } from '../../shared/domain/farmyard'
-import { E68_CherryOrchard } from '../../shared/cards/E/E68_CherryOrchard'
+import { E068_CherryOrchard } from '../../shared/cards/E/E068_CherryOrchard'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-const CARD_ID = 'E68_CherryOrchard'
+const CARD_ID = 'E068_CherryOrchard'
 const VIRTUAL_TILE = { row: -1, col: 5068 }
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-const loadCard = () => import('../../shared/cards/E/E68_CherryOrchard')
+const loadCard = () => import('../../shared/cards/E/E068_CherryOrchard')
 
 type CardCrop = { crop: 'wood'; remaining: number }
 
-describe('E68_CherryOrchard display', () => {
+describe('E068_CherryOrchard display', () => {
   it('describes wood sowing and harvesting as grain-like', () => {
-    expect(E68_CherryOrchard.desc.join(' ')).toContain('sow and harvest <WOOD> as you would <GRAIN>')
+    expect(E068_CherryOrchard.desc.join(' ')).toContain('sow and harvest <WOOD> as you would <GRAIN>')
   })
 })
 
@@ -71,7 +71,7 @@ const setup = (options?: {
   return session
 }
 
-describe('E68_CherryOrchard session', () => {
+describe('E068_CherryOrchard session', () => {
   it('allows wood only on extra sow fields', () => {
     const session = setup({
       withCard: false,

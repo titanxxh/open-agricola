@@ -226,11 +226,11 @@ describe('ActionLog', () => {
         log={[
           {
             key: 'log.cardInfoboxChanged',
-            params: { cardId: 'B21_HayloftBarn', text: '<b>Food: 3</b>' },
+            params: { cardId: 'B021_HayloftBarn', text: '<b>Food: 3</b>' },
           },
           {
             key: 'log.cardStackChanged',
-            params: { cardId: 'C81_MaterialHub', resources: { wood: 2 } },
+            params: { cardId: 'C081_MaterialHub', resources: { wood: 2 } },
           },
           {
             key: 'log.cardResourcePairsStored',
@@ -258,8 +258,8 @@ describe('ActionLog', () => {
             key: 'log.cardSwappedWithBoard',
             params: {
               player: 'Alice',
-              fromCardId: 'B21_HayloftBarn',
-              toCardId: 'C81_MaterialHub',
+              fromCardId: 'B021_HayloftBarn',
+              toCardId: 'C081_MaterialHub',
             },
           },
         ]}
@@ -293,7 +293,7 @@ describe('ActionLog', () => {
           {
             key: 'log.cardTriggered',
             params: {
-              cardId: 'B48_ForestStone',
+              cardId: 'B048_ForestStone',
               triggerAction: 'actions.forest.name',
               replacement: true,
               optional: true,

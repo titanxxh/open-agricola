@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState , ActionFlow } from '../../contract/types'
 
-import '../D/D18_SteamPlow'
-import { D18_SteamPlow as D18Card } from '../../cards/D/D18_SteamPlow'
+import '../D/D018_SteamPlow'
+import { D018_SteamPlow as D18Card } from '../../cards/D/D018_SteamPlow'
 
-const CARD_ID = 'D18_SteamPlow'
+const CARD_ID = 'D018_SteamPlow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -40,7 +40,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D18_SteamPlow', () => {
+describe('D018_SteamPlow', () => {
   it('card definition has correct properties', () => {
     expect(D18Card.cost).toEqual({ wood: 1, food: 1 })
     expect(D18Card.vp).toBe(1)

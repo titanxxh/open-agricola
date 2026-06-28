@@ -9,7 +9,7 @@ import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../help
 
 /**
  * Move a farmer from a source action space to another selectable action space and execute it.
- * Used by D51_Archway (move from Archway) and E10_StrawHat (move from Farmland).
+ * Used by D051_Archway (move from Archway) and E010_StrawHat (move from Farmland).
  *
  * - execute(): lists selectable spaces (excluding params.excludeSpaceId) → returns choice
  * - resolveChoice(): marks target space as takenBy, executes the space's action

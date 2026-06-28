@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/B/B19_MoldboardPlow'
+import '../../shared/cards/B/B019_MoldboardPlow'
 
 const setupB19 = () => {
   const session = new GameSession()
@@ -17,8 +17,8 @@ const setupB19 = () => {
   }
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
-  player.minorPlayed.push('B19_MoldboardPlow')
-  player.cardStates.B19_MoldboardPlow = { stack: ['field', 'field'] }
+  player.minorPlayed.push('B019_MoldboardPlow')
+  player.cardStates.B019_MoldboardPlow = { stack: ['field', 'field'] }
   session.loadState(state)
   return session
 }
@@ -51,7 +51,7 @@ describe('action cancel BGA parity session regressions', () => {
     const skipped = session.resolveChoice(0, '__skip__')
     expect(skipped.ok).toBe(true)
     expect(skipped.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
-    expect(skipped.state.players[0]!.cardStates.B19_MoldboardPlow?.stack)
+    expect(skipped.state.players[0]!.cardStates.B019_MoldboardPlow?.stack)
       .toEqual(['field', 'field'])
   })
 
@@ -76,7 +76,7 @@ describe('action cancel BGA parity session regressions', () => {
     expect(rejected.ok ? '' : rejected.error).toBe('action cancel is not allowed')
     expect(rejected.interaction.stateId === 'wait' ? rejected.interaction.request.kind : null)
       .toBe('farm-select')
-    expect(rejected.state.players[0]!.cardStates.B19_MoldboardPlow?.stack)
+    expect(rejected.state.players[0]!.cardStates.B019_MoldboardPlow?.stack)
       .toEqual(['field', 'field'])
 
     const completed = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
@@ -85,6 +85,6 @@ describe('action cancel BGA parity session regressions', () => {
       { row: 0, col: 0, stacks: [] },
       { row: 0, col: 1, stacks: [] },
     ])
-    expect(completed.state.players[0]!.cardStates.B19_MoldboardPlow?.stack).toEqual(['field'])
+    expect(completed.state.players[0]!.cardStates.B019_MoldboardPlow?.stack).toEqual(['field'])
   })
 })

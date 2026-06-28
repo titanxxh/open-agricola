@@ -16,10 +16,10 @@ describe('generatePrFiles', () => {
   const upstreamRegisterAll = `// GENERATED ...
 import './catalog'
 
-import { A1_impl } from './A/A1_X'
+import { A001_impl } from './A/A001_X'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
-  'A1': A1_impl,
+  'A1': A001_impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS
@@ -33,7 +33,7 @@ type GeneratedCatalogCardDefinition = CardDefinition & {
 
 export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] = [
   {
-    "id": "A1_Source",
+    "id": "A001_Source",
     "name": "Source",
     "deck": "A",
     "number": 1,

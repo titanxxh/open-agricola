@@ -3,7 +3,7 @@ import type { PlayerState } from '../../../contract/types'
 import { meetsCardPrerequisites } from '../prerequisites'
 import { MinorImprovement } from '../../registry-display'
 import { registerAdHocMinorImprovement } from '../../registry-runtime'
-import { C70_LettucePatch } from '../../../cards/C/C70_LettucePatch'
+import { C070_LettucePatch } from '../../../cards/C/C070_LettucePatch'
 
 // Register a throwaway field-providing minor for this test file only
 registerAdHocMinorImprovement(
@@ -134,11 +134,11 @@ describe('prerequisites: extraOccupationsFromCards counts toward occupations', (
 describe('C70 Lettuce Patch as providesField', () => {
   it('C70 counts as a field for "2 Fields" prerequisite', () => {
     // Ensure card is registered
-    expect(C70_LettucePatch.providesField).toBe(true)
+    expect(C070_LettucePatch.providesField).toBe(true)
 
     const player = makePlayer({
       fields: [{ row: 1, col: 1, crop: null } as unknown as PlayerState['fields'][0]],
-      minorPlayed: ['C70_LettucePatch'],
+      minorPlayed: ['C070_LettucePatch'],
     })
     const card = { prerequisite: '2 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(true)
@@ -149,7 +149,7 @@ describe('prerequisites: Farmers of the Moor text clauses', () => {
   it('counts all improvements for generic improvement prerequisites', () => {
     const player = makePlayer({
       improvements: ['Major_Well'],
-      minorPlayed: ['A37_Bucksaw'],
+      minorPlayed: ['A037_Bucksaw'],
     })
 
     expect(meetsCardPrerequisites(player, { prerequisite: '2 Improvements' })).toBe(true)

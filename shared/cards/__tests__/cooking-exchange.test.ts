@@ -3,8 +3,8 @@ import { getPlayerBakeRates, hasAnyBakingImprovement } from '../helpers/exchange
 import { canBakeBread, bakeBread } from '../../actions/effects/bake-bread'
 import type { PlayerState } from '../../contract/types'
 
-import '../E/E63_IronOven'
-import '../E/E64_SimpleOven'
+import '../E/E063_IronOven'
+import '../E/E064_SimpleOven'
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
   ({
@@ -48,21 +48,21 @@ describe('getPlayerBakeRates', () => {
   })
 
   it('returns Minor bake rates from minorPlayed', () => {
-    const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
+    const player = createPlayer({ minorPlayed: ['E063_IronOven'] })
     const rates = getPlayerBakeRates(player)
     expect(rates.length).toBe(1)
-    expect(rates[0]).toMatchObject({ cardId: 'E63_IronOven', rate: 6, max: 1 })
+    expect(rates[0]).toMatchObject({ cardId: 'E063_IronOven', rate: 6, max: 1 })
   })
 
   it('returns both Major and Minor rates', () => {
     const player = createPlayer({
       improvements: ['Major_Fireplace1'],
-      minorPlayed: ['E64_SimpleOven'],
+      minorPlayed: ['E064_SimpleOven'],
     })
     const rates = getPlayerBakeRates(player)
     expect(rates.length).toBe(2)
     expect(rates.find((r) => r.cardId === 'Major_Fireplace1')).toMatchObject({ rate: 2 })
-    expect(rates.find((r) => r.cardId === 'E64_SimpleOven')).toMatchObject({ rate: 3, max: 1 })
+    expect(rates.find((r) => r.cardId === 'E064_SimpleOven')).toMatchObject({ rate: 3, max: 1 })
   })
 
   it('returns empty for player with no baking improvements', () => {
@@ -77,7 +77,7 @@ describe('hasAnyBakingImprovement', () => {
   })
 
   it('true with Minor baking improvement', () => {
-    expect(hasAnyBakingImprovement(createPlayer({ minorPlayed: ['E63_IronOven'] }))).toBe(true)
+    expect(hasAnyBakingImprovement(createPlayer({ minorPlayed: ['E063_IronOven'] }))).toBe(true)
   })
 
   it('false without any baking improvement', () => {
@@ -87,27 +87,27 @@ describe('hasAnyBakingImprovement', () => {
 
 describe('canBakeBread', () => {
   it('true when player has grain and matching card', () => {
-    const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
-    expect(canBakeBread(player, 'E63_IronOven')).toBe(true)
+    const player = createPlayer({ minorPlayed: ['E063_IronOven'] })
+    expect(canBakeBread(player, 'E063_IronOven')).toBe(true)
   })
 
   it('false when no grain', () => {
-    const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
+    const player = createPlayer({ minorPlayed: ['E063_IronOven'] })
     player.resources.grain = 0
-    expect(canBakeBread(player, 'E63_IronOven')).toBe(false)
+    expect(canBakeBread(player, 'E063_IronOven')).toBe(false)
   })
 
   it('false when card not played', () => {
     const player = createPlayer()
-    expect(canBakeBread(player, 'E63_IronOven')).toBe(false)
+    expect(canBakeBread(player, 'E063_IronOven')).toBe(false)
   })
 })
 
 describe('bakeBread with Minor oven', () => {
   it('E63 bakes 1 grain → 6 food', () => {
-    const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
+    const player = createPlayer({ minorPlayed: ['E063_IronOven'] })
     const events: unknown[] = []
-    const result = bakeBread(player, 'E63_IronOven', 1, undefined, {
+    const result = bakeBread(player, 'E063_IronOven', 1, undefined, {
       emit: (event) => events.push(event),
       emitMany: (items) => events.push(...items),
     })
@@ -119,9 +119,9 @@ describe('bakeBread with Minor oven', () => {
   })
 
   it('E64 bakes 1 grain → 3 food', () => {
-    const player = createPlayer({ minorPlayed: ['E64_SimpleOven'] })
+    const player = createPlayer({ minorPlayed: ['E064_SimpleOven'] })
     const events: unknown[] = []
-    const result = bakeBread(player, 'E64_SimpleOven', 1, undefined, {
+    const result = bakeBread(player, 'E064_SimpleOven', 1, undefined, {
       emit: (event) => events.push(event),
       emitMany: (items) => events.push(...items),
     })

@@ -131,7 +131,7 @@ describe('cursor round-trip', () => {
     original.pendingContextSnapshot = {
       params: undefined,
       costs: undefined,
-      sourceCard: 'D7_X',
+      sourceCard: 'D007_X',
       actionContext: undefined,
     }
     const c1 = original.toCursor()

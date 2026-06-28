@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState , ActionFlow } from '../../contract/types'
 
-import '../D/D69_SmallGreenhouse'
+import '../D/D069_SmallGreenhouse'
 
-const CARD_ID = 'D69_SmallGreenhouse'
+const CARD_ID = 'D069_SmallGreenhouse'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -39,7 +39,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D69_SmallGreenhouse', () => {
+describe('D069_SmallGreenhouse', () => {
   it('onBuy queues future meeples for rounds current+4 and current+7', () => {
     const player = createPlayer()
     const state = createState(player)

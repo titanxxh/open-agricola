@@ -149,7 +149,7 @@ describe('E134_Omnifarmer session', () => {
       const { effect } = setupEffect()
       const player = createPlayer()
       player.occupationPlayed.push(CARD_ID)
-      player.minorPlayed.push('E84_DollysMother')
+      player.minorPlayed.push('E084_DollysMother')
       player.resources.sheep = 5
       setStored(player, [])
       const state = createState(player)

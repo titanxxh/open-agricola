@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/E/E69_MelonPatch'
+import '../../shared/cards/E/E069_MelonPatch'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E69_MelonPatch'
+const CARD_ID = 'E069_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const setup = (options?: {
@@ -46,7 +46,7 @@ const setup = (options?: {
   return session
 }
 
-describe('E69_MelonPatch session', () => {
+describe('E069_MelonPatch session', () => {
   describe('extra sowable field', () => {
     it('only vegetable is sowable (grain not allowed)', () => {
       const session = setup({ vegetable: 1 })

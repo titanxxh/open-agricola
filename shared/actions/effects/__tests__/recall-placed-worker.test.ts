@@ -62,12 +62,12 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       state: s,
       player: p,
       space: forest,
-      params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
+      params: { forceFirst: true, targetCardHold: 'C022_BasketChair' },
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('ok')
     expect(forest.takenBy).toEqual([])
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBe('1')
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBe('1')
     // 2 active workers minus 1 held = 1 at home
     expect(workersAvailable(s, p)).toBe(1)
   })
@@ -80,7 +80,7 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       state: s,
       player: p,
       space: { id: 'dummy' } as ActionSpace,
-      params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
+      params: { forceFirst: true, targetCardHold: 'C022_BasketChair' },
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('fail')
@@ -96,13 +96,13 @@ describe('recall-placed-worker — forceFirst + targetCardHold', () => {
       state: s,
       player: p,
       space: mp,
-      params: { forceFirst: true, targetCardHold: 'C22_BasketChair' },
+      params: { forceFirst: true, targetCardHold: 'C022_BasketChair' },
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('fail')
     // No recall happened.
     expect(mp.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBeUndefined()
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBeUndefined()
   })
 
   it('forceFirst without targetCardHold returns the worker to home (legacy behavior)', () => {

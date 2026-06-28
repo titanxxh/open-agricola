@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/E/E36_HerbalGarden'
+import '../../shared/cards/E/E036_HerbalGarden'
 
-const CARD_ID = 'E36_HerbalGarden'
+const CARD_ID = 'E036_HerbalGarden'
 
-describe('E36_HerbalGarden session', () => {
+describe('E036_HerbalGarden session', () => {
   it('with 2 pastures, one pasture has capacity 0 after card played', () => {
     const session = new GameSession()
     const state = session.getState().state

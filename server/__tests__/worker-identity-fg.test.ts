@@ -4,7 +4,7 @@ import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placeme
 import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/A/A092_AdoptiveParents'
 
 describe('worker-identity: family growth pushes newborn to FG space takenBy', () => {
   const setup = () => {
@@ -172,13 +172,13 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     player.resources.food = 5 // enough to pay A92's 1 food cost
 
     // Mark A92 as played
-    player.occupationPlayed.push('A92_AdoptiveParents')
+    player.occupationPlayed.push('A092_AdoptiveParents')
 
     session.loadState(state)
     return session
   }
 
-  const A92_ANYTIME = 'A92-adoptive-parents-anytime-grow'
+  const A092_ANYTIME = 'A92-adoptive-parents-anytime-grow'
 
   // Drain the FG flow's own optional minor-improvement tail (stop before the
   // rotation confirm) so the engine is back to an interactive window where the
@@ -214,7 +214,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     // Step 3: capability A — invoke the anytime grow-only entry. Pay 1 food,
     // promote the newborn off the FG space (child→adult). No place-farmer, so
     // alternation with the opponent is preserved.
-    const grown = session.takeAnytimeAction(0, A92_ANYTIME)
+    const grown = session.takeAnytimeAction(0, A092_ANYTIME)
     expect(grown.ok).toBe(true)
 
     const p1Mid = session.getState().state.players[0]!
@@ -274,11 +274,11 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(plow.ok).toBe(true)
     expect(newbornCount(plow.state.players[0]!)).toBe(2)
 
-    const first = session.takeAnytimeAction(0, A92_ANYTIME)
+    const first = session.takeAnytimeAction(0, A092_ANYTIME)
     expect(first.ok).toBe(true)
     expect(newbornCount(session.getState().state.players[0]!)).toBe(1)
 
-    const second = session.takeAnytimeAction(0, A92_ANYTIME)
+    const second = session.takeAnytimeAction(0, A092_ANYTIME)
     expect(second.ok).toBe(true)
     const after = session.getState().state.players[0]!
     expect(newbornCount(after)).toBe(0)
@@ -294,7 +294,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     const before = session.getState().state
     expect(computeHarvestFeedingRequirement(before, before.players[0]!)).toBe(5)
 
-    const grown = session.takeAnytimeAction(0, A92_ANYTIME)
+    const grown = session.takeAnytimeAction(0, A092_ANYTIME)
     expect(grown.ok).toBe(true)
 
     const after = session.getState().state

@@ -5,35 +5,35 @@ import {
   computeInvalidAnimalsForZone,
 } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/C/C11_WildlifeReserve'
+import '../../shared/cards/C/C011_WildlifeReserve'
 
-describe('C11_WildlifeReserve getInvalidAnimals', () => {
+describe('C011_WildlifeReserve getInvalidAnimals', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push('C11_WildlifeReserve')
+    player.minorPlayed.push('C011_WildlifeReserve')
     session.loadState(state)
     return session
   }
 
   const cardZone = (player: ReturnType<typeof setup>['getState'] extends () => infer R ? R extends { state: { players: (infer P)[] } } ? P : never : never) =>
-    computeAnimalZones(player as never).find(z => z.id === `card:C11_WildlifeReserve`)!
+    computeAnimalZones(player as never).find(z => z.id === `card:C011_WildlifeReserve`)!
 
   it('zone push carries cardId for hook dispatch', () => {
     const session = setup()
     const player = session.getState().state.players[0]!
     const zone = cardZone(player)
-    expect(zone.cardId).toBe('C11_WildlifeReserve')
+    expect(zone.cardId).toBe('C011_WildlifeReserve')
   })
 
   it('returns empty when at most 1 of each type', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:C11_WildlifeReserve`)!
+    const zone = computeAnimalZones(player).find(z => z.id === `card:C011_WildlifeReserve`)!
     // synthesize 1 sheep
     zone.animalType = 'sheep'
     zone.animalCount = 1
@@ -45,7 +45,7 @@ describe('C11_WildlifeReserve getInvalidAnimals', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:C11_WildlifeReserve`)!
+    const zone = computeAnimalZones(player).find(z => z.id === `card:C011_WildlifeReserve`)!
     // synthesize 3 sheep — over per-type cap
     zone.animalType = 'sheep'
     zone.animalCount = 3
@@ -60,7 +60,7 @@ describe('C11_WildlifeReserve getInvalidAnimals', () => {
     const state = session.getState().state
     state.enableFarmersOfTheMoor = true
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:C11_WildlifeReserve`)!
+    const zone = computeAnimalZones(player).find(z => z.id === `card:C011_WildlifeReserve`)!
     zone.animalCounts = { sheep: 1, horse: 1 }
 
     const invalid = computeInvalidAnimalsForZone(state, player, zone)

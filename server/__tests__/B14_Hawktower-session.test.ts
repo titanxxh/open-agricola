@@ -4,10 +4,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
 import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
-import { B14_Hawktower } from '../../shared/cards/B/B14_Hawktower'
+import { B014_Hawktower } from '../../shared/cards/B/B014_Hawktower'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'B14_Hawktower'
+const CARD_ID = 'B014_Hawktower'
 
 const setup = (houseType: 'wood' | 'clay' | 'stone') => {
   const session = new GameSession(/* seed */ 1)
@@ -132,7 +132,7 @@ describe('B14 Hawktower — session', () => {
       const state = session.getState().state
       state.round = 8
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B14_Hawktower, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, B014_Hawktower, state.round, state)).toBe(false)
     })
 
     it('allows when round <= 7', () => {
@@ -140,7 +140,7 @@ describe('B14 Hawktower — session', () => {
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B14_Hawktower, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, B014_Hawktower, state.round, state)).toBe(true)
     })
   })
 })

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionFlow } from '../../contract/types'
 
-import '../B/B4_WoodPile'
+import '../B/B004_WoodPile'
 
-const CARD_ID = 'B4_WoodPile'
+const CARD_ID = 'B004_WoodPile'
 
 const makePlayer = (id = 'p1'): PlayerState =>
   ({
@@ -42,7 +42,7 @@ const makeState = (player: PlayerState): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('B4_WoodPile onBuy', () => {
+describe('B004_WoodPile onBuy', () => {
   it('grants wood equal to count of accumulation spaces with my farmer (BGA)', () => {
     const player = makePlayer('p1')
     const state = makeState(player)

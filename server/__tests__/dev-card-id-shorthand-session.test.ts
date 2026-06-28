@@ -45,7 +45,7 @@ describe('dev card id shorthand', () => {
     const resp = session.devDrawCard(0, 'C1')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).toContain('C1_Overhaul')
+    expect(resp.state.players[0]!.minorHand).toContain('C001_Overhaul')
     expect(resp.state.players[0]!.minorHand).not.toContain('C1')
     expect(resp.state.players[0]!.occupationHand).not.toContain('C148_MudWallower')
   })

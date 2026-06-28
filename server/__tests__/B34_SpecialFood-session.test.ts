@@ -9,10 +9,10 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow, Resource } from '../../shared/contract/types'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/B/B34_SpecialFood'
+import '../../shared/cards/B/B034_SpecialFood'
 import '../../shared/cards/A/A137_RiverineShepherd'
 
-const CARD_ID = 'B34_SpecialFood'
+const CARD_ID = 'B034_SpecialFood'
 
 const findListener = () =>
   getRegisteredCardListeners().find((listener) => listener.id === 'B34-special-food-after-collect')
@@ -76,7 +76,7 @@ const runListener = (
   } as unknown as CardListenerContext)?.flow
 }
 
-describe('B34_SpecialFood action-space provenance', () => {
+describe('B034_SpecialFood action-space provenance', () => {
   it('awards bonus VP for animals moved from an action space to the trigger player', () => {
     const { player } = setup()
     const events = [moved({ sheep: 1 }, player.id)]

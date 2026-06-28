@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B55_MaintenancePremium'
+import '../../shared/cards/B/B055_MaintenancePremium'
 
-const CARD_ID = 'B55_MaintenancePremium'
+const CARD_ID = 'B055_MaintenancePremium'
 
 const setup = () => {
   const session = new GameSession()
@@ -38,7 +38,7 @@ const setup = () => {
   return session
 }
 
-describe('B55_MaintenancePremium session', () => {
+describe('B055_MaintenancePremium session', () => {
   it('onBuy sets foodCount to 3', () => {
     const session = new GameSession()
     const state = session.getState().state

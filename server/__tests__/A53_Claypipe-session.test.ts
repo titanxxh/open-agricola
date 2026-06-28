@@ -5,7 +5,7 @@ import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-describe('A53_Claypipe session flow', () => {
+describe('A053_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -21,13 +21,13 @@ describe('A53_Claypipe session flow', () => {
     })
 
     const player = state.players[0]!
-    player.minorHand = ['A53_Claypipe']
+    player.minorHand = ['A053_Claypipe']
     player.resources.clay = 1
     state.workPhaseObtainedResources[player.id] = { clay: 8 }
 
-    const playResult = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const playResult = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
     expect(playResult.type).toBe('ok')
-    expect(player.cardStates?.A53_Claypipe?.infobox).toBe('8 / 7')
+    expect(player.cardStates?.A053_Claypipe?.infobox).toBe('8 / 7')
 
     session.loadState(state)
     const resp = session.performRoundEnd()
@@ -36,12 +36,12 @@ describe('A53_Claypipe session flow', () => {
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(8)
     expect(resp.state.roundPhase).toBe('work')
-    expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
+    expect(resp.state.players[0]!.cardStates?.A053_Claypipe?.infobox).toBe('0 / 7')
 
     const gainLog = resp.state.log.find(
       (entry) =>
         entry.key === 'log.cardEffectGain' &&
-        entry.params?.cardId === 'A53_Claypipe',
+        entry.params?.cardId === 'A053_Claypipe',
     )
     expect(gainLog?.params?.gain).toEqual({ food: 2 })
   })
@@ -56,7 +56,7 @@ describe('A53_Claypipe session flow', () => {
     setActiveWorkerCount(state.players[0]!, 2)
     state.players[0]!.resources.food = 10
     state.players[0]!.resources.clay = 1
-    state.players[0]!.minorHand = ['A53_Claypipe']
+    state.players[0]!.minorHand = ['A053_Claypipe']
     setActiveWorkerCount(state.players[1]!, 1)
     markAllWorkersUsed(state, state.players[1]!)
     state.players[1]!.resources.food = 10
@@ -88,13 +88,13 @@ describe('A53_Claypipe session flow', () => {
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'minor:A53_Claypipe')
+      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'minor:A053_Claypipe')
       if (claypipeOption) {
         resp = session.resolveChoice(0, claypipeOption.value)
         expect(resp.ok).toBe(true)
       }
     }
-    expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('8 / 7')
+    expect(resp.state.players[0]!.cardStates?.A053_Claypipe?.infobox).toBe('8 / 7')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
     resp = confirmNextPlayer(session)
@@ -112,7 +112,7 @@ describe('A53_Claypipe session flow', () => {
     const gainLog = resp.state.log.find(
       (entry) =>
         entry.key === 'log.cardEffectGain' &&
-        entry.params?.cardId === 'A53_Claypipe',
+        entry.params?.cardId === 'A053_Claypipe',
     )
     expect(gainLog?.params?.gain).toEqual({ food: 2 })
   })

@@ -70,28 +70,28 @@ describe('space helpers', () => {
 
   it('adds and recognizes synthetic linked occupancy metadata', () => {
     const s = mkSpace([])
-    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C023_JobContract')
 
     expect(s.takenBy).toEqual([{
       playerId: 'p1',
       workerId: '1',
       synthetic: {
         kind: 'linked-occupancy',
-        sourceCard: 'C23_JobContract',
+        sourceCard: 'C023_JobContract',
         linkedWorkerId: '1',
       },
     }])
     expect(isSyntheticLinkedOccupancy(s.takenBy[0], {
-      sourceCard: 'C23_JobContract',
+      sourceCard: 'C023_JobContract',
       linkedWorkerId: '1',
     })).toBe(true)
   })
 
   it('removes only matching synthetic linked occupancy refs', () => {
     const s = mkSpace([{ playerId: 'p1', workerId: '4' }])
-    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C23_JobContract')
-    addSyntheticLinkedOccupancyRef(s, 'p1', '2', 'C23_JobContract')
-    addSyntheticLinkedOccupancyRef(s, 'p2', '1', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C023_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p1', '2', 'C023_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p2', '1', 'C023_JobContract')
 
     removeSyntheticLinkedOccupancyRefs(s, 'p1', '1')
 
@@ -102,7 +102,7 @@ describe('space helpers', () => {
         workerId: '2',
         synthetic: {
           kind: 'linked-occupancy',
-          sourceCard: 'C23_JobContract',
+          sourceCard: 'C023_JobContract',
           linkedWorkerId: '2',
         },
       },
@@ -111,7 +111,7 @@ describe('space helpers', () => {
         workerId: '1',
         synthetic: {
           kind: 'linked-occupancy',
-          sourceCard: 'C23_JobContract',
+          sourceCard: 'C023_JobContract',
           linkedWorkerId: '1',
         },
       },

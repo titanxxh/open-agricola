@@ -67,14 +67,14 @@ describe('cookery exchange metadata-driven helpers', () => {
   })
 
   it('getExchangesByTradeIds force-includes by sourceId', () => {
-    const player = createMockPlayer({ minorPlayed: ['E53_BoarSpear'] })
+    const player = createMockPlayer({ minorPlayed: ['E053_BoarSpear'] })
     // E53 is currently surfaced via anytime window (Sprint 6a kept legacy
     // behaviour). The tradeIds path also resolves the exchange.
-    const byId = getExchangesByTradeIds(player, ['E53_BoarSpear'])
+    const byId = getExchangesByTradeIds(player, ['E053_BoarSpear'])
     expect(byId).toHaveLength(1)
     expect(byId[0]!.from.boar).toBe(1)
     expect(byId[0]!.to.food).toBe(4)
-    expect(byId[0]!.sourceId).toBe('E53_BoarSpear')
+    expect(byId[0]!.sourceId).toBe('E053_BoarSpear')
   })
 
   it('Major_CookingHearth2 uses its own sourceId (not inherited from CookingHearth1)', () => {

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/C/C39_StudioBoat'
+import '../../shared/cards/C/C039_StudioBoat'
 
-const CARD_ID = 'C39_StudioBoat'
+const CARD_ID = 'C039_StudioBoat'
 
-describe('C39_StudioBoat — computeBonusScore wiring', () => {
+describe('C039_StudioBoat — computeBonusScore wiring', () => {
   it('exposes computeBonusScore on the effect', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()

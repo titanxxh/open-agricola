@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/B/B35_HookKnife'
+import '../../shared/cards/B/B035_HookKnife'
 import type { AnytimeAction } from '../../shared/contract/types';
 
-const CARD_ID = 'B35_HookKnife'
+const CARD_ID = 'B035_HookKnife'
 
-describe('B35_HookKnife session', () => {
+describe('B035_HookKnife session', () => {
   const setup = (sheep = 0, playerCount = 2) => {
     const session = new GameSession(undefined, undefined, { playerCount })
     const state = session.getState().state
@@ -44,7 +44,7 @@ describe('B35_HookKnife session', () => {
 
     const resp2 = session.takeAnytimeAction(0, 'B35-hook-knife-anytime')
     expect(resp2.ok).toBe(true)
-    expect(resp2.state.players[0]!.cardStates?.B35_HookKnife?.counters?.bonusVp).toBe(2)
+    expect(resp2.state.players[0]!.cardStates?.B035_HookKnife?.counters?.bonusVp).toBe(2)
   })
 
   it('3-player: threshold is 7, available with 7 sheep', () => {
@@ -55,7 +55,7 @@ describe('B35_HookKnife session', () => {
 
     const resp2 = session.takeAnytimeAction(0, 'B35-hook-knife-anytime')
     expect(resp2.ok).toBe(true)
-    expect(resp2.state.players[0]!.cardStates?.B35_HookKnife?.counters?.bonusVp).toBe(2)
+    expect(resp2.state.players[0]!.cardStates?.B035_HookKnife?.counters?.bonusVp).toBe(2)
   })
 
   it('one-time only', () => {

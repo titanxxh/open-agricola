@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
-import '../../shared/cards/E/E58_LunchtimeBeer'
+import '../../shared/cards/E/E058_LunchtimeBeer'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E58_LunchtimeBeer'
+const CARD_ID = 'E058_LunchtimeBeer'
 
 const setupHarvestRound = (round = 4) => {
   const session = new GameSession()
@@ -45,7 +45,7 @@ const drainHarvest = (session: GameSession) => {
   return resp
 }
 
-describe('E58_LunchtimeBeer onStartHarvest flow shape', () => {
+describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
   it('returns optional SEQ with [gain food:1, special-effect set-extra-data]', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -94,7 +94,7 @@ describe('E58_LunchtimeBeer onStartHarvest flow shape', () => {
   })
 })
 
-describe('E58_LunchtimeBeer harvest-phase skip integration', () => {
+describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
   it('accepting the SEQ at round 4: +1 food, passFieldAndBreedRound=4, reap skipped, breed skipped', () => {
     const { session, state } = setupHarvestRound(4)
     const p1 = state.players[0]!

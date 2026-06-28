@@ -4,30 +4,30 @@ import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
-import '../A/A13_RenovationCompany'
-import '../A/A15_CarpentersAxe'
-import '../A/A85_Homekeeper'
+import '../A/A013_RenovationCompany'
+import '../A/A015_CarpentersAxe'
+import '../A/A085_Homekeeper'
 import '../A/A118_Treegardener'
-import '../B/B2_MiniPasture'
-import '../B/B16_MiningHammer'
-import '../B/B49_Scales'
-import '../B/B88_EstablishedPerson'
-import '../B/B89_Groom'
-import '../B/B93_Confidant'
+import '../B/B002_MiniPasture'
+import '../B/B016_MiningHammer'
+import '../B/B049_Scales'
+import '../B/B088_EstablishedPerson'
+import '../B/B089_Groom'
+import '../B/B093_Confidant'
 import '../B/B149_OpenAirFarmer'
-import '../C/C2_Stable'
-import '../C/C89_StableMaster'
-import '../C/C94_StableCleaner'
+import '../C/C002_Stable'
+import '../C/C089_StableMaster'
+import '../C/C094_StableCleaner'
 import '../C/C149_ResourceRecycler'
-import '../D/D16_WoodenWheyBucket'
-import '../D/D42_EducationBonus'
-import '../D/D89_Stablehand'
+import '../D/D016_WoodenWheyBucket'
+import '../D/D042_EducationBonus'
+import '../D/D089_Stablehand'
 import '../D/D149_CasualWorker'
-import '../E/E1_PoleBarns'
-import '../E/E2_RenovationMaterials'
-import '../E/E88_MasterFencer'
-import '../E/E89_Stallwright'
-import '../E/E97_Beneficiary'
+import '../E/E001_PoleBarns'
+import '../E/E002_RenovationMaterials'
+import '../E/E088_MasterFencer'
+import '../E/E089_Stallwright'
+import '../E/E097_Beneficiary'
 
 type ListenerContextInput = Parameters<typeof executeCardListener>[1]
 type LeafFlow = Extract<ActionFlow, { type: 'leaf' }>
@@ -185,20 +185,20 @@ const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
 })
 
 describe('formatCost migrated card flows', () => {
-  it('A13_RenovationCompany emits a free optional renovation through exactCost', () => {
+  it('A013_RenovationCompany emits a free optional renovation through exactCost', () => {
     const actor = player({ houseType: 'wood', rooms: 2 })
     const gameState = state(actor)
-    const flow = getCardEffect('A13_RenovationCompany')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('A013_RenovationCompany')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'renovate-house')
     expect(leaf.optional).toBe(true)
     expect(leaf.actionContext).toEqual({ exactCost: {} })
     expectNoLegacyCostFields(leaf)
   })
 
-  it('A15_CarpentersAxe emits one stable at exact 1 wood', () => {
+  it('A015_CarpentersAxe emits one stable at exact 1 wood', () => {
     const actor = player({
       resources: resources({ wood: 7 }),
-      minorPlayed: ['A15_CarpentersAxe'],
+      minorPlayed: ['A015_CarpentersAxe'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('A15-carpenters-axe-after-collect'), context(gameState, actor, {
@@ -211,8 +211,8 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('B16_MiningHammer emits one free stable after renovation', () => {
-    const actor = player({ minorPlayed: ['B16_MiningHammer'] })
+  it('B016_MiningHammer emits one free stable after renovation', () => {
+    const actor = player({ minorPlayed: ['B016_MiningHammer'] })
     const gameState = state(actor)
     const result = executeCardListener(listener('B16-mining-hammer-after-renovate'), context(gameState, actor, {
       actionId: 'renovate-house',
@@ -223,14 +223,14 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('B88_EstablishedPerson emits free renovation and ordinary fence action without upfront pay', () => {
+  it('B088_EstablishedPerson emits free renovation and ordinary fence action without upfront pay', () => {
     const actor = player({
       houseType: 'wood',
       rooms: 2,
-      occupationPlayed: ['B88_EstablishedPerson'],
+      occupationPlayed: ['B088_EstablishedPerson'],
     })
     const gameState = state(actor)
-    const flow = getCardEffect('B88_EstablishedPerson')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('B088_EstablishedPerson')!.onBuy!(gameState, actor)
     const renovation = expectLeaf(flow, 'renovate-house')
     expect(renovation.actionContext).toEqual({ exactCost: {} })
     expectNoLegacyCostFields(renovation)
@@ -238,34 +238,34 @@ describe('formatCost migrated card flows', () => {
     expect(findLeaves(flow, 'pay')).toEqual([])
   })
 
-  it('B89_Groom emits one stable at exact 1 wood', () => {
+  it('B089_Groom emits one stable at exact 1 wood', () => {
     const actor = player({
       houseType: 'stone',
-      occupationPlayed: ['B89_Groom'],
+      occupationPlayed: ['B089_Groom'],
     })
     const gameState = state(actor)
-    const flow = runCardEffectHook(gameState, actor, 'B89_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(gameState, actor, 'B089_Groom', 'onBeforeStartOfTurn')
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
     expectNoLegacyCostFields(leaf)
   })
 
-  it('C89_StableMaster emits one stable at exact 1 wood', () => {
+  it('C089_StableMaster emits one stable at exact 1 wood', () => {
     const actor = player({
       resources: resources({ wood: 1 }),
-      occupationPlayed: ['C89_StableMaster'],
+      occupationPlayed: ['C089_StableMaster'],
     })
     const gameState = state(actor)
-    const flow = runCardEffectHook(gameState, actor, 'C89_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(gameState, actor, 'C089_StableMaster', 'onBuy')
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1 }, trueAction: false })
     expectNoLegacyCostFields(leaf)
   })
 
-  it('C94_StableCleaner emits stables at exact 1 wood and 1 food', () => {
+  it('C094_StableCleaner emits stables at exact 1 wood and 1 food', () => {
     const actor = player({
       resources: resources({ wood: 1, food: 1 }),
-      occupationPlayed: ['C94_StableCleaner'],
+      occupationPlayed: ['C094_StableCleaner'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('C94-stable-cleaner-anytime'), context(gameState, actor, {
@@ -300,8 +300,8 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('D89_Stablehand emits one free stable after new pasture fencing', () => {
-    const actor = player({ occupationPlayed: ['D89_Stablehand'] })
+  it('D089_Stablehand emits one free stable after new pasture fencing', () => {
+    const actor = player({ occupationPlayed: ['D089_Stablehand'] })
     const gameState = state(actor)
     const actionEvents = [fenceBuilt()]
     const result = executeCardListener(listener('D89-stablehand-after-fencing'), context(gameState, actor, {
@@ -335,10 +335,10 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('C2_Stable emits one free stable from actionContext', () => {
+  it('C002_Stable emits one free stable from actionContext', () => {
     const actor = player()
     const gameState = state(actor)
-    const flow = getCardEffect('C2_Stable')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('C002_Stable')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.params).toBeUndefined()
     expect(leaf.actionContext).toMatchObject({
@@ -349,20 +349,20 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('E1_PoleBarns emits up to three free stables from actionContext', () => {
+  it('E001_PoleBarns emits up to three free stables from actionContext', () => {
     const actor = player()
     const gameState = state(actor)
-    const flow = getCardEffect('E1_PoleBarns')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('E001_PoleBarns')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.params).toBeUndefined()
     expect(leaf.actionContext).toMatchObject({ max: 3, exactCost: { wood: 0, max: 3 } })
     expectNoLegacyCostFields(leaf)
   })
 
-  it('B2_MiniPasture emits free fence policy directly to fence action', () => {
+  it('B002_MiniPasture emits free fence policy directly to fence action', () => {
     const actor = player()
     const gameState = state(actor)
-    const flow = getCardEffect('B2_MiniPasture')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('B002_MiniPasture')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'fence')
     expect(leaf.params).toBeUndefined()
     expect(leaf.actionContext).toMatchObject({
@@ -377,8 +377,8 @@ describe('formatCost migrated card flows', () => {
     })
   })
 
-  it('D16_WoodenWheyBucket emits exactly one stable at the sheep/cattle market costs', () => {
-    const actor = player({ minorPlayed: ['D16_WoodenWheyBucket'] })
+  it('D016_WoodenWheyBucket emits exactly one stable at the sheep/cattle market costs', () => {
+    const actor = player({ minorPlayed: ['D016_WoodenWheyBucket'] })
     const gameState = state(actor)
     const registration = listener('D16-wooden-whey-bucket-before-place-farmer')
 
@@ -401,10 +401,10 @@ describe('formatCost migrated card flows', () => {
     expect(cattleLeaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
   })
 
-  it('E2_RenovationMaterials emits a free clay renovation through exactCost', () => {
+  it('E002_RenovationMaterials emits a free clay renovation through exactCost', () => {
     const actor = player({ houseType: 'wood' })
     const gameState = state(actor)
-    const flow = getCardEffect('E2_RenovationMaterials')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('E002_RenovationMaterials')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'renovate-house')
     expect(leaf.params).toEqual({ selectedOption: 'clay' })
     expect(leaf.actionContext).toEqual({ exactCost: {} })
@@ -428,14 +428,14 @@ describe('formatCost migrated card flows', () => {
     })
   })
 
-  it('E88_MasterFencer emits free capped fence policies for both options', () => {
+  it('E088_MasterFencer emits free capped fence policies for both options', () => {
     const actor = player({
       houseType: 'stone',
       resources: resources({ wood: 3 }),
-      occupationPlayed: ['E88_MasterFencer'],
+      occupationPlayed: ['E088_MasterFencer'],
     })
     const gameState = state(actor)
-    const flow = getCardEffect('E88_MasterFencer')!.onRoundStart!(gameState, actor)
+    const flow = getCardEffect('E088_MasterFencer')!.onRoundStart!(gameState, actor)
     const leaves = findLeaves(flow, 'fence')
     expect(leaves).toHaveLength(2)
     expect(leaves[0]!.params).toBeUndefined()
@@ -454,9 +454,9 @@ describe('formatCost migrated card flows', () => {
     })
   })
 
-  it('E89_Stallwright emits one free stable on configured occupation count', () => {
+  it('E089_Stallwright emits one free stable on configured occupation count', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper'],
+      occupationPlayed: ['E089_Stallwright', 'A085_Homekeeper'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -469,9 +469,9 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('E89_Stallwright still offers the third-occupation stable when Beneficiary bonus is skipped', () => {
+  it('E089_Stallwright still offers the third-occupation stable when Beneficiary bonus is skipped', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper', 'E97_Beneficiary'],
+      occupationPlayed: ['E089_Stallwright', 'A085_Homekeeper', 'E097_Beneficiary'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -480,7 +480,7 @@ describe('formatCost migrated card flows', () => {
       space: gameState.actionSpaces.find((entry) => entry.id === 'occupation')!,
       transactionEvents: [{
         type: 'card.played',
-        cardId: 'E97_Beneficiary',
+        cardId: 'E097_Beneficiary',
         cardType: 'occupation',
       }],
     }))
@@ -488,9 +488,9 @@ describe('formatCost migrated card flows', () => {
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 }, trueAction: false })
   })
 
-  it('E89_Stallwright does not duplicate when Beneficiary already played the extra occupation branch', () => {
+  it('E089_Stallwright does not duplicate when Beneficiary already played the extra occupation branch', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper', 'E97_Beneficiary', 'A114_SeasonalWorker'],
+      occupationPlayed: ['E089_Stallwright', 'A085_Homekeeper', 'E097_Beneficiary', 'A114_SeasonalWorker'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -499,7 +499,7 @@ describe('formatCost migrated card flows', () => {
       space: gameState.actionSpaces.find((entry) => entry.id === 'occupation')!,
       transactionEvents: [{
         type: 'card.played',
-        cardId: 'E97_Beneficiary',
+        cardId: 'E097_Beneficiary',
         cardType: 'occupation',
       }, {
         type: 'card.played',
@@ -510,13 +510,13 @@ describe('formatCost migrated card flows', () => {
     expect(result).toBeUndefined()
   })
 
-  it('E97_Beneficiary emits one-food occupation without embedding Stallwright', () => {
+  it('E097_Beneficiary emits one-food occupation without embedding Stallwright', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
+      occupationPlayed: ['E089_Stallwright', 'A001_OtherOccupation', 'E097_Beneficiary'],
       occupationHand: ['A114_SeasonalWorker'],
     })
     const gameState = state(actor)
-    const flow = getCardEffect('E97_Beneficiary')!.onBuy!(gameState, actor)
+    const flow = getCardEffect('E097_Beneficiary')!.onBuy!(gameState, actor)
     expect(flow?.type).toBe('or')
     if (flow?.type !== 'or') return
     const occupationBranch = flow.children[0]
@@ -535,8 +535,8 @@ describe('formatCost migrated card flows', () => {
     expect(occupation.params).toEqual({ exactCost: { food: 1 } })
   })
 
-  it('B93_Confidant offers future receive sow/fence with explicit fence cost policy', () => {
-    const actor = player({ occupationPlayed: ['B93_Confidant'] })
+  it('B093_Confidant offers future receive sow/fence with explicit fence cost policy', () => {
+    const actor = player({ occupationPlayed: ['B093_Confidant'] })
     const gameState = state(actor)
     gameState.round = 4
     gameState.events.push({
@@ -548,12 +548,12 @@ describe('formatCost migrated card flows', () => {
       visibility: 'public',
       type: 'futureMeeple.resolved',
       playerId: actor.id,
-      cardId: 'B93_Confidant',
-      sourceCardId: 'B93_Confidant',
+      cardId: 'B093_Confidant',
+      sourceCardId: 'B093_Confidant',
       resources: { food: 1 },
     })
 
-    const flow = getCardEffect('B93_Confidant')!.onRoundStart!(gameState, actor)
+    const flow = getCardEffect('B093_Confidant')!.onRoundStart!(gameState, actor)
     expect(flow?.type).toBe('seq')
     const sow = expectLeaf(flow, 'sow')
     expect(sow.actionContext).toMatchObject({ trueAction: false })

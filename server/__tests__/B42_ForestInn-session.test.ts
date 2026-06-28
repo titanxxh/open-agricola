@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/B/B42_ForestInn'
+import '../../shared/cards/B/B042_ForestInn'
 import { setActiveWorkerCount } from '../../shared/domain/player'
 import type { ChoiceDescriptionPreview } from '../../shared/contract/types'
 
-const CARD_ID = 'B42_ForestInn'
+const CARD_ID = 'B042_ForestInn'
 
 const resetResources = (resources: Record<string, number>) => ({
   wood: 0,
@@ -89,7 +89,7 @@ const choiceByPaidWood = (
   return option
 }
 
-describe('B42_ForestInn session', () => {
+describe('B042_ForestInn session', () => {
   it('owner uses xor exchange without paying the 1 food fee', () => {
     const session = setup(0)
     const state = session.getState().state

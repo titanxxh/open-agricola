@@ -123,7 +123,7 @@ const publicEventFixtureMatrix = {
   'resource.moved': {
     log: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' },
-      silent: { ...base, id: 'resource-moved-card', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A1_Test' }, to: { kind: 'card', cardId: 'A2_Test' }, reason: 'cardEffect' },
+      silent: { ...base, id: 'resource-moved-card', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A001_Test' }, to: { kind: 'card', cardId: 'A002_Test' }, reason: 'cardEffect' },
     },
     highlight: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'actionSpace', spaceId: 'forest' }, to: { kind: 'player', playerId: 'p1' }, reason: 'collect' },
@@ -131,7 +131,7 @@ const publicEventFixtureMatrix = {
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' },
-      silent: { ...base, id: 'resource-moved-card-animation', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A1_Test' }, to: { kind: 'card', cardId: 'A2_Test' }, reason: 'cardEffect' },
+      silent: { ...base, id: 'resource-moved-card-animation', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A001_Test' }, to: { kind: 'card', cardId: 'A002_Test' }, reason: 'cardEffect' },
     },
   },
   'resource.exchanged': {
@@ -141,7 +141,7 @@ const publicEventFixtureMatrix = {
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'player', playerId: 'p1' }, paidTo: { kind: 'supply' }, gainedFrom: { kind: 'supply' }, gainedTo: { kind: 'player', playerId: 'p1' } },
-      silent: { ...base, id: 'exchange-card-endpoints', seq: 2, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'card', cardId: 'A1_Test' }, paidTo: { kind: 'card', cardId: 'A2_Test' }, gainedFrom: { kind: 'card', cardId: 'A3_Test' }, gainedTo: { kind: 'roundCard', round: 3 } },
+      silent: { ...base, id: 'exchange-card-endpoints', seq: 2, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'card', cardId: 'A001_Test' }, paidTo: { kind: 'card', cardId: 'A002_Test' }, gainedFrom: { kind: 'card', cardId: 'A003_Test' }, gainedTo: { kind: 'roundCard', round: 3 } },
     },
   },
   'resource.accumulated': {
@@ -155,17 +155,17 @@ const publicEventFixtureMatrix = {
     },
     highlight: {
       mapped: { ...base, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'actionSpace', spaceId: 'fishing' } },
-      silent: { ...base, id: 'resource-accumulated-card-highlight', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B48_ForestStone' } },
+      silent: { ...base, id: 'resource-accumulated-card-highlight', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B048_ForestStone' } },
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'actionSpace', spaceId: 'fishing' } },
-      silent: { ...base, id: 'resource-accumulated-card-animation', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B48_ForestStone' } },
+      silent: { ...base, id: 'resource-accumulated-card-animation', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B048_ForestStone' } },
     },
   },
   'resource.paid': {
     notification: {
       mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
-      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A1_Test'] },
+      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A001_Test'] },
     },
     highlight: {
       mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'room' },
@@ -179,19 +179,19 @@ const publicEventFixtureMatrix = {
   'farm.sown': {
     highlight: {
       mapped: { ...base, type: 'farm.sown', sows: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', added: 2 }] },
-      silent: { ...base, id: 'sown-card', seq: 2, type: 'farm.sown', sows: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', added: 2 }] },
+      silent: { ...base, id: 'sown-card', seq: 2, type: 'farm.sown', sows: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', added: 2 }] },
     },
   },
   'farm.cropAdded': {
     highlight: {
       mapped: { ...base, type: 'farm.cropAdded', crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
-      silent: { ...base, id: 'crop-added-card', seq: 2, type: 'farm.cropAdded', crops: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
+      silent: { ...base, id: 'crop-added-card', seq: 2, type: 'farm.cropAdded', crops: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
     },
   },
   'farm.cropRemoved': {
     highlight: {
       mapped: { ...base, type: 'farm.cropRemoved', crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: 1 }], reason: 'harvest' },
-      silent: { ...base, id: 'crop-removed-card', seq: 2, type: 'farm.cropRemoved', crops: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
+      silent: { ...base, id: 'crop-removed-card', seq: 2, type: 'farm.cropRemoved', crops: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
     },
   },
   'farm.fieldPlowed': {
@@ -254,8 +254,8 @@ const publicEventFixtureMatrix = {
   },
   'card.stackChanged': {
     notification: {
-      mapped: { ...base, type: 'card.stackChanged', cardId: 'C81_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
-      silent: { ...base, id: 'stack-empty', seq: 2, type: 'card.stackChanged', cardId: 'C81_MaterialHub', targetPlayerId: 'p1', resources: {}, reason: 'store' },
+      mapped: { ...base, type: 'card.stackChanged', cardId: 'C081_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
+      silent: { ...base, id: 'stack-empty', seq: 2, type: 'card.stackChanged', cardId: 'C081_MaterialHub', targetPlayerId: 'p1', resources: {}, reason: 'store' },
     },
   },
   'futureMeeple.queued': {
@@ -293,7 +293,7 @@ describe('event mapping policy', () => {
 
   it('keeps replay helper aligned with metadata-only policy entries', () => {
     const replayable = { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' } satisfies GameEvent
-    const metadataOnly = { ...base, type: 'card.stateChanged', cardId: 'B21_HayloftBarn', key: 'food', value: 3, targetPlayerId: 'p1' } satisfies GameEvent
+    const metadataOnly = { ...base, type: 'card.stateChanged', cardId: 'B021_HayloftBarn', key: 'food', value: 3, targetPlayerId: 'p1' } satisfies GameEvent
 
     expect(publicEventMappingPolicy[replayable.type].replay).toBe('replayable')
     expect(isPublicEventReplayable(replayable)).toBe(true)
@@ -303,7 +303,7 @@ describe('event mapping policy', () => {
 
   it('documents conditional log mapping for existing event shapes', () => {
     const playerGain = { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' } satisfies GameEvent
-    const cardMove = { ...base, id: 'evt-2', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A1_Test' }, to: { kind: 'card', cardId: 'A2_Test' }, reason: 'cardEffect' } satisfies GameEvent
+    const cardMove = { ...base, id: 'evt-2', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A001_Test' }, to: { kind: 'card', cardId: 'A002_Test' }, reason: 'cardEffect' } satisfies GameEvent
     expect(eventsToLogEntries([playerGain], { playerNames: { p1: 'Alice' } })).toHaveLength(1)
     expect(eventsToLogEntries([cardMove], { playerNames: { p1: 'Alice' } })).toEqual([])
   })

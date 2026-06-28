@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../../contract/types'
 import { computeHarvestFeedingRequirement } from '../harvest-feeding-requirement'
-import '../../../cards/E/E30_ChildsToy'
+import '../../../cards/E/E030_ChildsToy'
 import '../../../cards/E/E159_OldMiser'
 
 const emptyResources = (): Resource => ({
@@ -68,7 +68,7 @@ describe('computeHarvestFeedingRequirement', () => {
   })
 
   it('adds one food per newborn for E30 Childs Toy', () => {
-    const player = createPlayer({ minor: ['E30_ChildsToy'] }, 3, 1)
+    const player = createPlayer({ minor: ['E030_ChildsToy'] }, 3, 1)
     expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(6)
   })
 
@@ -79,7 +79,7 @@ describe('computeHarvestFeedingRequirement', () => {
 
   it('stacks E30 and E159 as formula modifiers', () => {
     const player = createPlayer({
-      minor: ['E30_ChildsToy'],
+      minor: ['E030_ChildsToy'],
       occupation: ['E159_OldMiser'],
     }, 3, 1)
     expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(3)

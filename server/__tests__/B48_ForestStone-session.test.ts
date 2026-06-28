@@ -4,9 +4,9 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import '../../shared/cards/B/B48_ForestStone'
+import '../../shared/cards/B/B048_ForestStone'
 
-const CARD_ID = 'B48_ForestStone'
+const CARD_ID = 'B048_ForestStone'
 
 const setup = () => {
   const session = new GameSession()
@@ -43,7 +43,7 @@ const setup = () => {
   return session
 }
 
-describe('B48_ForestStone session', () => {
+describe('B048_ForestStone session', () => {
   it('onBuy sets foodCount to 2', () => {
     const session = new GameSession()
     const state = session.getState().state

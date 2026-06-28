@@ -11,8 +11,8 @@ describe('useFarmSelection updateSowSelection group counting', () => {
   it('allows 2 D75 slots when maxSelections=1 (same groupKey)', () => {
     const { result } = renderHook(() => useFarmSelection())
     const groupKeyByTile = new Map<string, string | undefined>([
-      ['-75-0', 'D75_WoodField'],
-      ['-75-1', 'D75_WoodField'],
+      ['-75-0', 'D075_WoodField'],
+      ['-75-1', 'D075_WoodField'],
     ])
     act(() => {
       result.current.updateSowSelection(
@@ -38,7 +38,7 @@ describe('useFarmSelection updateSowSelection group counting', () => {
   it('rejects normal field after picking D75 slot when maxSelections=1', () => {
     const { result } = renderHook(() => useFarmSelection())
     const groupKeyByTile = new Map<string, string | undefined>([
-      ['-75-0', 'D75_WoodField'],
+      ['-75-0', 'D075_WoodField'],
       ['0-0', undefined],
     ])
     act(() => {

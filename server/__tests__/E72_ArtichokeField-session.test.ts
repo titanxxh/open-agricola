@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/E/E72_ArtichokeField'
+import '../../shared/cards/E/E072_ArtichokeField'
 
-const CARD_ID = 'E72_ArtichokeField'
+const CARD_ID = 'E072_ArtichokeField'
 const ROW = -1
 const COL = 5072
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -47,7 +47,7 @@ const setup = (options?: {
   return session
 }
 
-describe('E72_ArtichokeField session', () => {
+describe('E072_ArtichokeField session', () => {
   describe('extra sowable field', () => {
     it('registers as extra sowable field when empty', () => {
       const session = setup({ grain: 1 })

@@ -3,14 +3,14 @@ import { GameSession } from '../game/authoritative-session'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent, ResourceMovedEvent } from '../../shared/contract/events'
-import { E47_SyrupTap_impl } from '../../shared/cards/E/E47_SyrupTap'
+import { E047_SyrupTap_impl } from '../../shared/cards/E/E047_SyrupTap'
 
-import '../../shared/cards/E/E47_SyrupTap'
+import '../../shared/cards/E/E047_SyrupTap'
 import '../../shared/cards/C/C162_ForestOwner'
 
-const CARD_ID = 'E47_SyrupTap'
+const CARD_ID = 'E047_SyrupTap'
 
-describe('E47_SyrupTap session', () => {
+describe('E047_SyrupTap session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -25,7 +25,7 @@ describe('E47_SyrupTap session', () => {
     return session
   }
 
-  const listener = E47_SyrupTap_impl.listeners?.[0]
+  const listener = E047_SyrupTap_impl.listeners?.[0]
 
   const movedWood = (
     playerId: string,

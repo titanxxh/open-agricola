@@ -304,7 +304,7 @@ state.players[0].resources = {
 
 #### C.6 Reading global `completedFeedingPhases` in tests
 
-`state.completedFeedingPhases` 是全局收获计数（A148_Woolgrower / B86_TruffleSearcher 等"按已完成 feeding +1 容量"卡牌从此字段读取）。Session 测试无需跑完整收获 phase；直接在 setup 阶段覆盖即可：
+`state.completedFeedingPhases` 是全局收获计数（A148_Woolgrower / B086_TruffleSearcher 等"按已完成 feeding +1 容量"卡牌从此字段读取）。Session 测试无需跑完整收获 phase；直接在 setup 阶段覆盖即可：
 
 ```ts
 const session = new GameSession(SEED)
@@ -451,7 +451,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
   - 站在 `GameSession` 边界的集成测试（**主战场**——目前 `server/__tests__/` 下绝大多数卡牌测试都是这种命名）
 
 - `e2e-tests/CARD_ID.spec.ts`
-  - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C22_BasketChair.spec.ts`）
+  - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C022_BasketChair.spec.ts`）
 
 并不是每张卡都必须三层都写满，但至少要满足：
 

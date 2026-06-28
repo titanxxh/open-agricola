@@ -5,10 +5,10 @@ import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
-import '../../shared/cards/C/C93_InnerDistrictsDirector'
+import '../../shared/cards/C/C093_InnerDistrictsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C93_InnerDistrictsDirector'
+const CARD_ID = 'C093_InnerDistrictsDirector'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -57,7 +57,7 @@ const createState = (player: PlayerState): GameState => {
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('C93_InnerDistrictsDirector', () => {
+describe('C093_InnerDistrictsDirector', () => {
   it('returns a special-effect flow that places 1 stone on clay-pit when using forest', () => {
     const listener = findListener('C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()

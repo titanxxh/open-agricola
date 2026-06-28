@@ -4,20 +4,20 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { FenceSegment, Field } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B2_MiniPasture'
-import '../../shared/cards/B/B49_Scales'
-import '../../shared/cards/B/B82_ValueAssets'
-import '../../shared/cards/B/B93_Confidant'
+import '../../shared/cards/B/B002_MiniPasture'
+import '../../shared/cards/B/B049_Scales'
+import '../../shared/cards/B/B082_ValueAssets'
+import '../../shared/cards/B/B093_Confidant'
 import '../../shared/cards/B/B149_OpenAirFarmer'
-import '../../shared/cards/C/C2_Stable'
-import '../../shared/cards/A/A28_ForestSchool'
-import '../../shared/cards/A/A85_Homekeeper'
+import '../../shared/cards/C/C002_Stable'
+import '../../shared/cards/A/A028_ForestSchool'
+import '../../shared/cards/A/A085_Homekeeper'
 import '../../shared/cards/A/A118_Treegardener'
-import '../../shared/cards/D/D42_EducationBonus'
-import '../../shared/cards/E/E1_PoleBarns'
-import '../../shared/cards/E/E16_BriarHedge'
-import '../../shared/cards/E/E89_Stallwright'
-import '../../shared/cards/E/E97_Beneficiary'
+import '../../shared/cards/D/D042_EducationBonus'
+import '../../shared/cards/E/E001_PoleBarns'
+import '../../shared/cards/E/E016_BriarHedge'
+import '../../shared/cards/E/E089_Stallwright'
+import '../../shared/cards/E/E097_Beneficiary'
 import '../../shared/cards/A/A114_SeasonalWorker'
 
 const FILLER = '__test_placeholder__'
@@ -122,8 +122,8 @@ const setupBeneficiaryWithStallwright = (minorHand: string[] = [FILLER]) => {
   }
 
   const player = state.players[0]!
-  player.occupationPlayed = ['E89_Stallwright', 'A85_Homekeeper']
-  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.occupationPlayed = ['E089_Stallwright', 'A085_Homekeeper']
+  player.occupationHand = ['E097_Beneficiary', 'A114_SeasonalWorker']
   player.minorHand = minorHand
   player.resources = {
     ...player.resources,
@@ -148,9 +148,9 @@ const setupBeneficiaryWithEducationBonus = () => {
   }
 
   const player = state.players[0]!
-  player.occupationPlayed = ['A85_Homekeeper', 'A118_Treegardener']
-  player.minorPlayed = ['D42_EducationBonus']
-  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.occupationPlayed = ['A085_Homekeeper', 'A118_Treegardener']
+  player.minorPlayed = ['D042_EducationBonus']
+  player.occupationHand = ['E097_Beneficiary', 'A114_SeasonalWorker']
   player.resources = {
     ...player.resources,
     food: 10,
@@ -175,9 +175,9 @@ const setupBeneficiaryWithScales = () => {
   }
 
   const player = state.players[0]!
-  player.occupationPlayed = ['A85_Homekeeper', 'A118_Treegardener']
-  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
-  player.minorPlayed = ['B49_Scales', 'B82_ValueAssets', 'C2_Stable']
+  player.occupationPlayed = ['A085_Homekeeper', 'A118_Treegardener']
+  player.occupationHand = ['E097_Beneficiary', 'A114_SeasonalWorker']
+  player.minorPlayed = ['B049_Scales', 'B082_ValueAssets', 'C002_Stable']
   player.resources = {
     ...player.resources,
     food: 10,
@@ -215,13 +215,13 @@ const chooseCardIfPrompted = (
 }
 
 describe('formatCost card session regressions', () => {
-  it('C2_Stable builds its free stable after paying only the card wood cost', () => {
-    const session = setupMinor('C2_Stable')
+  it('C002_Stable builds its free stable after paying only the card wood cost', () => {
+    const session = setupMinor('C002_Stable')
     const state = session.getState().state
     state.players[0]!.resources.wood = 1
     session.loadState(state)
 
-    const played = playPassingMinor(session, 'C2_Stable')
+    const played = playPassingMinor(session, 'C002_Stable')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('farm-select')
@@ -232,16 +232,16 @@ describe('formatCost card session regressions', () => {
     expect(built.ok).toBe(true)
     expect(built.state.players[0]!.resources.wood).toBe(0)
     expect(built.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
-    expect(built.state.players[1]!.minorHand).toContain('C2_Stable')
+    expect(built.state.players[1]!.minorHand).toContain('C002_Stable')
   })
 
-  it('C2_Stable does not allow cancelling the mandatory free stable', () => {
-    const session = setupMinor('C2_Stable')
+  it('C002_Stable does not allow cancelling the mandatory free stable', () => {
+    const session = setupMinor('C002_Stable')
     const state = session.getState().state
     state.players[0]!.resources.wood = 1
     session.loadState(state)
 
-    const played = playPassingMinor(session, 'C2_Stable')
+    const played = playPassingMinor(session, 'C002_Stable')
     expect(played.interaction.stateId).toBe('wait')
 
     const cancelled = session.commitSelectionChoice(0, { cancel: true })
@@ -249,11 +249,11 @@ describe('formatCost card session regressions', () => {
     expect(cancelled.error).toBe('action cancel is not allowed')
     expect(cancelled.interaction.stateId).toBe('wait')
     expect(cancelled.state.players[0]!.stableTiles).toEqual([])
-    expect(cancelled.state.players[1]!.minorHand).toContain('C2_Stable')
+    expect(cancelled.state.players[1]!.minorHand).toContain('C002_Stable')
   })
 
-  it('E1_PoleBarns offers free stables after the card cost consumes all wood', () => {
-    const session = setupMinor('E1_PoleBarns')
+  it('E001_PoleBarns offers free stables after the card cost consumes all wood', () => {
+    const session = setupMinor('E001_PoleBarns')
     const state = session.getState().state
     state.players[0]!.resources.wood = 2
     state.players[0]!.fenceSegments = Array.from({ length: 15 }, (_, index): FenceSegment => ({
@@ -262,7 +262,7 @@ describe('formatCost card session regressions', () => {
     }))
     session.loadState(state)
 
-    const played = playPassingMinor(session, 'E1_PoleBarns')
+    const played = playPassingMinor(session, 'E001_PoleBarns')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('choice')
@@ -283,14 +283,14 @@ describe('formatCost card session regressions', () => {
     expect(built.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
   })
 
-  it('B2_MiniPasture fences one tile without requiring wood after paying food cost', () => {
-    const session = setupMinor('B2_MiniPasture')
+  it('B002_MiniPasture fences one tile without requiring wood after paying food cost', () => {
+    const session = setupMinor('B002_MiniPasture')
     const state = session.getState().state
     state.players[0]!.resources.food = 2
     state.players[0]!.resources.wood = 0
     session.loadState(state)
 
-    const played = playPassingMinor(session, 'B2_MiniPasture')
+    const played = playPassingMinor(session, 'B002_MiniPasture')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('farm-select')
@@ -304,11 +304,11 @@ describe('formatCost card session regressions', () => {
     expect(fenced.state.players[0]!.resources.food).toBe(0)
     expect(fenced.state.players[0]!.resources.wood).toBe(0)
     expect(fenced.state.players[0]!.fenceSegments).toHaveLength(4)
-    expect(fenced.state.players[1]!.minorHand).toContain('B2_MiniPasture')
+    expect(fenced.state.players[1]!.minorHand).toContain('B002_MiniPasture')
   })
 
-  it('B2_MiniPasture rejects a two-cell pasture completed with existing fences', () => {
-    const session = setupMinor('B2_MiniPasture')
+  it('B002_MiniPasture rejects a two-cell pasture completed with existing fences', () => {
+    const session = setupMinor('B002_MiniPasture')
     const state = session.getState().state
     state.players[0]!.resources.food = 2
     state.players[0]!.resources.wood = 0
@@ -318,7 +318,7 @@ describe('formatCost card session regressions', () => {
     ]
     session.loadState(state)
 
-    const played = playPassingMinor(session, 'B2_MiniPasture')
+    const played = playPassingMinor(session, 'B002_MiniPasture')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
 
@@ -359,10 +359,10 @@ describe('formatCost card session regressions', () => {
     expect(twoCells.state.players[0]!.pastures[0]?.tiles).toHaveLength(2)
   })
 
-  it('B93_Confidant requires choosing a future food schedule when played', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant requires choosing a future food schedule when played', () => {
+    const session = setupOccupation('B093_Confidant')
 
-    const played = playOccupation(session, 'B93_Confidant')
+    const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(false)
@@ -372,41 +372,41 @@ describe('formatCost card session regressions', () => {
     expect(skipped.interaction.stateId).toBe('wait')
   })
 
-  it('B93_Confidant is not playable when the minimum future food schedule is unaffordable', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant is not playable when the minimum future food schedule is unaffordable', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
-    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.occupationHand = ['B093_Confidant', 'A114_SeasonalWorker']
     state.players[0]!.resources.food = 1
     session.loadState(state)
 
     const action = session.takeAction(0, 'lessons-4')
     expect(action.ok).toBe(true)
     if (action.interaction.stateId === 'wait') {
-      expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant') ?? false).toBe(false)
+      expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
     }
-    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
-    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B093_Confidant')
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B093_Confidant')).toBe(false)
   })
 
-  it('B93_Confidant does not consume the lessons action as the only unaffordable occupation', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant does not consume the lessons action as the only unaffordable occupation', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
-    state.players[0]!.occupationHand = ['B93_Confidant']
+    state.players[0]!.occupationHand = ['B093_Confidant']
     state.players[0]!.resources.food = 1
     session.loadState(state)
 
     const action = session.takeAction(0, 'lessons-4')
     expect(action.ok).toBe(false)
-    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B093_Confidant')
     expect(action.state.players[0]!.workers.some((worker) => worker.action === 'lessons-4')).toBe(false)
-    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B093_Confidant')).toBe(false)
   })
 
-  it('B93_Confidant is not playable when A28_ForestSchool only covers the occupation cost', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant is not playable when A028_ForestSchool only covers the occupation cost', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
-    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
-    state.players[0]!.minorPlayed = ['A28_ForestSchool']
+    state.players[0]!.occupationHand = ['B093_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.minorPlayed = ['A028_ForestSchool']
     state.players[0]!.resources.food = 0
     state.players[0]!.resources.wood = 5
     session.loadState(state)
@@ -414,17 +414,17 @@ describe('formatCost card session regressions', () => {
     const action = session.takeAction(0, 'lessons-4')
     expect(action.ok).toBe(true)
     if (action.interaction.stateId === 'wait') {
-      expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant') ?? false).toBe(false)
+      expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
     }
-    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
-    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B093_Confidant')
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B093_Confidant')).toBe(false)
   })
 
-  it('B93_Confidant remains playable with A28_ForestSchool when food remains for the future schedule', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant remains playable with A028_ForestSchool when food remains for the future schedule', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
-    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
-    state.players[0]!.minorPlayed = ['A28_ForestSchool']
+    state.players[0]!.occupationHand = ['B093_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.minorPlayed = ['A028_ForestSchool']
     state.players[0]!.resources.food = 2
     state.players[0]!.resources.wood = 5
     session.loadState(state)
@@ -433,9 +433,9 @@ describe('formatCost card session regressions', () => {
     expect(action.ok).toBe(true)
     expect(action.interaction.stateId).toBe('wait')
     if (action.interaction.stateId !== 'wait') return
-    expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant')).toBe(true)
+    expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant')).toBe(true)
 
-    let response = session.resolveChoice(0, 'B93_Confidant')
+    let response = session.resolveChoice(0, 'B093_Confidant')
     expect(response.ok).toBe(true)
     if (
       response.interaction.stateId === 'wait' &&
@@ -472,17 +472,17 @@ describe('formatCost card session regressions', () => {
     }
     expect(scheduled.state.players[0]!.resources.food).toBe(0)
     expect(scheduled.state.players[0]!.resources.wood).toBe(4)
-    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B93_Confidant')).toHaveLength(2)
+    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B093_Confidant')).toHaveLength(2)
   })
 
-  it('B93_Confidant returns future food and offers optional sow or fence at round start', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant returns future food and offers optional sow or fence at round start', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
     state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] } satisfies Field]
     state.players[0]!.resources.grain = 1
     session.loadState(state)
 
-    const played = playOccupation(session, 'B93_Confidant')
+    const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     const schedule = played.interaction.options?.[0]
@@ -490,7 +490,7 @@ describe('formatCost card session regressions', () => {
 
     const scheduled = session.resolveChoice(0, schedule!.value)
     expect(scheduled.ok).toBe(true)
-    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B93_Confidant')).toHaveLength(2)
+    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B093_Confidant')).toHaveLength(2)
     const foodAfterScheduling = scheduled.state.players[0]!.resources.food
 
     const stateBeforeRoundStart = session.getState().state
@@ -513,10 +513,10 @@ describe('formatCost card session regressions', () => {
     ).toBe(true)
   })
 
-  it('B93_Confidant future fence remains available when a fence discount covers the policy cost', () => {
-    const session = setupOccupation('B93_Confidant')
+  it('B093_Confidant future fence remains available when a fence discount covers the policy cost', () => {
+    const session = setupOccupation('B093_Confidant')
     const state = session.getState().state
-    state.players[0]!.minorPlayed = ['E16_BriarHedge']
+    state.players[0]!.minorPlayed = ['E016_BriarHedge']
     state.players[0]!.resources.wood = 0
     state.players[0]!.fenceSegments = [
       { edge: 'H-1-0', type: 'fence' },
@@ -525,7 +525,7 @@ describe('formatCost card session regressions', () => {
     ]
     session.loadState(state)
 
-    const played = playOccupation(session, 'B93_Confidant')
+    const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     const schedule = played.interaction.options?.[0]
@@ -564,10 +564,10 @@ describe('formatCost card session regressions', () => {
     expect(fenced.state.players[0]!.pastures).toHaveLength(1)
   })
 
-  it('E97_Beneficiary leaves Stallwright to trigger after the extra occupation branch', () => {
+  it('E097_Beneficiary leaves Stallwright to trigger after the extra occupation branch', () => {
     const session = setupBeneficiaryWithStallwright()
 
-    const played = playOccupation(session, 'E97_Beneficiary')
+    const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
     expect(acceptedOccupationBranch.interaction.stateId).toBe('wait')
     if (acceptedOccupationBranch.interaction.stateId !== 'wait') return
@@ -584,15 +584,15 @@ describe('formatCost card session regressions', () => {
     })
     expect(builtStable.ok).toBe(true)
     expect(builtStable.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
-    expect(readCardResourceStats(builtStable.state.players[0]!, 'E89_Stallwright')?.gained.stable).toBe(1)
-    expect(readCardResourceStats(builtStable.state.players[0]!, 'E97_Beneficiary')?.gained.stable ?? 0).toBe(0)
+    expect(readCardResourceStats(builtStable.state.players[0]!, 'E089_Stallwright')?.gained.stable).toBe(1)
+    expect(readCardResourceStats(builtStable.state.players[0]!, 'E097_Beneficiary')?.gained.stable ?? 0).toBe(0)
     expect(builtStable.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
   })
 
-  it('E89_Stallwright still triggers when E97_Beneficiary bonus is skipped', () => {
+  it('E089_Stallwright still triggers when E097_Beneficiary bonus is skipped', () => {
     const session = setupBeneficiaryWithStallwright()
 
-    const played = playOccupation(session, 'E97_Beneficiary')
+    const played = playOccupation(session, 'E097_Beneficiary')
     expect(played.interaction.stateId).toBe('wait')
     const skipped = session.resolveChoice(0, '__skip__')
     expect(skipped.ok).toBe(true)
@@ -601,13 +601,13 @@ describe('formatCost card session regressions', () => {
     expect(skipped.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 
-  it('E89_Stallwright still triggers when E97_Beneficiary bonus plays a minor improvement', () => {
-    const session = setupBeneficiaryWithStallwright(['B82_ValueAssets'])
+  it('E089_Stallwright still triggers when E097_Beneficiary bonus plays a minor improvement', () => {
+    const session = setupBeneficiaryWithStallwright(['B082_ValueAssets'])
 
-    const played = playOccupation(session, 'E97_Beneficiary')
+    const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedMinorBranch = chooseByLabel(session, played, 'actions.improvement.name')
-    const playedMinor = chooseCardIfPrompted(session, acceptedMinorBranch, 'B82_ValueAssets')
-    expect(playedMinor.state.players[0]!.minorPlayed).toContain('B82_ValueAssets')
+    const playedMinor = chooseCardIfPrompted(session, acceptedMinorBranch, 'B082_ValueAssets')
+    expect(playedMinor.state.players[0]!.minorPlayed).toContain('B082_ValueAssets')
     expect(playedMinor.interaction.stateId).toBe('wait')
     if (playedMinor.interaction.stateId !== 'wait') return
     expect(playedMinor.interaction.options?.some((entry) => entry.value === '__done__')).toBe(true)
@@ -619,38 +619,38 @@ describe('formatCost card session regressions', () => {
     expect(completedBonus.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 
-  it('D42_EducationBonus uses the original occupation trigger count across Beneficiary extra occupation', () => {
+  it('D042_EducationBonus uses the original occupation trigger count across Beneficiary extra occupation', () => {
     const session = setupBeneficiaryWithEducationBonus()
 
-    const played = playOccupation(session, 'E97_Beneficiary')
+    const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
     const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
 
     const player = playedExtraOccupation.state.players[0]!
     expect(player.occupationPlayed).toEqual([
-      'A85_Homekeeper',
+      'A085_Homekeeper',
       'A118_Treegardener',
-      'E97_Beneficiary',
+      'E097_Beneficiary',
       'A114_SeasonalWorker',
     ])
-    expect(readCardResourceStats(player, 'D42_EducationBonus')?.gained.reed).toBe(1)
-    expect(readCardResourceStats(player, 'D42_EducationBonus')?.gained.stone).toBe(1)
+    expect(readCardResourceStats(player, 'D042_EducationBonus')?.gained.reed).toBe(1)
+    expect(readCardResourceStats(player, 'D042_EducationBonus')?.gained.stone).toBe(1)
   })
 
-  it('B49_Scales checks balanced counts from the original Beneficiary trigger', () => {
+  it('B049_Scales checks balanced counts from the original Beneficiary trigger', () => {
     const session = setupBeneficiaryWithScales()
 
-    const played = playOccupation(session, 'E97_Beneficiary')
+    const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
     const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
 
     const player = playedExtraOccupation.state.players[0]!
     expect(player.occupationPlayed).toEqual([
-      'A85_Homekeeper',
+      'A085_Homekeeper',
       'A118_Treegardener',
-      'E97_Beneficiary',
+      'E097_Beneficiary',
       'A114_SeasonalWorker',
     ])
-    expect(readCardResourceStats(player, 'B49_Scales')?.gained.food).toBe(2)
+    expect(readCardResourceStats(player, 'B049_Scales')?.gained.food).toBe(2)
   })
 })

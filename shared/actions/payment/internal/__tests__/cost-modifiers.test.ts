@@ -132,7 +132,7 @@ describe('applyCostModifiers — scope handling', () => {
   it('preserves explicit max regardless of scope', () => {
     const result = applyCostModifiers({}, [
       {
-        type: 'trade', cardId: 'A88_HedgeKeeper', appliesTo: ['fencing'],
+        type: 'trade', cardId: 'A088_HedgeKeeper', appliesTo: ['fencing'],
         from: {}, to: { wood: 1 }, max: 3, scope: 'action',
       },
     ])
@@ -141,13 +141,13 @@ describe('applyCostModifiers — scope handling', () => {
   it('copies groupId and groupMax to synthesised Trade', () => {
     const result = applyCostModifiers({}, [
       {
-        type: 'trade', cardId: 'E60_WorkingGloves', appliesTo: ['occupation'],
+        type: 'trade', cardId: 'E060_WorkingGloves', appliesTo: ['occupation'],
         from: { wood: 1 }, to: { food: 2 }, max: 1,
-        groupId: 'E60_WorkingGloves:occupation-food-replacement',
+        groupId: 'E060_WorkingGloves:occupation-food-replacement',
         groupMax: 1,
       },
     ])
-    expect(result.trades?.[0]?.groupId).toBe('E60_WorkingGloves:occupation-food-replacement')
+    expect(result.trades?.[0]?.groupId).toBe('E060_WorkingGloves:occupation-food-replacement')
     expect(result.trades?.[0]?.groupMax).toBe(1)
   })
   it('throws via validateTradeModifier on scope:unit + minNumRooms', () => {

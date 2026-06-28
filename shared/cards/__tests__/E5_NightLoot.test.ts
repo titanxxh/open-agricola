@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { GameSession } from '../../../server/game/authoritative-session'
 import type { PlayerState } from '../../contract/types'
-import { E5_NightLoot_impl } from '../E/E5_NightLoot'
+import { E005_NightLoot_impl } from '../E/E005_NightLoot'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -18,9 +18,9 @@ const setup = () => {
   return { session, core }
 }
 
-describe('E5_NightLoot', () => {
+describe('E005_NightLoot', () => {
   it('E5 source file does not contain "E33" (no hard coupling)', () => {
-    const src = readFileSync(path.resolve(__dirname, '..', 'E', 'E5_NightLoot.ts'), 'utf8')
+    const src = readFileSync(path.resolve(__dirname, '..', 'E', 'E005_NightLoot.ts'), 'utf8')
     expect(src.includes('E33')).toBe(false)
   })
 
@@ -32,7 +32,7 @@ describe('E5_NightLoot', () => {
         { id: 'reed-bank', gainPerRound: { reed: 1 }, resources: { wood: 0, clay: 0, reed: 1, stone: 0 } },
       ],
     }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     expect(flow).toBeDefined()
     expect(flow.type).toBe('xor')
     expect(flow.optional).toBeFalsy()
@@ -55,7 +55,7 @@ describe('E5_NightLoot', () => {
         { id: 'forest', gainPerRound: { wood: 3 }, resources: { wood: 3, clay: 0, reed: 0, stone: 0 } },
       ],
     }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     expect(flow).toBeDefined()
     expect(flow.type === 'leaf' || flow.type === 'xor').toBe(true)
     if (flow.type === 'leaf') {
@@ -69,7 +69,7 @@ describe('E5_NightLoot', () => {
 
   it('returns undefined when no accumulation space has any building resource', () => {
     const state: any = { actionSpaces: [] }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     expect(flow).toBeUndefined()
   })
 
@@ -80,7 +80,7 @@ describe('E5_NightLoot', () => {
         { id: 'visitor', gainPerRound: {}, resources: { wood: 5, clay: 0, reed: 0, stone: 0 } },
       ],
     }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     if (flow?.type === 'leaf') {
       expect(flow.actionContext.spaceId).toBe('forest')
     } else if (flow?.type === 'xor') {
@@ -99,7 +99,7 @@ describe('E5_NightLoot', () => {
         { id: 'reed-bank', gainPerRound: { reed: 1 }, resources: { wood: 0, clay: 0, reed: 1, stone: 0 } },
       ],
     }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     expect(flow?.type).toBe('xor')
     expect(flow!.children.length).toBe(2) // (forest,wood)×(reed-bank,reed) + (forest-extra,wood)×(reed-bank,reed)
     const spaceIds = flow!.children.flatMap((seq: any) => seq.children.map((l: any) => l.actionContext.spaceId))
@@ -115,7 +115,7 @@ describe('E5_NightLoot', () => {
         { id: 'reed-bank', nameKey: 'actions.reed-bank.name', gainPerRound: { reed: 1 }, resources: { wood: 0, clay: 0, reed: 1, stone: 0 } },
       ],
     }
-    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    const flow = E005_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
     expect(flow?.type).toBe('xor')
 
     const leaves = flow!.children.flatMap((seq: any) => seq.children)

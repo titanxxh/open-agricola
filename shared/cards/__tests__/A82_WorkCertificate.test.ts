@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../contract/types'
 
-import '../A/A82_WorkCertificate'
+import '../A/A082_WorkCertificate'
 
-const CARD_ID = 'A82_WorkCertificate'
+const CARD_ID = 'A082_WorkCertificate'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -50,7 +50,7 @@ const createState = (player: PlayerState, spaces: ActionSpace[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   } as unknown as GameState)
 
-describe('A82_WorkCertificate', () => {
+describe('A082_WorkCertificate', () => {
   const findListener = () =>
     getRegisteredCardListeners().find(
       (l) => l.id === 'A82-work-certificate-after-place-farmer',

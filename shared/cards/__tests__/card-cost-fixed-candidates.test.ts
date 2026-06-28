@@ -6,16 +6,16 @@ import { computeAllBuyableCombinations, resolveCardCostWithModifiersDetailed } f
 import type { CardListenerRegistration } from '../card-listeners'
 import { createInitialPlayerStats } from '../../session/stats'
 
-import '../A/A27_OvenSite'
-import '../A/A75_LumberMill'
+import '../A/A027_OvenSite'
+import '../A/A075_LumberMill'
 import '../A/A143_Stonecutter'
-import '../B/B65_GrainDepot'
-import '../C/C95_BasketWeaver'
+import '../B/B065_GrainDepot'
+import '../C/C095_BasketWeaver'
 import '../D/D117_WoodExpert'
-import '../D/D95_SiteManager'
+import '../D/D095_SiteManager'
 import '../E/E130_Overachiever'
 import '../E/E109_BraidMaker'
-import '../E/E27_PiggyBank'
+import '../E/E027_PiggyBank'
 
 const HOOK_CARD = 'HookFreeGrainDepot'
 
@@ -151,7 +151,7 @@ describe('fixed card-purchase cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
     state.availableMajorImprovements = ['Major_Basket']
-    player.occupationPlayed = ['C95_BasketWeaver']
+    player.occupationPlayed = ['C095_BasketWeaver']
     player.resources.reed = 2
     player.resources.stone = 2
 
@@ -161,7 +161,7 @@ describe('fixed card-purchase cost candidates', () => {
       'major:Major_Basket',
       'any',
       undefined,
-      'C95_BasketWeaver',
+      'C095_BasketWeaver',
     )
 
     if (result.type === 'request') {
@@ -203,7 +203,7 @@ describe('fixed card-purchase cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
     state.availableMajorImprovements = ['Major_ClayOven']
-    player.minorPlayed = ['A27_OvenSite']
+    player.minorPlayed = ['A027_OvenSite']
     player.resources.clay = 3
     player.resources.stone = 1
 
@@ -213,13 +213,13 @@ describe('fixed card-purchase cost candidates', () => {
       'improvement',
       'Major_ClayOven',
       { clay: 3, stone: 1 },
-      'A27_OvenSite',
+      'A027_OvenSite',
     )
 
     expect(candidateOptions(result)).toEqual([
       {
         resources: { clay: 1, stone: 1 },
-        sources: ['A27_OvenSite'],
+        sources: ['A027_OvenSite'],
       },
     ])
   })
@@ -228,7 +228,7 @@ describe('fixed card-purchase cost candidates', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
-    player.minorPlayed = ['A75_LumberMill']
+    player.minorPlayed = ['A075_LumberMill']
 
     const result = resolveCardCostWithModifiersDetailed(
       state,
@@ -245,7 +245,7 @@ describe('fixed card-purchase cost candidates', () => {
       },
       {
         resources: { wood: 1, clay: 2, reed: 2, stone: 2 },
-        sources: ['A75_LumberMill'],
+        sources: ['A075_LumberMill'],
       },
     ]))
   })
@@ -293,7 +293,7 @@ describe('fixed card-purchase cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
     player.occupationPlayed = [
-      'C95_BasketWeaver',
+      'C095_BasketWeaver',
       'E109_BraidMaker',
       'A143_Stonecutter',
       'D117_WoodExpert',
@@ -305,7 +305,7 @@ describe('fixed card-purchase cost candidates', () => {
       'improvement',
       'Major_Basket',
       { wood: 2, reed: 2, stone: 2 },
-      'C95_BasketWeaver',
+      'C095_BasketWeaver',
     )
 
     // Candidate Closure (ADR 0004): fixed-price rows report their own card
@@ -319,8 +319,8 @@ describe('fixed card-purchase cost candidates', () => {
     // deterministic representative (fewest sources, then key order), so the
     // C95/E109 fixed-price twins and their discounted twins collapse.
     expect(sortedJson(sortSources(candidateOptions(result)))).toEqual(sortedJson(sortSources([
-      { resources: { reed: 1, stone: 1 }, sources: ['C95_BasketWeaver'] },
-      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C95_BasketWeaver'] },
+      { resources: { reed: 1, stone: 1 }, sources: ['C095_BasketWeaver'] },
+      { resources: { reed: 1 }, sources: ['A143_Stonecutter', 'C095_BasketWeaver'] },
       { resources: { reed: 2, stone: 1, food: 1 }, sources: ['A143_Stonecutter', 'D117_WoodExpert'] },
       { resources: { reed: 2, stone: 2, food: 1 }, sources: ['D117_WoodExpert'] },
       { resources: { wood: 2, reed: 2, stone: 1 }, sources: ['A143_Stonecutter'] },
@@ -333,8 +333,8 @@ describe('fixed card-purchase cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
     state.availableMajorImprovements = ['Major_Joinery']
-    player.minorPlayed = ['E27_PiggyBank']
-    player.cardStates = { E27_PiggyBank: { flagged: true } }
+    player.minorPlayed = ['E027_PiggyBank']
+    player.cardStates = { E027_PiggyBank: { flagged: true } }
     player.resources.wood = 2
     player.resources.stone = 2
 
@@ -344,7 +344,7 @@ describe('fixed card-purchase cost candidates', () => {
       const options = expectPaymentRequest(result)
       expect(options.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
       const free = options.find((option) => hasPaidResources(option, {}))
-      expect(free?.labelParams.sourceCards).toEqual(['E27_PiggyBank'])
+      expect(free?.labelParams.sourceCards).toEqual(['E027_PiggyBank'])
     } else {
       expect(player.improvements).toContain('Major_Joinery')
       expect(player.resources.wood).toBe(2)
@@ -356,7 +356,7 @@ describe('fixed card-purchase cost candidates', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
-    player.occupationPlayed = ['D95_SiteManager']
+    player.occupationPlayed = ['D095_SiteManager']
 
     const result = resolveCardCostWithModifiersDetailed(
       state,
@@ -364,14 +364,14 @@ describe('fixed card-purchase cost candidates', () => {
       'improvement',
       'Major_Joinery',
       { wood: 2, stone: 2 },
-      'D95_SiteManager',
+      'D095_SiteManager',
     )
 
     expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
       { resources: { wood: 2, stone: 2 }, sources: [] },
-      { resources: { wood: 1, stone: 2, food: 1 }, sources: ['D95_SiteManager'] },
-      { resources: { wood: 2, stone: 1, food: 1 }, sources: ['D95_SiteManager'] },
-      { resources: { wood: 1, stone: 1, food: 2 }, sources: ['D95_SiteManager'] },
+      { resources: { wood: 1, stone: 2, food: 1 }, sources: ['D095_SiteManager'] },
+      { resources: { wood: 2, stone: 1, food: 1 }, sources: ['D095_SiteManager'] },
+      { resources: { wood: 1, stone: 1, food: 2 }, sources: ['D095_SiteManager'] },
     ]))
     expect('bonuses' in result.cost).toBe(false)
   })
@@ -383,7 +383,7 @@ describe('fixed card-purchase cost candidates', () => {
       phases: ['computeCosts'],
       actions: ['improvement'],
       deriveCardCostCandidate: (context, candidate) => {
-        if (context.cardId !== 'B65_GrainDepot') return null
+        if (context.cardId !== 'B065_GrainDepot') return null
         if (candidate.originalFeeIndex !== 1) return null
         if (candidate.sources.includes(HOOK_CARD)) return null
         return {
@@ -399,12 +399,12 @@ describe('fixed card-purchase cost candidates', () => {
     const player = createPlayer()
     state.players = [player]
     player.occupationPlayed = [HOOK_CARD]
-    player.minorHand = ['B65_GrainDepot']
+    player.minorHand = ['B065_GrainDepot']
     player.resources.wood = 2
     player.resources.clay = 2
     player.resources.stone = 2
 
-    const request = playImprovement(state, player, 'minor:B65_GrainDepot', 'any')
+    const request = playImprovement(state, player, 'minor:B065_GrainDepot', 'any')
     const options = expectPaymentRequest(request)
     const free = options.find((option) => hasPaidResources(option, {}))
     expect(free?.labelParams.sourceCards).toEqual([HOOK_CARD])
@@ -414,7 +414,7 @@ describe('fixed card-purchase cost candidates', () => {
     expect(result.type).toBe('flow')
     expect(state.pendingFutureMeeples).toEqual([
       expect.objectContaining({
-        cardId: 'B65_GrainDepot',
+        cardId: 'B065_GrainDepot',
         count: 3,
         resources: { grain: 1 },
       }),
@@ -429,7 +429,7 @@ describe('fixed card-purchase cost candidates', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
-    player.minorPlayed = ['A27_OvenSite']
+    player.minorPlayed = ['A027_OvenSite']
     player.occupationPlayed = ['A143_Stonecutter']
 
     const result = resolveCardCostWithModifiersDetailed(
@@ -438,7 +438,7 @@ describe('fixed card-purchase cost candidates', () => {
       'improvement',
       'Major_ClayOven',
       { clay: 3 },
-      'A27_OvenSite',
+      'A027_OvenSite',
     )
     expect(sortedJson(candidateOptions(result).map((row) => row.resources))).toEqual(sortedJson([
       { clay: 1, stone: 1 },
@@ -450,7 +450,7 @@ describe('fixed card-purchase cost candidates', () => {
     const state = createState()
     const player = createPlayer()
     state.players = [player]
-    player.minorPlayed = ['A75_LumberMill']
+    player.minorPlayed = ['A075_LumberMill']
     player.occupationPlayed = ['D117_WoodExpert']
 
     const result = resolveCardCostWithModifiersDetailed(
@@ -462,7 +462,7 @@ describe('fixed card-purchase cost candidates', () => {
     )
     expect(sortedJson(candidateOptions(result))).toEqual(sortedJson([
       { resources: { wood: 2 }, sources: [] },
-      { resources: { wood: 1 }, sources: ['A75_LumberMill'] },
+      { resources: { wood: 1 }, sources: ['A075_LumberMill'] },
       { resources: { food: 1 }, sources: ['D117_WoodExpert'] },
     ]))
   })

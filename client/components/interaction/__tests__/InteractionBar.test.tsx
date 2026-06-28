@@ -1300,7 +1300,7 @@ describe('InteractionBar', () => {
       options: [
         {
           value: 'action-e53-exchange',
-          labelKey: 'cards.E53_BoarSpear.choice',
+          labelKey: 'cards.E053_BoarSpear.choice',
           descriptionPreview: {
             kind: 'action',
             labelKey: 'actions.exchange.description',
@@ -1310,7 +1310,7 @@ describe('InteractionBar', () => {
       ],
       playerIndex: 0,
       spaceId: 'pig-market',
-      sourceCard: 'E53_BoarSpear',
+      sourceCard: 'E053_BoarSpear',
     }
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -1355,7 +1355,7 @@ describe('InteractionBar', () => {
       />,
     )
 
-    expect(html).not.toContain('cards.E53_BoarSpear.choice')
+    expect(html).not.toContain('cards.E053_BoarSpear.choice')
     expect(html).toContain('Optional: Exchange resources')
     expect(html).toContain('Triggered by')
     expect(html).toContain('Boar Spear')
@@ -1728,7 +1728,7 @@ describe('InteractionBar', () => {
       options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
       playerIndex: 0,
       spaceId: 'forest',
-      sourceCard: 'B15_CarpentersBench',
+      sourceCard: 'B015_CarpentersBench',
     }
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -1781,7 +1781,7 @@ describe('InteractionBar', () => {
     const disabledChoice: PendingChoice = {
       promptKey: 'ui.interactionChooseOne',
       options: [
-        { value: 'play', labelKey: 'ui.interactionConfirmButton', disabled: true, disabledReasonKey: 'cards.B3_Moonshine.choicePlayDisabled' },
+        { value: 'play', labelKey: 'ui.interactionConfirmButton', disabled: true, disabledReasonKey: 'cards.B003_Moonshine.choicePlayDisabled' },
         { value: 'pass', labelKey: 'ui.interactionOptionalSkip' },
       ],
       playerIndex: 0,

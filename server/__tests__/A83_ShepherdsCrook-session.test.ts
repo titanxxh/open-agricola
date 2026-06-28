@@ -4,7 +4,7 @@ import { executeCardListener, getRegisteredCardListeners, type CardListenerConte
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-import '../../shared/cards/A/A83_ShepherdsCrook'
+import '../../shared/cards/A/A083_ShepherdsCrook'
 
 const edgesForTwoByTwo = [
   'H-0-1',
@@ -26,7 +26,7 @@ const fenceBuilt = (
   newPastures,
 })
 
-describe('A83_ShepherdsCrook session flow', () => {
+describe('A083_ShepherdsCrook session flow', () => {
   it('uses fence delta in listener context to grant sheep', () => {
     expect(getRegisteredCardListeners().some((entry) => entry.id === 'A83-shepherds-crook-after-fencing')).toBe(true)
     const session = new GameSession()
@@ -35,7 +35,7 @@ describe('A83_ShepherdsCrook session flow', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.minorPlayed.push('A83_ShepherdsCrook')
+    player.minorPlayed.push('A083_ShepherdsCrook')
     player.resources.wood = 10
 
     session.loadState(state)
@@ -64,7 +64,7 @@ describe('A83_ShepherdsCrook session flow', () => {
         ]),
       }),
     ]))
-    expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toMatchObject({
+    expect(readCardResourceStats(resp.state.players[0]!, 'A083_ShepherdsCrook')).toMatchObject({
       paid: {},
       gained: { sheep: 2 },
     })
@@ -77,7 +77,7 @@ describe('A83_ShepherdsCrook session flow', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
-    player.minorPlayed.push('A83_ShepherdsCrook')
+    player.minorPlayed.push('A083_ShepherdsCrook')
     const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }])]
 
     const result = executeCardListener(listener!, {

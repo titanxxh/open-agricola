@@ -13,9 +13,9 @@ import {
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import type { PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B29_CookeryLesson'
+import '../../shared/cards/B/B029_CookeryLesson'
 
-const CARD_ID = 'B29_CookeryLesson'
+const CARD_ID = 'B029_CookeryLesson'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
@@ -24,7 +24,7 @@ const setActionToken = (player: PlayerState, token: number) => {
   recordActionSnapshot(player, token)
 }
 
-describe('B29_CookeryLesson — per-action token tracking, not per-round', () => {
+describe('B029_CookeryLesson — per-action token tracking, not per-round', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

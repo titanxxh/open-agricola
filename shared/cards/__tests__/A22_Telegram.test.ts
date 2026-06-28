@@ -3,9 +3,9 @@ import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest, setPalisadesForTest } from './__fixtures__/fence'
 
-import '../A/A22_Telegram'
+import '../A/A022_Telegram'
 
-const CARD_ID = 'A22_Telegram'
+const CARD_ID = 'A022_Telegram'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -33,12 +33,12 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('A22_Telegram', () => {
+describe('A022_Telegram', () => {
   it('computes target round from fence reserve, excluding palisades and E74-held fences', () => {
     const player = createPlayer()
     setFencesForTest(player, 4)
     setPalisadesForTest(player, 3)
-    player.cardStates = { E74_AshTrees: { counters: { fences: 5 } } }
+    player.cardStates = { E074_AshTrees: { counters: { fences: 5 } } }
     player.supplyTokensConsumed = { fence: 1 }
     const state = createState(player)
     const effect = getCardEffect(CARD_ID)!
@@ -60,7 +60,7 @@ describe('A22_Telegram', () => {
   })
 })
 
-describe('A22_Telegram onBeforeStartOfTurn', () => {
+describe('A022_Telegram onBeforeStartOfTurn', () => {
   const setupTriggerable = () => {
     const player = createPlayer() as PlayerState & { workers?: { id: string; isActive: boolean; isNewborn: boolean }[] }
     player.workers = [

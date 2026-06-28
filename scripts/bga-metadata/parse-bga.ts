@@ -17,6 +17,17 @@ export type BgaCard = {
   banned: boolean
 }
 
+function parseBgaFilenameId(rawId: string): { id: string; deck: string; number: number } {
+  const match = rawId.match(/^([A-E])(\d+)([a-z]?)(_.*)$/)
+  if (!match) {
+    return { id: rawId, deck: rawId[0] ?? '', number: Number(rawId.slice(1).split('_')[0]) }
+  }
+  const [, deck, rawNumber, variant = '', suffix] = match
+  const number = Number(rawNumber)
+  const id = `${deck}${rawNumber!.padStart(3, '0')}${variant}${suffix}`
+  return { id, deck: deck!, number }
+}
+
 const RESOURCE_MAP: Record<string, string> = {
   WOOD: 'wood',
   CLAY: 'clay',
@@ -97,9 +108,7 @@ function unwrapClientTranslate(value: string): string {
 
 export function parseBgaCard(phpPath: string): BgaCard {
   const src = fs.readFileSync(phpPath, 'utf8')
-  const id = path.basename(phpPath, '.php')
-  const deck = id[0]
-  const number = Number(id.slice(1).split('_')[0])
+  const { id, deck, number } = parseBgaFilenameId(path.basename(phpPath, '.php'))
 
   const card: BgaCard = { id, deck, number, banned: false }
 

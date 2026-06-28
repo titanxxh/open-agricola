@@ -4,11 +4,11 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import { familySize } from '../../shared/domain/player'
-import '../../shared/cards/E/E22_GuestRoom'
+import '../../shared/cards/E/E022_GuestRoom'
 
-const CARD_ID = 'E22_GuestRoom'
+const CARD_ID = 'E022_GuestRoom'
 
-describe('E22_GuestRoom session', () => {
+describe('E022_GuestRoom session', () => {
   const setup = (food = 5) => {
     const session = new GameSession()
     const state = session.getState().state

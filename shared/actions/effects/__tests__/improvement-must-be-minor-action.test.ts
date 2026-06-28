@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { playMinorImprovement } from '../improvement'
 
-import '../../../cards/D/D25_WitchesDanceFloor'
+import '../../../cards/D/D025_WitchesDanceFloor'
 
 const createState = (): GameState => ({
   round: 1,
@@ -44,7 +44,7 @@ const createPlayer = (): PlayerState => ({
   roomTiles: [],
   stableTiles: [],
   improvements: [],
-  minorHand: ['D25_WitchesDanceFloor'],
+  minorHand: ['D025_WitchesDanceFloor'],
   minorPlayed: [],
   occupationHand: [],
   occupationPlayed: [],
@@ -68,7 +68,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
     const result = playMinorImprovement(
       state,
       player,
-      'D25_WitchesDanceFloor',
+      'D025_WitchesDanceFloor',
       undefined,
       undefined,
       'cardEffect',
@@ -86,7 +86,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
     const result = playMinorImprovement(
       state,
       player,
-      'D25_WitchesDanceFloor',
+      'D025_WitchesDanceFloor',
       undefined,
       undefined,
       'setup',
@@ -105,7 +105,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
     const result = playMinorImprovement(
       state,
       player,
-      'D25_WitchesDanceFloor',
+      'D025_WitchesDanceFloor',
       undefined,
       undefined,
       'minorAction',

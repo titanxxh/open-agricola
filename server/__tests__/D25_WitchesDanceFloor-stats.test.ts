@@ -1,5 +1,5 @@
 /**
- * D25_WitchesDanceFloor — stats counting for multi-identity card.
+ * D025_WitchesDanceFloor — stats counting for multi-identity card.
  *
  * D25 is simultaneously a minor improvement, an occupation, and the Fireplace
  * major improvement. Existing helpers `countOccupations(player)` already include
@@ -12,7 +12,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { playMinorImprovement } from '../../shared/actions/effects/improvement'
 import { createInitialPlayerStats } from '../../shared/session/stats'
 
-import '../../shared/cards/D/D25_WitchesDanceFloor'
+import '../../shared/cards/D/D025_WitchesDanceFloor'
 
 const createState = (): GameState => ({
   round: 1,
@@ -54,7 +54,7 @@ const createPlayer = (): PlayerState => ({
   roomTiles: [],
   stableTiles: [],
   improvements: [],
-  minorHand: ['D25_WitchesDanceFloor'],
+  minorHand: ['D025_WitchesDanceFloor'],
   minorPlayed: [],
   occupationHand: [],
   occupationPlayed: [],
@@ -84,7 +84,7 @@ describe('D25 stats: multi-identity counting', () => {
     const result = playMinorImprovement(
       state,
       player,
-      'D25_WitchesDanceFloor',
+      'D025_WitchesDanceFloor',
       undefined,
       undefined,
       'minorAction',
@@ -98,29 +98,29 @@ describe('D25 stats: multi-identity counting', () => {
     }
 
     // Played as minor → +1
-    expect(player.minorPlayed).toContain('D25_WitchesDanceFloor')
+    expect(player.minorPlayed).toContain('D025_WitchesDanceFloor')
     expect(player.stats.totalMinorBuilt).toBe(1)
     // Multi-identity: also counted as occupation built → +1
-    expect(player.extraOccupationsFromCards).toContain('D25_WitchesDanceFloor')
+    expect(player.extraOccupationsFromCards).toContain('D025_WitchesDanceFloor')
     expect(player.stats.totalOccupationBuilt).toBe(1)
   })
 
   it('idempotency guard: re-running the providesOccupation branch does not double-count', () => {
     // Simulate the dedup path: extraOccupationsFromCards already contains D25.
     const player = createPlayer()
-    player.minorPlayed.push('D25_WitchesDanceFloor')
-    player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    player.minorPlayed.push('D025_WitchesDanceFloor')
+    player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     player.stats.totalMinorBuilt = 1
     player.stats.totalOccupationBuilt = 1
     // The idempotency guard inside finalizeMinorImprovementPurchase only runs
     // incOccupationBuilt when the card is newly inserted, so re-entering would
     // be a no-op for stats. Verify the invariant holds.
-    if (!player.extraOccupationsFromCards.includes('D25_WitchesDanceFloor')) {
-      player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    if (!player.extraOccupationsFromCards.includes('D025_WitchesDanceFloor')) {
+      player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
       player.stats.totalOccupationBuilt += 1
     }
     expect(
-      player.extraOccupationsFromCards.filter((id) => id === 'D25_WitchesDanceFloor'),
+      player.extraOccupationsFromCards.filter((id) => id === 'D025_WitchesDanceFloor'),
     ).toHaveLength(1)
     expect(player.stats.totalOccupationBuilt).toBe(1)
   })

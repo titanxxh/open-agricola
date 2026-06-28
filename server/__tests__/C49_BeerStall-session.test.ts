@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/C/C49_BeerStall'
+import '../../shared/cards/C/C049_BeerStall'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C49_BeerStall'
+const CARD_ID = 'C049_BeerStall'
 
-describe('C49_BeerStall session', () => {
+describe('C049_BeerStall session', () => {
   it('offers optional exchange when player has grain and empty unfenced stable', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -109,7 +109,7 @@ describe('C49_BeerStall session', () => {
     player.pastures = []
     player.stableAnimals = {}
     player.cardStates = {
-      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+      B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }
 
     session.loadState(state)

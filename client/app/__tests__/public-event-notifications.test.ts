@@ -38,7 +38,7 @@ const clientFixtureMatrix = {
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' },
-      silent: { ...base, id: 'resource-moved-card-animation', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A1_Test' }, to: { kind: 'card', cardId: 'A2_Test' }, reason: 'cardEffect' },
+      silent: { ...base, id: 'resource-moved-card-animation', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'card', cardId: 'A001_Test' }, to: { kind: 'card', cardId: 'A002_Test' }, reason: 'cardEffect' },
     },
   },
   'resource.exchanged': {
@@ -48,7 +48,7 @@ const clientFixtureMatrix = {
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'player', playerId: 'p1' }, paidTo: { kind: 'supply' }, gainedFrom: { kind: 'supply' }, gainedTo: { kind: 'player', playerId: 'p1' } },
-      silent: { ...base, id: 'exchange-card-endpoints', seq: 2, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'card', cardId: 'A1_Test' }, paidTo: { kind: 'card', cardId: 'A2_Test' }, gainedFrom: { kind: 'card', cardId: 'A3_Test' }, gainedTo: { kind: 'roundCard', round: 3 } },
+      silent: { ...base, id: 'exchange-card-endpoints', seq: 2, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, paidFrom: { kind: 'card', cardId: 'A001_Test' }, paidTo: { kind: 'card', cardId: 'A002_Test' }, gainedFrom: { kind: 'card', cardId: 'A003_Test' }, gainedTo: { kind: 'roundCard', round: 3 } },
     },
   },
   'resource.accumulated': {
@@ -58,17 +58,17 @@ const clientFixtureMatrix = {
     },
     highlight: {
       mapped: { ...base, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'actionSpace', spaceId: 'fishing' } },
-      silent: { ...base, id: 'resource-accumulated-card-highlight', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B48_ForestStone' } },
+      silent: { ...base, id: 'resource-accumulated-card-highlight', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B048_ForestStone' } },
     },
     resourceAnimation: {
       mapped: { ...base, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'actionSpace', spaceId: 'fishing' } },
-      silent: { ...base, id: 'resource-accumulated-card-animation', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B48_ForestStone' } },
+      silent: { ...base, id: 'resource-accumulated-card-animation', seq: 2, type: 'resource.accumulated', resources: { food: 1 }, to: { kind: 'card', cardId: 'B048_ForestStone' } },
     },
   },
   'resource.paid': {
     notification: {
       mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
-      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A1_Test'] },
+      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A001_Test'] },
     },
     highlight: {
       mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'room' },
@@ -96,7 +96,7 @@ const clientFixtureMatrix = {
   'farm.sown': {
     highlight: {
       mapped: { ...base, type: 'farm.sown', sows: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', added: 2 }] },
-      silent: { ...base, id: 'sown-card', seq: 2, type: 'farm.sown', sows: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', added: 2 }] },
+      silent: { ...base, id: 'sown-card', seq: 2, type: 'farm.sown', sows: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', added: 2 }] },
     },
   },
   'farm.fieldPlowed': {
@@ -132,19 +132,19 @@ const clientFixtureMatrix = {
   'farm.cropAdded': {
     highlight: {
       mapped: { ...base, type: 'farm.cropAdded', crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
-      silent: { ...base, id: 'crop-added-card', seq: 2, type: 'farm.cropAdded', crops: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
+      silent: { ...base, id: 'crop-added-card', seq: 2, type: 'farm.cropAdded', crops: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
     },
   },
   'farm.cropRemoved': {
     highlight: {
       mapped: { ...base, type: 'farm.cropRemoved', crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: 1 }], reason: 'harvest' },
-      silent: { ...base, id: 'crop-removed-card', seq: 2, type: 'farm.cropRemoved', crops: [{ location: { kind: 'card', cardId: 'A1_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
+      silent: { ...base, id: 'crop-removed-card', seq: 2, type: 'farm.cropRemoved', crops: [{ location: { kind: 'card', cardId: 'A001_Test' }, crop: 'grain', amount: 1 }], reason: 'cardEffect' },
     },
   },
   'card.stackChanged': {
     notification: {
-      mapped: { ...base, type: 'card.stackChanged', cardId: 'C81_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
-      silent: { ...base, id: 'stack-empty', seq: 2, type: 'card.stackChanged', cardId: 'C81_MaterialHub', targetPlayerId: 'p1', resources: {}, reason: 'store' },
+      mapped: { ...base, type: 'card.stackChanged', cardId: 'C081_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
+      silent: { ...base, id: 'stack-empty', seq: 2, type: 'card.stackChanged', cardId: 'C081_MaterialHub', targetPlayerId: 'p1', resources: {}, reason: 'store' },
     },
   },
 } satisfies ClientFixtureMatrix
@@ -185,10 +185,10 @@ describe('public event notifications', () => {
 
   it('maps selected card, future, and worker events to public notifications', () => {
     const events: GameEvent[] = [
-      { ...base, type: 'card.infoboxChanged', cardId: 'B21_HayloftBarn', text: '+2 food', targetPlayerId: 'p1' },
-      { ...base, id: 'evt-2', seq: 2, type: 'card.stackChanged', cardId: 'C81_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
-      { ...base, id: 'evt-3', seq: 3, type: 'card.swappedWithBoard', playerId: 'p1', fromPlayerCardId: 'A1_Test', toPlayerCardId: 'A2_Test' },
-      { ...base, id: 'evt-4', seq: 4, type: 'card.returnedToBoard', playerId: 'p1', cardId: 'A2_Test' },
+      { ...base, type: 'card.infoboxChanged', cardId: 'B021_HayloftBarn', text: '+2 food', targetPlayerId: 'p1' },
+      { ...base, id: 'evt-2', seq: 2, type: 'card.stackChanged', cardId: 'C081_MaterialHub', targetPlayerId: 'p1', resources: { wood: 2 }, delta: 2, reason: 'store' },
+      { ...base, id: 'evt-3', seq: 3, type: 'card.swappedWithBoard', playerId: 'p1', fromPlayerCardId: 'A001_Test', toPlayerCardId: 'A002_Test' },
+      { ...base, id: 'evt-4', seq: 4, type: 'card.returnedToBoard', playerId: 'p1', cardId: 'A002_Test' },
       { ...base, id: 'evt-5', seq: 5, type: 'futureMeeple.removed', playerId: 'p1', cardId: 'B157_Salter', rounds: [3] },
       { ...base, id: 'evt-6', seq: 6, type: 'futureMeeple.resolved', playerId: 'p1', cardId: 'B157_Salter', round: 3, resources: { food: 2 } },
       { ...base, id: 'evt-7', seq: 7, type: 'worker.promoted', playerId: 'p1', workerId: 'w1', from: 'newborn', to: 'adult' },
@@ -206,12 +206,12 @@ describe('public event notifications', () => {
       'future',
       'action',
     ])
-    expect(notifications[0]?.message).toBe('卡牌标记：B21_HayloftBarn：+2 food')
+    expect(notifications[0]?.message).toBe('卡牌标记：B021_HayloftBarn：+2 food')
   })
 
   it('keeps noisy lifecycle and low-level card state events notification-silent', () => {
     const events: GameEvent[] = [
-      { ...base, type: 'card.stateChanged', cardId: 'A1_Test', key: 'used', value: true, targetPlayerId: 'p1' },
+      { ...base, type: 'card.stateChanged', cardId: 'A001_Test', key: 'used', value: true, targetPlayerId: 'p1' },
       { ...base, id: 'evt-2', seq: 2, type: 'work.started' },
       { ...base, id: 'evt-3', seq: 3, type: 'returnHome.started' },
       { ...base, id: 'evt-4', seq: 4, type: 'worker.returned', workers: [{ playerId: 'p1', workerId: 'w1' }], to: 'home' },
@@ -227,7 +227,7 @@ describe('public event notifications', () => {
     const event = {
       ...base,
       type: 'card.stackChanged',
-      cardId: 'C81_MaterialHub',
+      cardId: 'C081_MaterialHub',
       targetPlayerId: 'p1',
       resources: {},
       reason: 'store',
@@ -243,7 +243,7 @@ describe('public event notifications', () => {
       type: 'resource.paid',
       resources: {},
       paymentFor: 'bonus',
-      bonusSources: ['A1_Test'],
+      bonusSources: ['A001_Test'],
     } satisfies GameEvent
 
     expect(publicEventMappingPolicy['resource.paid'].notification.mode).toBe('conditional')
@@ -254,7 +254,7 @@ describe('public event notifications', () => {
     const event = {
       ...base,
       type: 'card.stackChanged',
-      cardId: 'C81_MaterialHub',
+      cardId: 'C081_MaterialHub',
       targetPlayerId: 'p1',
       resources: { wood: 1 },
       delta: -1,
@@ -270,7 +270,7 @@ describe('public event notifications', () => {
   })
 
   it('dedupes repeated public events within a batch', () => {
-    const event = { ...base, type: 'action.exclusiveUseSet', actionId: 'forest', playerId: 'p1', sourceCardId: 'B23_FinalScenario', untilRound: 4 } satisfies GameEvent
+    const event = { ...base, type: 'action.exclusiveUseSet', actionId: 'forest', playerId: 'p1', sourceCardId: 'B023_FinalScenario', untilRound: 4 } satisfies GameEvent
 
     expect(collectPublicEventNotifications([event, event], 'zh')).toHaveLength(1)
   })
@@ -283,7 +283,7 @@ describe('public event notifications', () => {
 
   it('selects only new events after the cursor and resets silently when seq moves backward', () => {
     const oldEvent = { ...base, type: 'action.revealed', actionId: 'round-1', roundSlot: 1 } satisfies GameEvent
-    const newEvent = { ...base, id: 'evt-2', seq: 2, type: 'action.exclusiveUseCleared', actionId: 'forest', playerId: 'p1', sourceCardId: 'B23_FinalScenario' } satisfies GameEvent
+    const newEvent = { ...base, id: 'evt-2', seq: 2, type: 'action.exclusiveUseCleared', actionId: 'forest', playerId: 'p1', sourceCardId: 'B023_FinalScenario' } satisfies GameEvent
 
     expect(collectNewPublicEventNotifications([oldEvent], null, 'en')).toEqual({
       notifications: [],
@@ -401,7 +401,7 @@ describe('public event notifications', () => {
           row: 1,
           col: 1,
           kind: 'special',
-          sourceCardId: 'B85_FarmHand',
+          sourceCardId: 'B085_FarmHand',
         },
       ],
     } satisfies GameEvent
@@ -493,7 +493,7 @@ describe('public event notifications', () => {
       seq: 2,
       type: 'resource.moved',
       resources: { wood: 1 },
-      from: { kind: 'card', cardId: 'A1_Test' },
+      from: { kind: 'card', cardId: 'A001_Test' },
       to: { kind: 'player', playerId: 'p1' },
       reason: 'cardEffect',
     } satisfies GameEvent
@@ -557,13 +557,13 @@ describe('public event notifications', () => {
       seq: 3,
       type: 'resource.accumulated',
       resources: { food: 2 },
-      to: { kind: 'card', playerId: 'p1', cardId: 'B48_ForestStone' },
+      to: { kind: 'card', playerId: 'p1', cardId: 'B048_ForestStone' },
     } satisfies GameEvent
 
     expect(collectPublicEventNotifications([actionAccumulated, resourceSpace, resourceCard], 'en')).toEqual([
       expect.objectContaining({ id: 'evt', kind: 'resource', message: expect.stringContaining('forest') }),
       expect.objectContaining({ id: 'evt-2', kind: 'resource', message: expect.stringContaining('fishing') }),
-      expect.objectContaining({ id: 'evt-3', kind: 'resource', message: expect.stringContaining('B48_ForestStone') }),
+      expect.objectContaining({ id: 'evt-3', kind: 'resource', message: expect.stringContaining('B048_ForestStone') }),
     ])
     expect(collectPublicEventHighlightTargets([actionAccumulated, resourceSpace, resourceCard]).actionIds).toEqual([
       'forest',

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/B/B72_LoveforAgriculture'
+import '../../shared/cards/B/B072_LoveforAgriculture'
 import type { AnimalZone } from '../../shared/domain/animal-zones'
 
 
@@ -45,7 +45,7 @@ const setup = (options?: {
   player.pastures = options?.pastures ?? []
 
   if (options?.withCard ?? true) {
-    player.minorPlayed.push('B72_LoveforAgriculture')
+    player.minorPlayed.push('B072_LoveforAgriculture')
   }
 
   // Set all players' workers to 0 for harvest/round-end tests
@@ -59,7 +59,7 @@ const setup = (options?: {
   return session
 }
 
-describe('B72_LoveforAgriculture session', () => {
+describe('B072_LoveforAgriculture session', () => {
   describe('sow in pasture', () => {
     it('allows sowing grain in a size-1 pasture', () => {
       const session = setup({
@@ -103,7 +103,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.state.players[0]!.resources.grain).toBe(1)
 
       // Pasture crops should be stored in cardStates
-      const cardState = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']
+      const cardState = resp.state.players[0]!.cardStates['B072_LoveforAgriculture']
       expect(cardState?.extraData?.pastureCrops).toBeDefined()
       const crops = cardState?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
@@ -137,7 +137,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.vegetable).toBe(0)
 
-      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
+      const crops = resp.state.players[0]!.cardStates['B072_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].crop).toBe('vegetable')
       expect(crops[0].remaining).toBe(2)
@@ -201,7 +201,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
 
       // Pasture should have grain in cardStates
-      const crops = resp.state.players[0]!.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
+      const crops = resp.state.players[0]!.cardStates['B072_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].crop).toBe('grain')
     })
@@ -262,7 +262,7 @@ describe('B72_LoveforAgriculture session', () => {
       // The pasture should no longer appear as sowable
       const state = session.getState().state
       const player = state.players[0]!
-      const crops = player.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
+      const crops = player.cardStates['B072_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
     })
   })
@@ -287,7 +287,7 @@ describe('B72_LoveforAgriculture session', () => {
       // Manually set sown pasture crops
       const state = session.getState().state
       const player = state.players[0]!
-      player.cardStates['B72_LoveforAgriculture'] = {
+      player.cardStates['B072_LoveforAgriculture'] = {
         extraData: {
           pastureCrops: [
             {
@@ -310,7 +310,7 @@ describe('B72_LoveforAgriculture session', () => {
       // After harvest, grain should have been reaped from pasture
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1)
-      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
+      const crops = playerAfter.cardStates['B072_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(1)
       expect(crops[0].remaining).toBe(2)
     })
@@ -333,7 +333,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       const state = session.getState().state
       const player = state.players[0]!
-      player.cardStates['B72_LoveforAgriculture'] = {
+      player.cardStates['B072_LoveforAgriculture'] = {
         extraData: {
           pastureCrops: [
             {
@@ -354,7 +354,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1)
-      const crops = playerAfter.cardStates['B72_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
+      const crops = playerAfter.cardStates['B072_LoveforAgriculture']?.extraData?.pastureCrops as PastureCrop[]
       expect(crops.length).toBe(0) // exhausted, removed
     })
   })
@@ -376,7 +376,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       const state = session.getState().state
       const player = state.players[0]!
-      player.cardStates['B72_LoveforAgriculture'] = {
+      player.cardStates['B072_LoveforAgriculture'] = {
         extraData: {
           pastureCrops: [
             {
@@ -412,7 +412,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       const state = session.getState().state
       const player = state.players[0]!
-      player.cardStates['B72_LoveforAgriculture'] = {
+      player.cardStates['B072_LoveforAgriculture'] = {
         extraData: {
           pastureCrops: [
             {

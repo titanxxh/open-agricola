@@ -3,9 +3,9 @@ import { buildStableFarmInteraction } from '../../domain/farmyard'
 import { getCardEffect } from '../card-effects'
 import type { PlayerState, Pasture } from '../../contract/types'
 
-import '../A/A1_Shelter'
+import '../A/A001_Shelter'
 
-const CARD_ID = 'A1_Shelter'
+const CARD_ID = 'A001_Shelter'
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
   ({

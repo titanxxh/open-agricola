@@ -6,9 +6,9 @@ import { specialEffectAction } from '../../shared/actions/effects/special-effect
 import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B18_GrasslandHarrow'
+import '../../shared/cards/B/B018_GrasslandHarrow'
 
-const CARD_ID = 'B18_GrasslandHarrow'
+const CARD_ID = 'B018_GrasslandHarrow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({

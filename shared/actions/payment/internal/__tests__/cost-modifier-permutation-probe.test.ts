@@ -32,7 +32,7 @@ import {
 } from './permutation-harness'
 
 describe('unit-trade ordering probes (current impl applies trades in array/order sequence)', () => {
-  // Synthetic trades mirroring D15_ClaySupports (full row replacement: pay
+  // Synthetic trades mirroring D015_ClaySupports (full row replacement: pay
   // 1 wood instead of 3 clay + 1 reed) and B145_BrushwoodCollector
   // (replaceUpTo: pay 1 wood instead of up to 2 reed). Today these cards
   // need order:10 / order:20 to sequence correctly; the probes drop `order`
@@ -162,7 +162,7 @@ describe('card-purchase pipeline ordering probes (current impl folds listeners b
     return feeResourceSet(fees)
   }
 
-  // Mirrors A27_OvenSite-shaped optional fixed price plus A143_Stonecutter
+  // Mirrors A027_OvenSite-shaped optional fixed price plus A143_Stonecutter
   // (stone discount derived from every candidate). Under the closure the
   // fixed row is always reachable for the discount, whatever the ids.
   const fixedPrice: SyntheticCardCostListener = {

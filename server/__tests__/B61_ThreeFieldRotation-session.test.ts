@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/B/B61_ThreeFieldRotation'
+import '../../shared/cards/B/B061_ThreeFieldRotation'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'B61_ThreeFieldRotation'
+const CARD_ID = 'B061_ThreeFieldRotation'
 
-describe('B61_ThreeFieldRotation session', () => {
+describe('B061_ThreeFieldRotation session', () => {
   it('gains 3 food when player has grain field, vegetable field, and empty field', () => {
     const session = new GameSession()
     const state = session.getState().state

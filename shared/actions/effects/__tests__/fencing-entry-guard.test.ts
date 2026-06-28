@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import '../../../cards/B/B38_FutureBuildingSite'
+import '../../../cards/B/B038_FutureBuildingSite'
 import { canStartFencing, maxFences } from '../fencing'
 import { getAllTilePositions, positionKey } from '../../../domain/farm'
 import type { FarmTilePosition, GameState, PlayerState } from '../../../contract/types'
 
-import '../../../cards/E/E16_BriarHedge'
+import '../../../cards/E/E016_BriarHedge'
 
 const fakeState = { actionSpaces: [], players: [] } as unknown as GameState
 
@@ -49,7 +49,7 @@ describe('canStartFencing entry-guard', () => {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
-      minorPlayed: ['E16_BriarHedge'],
+      minorPlayed: ['E016_BriarHedge'],
     })
     expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(true)
   })
@@ -63,7 +63,7 @@ describe('canStartFencing entry-guard', () => {
         wood: 99, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
-      minorPlayed: ['E16_BriarHedge'],
+      minorPlayed: ['E016_BriarHedge'],
       fenceSegments,
     })
     expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(false)
@@ -96,9 +96,9 @@ describe('canStartFencing entry-guard', () => {
       fields: getAllTilePositions()
         .filter((tile) => !occupiedKeys.has(positionKey(tile)))
         .map((tile) => ({ ...tile, stacks: [] })),
-      minorPlayed: ['B38_FutureBuildingSite'],
+      minorPlayed: ['B038_FutureBuildingSite'],
       cardStates: {
-        B38_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
+        B038_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
       },
     })
     const state = { actionSpaces: [], players: [player] } as unknown as GameState

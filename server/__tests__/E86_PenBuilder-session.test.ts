@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/E/E86_PenBuilder'
+import '../../shared/cards/E/E086_PenBuilder'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { AnimalZone } from '../../shared/domain/animal-zones'
 
-describe('E86_PenBuilder session', () => {
+describe('E086_PenBuilder session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -15,9 +15,9 @@ describe('E86_PenBuilder session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('E86_PenBuilder')
+    player.occupationHand.push('E086_PenBuilder')
     session.loadState(state)
-    session.devPlayCard(0, 'E86_PenBuilder')
+    session.devPlayCard(0, 'E086_PenBuilder')
     return session
   }
 
@@ -69,7 +69,7 @@ describe('E86_PenBuilder session', () => {
 
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.wood).toBe(4) // 5 - 1
-    expect(updatedPlayer.cardStates?.['E86_PenBuilder']?.counters?.discards).toBe(1)
+    expect(updatedPlayer.cardStates?.['E086_PenBuilder']?.counters?.discards).toBe(1)
   })
 
   it('can use multiple times (not once per round)', () => {
@@ -85,7 +85,7 @@ describe('E86_PenBuilder session', () => {
     const resp1 = session.takeAnytimeAction(0, 'E86-pen-builder-anytime')
     expect(resp1.ok).toBe(true)
     expect(resp1.state.players[0]!.resources.wood).toBe(4)
-    expect(resp1.state.players[0]!.cardStates?.['E86_PenBuilder']?.counters?.discards).toBe(1)
+    expect(resp1.state.players[0]!.cardStates?.['E086_PenBuilder']?.counters?.discards).toBe(1)
 
     // Second use - should still be available
     const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
@@ -94,13 +94,13 @@ describe('E86_PenBuilder session', () => {
     const resp2 = session.takeAnytimeAction(0, 'E86-pen-builder-anytime')
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.wood).toBe(3)
-    expect(resp2.state.players[0]!.cardStates?.['E86_PenBuilder']?.counters?.discards).toBe(2)
+    expect(resp2.state.players[0]!.cardStates?.['E086_PenBuilder']?.counters?.discards).toBe(2)
 
     // Third use
     const resp3 = session.takeAnytimeAction(0, 'E86-pen-builder-anytime')
     expect(resp3.ok).toBe(true)
     expect(resp3.state.players[0]!.resources.wood).toBe(2)
-    expect(resp3.state.players[0]!.cardStates?.['E86_PenBuilder']?.counters?.discards).toBe(3)
+    expect(resp3.state.players[0]!.cardStates?.['E086_PenBuilder']?.counters?.discards).toBe(3)
   })
 
   it('onComputeAnimalZones adds capacity based on discards', () => {
@@ -112,7 +112,7 @@ describe('E86_PenBuilder session', () => {
 
     // Before any discards - no card zone
     let zones = computeAnimalZones(player)
-    const cardZoneBefore = zones.find((z: InteractionAnimalReorgZone) => z.id === 'card:E86_PenBuilder')
+    const cardZoneBefore = zones.find((z: InteractionAnimalReorgZone) => z.id === 'card:E086_PenBuilder')
     expect(cardZoneBefore).toBeUndefined()
 
     // Enter interaction and discard wood twice
@@ -124,7 +124,7 @@ describe('E86_PenBuilder session', () => {
 
     const updatedPlayer = resp2.state.players[0]!
     zones = computeAnimalZones(updatedPlayer)
-    const cardZone = zones.find((z: AnimalZone) => z.id === 'card:E86_PenBuilder')
+    const cardZone = zones.find((z: AnimalZone) => z.id === 'card:E086_PenBuilder')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(4) // 2 discards * 2 = 4

@@ -17,7 +17,7 @@ const CARD_ID = 'CUSTOM_M3_HarvestHelper'
 //    handler can never fire here.
 //
 // 2. Effect hooks like `onBeforeFeed` exist in the prompt's allowlist (see
-//    shared/cards/E/E30_ChildsToy.ts and E159_OldMiser.ts) but the custom-code
+//    shared/cards/E/E030_ChildsToy.ts and E159_OldMiser.ts) but the custom-code
 //    sandbox JSON-clones `state` / `player` into the V8 isolate, so direct
 //    mutation (`player.resources.food += 1`) does NOT propagate back to the
 //    host state. Mutating effect hooks like `onBeforeFeed` cannot be

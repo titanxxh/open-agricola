@@ -6,9 +6,9 @@ import { createEventQuery } from '../../shared/events/query'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { B21_HayloftBarn_impl } from '../../shared/cards/B/B21_HayloftBarn'
+import { B021_HayloftBarn_impl } from '../../shared/cards/B/B021_HayloftBarn'
 
-const CARD_ID = 'B21_HayloftBarn'
+const CARD_ID = 'B021_HayloftBarn'
 
 const setup = (options?: { foodCount?: number }) => {
   const session = new GameSession()
@@ -35,7 +35,7 @@ const setup = (options?: { foodCount?: number }) => {
   return session
 }
 
-describe('B21_HayloftBarn session', () => {
+describe('B021_HayloftBarn session', () => {
   it('onBuy sets foodCount to 4', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -137,7 +137,7 @@ describe('B21_HayloftBarn session', () => {
       gainedTo: { kind: 'player', playerId: player.id },
       exchangeSource: 'test-grain-exchange',
     }
-    const listener = B21_HayloftBarn_impl.listeners?.find((entry) =>
+    const listener = B021_HayloftBarn_impl.listeners?.find((entry) =>
       entry.id === 'B21-hayloft-barn-after-grain-gain'
     )
 
@@ -189,7 +189,7 @@ describe('B21_HayloftBarn session', () => {
       to: { kind: 'player', playerId: player.id },
       reason: 'gain',
     }
-    const listener = B21_HayloftBarn_impl.listeners?.find((entry) =>
+    const listener = B021_HayloftBarn_impl.listeners?.find((entry) =>
       entry.id === 'B21-hayloft-barn-after-grain-gain'
     )
 

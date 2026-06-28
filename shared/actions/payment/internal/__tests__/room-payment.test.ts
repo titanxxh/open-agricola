@@ -26,7 +26,7 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
   // verify the alternative is enumerated.
   it('D15 ClaySupports multi-key unit trade produces 1-room cost variants', () => {
     const player = makePlayer([{
-      type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+      type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
       scope: 'unit',
       from: { wood: 1 }, to: { clay: 3, reed: 1 },
     }])
@@ -48,7 +48,7 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
   // the row alternative at most once.
   it('D15 unit trade applies at most once per room by default', () => {
     const player = makePlayer([{
-      type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+      type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
       scope: 'unit',
       from: { wood: 1 }, to: { clay: 3, reed: 1 },
     }])
@@ -96,7 +96,7 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
   it('D15 ClaySupports and B145 BrushwoodCollector can stack on one clay room', () => {
     const player = makePlayer([
       {
-        type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+        type: 'trade', cardId: 'D015_ClaySupports', appliesTo: ['construct'],
         scope: 'unit', order: 10, from: { wood: 1 }, to: { clay: 3, reed: 1 },
       },
       {

@@ -3,13 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/D/D65_GrainSieve'
+import '../../shared/cards/D/D065_GrainSieve'
 import type { ActionFlow } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-const CARD_ID = 'D65_GrainSieve'
+const CARD_ID = 'D065_GrainSieve'
 
-describe('D65_GrainSieve session', () => {
+describe('D065_GrainSieve session', () => {
   const setupForHarvest = (options: {
     grainFields?: { row: number; col: number; crop: 'grain'; remaining: number }[]
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]

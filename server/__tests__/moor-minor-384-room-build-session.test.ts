@@ -313,7 +313,7 @@ describe('M091 Routine Work', () => {
 
     expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(true)
 
-    player.minorPlayed = ['A1_Shelter']
+    player.minorPlayed = ['A001_Shelter']
     expect(meetsCardPrerequisites(player, { id: 'M091_RoutineWork', prerequisite: 'No Improvements' }, session.state.round, session.state)).toBe(false)
   })
 

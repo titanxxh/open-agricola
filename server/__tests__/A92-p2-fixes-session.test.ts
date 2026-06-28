@@ -13,10 +13,10 @@ import type { ActionDefinition, ActionSpace } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/A/A092_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
 
-const A92 = 'A92_AdoptiveParents'
+const A92 = 'A092_AdoptiveParents'
 const D134 = 'D134_OysterEater'
 
 const placeholderHands = (state: {

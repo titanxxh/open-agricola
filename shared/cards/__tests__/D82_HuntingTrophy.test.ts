@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
-import { D82_HuntingTrophy_impl } from '../D/D82_HuntingTrophy'
+import { D082_HuntingTrophy_impl } from '../D/D082_HuntingTrophy'
 
-const CARD_ID = 'D82_HuntingTrophy'
+const CARD_ID = 'D082_HuntingTrophy'
 
 const resources = {
   wood: 0,
@@ -96,9 +96,9 @@ const makeContext = (
   }) as CardListenerContext
 
 const findListener = (id: string) =>
-  D82_HuntingTrophy_impl.listeners.find((listener) => listener.id === id)!
+  D082_HuntingTrophy_impl.listeners.find((listener) => listener.id === id)!
 
-describe('D82_HuntingTrophy listeners', () => {
+describe('D082_HuntingTrophy listeners', () => {
   it('place-farmer listeners do not mutate flags or active modifiers', () => {
     const player = createPlayer()
     const before = JSON.stringify({
@@ -106,7 +106,7 @@ describe('D82_HuntingTrophy listeners', () => {
       activeModifiers: player.activeModifiers,
     })
 
-    const placeFarmerListeners = D82_HuntingTrophy_impl.listeners.filter(
+    const placeFarmerListeners = D082_HuntingTrophy_impl.listeners.filter(
       (entry) => entry.actions?.includes('place-farmer'),
     )
     expect(placeFarmerListeners).toHaveLength(0)

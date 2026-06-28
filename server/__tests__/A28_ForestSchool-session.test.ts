@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A28_ForestSchool as A28Card } from '../../shared/cards/A/A28_ForestSchool'
+import { A028_ForestSchool as A28Card } from '../../shared/cards/A/A028_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
-import '../../shared/cards/A/A28_ForestSchool'
+import '../../shared/cards/A/A028_ForestSchool'
 import '../../shared/cards/A/A123_FrameBuilder'
 
 const setup = (withForestSchool: boolean, options?: { playerCount?: number; spaceId?: string }) => {
@@ -25,7 +25,7 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
   player.occupationPlayed = ['D152_Patron']
 
   if (withForestSchool) {
-    player.minorPlayed.push('A28_ForestSchool')
+    player.minorPlayed.push('A028_ForestSchool')
     player.activeModifiers.push({ ...(A28Card.impl.modifiers![0] ?? {}) })
   }
 
@@ -37,7 +37,7 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
   return session
 }
 
-describe('A28_ForestSchool session', () => {
+describe('A028_ForestSchool session', () => {
   it('makes occupied lessons available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)

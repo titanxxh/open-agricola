@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
 import { applyTradeSideEffect } from '../../shared/actions/payment/internal'
 
-import '../../shared/cards/C/C62_CookeryExtension'
+import '../../shared/cards/C/C062_CookeryExtension'
 
-const C62 = 'C62_CookeryExtension'
+const C62 = 'C062_CookeryExtension'
 const FIREPLACE1 = 'Major_Fireplace1'
 const COOKING_HEARTH1 = 'Major_CookingHearth1'
 
@@ -127,8 +127,8 @@ describe('C62 CookeryExtension', () => {
     p1.cardStates![C62]!.extraData!.usedCookeryIds = [FIREPLACE1]
 
     const impl = (
-      await import('../../shared/cards/C/C62_CookeryExtension')
-    ).C62_CookeryExtension_impl
+      await import('../../shared/cards/C/C062_CookeryExtension')
+    ).C062_CookeryExtension_impl
     impl.effect!.onStartHarvest!(state, p1)
     expect(p1.cardStates![C62]!.extraData!.usedCookeryIds).toEqual([])
   })
@@ -161,7 +161,7 @@ describe('C62 + harvest feed integration (simplified)', () => {
   // Note: simplified per plan task 9 fallback. Driving the live
   // confirmHarvestFeed path with derived sourceIds requires
   // game-core.ts:lookupCard() to resolve composite sourceIds (e.g.
-  // 'C62_CookeryExtension::Major_Fireplace1') back to a card; today it only
+  // 'C062_CookeryExtension::Major_Fireplace1') back to a card; today it only
   // looks for sourceId directly in improvements/minorPlayed/occupationPlayed
   // arrays, so derived trades are silently skipped. Rather than expand the
   // main path, this test exercises the trade-application semantics directly:

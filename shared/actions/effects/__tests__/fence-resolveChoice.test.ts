@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import '../../../cards/B/B30_WoodPalisades'
+import '../../../cards/B/B030_WoodPalisades'
 import { fenceAction } from '../fencing'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import { getOwnOrdinaryFenceReserveCount } from '../../../domain/supply-tokens'
@@ -342,7 +342,7 @@ describe('fenceAction.resolveChoice', () => {
           boar: 0,
           cattle: 0,
         },
-        minorPlayed: ['B30_WoodPalisades'],
+        minorPlayed: ['B030_WoodPalisades'],
       },
       actionContext: {
         fencePolicy: { segmentBounds: { total: { max: 3 } } },
@@ -361,7 +361,7 @@ describe('fenceAction.resolveChoice', () => {
 
   it('fails when policy only allows ordinary fences and palisades are submitted', () => {
     const ctx = makeCtx({
-      player: { minorPlayed: ['B30_WoodPalisades'] },
+      player: { minorPlayed: ['B030_WoodPalisades'] },
       actionContext: {
         fencePolicy: { allowedSegmentTypes: ['fence'] },
       },
@@ -680,7 +680,7 @@ describe('fenceAction.resolveChoice', () => {
           to: { wood: 1 },
           max: 3,
           scope: 'action',
-          sourceId: 'D82_HuntingTrophy',
+          sourceId: 'D082_HuntingTrophy',
         }],
       }),
     }
@@ -942,11 +942,11 @@ describe('fenceAction.resolveChoice', () => {
           type: 'fence',
           source: { kind: 'own', ownerPlayerId: 'p1' },
         })),
-        cardStates: { E74_AshTrees: { counters: { fences: 4 } } },
+        cardStates: { E074_AshTrees: { counters: { fences: 4 } } },
       },
     })
     storePendingFenceBonus(ctx.player, {
-      sourceCard: 'E74_AshTrees',
+      sourceCard: 'E074_AshTrees',
       counterKey: 'fences',
       freeFences: 4,
     })

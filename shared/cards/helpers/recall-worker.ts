@@ -19,7 +19,7 @@ type RecallOptions = {
  *
  * Used by:
  * - `recall-placed-worker` ActionDefinition (engine-driven leaf path).
- * - Cards whose onBuy / onHook directly mutates state (E3_TeaTime).
+ * - Cards whose onBuy / onHook directly mutates state (E003_TeaTime).
  */
 export const recallWorkerById = (
   state: GameState,

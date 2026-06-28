@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/D/D96_Furnisher'
+import '../../shared/cards/D/D096_Furnisher'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D96_Furnisher'
+const CARD_ID = 'D096_Furnisher'
 
 const setup = () => {
   const session = new GameSession()
@@ -26,7 +26,7 @@ const setup = () => {
   return session
 }
 
-describe('D96_Furnisher session', () => {
+describe('D096_Furnisher session', () => {
   it('card is registered after devPlayCard', () => {
     const session = setup()
     const state = session.getState().state

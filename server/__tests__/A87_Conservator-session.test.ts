@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/A/A87_Conservator'
+import '../../shared/cards/A/A087_Conservator'
 
-const CARD_ID = 'A87_Conservator'
+const CARD_ID = 'A087_Conservator'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
@@ -37,7 +37,7 @@ const setup = (
   return session
 }
 
-describe('A87_Conservator computeChoiceCandidates listener', () => {
+describe('A087_Conservator computeChoiceCandidates listener', () => {
   it('injects a stone target when wooden house owner takes renovate-house', () => {
     const session = setup({ houseType: 'wood', rooms: 2 })
     const state = session.getState().state
@@ -116,7 +116,7 @@ describe('A87_Conservator computeChoiceCandidates listener', () => {
   })
 })
 
-describe('A87_Conservator isDoable listener', () => {
+describe('A087_Conservator isDoable listener', () => {
   it('rescues entry visibility when wooden owner cannot afford clay tier but can afford stone tier', () => {
     const session = setup({
       houseType: 'wood',
@@ -225,7 +225,7 @@ describe('A87_Conservator isDoable listener', () => {
   })
 })
 
-describe('A87_Conservator session sourceCard', () => {
+describe('A087_Conservator session sourceCard', () => {
   it('does not stamp the whole renovation target prompt with sourceCard when only one option comes from the card', () => {
     const session = setup({
       houseType: 'wood',

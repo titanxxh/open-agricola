@@ -14,14 +14,14 @@ import {
   makeEventTestEngine,
   makeEventTestState,
 } from './event-test-helpers'
-import '../../cards/A/A85_Homekeeper'
+import '../../cards/A/A085_Homekeeper'
 import '../../cards/A/A114_SeasonalWorker'
 import '../../cards/A/A118_Treegardener'
-import '../../cards/B/B49_Scales'
-import '../../cards/B/B82_ValueAssets'
-import '../../cards/D/D42_EducationBonus'
-import '../../cards/E/E89_Stallwright'
-import '../../cards/E/E97_Beneficiary'
+import '../../cards/B/B049_Scales'
+import '../../cards/B/B082_ValueAssets'
+import '../../cards/D/D042_EducationBonus'
+import '../../cards/E/E089_Stallwright'
+import '../../cards/E/E097_Beneficiary'
 
 ensureCatalogLookupsInstalled()
 
@@ -50,11 +50,11 @@ describe('trailing trigger snapshots', () => {
     })
     const state = makeEventTestState()
     const player = state.players[0]!
-    player.occupationPlayed = ['E89_Stallwright']
+    player.occupationPlayed = ['E089_Stallwright']
     const registry = new CardRegistry()
     registry.registerListener({
       id: 'trigger-snapshot-observer',
-      cardIds: ['E89_Stallwright'],
+      cardIds: ['E089_Stallwright'],
       actions: [trigger.id],
       phases: ['after'],
       handler: () => undefined,
@@ -75,7 +75,7 @@ describe('trailing trigger snapshots', () => {
     expect(activation?.params?.triggerSnapshot).toMatchObject({
       players: {
         [player.id]: {
-          occupation: ['E89_Stallwright', 'A114_SeasonalWorker'],
+          occupation: ['E089_Stallwright', 'A114_SeasonalWorker'],
           counts: { occupation: 2 },
         },
       },
@@ -88,17 +88,17 @@ describe('trailing trigger snapshots', () => {
       return { type: 'ok' }
     })
     const appendOccupation = action('append-live-occupation', (context) => {
-      context.player.occupationPlayed.push('E97_Beneficiary')
+      context.player.occupationPlayed.push('E097_Beneficiary')
       return { type: 'ok' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
-    player.occupationPlayed = ['A85_Homekeeper', 'E89_Stallwright']
+    player.occupationPlayed = ['A085_Homekeeper', 'E089_Stallwright']
     const observed: Array<{ snapshot: number; live: number }> = []
     const registry = new CardRegistry()
     registry.registerListener({
       id: 'trigger-snapshot-mutator',
-      cardIds: ['A85_Homekeeper'],
+      cardIds: ['A085_Homekeeper'],
       actions: [trigger.id],
       phases: ['after'],
       order: 10,
@@ -108,7 +108,7 @@ describe('trailing trigger snapshots', () => {
     })
     registry.registerListener({
       id: 'trigger-snapshot-observer',
-      cardIds: ['E89_Stallwright'],
+      cardIds: ['E089_Stallwright'],
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
@@ -137,12 +137,12 @@ describe('trailing trigger snapshots', () => {
     })
     const state = makeEventTestState()
     const player = state.players[0]!
-    player.occupationPlayed = ['A85_Homekeeper']
+    player.occupationPlayed = ['A085_Homekeeper']
     const observed: number[] = []
     const registry = new CardRegistry()
     registry.registerListener({
       id: 'trigger-snapshot-cursor-observer',
-      cardIds: ['A85_Homekeeper'],
+      cardIds: ['A085_Homekeeper'],
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
@@ -156,7 +156,7 @@ describe('trailing trigger snapshots', () => {
     })
 
     const snapshot = engine.snapshot()
-    player.occupationPlayed.push('E97_Beneficiary')
+    player.occupationPlayed.push('E097_Beneficiary')
     const restored = new Engine({
       tree: new EngineTree(new ActionNode('dummy', trigger.id)),
       registry: engine._internals().registry,
@@ -175,18 +175,18 @@ describe('trailing trigger snapshots', () => {
   it('executes matched listeners even if an earlier listener moves the owner card out of its trigger zone', () => {
     const trigger = action('trigger-snapshot-zone-host', () => ({ type: 'ok' }))
     const moveObserver = action('move-observer-card', (context) => {
-      context.player.minorPlayed = context.player.minorPlayed.filter((id) => id !== 'B82_ValueAssets')
-      context.player.minorHand.push('B82_ValueAssets')
+      context.player.minorPlayed = context.player.minorPlayed.filter((id) => id !== 'B082_ValueAssets')
+      context.player.minorHand.push('B082_ValueAssets')
       return { type: 'ok' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
-    player.minorPlayed = ['B49_Scales', 'B82_ValueAssets']
+    player.minorPlayed = ['B049_Scales', 'B082_ValueAssets']
     const seenZones: Array<string | undefined> = []
     const registry = new CardRegistry()
     registry.registerListener({
       id: 'trigger-snapshot-zone-mutator',
-      cardIds: ['B49_Scales'],
+      cardIds: ['B049_Scales'],
       actions: [trigger.id],
       phases: ['after'],
       order: 10,
@@ -196,7 +196,7 @@ describe('trailing trigger snapshots', () => {
     })
     registry.registerListener({
       id: 'trigger-snapshot-zone-observer',
-      cardIds: ['B82_ValueAssets'],
+      cardIds: ['B082_ValueAssets'],
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
@@ -213,7 +213,7 @@ describe('trailing trigger snapshots', () => {
     })
 
     expect(seenZones).toEqual(['played'])
-    expect(player.minorPlayed).not.toContain('B82_ValueAssets')
-    expect(player.minorHand).toContain('B82_ValueAssets')
+    expect(player.minorPlayed).not.toContain('B082_ValueAssets')
+    expect(player.minorHand).toContain('B082_ValueAssets')
   })
 })

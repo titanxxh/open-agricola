@@ -6,7 +6,7 @@ import { playImprovement } from '../../actions/effects/improvement'
 import { getCardEffect } from '../card-effects'
 import { getWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 
-import '../A/A53_Claypipe'
+import '../A/A053_Claypipe'
 import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (): PlayerState => ({
@@ -33,7 +33,7 @@ const createPlayer = (): PlayerState => ({
   roomTiles: [],
   stableTiles: [],
   improvements: [],
-  minorHand: ['A53_Claypipe'],
+  minorHand: ['A053_Claypipe'],
   minorPlayed: [],
   occupationHand: [],
   occupationPlayed: [],houseAnimalType: null,
@@ -88,7 +88,7 @@ const createSpace = (id: string): ActionSpace => ({
   takenBy: [],
 } as ActionSpace)
 
-describe('A53_Claypipe', () => {
+describe('A053_Claypipe', () => {
   it('triggers on return home when 7 building resources were gained before playing it', () => {
     const player = createPlayer()
     const state = createState(player)
@@ -103,21 +103,21 @@ describe('A53_Claypipe', () => {
     expect(gainResult.type).toBe('ok')
     expect(getWorkPhaseBuildingResources(state, player.id)).toBe(7)
 
-    const playResult = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const playResult = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
     expect(playResult.type).toBe('ok')
-    expect(player.minorPlayed).toContain('A53_Claypipe')
-    expect(player.cardStates?.A53_Claypipe?.infobox).toBe('7 / 7')
+    expect(player.minorPlayed).toContain('A053_Claypipe')
+    expect(player.cardStates?.A053_Claypipe?.infobox).toBe('7 / 7')
 
-    const effect = getCardEffect('A53_Claypipe')
+    const effect = getCardEffect('A053_Claypipe')
     expect(effect?.onReturnHome).toBeDefined()
     const flow = effect?.onReturnHome?.(state, player)
     expect(flow).toEqual({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'A53_Claypipe' },
+        { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'A053_Claypipe' },
       ],
     })
-    expect(player.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
+    expect(player.cardStates?.A053_Claypipe?.infobox).toBe('0 / 7')
   })
 
   it('does not trigger on return home when only 6 building resources were gained before playing it', () => {
@@ -134,13 +134,13 @@ describe('A53_Claypipe', () => {
     expect(gainResult.type).toBe('ok')
     expect(getWorkPhaseBuildingResources(state, player.id)).toBe(6)
 
-    const playResult = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const playResult = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
     expect(playResult.type).toBe('ok')
-    expect(player.cardStates?.A53_Claypipe?.infobox).toBe('6 / 7')
+    expect(player.cardStates?.A053_Claypipe?.infobox).toBe('6 / 7')
 
-    const effect = getCardEffect('A53_Claypipe')
+    const effect = getCardEffect('A053_Claypipe')
     const flow = effect?.onReturnHome?.(state, player)
     expect(flow).toBeUndefined()
-    expect(player.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
+    expect(player.cardStates?.A053_Claypipe?.infobox).toBe('0 / 7')
   })
 })

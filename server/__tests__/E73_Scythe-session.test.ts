@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/E/E73_Scythe'
+import '../../shared/cards/E/E073_Scythe'
 import { E112_GrainThief_impl } from '../../shared/cards/E/E112_GrainThief'
 import type { ActionFlow, ActionSpace, Field } from '../../shared/contract/types'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 
-const CARD_ID = 'E73_Scythe'
+const CARD_ID = 'E073_Scythe'
 
 const makeField = (
   row: number,
@@ -25,7 +25,7 @@ const setupSession = () => {
   return { session, state }
 }
 
-describe('E73_Scythe session — token model + reap full stack', () => {
+describe('E073_Scythe session — token model + reap full stack', () => {
   it('triggers when a field has at least 2 crops total (single-stack ≥2)', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
@@ -114,10 +114,10 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     expect(xor.children.length).toBe(2)
 
     const firstChild = xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(firstChild.actionId).toBe('card_E73_Scythe_harvest-field')
+    expect(firstChild.actionId).toBe('card_E073_Scythe_harvest-field')
     expect(firstChild.params).toEqual({ fieldIndex: 0 })
 
-    const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
+    const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
     const result = adHoc.execute({
       state,
       player,
@@ -160,7 +160,7 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     player.resources.vegetable = 0
     session.loadState(state)
 
-    const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
+    const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
     const result = adHoc.execute({
       state,
       player,
@@ -192,7 +192,7 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     player.resources.vegetable = 0
     session.loadState(state)
 
-    const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
+    const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
     const result = adHoc.execute({
       state,
       player,
@@ -223,7 +223,7 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     player.resources.vegetable = 0
     session.loadState(state)
 
-    const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
+    const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
     adHoc.execute({
       state,
       player,

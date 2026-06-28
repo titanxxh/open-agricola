@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
-import '../../shared/cards/A/A50_MilkJug'
+import '../../shared/cards/A/A050_MilkJug'
 
-describe('A50_MilkJug session', () => {
+describe('A050_MilkJug session', () => {
   /**
    * Setup: 2-player game, player 0 owns MilkJug.
    * cattle-market has 1 cattle pre-loaded so the space is usable.
@@ -19,7 +19,7 @@ describe('A50_MilkJug session', () => {
     state.round = 1
 
     const owner = state.players[0]!
-    owner.minorPlayed.push('A50_MilkJug')
+    owner.minorPlayed.push('A050_MilkJug')
     setWorkersAtHome(state, owner, 2)
     owner.resources.food = 0
     // Give pasture so cattle placement works

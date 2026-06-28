@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 
-import '../../shared/cards/E/E83_ShepherdsWhistle'
+import '../../shared/cards/E/E083_ShepherdsWhistle'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E83_ShepherdsWhistle'
+const CARD_ID = 'E083_ShepherdsWhistle'
 
 const setupSession = () => {
   const session = new GameSession()
@@ -16,7 +16,7 @@ const setupSession = () => {
   return { session, state }
 }
 
-describe('E83_ShepherdsWhistle session — reorganize fallback', () => {
+describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
   it('returns gain sheep flow when player has at least 1 empty unfenced stable', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
@@ -54,7 +54,7 @@ describe('E83_ShepherdsWhistle session — reorganize fallback', () => {
     const reorgChild = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
     expect(reorgChild.actionId).toBe('anytime-reorg')
     const checkChild = seq.children[1] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(checkChild.actionId).toBe('card_E83_ShepherdsWhistle_post-reorg-check')
+    expect(checkChild.actionId).toBe('card_E083_ShepherdsWhistle_post-reorg-check')
   })
 
   it('does NOT trigger when player has no unfenced stables at all', () => {
@@ -82,7 +82,7 @@ describe('E83_ShepherdsWhistle session — reorganize fallback', () => {
     player.stableAnimals = { '0-0': 'sheep', '0-1': null }
     session.loadState(state)
 
-    const adHoc = getAdHocAction('card_E83_ShepherdsWhistle_post-reorg-check')!
+    const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!
     const result = adHoc.execute({
       state,
       player,
@@ -105,7 +105,7 @@ describe('E83_ShepherdsWhistle session — reorganize fallback', () => {
     player.stableAnimals = { '0-0': 'sheep' }
     session.loadState(state)
 
-    const adHoc = getAdHocAction('card_E83_ShepherdsWhistle_post-reorg-check')!
+    const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!
     const result = adHoc.execute({
       state,
       player,

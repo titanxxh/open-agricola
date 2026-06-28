@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { Resource } from '../../shared/contract/types'
 
-import '../../shared/cards/E/E78_SleightofHand'
+import '../../shared/cards/E/E078_SleightofHand'
 
-const CARD_ID = 'E78_SleightofHand'
+const CARD_ID = 'E078_SleightofHand'
 
 const setupPlaySession = (resources?: Partial<Resource>) => {
   const session = new GameSession()
@@ -43,7 +43,7 @@ const playUntilBatchPrompt = (session: GameSession) => {
   throw new Error('resource batch prompt not reached')
 }
 
-describe('E78_SleightofHand session', () => {
+describe('E078_SleightofHand session', () => {
   it('onBuy creates one batch exchange request leaf', () => {
     const session = new GameSession()
     const state = session.getState().state

@@ -236,7 +236,7 @@ describe('Farmers of the Moor special actions', () => {
     player.resources.fuel = 1
     player.resources.food = 0
     player.resources.wood = 1
-    player.minorHand = ['E60_WorkingGloves', 'A37_Bucksaw']
+    player.minorHand = ['E060_WorkingGloves', 'A037_Bucksaw']
     session.state.players[1]!.minorHand = ['__test_placeholder__']
     const card = findCardFor(session, 'black-market')
 
@@ -248,14 +248,14 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('choice')
-    const option = resp.interaction.options?.find((entry) => entry.value === 'E60_WorkingGloves')
+    const option = resp.interaction.options?.find((entry) => entry.value === 'E060_WorkingGloves')
     expect(option).toBeDefined()
 
     resp = session.resolveChoice(0, option!.value)
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).not.toContain('E60_WorkingGloves')
-    expect(resp.state.players[0]!.minorPlayed).toContain('E60_WorkingGloves')
+    expect(resp.state.players[0]!.minorHand).not.toContain('E060_WorkingGloves')
+    expect(resp.state.players[0]!.minorPlayed).toContain('E060_WorkingGloves')
     expect(resp.state.players[0]!.resources.food).toBe(1)
   })
 

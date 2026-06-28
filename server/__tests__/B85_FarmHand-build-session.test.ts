@@ -12,7 +12,7 @@ import {
   getFarmHandCandidates,
   getFarmHandStablePositions,
   readFarmHandPosition,
-} from '../../shared/cards/B/B85_FarmHand'
+} from '../../shared/cards/B/B085_FarmHand'
 import { positionKey } from '../../shared/domain/farm'
 import { playerBoard } from '../../shared/domain'
 import type { GameEvent } from '../../shared/contract/events'
@@ -20,11 +20,11 @@ import { runSelectionEffect } from '../../shared/actions/helpers/selection-effec
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 import { EngineStack } from '../../shared/engine'
 
-import '../../shared/cards/B/B85_FarmHand'
+import '../../shared/cards/B/B085_FarmHand'
 import '../../shared/cards/D/D102_SampleStableMaker'
-import '../../shared/cards/E/E76_LumberPile'
+import '../../shared/cards/E/E076_LumberPile'
 
-const CARD_ID = 'B85_FarmHand'
+const CARD_ID = 'B085_FarmHand'
 
 const PLACEHOLDER = ['__test_placeholder__']
 
@@ -256,7 +256,7 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
       player,
       positions: [positionStr],
       cards: [],
-      sourceCard: 'E76_LumberPile',
+      sourceCard: 'E076_LumberPile',
       state,
     })
 
@@ -295,7 +295,7 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
       player,
       positions: [positionStr],
       cards: [],
-      sourceCard: 'E76_LumberPile',
+      sourceCard: 'E076_LumberPile',
       state,
     })
 
@@ -372,7 +372,7 @@ describe('B85 FarmHand — snapshot specialStables display field', () => {
       player,
       positions: [positionKey(FARM_HAND_TILE)],
       cards: [],
-      sourceCard: 'E76_LumberPile',
+      sourceCard: 'E076_LumberPile',
       state: commit.state,
     })
 

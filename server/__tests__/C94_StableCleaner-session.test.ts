@@ -6,11 +6,11 @@ import {
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/C/C94_StableCleaner'
-import '../../shared/cards/C/C88_CarpentersApprentice'
+import '../../shared/cards/C/C094_StableCleaner'
+import '../../shared/cards/C/C088_CarpentersApprentice'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C94_StableCleaner'
+const CARD_ID = 'C094_StableCleaner'
 const LISTENER_ID = 'C94-stable-cleaner-anytime'
 
 const findListener = (id: string) =>
@@ -23,7 +23,7 @@ const findListener = (id: string) =>
  * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
  */
-describe('C94_StableCleaner — exact cost 1 wood + 1 food', () => {
+describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
   const setupContext = (
     resources: { wood?: number; food?: number },
     stableTilesLength = 0,
@@ -77,7 +77,7 @@ describe('C94_StableCleaner — exact cost 1 wood + 1 food', () => {
   it('emits with no wood when a stables cost modifier covers the wood', () => {
     const listener = findListener(LISTENER_ID)!
     const ctx = setupContext({ wood: 0, food: 5 }, 2)
-    ctx.player.occupationPlayed.push('C88_CarpentersApprentice')
+    ctx.player.occupationPlayed.push('C088_CarpentersApprentice')
     const result = executeCardListener(listener, ctx)
     expect(result?.flow).toBeDefined()
   })
@@ -117,7 +117,7 @@ describe('C94_StableCleaner — exact cost 1 wood + 1 food', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID, 'C88_CarpentersApprentice']
+    player.occupationPlayed = [CARD_ID, 'C088_CarpentersApprentice']
     player.resources.food = 1
     player.resources.wood = 0
     player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]

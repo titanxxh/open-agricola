@@ -63,10 +63,10 @@ describe('buildHarvestFeedOptions', () => {
   it('lists harvest-trigger card exchanges (existing behaviour)', () => {
     const player = mkPlayer({
       resources: { ...emptyResources, vegetable: 1 },
-      minorPlayed: ['C59_SchnappsDistillery'],
+      minorPlayed: ['C059_SchnappsDistillery'],
     })
     const options = buildHarvestFeedOptions(player, 'en', cardLabel)
-    expect(options.find((o) => o.sourceId === 'C59_SchnappsDistillery')).toBeDefined()
+    expect(options.find((o) => o.sourceId === 'C059_SchnappsDistillery')).toBeDefined()
   })
 
   it('lists anytime card exchanges (e.g. B104 SheepWalker)', () => {

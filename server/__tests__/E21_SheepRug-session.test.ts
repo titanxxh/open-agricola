@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/domain/player'
-import { E21_SheepRug } from '../../shared/cards/E/E21_SheepRug'
+import { E021_SheepRug } from '../../shared/cards/E/E021_SheepRug'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -33,7 +33,7 @@ const setup = (withSheepRug: boolean) => {
   state.players[1]!.occupationHand = ['__test_placeholder__']
 
   if (withSheepRug) {
-    player.minorPlayed.push('E21_SheepRug')
+    player.minorPlayed.push('E021_SheepRug')
   }
 
   const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
@@ -44,7 +44,7 @@ const setup = (withSheepRug: boolean) => {
   return session
 }
 
-describe('E21_SheepRug session', () => {
+describe('E021_SheepRug session', () => {
   it('makes occupied wish-children available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
@@ -93,7 +93,7 @@ describe('E21_SheepRug session', () => {
       player.houseAnimalType = null
       player.houseAnimalCount = 0
       player.stableAnimals = {}
-      expect(meetsCardPrerequisites(player, E21_SheepRug, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, E021_SheepRug, state.round, state)).toBe(false)
     })
 
     it('allows when player has 4+ sheep on board (in pasture)', () => {
@@ -108,7 +108,7 @@ describe('E21_SheepRug session', () => {
         size: 2,
         stables: 0,
       }]
-      expect(meetsCardPrerequisites(player, E21_SheepRug, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, E021_SheepRug, state.round, state)).toBe(true)
     })
   })
 })

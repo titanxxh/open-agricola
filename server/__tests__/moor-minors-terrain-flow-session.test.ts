@@ -275,7 +275,7 @@ describe('Farmers of the Moor terrain minor cards', () => {
     player.minorPlayed = []
     expect(meetsCardPrerequisites(player, M042_DeepPlow, session.state.round, session.state)).toBe(false)
     player.improvements = ['Major_Well', 'Major_Joinery']
-    player.minorPlayed = ['A37_Bucksaw']
+    player.minorPlayed = ['A037_Bucksaw']
     expect(meetsCardPrerequisites(player, M066_LandParcel, session.state.round, session.state)).toBe(false)
 
     expect(M015_PeatBurnOff.implemented).toBe(true)

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/C/C19_SwingPlow'
+import '../../shared/cards/C/C019_SwingPlow'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
-describe('C19_SwingPlow session', () => {
+describe('C019_SwingPlow session', () => {
   const setup = (stackSize = 4) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -14,9 +14,9 @@ describe('C19_SwingPlow session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorPlayed.push('C19_SwingPlow')
+    player.minorPlayed.push('C019_SwingPlow')
     if (!player.cardStates) player.cardStates = {}
-    player.cardStates['C19_SwingPlow'] = {
+    player.cardStates['C019_SwingPlow'] = {
       stack: Array(stackSize).fill('field'),
     }
 
@@ -27,7 +27,7 @@ describe('C19_SwingPlow session', () => {
   it('stack has 4 field tiles after setup', () => {
     const session = setup()
     const state = session.getState().state
-    const stack = getCardStack(state.players[0]!, 'C19_SwingPlow')
+    const stack = getCardStack(state.players[0]!, 'C019_SwingPlow')
     expect(stack.length).toBe(4)
   })
 
@@ -70,7 +70,7 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Stack should have 2 fields left (4 - 2)
-    const stack = getCardStack(resp.state.players[0]!, 'C19_SwingPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'C019_SwingPlow')
     expect(stack.length).toBe(2)
 
     // Player should have 3 fields (farmland + 2 from card)
@@ -96,7 +96,7 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Stack should have 3 fields left (4 - 1)
-    const stack = getCardStack(resp.state.players[0]!, 'C19_SwingPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'C019_SwingPlow')
     expect(stack.length).toBe(3)
 
     expect(resp.state.players[0]!.fields.length).toBe(2)
@@ -115,7 +115,7 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Stack unchanged
-    const stack = getCardStack(resp.state.players[0]!, 'C19_SwingPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'C019_SwingPlow')
     expect(stack.length).toBe(4)
 
     expect(resp.state.players[0]!.fields.length).toBe(1)
@@ -137,7 +137,7 @@ describe('C19_SwingPlow session', () => {
 
     // Should not get another optional choice (stack is now empty)
     // Action should complete (no second plow offered)
-    const stack = getCardStack(resp.state.players[0]!, 'C19_SwingPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'C019_SwingPlow')
     expect(stack.length).toBe(0)
     expect(resp.state.players[0]!.fields.length).toBe(2)
   })

@@ -3,9 +3,9 @@ import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest, setPalisadesForTest } from './__fixtures__/fence'
 
-import '../A/A47_Trellises'
+import '../A/A047_Trellises'
 
-const CARD_ID = 'A47_Trellises'
+const CARD_ID = 'A047_Trellises'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -33,7 +33,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('A47_Trellises', () => {
+describe('A047_Trellises', () => {
   it('queues future food meeples only for fence count (palisades excluded)', () => {
     const player = createPlayer()
     setFencesForTest(player, 2)

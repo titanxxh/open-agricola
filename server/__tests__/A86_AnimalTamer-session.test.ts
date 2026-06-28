@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/A/A86_AnimalTamer'
+import '../../shared/cards/A/A086_AnimalTamer'
 
-describe('A86_AnimalTamer session', () => {
+describe('A086_AnimalTamer session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,9 +13,9 @@ describe('A86_AnimalTamer session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('A86_AnimalTamer')
+    player.occupationHand.push('A086_AnimalTamer')
     session.loadState(state)
-    session.devPlayCard(0, 'A86_AnimalTamer')
+    session.devPlayCard(0, 'A086_AnimalTamer')
     return session
   }
 
@@ -69,6 +69,6 @@ describe('A86_AnimalTamer session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(player.occupationPlayed).toContain('A86_AnimalTamer')
+    expect(player.occupationPlayed).toContain('A086_AnimalTamer')
   })
 })

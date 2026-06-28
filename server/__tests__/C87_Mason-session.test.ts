@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/C/C87_Mason'
+import '../../shared/cards/C/C087_Mason'
 
-describe('C87_Mason session', () => {
+describe('C087_Mason session', () => {
   const roomTiles = (count: number) =>
     Array.from({ length: count }, (_, col) => ({ row: 0, col }))
 
@@ -17,13 +17,13 @@ describe('C87_Mason session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('C87_Mason')
+    player.occupationHand.push('C087_Mason')
     player.resources.food = 10
     player.houseType = options?.houseType ?? 'stone'
     player.rooms = options?.rooms ?? 4
     player.roomTiles = roomTiles(player.rooms)
     session.loadState(state)
-    session.devPlayCard(0, 'C87_Mason')
+    session.devPlayCard(0, 'C087_Mason')
     return session
   }
 
@@ -54,7 +54,7 @@ describe('C87_Mason session', () => {
     const updatedPlayer = built.state.players[0]!
     expect(updatedPlayer.rooms).toBe(initialRooms + 1)
     expect(updatedPlayer.roomTiles).toContainEqual({ row: 0, col: 4 })
-    expect(isCardFlagged(updatedPlayer, 'C87_Mason')).toBe(true)
+    expect(isCardFlagged(updatedPlayer, 'C087_Mason')).toBe(true)
   })
 
   it('NOT available when houseType is wood', () => {
@@ -103,7 +103,7 @@ describe('C87_Mason session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const hasRoom = readCardExtraData<boolean>(player, 'C87_Mason', 'hasRoom')
+    const hasRoom = readCardExtraData<boolean>(player, 'C087_Mason', 'hasRoom')
     expect(hasRoom).toBe(true)
   })
 })

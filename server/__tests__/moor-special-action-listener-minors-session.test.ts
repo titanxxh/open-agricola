@@ -285,7 +285,7 @@ describe('FoM special action listener minors', () => {
     const { session, player } = setup()
     player.minorPlayed.push('M119_AlderSwamp', 'M122_WillowBank', 'M127_Wheelbarrow')
     player.improvements.push('Major_Well')
-    player.minorPlayed.push('A1_Shelter')
+    player.minorPlayed.push('A001_Shelter')
     session.loadState(session.state)
 
     let resp = takeSpecial(session, 'fell-trees')
@@ -358,7 +358,7 @@ describe('FoM special action listener minors', () => {
 
   it('M121 rewards Hiring Fair only when exactly one worker remains at home and prerequisite is met', () => {
     const { session, player } = setup()
-    player.minorPlayed.push('M121_Loam', 'A1_Shelter')
+    player.minorPlayed.push('M121_Loam', 'A001_Shelter')
     setWorkersAtHome(session.state, player, 1)
     expect(meetsCardPrerequisites(player, M121_Loam, session.state.round, session.state)).toBe(true)
 
@@ -368,7 +368,7 @@ describe('FoM special action listener minors', () => {
     expect(resp.state.players[0]!.resources.clay).toBe(1)
 
     const blocked = setup()
-    blocked.player.minorPlayed.push('M121_Loam', 'A1_Shelter')
+    blocked.player.minorPlayed.push('M121_Loam', 'A001_Shelter')
     setWorkersAtHome(blocked.state, blocked.player, 2)
     resp = takeSpecial(blocked.session, 'hiring-fair')
     expect(resp.ok).toBe(true)

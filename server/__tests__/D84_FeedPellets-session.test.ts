@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/D/D84_FeedPellets'
+import '../../shared/cards/D/D084_FeedPellets'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D84_FeedPellets'
+const CARD_ID = 'D084_FeedPellets'
 
-describe('D84_FeedPellets session', () => {
+describe('D084_FeedPellets session', () => {
   it('onBuy returns gain 1 sheep flow', () => {
     const session = new GameSession()
     const state = session.getState().state

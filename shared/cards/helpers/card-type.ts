@@ -10,8 +10,8 @@ import { getMajorCard } from '../major'
  * Primary type is derived from which catalog the card lives in (majors /
  * minors / occupations). A card additionally "counts as" extra types when its
  * `alsoCountsAs?: CardType[]` list includes that type — used by dual-type
- * cards (D60_LargePottery / D59_EarthOven / A60_OrientalFireplace /
- * D25_WitchesDanceFloor / C60_SmallPottersOven, all minors that also count as
+ * cards (D060_LargePottery / D059_EarthOven / A060_OrientalFireplace /
+ * D025_WitchesDanceFloor / C060_SmallPottersOven, all minors that also count as
  * major for prereq / cookery / baking accounting). Scoring intentionally does
  * NOT call `cardCountsAs` — dual-type minors stay in `player.minorPlayed` and
  * earn their printed VP once.
@@ -112,7 +112,7 @@ export const playerHasCardCapability = (
 
 /**
  * `fireplaceIdentity` query — true for the Major Fireplace cards plus any
- * minor declaring the marker (e.g. D25_WitchesDanceFloor). Used by the
+ * minor declaring the marker (e.g. D025_WitchesDanceFloor). Used by the
  * "return-a-Fireplace" cost slot machinery in payment / improvement so the
  * cost handler does not need to enumerate Major_Fireplace1 / Major_Fireplace2
  * explicitly.
@@ -132,7 +132,7 @@ export const isCookingHearthIdentityCard = (cardId: string): boolean => {
 /**
  * `enablesPalisades` query rolled up to a player — true iff any of the
  * player's played cards declares the marker that unlocks placing wooden
- * palisades on fence edges. Currently only B30_WoodPalisades carries it,
+ * palisades on fence edges. Currently only B030_WoodPalisades carries it,
  * but main-path code must query the marker, not the card id, so future
  * cards with the same ability slot in without further changes.
  */

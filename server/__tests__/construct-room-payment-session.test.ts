@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
@@ -155,9 +155,9 @@ describe('construct room payment session', () => {
       wood: 8,
       reed: 2,
     }
-    player.minorPlayed.push('A14_CarpentersHammer')
+    player.minorPlayed.push('A014_CarpentersHammer')
     player.activeModifiers = [
-      ...(A14_CarpentersHammer.impl.modifiers ?? []),
+      ...(A014_CarpentersHammer.impl.modifiers ?? []),
     ]
 
     session.loadState(state)

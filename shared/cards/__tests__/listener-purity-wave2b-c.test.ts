@@ -4,46 +4,46 @@ import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 import { storePendingFenceBonus } from '../helpers/pending-fence-bonus'
-import { A68_AsparagusGift_impl } from '../A/A68_AsparagusGift'
-import { A73_AgriculturalFertilizers_impl } from '../A/A73_AgriculturalFertilizers'
-import { A92_AdoptiveParents_impl } from '../A/A92_AdoptiveParents'
-import { B18_GrasslandHarrow_impl } from '../B/B18_GrasslandHarrow'
-import { B34_SpecialFood_impl } from '../B/B34_SpecialFood'
-import { B76_Ceilings_impl } from '../B/B76_Ceilings'
-import { C48_Farmstead_impl } from '../C/C48_Farmstead'
-import { C53_GypsysCrock_impl } from '../C/C53_GypsysCrock'
-import { C93_InnerDistrictsDirector_impl } from '../C/C93_InnerDistrictsDirector'
+import { A068_AsparagusGift_impl } from '../A/A068_AsparagusGift'
+import { A073_AgriculturalFertilizers_impl } from '../A/A073_AgriculturalFertilizers'
+import { A092_AdoptiveParents_impl } from '../A/A092_AdoptiveParents'
+import { B018_GrasslandHarrow_impl } from '../B/B018_GrasslandHarrow'
+import { B034_SpecialFood_impl } from '../B/B034_SpecialFood'
+import { B076_Ceilings_impl } from '../B/B076_Ceilings'
+import { C048_Farmstead_impl } from '../C/C048_Farmstead'
+import { C053_GypsysCrock_impl } from '../C/C053_GypsysCrock'
+import { C093_InnerDistrictsDirector_impl } from '../C/C093_InnerDistrictsDirector'
 import { C130_OutskirtsDirector_impl } from '../C/C130_OutskirtsDirector'
 import { C150_ParrotBreeder_impl } from '../C/C150_ParrotBreeder'
-import { D36_BreedRegistry_impl } from '../D/D36_BreedRegistry'
-import { D56_FatstockStretcher_impl } from '../D/D56_FatstockStretcher'
-import { D74_RoyalWood_impl } from '../D/D74_RoyalWood'
+import { D036_BreedRegistry_impl } from '../D/D036_BreedRegistry'
+import { D056_FatstockStretcher_impl } from '../D/D056_FatstockStretcher'
+import { D074_RoyalWood_impl } from '../D/D074_RoyalWood'
 import { D158_BeanCounter_impl } from '../D/D158_BeanCounter'
-import { E53_BoarSpear_impl } from '../E/E53_BoarSpear'
-import { E74_AshTrees_impl } from '../E/E74_AshTrees'
-import { E85_MasterTanner_impl } from '../E/E85_MasterTanner'
+import { E053_BoarSpear_impl } from '../E/E053_BoarSpear'
+import { E074_AshTrees_impl } from '../E/E074_AshTrees'
+import { E085_MasterTanner_impl } from '../E/E085_MasterTanner'
 import { E148_Lazybones_impl } from '../E/E148_Lazybones'
 
 const TARGETS = [
-  'A68_AsparagusGift',
-  'A73_AgriculturalFertilizers',
-  'A92_AdoptiveParents',
-  'B18_GrasslandHarrow',
-  'B34_SpecialFood',
-  'B76_Ceilings',
-  'C48_Farmstead',
-  'C53_GypsysCrock',
-  'C88_CarpentersApprentice',
-  'C93_InnerDistrictsDirector',
+  'A068_AsparagusGift',
+  'A073_AgriculturalFertilizers',
+  'A092_AdoptiveParents',
+  'B018_GrasslandHarrow',
+  'B034_SpecialFood',
+  'B076_Ceilings',
+  'C048_Farmstead',
+  'C053_GypsysCrock',
+  'C088_CarpentersApprentice',
+  'C093_InnerDistrictsDirector',
   'C130_OutskirtsDirector',
   'C150_ParrotBreeder',
-  'D36_BreedRegistry',
-  'D56_FatstockStretcher',
-  'D74_RoyalWood',
+  'D036_BreedRegistry',
+  'D056_FatstockStretcher',
+  'D074_RoyalWood',
   'D158_BeanCounter',
-  'E53_BoarSpear',
-  'E74_AshTrees',
-  'E85_MasterTanner',
+  'E053_BoarSpear',
+  'E074_AshTrees',
+  'E085_MasterTanner',
   'E148_Lazybones',
 ] as const
 
@@ -250,64 +250,64 @@ const firstLeaf = (flow: ActionFlow | undefined): LeafFlow | undefined => {
 describe('listener purity wave 2b/c', () => {
   it('covers every remaining Wave2b/c target named in the plan', () => {
     expect(TARGETS).toEqual([
-      'A68_AsparagusGift',
-      'A73_AgriculturalFertilizers',
-      'A92_AdoptiveParents',
-      'B18_GrasslandHarrow',
-      'B34_SpecialFood',
-      'B76_Ceilings',
-      'C48_Farmstead',
-      'C53_GypsysCrock',
-      'C88_CarpentersApprentice',
-      'C93_InnerDistrictsDirector',
+      'A068_AsparagusGift',
+      'A073_AgriculturalFertilizers',
+      'A092_AdoptiveParents',
+      'B018_GrasslandHarrow',
+      'B034_SpecialFood',
+      'B076_Ceilings',
+      'C048_Farmstead',
+      'C053_GypsysCrock',
+      'C088_CarpentersApprentice',
+      'C093_InnerDistrictsDirector',
       'C130_OutskirtsDirector',
       'C150_ParrotBreeder',
-      'D36_BreedRegistry',
-      'D56_FatstockStretcher',
-      'D74_RoyalWood',
+      'D036_BreedRegistry',
+      'D056_FatstockStretcher',
+      'D074_RoyalWood',
       'D158_BeanCounter',
-      'E53_BoarSpear',
-      'E74_AshTrees',
-      'E85_MasterTanner',
+      'E053_BoarSpear',
+      'E074_AshTrees',
+      'E085_MasterTanner',
       'E148_Lazybones',
     ])
   })
 
   it('A68 AsparagusGift before-fencing snapshots fence count by flow only', () => {
-    const p = player('A68_AsparagusGift', {
+    const p = player('A068_AsparagusGift', {
       fenceSegments: [{ type: 'fence', from: { row: 0, col: 0 }, to: { row: 0, col: 1 } }],
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A68_AsparagusGift_impl.listeners, 'A68-asparagus-gift-before-fencing')
+    const result = listenerById(A068_AsparagusGift_impl.listeners, 'A68-asparagus-gift-before-fencing')
       .handler(context(p, { state: game, actionId: 'fence', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'A68_AsparagusGift',
+      sourceCard: 'A068_AsparagusGift',
       params: { kind: 'set-extra-data', key: 'fencesBefore' },
     })
   })
 
   it('A73 AgriculturalFertilizers before-action snapshots used spaces by flow only', () => {
-    const p = player('A73_AgriculturalFertilizers', {
+    const p = player('A073_AgriculturalFertilizers', {
       roomTiles: [{ row: 0, col: 0 }],
       fields: [{ row: 0, col: 1, stacks: [] }],
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A73_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-before')
+    const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-before')
       .handler(context(p, { state: game, actionId: 'construct', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'A73_AgriculturalFertilizers',
+      sourceCard: 'A073_AgriculturalFertilizers',
       params: { kind: 'set-extra-data', key: 'spacesBefore' },
     })
   })
@@ -316,7 +316,7 @@ describe('listener purity wave 2b/c', () => {
   // (capability A) plus a `contributeExtraTurn` effect hook (capability B). The
   // old before/after/immediatelyAfter push listeners are gone.
   it('A92 AdoptiveParents anytime grow-only returns a pay+promote seq without mutating state', () => {
-    const p = player('A92_AdoptiveParents', {
+    const p = player('A092_AdoptiveParents', {
       workers: [
         { id: '1', isActive: true, isNewborn: false },
         { id: '2', isActive: true, isNewborn: true },
@@ -326,7 +326,7 @@ describe('listener purity wave 2b/c', () => {
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
+    const result = listenerById(A092_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
       .handler(context(p, { state: game, actionId: 'anytime', phase: 'anytime' }))
 
     expectUnchanged(before, game)
@@ -335,11 +335,11 @@ describe('listener purity wave 2b/c', () => {
   })
 
   it('A92 AdoptiveParents anytime grow-only returns void without a newborn', () => {
-    const p = player('A92_AdoptiveParents', { resources: resource({ food: 3 }) })
+    const p = player('A092_AdoptiveParents', { resources: resource({ food: 3 }) })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
+    const result = listenerById(A092_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-anytime-grow')
       .handler(context(p, { state: game, actionId: 'anytime', phase: 'anytime' }))
 
     expectUnchanged(before, game)
@@ -347,7 +347,7 @@ describe('listener purity wave 2b/c', () => {
   })
 
   it('A92 AdoptiveParents contributeExtraTurn returns an XOR without mutating state', () => {
-    const p = player('A92_AdoptiveParents', {
+    const p = player('A092_AdoptiveParents', {
       workers: [
         { id: '1', isActive: true, isNewborn: false },
         { id: '2', isActive: true, isNewborn: true },
@@ -357,163 +357,163 @@ describe('listener purity wave 2b/c', () => {
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const flow = A92_AdoptiveParents_impl.effect!.contributeExtraTurn!(game, p)
+    const flow = A092_AdoptiveParents_impl.effect!.contributeExtraTurn!(game, p)
 
     expectUnchanged(before, game)
     expect(flow?.type).toBe('xor')
   })
 
   it('B18 GrasslandHarrow queues target round and future meeple lazily', () => {
-    const p = player('B18_GrasslandHarrow', {
+    const p = player('B018_GrasslandHarrow', {
       resources: resource({ wood: 2, clay: 1 }),
     })
     const game = state([p], { round: 4 })
     const before = stateSnapshot(game)
 
-    const result = listenerById(B18_GrasslandHarrow_impl.listeners, 'B18-grassland-harrow-after-pay')
-      .handler(context(p, { state: game, actionId: 'pay', phase: 'after', sourceCard: 'B18_GrasslandHarrow' }))
+    const result = listenerById(B018_GrasslandHarrow_impl.listeners, 'B18-grassland-harrow-after-pay')
+      .handler(context(p, { state: game, actionId: 'pay', phase: 'after', sourceCard: 'B018_GrasslandHarrow' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'future-meeples',
-      sourceCard: 'B18_GrasslandHarrow',
-      params: { __futureMeepleRequest: { cardId: 'B18_GrasslandHarrow', playerId: p.id } },
+      sourceCard: 'B018_GrasslandHarrow',
+      params: { __futureMeepleRequest: { cardId: 'B018_GrasslandHarrow', playerId: p.id } },
     })
   })
 
   it('B34 SpecialFood before-collect stores animal snapshot by flow only', () => {
-    const p = player('B34_SpecialFood', {
+    const p = player('B034_SpecialFood', {
       houseAnimalType: 'sheep',
       houseAnimalCount: 1,
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(B34_SpecialFood_impl.listeners, 'B34-special-food-before-collect')
+    const result = listenerById(B034_SpecialFood_impl.listeners, 'B34-special-food-before-collect')
       .handler(context(p, { state: game, actionId: 'collect', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'B34_SpecialFood',
+      sourceCard: 'B034_SpecialFood',
       params: { kind: 'set-extra-data', key: 'animalsBeforeCollecting' },
     })
   })
 
   it('B76 Ceilings removes future meeples and sets flag by flow only', () => {
-    const p = player('B76_Ceilings')
+    const p = player('B076_Ceilings')
     const game = state([p], {
-      futureMeeples: [{ id: 'b76-1', cardId: 'B76_Ceilings', playerId: p.id, round: 4, actionId: 'forest', resources: { wood: 1 } }],
+      futureMeeples: [{ id: 'b76-1', cardId: 'B076_Ceilings', playerId: p.id, round: 4, actionId: 'forest', resources: { wood: 1 } }],
     })
     const before = stateSnapshot(game)
 
-    const result = listenerById(B76_Ceilings_impl.listeners, 'B76-ceilings-after-renovation')
+    const result = listenerById(B076_Ceilings_impl.listeners, 'B76-ceilings-after-renovation')
       .handler(context(p, { state: game, actionId: 'renovate-house', phase: 'after' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'B76_Ceilings', params: { kind: 'remove-future-meeples' } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'B76_Ceilings', params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'B076_Ceilings', params: { kind: 'remove-future-meeples' } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'B076_Ceilings', params: { kind: 'set-flag', flag: true } },
       ],
     })
   })
 
   it('C48 Farmstead before-place-farmer snapshots used tiles by flow only', () => {
-    const p = player('C48_Farmstead', { roomTiles: [{ row: 0, col: 0 }] })
+    const p = player('C048_Farmstead', { roomTiles: [{ row: 0, col: 0 }] })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(C48_Farmstead_impl.listeners, 'C48-farmstead-before-place-farmer')
+    const result = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-before-place-farmer')
       .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'C48_Farmstead',
+      sourceCard: 'C048_Farmstead',
       params: { kind: 'set-extra-data', key: 'usedTilesBefore' },
     })
   })
 
   it('C48 Farmstead after-place-farmer clears snapshot through flow before reward', () => {
-    const p = player('C48_Farmstead', {
+    const p = player('C048_Farmstead', {
       roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-      cardStates: { C48_Farmstead: { extraData: { usedTilesBefore: 1 } } },
+      cardStates: { C048_Farmstead: { extraData: { usedTilesBefore: 1 } } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(C48_Farmstead_impl.listeners, 'C48-farmstead-after-place-farmer')
+    const result = listenerById(C048_Farmstead_impl.listeners, 'C48-farmstead-after-place-farmer')
       .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'after' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C48_Farmstead', params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined } },
-        { type: 'leaf', actionId: 'gain', sourceCard: 'C48_Farmstead', params: { food: 1 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C048_Farmstead', params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined } },
+        { type: 'leaf', actionId: 'gain', sourceCard: 'C048_Farmstead', params: { food: 1 } },
       ],
     })
   })
 
   it('C53 GypsysCrock trade-applied increments cooked counter by flow only', () => {
-    const p = player('C53_GypsysCrock', {
-      cardStates: { C53_GypsysCrock: { extraData: { cookedCount: 1 } } },
+    const p = player('C053_GypsysCrock', {
+      cardStates: { C053_GypsysCrock: { extraData: { cookedCount: 1 } } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(C53_GypsysCrock_impl.listeners, 'C53-gypsys-crock-trade-applied')
+    const result = listenerById(C053_GypsysCrock_impl.listeners, 'C53-gypsys-crock-trade-applied')
       .handler(context(p, { state: game, actionId: 'trade-applied', phase: 'immediatelyAfter', extraData: { sourceId: 'Major_Fireplace1', times: 2 } }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'C53_GypsysCrock',
+      sourceCard: 'C053_GypsysCrock',
       params: { kind: 'set-extra-data', key: 'cookedCount', value: 3 },
     })
   })
 
   it('C53 GypsysCrock after-exchange resets cooked counter by flow before gain', () => {
-    const p = player('C53_GypsysCrock', {
-      cardStates: { C53_GypsysCrock: { extraData: { cookedCount: 3 } } },
+    const p = player('C053_GypsysCrock', {
+      cardStates: { C053_GypsysCrock: { extraData: { cookedCount: 3 } } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(C53_GypsysCrock_impl.listeners, 'C53-gypsys-crock-after-exchange')
+    const result = listenerById(C053_GypsysCrock_impl.listeners, 'C53-gypsys-crock-after-exchange')
       .handler(context(p, { state: game, actionId: 'exchange', phase: 'after' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C53_GypsysCrock', params: { kind: 'set-extra-data', key: 'cookedCount', value: 0 } },
-        { type: 'leaf', actionId: 'gain', sourceCard: 'C53_GypsysCrock', params: { food: 1 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'C053_GypsysCrock', params: { kind: 'set-extra-data', key: 'cookedCount', value: 0 } },
+        { type: 'leaf', actionId: 'gain', sourceCard: 'C053_GypsysCrock', params: { food: 1 } },
       ],
     })
   })
 
   it('C93 InnerDistrictsDirector adds stone to paired space by flow only', () => {
-    const p = player('C93_InnerDistrictsDirector')
+    const p = player('C093_InnerDistrictsDirector')
     const forest = space('forest', { takenBy: [{ playerId: p.id, workerId: '1' }] })
     const clayPit = space('clay-pit')
     const game = state([p], { actionSpaces: [forest, clayPit] })
     const before = stateSnapshot(game)
 
-    const result = listenerById(C93_InnerDistrictsDirector_impl.listeners, 'C93-inner-districts-director-after-place-farmer')
+    const result = listenerById(C093_InnerDistrictsDirector_impl.listeners, 'C93-inner-districts-director-after-place-farmer')
       .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'after', space: forest }))
 
     expectUnchanged(before, game)
     expect(firstLeaf(result?.flow)).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'C93_InnerDistrictsDirector',
+      sourceCard: 'C093_InnerDistrictsDirector',
       params: { kind: 'add-resource-to-space', spaceId: 'clay-pit', resource: 'stone', amount: 1 },
     })
   })
@@ -638,14 +638,14 @@ describe('listener purity wave 2b/c', () => {
   })
 
   it('D36 BreedRegistry after-collect stores sheep counter and infobox by flow only', () => {
-    const p = player('D36_BreedRegistry', {
-      cardStates: { D36_BreedRegistry: { extraData: { boardSheep: 1 }, infobox: '1 / 2' } },
+    const p = player('D036_BreedRegistry', {
+      cardStates: { D036_BreedRegistry: { extraData: { boardSheep: 1 }, infobox: '1 / 2' } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
     const actionEvents = [movedToPlayer({ sheep: 1 }, p.id)]
-    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-sheep-gain')
+    const result = listenerById(D036_BreedRegistry_impl.listeners, 'D36-breed-registry-after-sheep-gain')
       .handler(context(p, {
         state: game,
         actionId: 'collect',
@@ -660,19 +660,19 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D36_BreedRegistry', params: { kind: 'set-extra-data', key: 'boardSheep', value: 2 } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D36_BreedRegistry', params: { kind: 'set-infobox', text: '2 / 2' } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D036_BreedRegistry', params: { kind: 'set-extra-data', key: 'boardSheep', value: 2 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D036_BreedRegistry', params: { kind: 'set-infobox', text: '2 / 2' } },
       ],
     })
   })
 
   it('D36 BreedRegistry after-exchange marks sheep conversion by flow only', () => {
-    const p = player('D36_BreedRegistry', { resources: resource({ sheep: 2 }) })
+    const p = player('D036_BreedRegistry', { resources: resource({ sheep: 2 }) })
     const game = state([p])
     const before = stateSnapshot(game)
     const actionEvents = [exchangedByPlayer({ sheep: 1 }, { food: 2 }, p.id)]
 
-    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-exchange-sheep-conversion')
+    const result = listenerById(D036_BreedRegistry_impl.listeners, 'D36-breed-registry-after-exchange-sheep-conversion')
       .handler(context(p, {
         state: game,
         actionId: 'exchange',
@@ -685,39 +685,39 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'D36_BreedRegistry',
+      sourceCard: 'D036_BreedRegistry',
       params: { kind: 'set-extra-data', key: 'sheepConvertedToFood', value: true },
     })
   })
 
   it('D56 FatstockStretcher before-exchange snapshots animals by flow only', () => {
-    const p = player('D56_FatstockStretcher', { resources: resource({ sheep: 2, boar: 1 }) })
+    const p = player('D056_FatstockStretcher', { resources: resource({ sheep: 2, boar: 1 }) })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(D56_FatstockStretcher_impl.listeners, 'D56-fatstock-stretcher-before-exchange')
+    const result = listenerById(D056_FatstockStretcher_impl.listeners, 'D56-fatstock-stretcher-before-exchange')
       .handler(context(p, { state: game, actionId: 'exchange', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D56_FatstockStretcher', params: { kind: 'set-extra-data', key: 'sheepBefore', value: 2 } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D56_FatstockStretcher', params: { kind: 'set-extra-data', key: 'boarBefore', value: 1 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D056_FatstockStretcher', params: { kind: 'set-extra-data', key: 'sheepBefore', value: 2 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D056_FatstockStretcher', params: { kind: 'set-extra-data', key: 'boarBefore', value: 1 } },
       ],
     })
   })
 
   it('D74 RoyalWood after construct accumulates wood spent by flow only', () => {
-    const p = player('D74_RoyalWood', {
+    const p = player('D074_RoyalWood', {
       resources: resource({ wood: 5 }),
-      cardStates: { D74_RoyalWood: { extraData: { woodSpent: 1 } } },
+      cardStates: { D074_RoyalWood: { extraData: { woodSpent: 1 } } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
     const actionEvents = [paidByPlayer({ wood: 2 }, 'construct', p.id)]
 
-    const result = listenerById(D74_RoyalWood_impl.listeners, 'D74-royal-wood-after')
+    const result = listenerById(D074_RoyalWood_impl.listeners, 'D74-royal-wood-after')
       .handler(context(p, {
         state: game,
         actionId: 'construct',
@@ -730,20 +730,20 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'D74_RoyalWood',
+      sourceCard: 'D074_RoyalWood',
       params: { kind: 'set-extra-data', key: 'woodSpent', value: 3 },
     })
   })
 
   it('D74 RoyalWood after-pay accumulates wood spent by flow only', () => {
-    const p = player('D74_RoyalWood', {
-      cardStates: { D74_RoyalWood: { extraData: { woodSpent: 1 } } },
+    const p = player('D074_RoyalWood', {
+      cardStates: { D074_RoyalWood: { extraData: { woodSpent: 1 } } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
     const actionEvents = [paidByPlayer({ wood: 2 }, 'minor-improvement', p.id)]
 
-    const result = listenerById(D74_RoyalWood_impl.listeners, 'D74-royal-wood-after-pay')
+    const result = listenerById(D074_RoyalWood_impl.listeners, 'D74-royal-wood-after-pay')
       .handler(context(p, {
         state: game,
         actionId: 'pay',
@@ -758,7 +758,7 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'D74_RoyalWood',
+      sourceCard: 'D074_RoyalWood',
       params: { kind: 'set-extra-data', key: 'woodSpent', value: 3 },
     })
   })
@@ -783,13 +783,13 @@ describe('listener purity wave 2b/c', () => {
   })
 
   it('E53 BoarSpear marks used token by flow before optional exchange', () => {
-    const p = player('E53_BoarSpear')
+    const p = player('E053_BoarSpear')
     recordActionSnapshot(p, 11)
     const game = state([p], { roundPhase: 'work' })
     const before = stateSnapshot(game)
     const actionEvents = [movedToPlayer({ boar: 1 }, p.id, { kind: 'actionSpace', spaceId: 'boar-market' })]
 
-    const result = listenerById(E53_BoarSpear_impl.listeners, 'E53-boar-spear-after-obtain')
+    const result = listenerById(E053_BoarSpear_impl.listeners, 'E53-boar-spear-after-obtain')
       .handler(context(p, {
         state: game,
         actionId: 'collect',
@@ -803,47 +803,47 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E53_BoarSpear', params: { kind: 'set-extra-data', key: 'E53UsedActionToken', value: 11 } },
-        { type: 'leaf', actionId: 'exchange', sourceCard: 'E53_BoarSpear' },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E053_BoarSpear', params: { kind: 'set-extra-data', key: 'E53UsedActionToken', value: 11 } },
+        { type: 'leaf', actionId: 'exchange', sourceCard: 'E053_BoarSpear' },
       ],
     })
   })
 
   it('E74 AshTrees after-fence clears pending bonus and refreshes infobox by flow only', () => {
-    const p = player('E74_AshTrees', {
-      cardStates: { E74_AshTrees: { counters: { fences: 3 }, infobox: 'stale' } },
+    const p = player('E074_AshTrees', {
+      cardStates: { E074_AshTrees: { counters: { fences: 3 }, infobox: 'stale' } },
     })
-    storePendingFenceBonus(p, { sourceCard: 'E74_AshTrees', counterKey: 'fences', freeFences: 2 })
+    storePendingFenceBonus(p, { sourceCard: 'E074_AshTrees', counterKey: 'fences', freeFences: 2 })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(E74_AshTrees_impl.listeners, 'E74-ash-trees-after-fence')
+    const result = listenerById(E074_AshTrees_impl.listeners, 'E74-ash-trees-after-fence')
       .handler(context(p, { state: game, actionId: 'fence', phase: 'after' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E74_AshTrees', params: { kind: 'clear-pending-fence-bonus' } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E74_AshTrees', params: { kind: 'set-infobox', text: '3 / 5' } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E074_AshTrees', params: { kind: 'clear-pending-fence-bonus' } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E074_AshTrees', params: { kind: 'set-infobox', text: '3 / 5' } },
       ],
     })
   })
 
   it('E85 MasterTanner before-exchange snapshots animals by flow only', () => {
-    const p = player('E85_MasterTanner', { resources: resource({ boar: 2, cattle: 1 }) })
+    const p = player('E085_MasterTanner', { resources: resource({ boar: 2, cattle: 1 }) })
     const game = state([p])
     const before = stateSnapshot(game)
 
-    const result = listenerById(E85_MasterTanner_impl.listeners, 'E85-master-tanner-before-exchange')
+    const result = listenerById(E085_MasterTanner_impl.listeners, 'E85-master-tanner-before-exchange')
       .handler(context(p, { state: game, actionId: 'exchange', phase: 'before' }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E85_MasterTanner', params: { kind: 'set-extra-data', key: 'boarBefore', value: 2 } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E85_MasterTanner', params: { kind: 'set-extra-data', key: 'cattleBefore', value: 1 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E085_MasterTanner', params: { kind: 'set-extra-data', key: 'boarBefore', value: 2 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E085_MasterTanner', params: { kind: 'set-extra-data', key: 'cattleBefore', value: 1 } },
       ],
     })
   })

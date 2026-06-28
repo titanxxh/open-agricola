@@ -49,11 +49,11 @@ describe('A148_Woolgrower', () => {
   it('synced with B86: both cards read the same global counter', () => {
     const { core } = setupGame()
     core.state.completedFeedingPhases = 4
-    core.state.players[0].occupationPlayed = ['A148_Woolgrower', 'B86_TruffleSearcher']
+    core.state.players[0].occupationPlayed = ['A148_Woolgrower', 'B086_TruffleSearcher']
 
     const zones = computeAnimalZones(core.state.players[0], core.state)
     const a148 = zones.find((z: any) => z.cardId === 'A148_Woolgrower')
-    const b86 = zones.find((z: any) => z.cardId === 'B86_TruffleSearcher')
+    const b86 = zones.find((z: any) => z.cardId === 'B086_TruffleSearcher')
     expect(a148?.capacity).toBe(4)
     expect(b86?.capacity).toBe(4)
   })

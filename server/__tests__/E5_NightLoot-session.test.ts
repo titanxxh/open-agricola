@@ -5,9 +5,9 @@ import type { ActionSpace, Resource } from '../../shared/contract/types'
 
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E5_NightLoot'
+const CARD_ID = 'E005_NightLoot'
 
-describe('E5_NightLoot session', () => {
+describe('E005_NightLoot session', () => {
   const setupSession = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -144,7 +144,7 @@ describe('E5_NightLoot session', () => {
   })
 
   it('onBuy uses collect leaves with actionContext that decrement accumulation spaces', () => {
-    // BGA `E5_NightLoot::actSelectResources` decrements the chosen
+    // BGA `E005_NightLoot::actSelectResources` decrements the chosen
     // accumulation space's resources. Our previous impl used gain leaves
     // pulling from the general supply, so the accumulation space was left
     // untouched (the player effectively double-banked the resource). After

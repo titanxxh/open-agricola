@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 import * as B137Module from '../B/B137_Wholesaler'
-import * as C41Module from '../C/C41_FarmStore'
+import * as C41Module from '../C/C041_FarmStore'
 import * as E142Module from '../E/E142_Smuggler'
 import { B137_Wholesaler_impl } from '../B/B137_Wholesaler'
-import { C41_FarmStore_impl } from '../C/C41_FarmStore'
+import { C041_FarmStore_impl } from '../C/C041_FarmStore'
 import { E142_Smuggler_impl } from '../E/E142_Smuggler'
 
 type ResourceMap = Partial<Resource>
@@ -187,13 +187,13 @@ describe('card-local table-driven flows', () => {
     ])
 
     const owner = player({ food: 1 })
-    const flow = C41_FarmStore_impl.effect?.onEndHarvestFeedingPhase?.(state(owner), owner)
+    const flow = C041_FarmStore_impl.effect?.onEndHarvestFeedingPhase?.(state(owner), owner)
     expect(flow?.type).toBe('xor')
     if (flow?.type !== 'xor') return
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(table!.length)
     table!.forEach((reward, index) => {
-      expectPayGain(flow.children[index]!, { food: 1 }, reward, 'C41_FarmStore')
+      expectPayGain(flow.children[index]!, { food: 1 }, reward, 'C041_FarmStore')
     })
   })
 

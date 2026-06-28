@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C80_RockyTerrain'
-import '../../shared/cards/B/B68_Beanfield'
+import '../../shared/cards/C/C080_RockyTerrain'
+import '../../shared/cards/B/B068_Beanfield'
 import '../../shared/cards/B/B113_PatchCaregiver'
-import '../../shared/cards/E/E70_CropRotationField'
-import '../../shared/cards/D/D75_WoodField'
+import '../../shared/cards/E/E070_CropRotationField'
+import '../../shared/cards/D/D075_WoodField'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C80_RockyTerrain'
+const CARD_ID = 'C080_RockyTerrain'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -69,7 +69,7 @@ const expectPayGainStoneForFood = (result: { flow?: ActionFlow } | undefined) =>
   expect(child1.params).toEqual({ stone: 1 })
 }
 
-describe('C80_RockyTerrain', () => {
+describe('C080_RockyTerrain', () => {
   describe('plow trigger', () => {
     it('returns pay-gain flow after plow when player has food', () => {
       const listener = findListener('C80-rocky-terrain-after-plow')
@@ -116,7 +116,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
-        choice: 'minor:B68_Beanfield',
+        choice: 'minor:B068_Beanfield',
       } as unknown as CardListenerContext)
 
       expectPayGainStoneForFood(result)
@@ -131,7 +131,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
-        choice: 'minor:E70_CropRotationField',
+        choice: 'minor:E070_CropRotationField',
       } as unknown as CardListenerContext)
 
       expectPayGainStoneForFood(result)
@@ -146,7 +146,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
-        choice: 'minor:E54_Contraband',
+        choice: 'minor:E054_Contraband',
       } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
@@ -161,7 +161,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
-        choice: 'minor:B68_Beanfield',
+        choice: 'minor:B068_Beanfield',
       } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()
@@ -176,7 +176,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('improvement'),
         actionId: 'improvement', phase: 'after',
-        choice: 'minor:D75_WoodField',
+        choice: 'minor:D075_WoodField',
       } as unknown as CardListenerContext)
 
       expectPayGainStoneForFood(result)
@@ -210,7 +210,7 @@ describe('C80_RockyTerrain', () => {
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
         actionId: 'occupation', phase: 'after',
-        choice: 'E51_WhaleOil',
+        choice: 'E051_WhaleOil',
       } as unknown as CardListenerContext)
 
       expect(result).toBeUndefined()

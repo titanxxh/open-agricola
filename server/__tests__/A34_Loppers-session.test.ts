@@ -5,10 +5,10 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
-import '../../shared/cards/A/A34_Loppers'
-import '../../shared/cards/E/E74_AshTrees'
+import '../../shared/cards/A/A034_Loppers'
+import '../../shared/cards/E/E074_AshTrees'
 
-const CARD_ID = 'A34_Loppers'
+const CARD_ID = 'A034_Loppers'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
@@ -94,10 +94,10 @@ const setupFencingSession = (options: {
     player.supplyTokensConsumed = { fence: options.consumedFences }
   }
   if (options.e74HeldFences) {
-    player.minorPlayed.push('E74_AshTrees')
+    player.minorPlayed.push('E074_AshTrees')
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: options.e74HeldFences } },
+      E074_AshTrees: { counters: { fences: options.e74HeldFences } },
     }
   }
 

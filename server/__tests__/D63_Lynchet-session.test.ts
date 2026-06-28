@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { reap } from '../../shared/actions/effects/reap'
 
-import '../../shared/cards/D/D63_Lynchet'
+import '../../shared/cards/D/D063_Lynchet'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D63_Lynchet'
+const CARD_ID = 'D063_Lynchet'
 
-describe('D63_Lynchet session', () => {
+describe('D063_Lynchet session', () => {
   it('onAfterReap counts only adjacent harvested positions', () => {
     const session = new GameSession()
     const state = session.getState().state

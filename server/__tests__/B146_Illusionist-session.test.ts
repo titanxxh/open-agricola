@@ -121,8 +121,8 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.minorPlayed.push('C35_LanternHouse')
-    player.occupationHand = ['A9_SheepFarmer']
+    player.minorPlayed.push('C035_LanternHouse')
+    player.occupationHand = ['A009_SheepFarmer']
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
     const state = createState([player], [forest])
@@ -142,7 +142,7 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const fishing = createSpace('fishing', {})
     // fishing accumulates food — no wood/clay/reed/stone.
     fishing.resources.food = 2
@@ -164,7 +164,7 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
     const state = createState([player], [forest])
@@ -193,8 +193,8 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.minorPlayed.push('B68_Beanfield')
-    player.occupationHand = ['A9_SheepFarmer']
+    player.minorPlayed.push('B068_Beanfield')
+    player.occupationHand = ['A009_SheepFarmer']
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
     const state = createState([player], [forest])
@@ -214,7 +214,7 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.minorHand = ['A1_AnimalPen']
+    player.minorHand = ['A001_AnimalPen']
     const clayPit = createSpace('clay-pit', { clay: 2 })
     clayPit.takenBy = player.id
     const state = createState([player], [clayPit])
@@ -236,7 +236,7 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const reedBank = createSpace('reed-bank', { reed: 1 })
     reedBank.takenBy = player.id
     const state = createState([player], [reedBank])
@@ -258,7 +258,7 @@ describe('B146_Illusionist listener handler', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const quarry = createSpace('eastern-quarry', { stone: 1 })
     quarry.takenBy = player.id
     const state = createState([player], [quarry])
@@ -281,7 +281,7 @@ describe('B146_Illusionist listener handler', () => {
     const player = createPlayer('p1')
     player.occupationPlayed.push(CARD_ID)
     player.occupationHand = []
-    player.minorHand = ['A1_AnimalPen']
+    player.minorHand = ['A001_AnimalPen']
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
     const state = createState([player], [forest])
@@ -305,8 +305,8 @@ describe('discard-from-hand action', () => {
     expect(def).toBeDefined()
 
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper']
-    player.minorHand = ['A1_AnimalPen']
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
+    player.minorHand = ['A001_AnimalPen']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
@@ -317,22 +317,22 @@ describe('discard-from-hand action', () => {
     if (result.request.kind !== 'choice') return
     expect(result.request.options).toHaveLength(3)
     expect(result.request.options.map((o) => o.value)).toEqual([
-      'occ:A9_SheepFarmer',
+      'occ:A009_SheepFarmer',
       'occ:A124_Knapper',
-      'min:A1_AnimalPen',
+      'min:A001_AnimalPen',
     ])
   })
 
   it('resolveChoice removes the chosen occupation from hand', () => {
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper']
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def.resolveChoice!(
       { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
-      'occ:A9_SheepFarmer',
+      'occ:A009_SheepFarmer',
     )
     expect(result.type).toBe('ok')
     expect(player.occupationHand).toEqual(['A124_Knapper'])
@@ -341,22 +341,22 @@ describe('discard-from-hand action', () => {
   it('resolveChoice removes the chosen minor card from hand', () => {
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
-    player.minorHand = ['A1_AnimalPen', 'A2_Basket']
+    player.minorHand = ['A001_AnimalPen', 'A002_Basket']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def.resolveChoice!(
       { state, player, space: forest, params: {} } as unknown as ActionExecutionContext,
-      'min:A2_Basket',
+      'min:A002_Basket',
     )
     expect(result.type).toBe('ok')
-    expect(player.minorHand).toEqual(['A1_AnimalPen'])
+    expect(player.minorHand).toEqual(['A001_AnimalPen'])
   })
 
   it('resolveChoice fails when choice points at a card not in hand', () => {
     const def = getActionDefinition(DISCARD_ACTION_ID)!
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
 
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])

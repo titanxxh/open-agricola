@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/C/C70_LettucePatch'
+import '../../shared/cards/C/C070_LettucePatch'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C70_LettucePatch'
+const CARD_ID = 'C070_LettucePatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const setup = (options?: {
@@ -49,7 +49,7 @@ const setup = (options?: {
   return session
 }
 
-describe('C70_LettucePatch session', () => {
+describe('C070_LettucePatch session', () => {
   describe('sow - only vegetable sowable', () => {
     it('allows sowing vegetable in the card field', () => {
       const session = setup({ vegetable: 2 })

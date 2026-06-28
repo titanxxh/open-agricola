@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/C/C56_FeedFence'
+import '../../shared/cards/C/C056_FeedFence'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C56_FeedFence'
+const CARD_ID = 'C056_FeedFence'
 
-describe('C56_FeedFence session', () => {
+describe('C056_FeedFence session', () => {
   const runAfterStables = (configure: (player: import('../../shared/contract/types').PlayerState) => void) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -43,7 +43,7 @@ describe('C56_FeedFence session', () => {
       player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }]
       player.cardStates = {
         __actionSnapshot__: { extraData: { stableTiles: 3 } },
-        B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+        B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })
     expect(result).toBeDefined()

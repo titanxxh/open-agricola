@@ -1,5 +1,5 @@
 /**
- * D25_WitchesDanceFloor — comprehensive session-level integration tests.
+ * D025_WitchesDanceFloor — comprehensive session-level integration tests.
  *
  * Covers:
  *  1. Card identity flags
@@ -24,10 +24,10 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry'
 import { computeScores } from '../../shared/domain/scoring'
 
-import '../../shared/cards/D/D25_WitchesDanceFloor'
-import { D25_WitchesDanceFloor } from '../../shared/cards/D/D25_WitchesDanceFloor'
+import '../../shared/cards/D/D025_WitchesDanceFloor'
+import { D025_WitchesDanceFloor } from '../../shared/cards/D/D025_WitchesDanceFloor'
 
-const CARD_ID = 'D25_WitchesDanceFloor'
+const CARD_ID = 'D025_WitchesDanceFloor'
 
 const setup = () => {
   const session = new GameSession()
@@ -37,16 +37,16 @@ const setup = () => {
   return session
 }
 
-describe('D25_WitchesDanceFloor session', () => {
+describe('D025_WitchesDanceFloor session', () => {
   // ─── Test 1: Card identity flags ───────────────────────────────────────────
   describe('card identity flags', () => {
     it('all 6 identity flags are true on the card definition', () => {
-      expect(D25_WitchesDanceFloor.providesField).toBe(true)
-      expect(D25_WitchesDanceFloor.providesOccupation).toBe(true)
-      expect(D25_WitchesDanceFloor.fireplaceIdentity).toBe(true)
-      expect(D25_WitchesDanceFloor.mustBePlayedViaMinorAction).toBe(true)
-      expect(D25_WitchesDanceFloor.isCookery).toBe(true)
-      expect(D25_WitchesDanceFloor.isBaking).toBe(true)
+      expect(D025_WitchesDanceFloor.providesField).toBe(true)
+      expect(D025_WitchesDanceFloor.providesOccupation).toBe(true)
+      expect(D025_WitchesDanceFloor.fireplaceIdentity).toBe(true)
+      expect(D025_WitchesDanceFloor.mustBePlayedViaMinorAction).toBe(true)
+      expect(D025_WitchesDanceFloor.isCookery).toBe(true)
+      expect(D025_WitchesDanceFloor.isBaking).toBe(true)
     })
   })
 
@@ -120,8 +120,8 @@ describe('D25_WitchesDanceFloor session', () => {
   // ─── Test 5: Anytime exchanges visible ─────────────────────────────────────
   describe('anytime exchanges (isCookery + exchange list)', () => {
     it('card definition has isCookery=true and at least one anytime exchange with food output', () => {
-      expect(D25_WitchesDanceFloor.isCookery).toBe(true)
-      const anytimeExchanges = (D25_WitchesDanceFloor.exchanges ?? []).filter(
+      expect(D025_WitchesDanceFloor.isCookery).toBe(true)
+      const anytimeExchanges = (D025_WitchesDanceFloor.exchanges ?? []).filter(
         (ex) => (ex.triggers ?? []).includes('anytime'),
       )
       expect(anytimeExchanges.length).toBeGreaterThan(0)
@@ -390,7 +390,7 @@ describe('D25_WitchesDanceFloor session', () => {
   // ─── Test 11: mustBePlayedViaMinorAction guard (smoke) ─────────────────────
   describe('mustBePlayedViaMinorAction guard (smoke)', () => {
     it('D25 has mustBePlayedViaMinorAction=true', () => {
-      expect(D25_WitchesDanceFloor.mustBePlayedViaMinorAction).toBe(true)
+      expect(D025_WitchesDanceFloor.mustBePlayedViaMinorAction).toBe(true)
     })
   })
 

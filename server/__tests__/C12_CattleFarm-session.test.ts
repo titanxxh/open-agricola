@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/C/C12_CattleFarm'
+import '../../shared/cards/C/C012_CattleFarm'
 
-describe('C12_CattleFarm session', () => {
+describe('C012_CattleFarm session', () => {
   const setup = (pastureCount: number) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -14,7 +14,7 @@ describe('C12_CattleFarm session', () => {
 
     const player = state.players[0]!
     // Manually add to minorPlayed (card is not in catalog, so devPlayCard misidentifies it)
-    player.minorPlayed.push('C12_CattleFarm')
+    player.minorPlayed.push('C012_CattleFarm')
 
     // Set up pastures
     player.pastures = []
@@ -39,7 +39,7 @@ describe('C12_CattleFarm session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:C12_CattleFarm')
+    const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(2)
@@ -52,7 +52,7 @@ describe('C12_CattleFarm session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:C12_CattleFarm')
+    const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeUndefined()
   })
 
@@ -62,7 +62,7 @@ describe('C12_CattleFarm session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:C12_CattleFarm')
+    const cardZone = zones.find(z => z.id === 'card:C012_CattleFarm')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(4)
   })
@@ -79,9 +79,9 @@ describe('C12_CattleFarm session', () => {
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
         {
-          id: 'card:C12_CattleFarm',
+          id: 'card:C012_CattleFarm',
           zoneType: 'card',
-          cardId: 'C12_CattleFarm',
+          cardId: 'C012_CattleFarm',
           animalType: 'sheep',
           animalCount: 1,
           animalCounts: { sheep: 1 },
@@ -92,6 +92,6 @@ describe('C12_CattleFarm session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.sheep).toBe(0)
     expect(resp.state.players[0]!.resources.cattle).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.C12_CattleFarm?.extraData ?? {}).toEqual({})
+    expect(resp.state.players[0]!.cardStates?.C012_CattleFarm?.extraData ?? {}).toEqual({})
   })
 })

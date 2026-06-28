@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, type BonusScoringContext } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/D/D60_LargePottery'
+import '../../shared/cards/D/D060_LargePottery'
 
-const CARD_ID = 'D60_LargePottery'
+const CARD_ID = 'D060_LargePottery'
 
 // After the solver refactor (2026-04-30), D60 reads `player.resources.clay`
 // directly. The solver mutates a clone of `player` BEFORE D60's handler runs,
 // so the clay it sees is the post-solve remaining. These tests pass the value
 // directly via player.resources to mimic that flow (no more ctx.reserved bridge).
 
-describe('D60_LargePottery computeBonusScore', () => {
+describe('D060_LargePottery computeBonusScore', () => {
   const ctx: BonusScoringContext = { categories: [] }
 
   it('clay=5 → 2 VP (matches scoresMap 5→2)', () => {

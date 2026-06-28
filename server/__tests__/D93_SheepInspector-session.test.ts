@@ -10,12 +10,12 @@ import type {
   PlayerState,
 } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D93_SheepInspector'
+import '../../shared/cards/D/D093_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-const CARD_ID = 'D93_SheepInspector'
+const CARD_ID = 'D093_SheepInspector'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -84,7 +84,7 @@ const createState = (
 const findListener = () =>
   getRegisteredCardListeners().find((l) => l.id === 'D93-sheep-inspector-after-place-farmer')
 
-describe('D93_SheepInspector listener', () => {
+describe('D093_SheepInspector listener', () => {
   it('is registered on place-farmer after (player scope)', () => {
     const listener = findListener()
     expect(listener).toBeDefined()
@@ -204,7 +204,7 @@ describe('D93_SheepInspector listener', () => {
 
 })
 
-describe('D93_SheepInspector end-to-end via GameSession', () => {
+describe('D093_SheepInspector end-to-end via GameSession', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

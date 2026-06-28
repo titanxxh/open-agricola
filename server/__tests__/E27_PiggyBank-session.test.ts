@@ -5,10 +5,10 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
-import '../../shared/cards/E/E27_PiggyBank'
+import '../../shared/cards/E/E027_PiggyBank'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E27_PiggyBank'
+const CARD_ID = 'E027_PiggyBank'
 
 const emptyResources = (): Resource => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -50,7 +50,7 @@ const createSpace = (id: string): ActionSpace => ({
   resolveChoice: () => ({ type: 'ok' }),
 })
 
-describe('E27_PiggyBank session', () => {
+describe('E027_PiggyBank session', () => {
   it('onBeforeReturnHome offers to place 1 food on card when player has food', () => {
     const session = new GameSession()
     const state = session.getState().state

@@ -123,7 +123,7 @@ describe('player panel stable supply summary', () => {
   it('counts special stables that consume supply without adding animal capacity', () => {
     const p = player({
       cardStates: {
-        B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
+        B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
       },
     })
     const s = state([p])
@@ -157,7 +157,7 @@ describe('player panel stable supply summary', () => {
       futureMeeples: [
         {
           id: 'A89-p1-5',
-          cardId: 'A89_StablePlanner',
+          cardId: 'A089_StablePlanner',
           playerId: p.id,
           round: 5,
           actionId: null,
@@ -165,7 +165,7 @@ describe('player panel stable supply summary', () => {
         },
         {
           id: 'A89-p1-8',
-          cardId: 'A89_StablePlanner',
+          cardId: 'A089_StablePlanner',
           playerId: p.id,
           round: 8,
           actionId: null,
@@ -195,7 +195,7 @@ describe('player panel stable supply summary', () => {
       futureMeeples: [
         {
           id: 'A89-p1-5',
-          cardId: 'A89_StablePlanner',
+          cardId: 'A089_StablePlanner',
           playerId: p.id,
           round: 5,
           actionId: null,

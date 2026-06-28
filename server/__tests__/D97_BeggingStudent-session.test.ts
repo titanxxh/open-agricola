@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/D/D97_BeggingStudent'
+import '../../shared/cards/D/D097_BeggingStudent'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D97_BeggingStudent'
+const CARD_ID = 'D097_BeggingStudent'
 
-describe('D97_BeggingStudent session', () => {
+describe('D097_BeggingStudent session', () => {
   it('onBuy gives 1 begging marker', () => {
     const session = new GameSession()
     const state = session.getState().state

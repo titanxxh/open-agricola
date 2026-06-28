@@ -3,13 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/A/A59_PotatoRidger'
+import '../../shared/cards/A/A059_PotatoRidger'
 import type { ActionFlow } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-const CARD_ID = 'A59_PotatoRidger'
+const CARD_ID = 'A059_PotatoRidger'
 
-describe('A59_PotatoRidger session', () => {
+describe('A059_PotatoRidger session', () => {
   const setup = (options: {
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]
     extraVegetable?: number

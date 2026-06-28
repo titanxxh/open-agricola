@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { A68_AsparagusGift } from '../../shared/cards/A/A68_AsparagusGift'
-import '../../shared/cards/B/B30_WoodPalisades'
+import { A068_AsparagusGift } from '../../shared/cards/A/A068_AsparagusGift'
+import '../../shared/cards/B/B030_WoodPalisades'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'A68_AsparagusGift'
-const B30 = 'B30_WoodPalisades'
+const CARD_ID = 'A068_AsparagusGift'
+const B30 = 'B030_WoodPalisades'
 
 // Tile (0,0) edges
 const tile00Fences = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
@@ -79,7 +79,7 @@ describe('A68 Asparagus Gift — session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = []
-      expect(meetsCardPrerequisites(player, A68_AsparagusGift, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state)).toBe(false)
     })
 
     it('allows when player has at least one empty field', () => {
@@ -87,7 +87,7 @@ describe('A68 Asparagus Gift — session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [{ row: 0, col: 0, stacks: [] }]
-      expect(meetsCardPrerequisites(player, A68_AsparagusGift, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state)).toBe(true)
     })
   })
 })
