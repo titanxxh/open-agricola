@@ -973,7 +973,12 @@ export function engineResolveChoice(
     return result
   }
   int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
-  if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
+  if (
+    result.type === 'fail' &&
+    (result.recoverable === true || pendingEnvelope?.request.kind === 'farm-select') &&
+    pendingHost &&
+    pendingEnvelope
+  ) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
       targetNode: pendingHost,
@@ -995,7 +1000,7 @@ export function engineResolveChoice(
       actionContext: contextSnapshot?.actionContext,
     })
     if (pendingHost instanceof ActionNode) copyInternalMetadataToPending(pendingHost, pendingEnvelope)
-    return result
+    return result.recoverable === true ? result : { type: 'fail', errorKey: result.errorKey, recoverable: true }
   }
   if (result.type === 'fail') {
     return rollbackAndReturn(int, result)

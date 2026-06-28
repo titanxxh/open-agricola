@@ -313,6 +313,37 @@ describe('farm interaction builders', () => {
     expect(rejected.state.players[0]!.fields).toEqual([])
   })
 
+  it('fence farm-select rejects empty selection and keeps pending interaction', () => {
+    const session = new GameSession(260628, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    player.resources.wood = 10
+    setWorkersAtHome(state, player, 2)
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'fencing')
+    expect(pending.ok).toBe(true)
+    expect(pending.interaction.stateId === 'wait' ? pending.interaction.request.kind : null).toBe('farm-select')
+
+    const rejected = session.commitSelectionChoice(0, {
+      edges: [],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('NO_NEW_FENCES')
+    expect(rejected.interaction.stateId).toBe('wait')
+    if (rejected.interaction.stateId !== 'wait') return
+    expect(rejected.interaction.request.kind).toBe('farm-select')
+    expect(rejected.interaction.promptKey).toBe('ui.interactionFenceSelect')
+    expect(rejected.state.currentPlayerIndex).toBe(0)
+    expect(rejected.state.players[0]!.fenceSegments).toEqual([])
+  })
+
   it('rejects direct resolveChoice farm payload on farm-select', () => {
     const session = new GameSession()
     const state = session.getState().state
