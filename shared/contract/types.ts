@@ -573,7 +573,7 @@ export type GameState = {
   /**
    * Number of feeding phases that have completed (incremented once at the
    * start of each breeding phase, after all players have fed).
-   * Consumed by A148_Woolgrower / B86_TruffleSearcher animal capacity.
+   * Consumed by A148_Woolgrower / B086_TruffleSearcher animal capacity.
    * Mirrors BGA `Globals::getCompletedFeedingPhases()`.
    */
   completedFeedingPhases: number
@@ -583,7 +583,7 @@ export type CanBeExecutedByPlayerContext = {
   /**
    * The card id that originated this action invocation, if any. Forwarded so
    * doable checks can route through the same per-card cost/effect modifiers
-   * that pay-time uses (e.g. D95 Site Manager treats `actionCardId === 'D95_SiteManager'`
+   * that pay-time uses (e.g. D95 Site Manager treats `actionCardId === 'D095_SiteManager'`
    * as the trigger for its food-for-resource substitution).
    */
   sourceCard?: string

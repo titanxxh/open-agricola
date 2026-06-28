@@ -15,7 +15,7 @@ import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../active-registry'
 
 // Snapshot + restore approach: avoid blowing away module-level listeners
-// registered by other cards (e.g. D95_SiteManager) when this test file runs
+// registered by other cards (e.g. D095_SiteManager) when this test file runs
 // in the same process as session tests that depend on them.
 let snapshot: CardListenerRegistration[] = []
 const snapshotListeners = () => {

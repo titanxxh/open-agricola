@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import '../../shared/cards/C/C64_CornSchnappsDistillery'
+import '../../shared/cards/C/C064_CornSchnappsDistillery'
 import type { FutureMeeple } from '../../shared/contract/types'
 
-describe('C64_CornSchnappsDistillery session', () => {
+describe('C064_CornSchnappsDistillery session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -17,7 +17,7 @@ describe('C64_CornSchnappsDistillery session', () => {
     player.resources.grain = 3
     player.resources.food = 0
     // Directly place card
-    player.minorPlayed.push('C64_CornSchnappsDistillery')
+    player.minorPlayed.push('C064_CornSchnappsDistillery')
     session.loadState(state)
     return session
   }
@@ -30,8 +30,8 @@ describe('C64_CornSchnappsDistillery session', () => {
     expect(resp2.ok).toBe(true)
     const p = resp2.state.players[0]!
     expect(p.resources.grain).toBe(2)
-    expect(isCardFlagged(p, 'C64_CornSchnappsDistillery')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C64_CornSchnappsDistillery')
+    expect(isCardFlagged(p, 'C064_CornSchnappsDistillery')).toBe(true)
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'C064_CornSchnappsDistillery')
     expect(fm).toHaveLength(4)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)

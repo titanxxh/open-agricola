@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/B/B70_NewPurchase'
+import '../../shared/cards/B/B070_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'
-import '../../shared/cards/A/A64_BarleyMill'
-import '../../shared/cards/C/C71_Slurry'
+import '../../shared/cards/A/A064_BarleyMill'
+import '../../shared/cards/C/C071_Slurry'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
-import '../../shared/cards/D/D99_EarthenwarePotter'
+import '../../shared/cards/D/D099_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
 import '../../shared/cards/D/D167_PureBreeder'
 
@@ -23,7 +23,7 @@ const chooseFirstOption = (session: GameSession, playerIndex: number) => {
 }
 
 describe('stage hook flows', () => {
-  it('runs B70_NewPurchase through before-start-of-turn flow', () => {
+  it('runs B070_NewPurchase through before-start-of-turn flow', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -33,7 +33,7 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('B70_NewPurchase')
+    player.minorPlayed.push('B070_NewPurchase')
     player.resources.food = 6
 
     session.loadState(state)
@@ -54,7 +54,7 @@ describe('stage hook flows', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
-    expect(readCardResourceStats(resp.state.players[0]!, 'B70_NewPurchase')).toMatchObject({
+    expect(readCardResourceStats(resp.state.players[0]!, 'B070_NewPurchase')).toMatchObject({
       paid: { food: 6 },
       gained: { grain: 1, vegetable: 1 },
     })
@@ -105,7 +105,7 @@ describe('stage hook flows', () => {
     })
   })
 
-  it('runs D99_EarthenwarePotter through after-harvest flow on round 14', () => {
+  it('runs D099_EarthenwarePotter through after-harvest flow on round 14', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -115,12 +115,12 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.occupationPlayed.push('D99_EarthenwarePotter')
+    player.occupationPlayed.push('D099_EarthenwarePotter')
     player.resources.food = 10
     player.resources.clay = 2
     player.cardStates = {
       ...player.cardStates,
-      D99_EarthenwarePotter: { counters: { earlyBuy: 1 } },
+      D099_EarthenwarePotter: { counters: { earlyBuy: 1 } },
     }
 
     session.loadState(state)
@@ -133,14 +133,14 @@ describe('stage hook flows', () => {
     expect(resp.interaction.stateId).toBe('gameover')
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.bonusVp).toBe(2)
-    expect(readCardResourceStats(resp.state.players[0]!, 'D99_EarthenwarePotter')).toMatchObject({
+    expect(resp.state.players[0]!.cardStates?.D099_EarthenwarePotter?.counters?.bonusVp).toBe(2)
+    expect(readCardResourceStats(resp.state.players[0]!, 'D099_EarthenwarePotter')).toMatchObject({
       paid: { clay: 2 },
       gained: {},
     })
   })
 
-  it('runs A64_BarleyMill through after-reap flow', () => {
+  it('runs A064_BarleyMill through after-reap flow', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -150,7 +150,7 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('A64_BarleyMill')
+    player.minorPlayed.push('A064_BarleyMill')
     player.resources.food = 10
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
@@ -165,7 +165,7 @@ describe('stage hook flows', () => {
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
     expect(resp.state.players[0]!.resources.grain).toBe(2)
-    expect(readCardResourceStats(resp.state.players[0]!, 'A64_BarleyMill')).toMatchObject({
+    expect(readCardResourceStats(resp.state.players[0]!, 'A064_BarleyMill')).toMatchObject({
       paid: {},
       gained: { food: 2 },
     })
@@ -173,7 +173,7 @@ describe('stage hook flows', () => {
     const gainLog = resp.state.log.find(
       (entry) =>
         entry.key === 'log.cardEffectGain' &&
-        entry.params?.cardId === 'A64_BarleyMill',
+        entry.params?.cardId === 'A064_BarleyMill',
     )
     expect(gainLog?.params?.gain).toEqual({ food: 2 })
   })
@@ -218,7 +218,7 @@ describe('stage hook flows', () => {
     expect(gainLog?.params?.gain).toEqual({ clay: 2 })
   })
 
-  it('runs C71_Slurry through end-harvest sow flow after multi-animal breeding', () => {
+  it('runs C071_Slurry through end-harvest sow flow after multi-animal breeding', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -228,7 +228,7 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('C71_Slurry')
+    player.minorPlayed.push('C071_Slurry')
     player.resources.food = 10
     player.resources.grain = 1
     player.resources.sheep = 2

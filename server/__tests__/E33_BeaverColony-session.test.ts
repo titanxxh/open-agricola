@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { E33_BeaverColony_impl } from '../../shared/cards/E/E33_BeaverColony'
+import { E033_BeaverColony_impl } from '../../shared/cards/E/E033_BeaverColony'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-import '../../shared/cards/E/E33_BeaverColony'
+import '../../shared/cards/E/E033_BeaverColony'
 
-const CARD_ID = 'E33_BeaverColony'
-const AFTER_COLLECT = E33_BeaverColony_impl.listeners.find((listener) => listener.id === 'E33-beaver-colony-after-collect')!
-const AFTER_GAIN = E33_BeaverColony_impl.listeners.find((listener) => listener.id === 'E33-beaver-colony-after-gain')!
+const CARD_ID = 'E033_BeaverColony'
+const AFTER_COLLECT = E033_BeaverColony_impl.listeners.find((listener) => listener.id === 'E33-beaver-colony-after-collect')!
+const AFTER_GAIN = E033_BeaverColony_impl.listeners.find((listener) => listener.id === 'E33-beaver-colony-after-gain')!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -44,7 +44,7 @@ const directContext = (
   } as unknown as CardListenerContext
 }
 
-describe('E33_BeaverColony session', () => {
+describe('E033_BeaverColony session', () => {
   it('grants bonus VP for reed collected from an action space without result gains', () => {
     const ctx = directContext('collect', [moved()])
     ctx.result = { type: 'ok' }

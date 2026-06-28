@@ -1,0 +1,63 @@
+import { defineMinorCard } from '../card-source'
+import type { ActionFlow } from '../../contract/types'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'E009_BarteringHut'
+
+const cardImpl = {
+  effect: {
+  id: CARD_ID,
+  onBuy: () => {
+    const makeAnimalOption = (animal: 'sheep' | 'boar' | 'cattle', cost: number): ActionFlow => {
+      const payChoices: ActionFlow[] = [
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { wood: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { clay: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { reed: 1 } },
+        { type: 'leaf' as const, actionId: 'pay', sourceCard: CARD_ID, params: { stone: 1 } },
+      ]
+      const paySteps: ActionFlow[] = Array.from({ length: cost }, () => ({
+        type: 'xor' as const,
+        children: payChoices,
+      }))
+      return {
+        type: 'seq' as const,
+        children: [
+          { type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID, params: { [animal]: 1 } },
+          ...paySteps,
+        ],
+      }
+    }
+
+    const oneTime: ActionFlow = {
+      type: 'xor' as const,
+      optional: true,
+      children: [
+        makeAnimalOption('sheep', 2),
+        makeAnimalOption('boar', 3),
+        makeAnimalOption('cattle', 4),
+      ],
+    }
+
+    return {
+      type: 'seq' as const,
+      children: [oneTime, oneTime],
+    }
+  },
+},
+  reaches: [] as readonly string[],
+} satisfies CardImpl
+
+export const E009_BarteringHut = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Bartering Hut',
+    deck: 'E',
+    number: 9,
+    category: 'PASSING_-_ANIMAL',
+    desc: ['Up to two times: Immediately spend any 2/3/4 building resources for 1 <SHEEP>/<PIG>/<CATTLE> from the general supply.'],
+    passing: true,
+  },
+  impl: cardImpl,
+})
+
+export const E009_BarteringHut_impl = E009_BarteringHut.impl

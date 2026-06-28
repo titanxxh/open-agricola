@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { B79_Corf_impl } from '../../shared/cards/B/B79_Corf'
+import { B079_Corf_impl } from '../../shared/cards/B/B079_Corf'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B79_Corf'
+import '../../shared/cards/B/B079_Corf'
 
-const CARD_ID = 'B79_Corf'
-const LISTENER = B79_Corf_impl.listeners[0]!
+const CARD_ID = 'B079_Corf'
+const LISTENER = B079_Corf_impl.listeners[0]!
 
 const setup = () => {
   const session = new GameSession()
@@ -68,7 +68,7 @@ const directContext = (
   } as unknown as CardListenerContext
 }
 
-describe('B79_Corf session', () => {
+describe('B079_Corf session', () => {
   it('owner gets 1 stone when collecting 3+ stone from accumulation space', () => {
     const session = setup()
     const state = session.getState().state

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 
-import '../../shared/cards/A/A94_LazySowman'
+import '../../shared/cards/A/A094_LazySowman'
 
-const CARD_ID = 'A94_LazySowman'
+const CARD_ID = 'A094_LazySowman'
 
 const setup = (options?: {
   withCard?: boolean
@@ -28,7 +28,7 @@ const setup = (options?: {
   player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
 
   if (options?.withCard ?? true) {
-    player.occupationPlayed.push('A94_LazySowman')
+    player.occupationPlayed.push('A094_LazySowman')
   }
 
   const opponentId = state.players[1]!.id
@@ -42,7 +42,7 @@ const setup = (options?: {
   return session
 }
 
-describe('A94_LazySowman session', () => {
+describe('A094_LazySowman session', () => {
   it('turns unavailable sow into an immediate extra place-farmer flow', () => {
     const session = setup({ withCard: true })
 
@@ -70,7 +70,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A094_LazySowman).toBeUndefined()
   })
 
   it('offers normal sow and replacement when sow can already be executed', () => {
@@ -82,7 +82,7 @@ describe('A94_LazySowman session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
     expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
-    expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A094_LazySowman).toBeUndefined()
 
     const sowOption = resp.interaction.options?.find((option) => option.labelKey === 'actions.sow.name')
     expect(sowOption).toBeDefined()
@@ -92,7 +92,7 @@ describe('A94_LazySowman session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-    expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A094_LazySowman).toBeUndefined()
     expect(resp.interaction?.stateId).toBe('wait')
   })
 

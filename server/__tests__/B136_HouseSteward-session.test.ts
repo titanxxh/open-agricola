@@ -17,7 +17,7 @@ const setupSession = (round: number) => {
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
-  player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+  player.occupationHand = [CARD_ID, 'A085_Homekeeper']
   player.resources = { ...player.resources, food: 3, wood: 0 }
 
   session.loadState(state)

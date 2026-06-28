@@ -43,8 +43,8 @@ describe('buildSowFarmInteraction', () => {
         {
           tile: { row: -75, col: 0 },
           allowedCrops: ['wood'],
-          sourceCard: 'D75_WoodField',
-          groupKey: 'D75_WoodField',
+          sourceCard: 'D075_WoodField',
+          groupKey: 'D075_WoodField',
         },
       ],
       () => {
@@ -52,7 +52,7 @@ describe('buildSowFarmInteraction', () => {
         if (interaction.farmType !== 'sow') throw new Error('expected sow farmType')
         const extra = interaction.selectableFields.find((f) => f.tile.row === -75)
         expect(extra).toBeDefined()
-        expect(extra!.groupKey).toBe('D75_WoodField')
+        expect(extra!.groupKey).toBe('D075_WoodField')
         expect(extra!.allowedCrops).toEqual(['wood'])
       },
     )
@@ -68,8 +68,8 @@ describe('buildSowFarmInteraction', () => {
         {
           tile: { row: -80, col: 0 },
           allowedCrops: ['stone'],
-          sourceCard: 'E80_RockGarden',
-          groupKey: 'E80_RockGarden',
+          sourceCard: 'E080_RockGarden',
+          groupKey: 'E080_RockGarden',
         },
       ],
       () => {
@@ -90,8 +90,8 @@ describe('buildSowFarmInteraction', () => {
         {
           tile: { row: -80, col: 0 },
           allowedCrops: ['stone'],
-          sourceCard: 'E80_RockGarden',
-          groupKey: 'E80_RockGarden',
+          sourceCard: 'E080_RockGarden',
+          groupKey: 'E080_RockGarden',
         },
       ],
       () => {
@@ -128,7 +128,7 @@ describe('buildSowFarmInteraction', () => {
         {
           tile: { row: -1, col: 68 },
           allowedCrops: ['wood'],
-          sourceCard: 'E68_CherryOrchard',
+          sourceCard: 'E068_CherryOrchard',
         },
       ],
       () => {

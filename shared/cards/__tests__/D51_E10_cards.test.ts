@@ -8,9 +8,9 @@ import {
 import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-farmer-to-space'
 
 // Import cards to register effects
-import '../A/A28_ForestSchool'
-import '../D/D51_Archway'
-import '../E/E10_StrawHat'
+import '../A/A028_ForestSchool'
+import '../D/D051_Archway'
+import '../E/E010_StrawHat'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionExecutionContext } from '../../contract/types'
 
@@ -61,91 +61,91 @@ const createState = (players: PlayerState[], spaces: ActionSpace[] = []): GameSt
 
 describe('PlayerActionSpace infrastructure', () => {
   it('D51 is registered with access=all', () => {
-    const config = getPlayerActionSpaceConfig('D51_Archway')
+    const config = getPlayerActionSpaceConfig('D051_Archway')
     expect(config).toBeDefined()
     expect(config!.access).toBe('all')
   })
 
   it('createPlayerActionSpaces creates space when card is in minorPlayed', () => {
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
+    player.minorPlayed = ['D051_Archway']
     const state = createState([player])
     const spaces = createPlayerActionSpaces(state)
     expect(spaces.length).toBe(1)
-    expect(spaces[0].id).toBe('D51_Archway')
+    expect(spaces[0].id).toBe('D051_Archway')
   })
 
   it('createPlayerActionSpaces does not duplicate', () => {
     const p1 = createPlayer('p1')
-    p1.minorPlayed = ['D51_Archway']
+    p1.minorPlayed = ['D051_Archway']
     const p2 = createPlayer('p2')
-    p2.minorPlayed = ['D51_Archway']
+    p2.minorPlayed = ['D051_Archway']
     const spaces = createPlayerActionSpaces(createState([p1, p2]))
-    expect(spaces.filter((s) => s.id === 'D51_Archway').length).toBe(1)
+    expect(spaces.filter((s) => s.id === 'D051_Archway').length).toBe(1)
   })
 
   it('createPlayerActionSpaces ignores non-registered cards', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A55_JunkRoom']
+    player.minorPlayed = ['A055_JunkRoom']
     const spaces = createPlayerActionSpaces(createState([player]))
     expect(spaces.length).toBe(0)
   })
 })
 
-describe('D51_Archway', () => {
+describe('D051_Archway', () => {
   it('action space execute gives 1 food', () => {
-    const config = getPlayerActionSpaceConfig('D51_Archway')!
+    const config = getPlayerActionSpaceConfig('D051_Archway')!
     const def = config.createDefinition('p1')
     const player = createPlayer()
     const result = def.execute!({
       state: createState([player]),
       player,
-      space: createSpace('D51_Archway'),
+      space: createSpace('D051_Archway'),
     } as unknown as ActionExecutionContext)
     expect(result.type).toBe('ok')
     expect(player.resources.food).toBe(1)
   })
 
   it('onBuy adds D51 action space to state', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
+    player.minorPlayed = ['D051_Archway']
     const state = createState([player])
     expect(state.actionSpaces.length).toBe(0)
     effect.onBuy!(state, player)
-    expect(state.actionSpaces.some((s) => s.id === 'D51_Archway')).toBe(true)
+    expect(state.actionSpaces.some((s) => s.id === 'D051_Archway')).toBe(true)
   })
 
   it('onBuy does not duplicate action space', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
+    player.minorPlayed = ['D051_Archway']
     const state = createState([player])
     effect.onBuy!(state, player)
     effect.onBuy!(state, player)
-    expect(state.actionSpaces.filter((s) => s.id === 'D51_Archway').length).toBe(1)
+    expect(state.actionSpaces.filter((s) => s.id === 'D051_Archway').length).toBe(1)
   })
 
   it('onBeforeReturnHome triggers when player worker is on D51', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
-    const d51Space = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    player.minorPlayed = ['D051_Archway']
+    const d51Space = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const targetSpace = createSpace('day-laborer')
     const state = createState([player], [d51Space, targetSpace])
     const flow = effect.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('D51_Archway')
+    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('D051_Archway')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
   })
 
   it('onBeforeReturnHome does not trigger when different player on D51', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const p1 = createPlayer('p1')
-    p1.minorPlayed = ['D51_Archway']
-    const d51Space = createSpace('D51_Archway', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
+    p1.minorPlayed = ['D051_Archway']
+    const d51Space = createSpace('D051_Archway', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const targetSpace = createSpace('day-laborer')
     const state = createState([p1], [d51Space, targetSpace])
     const flow = effect.onBeforeReturnHome!(state, p1)
@@ -153,10 +153,10 @@ describe('D51_Archway', () => {
   })
 
   it('onBeforeReturnHome does not trigger when no one on D51', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
-    const d51Space = createSpace('D51_Archway')
+    player.minorPlayed = ['D051_Archway']
+    const d51Space = createSpace('D051_Archway')
     const targetSpace = createSpace('day-laborer')
     const state = createState([player], [d51Space, targetSpace])
     const flow = effect.onBeforeReturnHome!(state, player)
@@ -164,10 +164,10 @@ describe('D51_Archway', () => {
   })
 
   it('onBeforeReturnHome does not trigger when no available spaces', () => {
-    const effect = getCardEffect('D51_Archway')!
+    const effect = getCardEffect('D051_Archway')!
     const player = createPlayer()
-    player.minorPlayed = ['D51_Archway']
-    const d51Space = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    player.minorPlayed = ['D051_Archway']
+    const d51Space = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const occupiedSpace = createSpace('day-laborer', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [d51Space, occupiedSpace])
     const flow = effect.onBeforeReturnHome!(state, player)
@@ -175,11 +175,11 @@ describe('D51_Archway', () => {
   })
 })
 
-describe('E10_StrawHat', () => {
+describe('E010_StrawHat', () => {
   it('round 3 with no farmland worker returns mandatory food-only xor', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland')
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
@@ -195,9 +195,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('round 3 with farmland worker returns mandatory food then move xor', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
@@ -215,9 +215,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('triggers on round 6', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
@@ -231,9 +231,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('does not trigger on round 4', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const state = createState([player], [farmland])
     state.round = 4
@@ -242,9 +242,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('only offers food when player worker is not on farmland', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
@@ -260,9 +260,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('only offers food when no available spaces', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const occupied = createSpace('day-laborer', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [farmland, occupied])
@@ -278,9 +278,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('does not offer move when target is unopened', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const unopened = createSpace('vegetable-seeds', { roundAvailable: 8 })
     const state = createState([player], [farmland, unopened])
@@ -294,9 +294,9 @@ describe('E10_StrawHat', () => {
   })
 
   it('does not offer move when target is unreachable', () => {
-    const effect = getCardEffect('E10_StrawHat')!
+    const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
+    player.minorPlayed = ['E010_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const unreachable = createSpace('day-laborer', { canBeExecutedByPlayer: () => false })
     const state = createState([player], [farmland, unreachable])
@@ -314,13 +314,13 @@ describe('E10_StrawHat', () => {
 describe('move-farmer-to-space action', () => {
   it('execute lists unoccupied spaces excluding source', () => {
     const player = createPlayer()
-    const source = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const source = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const available = createSpace('day-laborer')
     const occupied = createSpace('plow', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, available, occupied])
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
-      params: { excludeSpaceId: 'D51_Archway' },
+      params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
     expect(result.type).toBe('request')
     if (result.type === 'request' && result.request.kind === 'choice') {
@@ -331,25 +331,25 @@ describe('move-farmer-to-space action', () => {
 
   it('execute returns fail when no spaces available', () => {
     const player = createPlayer()
-    const source = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const source = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const occupied = createSpace('plow', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, occupied])
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
-      params: { excludeSpaceId: 'D51_Archway' },
+      params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
     expect(result.type).toBe('fail')
   })
 
-  it('execute includes occupied Lessons with A28_ForestSchool', () => {
+  it('execute includes occupied Lessons with A028_ForestSchool', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A28_ForestSchool']
-    const source = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    player.minorPlayed = ['A028_ForestSchool']
+    const source = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const lessons = createSpace('lessons', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
     const state = createState([player], [source, lessons])
     const result = moveFarmerToSpaceAction.execute({
       state, player, space: source,
-      params: { excludeSpaceId: 'D51_Archway' },
+      params: { excludeSpaceId: 'D051_Archway' },
     } as unknown as ActionExecutionContext)
     expect(result.type).toBe('request')
     if (result.type === 'request' && result.request.kind === 'choice') {

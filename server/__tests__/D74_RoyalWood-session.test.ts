@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/D/D74_RoyalWood'
-import '../../shared/cards/B/B81_Handcart'
-import '../../shared/cards/E/E14_WoodSaw'
+import '../../shared/cards/D/D074_RoyalWood'
+import '../../shared/cards/B/B081_Handcart'
+import '../../shared/cards/E/E014_WoodSaw'
 
-const CARD_ID = 'D74_RoyalWood'
+const CARD_ID = 'D074_RoyalWood'
 
 const paidEvent = (wood: number, paymentFor: string) => ({
   type: 'resource.paid',
@@ -80,7 +80,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   return resp
 }
 
-describe('D74_RoyalWood session', () => {
+describe('D074_RoyalWood session', () => {
   it.each([
     ['pay', 'major-improvement'],
     ['pay', 'minor-improvement'],
@@ -264,7 +264,7 @@ describe('D74_RoyalWood session', () => {
   it('does not carry separate 1-wood payments across turns', () => {
     const session = setup({ wood: 10 })
 
-    let resp = playOneWoodMinorTurn(session, 'B81_Handcart')
+    let resp = playOneWoodMinorTurn(session, 'B081_Handcart')
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',
@@ -275,7 +275,7 @@ describe('D74_RoyalWood session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(9)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
 
-    resp = playOneWoodMinorTurn(session, 'E14_WoodSaw')
+    resp = playOneWoodMinorTurn(session, 'E014_WoodSaw')
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',

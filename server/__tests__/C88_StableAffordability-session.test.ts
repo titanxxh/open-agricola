@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C88_CarpentersApprentice'
+import '../../shared/cards/C/C088_CarpentersApprentice'
 
 const PLACEHOLDER = ['__test_placeholder__']
 
@@ -16,7 +16,7 @@ const setup = (overrides: Partial<PlayerState> = {}, withC88 = true) => {
     p.occupationHand = [...PLACEHOLDER]
   }
   const player = state.players[0]!
-  if (withC88) player.occupationPlayed.push('C88_CarpentersApprentice')
+  if (withC88) player.occupationPlayed.push('C088_CarpentersApprentice')
   player.resources = { ...player.resources, wood: 3, food: 10, reed: 2 }
   Object.assign(player, overrides)
   session.loadState(state)

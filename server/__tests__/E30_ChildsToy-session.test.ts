@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount } from '../../shared/domain/player'
-import { E30_ChildsToy } from '../../shared/cards/E/E30_ChildsToy'
+import { E030_ChildsToy } from '../../shared/cards/E/E030_ChildsToy'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
-const CARD_ID = 'E30_ChildsToy'
+const CARD_ID = 'E030_ChildsToy'
 
-describe('E30_ChildsToy session', () => {
+describe('E030_ChildsToy session', () => {
   it('with card and 1 newborn, feeding requires full 2 food per person (no discount)', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -213,7 +213,7 @@ describe('E30_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 1)
       setNewbornCount(player, 0)
-      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(false)
     })
 
     it('blocks when one active worker is a newborn (1 adult + 1 newborn)', () => {
@@ -222,7 +222,7 @@ describe('E30_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
       setNewbornCount(player, 1)
-      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(false)
     })
 
     it('allows when player has exactly 2 adults (no newborns)', () => {
@@ -231,7 +231,7 @@ describe('E30_ChildsToy session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
       setNewbornCount(player, 0)
-      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, E030_ChildsToy, state.round, state)).toBe(true)
     })
   })
 })

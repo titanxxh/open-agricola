@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/B/B94_StockProtector'
+import '../../shared/cards/B/B094_StockProtector'
 
-const CARD_ID = 'B94_StockProtector'
+const CARD_ID = 'B094_StockProtector'
 
 const edgesForTile = (row: number, col: number) => [
   `H-${row}-${col}`,
@@ -12,7 +12,7 @@ const edgesForTile = (row: number, col: number) => [
   `V-${row}-${col + 1}`,
 ]
 
-describe('B94_StockProtector session', () => {
+describe('B094_StockProtector session', () => {
   it('preserves sourceCard on the granted post-fencing place-farmer choice', () => {
     const session = new GameSession()
     const state = session.getState().state

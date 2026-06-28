@@ -43,7 +43,7 @@ describe('E114_ShedBuilder session', () => {
       player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }]
       player.cardStates = {
         __actionSnapshot__: { extraData: { stableTiles: 2 } },
-        B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+        B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })
     expect(result).toBeDefined()

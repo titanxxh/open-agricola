@@ -5,7 +5,7 @@ import type {
   GameState,
   PlayerState,
 } from '../../../contract/types'
-import { B65_GrainDepot_impl } from '../../../cards/B/B65_GrainDepot'
+import { B065_GrainDepot_impl } from '../../../cards/B/B065_GrainDepot'
 import { setActiveCardRegistry } from '../../../cards/active-registry'
 import { CardRegistry } from '../../../cards/registry'
 import { Engine } from '../../../engine/engine'
@@ -16,7 +16,7 @@ import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../internal-actions'
 
-const CARD_ID = 'B65_GrainDepot'
+const CARD_ID = 'B065_GrainDepot'
 
 const createState = () =>
   ({
@@ -125,7 +125,7 @@ const runUntilDone = (
 describe('pay child context', () => {
   beforeEach(() => {
     const registry = new CardRegistry()
-    registry.loadImpl(CARD_ID, B65_GrainDepot_impl)
+    registry.loadImpl(CARD_ID, B065_GrainDepot_impl)
     setActiveCardRegistry(registry)
   })
 

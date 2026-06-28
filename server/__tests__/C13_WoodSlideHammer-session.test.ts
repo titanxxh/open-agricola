@@ -8,11 +8,11 @@ import {
 } from '../../shared/actions/payment/internal'
 import type { BonusModifier } from '../../shared/contract/types'
 
-import '../../shared/cards/A/A87_Conservator'
-import '../../shared/cards/C/C13_WoodSlideHammer'
+import '../../shared/cards/A/A087_Conservator'
+import '../../shared/cards/C/C013_WoodSlideHammer'
 
-const CARD_ID = 'C13_WoodSlideHammer'
-const CONSERVATOR_ID = 'A87_Conservator'
+const CARD_ID = 'C013_WoodSlideHammer'
+const CONSERVATOR_ID = 'A087_Conservator'
 
 const setupOwner = () => {
   const session = new GameSession()
@@ -35,7 +35,7 @@ const setupOwner = () => {
   return { session, state, player }
 }
 
-describe('C13_WoodSlideHammer — renovation -2 stone discount gated by conditions', () => {
+describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditions', () => {
   it('5 wood rooms → modifier surfaces and reduces required stone by 2', () => {
     const { player } = setupOwner()
     player.houseType = 'wood'
@@ -127,7 +127,7 @@ describe('C13_WoodSlideHammer — renovation -2 stone discount gated by conditio
   })
 })
 
-describe('C13_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E follow-up)', () => {
+describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E follow-up)', () => {
   // These cases verify the conditions chain end-to-end on the unified
   // ComplexCost.bonuses payment path. The C13 BonusModifier flows through:
   //   getModifiersForCostType (static-only) → applyCostModifiers

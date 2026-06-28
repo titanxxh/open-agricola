@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../contract/types'
 import { getCardEffect } from '../card-effects'
 
-import '../D/D34_LuxuriousHostel'
-import { D34_LuxuriousHostel as D34Card } from '../../cards/D/D34_LuxuriousHostel'
+import '../D/D034_LuxuriousHostel'
+import { D034_LuxuriousHostel as D34Card } from '../../cards/D/D034_LuxuriousHostel'
 
-const CARD_ID = 'D34_LuxuriousHostel'
+const CARD_ID = 'D034_LuxuriousHostel'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -40,7 +40,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D34_LuxuriousHostel', () => {
+describe('D034_LuxuriousHostel', () => {
   it('card definition matches BGA (cost, flags, no purchase prereq)', () => {
     expect(D34Card.cost).toEqual({ wood: 1, clay: 2 })
     expect(D34Card.extraVp).toBe(true)

@@ -17,27 +17,27 @@ describe('getPlayerCookeryCards', () => {
   })
 
   it('returns minor cookery improvements (e.g. A60 OrientalFireplace)', () => {
-    const p = makePlayer({ minorPlayed: ['A60_OrientalFireplace'] })
+    const p = makePlayer({ minorPlayed: ['A060_OrientalFireplace'] })
     const out = getPlayerCookeryCards(p)
-    expect(out.map((c) => c.id)).toEqual(['A60_OrientalFireplace'])
+    expect(out.map((c) => c.id)).toEqual(['A060_OrientalFireplace'])
   })
 
   it('combines majors and minors', () => {
     const p = makePlayer({
       improvements: ['Major_CookingHearth1'],
-      minorPlayed: ['D59_EarthOven'],
+      minorPlayed: ['D059_EarthOven'],
     })
     const out = getPlayerCookeryCards(p)
     const ids = out.map((c) => c.id)
     expect(ids).toContain('Major_CookingHearth1')
-    expect(ids).toContain('D59_EarthOven')
+    expect(ids).toContain('D059_EarthOven')
     expect(out.length).toBe(2)
   })
 
   it('skips non-cookery improvements', () => {
     const p = makePlayer({
       improvements: ['Major_StoneOven', 'Major_Joinery'],
-      minorPlayed: ['B27_Toolbox'],
+      minorPlayed: ['B027_Toolbox'],
     })
     const out = getPlayerCookeryCards(p)
     expect(out).toHaveLength(0)

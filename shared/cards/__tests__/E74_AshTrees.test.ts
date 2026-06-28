@@ -6,7 +6,7 @@ import { specialEffectAction } from '../../actions/effects/special-effect'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest } from './__fixtures__/fence'
 
-import '../E/E74_AshTrees'
+import '../E/E074_AshTrees'
 import type { CardListenerContext } from '../card-listeners'
 
 const createPlayer = (): PlayerState =>
@@ -28,11 +28,11 @@ const createPlayer = (): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }, { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
     roomTiles: [], stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: ['E74_AshTrees'],
+    improvements: [], minorHand: [], minorPlayed: ['E074_AshTrees'],
     occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
-    cardStates: { E74_AshTrees: { counters: { fences: 4 } } },
+    cardStates: { E074_AshTrees: { counters: { fences: 4 } } },
   }) as PlayerState
 
 const createState = (...players: PlayerState[]): GameState =>
@@ -78,27 +78,27 @@ const executeSpecialEffectLeaves = (
   })
 }
 
-describe('E74_AshTrees', () => {
+describe('E074_AshTrees', () => {
   it('stores only available fences on buy', () => {
-    const effect = getCardEffect('E74_AshTrees')
+    const effect = getCardEffect('E074_AshTrees')
     const player = createPlayer()
-    delete player.cardStates.E74_AshTrees
+    delete player.cardStates.E074_AshTrees
     setFencesForTest(player, 13)
 
     effect?.onBuy?.(createState(player), player)
 
-    expect(player.cardStates?.E74_AshTrees?.counters?.fences).toBe(2)
+    expect(player.cardStates?.E074_AshTrees?.counters?.fences).toBe(2)
   })
 
   it('stores only reserve fences after consumed supply tokens', () => {
-    const effect = getCardEffect('E74_AshTrees')
+    const effect = getCardEffect('E074_AshTrees')
     const player = createPlayer()
-    delete player.cardStates.E74_AshTrees
+    delete player.cardStates.E074_AshTrees
     player.supplyTokensConsumed = { fence: 12 }
 
     effect?.onBuy?.(createState(player), player)
 
-    expect(player.cardStates?.E74_AshTrees?.counters?.fences).toBe(3)
+    expect(player.cardStates?.E074_AshTrees?.counters?.fences).toBe(3)
   })
 
   it('offers free fence count choices before fencing', () => {
@@ -146,7 +146,7 @@ describe('E74_AshTrees', () => {
     const isDoable = findListener('E74-ash-trees-isdoable-fence')
     const beforeFence = findListener('E74-ash-trees-before-fence')
     const player = createPlayer()
-    delete player.cardStates.E74_AshTrees
+    delete player.cardStates.E074_AshTrees
     const state = createState(player)
     const before = JSON.stringify(player.cardStates)
 
@@ -175,7 +175,7 @@ describe('E74_AshTrees', () => {
     const listener = findListener('E74-ash-trees-after-fence')
     const player = createPlayer()
     storePendingFenceBonus(player, {
-      sourceCard: 'E74_AshTrees',
+      sourceCard: 'E074_AshTrees',
       counterKey: 'fences',
       freeFences: 2,
     })

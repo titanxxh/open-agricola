@@ -15,21 +15,21 @@ import {
 } from '../../shared/domain/player'
 import { addSyntheticLinkedOccupancyRef, addWorkerRef, isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 
-import '../../shared/cards/C/C22_BasketChair'
-import '../../shared/cards/C/C23_JobContract'
+import '../../shared/cards/C/C022_BasketChair'
+import '../../shared/cards/C/C023_JobContract'
 // Import a second, cheap minor so the minor-selection choice never has exactly
 // one option (which would otherwise auto-resolve past the choice state the
 // tests need to observe).
-import '../../shared/cards/C/C57_Crudite'
+import '../../shared/cards/C/C057_Crudite'
 
-const CARD_ID = 'C22_BasketChair'
-const FILLER_MINOR = 'C57_Crudite' // free-cost, no prerequisites
+const CARD_ID = 'C022_BasketChair'
+const FILLER_MINOR = 'C057_Crudite' // free-cost, no prerequisites
 
 /**
  * Simulate that `workerId` of player `p` has already been placed on
  * `spaceId` earlier in the work phase: add the worker ref to the space and
  * record a matching round-placement entry. Does NOT run the space's action
- * flow — mirrors A25_Bassinet-session.test.ts / D24_BrotherlyLove-session.test.ts.
+ * flow — mirrors A025_Bassinet-session.test.ts / D024_BrotherlyLove-session.test.ts.
  */
 const simulatePlacement = (
   session: GameSession,
@@ -91,7 +91,7 @@ const buyC22ViaMeetingPlace = (session: GameSession) => {
   return session.resolveChoice(0, c22Option.value)
 }
 
-describe('C22_BasketChair session', () => {
+describe('C022_BasketChair session', () => {
   it('case 1 — golden path: recall first-placed worker onto C22 + place extra farmer on ClayPit', () => {
     const session = setup({ activeWorkers: 3 })
     simulatePlacement(session, 0, 'forest', '1')
@@ -270,12 +270,12 @@ describe('C22_BasketChair session', () => {
     const session = setup({ activeWorkers: 4 })
     const state = session.getState().state
     const player = state.players[0]!
-    player.minorPlayed.push('C23_JobContract')
+    player.minorPlayed.push('C023_JobContract')
     session.loadState(state)
     simulatePlacement(session, 0, 'day-laborer', '1')
     const withDayLaborer = session.getState().state
     const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addSyntheticLinkedOccupancyRef(lessons, player.id, '1', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(lessons, player.id, '1', 'C023_JobContract')
     session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)
@@ -298,7 +298,7 @@ describe('C22_BasketChair session', () => {
     simulatePlacement(session, 0, 'day-laborer', '1')
     const withDayLaborer = session.getState().state
     const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addSyntheticLinkedOccupancyRef(lessons, withDayLaborer.players[0]!.id, '2', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(lessons, withDayLaborer.players[0]!.id, '2', 'C023_JobContract')
     session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)
@@ -321,7 +321,7 @@ describe('C22_BasketChair session', () => {
     simulatePlacement(session, 0, 'day-laborer', '1')
     const withDayLaborer = session.getState().state
     const lessonsBefore = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addSyntheticLinkedOccupancyRef(lessonsBefore, withDayLaborer.players[0]!.id, '1', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(lessonsBefore, withDayLaborer.players[0]!.id, '1', 'C023_JobContract')
     addWorkerRef(lessonsBefore, withDayLaborer.players[0]!.id, '4')
     session.loadState(withDayLaborer)
 
@@ -347,14 +347,14 @@ describe('C22_BasketChair session', () => {
     const session = setup({ activeWorkers: 5 })
     const state = session.getState().state
     const player = state.players[0]!
-    player.minorPlayed.push('C23_JobContract')
+    player.minorPlayed.push('C023_JobContract')
     session.loadState(state)
 
     simulatePlacement(session, 0, 'forest', '1')
     simulatePlacement(session, 0, 'day-laborer', '2')
     const withDayLaborer = session.getState().state
     const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addSyntheticLinkedOccupancyRef(lessons, player.id, '2', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(lessons, player.id, '2', 'C023_JobContract')
     session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)

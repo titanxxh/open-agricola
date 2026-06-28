@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import { getRegisteredMinorImprovement } from '../registry-display'
-import '../B/B56_Brook'
+import '../B/B056_Brook'
 import type { GameState, PlayerState } from '../../contract/types'
 
-const CARD_ID = 'B56_Brook'
+const CARD_ID = 'B056_Brook'
 
 const makePlayer = (id: string): PlayerState =>
   ({
@@ -41,7 +41,7 @@ const makeState = (_player: PlayerState, fishingTakenBy: string[]): GameState =>
     ],
   }) as unknown as GameState
 
-describe('B56_Brook prerequisite (BGA isBuyable: farmer on Fishing space)', () => {
+describe('B056_Brook prerequisite (BGA isBuyable: farmer on Fishing space)', () => {
   it('passes when the player has a farmer on the Fishing action space', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const player = makePlayer('p1')

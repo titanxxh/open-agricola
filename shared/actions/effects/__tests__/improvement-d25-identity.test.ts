@@ -3,7 +3,7 @@ import type { GameState, PlayerState } from '../../../contract/types'
 import { playMinorImprovement } from '../improvement'
 
 // Ensure D25 card definition is registered before tests run
-import '../../../cards/D/D25_WitchesDanceFloor'
+import '../../../cards/D/D025_WitchesDanceFloor'
 
 const createState = (): GameState => ({
   round: 1,
@@ -45,7 +45,7 @@ const createPlayer = (): PlayerState => ({
   roomTiles: [],
   stableTiles: [],
   improvements: [],
-  minorHand: ['D25_WitchesDanceFloor'],
+  minorHand: ['D025_WitchesDanceFloor'],
   minorPlayed: [],
   occupationHand: [],
   occupationPlayed: [],
@@ -67,13 +67,13 @@ describe('D25 play side-effects', () => {
     const player = createPlayer()
 
     // Simulate the side-effect branch directly (unit intent)
-    player.minorPlayed.push('D25_WitchesDanceFloor')
-    if (!player.extraOccupationsFromCards.includes('D25_WitchesDanceFloor')) {
-      player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    player.minorPlayed.push('D025_WitchesDanceFloor')
+    if (!player.extraOccupationsFromCards.includes('D025_WitchesDanceFloor')) {
+      player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     }
 
-    expect(player.extraOccupationsFromCards).toContain('D25_WitchesDanceFloor')
-    expect(player.minorPlayed).toContain('D25_WitchesDanceFloor')
+    expect(player.extraOccupationsFromCards).toContain('D025_WitchesDanceFloor')
+    expect(player.minorPlayed).toContain('D025_WitchesDanceFloor')
   })
 
   it('playMinorImprovement branch: providesOccupation flag pushes to extraOccupationsFromCards', () => {
@@ -88,7 +88,7 @@ describe('D25 play side-effects', () => {
     const result = playMinorImprovement(
       state,
       player,
-      'D25_WitchesDanceFloor',
+      'D025_WitchesDanceFloor',
       undefined,
       undefined,
       'minorAction',
@@ -96,8 +96,8 @@ describe('D25 play side-effects', () => {
 
     if (result.type === 'ok' || result.type === 'flow') {
       // Full path succeeded — verify side-effect
-      expect(player.extraOccupationsFromCards).toContain('D25_WitchesDanceFloor')
-      expect(player.minorPlayed).toContain('D25_WitchesDanceFloor')
+      expect(player.extraOccupationsFromCards).toContain('D025_WitchesDanceFloor')
+      expect(player.minorPlayed).toContain('D025_WitchesDanceFloor')
     } else {
       // Prerequisites not met in minimal setup — acceptable here;
       // full integration coverage is in Task 11.
@@ -109,13 +109,13 @@ describe('D25 play side-effects', () => {
     const player = createPlayer()
 
     // Simulate the dedup guard in finalizeMinorImprovementPurchase
-    if (!player.extraOccupationsFromCards.includes('D25_WitchesDanceFloor')) {
-      player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    if (!player.extraOccupationsFromCards.includes('D025_WitchesDanceFloor')) {
+      player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     }
-    if (!player.extraOccupationsFromCards.includes('D25_WitchesDanceFloor')) {
-      player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    if (!player.extraOccupationsFromCards.includes('D025_WitchesDanceFloor')) {
+      player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     }
 
-    expect(player.extraOccupationsFromCards.filter((id) => id === 'D25_WitchesDanceFloor')).toHaveLength(1)
+    expect(player.extraOccupationsFromCards.filter((id) => id === 'D025_WitchesDanceFloor')).toHaveLength(1)
   })
 })

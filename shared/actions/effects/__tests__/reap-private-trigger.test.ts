@@ -3,8 +3,8 @@ import { internalActionDefinitions } from '../../internal-actions'
 import type { GameState, PlayerState, Resource } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
 import { makeCardFieldImpl } from '../../../cards/helpers/card-field'
-import '../../../cards/E/E68_CherryOrchard'
-import '../../../cards/E/E72_ArtichokeField'
+import '../../../cards/E/E068_CherryOrchard'
+import '../../../cards/E/E072_ArtichokeField'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -50,7 +50,7 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
       eventSink: { emit: (event: unknown) => events.push(event) },
     } as never)
@@ -68,12 +68,12 @@ describe('reap action private-field-phase trigger', () => {
       expect.objectContaining({
         type: 'farm.cropRemoved',
         reason: 'reap',
-        trigger: { phase: 'private-field-phase', cardId: 'C72_FestivalPlanning' },
+        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
       }),
       expect.objectContaining({
         type: 'resource.moved',
         reason: 'reap',
-        trigger: { phase: 'private-field-phase', cardId: 'C72_FestivalPlanning' },
+        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
       }),
     ])
   })
@@ -97,7 +97,7 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
     } as never)).toEqual({ type: 'fail', errorKey: 'log.action' })
   })
@@ -113,11 +113,11 @@ describe('reap action private-field-phase trigger', () => {
       fields: [
         { row: 0, col: 0, stacks: [{ kind: 'grain' as const, remaining: 1 }] },
       ],
-      minorPlayed: ['E68_CherryOrchard'],
+      minorPlayed: ['E068_CherryOrchard'],
       occupationPlayed: [],
       improvements: [],
       cardStates: {
-        E68_CherryOrchard: {
+        E068_CherryOrchard: {
           extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
         },
       },
@@ -128,14 +128,14 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
       eventSink: { emit: (event: unknown) => events.push(event) },
     } as never)
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.wood).toBe(1)
-    expect(player.cardStates.E68_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
     expect(events.map((event) => (event as { from?: { kind?: string } }).from?.kind)).toEqual([
       undefined,
       'field',
@@ -145,14 +145,14 @@ describe('reap action private-field-phase trigger', () => {
       {
         crop: 'grain',
         amount: 1,
-        trigger: { phase: 'private-field-phase', cardId: 'C72_FestivalPlanning' },
-        sourceCard: 'C72_FestivalPlanning',
+        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
+        sourceCard: 'C072_FestivalPlanning',
       },
       {
         crop: 'wood',
         amount: 1,
-        trigger: { phase: 'private-field-phase', cardId: 'C72_FestivalPlanning' },
-        sourceCard: 'C72_FestivalPlanning',
+        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
+        sourceCard: 'C072_FestivalPlanning',
       },
     ])
     expect(result).toEqual({
@@ -163,7 +163,7 @@ describe('reap action private-field-phase trigger', () => {
           type: 'leaf',
           actionId: 'gain',
           params: { vegetable: 1 },
-          sourceCard: 'E68_CherryOrchard',
+          sourceCard: 'E068_CherryOrchard',
           choiceLabelKey: undefined,
           choiceLabelParams: undefined,
         }],
@@ -181,11 +181,11 @@ describe('reap action private-field-phase trigger', () => {
       fields: [
         { row: 0, col: 0, stacks: [{ kind: 'grain' as const, remaining: 1 }] },
       ],
-      minorPlayed: ['E68_CherryOrchard'],
+      minorPlayed: ['E068_CherryOrchard'],
       occupationPlayed: [],
       improvements: [],
       cardStates: {
-        E68_CherryOrchard: {
+        E068_CherryOrchard: {
           extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
         },
       },
@@ -196,11 +196,11 @@ describe('reap action private-field-phase trigger', () => {
       fields: [
         { row: 0, col: 0, stacks: [{ kind: 'vegetable' as const, remaining: 1 }] },
       ],
-      minorPlayed: ['E68_CherryOrchard'],
+      minorPlayed: ['E068_CherryOrchard'],
       occupationPlayed: [],
       improvements: [],
       cardStates: {
-        E68_CherryOrchard: {
+        E068_CherryOrchard: {
           extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
         },
       },
@@ -211,18 +211,18 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player: actor,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
     } as never)
 
     expect(actor.resources.grain).toBe(1)
     expect(actor.resources.wood).toBe(1)
     expect(actor.fields[0]!.stacks).toEqual([])
-    expect(actor.cardStates.E68_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
+    expect(actor.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
     expect(opponent.resources.vegetable).toBe(0)
     expect(opponent.resources.wood).toBe(0)
     expect(opponent.fields[0]!.stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
-    expect(opponent.cardStates.E68_CherryOrchard?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 1 }])
+    expect(opponent.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 1 }])
   })
 
   it('passes private-field-phase trigger to Card Field onReap so harvest-only effects can skip', () => {
@@ -255,7 +255,7 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
     } as never)
 
@@ -271,11 +271,11 @@ describe('reap action private-field-phase trigger', () => {
       id: 'p1',
       resources: emptyResources(),
       fields: [],
-      minorPlayed: ['E72_ArtichokeField'],
+      minorPlayed: ['E072_ArtichokeField'],
       occupationPlayed: [],
       improvements: [],
       cardStates: {
-        E72_ArtichokeField: {
+        E072_ArtichokeField: {
           extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
         },
       },
@@ -286,13 +286,13 @@ describe('reap action private-field-phase trigger', () => {
       state,
       player,
       space: { id: 'reap' },
-      sourceCard: 'C72_FestivalPlanning',
+      sourceCard: 'C072_FestivalPlanning',
       actionContext: privateReapContext,
     } as never)
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.food).toBe(0)
-    expect(player.cardStates.E72_ArtichokeField?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates.E072_ArtichokeField?.extraData?.cardFieldStacks).toEqual([])
     expect(result.type).toBe('ok')
   })
 })

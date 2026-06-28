@@ -62,8 +62,8 @@ describe('validateSowSelection maxSelections by logical group', () => {
           ['-75-1', ['wood']],
         ]),
         extraGroupKeys: new Map([
-          ['-75-0', 'D75_WoodField'],
-          ['-75-1', 'D75_WoodField'],
+          ['-75-0', 'D075_WoodField'],
+          ['-75-1', 'D075_WoodField'],
         ]),
       },
     )
@@ -84,7 +84,7 @@ describe('validateSowSelection maxSelections by logical group', () => {
       {
         maxSelections: 1,
         extraAllowedCrops: new Map([['-75-0', ['wood']]]),
-        extraGroupKeys: new Map([['-75-0', 'D75_WoodField']]),
+        extraGroupKeys: new Map([['-75-0', 'D075_WoodField']]),
       },
     )
     expect(res.ok).toBe(false)

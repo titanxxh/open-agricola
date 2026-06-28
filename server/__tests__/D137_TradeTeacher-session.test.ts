@@ -237,7 +237,7 @@ describe('D137_TradeTeacher end-to-end via GameSession', () => {
     setWorkersAtHome(state, player, 1)
     state.players[1]!.workersAvailable = 1
     // Needs at least one occupation in hand to take Lessons (if Lessons requires it).
-    player.occupationHand.push('A1_WoodCutter')
+    player.occupationHand.push('A001_WoodCutter')
 
     session.loadState(state)
     return session

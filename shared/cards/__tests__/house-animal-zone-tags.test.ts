@@ -65,7 +65,7 @@ describe('house animal zone tags', () => {
 
   it('filters normal and tagged house animal zones through D12 capability metadata', () => {
     const player = createPlayer({
-      minorPlayed: ['D12_MilkingPlace'],
+      minorPlayed: ['D012_MilkingPlace'],
       occupationPlayed: ['D148_DomesticianExpert'],
     })
     const registry = new CardRegistry()

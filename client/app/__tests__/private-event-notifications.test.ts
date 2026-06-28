@@ -52,7 +52,7 @@ describe('private event notifications', () => {
       type: 'private.promptShown',
       recipientPlayerId: 'p1',
       promptKind: 'resource-batch-exchange-select',
-      sourceCard: 'E78_SleightofHand',
+      sourceCard: 'E078_SleightofHand',
       promptKey: 'ui.interactionSleightOfHand',
     }
 
@@ -73,7 +73,7 @@ describe('private event notifications', () => {
       cardIds: ['A1', 'B2'],
       cardType: 'mixed',
       reason: 'card-effect',
-      sourceCard: 'C1_Test',
+      sourceCard: 'C001_Test',
     }
     const right: PrivateGameEvent = {
       ...left,

@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/B/B030_WoodPalisades'
 
-const CARD_ID = 'B30_WoodPalisades'
+const CARD_ID = 'B030_WoodPalisades'
 
 // Tile (0,0) corner edges:
 // H-0-0 = top border (border), H-1-0 = bottom of tile (internal)

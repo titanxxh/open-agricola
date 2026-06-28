@@ -36,12 +36,12 @@ type ShapeCheck = {
 }
 
 const allowedContextResultUses = {
-  'shared/cards/A/A94_LazySowman.ts': {
+  'shared/cards/A/A094_LazySowman.ts': {
     reason: 'computeArgs request kind guard for extra options',
     expectedContextResultReferences: 2,
     expectedResultPaths: ['request', 'request.kind', 'type'],
   },
-  'shared/cards/B/B18_GrasslandHarrow.ts': {
+  'shared/cards/B/B018_GrasslandHarrow.ts': {
     reason: 'after-pay ok guard; resource facts come from state reserve',
     expectedContextResultReferences: 1,
     expectedResultPaths: ['type'],
@@ -51,7 +51,7 @@ const allowedContextResultUses = {
     expectedContextResultReferences: 1,
     expectedResultPaths: ['type'],
   },
-  'shared/cards/D/D50_ForeignAid.ts': {
+  'shared/cards/D/D050_ForeignAid.ts': {
     reason: 'computeArgs request options filtering',
     expectedContextResultReferences: 1,
     expectedResultPaths: ['request', 'request.kind', 'request.options', 'request.options.filter', 'type'],
@@ -544,7 +544,7 @@ function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, v
 }
 
 const requiredShapeChecks = {
-  'shared/cards/A/A94_LazySowman.ts': [
+  'shared/cards/A/A094_LazySowman.ts': [
     {
       label: 'guards request type',
       check: (sourceFile) =>
@@ -556,7 +556,7 @@ const requiredShapeChecks = {
         hasResultStringComparison(sourceFile, 'request.kind', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'choice'),
     },
   ],
-  'shared/cards/B/B18_GrasslandHarrow.ts': [
+  'shared/cards/B/B018_GrasslandHarrow.ts': [
     {
       label: 'guards own source card',
       check: hasContextSourceCardGuard,
@@ -578,7 +578,7 @@ const requiredShapeChecks = {
       check: (sourceFile) => hasCallWithStringArg(sourceFile, 'sumResourcePaid', 'boar'),
     },
   ],
-  'shared/cards/D/D50_ForeignAid.ts': [
+  'shared/cards/D/D050_ForeignAid.ts': [
     {
       label: 'guards request type',
       check: (sourceFile) =>

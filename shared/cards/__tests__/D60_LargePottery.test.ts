@@ -7,10 +7,10 @@ import { getCardEffect } from '../card-effects'
 import { cardCountsAs, collectCardsAs } from '../helpers/card-type'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 
-import '../D/D60_LargePottery'
-import { D60_LargePottery as D60Card } from '../../cards/D/D60_LargePottery'
+import '../D/D060_LargePottery'
+import { D060_LargePottery as D60Card } from '../../cards/D/D060_LargePottery'
 
-const CARD_ID = 'D60_LargePottery'
+const CARD_ID = 'D060_LargePottery'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -43,7 +43,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D60_LargePottery', () => {
+describe('D060_LargePottery', () => {
   it('card definition matches BGA (cost, vp, prerequisite, extraVp, alsoCountsAs, exchanges)', () => {
     expect(D60Card.cost).toEqual({ clay: 1, stone: 1 })
     expect(D60Card.vp).toBe(3)

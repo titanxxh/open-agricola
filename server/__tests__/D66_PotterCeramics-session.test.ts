@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B26_AgrarianFences'
-import '../../shared/cards/D/D66_PotterCeramics'
+import '../../shared/cards/B/B026_AgrarianFences'
+import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/__stubs__/STUB_BeforeBakeGainClay'
 
-const CARD_ID = 'D66_PotterCeramics'
+const CARD_ID = 'D066_PotterCeramics'
 
 const setup = (overrides: {
   clay?: number
@@ -39,7 +39,7 @@ const setup = (overrides: {
   return session
 }
 
-describe('D66_PotterCeramics session', () => {
+describe('D066_PotterCeramics session', () => {
   it('offers enabled D66 before bake and blocks pass when bake is empty without it', () => {
     const session = setup()
 
@@ -93,7 +93,7 @@ describe('D66_PotterCeramics session', () => {
     const session = setup({
       clay: 1,
       grain: 0,
-      extraPlayedCards: ['B26_AgrarianFences'],
+      extraPlayedCards: ['B026_AgrarianFences'],
     })
     const state = session.getState().state
     const player = state.players[0]!

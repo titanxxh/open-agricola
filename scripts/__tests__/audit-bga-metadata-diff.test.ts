@@ -17,7 +17,7 @@ describe('parseBgaCard', () => {
     const phpPath = path.join(FIXTURE_DIR, 'bga/A99_Test.php')
     const card = parseBgaCard(phpPath)
     expect(card).toEqual({
-      id: 'A99_Test',
+      id: 'A099_Test',
       deck: 'A',
       number: 99,
       name: 'Test Card',
@@ -35,7 +35,7 @@ describe('parseBgaCard', () => {
     const phpPath = path.join(FIXTURE_DIR, 'bga/A14_Banned.php')
     const card = parseBgaCard(phpPath)
     expect(card.banned).toBe(true)
-    expect(card.id).toBe('A14_Banned')
+    expect(card.id).toBe('A014_Banned')
   })
 
   it('parses quoted-string category with hyphens', () => {
@@ -72,10 +72,10 @@ describe('parseBgaCard', () => {
 
 describe('parseTsCard', () => {
   it('extracts fields from TS card-display file', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/A99_Test.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A099_Test.ts')
     const card = parseTsCard(tsPath)
     expect(card).toEqual({
-      id: 'A99_Test',
+      id: 'A099_Test',
       deck: 'A',
       number: 99,
       name: 'Test Card',
@@ -88,29 +88,29 @@ describe('parseTsCard', () => {
   })
 
   it('handles cards with no optional fields', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/A77_TsOnly.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A077_TsOnly.ts')
     const card = parseTsCard(tsPath)
-    expect(card.id).toBe('A77_TsOnly')
+    expect(card.id).toBe('A077_TsOnly')
     expect(card.players).toBe('1+')
     expect(card.extraVp).toBeUndefined()
     expect(card.vp).toBeUndefined()
   })
 
   it('parses JSON double-quoted cost key', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/A29_JsonCost.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A029_JsonCost.ts')
     const card = parseTsCard(tsPath)
     expect(card.cost).toEqual({ wood: 1 })
   })
 
   it('parses altCosts from TS array-of-objects literal', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/A29w_TsAltCosts.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A029w_TsAltCosts.ts')
     const card = parseTsCard(tsPath)
     expect(card.altCosts).toEqual([{ wood: 1 }, { food: 2 }])
     expect(card.cost).toBeUndefined()
   })
 
   it('parses passing metadata from TS card-display file', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/C1_Passing.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/C001_Passing.ts')
     const card = parseTsCard(tsPath)
     expect(card.passing).toBe(true)
   })
@@ -119,24 +119,24 @@ describe('parseTsCard', () => {
 describe('diffCards', () => {
   it('produces ⚠ for extraVp/vp deviations, ❌ for prerequisite text, tracks BGA-only and TS-only', () => {
     const bgaMap = new Map([
-      ['A99_Test', { id: 'A99_Test', deck: 'A', number: 99, category: 'POINTS_PROVIDER', players: '1+', extraVp: true, vp: 2, cost: { wood: 1, food: 2 }, prerequisite: '5 Sheep on farm', banned: false }],
-      ['A14_Banned', { id: 'A14_Banned', deck: 'A', number: 14, category: 'ACTIONS_BOOSTER', players: '1+', banned: true }],
+      ['A099_Test', { id: 'A099_Test', deck: 'A', number: 99, category: 'POINTS_PROVIDER', players: '1+', extraVp: true, vp: 2, cost: { wood: 1, food: 2 }, prerequisite: '5 Sheep on farm', banned: false }],
+      ['A014_Banned', { id: 'A014_Banned', deck: 'A', number: 14, category: 'ACTIONS_BOOSTER', players: '1+', banned: true }],
     ])
     const tsMap = new Map([
-      ['A99_Test', { id: 'A99_Test', deck: 'A', number: 99, category: 'POINTS_PROVIDER', players: '1+', vp: 1, cost: { wood: 1, food: 2 }, prerequisite: 'Wooden House' }],
-      ['A77_TsOnly', { id: 'A77_TsOnly', deck: 'A', number: 77, players: '1+' }],
+      ['A099_Test', { id: 'A099_Test', deck: 'A', number: 99, category: 'POINTS_PROVIDER', players: '1+', vp: 1, cost: { wood: 1, food: 2 }, prerequisite: 'Wooden House' }],
+      ['A077_TsOnly', { id: 'A077_TsOnly', deck: 'A', number: 77, players: '1+' }],
     ])
     const result = diffCards(bgaMap as never, tsMap as never)
 
-    const a99 = result.deviations.filter((d: FieldDiff) => d.id === 'A99_Test')
+    const a99 = result.deviations.filter((d: FieldDiff) => d.id === 'A099_Test')
     expect(a99.find(d => d.field === 'vp')?.verdict).toBe('warn')
     expect(a99.find(d => d.field === 'extraVp')?.verdict).toBe('warn')
     expect(a99.find(d => d.field === 'prerequisite')?.verdict).toBe('error')
     expect(a99.find(d => d.field === 'passing')).toBeUndefined()
 
     expect(result.bannedButPresent).toEqual([])
-    expect(result.bgaOnly).toEqual(['A14_Banned'])
-    expect(result.tsOnly).toEqual(['A77_TsOnly'])
+    expect(result.bgaOnly).toEqual(['A014_Banned'])
+    expect(result.tsOnly).toEqual(['A077_TsOnly'])
   })
 })
 
@@ -187,10 +187,10 @@ describe('diffCards cost normalization', () => {
 
   it('reports STABLE cost differences after parsing it as stable', () => {
     const bgaMap = new Map([
-      ['C54_StableCost', { id: 'C54_StableCost', deck: 'C', number: 54, cost: { stable: 1 }, banned: false }],
+      ['C054_StableCost', { id: 'C054_StableCost', deck: 'C', number: 54, cost: { stable: 1 }, banned: false }],
     ])
     const tsMap = new Map([
-      ['C54_StableCost', { id: 'C54_StableCost', deck: 'C', number: 54, cost: {} }],
+      ['C054_StableCost', { id: 'C054_StableCost', deck: 'C', number: 54, cost: {} }],
     ])
     const result = diffCards(bgaMap as never, tsMap as never)
     const costDev = result.deviations.find(d => d.field === 'cost')
@@ -203,14 +203,14 @@ describe('diffCards cost normalization', () => {
 describe('diffCards passing metadata', () => {
   it('reports passing=true when TS omits it', () => {
     const bgaMap = new Map([
-      ['C1_Overhaul', { id: 'C1_Overhaul', deck: 'C', number: 1, passing: true, banned: false }],
+      ['C001_Overhaul', { id: 'C001_Overhaul', deck: 'C', number: 1, passing: true, banned: false }],
     ])
     const tsMap = new Map([
-      ['C1_Overhaul', { id: 'C1_Overhaul', deck: 'C', number: 1 }],
+      ['C001_Overhaul', { id: 'C001_Overhaul', deck: 'C', number: 1 }],
     ])
     const result = diffCards(bgaMap as never, tsMap as never)
     expect(result.deviations).toEqual([
-      { id: 'C1_Overhaul', field: 'passing', bga: true, ours: undefined, verdict: 'warn' },
+      { id: 'C001_Overhaul', field: 'passing', bga: true, ours: undefined, verdict: 'warn' },
     ])
   })
 })
@@ -219,11 +219,11 @@ describe('renderReport', () => {
   it('produces a markdown report with summary section', () => {
     const md = renderReport({
       deviations: [
-        { id: 'A99_Test', field: 'vp', bga: 2, ours: 1, verdict: 'warn' },
-        { id: 'A99_Test', field: 'extraVp', bga: true, ours: undefined, verdict: 'warn' },
+        { id: 'A099_Test', field: 'vp', bga: 2, ours: 1, verdict: 'warn' },
+        { id: 'A099_Test', field: 'extraVp', bga: true, ours: undefined, verdict: 'warn' },
       ],
-      bgaOnly: ['A14_Banned'],
-      tsOnly: ['A77_TsOnly'],
+      bgaOnly: ['A014_Banned'],
+      tsOnly: ['A077_TsOnly'],
       bannedButPresent: [],
       totalBga: 2,
       totalTs: 2,
@@ -231,8 +231,8 @@ describe('renderReport', () => {
     expect(md).toContain('# BGA Metadata Diff Report (2026-05-12)')
     expect(md).toContain('## Summary')
     expect(md).toContain('## ⚠ Literal deviations (auto-fixable)')
-    expect(md).toContain('A99_Test')
-    expect(md).toContain('A14_Banned')
+    expect(md).toContain('A099_Test')
+    expect(md).toContain('A014_Banned')
   })
 })
 
@@ -271,7 +271,7 @@ describe('diffCards players normalization', () => {
 
 describe('applySafeFix', () => {
   it('replaces vp literal, inserts extraVp:true, inserts category', () => {
-    const tsPath = path.join(FIXTURE_DIR, 'ts/A88_FixMe.ts')
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A088_FixMe.ts')
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('node:fs') as typeof import('node:fs')
     const before = fs.readFileSync(tsPath, 'utf8') as string
@@ -326,11 +326,11 @@ describe('loadBga canonical pick (integration with parseBgaCard fixtures)', () =
   it('picks the canonical id when multiple files share deck+number', () => {
     const a = parseBgaCard(path.join(FIXTURE_DIR, 'bga/D11w_LawnFertilizer.php'))
     const b = parseBgaCard(path.join(FIXTURE_DIR, 'bga/D11w_LawnFertilzer.php'))
-    const tsIds = new Set(['D11w_LawnFertilizer'])
+    const tsIds = new Set(['D011w_LawnFertilizer'])
     const cards = [a, b]
     const tsMatch = cards.find(c => tsIds.has(c.id))
     const picked = tsMatch ?? cards.find(c => !c.banned) ?? cards[0]
-    expect(picked.id).toBe('D11w_LawnFertilizer')
+    expect(picked.id).toBe('D011w_LawnFertilizer')
     expect(picked.banned).toBe(false)
   })
 })

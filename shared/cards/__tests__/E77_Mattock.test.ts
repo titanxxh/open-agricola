@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
-import '../E/E77_Mattock'
+import '../E/E077_Mattock'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'E77_Mattock'
+const CARD_ID = 'E077_Mattock'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -51,7 +51,7 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('E77_Mattock', () => {
+describe('E077_Mattock', () => {
   it('gains 1 clay after collecting from reed-bank', () => {
     const listener = findListener('E77-mattock-after-collect')!
     expect(listener).toBeDefined()

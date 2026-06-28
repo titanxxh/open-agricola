@@ -3,18 +3,18 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import '../../shared/cards/D/D72_StableManure'
+import '../../shared/cards/D/D072_StableManure'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-describe('D72_StableManure session', () => {
+describe('D072_StableManure session', () => {
   const chooseStableManureSelection = (session: GameSession) => {
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     const triggerOption = resp.interaction.options?.find(
-      (o: ActionChoiceOption) => o.value === 'D72_StableManure',
+      (o: ActionChoiceOption) => o.value === 'D072_StableManure',
     )
     expect(triggerOption).toBeDefined()
     resp = session.resolveChoice(0, triggerOption!.value)
@@ -45,7 +45,7 @@ describe('D72_StableManure session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('D72_StableManure')
+    player.minorPlayed.push('D072_StableManure')
 
     // Fields with crops
     player.fields = [
@@ -132,11 +132,11 @@ describe('D72_StableManure session', () => {
     const p = state.players[0]!
     p.cardStates = {
       ...p.cardStates,
-      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+      B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }
     session.loadState(state)
 
-    const effect = getCardEffect('D72_StableManure')
+    const effect = getCardEffect('D072_StableManure')
     const flow = effect!.onStartHarvestFieldPhase!(state, p)
     expect(flow).toBeDefined()
   })
@@ -153,7 +153,7 @@ describe('D72_StableManure session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('D72_StableManure')
+    player.minorPlayed.push('D072_StableManure')
     player.fields = []
     player.stableTiles = [{ row: 2, col: 0 }]
     player.pastures = []

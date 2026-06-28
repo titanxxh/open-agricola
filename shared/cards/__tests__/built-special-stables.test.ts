@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { collectBuiltSpecialStables } from '../card-effects'
-import '../B/B85_FarmHand'
+import '../B/B085_FarmHand'
 
-const CARD_ID = 'B85_FarmHand'
+const CARD_ID = 'B085_FarmHand'
 const FARM_HAND_TILE: FarmTilePosition = { row: 0, col: 2 }
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>

@@ -27,7 +27,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { computeScores } from '../scoring'
-import '../../cards/D/D25_WitchesDanceFloor'
+import '../../cards/D/D025_WitchesDanceFloor'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -94,9 +94,9 @@ describe('D25 scoring', () => {
     // Occupation VP is 0 per card. extraOccupationsFromCards adds no entries
     // to the per-card scan (D25 sits in minorPlayed, not occupationPlayed).
     const player = createPlayer()
-    player.occupationPlayed.push('A1_FieldWatcher', 'A2_Cottager') // 2 real occupations
-    player.minorPlayed.push('D25_WitchesDanceFloor')
-    player.extraOccupationsFromCards.push('D25_WitchesDanceFloor') // 3 total
+    player.occupationPlayed.push('A001_FieldWatcher', 'A002_Cottager') // 2 real occupations
+    player.minorPlayed.push('D025_WitchesDanceFloor')
+    player.extraOccupationsFromCards.push('D025_WitchesDanceFloor') // 3 total
 
     const [result] = computeScores(createState(player))!
     const byKey = new Map(result!.categories.map((c) => [c.key, c]))
@@ -122,8 +122,8 @@ describe('D25 scoring', () => {
     const player = createPlayer()
     // 1 real field
     player.fields.push({ row: 1, col: 0, stacks: [] })
-    player.minorPlayed.push('D25_WitchesDanceFloor')
-    player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    player.minorPlayed.push('D025_WitchesDanceFloor')
+    player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
 
     const fieldsBefore = player.fields.length // 1
 
@@ -143,7 +143,7 @@ describe('D25 scoring', () => {
     // it should still not show up in per-card iteration (scoring only reads minorPlayed
     // and occupationPlayed directly).
     const player = createPlayer()
-    player.extraOccupationsFromCards.push('D25_WitchesDanceFloor')
+    player.extraOccupationsFromCards.push('D025_WitchesDanceFloor')
     // deliberately NOT adding to minorPlayed
 
     const [result] = computeScores(createState(player))!

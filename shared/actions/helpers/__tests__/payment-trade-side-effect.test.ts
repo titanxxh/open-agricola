@@ -92,11 +92,11 @@ describe('applyTradeSideEffect.pushExtraDataValue', () => {
     applyTradeSideEffect(
       state,
       player,
-      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      { type: 'pushExtraDataValue', sourceCard: 'C062_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
       1,
-      'C62_CookeryExtension',
+      'C062_CookeryExtension',
     )
-    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
+    expect(player.cardStates?.C062_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
   })
 
   it('dedupes when same value is pushed twice', () => {
@@ -104,13 +104,13 @@ describe('applyTradeSideEffect.pushExtraDataValue', () => {
     const player = makePlayer()
     const eff = {
       type: 'pushExtraDataValue' as const,
-      sourceCard: 'C62_CookeryExtension',
+      sourceCard: 'C062_CookeryExtension',
       key: 'usedCookeryIds',
       value: 'Major_Fireplace1',
     }
-    applyTradeSideEffect(state, player, eff, 1, 'C62_CookeryExtension')
-    applyTradeSideEffect(state, player, eff, 1, 'C62_CookeryExtension')
-    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
+    applyTradeSideEffect(state, player, eff, 1, 'C062_CookeryExtension')
+    applyTradeSideEffect(state, player, eff, 1, 'C062_CookeryExtension')
+    expect(player.cardStates?.C062_CookeryExtension?.extraData?.usedCookeryIds).toEqual(['Major_Fireplace1'])
   })
 
   it('appends a different value to existing list', () => {
@@ -119,18 +119,18 @@ describe('applyTradeSideEffect.pushExtraDataValue', () => {
     applyTradeSideEffect(
       state,
       player,
-      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      { type: 'pushExtraDataValue', sourceCard: 'C062_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
       1,
-      'C62_CookeryExtension',
+      'C062_CookeryExtension',
     )
     applyTradeSideEffect(
       state,
       player,
-      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_CookingHearth1' },
+      { type: 'pushExtraDataValue', sourceCard: 'C062_CookeryExtension', key: 'usedCookeryIds', value: 'Major_CookingHearth1' },
       1,
-      'C62_CookeryExtension',
+      'C062_CookeryExtension',
     )
-    expect(player.cardStates?.C62_CookeryExtension?.extraData?.usedCookeryIds).toEqual([
+    expect(player.cardStates?.C062_CookeryExtension?.extraData?.usedCookeryIds).toEqual([
       'Major_Fireplace1',
       'Major_CookingHearth1',
     ])
@@ -142,10 +142,10 @@ describe('applyTradeSideEffect.pushExtraDataValue', () => {
     applyTradeSideEffect(
       state,
       player,
-      { type: 'pushExtraDataValue', sourceCard: 'C62_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
+      { type: 'pushExtraDataValue', sourceCard: 'C062_CookeryExtension', key: 'usedCookeryIds', value: 'Major_Fireplace1' },
       0,
-      'C62_CookeryExtension',
+      'C062_CookeryExtension',
     )
-    expect(player.cardStates?.C62_CookeryExtension).toBeUndefined()
+    expect(player.cardStates?.C062_CookeryExtension).toBeUndefined()
   })
 })

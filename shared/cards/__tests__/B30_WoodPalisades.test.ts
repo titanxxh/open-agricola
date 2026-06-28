@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import '../B/B30_WoodPalisades'
-import { B30_WoodPalisades } from '../../cards/B/B30_WoodPalisades'
+import '../B/B030_WoodPalisades'
+import { B030_WoodPalisades } from '../../cards/B/B030_WoodPalisades'
 
-const CARD_ID = 'B30_WoodPalisades'
+const CARD_ID = 'B030_WoodPalisades'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -33,9 +33,9 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('B30_WoodPalisades', () => {
+describe('B030_WoodPalisades', () => {
   it('costs 1 food', () => {
-    expect(B30_WoodPalisades.cost).toEqual({ food: 1 })
+    expect(B030_WoodPalisades.cost).toEqual({ food: 1 })
   })
 
   it('awards 1 VP per palisade segment when card is played', () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import '../../shared/cards/B/B67_HandTruck'
+import '../../shared/cards/B/B067_HandTruck'
 
-const CARD_ID = 'B67_HandTruck'
+const CARD_ID = 'B067_HandTruck'
 
 const setupHandTruckBakeSession = () => {
   const session = new GameSession()
@@ -10,7 +10,7 @@ const setupHandTruckBakeSession = () => {
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   const player = state.players[0]!
-  player.occupationPlayed.push('B67_HandTruck')
+  player.occupationPlayed.push('B067_HandTruck')
   player.resources.grain = 1
   player.improvements.push('Major_Fireplace1')
   player.minorHand = ['__test_placeholder__']
@@ -21,7 +21,7 @@ const setupHandTruckBakeSession = () => {
   return { session, player }
 }
 
-describe('B67_HandTruck session', () => {
+describe('B067_HandTruck session', () => {
   it('accepting optional grain continues to the mandatory bake prompt', () => {
     const { session } = setupHandTruckBakeSession()
 

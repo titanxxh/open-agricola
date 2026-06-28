@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 
-describe('A55_JunkRoom session log dedupe', () => {
+describe('A055_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -17,9 +17,9 @@ describe('A55_JunkRoom session log dedupe', () => {
     state.players[1]!.familySize = 1
 
     const player = state.players[0]!
-    player.minorPlayed = ['A55_JunkRoom']
-    player.minorPlayed.push('A55_JunkRoom')
-    player.minorHand = ['A37_Bucksaw']
+    player.minorPlayed = ['A055_JunkRoom']
+    player.minorPlayed.push('A055_JunkRoom')
+    player.minorHand = ['A037_Bucksaw']
     player.resources.wood = 1
     player.resources.food = 0
 
@@ -35,7 +35,7 @@ describe('A55_JunkRoom session log dedupe', () => {
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const bucksawOption = resp.interaction.options?.find((option) => option.value === 'minor:A37_Bucksaw')
+      const bucksawOption = resp.interaction.options?.find((option) => option.value === 'minor:A037_Bucksaw')
       if (bucksawOption) {
         resp = session.resolveChoice(0, bucksawOption.value)
         expect(resp.ok).toBe(true)
@@ -45,7 +45,7 @@ describe('A55_JunkRoom session log dedupe', () => {
     const junkRoomLogs = resp.state.log.filter(
       (entry) =>
         entry.key === 'log.cardEffectGain' &&
-        entry.params?.cardId === 'A55_JunkRoom',
+        entry.params?.cardId === 'A055_JunkRoom',
     )
     expect(junkRoomLogs).toHaveLength(1)
     expect(junkRoomLogs[0]?.params?.gain).toEqual({ food: 1 })

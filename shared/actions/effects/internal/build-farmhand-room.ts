@@ -2,7 +2,7 @@ import type { ActionDefinition } from '../../../contract/types'
 import { incRoomsBuilt } from '../../../session/stats'
 
 /**
- * Card-specific action for B85_FarmHand.
+ * Card-specific action for B085_FarmHand.
  * Increments the player's room count by 1 without placing a physical room tile.
  * This "virtual room" provides room for a person but NOT for animals.
  */

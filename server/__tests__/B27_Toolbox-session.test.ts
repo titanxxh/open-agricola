@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
-import '../../shared/cards/B/B27_Toolbox'
+import '../../shared/cards/B/B027_Toolbox'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
-import { B27_Toolbox_impl } from '../../shared/cards/B/B27_Toolbox'
+import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
 
-const CARD_ID = 'B27_Toolbox'
+const CARD_ID = 'B027_Toolbox'
 
 const setupPlayed = (food = 5) => {
   const session = new GameSession()
@@ -98,7 +98,7 @@ describe('B27 Toolbox session', () => {
     session.loadState(state)
 
     // 直接调用 effect.onBuy
-    B27_Toolbox_impl.effect!.onBuy!(state, player)
+    B027_Toolbox_impl.effect!.onBuy!(state, player)
 
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
@@ -114,7 +114,7 @@ describe('B27 Toolbox session', () => {
     recordActionSnapshot(player, 99)
     session.loadState(state)
 
-    B27_Toolbox_impl.effect!.onBuy!(state, player)
+    B027_Toolbox_impl.effect!.onBuy!(state, player)
 
     expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })

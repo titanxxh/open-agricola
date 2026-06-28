@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-import '../../shared/cards/C/C32_AbortOriel'
-import { C32_AbortOriel } from '../../shared/cards/C/C32_AbortOriel'
+import '../../shared/cards/C/C032_AbortOriel'
+import { C032_AbortOriel } from '../../shared/cards/C/C032_AbortOriel'
 
-describe('C32_AbortOriel session', () => {
+describe('C032_AbortOriel session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -18,7 +18,7 @@ describe('C32_AbortOriel session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, C32_AbortOriel, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, C032_AbortOriel, state.round, state)).toBe(true)
   })
 
   it('playable as your 5th card (self has 4 before playing)', () => {
@@ -26,7 +26,7 @@ describe('C32_AbortOriel session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.minorPlayed = ['m1', 'm2', 'm3', 'm4']
-    expect(meetsCardPrerequisites(player, C32_AbortOriel, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, C032_AbortOriel, state.round, state)).toBe(true)
   })
 
   it('blocked when self already has 5+ cards', () => {
@@ -34,7 +34,7 @@ describe('C32_AbortOriel session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.minorPlayed = ['m1', 'm2', 'm3', 'm4', 'm5']
-    expect(meetsCardPrerequisites(player, C32_AbortOriel, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, C032_AbortOriel, state.round, state)).toBe(false)
   })
 
   it('blocked when any opponent has 5+ cards', () => {
@@ -44,6 +44,6 @@ describe('C32_AbortOriel session', () => {
     const opponent = state.players[1]!
     opponent.occupationPlayed = ['o1', 'o2', 'o3']
     opponent.minorPlayed = ['m1', 'm2']
-    expect(meetsCardPrerequisites(player, C32_AbortOriel, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, C032_AbortOriel, state.round, state)).toBe(false)
   })
 })

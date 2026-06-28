@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener } from '../../shared/cards/card-listeners'
-import { A17_ReclamationPlow_impl } from '../../shared/cards/A/A17_ReclamationPlow'
+import { A017_ReclamationPlow_impl } from '../../shared/cards/A/A017_ReclamationPlow'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionExecutionResult } from '../../shared/contract/types'
 
-import '../../shared/cards/A/A17_ReclamationPlow'
+import '../../shared/cards/A/A017_ReclamationPlow'
 import '../../shared/cards/A/A137_RiverineShepherd'
 
-const CARD_ID = 'A17_ReclamationPlow'
+const CARD_ID = 'A017_ReclamationPlow'
 const A137_ID = 'A137_RiverineShepherd'
-const LISTENER = A17_ReclamationPlow_impl.listeners[0]!
+const LISTENER = A017_ReclamationPlow_impl.listeners[0]!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -52,7 +52,7 @@ const setupDirectContext = (
   } as unknown as CardListenerContext
 }
 
-describe('A17_ReclamationPlow session', () => {
+describe('A017_ReclamationPlow session', () => {
   it('keeps the session collect path and prompts after animal reorg', () => {
     const session = new GameSession()
     const state = session.getState().state

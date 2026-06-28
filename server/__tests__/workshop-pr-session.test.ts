@@ -141,10 +141,10 @@ function fakeRes(): FakeRes {
 const FAKE_REGISTER_ALL = `// GENERATED
 import './catalog'
 
-import { A1_impl } from './A/A1'
+import { A001_impl } from './A/A1'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
-  'A1': A1_impl,
+  'A1': A001_impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS
@@ -160,7 +160,7 @@ const FAKE_COMMUNITY_MD = `# Community cards
 const FAKE_CATALOG_GENERATED = `// generated
 export const catalogCardDefinitions = [
   {
-    "id": "C99_Source",
+    "id": "C099_Source",
     "name": "Source",
     "deck": "C",
     "number": 99,

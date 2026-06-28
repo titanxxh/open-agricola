@@ -6,12 +6,12 @@ import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helper
 import { buildSowFarmInteraction } from '../../shared/domain/farmyard'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import '../../shared/cards/E/E70_CropRotationField'
-import '../../shared/cards/E/E69_MelonPatch'
+import '../../shared/cards/E/E070_CropRotationField'
+import '../../shared/cards/E/E069_MelonPatch'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-const CARD_ID = 'E70_CropRotationField'
-const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
+const CARD_ID = 'E070_CropRotationField'
+const OTHER_EXTRA_CARD_ID = 'E069_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const setup = (options?: {
@@ -72,7 +72,7 @@ const addMinorCard = (
   session.loadState(state)
 }
 
-describe('E70_CropRotationField session', () => {
+describe('E070_CropRotationField session', () => {
   describe('extra sowable field', () => {
     it('card registers as extra sowable field when empty (grain + veg allowed)', () => {
       const session = setup({ grain: 1, vegetable: 1 })

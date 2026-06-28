@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/E/E87_MasterRenovator'
+import '../../shared/cards/E/E087_MasterRenovator'
 
-const CARD_ID = 'E87_MasterRenovator'
+const CARD_ID = 'E087_MasterRenovator'
 
-describe('E87_MasterRenovator session — chooseOne renovation discount', () => {
+describe('E087_MasterRenovator session — chooseOne renovation discount', () => {
   const setup = (round: number) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -82,7 +82,7 @@ describe('E87_MasterRenovator session — chooseOne renovation discount', () => 
     //   wood-discount: same shape as stone (player has no wood to "pay less")
     // So the canonical chooseOne semantics yield variance via bonusUsed source
     // tags. We assert ≥2 distinct PaymentSolutions whose bonusUsed sourceCard
-    // includes E87_MasterRenovator.
+    // includes E087_MasterRenovator.
     const e87Solutions = solutions.filter((s) => (s.bonusUsed ?? '').includes(CARD_ID))
     expect(e87Solutions.length).toBeGreaterThanOrEqual(2)
     const clayDiscount = e87Solutions.find(

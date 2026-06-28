@@ -156,7 +156,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
       kind: 'selection',
       selection: {
         selectionType: 'occupation-hand',
-        selectableCards: ['A1_TestOcc', 'A2_TestOcc'],
+        selectableCards: ['A001_TestOcc', 'A002_TestOcc'],
         minSelections: 1,
         maxSelections: 1,
       },

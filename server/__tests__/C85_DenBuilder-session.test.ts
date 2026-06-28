@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/C/C85_DenBuilder'
+import '../../shared/cards/C/C085_DenBuilder'
 
-describe('C85_DenBuilder session', () => {
+describe('C085_DenBuilder session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; grain?: number; food?: number }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,12 +13,12 @@ describe('C85_DenBuilder session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('C85_DenBuilder')
+    player.occupationHand.push('C085_DenBuilder')
     player.houseType = options?.houseType ?? 'clay'
     player.resources.grain = options?.grain ?? 2
     player.resources.food = options?.food ?? 5
     session.loadState(state)
-    session.devPlayCard(0, 'C85_DenBuilder')
+    session.devPlayCard(0, 'C085_DenBuilder')
     return session
   }
 
@@ -42,7 +42,7 @@ describe('C85_DenBuilder session', () => {
     expect(updatedPlayer.resources.grain).toBe(1) // 2 - 1
     expect(updatedPlayer.resources.food).toBe(3)  // 5 - 2
     expect(updatedPlayer.rooms).toBe(initialRooms + 1)
-    expect(isCardFlagged(updatedPlayer, 'C85_DenBuilder')).toBe(true)
+    expect(isCardFlagged(updatedPlayer, 'C085_DenBuilder')).toBe(true)
   })
 
   it('available in stone house', () => {

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-import '../../shared/cards/E/E29_Heirloom'
-import { E29_Heirloom } from '../../shared/cards/E/E29_Heirloom'
+import '../../shared/cards/E/E029_Heirloom'
+import { E029_Heirloom } from '../../shared/cards/E/E029_Heirloom'
 
-describe('E29_Heirloom session', () => {
+describe('E029_Heirloom session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -21,7 +21,7 @@ describe('E29_Heirloom session', () => {
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')
     expect(dl).toBeTruthy()
     dl!.takenBy = []
-    expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, E029_Heirloom, state.round, state)).toBe(false)
   })
 
   it('playable when player has person on day-laborer', () => {
@@ -30,7 +30,7 @@ describe('E29_Heirloom session', () => {
     const player = state.players[0]!
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')!
     dl.takenBy = [{ playerId: player.id, workerId: '1' }]
-    expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, E029_Heirloom, state.round, state)).toBe(true)
   })
 
   it('blocked when opponent occupies day-laborer', () => {
@@ -40,6 +40,6 @@ describe('E29_Heirloom session', () => {
     const opponent = state.players[1]!
     const dl = state.actionSpaces.find((s) => s.id === 'day-laborer')!
     dl.takenBy = [{ playerId: opponent.id, workerId: '1' }]
-    expect(meetsCardPrerequisites(player, E29_Heirloom, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, E029_Heirloom, state.round, state)).toBe(false)
   })
 })

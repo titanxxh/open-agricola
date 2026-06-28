@@ -8,19 +8,19 @@ type Case = { id: string; prerequisite: string; kind: 'minor' | 'occupation' }
 
 // Forward 3: BGA has, TS now added
 const forwardAdded: Case[] = [
-  { id: 'D30_ArtisanDistrict', prerequisite: '3 Occupations', kind: 'minor' },
-  { id: 'D50_ForeignAid', prerequisite: 'Play in Round 11 or Before', kind: 'minor' },
-  { id: 'E38_RodCollection', prerequisite: '3 Occupations', kind: 'minor' },
+  { id: 'D030_ArtisanDistrict', prerequisite: '3 Occupations', kind: 'minor' },
+  { id: 'D050_ForeignAid', prerequisite: 'Play in Round 11 or Before', kind: 'minor' },
+  { id: 'E038_RodCollection', prerequisite: '3 Occupations', kind: 'minor' },
 ]
 
 // Wording 6: TS rewritten to match BGA exact text
 const wordingFixed: Case[] = [
-  { id: 'A20_DoubleTurnPlow', prerequisite: 'Play in Round 3 (5) or Before', kind: 'minor' },
-  { id: 'B18_GrasslandHarrow', prerequisite: '2 Occ., 1 Resource After Payment', kind: 'minor' },
-  { id: 'C35_LanternHouse', prerequisite: 'No occupation', kind: 'minor' },
-  { id: 'D1_ZigzagHarrow', prerequisite: '3 Fields in an "L" Shape', kind: 'minor' },
-  { id: 'E37_OxSkull', prerequisite: '1 cattle', kind: 'minor' },
-  { id: 'E39_Paintbrush', prerequisite: '1 pig', kind: 'minor' },
+  { id: 'A020_DoubleTurnPlow', prerequisite: 'Play in Round 3 (5) or Before', kind: 'minor' },
+  { id: 'B018_GrasslandHarrow', prerequisite: '2 Occ., 1 Resource After Payment', kind: 'minor' },
+  { id: 'C035_LanternHouse', prerequisite: 'No occupation', kind: 'minor' },
+  { id: 'D001_ZigzagHarrow', prerequisite: '3 Fields in an "L" Shape', kind: 'minor' },
+  { id: 'E037_OxSkull', prerequisite: '1 cattle', kind: 'minor' },
+  { id: 'E039_Paintbrush', prerequisite: '1 pig', kind: 'minor' },
 ]
 
 // Reverse 4 — BGA enforces these via `isBuyable()` method (no `$this->prerequisite`
@@ -30,10 +30,10 @@ const wordingFixed: Case[] = [
 // equivalent BGA isBuyable check; B56 re-labelled to match BGA's real Fishing
 // farmer requirement.)
 const oaExtraKept: Case[] = [
-  { id: 'A3_PaperKnife', prerequisite: '3 Occupations In Hand', kind: 'minor' },
+  { id: 'A003_PaperKnife', prerequisite: '3 Occupations In Hand', kind: 'minor' },
   { id: 'B154_SheepKeeper', prerequisite: 'Less Than 7 Sheep', kind: 'occupation' },
-  { id: 'B56_Brook', prerequisite: 'Farmer on Fishing Space', kind: 'minor' },
-  { id: 'B74_ThickForest', prerequisite: '5 Clay in Your Supply', kind: 'minor' },
+  { id: 'B056_Brook', prerequisite: 'Farmer on Fishing Space', kind: 'minor' },
+  { id: 'B074_ThickForest', prerequisite: '5 Clay in Your Supply', kind: 'minor' },
 ]
 
 const allCases: Case[] = [...forwardAdded, ...wordingFixed, ...oaExtraKept]

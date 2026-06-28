@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
 import type { PaymentSolution } from '../../shared/contract/types'
-import '../../shared/cards/E/E60_WorkingGloves'
+import '../../shared/cards/E/E060_WorkingGloves'
 
-const CARD_ID = 'E60_WorkingGloves'
+const CARD_ID = 'E060_WorkingGloves'
 
-describe('E60_WorkingGloves session — trade-style modifier on occupation cost', () => {
+describe('E060_WorkingGloves session — trade-style modifier on occupation cost', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

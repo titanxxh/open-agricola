@@ -5,12 +5,12 @@ import { getPlayerActionSpaceConfig } from '../player-action-space'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { getMajorCard } from '../major'
 
-import '../B/B42_ForestInn'
+import '../B/B042_ForestInn'
 import '../C/C104_Collector'
-import '../D/D23_PioneeringSpirit'
-import '../E/E53_BoarSpear'
-import '../E/E73_Scythe'
-import '../E/E74_AshTrees'
+import '../D/D023_PioneeringSpirit'
+import '../E/E053_BoarSpear'
+import '../E/E073_Scythe'
+import '../E/E074_AshTrees'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionExecutionContext } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
@@ -140,16 +140,16 @@ describe('sourceCard card production contract', () => {
 
   it('E73 Scythe includes sourceCard on every harvest choice', () => {
     const player = createPlayer()
-    player.minorPlayed = ['E73_Scythe']
+    player.minorPlayed = ['E073_Scythe']
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }] as any
-    const flow = runCardEffectHook(createState([player]), player, 'E73_Scythe', 'onStartHarvestFieldPhase')
+    const flow = runCardEffectHook(createState([player]), player, 'E073_Scythe', 'onStartHarvestFieldPhase')
 
     expect(flow?.type).toBe('xor')
     if (flow?.type !== 'xor') return
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(1)
     for (const child of flow.children) {
-      expect(child).toMatchObject({ type: 'leaf', sourceCard: 'E73_Scythe' })
+      expect(child).toMatchObject({ type: 'leaf', sourceCard: 'E073_Scythe' })
     }
   })
 
@@ -157,12 +157,12 @@ describe('sourceCard card production contract', () => {
     const listener = findListener('E74-ash-trees-before-fence')
     expect(listener).toBeDefined()
     const player = createPlayer()
-    player.minorPlayed = ['E74_AshTrees']
+    player.minorPlayed = ['E074_AshTrees']
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ] as any
-    player.cardStates = { E74_AshTrees: { counters: { fences: 2 } } }
+    player.cardStates = { E074_AshTrees: { counters: { fences: 2 } } }
 
     const result = executeCardListener(listener!, {
       state: createState([player]),
@@ -172,11 +172,11 @@ describe('sourceCard card production contract', () => {
       phase: 'before',
     } as unknown as CardListenerContext)
 
-    expect(result?.sourceCard).toBe('E74_AshTrees')
+    expect(result?.sourceCard).toBe('E074_AshTrees')
     expect(result?.flow?.type).toBe('xor')
     if (result?.flow?.type !== 'xor') return
     for (const child of result.flow.children) {
-      expect(child).toMatchObject({ type: 'leaf', sourceCard: 'E74_AshTrees' })
+      expect(child).toMatchObject({ type: 'leaf', sourceCard: 'E074_AshTrees' })
     }
   })
 
@@ -184,7 +184,7 @@ describe('sourceCard card production contract', () => {
     const obtainListener = findListener('E53-boar-spear-after-obtain')
     expect(obtainListener).toBeDefined()
     const player = createPlayer()
-    player.minorPlayed = ['E53_BoarSpear']
+    player.minorPlayed = ['E053_BoarSpear']
     // Seed an action snapshot token so the once-per-action guard sees a valid token
     player.cardStates = {
       ...(player.cardStates ?? {}),
@@ -203,18 +203,18 @@ describe('sourceCard card production contract', () => {
       actionEvents,
     } as unknown as CardListenerContext)
 
-    expect(after?.sourceCard).toBe('E53_BoarSpear')
+    expect(after?.sourceCard).toBe('E053_BoarSpear')
     expect(after?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E53_BoarSpear' },
-        { type: 'leaf', actionId: 'exchange', optional: true, sourceCard: 'E53_BoarSpear' },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E053_BoarSpear' },
+        { type: 'leaf', actionId: 'exchange', optional: true, sourceCard: 'E053_BoarSpear' },
       ],
     })
   })
 
   it('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
-    const config = getPlayerActionSpaceConfig('D23_PioneeringSpirit')
+    const config = getPlayerActionSpaceConfig('D023_PioneeringSpirit')
     expect(config).toBeDefined()
     const player = createPlayer()
     const state = createState([player])
@@ -223,7 +223,7 @@ describe('sourceCard card production contract', () => {
     const result = config!.createDefinition(player.id).execute({
       state,
       player,
-      space: createSpace('D23_PioneeringSpirit'),
+      space: createSpace('D023_PioneeringSpirit'),
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('request')
@@ -231,9 +231,9 @@ describe('sourceCard card production contract', () => {
     expect(result.request.kind).toBe('choice')
     if (result.request.kind !== 'choice') return
     expect(result.request.options.map((option) => option.sourceCard)).toEqual([
-      'D23_PioneeringSpirit',
-      'D23_PioneeringSpirit',
-      'D23_PioneeringSpirit',
+      'D023_PioneeringSpirit',
+      'D023_PioneeringSpirit',
+      'D023_PioneeringSpirit',
     ])
   })
 
@@ -270,17 +270,17 @@ describe('sourceCard card production contract', () => {
   })
 
   it('B42 Forest Inn tags its xor exchange leaves with sourceCard', () => {
-    const config = getPlayerActionSpaceConfig('B42_ForestInn')
+    const config = getPlayerActionSpaceConfig('B042_ForestInn')
     expect(config).toBeDefined()
     const player = createPlayer()
-    player.minorPlayed = ['B42_ForestInn']
+    player.minorPlayed = ['B042_ForestInn']
     player.resources.wood = 9
     const state = createState([player])
 
     const result = config!.createDefinition(player.id).execute({
       state,
       player,
-      space: createSpace('B42_ForestInn'),
+      space: createSpace('B042_ForestInn'),
     } as unknown as ActionExecutionContext)
 
     expect(result.type).toBe('flow')
@@ -295,8 +295,8 @@ describe('sourceCard card production contract', () => {
       expect(pay?.type).toBe('leaf')
       expect(gain?.type).toBe('leaf')
       if (pay?.type !== 'leaf' || gain?.type !== 'leaf') return
-      expect(pay.sourceCard).toBe('B42_ForestInn')
-      expect(gain.sourceCard).toBe('B42_ForestInn')
+      expect(pay.sourceCard).toBe('B042_ForestInn')
+      expect(gain.sourceCard).toBe('B042_ForestInn')
     }
   })
 })

@@ -4099,7 +4099,7 @@ export class GameCore {
       if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
         const disabled = pendingEnvelopeChoices(envelope)
           .some((option) => option.value === value && option.disabled === true)
-        if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
+        if (disabled && String(envelope.promptKey) === 'cards.B003_Moonshine.choice') return this.respond(false, 'choice disabled')
         return this.respond(false, 'invalid choice value')
       }
       if (
@@ -4448,7 +4448,7 @@ export class GameCore {
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
     clearAllLinkedSpaceBlocks(this.state)
-    // Release any workers that cards were holding (e.g. C22_BasketChair).
+    // Release any workers that cards were holding (e.g. C022_BasketChair).
     for (const p of this.state.players) {
       const cardStates = p.cardStates ?? {}
       for (const cardId of Object.keys(cardStates)) {

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/B/B19_MoldboardPlow'
+import '../../shared/cards/B/B019_MoldboardPlow'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
-describe('B19_MoldboardPlow session', () => {
+describe('B019_MoldboardPlow session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -16,10 +16,10 @@ describe('B19_MoldboardPlow session', () => {
 
     const player = state.players[0]!
     // Card not in catalog — manually add it to minorPlayed.
-    player.minorPlayed.push('B19_MoldboardPlow')
+    player.minorPlayed.push('B019_MoldboardPlow')
     // Initialize stack as onBuy would
     if (!player.cardStates) player.cardStates = {}
-    player.cardStates['B19_MoldboardPlow'] = { stack: ['field', 'field'] }
+    player.cardStates['B019_MoldboardPlow'] = { stack: ['field', 'field'] }
 
     session.loadState(state)
     return session
@@ -29,7 +29,7 @@ describe('B19_MoldboardPlow session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const stack = getCardStack(player, 'B19_MoldboardPlow')
+    const stack = getCardStack(player, 'B019_MoldboardPlow')
     expect(stack).toEqual(['field', 'field'])
   })
 
@@ -58,14 +58,14 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     expect(resp.interaction.stateId).toBe('wait')
-    expect(getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow').length).toBe(2)
+    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(2)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     expect(tile2).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Stack should have 1 field left
-    const stack = getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow')
     expect(stack.length).toBe(1)
 
     // Player should have 2 fields (farmland + card plow)
@@ -88,7 +88,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Stack should still have 2 fields
-    const stack = getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow')
     expect(stack.length).toBe(2)
 
     // Player should have only 1 field (just the farmland plow)
@@ -98,7 +98,7 @@ describe('B19_MoldboardPlow session', () => {
   it('no extra plow offered when stack is empty', () => {
     const session = setup()
     const state = session.getState().state
-    state.players[0]!.cardStates!['B19_MoldboardPlow']!.stack = []
+    state.players[0]!.cardStates!['B019_MoldboardPlow']!.stack = []
     session.loadState(state)
 
     let resp = session.takeAction(0, 'farmland')
@@ -125,7 +125,7 @@ describe('B19_MoldboardPlow session', () => {
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
-    expect(getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow').length).toBe(1)
+    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(1)
 
     // Advance to next turn so player can use farmland again
     // Player 1 takes an action, then player 0 gets another turn
@@ -140,6 +140,6 @@ describe('B19_MoldboardPlow session', () => {
     // Use cultivation (round 5+ action) instead? No, farmland is always available.
     // Actually player 0 already used farmland this round. Need round 2.
     // Let me just check the stack state after first use.
-    expect(getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow').length).toBe(1)
+    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(1)
   })
 })

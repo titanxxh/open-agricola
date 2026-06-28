@@ -4,7 +4,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { getActiveCardRegistry, requireActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
-import '../../shared/cards/C/C59_SchnappsDistillery'
+import '../../shared/cards/C/C059_SchnappsDistillery'
 
 const LISTENER_CARD = 'X_HandFeedConversionListener'
 
@@ -55,7 +55,7 @@ describe('harvest feed conversion card listener dispatch', () => {
     playerA.name = 'PlayerA'
     playerB.name = 'PlayerB'
     playerA.minorHand = [LISTENER_CARD]
-    playerA.minorPlayed.push('C59_SchnappsDistillery')
+    playerA.minorPlayed.push('C059_SchnappsDistillery')
     playerA.resources.vegetable = 1
     setActiveWorkerCount(playerB, 0)
 
@@ -73,7 +73,7 @@ describe('harvest feed conversion card listener dispatch', () => {
 
       resp = session.resolveChoice(0, 'confirm', { selections: [
         {
-          sourceId: 'C59_SchnappsDistillery',
+          sourceId: 'C059_SchnappsDistillery',
           exchangeIndex: 0,
           count: 1,
           sourceName: 'Schnapps Distillery',

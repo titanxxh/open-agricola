@@ -71,7 +71,7 @@ describe('C101_StallHolder session', () => {
     const player = state.players[0]!
     player.cardStates = {
       ...player.cardStates,
-      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+      B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }
     session.loadState(state)
 

@@ -429,10 +429,10 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       state,
       player: actor,
       ownerPlayer: owner,
-      space: { id: 'B1_UpscaleLifestyle' },
+      space: { id: 'B001_UpscaleLifestyle' },
       actionId: 'renovate-house',
       phase: 'after',
-      sourceCard: 'B1_UpscaleLifestyle',
+      sourceCard: 'B001_UpscaleLifestyle',
       transactionEvents: [],
     } as unknown as CardListenerContext)
     expect(result?.sourceCard).toBe(CARD_ID)

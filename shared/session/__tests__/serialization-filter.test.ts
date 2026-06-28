@@ -300,11 +300,11 @@ describe('serializeStateForPlayer', () => {
   it('masks cardStates and card-state events for cards still hidden in opponent hands', () => {
     const state = makePlayingState()
     const p2 = state.players[1]!
-    p2.minorHand = ['D36_BreedRegistry']
-    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.minorHand = ['D036_BreedRegistry']
+    p2.minorPlayed = ['B021_HayloftBarn']
     p2.cardStates = {
-      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
-      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+      D036_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B021_HayloftBarn: { extraData: { foodCount: 2 } },
     }
     const hiddenTriggerEvent: GameEvent = {
       schemaVersion: 1,
@@ -314,8 +314,8 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.triggered',
       visibility: 'public',
-      cardId: 'D36_BreedRegistry',
-      sourceCardId: 'D36_BreedRegistry',
+      cardId: 'D036_BreedRegistry',
+      sourceCardId: 'D036_BreedRegistry',
       triggerActionId: 'gain-sheep',
       accepted: true,
     }
@@ -327,7 +327,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'D36_BreedRegistry',
+      cardId: 'D036_BreedRegistry',
       targetPlayerId: p2.id,
       key: 'boardSheep',
       value: 1,
@@ -340,7 +340,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       targetPlayerId: p2.id,
       key: 'foodCount',
       value: 2,
@@ -348,8 +348,8 @@ describe('serializeStateForPlayer', () => {
     state.events = [hiddenTriggerEvent, visibleEvent]
     state.nextEventSeq = 103
     const seededLog: GameState['log'] = [
-      { key: 'log.cardTriggered', params: { cardId: 'D36_BreedRegistry' } },
-      { key: 'log.cardTriggered', params: { cardId: 'B21_HayloftBarn' } },
+      { key: 'log.cardTriggered', params: { cardId: 'D036_BreedRegistry' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B021_HayloftBarn' } },
       { key: 'log.existing' },
     ]
     state.publicEventArchive = [
@@ -385,12 +385,12 @@ describe('serializeStateForPlayer', () => {
     const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
 
     expect(filteredP2.minorHand).toEqual(['?'])
-    expect(filteredP2.cardStates.D36_BreedRegistry).toBeUndefined()
-    expect(filteredP2.cardStates.B21_HayloftBarn).toEqual(p2.cardStates.B21_HayloftBarn)
+    expect(filteredP2.cardStates.D036_BreedRegistry).toBeUndefined()
+    expect(filteredP2.cardStates.B021_HayloftBarn).toEqual(p2.cardStates.B021_HayloftBarn)
     expect(opponentView.events.map((event) => event.id)).toEqual(['102'])
     expect(opponentView.events.map((event) => event.seq)).toEqual([1])
     expect(opponentView.log).toEqual([
-      { key: 'log.cardTriggered', params: { cardId: 'B21_HayloftBarn' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B021_HayloftBarn' } },
       { key: 'log.existing' },
     ])
     expect(opponentView.nextEventSeq).toBe(2)
@@ -419,7 +419,7 @@ describe('serializeStateForPlayer', () => {
         canceledEvents: [{ ...visibleEvent, seq: 1 }],
       },
     ])
-    expect(ownerP2.cardStates.D36_BreedRegistry).toEqual(p2.cardStates.D36_BreedRegistry)
+    expect(ownerP2.cardStates.D036_BreedRegistry).toEqual(p2.cardStates.D036_BreedRegistry)
     expect(ownerView.events.map((event) => event.id)).toEqual(['100', '102'])
     expect(ownerView.events.map((event) => event.seq)).toEqual([100, 102])
     expect(ownerView.log).toEqual(stateWithLog.log)
@@ -432,11 +432,11 @@ describe('serializeStateForPlayer', () => {
   it('does not filter visible archive entries that reuse a canceled hidden event id', () => {
     const state = makePlayingState()
     const p2 = state.players[1]!
-    p2.minorHand = ['D36_BreedRegistry']
-    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.minorHand = ['D036_BreedRegistry']
+    p2.minorPlayed = ['B021_HayloftBarn']
     p2.cardStates = {
-      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
-      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+      D036_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B021_HayloftBarn: { extraData: { foodCount: 2 } },
     }
     const hiddenEvent: GameEvent = {
       schemaVersion: 1,
@@ -446,7 +446,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'D36_BreedRegistry',
+      cardId: 'D036_BreedRegistry',
       targetPlayerId: p2.id,
       key: 'boardSheep',
       value: 1,
@@ -459,7 +459,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       targetPlayerId: p2.id,
       key: 'foodCount',
       value: 2,
@@ -524,11 +524,11 @@ describe('serializeStateForPlayer', () => {
   it('remaps committed archive seqs with event ids when visible seqs are reused', () => {
     const state = makePlayingState()
     const p2 = state.players[1]!
-    p2.minorHand = ['D36_BreedRegistry']
-    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.minorHand = ['D036_BreedRegistry']
+    p2.minorPlayed = ['B021_HayloftBarn']
     p2.cardStates = {
-      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
-      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+      D036_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B021_HayloftBarn: { extraData: { foodCount: 2 } },
     }
     const oldVisibleEvent: GameEvent = {
       schemaVersion: 1,
@@ -538,7 +538,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       targetPlayerId: p2.id,
       key: 'foodCount',
       value: 1,
@@ -551,7 +551,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'D36_BreedRegistry',
+      cardId: 'D036_BreedRegistry',
       targetPlayerId: p2.id,
       key: 'boardSheep',
       value: 1,
@@ -564,7 +564,7 @@ describe('serializeStateForPlayer', () => {
       phase: state.roundPhase,
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       targetPlayerId: p2.id,
       key: 'foodCount',
       value: 2,

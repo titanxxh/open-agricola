@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/D/D85_Reader'
+import '../../shared/cards/D/D085_Reader'
 
-const CARD_ID = 'D85_Reader'
+const CARD_ID = 'D085_Reader'
 
-describe('D85_Reader session', () => {
+describe('D085_Reader session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

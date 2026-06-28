@@ -18,7 +18,7 @@ describe('LogPanel', () => {
         key: 'log.playOccupation',
         params: {
           player: 'Player A',
-          occupations: 'D95_SiteManager',
+          occupations: 'D095_SiteManager',
         },
       },
     ]
@@ -27,7 +27,7 @@ describe('LogPanel', () => {
     const text = stripHtml(html)
 
     expect(text).toContain('工地管理员')
-    expect(text).not.toContain('occupations.D95_SiteManager.name')
+    expect(text).not.toContain('occupations.D095_SiteManager.name')
     expect(html).toContain('log-card-link')
   })
 
@@ -37,7 +37,7 @@ describe('LogPanel', () => {
         key: 'log.playMinorImprovement',
         params: {
           player: 'Player B',
-          improvements: 'C60_SmallPottersOven',
+          improvements: 'C060_SmallPottersOven',
           costResources: { clay: 2 },
           returnedCards: ['Major_ClayOven'],
         },
@@ -46,7 +46,7 @@ describe('LogPanel', () => {
         key: 'log.cardEffectGain',
         params: {
           player: 'Player B',
-          cardId: 'C60_SmallPottersOven',
+          cardId: 'C060_SmallPottersOven',
           gain: { food: 5 },
         },
       },
@@ -71,7 +71,7 @@ describe('LogPanel', () => {
         key: 'log.cardEffectBonusVp',
         params: {
           player: 'Player A',
-          cardId: 'A37_Bucksaw',
+          cardId: 'A037_Bucksaw',
         },
       },
     ]
@@ -178,7 +178,7 @@ describe('LogPanel', () => {
           detailParts: {
             effects: {
               improvements: ['Major_ClayOven'],
-              minorImprovements: ['C60_SmallPottersOven'],
+              minorImprovements: ['C060_SmallPottersOven'],
             },
           },
         },

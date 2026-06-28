@@ -8,7 +8,7 @@ describe('GameSession return-home releases card-held workers', () => {
     const state = session.getState().state
 
     // Hold a worker on a card for each player
-    holdWorkerOnCard(state.players[0]!, 'C22_BasketChair', '1')
+    holdWorkerOnCard(state.players[0]!, 'C022_BasketChair', '1')
     holdWorkerOnCard(state.players[1]!, 'X_OtherCard', '2')
 
     session.loadState(state)
@@ -17,7 +17,7 @@ describe('GameSession return-home releases card-held workers', () => {
     ;(session as unknown as { continueReturnHomeHooks: () => void }).continueReturnHomeHooks()
 
     const afterState = session.getState().state
-    expect(getWorkerHeldOnCard(afterState.players[0]!, 'C22_BasketChair')).toBeUndefined()
+    expect(getWorkerHeldOnCard(afterState.players[0]!, 'C022_BasketChair')).toBeUndefined()
     expect(getWorkerHeldOnCard(afterState.players[1]!, 'X_OtherCard')).toBeUndefined()
   })
 
@@ -26,9 +26,9 @@ describe('GameSession return-home releases card-held workers', () => {
     const state = session.getState().state
 
     // Set a held worker AND another extraData key on player 0
-    holdWorkerOnCard(state.players[0]!, 'C22_BasketChair', '1')
+    holdWorkerOnCard(state.players[0]!, 'C022_BasketChair', '1')
     // Manually add a sibling key to extraData
-    const cs = state.players[0]!.cardStates!['C22_BasketChair']!
+    const cs = state.players[0]!.cardStates!['C022_BasketChair']!
     cs.extraData = { ...(cs.extraData ?? {}), someCounter: 42 }
 
     session.loadState(state)
@@ -36,8 +36,8 @@ describe('GameSession return-home releases card-held workers', () => {
 
     const afterState = session.getState().state
     // heldWorkerId must be gone
-    expect(getWorkerHeldOnCard(afterState.players[0]!, 'C22_BasketChair')).toBeUndefined()
+    expect(getWorkerHeldOnCard(afterState.players[0]!, 'C022_BasketChair')).toBeUndefined()
     // other extraData keys must survive
-    expect(afterState.players[0]!.cardStates?.['C22_BasketChair']?.extraData?.['someCounter']).toBe(42)
+    expect(afterState.players[0]!.cardStates?.['C022_BasketChair']?.extraData?.['someCounter']).toBe(42)
   })
 })

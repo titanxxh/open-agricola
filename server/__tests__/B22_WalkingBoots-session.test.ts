@@ -8,14 +8,14 @@ import {
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import { B22_WalkingBoots } from '../../shared/cards/B/B22_WalkingBoots'
+import { B022_WalkingBoots } from '../../shared/cards/B/B022_WalkingBoots'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'B22_WalkingBoots'
+const CARD_ID = 'B022_WalkingBoots'
 
-describe('B22_WalkingBoots session', () => {
+describe('B022_WalkingBoots session', () => {
   it('onBuy returns SEQ(gain food:2, place-farmer fromSupply markForRemoval)', () => {
-    // BGA `B22_WalkingBoots::onBuy` returns NODE_SEQ with children
+    // BGA `B022_WalkingBoots::onBuy` returns NODE_SEQ with children
     //   gainNode([FOOD => 2])
     //   PLACE_FARMER args { fromSupply: true, source, markForRemoval: true }
     // Our previous implementation truncated to gainLeaf food:2 only.
@@ -113,7 +113,7 @@ describe('B22_WalkingBoots session', () => {
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
     // CardBase exposes `passing` via toJSON(); test uses the imported class.
-    expect((B22_WalkingBoots as { passing?: boolean }).passing).toBeFalsy()
+    expect((B022_WalkingBoots as { passing?: boolean }).passing).toBeFalsy()
   })
 
   describe('prerequisite "At Most 4 People"', () => {
@@ -126,14 +126,14 @@ describe('B22_WalkingBoots session', () => {
         next.push({ id: `worker-${i}`, isActive: true, isNewborn: false })
       }
       player.workers = next
-      expect(meetsCardPrerequisites(player, B22_WalkingBoots, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, B022_WalkingBoots, state.round, state)).toBe(false)
     })
 
     it('allows when player has 4 or fewer farmers', () => {
       const session = new GameSession()
       const state = session.getState().state
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B22_WalkingBoots, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, B022_WalkingBoots, state.round, state)).toBe(true)
     })
   })
 })

@@ -3,9 +3,9 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
-import '../B/B15_CarpentersBench'
+import '../B/B015_CarpentersBench'
 
-const CARD_ID = 'B15_CarpentersBench'
+const CARD_ID = 'B015_CarpentersBench'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -64,7 +64,7 @@ const woodMoved = (
   reason: 'collect',
 })
 
-describe('B15_CarpentersBench', () => {
+describe('B015_CarpentersBench', () => {
   it('triggers after collecting wood from a wood space with a paid wood budget', () => {
     const listener = findListener('B15-carpenters-bench-after-collect')
     expect(listener).toBeDefined()

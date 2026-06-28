@@ -226,7 +226,7 @@ describe('3P lessons-3 cost', () => {
     state.currentPlayerIndex = 0
     const p = state.players[0]!
     p.resources.food = 5
-    expect(p.occupationHand.length).toBeGreaterThan(0)
+    p.occupationHand = ['A124_Knapper', 'A143_Stonecutter']
     session.loadState(state)
 
     const resp = session.takeAction(0, 'lessons-3')

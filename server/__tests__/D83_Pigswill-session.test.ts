@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/D/D83_Pigswill'
+import '../../shared/cards/D/D083_Pigswill'
 
-const CARD_ID = 'D83_Pigswill'
+const CARD_ID = 'D083_Pigswill'
 
 const setup = (opts?: { food?: number; grain?: number }) => {
   const session = new GameSession(/* seed */ 1)
@@ -54,7 +54,7 @@ const playD83 = (session: GameSession) => {
   return session.resolveChoice(0, d83Option!.value)
 }
 
-describe('D83_Pigswill session — altCosts', () => {
+describe('D083_Pigswill session — altCosts', () => {
   it('food=2, grain=0 → auto-pay food (single solution)', () => {
     const session = setup({ food: 2, grain: 0 })
     const resp = playD83(session)

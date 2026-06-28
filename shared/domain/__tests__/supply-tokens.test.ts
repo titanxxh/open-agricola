@@ -75,7 +75,7 @@ describe('supply token helpers', () => {
         { edge: '0,0-H', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
         { edge: '0,1-H', type: 'palisade', source: { kind: 'own', ownerPlayerId: 'p1' } },
       ],
-      cardStates: { E74_AshTrees: { counters: { fences: 5 } } },
+      cardStates: { E074_AshTrees: { counters: { fences: 5 } } },
       supplyTokensConsumed: { fence: 1 },
     })
 
@@ -89,14 +89,14 @@ describe('supply token helpers', () => {
       supplyTokensConsumed: { stable: 1 },
       cardStates: {
         E148_Lazybones: { extraData: { reservedActionSpaces: ['grain-seeds'] } },
-        B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
+        B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
       },
     })
     const state = {
       players: [p],
       futureMeeples: [{
         id: 'future-stable',
-        cardId: 'A89_StablePlanner',
+        cardId: 'A089_StablePlanner',
         playerId: p.id,
         round: 6,
         actionId: null,

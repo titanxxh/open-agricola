@@ -27,9 +27,9 @@ const stateWithChoices = (
 describe('computeOrdinaryCardDrawViewModel', () => {
   it('filters to the local player and orders queued choices by sequence', () => {
     const vm = computeOrdinaryCardDrawViewModel({
-      'ordinary-card-draw-11': choice('ordinary-card-draw-11', 'p1', 'minor', ['E42_WaterGully']),
+      'ordinary-card-draw-11': choice('ordinary-card-draw-11', 'p1', 'minor', ['E042_WaterGully']),
       'ordinary-card-draw-2': choice('ordinary-card-draw-2', 'p1', 'occupation', ['E164_MountainPlowman']),
-      'ordinary-card-draw-1': choice('ordinary-card-draw-1', 'p2', 'minor', ['E25_BumperCrop']),
+      'ordinary-card-draw-1': choice('ordinary-card-draw-1', 'p2', 'minor', ['E025_BumperCrop']),
     }, 'p1')
 
     expect(vm.queueLength).toBe(2)
@@ -65,7 +65,7 @@ describe('OrdinaryCardDrawOverlay', () => {
     const { container } = render(
       <OrdinaryCardDrawOverlay
         state={stateWithChoices({
-          'ordinary-card-draw-4': choice('ordinary-card-draw-4', 'p2', 'minor', ['E42_WaterGully']),
+          'ordinary-card-draw-4': choice('ordinary-card-draw-4', 'p2', 'minor', ['E042_WaterGully']),
         })}
         playerId="p1"
         locale="en"

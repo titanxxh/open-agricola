@@ -164,7 +164,7 @@ describe('Through the Seasons Autumn rules', () => {
     const session = setupAutumn()
     const player = session.state.players[0]!
     player.improvements = ['Major_Pottery']
-    player.minorHand = ['D60_LargePottery']
+    player.minorHand = ['D060_LargePottery']
     player.resources = {
       ...player.resources,
       clay: 1,
@@ -178,7 +178,7 @@ describe('Through the Seasons Autumn rules', () => {
     const resp = session.takeAction(0, 'major-improvement')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain('D60_LargePottery')
+    expect(resp.state.players[0]!.minorPlayed).toContain('D060_LargePottery')
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
   })

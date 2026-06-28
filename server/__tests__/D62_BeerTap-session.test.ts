@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { D62_BeerTap } from '../../shared/cards/D/D62_BeerTap'
-import { D62_BeerTap_impl } from '../../shared/cards/D/D62_BeerTap'
+import { D062_BeerTap } from '../../shared/cards/D/D062_BeerTap'
+import { D062_BeerTap_impl } from '../../shared/cards/D/D062_BeerTap'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 
-const CARD_ID = 'D62_BeerTap'
+const CARD_ID = 'D062_BeerTap'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -23,9 +23,9 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   ...overrides,
 })
 
-describe('D62_BeerTap — metadata exchange', () => {
+describe('D062_BeerTap — metadata exchange', () => {
   it('declares 3 harvest exchange tiers, all sharing sourceId for sourceId-level cap', () => {
-    const exchanges = D62_BeerTap.exchanges ?? []
+    const exchanges = D062_BeerTap.exchanges ?? []
     expect(exchanges).toHaveLength(3)
     expect(exchanges.every((ex) => ex.sourceId === CARD_ID)).toBe(true)
     expect(exchanges.every((ex) => ex.max === 1)).toBe(true)
@@ -52,7 +52,7 @@ describe('D62_BeerTap — metadata exchange', () => {
   })
 
   it('onBuy grants +2 food via gainLeaf', () => {
-    const flow = D62_BeerTap_impl.effect.onBuy?.(null as never, null as never)
+    const flow = D062_BeerTap_impl.effect.onBuy?.(null as never, null as never)
     expect(flow).toBeTruthy()
     expect(flow?.type).toBe('leaf')
     if (flow?.type !== 'leaf') return

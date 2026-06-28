@@ -4,12 +4,12 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/B/B54_Tumbrel'
+import '../../shared/cards/B/B054_Tumbrel'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'B54_Tumbrel'
+const CARD_ID = 'B054_Tumbrel'
 
-describe('B54_Tumbrel session', () => {
+describe('B054_Tumbrel session', () => {
   it('onBuy returns a gain-2-food flow', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -100,7 +100,7 @@ describe('B54_Tumbrel session', () => {
     player.minorPlayed.push(CARD_ID)
     player.stableTiles = [{ row: 2, col: 0 }]
     player.cardStates = {
-      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+      B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
     }
 
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!

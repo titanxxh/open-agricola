@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/A/A77_Hod'
+import '../../shared/cards/A/A077_Hod'
 import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-describe('A77_Hod session', () => {
+describe('A077_Hod session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -16,7 +16,7 @@ describe('A77_Hod session', () => {
     state.round = 1
 
     const owner = state.players[0]!
-    owner.minorHand.push('A77_Hod')
+    owner.minorHand.push('A077_Hod')
     setWorkersAtHome(state, owner, 2)
     owner.resources.clay = 0
     // Give pasture for boar placement
@@ -39,7 +39,7 @@ describe('A77_Hod session', () => {
     if (pigMarket) pigMarket.resources.boar = 1
 
     session.loadState(state)
-    session.devPlayCard(0, 'A77_Hod')
+    session.devPlayCard(0, 'A077_Hod')
     return session
   }
 
@@ -47,7 +47,7 @@ describe('A77_Hod session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'A77_Hod', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'A077_Hod', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')

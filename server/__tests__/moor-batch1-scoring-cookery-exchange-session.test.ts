@@ -444,7 +444,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     player.minorHand = ['M115_OakBark']
     player.resources = fullResources({ vegetable: 1 })
     player.improvements = ['Major_Well']
-    player.minorPlayed = ['D60_LargePottery']
+    player.minorPlayed = ['D060_LargePottery']
     expect(meetsCardPrerequisites(player, { id: 'M115_OakBark', prerequisite: '2 Major Improvements' }, session.state.round, session.state)).toBe(true)
 
     const resp = playMinor(session, 'M115_OakBark')

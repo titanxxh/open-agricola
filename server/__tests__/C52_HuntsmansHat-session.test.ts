@@ -6,11 +6,11 @@ import {
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/C/C52_HuntsmansHat'
+import '../../shared/cards/C/C052_HuntsmansHat'
 import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-const CARD_ID = 'C52_HuntsmansHat'
+const CARD_ID = 'C052_HuntsmansHat'
 const LISTENER_ID = 'C52-huntsmans-hat-after-boar-gain'
 
 const findListener = (id: string) =>
@@ -27,7 +27,7 @@ const moved = (
   ...overrides,
 })
 
-describe('C52_HuntsmansHat server session', () => {
+describe('C052_HuntsmansHat server session', () => {
   it('adds food and logs cardEffectGain when collecting boar from pig-market', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -77,7 +77,7 @@ describe('C52_HuntsmansHat server session', () => {
  * (sheep+food / boar+food / pay-food→cattle xor) is NOT implemented since
  * we have no AnimalMarket action space — registered as §2.5.
  */
-describe('C52_HuntsmansHat listener — generic boar-gain trigger (any space)', () => {
+describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)', () => {
   const setupListenerContext = (
     actionId: string,
     spaceId: string,

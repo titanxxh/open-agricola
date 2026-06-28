@@ -109,16 +109,16 @@ describe('shared/session/serialization', () => {
     it('rebuilds missing activeModifiers from played cards', () => {
       const modified = createInitialState(42)
       const player = modified.players[0]!
-      player.minorPlayed.push('A14_CarpentersHammer')
+      player.minorPlayed.push('A014_CarpentersHammer')
       player.activeModifiers = []
 
       const serialized = serializeState(modified, emptyCtx())
       serialized.players[0]!.activeModifiers = []
 
       const { state: restored } = rehydrateState(serialized)
-      expect(getCardModifiers('A14_CarpentersHammer')).not.toHaveLength(0)
+      expect(getCardModifiers('A014_CarpentersHammer')).not.toHaveLength(0)
       expect(restored.players[0]!.activeModifiers).toEqual(
-        getCardModifiers('A14_CarpentersHammer'),
+        getCardModifiers('A014_CarpentersHammer'),
       )
     })
 
@@ -130,7 +130,7 @@ describe('shared/session/serialization', () => {
         wood: 8,
         reed: 2,
       }
-      player.minorPlayed.push('A14_CarpentersHammer')
+      player.minorPlayed.push('A014_CarpentersHammer')
       player.activeModifiers = []
 
       const serialized = serializeState(modified, emptyCtx())

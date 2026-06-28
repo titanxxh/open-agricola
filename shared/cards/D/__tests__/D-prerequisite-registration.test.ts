@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../../helpers/prerequisites'
 import type { GameState, PlayerState, Field } from '../../../contract/types'
 
-import '../D7_Trident'
-import '../D8_FernSeeds'
-import '../D39_TruffleSlicer'
-import '../D53_TeaHouse'
-import '../D58_Gritter'
+import '../D007_Trident'
+import '../D008_FernSeeds'
+import '../D039_TruffleSlicer'
+import '../D053_TeaHouse'
+import '../D058_Gritter'
 
-import { D7_Trident } from '../../../cards/D/D7_Trident'
-import { D8_FernSeeds } from '../../../cards/D/D8_FernSeeds'
-import { D39_TruffleSlicer } from '../../../cards/D/D39_TruffleSlicer'
-import { D53_TeaHouse } from '../../../cards/D/D53_TeaHouse'
-import { D58_Gritter } from '../../../cards/D/D58_Gritter'
+import { D007_Trident } from '../../../cards/D/D007_Trident'
+import { D008_FernSeeds } from '../../../cards/D/D008_FernSeeds'
+import { D039_TruffleSlicer } from '../../../cards/D/D039_TruffleSlicer'
+import { D053_TeaHouse } from '../../../cards/D/D053_TeaHouse'
+import { D058_Gritter } from '../../../cards/D/D058_Gritter'
 
 const emptyResources = {
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -69,7 +69,7 @@ describe('D7 Trident — playable only on rounds 3, 6, 9, 12', () => {
   ])('round $round → meetsCardPrerequisites=$expected', ({ round, expected }) => {
     const player = createPlayer()
     const state = createState(round, player)
-    expect(meetsCardPrerequisites(player, D7_Trident, round, state)).toBe(expected)
+    expect(meetsCardPrerequisites(player, D007_Trident, round, state)).toBe(expected)
   })
 })
 
@@ -77,7 +77,7 @@ describe('D8 FernSeeds — needs >=1 empty and >=2 planted fields', () => {
   it('0 fields: not playable', () => {
     const player = createPlayer([])
     const state = createState(1, player)
-    expect(meetsCardPrerequisites(player, D8_FernSeeds, 1, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, D008_FernSeeds, 1, state)).toBe(false)
   })
 
   it('1 empty + 1 planted: not playable (only 1 planted)', () => {
@@ -86,7 +86,7 @@ describe('D8 FernSeeds — needs >=1 empty and >=2 planted fields', () => {
       fieldEmpty(0, 1),
     ])
     const state = createState(1, player)
-    expect(meetsCardPrerequisites(player, D8_FernSeeds, 1, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, D008_FernSeeds, 1, state)).toBe(false)
   })
 
   it('1 empty + 2 planted: playable', () => {
@@ -96,7 +96,7 @@ describe('D8 FernSeeds — needs >=1 empty and >=2 planted fields', () => {
       fieldEmpty(0, 2),
     ])
     const state = createState(1, player)
-    expect(meetsCardPrerequisites(player, D8_FernSeeds, 1, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, D008_FernSeeds, 1, state)).toBe(true)
   })
 
   it('0 empty + 3 planted: not playable (no empty)', () => {
@@ -106,7 +106,7 @@ describe('D8 FernSeeds — needs >=1 empty and >=2 planted fields', () => {
       fieldVeg(0, 2),
     ])
     const state = createState(1, player)
-    expect(meetsCardPrerequisites(player, D8_FernSeeds, 1, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, D008_FernSeeds, 1, state)).toBe(false)
   })
 })
 
@@ -119,7 +119,7 @@ describe('D39 TruffleSlicer — round >= 8', () => {
   ])('round $round → $expected', ({ round, expected }) => {
     const player = createPlayer()
     const state = createState(round, player)
-    expect(meetsCardPrerequisites(player, D39_TruffleSlicer, round, state)).toBe(expected)
+    expect(meetsCardPrerequisites(player, D039_TruffleSlicer, round, state)).toBe(expected)
   })
 })
 
@@ -130,7 +130,7 @@ describe('D53 TeaHouse — round >= 6', () => {
   ])('round $round → $expected', ({ round, expected }) => {
     const player = createPlayer()
     const state = createState(round, player)
-    expect(meetsCardPrerequisites(player, D53_TeaHouse, round, state)).toBe(expected)
+    expect(meetsCardPrerequisites(player, D053_TeaHouse, round, state)).toBe(expected)
   })
 })
 
@@ -141,6 +141,6 @@ describe('D58 Gritter — round >= 5', () => {
   ])('round $round → $expected', ({ round, expected }) => {
     const player = createPlayer()
     const state = createState(round, player)
-    expect(meetsCardPrerequisites(player, D58_Gritter, round, state)).toBe(expected)
+    expect(meetsCardPrerequisites(player, D058_Gritter, round, state)).toBe(expected)
   })
 })

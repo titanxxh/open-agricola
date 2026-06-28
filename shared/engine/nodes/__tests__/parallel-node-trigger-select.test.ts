@@ -330,7 +330,7 @@ describe('ParallelNode trigger-select mode', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
-      cardIds: ['D66_PotterCeramics'],
+      cardIds: ['D066_PotterCeramics'],
       actions: ['bake-bread'],
       phases: ['before'],
       dispatchMode: 'select',
@@ -343,7 +343,7 @@ describe('ParallelNode trigger-select mode', () => {
       resources: baseResources({ grain: 0, clay: 0 }),
       improvements: ['Major_Fireplace1'],
     })
-    const child = makeActivate('a', 'D66_PotterCeramics', false, {
+    const child = makeActivate('a', 'D066_PotterCeramics', false, {
       phase: 'before',
       actionId: 'bake-bread',
     })
@@ -355,9 +355,9 @@ describe('ParallelNode trigger-select mode', () => {
 
     expect(evaluation.options).toEqual([
       {
-        value: 'D66_PotterCeramics',
-        labelKey: 'cards.D66_PotterCeramics.name',
-        sourceCard: 'D66_PotterCeramics',
+        value: 'D066_PotterCeramics',
+        labelKey: 'cards.D066_PotterCeramics.name',
+        sourceCard: 'D066_PotterCeramics',
         disabled: true,
         disabledReasonKey: 'ui.interactionTriggerUnavailable',
       },

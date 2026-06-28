@@ -3,19 +3,19 @@ import { executeCardListener, getRegisteredCardListeners } from '../card-listene
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
-import '../A/A65_SeedPellets'
+import '../A/A065_SeedPellets'
 import '../A/A126_MasterWorkman'
-import '../B/B67_HandTruck'
-import '../B/B75_WoodWorkshop'
-import '../B/B94_StockProtector'
+import '../B/B067_HandTruck'
+import '../B/B075_WoodWorkshop'
+import '../B/B094_StockProtector'
 import '../C/C112_Thresher'
-import '../D/D14_HammerCrusher'
-import '../D/D17_DrillHarrow'
-import '../D/D49_Bookshelf'
-import '../D/D66_PotterCeramics'
+import '../D/D014_HammerCrusher'
+import '../D/D017_DrillHarrow'
+import '../D/D049_Bookshelf'
+import '../D/D066_PotterCeramics'
 import '../D/D119_WoodBarterer'
 import '../D/D152_Patron'
-import '../E/E74_AshTrees'
+import '../E/E074_AshTrees'
 import '../__stubs__/STUB_BeforeBakeGainClay'
 
 const resources = () => ({
@@ -37,23 +37,23 @@ const player = (): PlayerState => ({
   improvements: [],
   minorHand: [],
   minorPlayed: [
-    'A65_SeedPellets',
-    'B75_WoodWorkshop',
-    'D17_DrillHarrow',
-    'D66_PotterCeramics',
+    'A065_SeedPellets',
+    'B075_WoodWorkshop',
+    'D017_DrillHarrow',
+    'D066_PotterCeramics',
     'D119_WoodBarterer',
     'STUB_BeforeBakeGainClay',
   ],
   occupationHand: [],
   occupationPlayed: [
     'A126_MasterWorkman',
-    'B67_HandTruck',
-    'B94_StockProtector',
+    'B067_HandTruck',
+    'B094_StockProtector',
     'C112_Thresher',
-    'D14_HammerCrusher',
-    'D49_Bookshelf',
+    'D014_HammerCrusher',
+    'D049_Bookshelf',
     'D152_Patron',
-    'E74_AshTrees',
+    'E074_AshTrees',
   ],
   houseAnimalType: null,
   houseAnimalCount: 0,
@@ -63,7 +63,7 @@ const player = (): PlayerState => ({
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
   cardStates: {
-    E74_AshTrees: { counters: { fences: 4 } },
+    E074_AshTrees: { counters: { fences: 4 } },
   },
 }) as PlayerState
 

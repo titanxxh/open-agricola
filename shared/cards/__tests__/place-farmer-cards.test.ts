@@ -31,9 +31,9 @@ describe('PlaceFarmer card listeners', () => {
           type: 'leaf',
           actionId: 'bake-bread',
           optional: true,
-          sourceCard: 'C25_SteamMachine',
+          sourceCard: 'C025_SteamMachine',
         },
-        sourceCard: 'C25_SteamMachine',
+        sourceCard: 'C025_SteamMachine',
       }
     },
   }
@@ -151,7 +151,7 @@ describe('PlaceFarmer card listeners', () => {
 
   // A126_MasterWorkman tests moved to dedicated test file
 
-  describe('C25_SteamMachine', () => {
+  describe('C025_SteamMachine', () => {
     beforeEach(() => {
       requireActiveCardRegistry('place-farmer-cards').registerListener(steamMachineListener)
     })
@@ -179,7 +179,7 @@ describe('PlaceFarmer card listeners', () => {
         type: 'leaf',
         actionId: 'bake-bread',
         optional: true,
-        sourceCard: 'C25_SteamMachine',
+        sourceCard: 'C025_SteamMachine',
       })
     })
 
@@ -198,7 +198,7 @@ describe('PlaceFarmer card listeners', () => {
     })
   })
 
-  describe('C52_HuntsmansHat', () => {
+  describe('C052_HuntsmansHat', () => {
     beforeEach(() => {
       requireActiveCardRegistry('place-farmer-cards').registerListener(huntsmansHatListener)
     })
@@ -211,7 +211,7 @@ describe('PlaceFarmer card listeners', () => {
     })
   })
 
-  describe('C75_Firewood', () => {
+  describe('C075_Firewood', () => {
     beforeEach(() => {
       requireActiveCardRegistry('place-farmer-cards').registerListener(firewoodReturnHomeListener)
     })
@@ -224,7 +224,7 @@ describe('PlaceFarmer card listeners', () => {
     })
   })
 
-  describe('E21_SheepRug', () => {
+  describe('E021_SheepRug', () => {
     const sheepRugComputeArgsListener: CardListenerRegistration = {
       id: 'E21-sheep-rug-compute-args',
       phases: ['computeArgs' as ActionHookPhase],

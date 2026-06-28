@@ -4,9 +4,9 @@ import { runCardListeners } from '../../shared/cards/card-listeners'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C53_GypsysCrock'
+import '../../shared/cards/C/C053_GypsysCrock'
 
-describe('C53_GypsysCrock session', () => {
+describe('C053_GypsysCrock session', () => {
   const executeSpecialEffectLeaves = (
     flow: ActionFlow | undefined,
     state: GameState,
@@ -37,7 +37,7 @@ describe('C53_GypsysCrock session', () => {
 
     const player = state.players[0]!
     // Place card directly
-    player.minorPlayed.push('C53_GypsysCrock')
+    player.minorPlayed.push('C053_GypsysCrock')
     // Give player a Fireplace for cooking
     player.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(
@@ -160,13 +160,13 @@ describe('C53_GypsysCrock session', () => {
   it('non-cooking source (E64 SimpleOven bake-bread) does NOT count toward C53 bonus', () => {
     // SimpleOven exchanges 1 grain → 3 food via bake-bread (isBaking=true,
     // isCookery is NOT set). The trade-applied event fires with sourceId
-    // 'E64_SimpleOven' which is not a cooking source — C53 must skip it.
+    // 'E064_SimpleOven' which is not a cooking source — C53 must skip it.
     // Use direct listener-fire path to keep the assertion focused.
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
-    player.minorPlayed.push('C53_GypsysCrock')
+    player.minorPlayed.push('C053_GypsysCrock')
     session.loadState(state)
 
     // Synthesize the trade-applied event for a non-cooking source twice (so
@@ -182,13 +182,13 @@ describe('C53_GypsysCrock session', () => {
       })
       results.forEach((result) => executeSpecialEffectLeaves(result.flow, state, player))
     }
-    fire('E64_SimpleOven', 2)
+    fire('E064_SimpleOven', 2)
     // C53 counter must remain 0 (non-cooking source filtered out).
-    const cooked = player.cardStates?.['C53_GypsysCrock']?.extraData?.cookedCount
+    const cooked = player.cardStates?.['C053_GypsysCrock']?.extraData?.cookedCount
     expect(cooked ?? 0).toBe(0)
     // And cooking source increments correctly.
     fire('Major_Fireplace1', 2)
-    const cookedAfter = player.cardStates?.['C53_GypsysCrock']?.extraData?.cookedCount
+    const cookedAfter = player.cardStates?.['C053_GypsysCrock']?.extraData?.cookedCount
     expect(cookedAfter).toBe(2)
   })
 })

@@ -115,7 +115,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const player = session.state.players[0]!
     player.minorHand = ['M019_LawnTurf']
     player.improvements = ['Major_Well', 'Major_Joinery']
-    player.minorPlayed = ['A1_Shelter', 'A2_PieceOfLand']
+    player.minorPlayed = ['A001_Shelter', 'A002_PieceOfLand']
     fillToUnused(player, 7)
     expect(meetsCardPrerequisites(player, M019_LawnTurf, session.state.round, session.state)).toBe(true)
 
@@ -126,7 +126,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const blocked = setup()
     const blockedPlayer = blocked.state.players[0]!
     blockedPlayer.improvements = ['Major_Well']
-    blockedPlayer.minorPlayed = ['A1_Shelter', 'A2_PieceOfLand']
+    blockedPlayer.minorPlayed = ['A001_Shelter', 'A002_PieceOfLand']
     expect(meetsCardPrerequisites(blockedPlayer, M019_LawnTurf, blocked.state.round, blocked.state)).toBe(false)
   })
 
@@ -181,9 +181,9 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.minorHand = ['M022_EcologicalNiche']
-    player.minorPlayed = ['B68_Beanfield']
+    player.minorPlayed = ['B068_Beanfield']
     player.cardStates = {
-      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
     }
 
     const resp = playMinor(session, 'M022_EcologicalNiche')
@@ -192,13 +192,13 @@ describe('Moor Batch 1 immediate resource minors', () => {
 
     const tied = setup()
     tied.state.players[0]!.minorHand = ['M022_EcologicalNiche']
-    tied.state.players[0]!.minorPlayed = ['B68_Beanfield']
+    tied.state.players[0]!.minorPlayed = ['B068_Beanfield']
     tied.state.players[0]!.cardStates = {
-      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
     }
-    tied.state.players[1]!.minorPlayed = ['B68_Beanfield']
+    tied.state.players[1]!.minorPlayed = ['B068_Beanfield']
     tied.state.players[1]!.cardStates = {
-      B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
     }
 
     const noReward = playMinor(tied, 'M022_EcologicalNiche', false)
@@ -370,7 +370,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     const other = session.state.players[1]!
     player.minorHand = ['M100_Pheromones']
     player.improvements = ['Major_Well']
-    player.minorPlayed = ['A1_Shelter']
+    player.minorPlayed = ['A001_Shelter']
     player.stableTiles = [{ row: 0, col: 0 }]
     other.pastures = [pasture([{ row: 0, col: 1 }])]
     expect(meetsCardPrerequisites(player, M100_Pheromones, session.state.round, session.state)).toBe(true)
@@ -382,7 +382,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
 
     const blocked = setup()
     blocked.state.players[0]!.improvements = ['Major_Well', 'Major_Joinery']
-    blocked.state.players[0]!.minorPlayed = ['A1_Shelter']
+    blocked.state.players[0]!.minorPlayed = ['A001_Shelter']
     expect(meetsCardPrerequisites(blocked.state.players[0]!, M100_Pheromones, blocked.state.round, blocked.state)).toBe(false)
   })
 })

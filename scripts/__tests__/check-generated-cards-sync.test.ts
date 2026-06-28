@@ -17,10 +17,10 @@ describe('checkGeneratedCardsSync', () => {
     const majorRoot = path.join(cardsRoot, 'major')
 
     writeSource(
-      path.join(cardsRoot, 'A', 'A1_Source.ts'),
+      path.join(cardsRoot, 'A', 'A001_Source.ts'),
       `import { defineMinorCard } from '../card-source'\n` +
-      `export const A1_Source = defineMinorCard({\n` +
-      `  meta: { id: 'A1_Source', name: 'Source', deck: 'A', number: 1, desc: [], cost: {} },\n` +
+      `export const A001_Source = defineMinorCard({\n` +
+      `  meta: { id: 'A001_Source', name: 'Source', deck: 'A', number: 1, desc: [], cost: {} },\n` +
       `})\n`,
     )
     writeSource(

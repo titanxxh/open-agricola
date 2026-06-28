@@ -3,13 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B25_BreadPaddle'
+import '../../shared/cards/B/B025_BreadPaddle'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'B25_BreadPaddle'
+const CARD_ID = 'B025_BreadPaddle'
 
-describe('B25_BreadPaddle session', () => {
+describe('B025_BreadPaddle session', () => {
   it('onBuy returns a gain-1-food flow', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -88,7 +88,7 @@ describe('B25_BreadPaddle session', () => {
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Fireplace1')
     player.occupationHand.push('A114_SeasonalWorker')
-    player.occupationPlayed.push('A85_Homekeeper')
+    player.occupationPlayed.push('A085_Homekeeper')
 
     setActiveWorkerCount(state.players[1]!, 1)
     markAllWorkersUsed(state, state.players[1]!)

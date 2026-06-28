@@ -5,12 +5,12 @@ import { getActionDefinition } from '../../shared/actions'
 import type { ActionExecutionContext, ActionSpace } from '../../shared/contract/types'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { B3_Moonshine_impl } from '../../shared/cards/B/B3_Moonshine'
+import { B003_Moonshine_impl } from '../../shared/cards/B/B003_Moonshine'
 
-import '../../shared/cards/A/A16_RammedClay'
-import '../../shared/cards/A/A95_Angler'
+import '../../shared/cards/A/A016_RammedClay'
+import '../../shared/cards/A/A095_Angler'
 import '../../shared/cards/A/A116_WoodCutter'
-import '../../shared/cards/B/B3_Moonshine'
+import '../../shared/cards/B/B003_Moonshine'
 import '../../shared/cards/B/B146_Illusionist'
 
 const handChangedEvent = (recipientPlayerId: string, cardIds: string[]): PrivateGameEvent => ({
@@ -31,9 +31,9 @@ const responseEmitter = (session: GameSession): ResponsePrivateEventEmitter =>
   session as unknown as ResponsePrivateEventEmitter
 
 const B146_DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
-const B3_CARD_ID = 'B3_Moonshine'
-const A95_CARD_ID = 'A95_Angler'
-const A6_MINOR_ID = 'A16_RammedClay'
+const B003_CARD_ID = 'B003_Moonshine'
+const A095_CARD_ID = 'A095_Angler'
+const A006_MINOR_ID = 'A016_RammedClay'
 const TEST_OCCUPATION_ID = 'A116_WoodCutter'
 
 const makeSpace = (id = 'test-space'): ActionSpace => ({
@@ -111,15 +111,15 @@ const resolveMinorFromPrompt = (
 const playB3 = (session: GameSession) => {
   const resp = session.takeAction(0, 'meeting-place')
   expect(resp.ok).toBe(true)
-  return resolveMinorFromPrompt(session, resp, B3_CARD_ID)
+  return resolveMinorFromPrompt(session, resp, B003_CARD_ID)
 }
 
 const setupAnglerSession = () => {
   const session = setupTwoPlayerSession()
   const state = session.getState().state
   const player = state.players[0]!
-  player.occupationPlayed.push(A95_CARD_ID)
-  player.minorHand = [A6_MINOR_ID]
+  player.occupationPlayed.push(A095_CARD_ID)
+  player.minorHand = [A006_MINOR_ID]
   const fishing = state.actionSpaces.find((space) => space.id === 'fishing')
   if (!fishing) throw new Error('fishing space missing')
   fishing.resources.food = 2
@@ -131,7 +131,7 @@ describe('card effect hand notification response plumbing', () => {
   it('explicit privateEvents are returned without entering state.events', () => {
     const session = new GameSession()
     const playerId = session.getState().state.players[0]!.id
-    const event = handChangedEvent(playerId, ['A1_TestCard'])
+    const event = handChangedEvent(playerId, ['A001_TestCard'])
 
     const resp = session.emitResponse(true, undefined, [event])
 
@@ -142,7 +142,7 @@ describe('card effect hand notification response plumbing', () => {
   it('buffered private events are drained once on successful responses', () => {
     const session = new GameSession()
     const playerId = session.getState().state.players[0]!.id
-    const event = handChangedEvent(playerId, ['A2_TestCard'])
+    const event = handChangedEvent(playerId, ['A002_TestCard'])
 
     responseEmitter(session).emitResponsePrivateEvent(event)
 
@@ -157,7 +157,7 @@ describe('card effect hand notification response plumbing', () => {
   it('failed responses clear buffered private events without leaking stale events', () => {
     const session = new GameSession()
     const playerId = session.getState().state.players[0]!.id
-    const event = handChangedEvent(playerId, ['A3_TestCard'])
+    const event = handChangedEvent(playerId, ['A003_TestCard'])
 
     responseEmitter(session).emitResponsePrivateEvent(event)
 
@@ -206,7 +206,7 @@ describe('card effect hand notification events', () => {
     const session = new GameSession()
     const state = session.getState().state
     const player = state.players[0]!
-    player.minorHand = [A6_MINOR_ID]
+    player.minorHand = [A006_MINOR_ID]
 
     const result = def.resolveChoice!(
       {
@@ -216,15 +216,15 @@ describe('card effect hand notification events', () => {
         params: {},
         emitPrivateEvent: (event) => responseEmitter(session).emitResponsePrivateEvent(event),
       } as ActionExecutionContext,
-      `min:${A6_MINOR_ID}`,
+      `min:${A006_MINOR_ID}`,
     )
     const resp = session.emitResponse(result.type !== 'fail')
 
     expect(result.type).toBe('ok')
-    expect(resp.state.players[0]!.minorHand).not.toContain(A6_MINOR_ID)
+    expect(resp.state.players[0]!.minorHand).not.toContain(A006_MINOR_ID)
     expectOnlyHandEvents(resp.privateEvents, [{
       recipientPlayerId: player.id,
-      cardIds: [A6_MINOR_ID],
+      cardIds: [A006_MINOR_ID],
       cardType: 'minor',
       sourceCard: 'B146_Illusionist',
       sourceActionId: B146_DISCARD_ACTION_ID,
@@ -235,7 +235,7 @@ describe('card effect hand notification events', () => {
   it('B3 pass branch emits private hand events for original and receiving players', () => {
     const session = setupTwoPlayerSession()
     const state = session.getState().state
-    state.players[0]!.minorHand = [B3_CARD_ID]
+    state.players[0]!.minorHand = [B003_CARD_ID]
     state.players[0]!.occupationHand = [TEST_OCCUPATION_ID]
     state.players[0]!.resources.food = 3
     session.loadState(state)
@@ -254,13 +254,13 @@ describe('card effect hand notification events', () => {
         recipientPlayerId: p0.id,
         cardIds: [TEST_OCCUPATION_ID],
         cardType: 'occupation',
-        sourceCard: B3_CARD_ID,
+        sourceCard: B003_CARD_ID,
       },
       {
         recipientPlayerId: p1.id,
         cardIds: [TEST_OCCUPATION_ID],
         cardType: 'occupation',
-        sourceCard: B3_CARD_ID,
+        sourceCard: B003_CARD_ID,
       },
     ])
   })
@@ -271,11 +271,11 @@ describe('card effect hand notification events', () => {
     state.players = state.players.slice(0, 1)
     const player = state.players[0]!
     player.occupationHand = [TEST_OCCUPATION_ID]
-    writeCardExtraData(player, B3_CARD_ID, 'occ', TEST_OCCUPATION_ID)
+    writeCardExtraData(player, B003_CARD_ID, 'occ', TEST_OCCUPATION_ID)
 
     const events: PrivateGameEvent[] = []
-    B3_Moonshine_impl.effect.resolveChoice?.(state, player, 'pass', {
-      sourceCard: B3_CARD_ID,
+    B003_Moonshine_impl.effect.resolveChoice?.(state, player, 'pass', {
+      sourceCard: B003_CARD_ID,
       emitPrivateEvent: (event) => events.push(event),
     })
 
@@ -284,14 +284,14 @@ describe('card effect hand notification events', () => {
       recipientPlayerId: player.id,
       cardIds: [TEST_OCCUPATION_ID],
       cardType: 'occupation',
-      sourceCard: B3_CARD_ID,
+      sourceCard: B003_CARD_ID,
     }])
   })
 
   it('B3 play branch emits a private event when its picked occupation leaves hand', () => {
     const session = setupTwoPlayerSession()
     const state = session.getState().state
-    state.players[0]!.minorHand = [B3_CARD_ID]
+    state.players[0]!.minorHand = [B003_CARD_ID]
     state.players[0]!.occupationHand = [TEST_OCCUPATION_ID]
     state.players[0]!.resources.food = 3
     session.loadState(state)
@@ -308,7 +308,7 @@ describe('card effect hand notification events', () => {
       recipientPlayerId: player.id,
       cardIds: [TEST_OCCUPATION_ID],
       cardType: 'occupation',
-      sourceCard: B3_CARD_ID,
+      sourceCard: B003_CARD_ID,
     }])
   })
 
@@ -325,21 +325,21 @@ describe('card effect hand notification events', () => {
     resp = session.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
       const hasMinorChoice = resp.interaction.options?.some(
-        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A6_MINOR_ID}`,
+        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A006_MINOR_ID}`,
       )
       if (hasMinorChoice) {
-        resp = resolveMinorFromPrompt(session, resp, A6_MINOR_ID)
+        resp = resolveMinorFromPrompt(session, resp, A006_MINOR_ID)
       }
     }
 
     const player = resp.state.players[0]!
-    expect(player.minorHand).not.toContain(A6_MINOR_ID)
-    expect(player.minorPlayed).toContain(A6_MINOR_ID)
+    expect(player.minorHand).not.toContain(A006_MINOR_ID)
+    expect(player.minorPlayed).toContain(A006_MINOR_ID)
     expectOnlyHandEvents(resp.privateEvents, [{
       recipientPlayerId: player.id,
-      cardIds: [A6_MINOR_ID],
+      cardIds: [A006_MINOR_ID],
       cardType: 'minor',
-      sourceCard: A95_CARD_ID,
+      sourceCard: A095_CARD_ID,
     }])
   })
 
@@ -362,7 +362,7 @@ describe('card effect hand notification events', () => {
 
     const minorSession = setupTwoPlayerSession()
     const minorState = minorSession.getState().state
-    minorState.players[0]!.minorHand = [A6_MINOR_ID]
+    minorState.players[0]!.minorHand = [A006_MINOR_ID]
     minorSession.loadState(minorState)
 
     resp = minorSession.takeAction(0, 'meeting-place')
@@ -373,14 +373,14 @@ describe('card effect hand notification events', () => {
     resp = minorSession.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
       const hasMinorChoice = resp.interaction.options?.some(
-        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A6_MINOR_ID}`,
+        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A006_MINOR_ID}`,
       )
       if (hasMinorChoice) {
-        resp = resolveMinorFromPrompt(minorSession, resp, A6_MINOR_ID)
+        resp = resolveMinorFromPrompt(minorSession, resp, A006_MINOR_ID)
       }
     }
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain(A6_MINOR_ID)
+    expect(resp.state.players[0]!.minorPlayed).toContain(A006_MINOR_ID)
     expect(resp.privateEvents).toBeUndefined()
   })
 })

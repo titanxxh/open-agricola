@@ -8,7 +8,7 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../../shared/domain/farmyard'
-import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
+import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
@@ -133,7 +133,7 @@ describe('farm interaction builders', () => {
     const player = createPlayer()
     player.resources.wood = 8
     player.resources.reed = 2
-    player.activeModifiers = [...(A14_CarpentersHammer.impl.modifiers ?? [])]
+    player.activeModifiers = [...(A014_CarpentersHammer.impl.modifiers ?? [])]
 
     const interaction = buildRoomFarmInteraction(player)
 

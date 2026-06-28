@@ -4,9 +4,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-import '../../shared/cards/C/C16_FieldFences'
+import '../../shared/cards/C/C016_FieldFences'
 
-const CARD_ID = 'C16_FieldFences'
+const CARD_ID = 'C016_FieldFences'
 
 const setup = (opts: { wood: number; withField?: boolean; food?: number }) => {
   const session = new GameSession()

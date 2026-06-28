@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A42_ForestLakeHut'
+import '../../shared/cards/A/A042_ForestLakeHut'
 
-const CARD_ID = 'A42_ForestLakeHut'
+const CARD_ID = 'A042_ForestLakeHut'
 
-describe('A42_ForestLakeHut session', () => {
+describe('A042_ForestLakeHut session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

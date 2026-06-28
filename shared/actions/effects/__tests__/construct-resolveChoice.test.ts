@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import '../../../cards/B/B38_FutureBuildingSite'
+import '../../../cards/B/B038_FutureBuildingSite'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import { constructAction } from '../construct'
 import type {
@@ -114,9 +114,9 @@ describe('constructAction.resolveChoice', () => {
   it('is not executable when locked tiles leave no reachable room selection', () => {
     const ctx = makeCtx({
       player: {
-        minorPlayed: ['B38_FutureBuildingSite'],
+        minorPlayed: ['B038_FutureBuildingSite'],
         cardStates: {
-          B38_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
+          B038_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
         },
       },
     })

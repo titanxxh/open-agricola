@@ -65,7 +65,7 @@ describe('computeScores', () => {
   it('scores begging cards and empty spaces consistently', () => {
     const player = createPlayer()
     player.resources.begging = 2
-    player.minorPlayed = ['A3_PaperKnife']
+    player.minorPlayed = ['A003_PaperKnife']
     player.occupationPlayed = ['B109_PaperMaker']
 
     const [result] = computeScores(createState(player))
@@ -199,7 +199,7 @@ describe('computeScores', () => {
     player.fields = [
       { row: 0, col: 0, stacks: [] },  // 1 normal field
     ]
-    player.minorPlayed = ['D75_WoodField', 'E80_RockGarden']  // 2 isField cards
+    player.minorPlayed = ['D075_WoodField', 'E080_RockGarden']  // 2 isField cards
     const [result] = computeScores(createState(player))
     const byKey = new Map(result.categories.map((item) => [item.key, item]))
     // 1 normal field + 2 isField cards = 3 logical fields → range '3' → 2 VP

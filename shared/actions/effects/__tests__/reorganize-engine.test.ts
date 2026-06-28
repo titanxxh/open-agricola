@@ -6,8 +6,8 @@ import type {
   GameState,
   PlayerState,
 } from '../../../contract/types'
-import '../../../cards/B/B12_Stockyard'
-import '../../../cards/C/C11_WildlifeReserve'
+import '../../../cards/B/B012_Stockyard'
+import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
 
 const dummySpace: ActionSpace = {
@@ -175,7 +175,7 @@ describe('reorganizeAction.resolveChoice', () => {
   it('normalizes mixed animalCounts on same-type unkeyed card zones', () => {
     const ctx = makeCtx({
       player: {
-        minorPlayed: ['B12_Stockyard'],
+        minorPlayed: ['B012_Stockyard'],
         resources: { sheep: 1, boar: 1 } as never,
       },
     })
@@ -184,7 +184,7 @@ describe('reorganizeAction.resolveChoice', () => {
       ctx,
       'confirm',
       [{
-        id: 'card:B12_Stockyard',
+        id: 'card:B012_Stockyard',
         zoneType: 'card',
         animalType: 'boar',
         animalCount: 2,
@@ -229,7 +229,7 @@ describe('reorganizeAction.resolveChoice', () => {
   it('filters invalid card animals before clamping capacity', () => {
     const ctx = makeCtx({
       player: {
-        minorPlayed: ['C11_WildlifeReserve'],
+        minorPlayed: ['C011_WildlifeReserve'],
         resources: { sheep: 2, boar: 1, cattle: 1 } as never,
       },
     })
@@ -238,9 +238,9 @@ describe('reorganizeAction.resolveChoice', () => {
       ctx,
       'confirm',
       [{
-        id: 'card:C11_WildlifeReserve',
+        id: 'card:C011_WildlifeReserve',
         zoneType: 'card',
-        cardId: 'C11_WildlifeReserve',
+        cardId: 'C011_WildlifeReserve',
         animalType: null,
         animalCount: 4,
         animalCounts: { sheep: 2, boar: 1, cattle: 1 },
@@ -257,7 +257,7 @@ describe('reorganizeAction.resolveChoice', () => {
     const ctx = makeCtx({
       state: { enableFarmersOfTheMoor: true },
       player: {
-        minorPlayed: ['C11_WildlifeReserve'],
+        minorPlayed: ['C011_WildlifeReserve'],
         resources: { sheep: 1, boar: 1, cattle: 1, horse: 1 } as never,
       },
     })
@@ -266,9 +266,9 @@ describe('reorganizeAction.resolveChoice', () => {
       ctx,
       'confirm',
       [{
-        id: 'card:C11_WildlifeReserve',
+        id: 'card:C011_WildlifeReserve',
         zoneType: 'card',
-        cardId: 'C11_WildlifeReserve',
+        cardId: 'C011_WildlifeReserve',
         animalType: null,
         animalCount: 4,
         animalCounts: { sheep: 1, boar: 1, cattle: 1, horse: 1 },

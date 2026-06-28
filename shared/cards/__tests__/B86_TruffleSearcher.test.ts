@@ -13,14 +13,14 @@ const setupGame = () => {
   return { session, core }
 }
 
-describe('B86_TruffleSearcher', () => {
+describe('B086_TruffleSearcher', () => {
   it('emits a card zone with capacity = state.completedFeedingPhases', () => {
     const { core } = setupGame()
     core.state.completedFeedingPhases = 3
-    core.state.players[0].occupationPlayed = ['B86_TruffleSearcher']
+    core.state.players[0].occupationPlayed = ['B086_TruffleSearcher']
 
     const zones = computeAnimalZones(core.state.players[0], core.state)
-    const z = zones.find((zz: any) => zz.cardId === 'B86_TruffleSearcher')
+    const z = zones.find((zz: any) => zz.cardId === 'B086_TruffleSearcher')
     expect(z).toBeDefined()
     expect(z!.capacity).toBe(3)
     expect(z!.animalType).toBe('boar')
@@ -30,9 +30,9 @@ describe('B86_TruffleSearcher', () => {
   it('emits no zone when completedFeedingPhases === 0', () => {
     const { core } = setupGame()
     core.state.completedFeedingPhases = 0
-    core.state.players[0].occupationPlayed = ['B86_TruffleSearcher']
+    core.state.players[0].occupationPlayed = ['B086_TruffleSearcher']
 
     const zones = computeAnimalZones(core.state.players[0], core.state)
-    expect(zones.find((z: any) => z.cardId === 'B86_TruffleSearcher')).toBeUndefined()
+    expect(zones.find((z: any) => z.cardId === 'B086_TruffleSearcher')).toBeUndefined()
   })
 })

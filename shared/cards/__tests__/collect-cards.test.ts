@@ -167,7 +167,7 @@ describe('Collect action card listeners', () => {
     },
   }
 
-  describe('E53_BoarSpear', () => {
+  describe('E053_BoarSpear', () => {
     beforeEach(() => {
       requireActiveCardRegistry('collect-cards').registerListener(boarSpearDuringListener)
     })
@@ -269,7 +269,7 @@ describe('Collect action card listeners', () => {
     })
   })
 
-  describe('A17_ReclamationPlow', () => {
+  describe('A017_ReclamationPlow', () => {
     beforeEach(() => {
       requireActiveCardRegistry('collect-cards').registerListener(reclamationPlowAfterListener)
     })
@@ -366,7 +366,7 @@ describe('Collect action card listeners', () => {
     })
   })
 
-  describe('A53_Claypipe', () => {
+  describe('A053_Claypipe', () => {
     const claypipeImmediatelyAfterListener: Record<string, unknown> = {
       id: 'A53-claypipe-immediately-after',
       phases: ['immediatelyAfter' as ActionHookPhase],
@@ -374,7 +374,7 @@ describe('Collect action card listeners', () => {
       handler: (context: CardListenerContext): ActionHookResult | void => {
         const { player, result } = context
         
-        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        if (!player.minorPlayed?.includes('A053_Claypipe')) return
         if (result?.type !== 'ok') return
         
         const gainedResources = result.resourcesGained ?? {}
@@ -399,9 +399,9 @@ describe('Collect action card listeners', () => {
       handler: (context: CardListenerContext): ActionHookResult | void => {
         const { player } = context
         
-        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        if (!player.minorPlayed?.includes('A053_Claypipe')) return
         
-        const cardState = player.cardStates?.['A53_Claypipe'] ?? {}
+        const cardState = player.cardStates?.['A053_Claypipe'] ?? {}
         const buildingCount = cardState.counters?.['buildingResources'] ?? 0
         
         if (buildingCount >= 7) {
@@ -439,7 +439,7 @@ describe('Collect action card listeners', () => {
         phase: 'immediatelyAfter',
         result: { type: 'ok', resourcesGained: { wood: 2, clay: 3 } },
         player: {
-          minorPlayed: ['A53_Claypipe'],
+          minorPlayed: ['A053_Claypipe'],
           cardStates: {},
         },
       })
@@ -476,9 +476,9 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { type: 'ok' },
         player: {
-          minorPlayed: ['A53_Claypipe'],
+          minorPlayed: ['A053_Claypipe'],
           cardStates: {
-            'A53_Claypipe': { counters: { buildingResources: 7 } },
+            'A053_Claypipe': { counters: { buildingResources: 7 } },
           },
         },
       })
@@ -498,9 +498,9 @@ describe('Collect action card listeners', () => {
         phase: 'after',
         result: { type: 'ok' },
         player: {
-          minorPlayed: ['A53_Claypipe'],
+          minorPlayed: ['A053_Claypipe'],
           cardStates: {
-            'A53_Claypipe': { counters: { buildingResources: 5 } },
+            'A053_Claypipe': { counters: { buildingResources: 5 } },
           },
         },
       })

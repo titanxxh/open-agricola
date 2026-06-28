@@ -4,7 +4,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { playOccupationAction } from '../../actions/effects/occupation'
 import { actionDefinitions } from '../../actions'
 
-import '../A/A97_Freshman'
+import '../A/A097_Freshman'
 import '../../cards/A/A123_FrameBuilder'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionExecutionContext } from '../../contract/types'
@@ -28,7 +28,7 @@ const createPlayer = (): PlayerState =>
     rooms: 2, houseType: 'wood',
     fields: [], fences: 0, roomTiles: [], stableTiles: [],
     improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: ['A97_Freshman'],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
+    occupationHand: [], occupationPlayed: ['A097_Freshman'],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [], cardStates: {},
@@ -69,7 +69,7 @@ const findListener = (id: string) =>
   getRegisteredCardListeners().find((listener) => listener.id === id)
 const grainUtilization = actionDefinitions.find((action) => action.id === 'grain-utilization')!
 
-describe('A97_Freshman', () => {
+describe('A097_Freshman', () => {
   it('makes grain utilization doable through bake replacement', () => {
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
@@ -97,11 +97,11 @@ describe('A97_Freshman', () => {
       promptKey: 'ui.interactionFreshmanOccupation',
       choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A97_Freshman', params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-flag', flag: true } },
         {
           type: 'leaf',
           actionId: 'occupation',
-          sourceCard: 'A97_Freshman',
+          sourceCard: 'A097_Freshman',
           params: { exactCost: {} },
         },
       ],
@@ -113,7 +113,7 @@ describe('A97_Freshman', () => {
     const doableListener = findListener('A97-freshman-isdoable-bake')
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
-    player.cardStates = { A97_Freshman: { flagged: true } }
+    player.cardStates = { A097_Freshman: { flagged: true } }
 
     expect(resetListener).toBeDefined()
     expect(doableListener).toBeDefined()
@@ -130,14 +130,14 @@ describe('A97_Freshman', () => {
     expect(result?.flow).toEqual({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'A97_Freshman',
+      sourceCard: 'A097_Freshman',
       params: { kind: 'set-flag', flag: false },
     })
   })
 
   it('lets occupation ignore normal lessons cost when Freshman provides free play', () => {
     const player = createPlayer()
-    player.occupationPlayed.push('A55_JunkRoom')
+    player.occupationPlayed.push('A055_JunkRoom')
     player.occupationHand = ['A123_FrameBuilder']
 
     const result = playOccupationAction.execute({

@@ -105,7 +105,7 @@ describe('E165_MasterHuntsman session', () => {
       space: mkActionSpace({ id: 'improvement' }),
       actionId: 'improvement',
       phase: 'after',
-      choice: 'minor:A55_JunkRoom',
+      choice: 'minor:A055_JunkRoom',
       result: { type: 'ok' },
     } as CardListenerContext)
 

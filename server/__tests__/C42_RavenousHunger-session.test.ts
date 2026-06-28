@@ -5,10 +5,10 @@ import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource 
 
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/C/C42_RavenousHunger'
+import '../../shared/cards/C/C042_RavenousHunger'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C42_RavenousHunger'
+const CARD_ID = 'C042_RavenousHunger'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -114,7 +114,7 @@ const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getS
   return session.resolveChoice(0, accept!.value)
 }
 
-describe('C42_RavenousHunger', () => {
+describe('C042_RavenousHunger', () => {
   it('after vegetable-seeds: offers place-farmer with flag/unflag sequence and accumulation constraints', () => {
     const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()

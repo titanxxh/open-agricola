@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/E/E51_WhaleOil'
+import '../../shared/cards/E/E051_WhaleOil'
 
-const CARD_ID = 'E51_WhaleOil'
+const CARD_ID = 'E051_WhaleOil'
 
 const setup = (options?: { foodCount?: number }) => {
   const session = new GameSession()
@@ -35,7 +35,7 @@ const setup = (options?: { foodCount?: number }) => {
   return session
 }
 
-describe('E51_WhaleOil session', () => {
+describe('E051_WhaleOil session', () => {
   it('onBuy sets foodCount to 0', () => {
     const session = new GameSession()
     const state = session.getState().state

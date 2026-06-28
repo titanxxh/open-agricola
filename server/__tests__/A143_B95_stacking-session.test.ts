@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
-import { B95_MasterBricklayer } from '../../shared/cards/B/B95_MasterBricklayer'
+import { B095_MasterBricklayer } from '../../shared/cards/B/B095_MasterBricklayer'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
-void B95_MasterBricklayer
+void B095_MasterBricklayer
 
 describe('A143 + B95 stacking', () => {
   const setup = (rooms: number) => {
@@ -18,7 +18,7 @@ describe('A143 + B95 stacking', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationPlayed = ['A143_Stonecutter', 'B95_MasterBricklayer']
+    player.occupationPlayed = ['A143_Stonecutter', 'B095_MasterBricklayer']
     player.rooms = rooms
     player.resources = {
       ...player.resources,

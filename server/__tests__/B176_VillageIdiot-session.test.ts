@@ -61,7 +61,7 @@ describe('B176 Village Idiot', () => {
       state,
       player,
       space: { id: 'lessons' },
-      sourceCard: 'A97_Freshman',
+      sourceCard: 'A097_Freshman',
       params: { exactCost: {} },
       actionContext: { trueAction: false },
     } as unknown as ActionExecutionContext)
@@ -76,14 +76,14 @@ describe('B176 Village Idiot', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed = [CARD_ID]
-    player.minorHand = ['D25_WitchesDanceFloor']
+    player.minorHand = ['D025_WitchesDanceFloor']
     player.resources.food = 2
     session.loadState(state)
 
     const resp = session.takeAction(0, 'minor-improvement')
 
-    expect(resp.interaction.options?.some((option) => option.value === 'D25_WitchesDanceFloor') ?? false).toBe(false)
-    expect(resp.state.players[0]!.minorHand).toContain('D25_WitchesDanceFloor')
+    expect(resp.interaction.options?.some((option) => option.value === 'D025_WitchesDanceFloor') ?? false).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain('D025_WitchesDanceFloor')
     expect(resp.state.players[0]!.extraOccupationsFromCards).toEqual([])
   })
 

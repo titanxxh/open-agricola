@@ -2,11 +2,11 @@
  * passing-card End-to-End Playwright spec.
  *
  * Tests the passing minor card mechanic:
- *   - P1 buys a passing minor (A1_Shelter) via meeting-place
+ *   - P1 buys a passing minor (A001_Shelter) via meeting-place
  *   - Card moves to P2's hand (not P1's played cards)
  *   - Log panel shows a "passes" entry (log.cardPassed)
  *   - card.passed event is present in state.events
- *   - P2 board view shows A1_Shelter in hand area (data-hand-anchor="p2")
+ *   - P2 board view shows A001_Shelter in hand area (data-hand-anchor="p2")
  *   - Flying animation smoke check: .card-pass-overlay appears briefly
  *
  * API endpoints (same as other e2e specs):
@@ -27,8 +27,8 @@ import {
   FRONTEND_URL,
 } from './fixtures'
 
-const PASSING_CARD_ID = 'A1_Shelter'
-const FILLER_MINOR = 'C57_Crudite'
+const PASSING_CARD_ID = 'A001_Shelter'
+const FILLER_MINOR = 'C057_Crudite'
 
 test.use({ viewport: { width: 1920, height: 1080 } })
 test.setTimeout(120_000)
@@ -92,7 +92,7 @@ async function buyPassingCard(request: Parameters<typeof postJson>[0]) {
   return buyResp
 }
 
-test.describe('passing-card: A1_Shelter minor', () => {
+test.describe('passing-card: A001_Shelter minor', () => {
   test('smoke: page loads with board visible', async ({ page, request }) => {
     await postJson(request, `${BACKEND_URL}/api/game/new`)
 
@@ -116,7 +116,7 @@ test.describe('passing-card: A1_Shelter minor', () => {
     expect(hardErrors).toHaveLength(0)
   })
 
-  test('P1 buys A1_Shelter → card goes to P2 hand + log shows passes entry + P2 board shows card', async ({
+  test('P1 buys A001_Shelter → card goes to P2 hand + log shows passes entry + P2 board shows card', async ({
     page,
     request,
   }) => {
@@ -158,7 +158,7 @@ test.describe('passing-card: A1_Shelter minor', () => {
     expect(count).toBeGreaterThan(0)
 
     const logText = await logPanel.textContent()
-    expect(logText).toMatch(/passes|A1_Shelter/i)
+    expect(logText).toMatch(/passes|A001_Shelter/i)
 
     await saveScreenshot(page, 'passing-e2e-p1-board-after-buy')
 
@@ -169,7 +169,7 @@ test.describe('passing-card: A1_Shelter minor', () => {
     await saveScreenshot(page, 'passing-e2e-p2-board-after-buy')
 
     await expect(
-      page.locator('[data-hand-anchor="p2"] [data-card-anchor="A1_Shelter"]'),
+      page.locator('[data-hand-anchor="p2"] [data-card-anchor="A001_Shelter"]'),
     ).toBeVisible({ timeout: 10_000 })
   })
 })

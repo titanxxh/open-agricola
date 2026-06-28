@@ -5,9 +5,9 @@ import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import { discountCardCostCandidate } from '../../payment/internal'
 import { playImprovement } from '../improvement'
 
-import '../../../cards/A/A53_Claypipe'
-import '../../../cards/D/D20_TurnwrestPlow'
-import '../../../cards/D/D96_Furnisher'
+import '../../../cards/A/A053_Claypipe'
+import '../../../cards/D/D020_TurnwrestPlow'
+import '../../../cards/D/D096_Furnisher'
 import '../../../cards/D/D117_WoodExpert'
 
 const SOURCE_CARD = 'HookCandidate'
@@ -55,7 +55,7 @@ const createPlayer = (): PlayerState =>
     roomTiles: [],
     stableTiles: [],
     improvements: [],
-    minorHand: ['A53_Claypipe'],
+    minorHand: ['A053_Claypipe'],
     minorPlayed: [],
     occupationHand: [],
     occupationPlayed: [SOURCE_CARD],
@@ -121,7 +121,7 @@ describe('improvement card cost candidates', () => {
     state.players = [player]
 
     const clayBefore = player.resources.clay
-    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const result = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
 
     expectAutoResolvedFreePayment(result, player)
     expect(player.resources.clay).toBe(clayBefore)
@@ -143,11 +143,11 @@ describe('improvement card cost candidates', () => {
     const state = createState()
     const player = createPlayer()
     player.resources = { ...player.resources, wood: 3, food: 1 }
-    player.minorHand = ['D20_TurnwrestPlow']
+    player.minorHand = ['D020_TurnwrestPlow']
     player.occupationPlayed = ['D117_WoodExpert', 'OtherOccupation']
     state.players = [player]
 
-    const request = playImprovement(state, player, 'minor:D20_TurnwrestPlow', 'any')
+    const request = playImprovement(state, player, 'minor:D020_TurnwrestPlow', 'any')
     expect(request.type).toBe('request')
     if (request.type !== 'request' || request.request.kind !== 'choice') return
     const option = request.request.options.find((entry) =>
@@ -163,18 +163,18 @@ describe('improvement card cost candidates', () => {
       saved: { wood: 2 },
       paid: { food: 1 },
     })
-    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
+    expect(readCardResourceStats(player, 'D020_TurnwrestPlow')?.paid).toBeUndefined()
   })
 
   it('does not record optional derived attribution when the original candidate is selected', () => {
     const state = createState()
     const player = createPlayer()
     player.resources = { ...player.resources, wood: 3, food: 1 }
-    player.minorHand = ['D20_TurnwrestPlow']
+    player.minorHand = ['D020_TurnwrestPlow']
     player.occupationPlayed = ['D117_WoodExpert', 'OtherOccupation']
     state.players = [player]
 
-    const request = playImprovement(state, player, 'minor:D20_TurnwrestPlow', 'any')
+    const request = playImprovement(state, player, 'minor:D020_TurnwrestPlow', 'any')
     expect(request.type).toBe('request')
     if (request.type !== 'request' || request.request.kind !== 'choice') return
     const option = request.request.options.find((entry) =>
@@ -186,28 +186,28 @@ describe('improvement card cost candidates', () => {
 
     expect(result.type).toBe('ok')
     expect(readCardResourceStats(player, 'D117_WoodExpert')).toBeUndefined()
-    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
+    expect(readCardResourceStats(player, 'D020_TurnwrestPlow')?.paid).toBeUndefined()
   })
 
   it('records Furnisher saved attribution when its discounted candidate is selected', () => {
     const state = createState()
     const player = createPlayer()
     player.resources = { ...player.resources, wood: 3 }
-    player.minorHand = ['D20_TurnwrestPlow']
-    player.occupationPlayed = ['D96_Furnisher', 'OtherOccupation']
+    player.minorHand = ['D020_TurnwrestPlow']
+    player.occupationPlayed = ['D096_Furnisher', 'OtherOccupation']
     state.players = [player]
 
     const result = playImprovement(
       state,
       player,
-      'minor:D20_TurnwrestPlow',
+      'minor:D020_TurnwrestPlow',
       'any',
       undefined,
-      'D96_Furnisher',
+      'D096_Furnisher',
     )
 
     expect(result.type).toBe('ok')
-    expect(readCardResourceStats(player, 'D96_Furnisher')?.saved).toEqual({ wood: 1 })
-    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')?.paid).toBeUndefined()
+    expect(readCardResourceStats(player, 'D096_Furnisher')?.saved).toEqual({ wood: 1 })
+    expect(readCardResourceStats(player, 'D020_TurnwrestPlow')?.paid).toBeUndefined()
   })
 })

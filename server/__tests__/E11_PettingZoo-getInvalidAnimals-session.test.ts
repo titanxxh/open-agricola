@@ -5,16 +5,16 @@ import {
   computeInvalidAnimalsForZone,
 } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/E/E11_PettingZoo'
+import '../../shared/cards/E/E011_PettingZoo'
 
-describe('E11_PettingZoo getInvalidAnimals', () => {
+describe('E011_PettingZoo getInvalidAnimals', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push('E11_PettingZoo')
+    player.minorPlayed.push('E011_PettingZoo')
     // Place a pasture adjacent to a room (room at (1,0), pasture at (1,1))
     player.roomTiles = [
       { row: 1, col: 0 },
@@ -35,15 +35,15 @@ describe('E11_PettingZoo getInvalidAnimals', () => {
   it('zone push carries cardId when adjacency holds', () => {
     const session = setup()
     const player = session.getState().state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E11_PettingZoo`)!
-    expect(zone.cardId).toBe('E11_PettingZoo')
+    const zone = computeAnimalZones(player).find(z => z.id === `card:E011_PettingZoo`)!
+    expect(zone.cardId).toBe('E011_PettingZoo')
   })
 
   it('hook returns empty (BGA mirror; adjacency gate handles activation)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const zone = computeAnimalZones(player).find(z => z.id === `card:E11_PettingZoo`)!
+    const zone = computeAnimalZones(player).find(z => z.id === `card:E011_PettingZoo`)!
     zone.animalType = 'sheep'
     zone.animalCount = 1
     expect(computeInvalidAnimalsForZone(state, player, zone)).toEqual([])

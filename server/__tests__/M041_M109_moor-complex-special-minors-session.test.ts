@@ -10,7 +10,7 @@ import { M060_SowingMachine } from '../../shared/cards/M/M060_SowingMachine'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import type { FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
-import '../../shared/cards/B/B68_Beanfield'
+import '../../shared/cards/B/B068_Beanfield'
 
 const FILLER = '__test_placeholder__'
 const FOREST_A = { row: 0, col: 0, kind: 'forest' as const }
@@ -239,7 +239,7 @@ describe('Moor complex special-action minors', () => {
   })
 
   it('M059 Nature\'s Fertilizer sows only the field created by Slash and Burn', () => {
-    const { session, player } = setup(['M059_NaturesFertilizer', 'B68_Beanfield'])
+    const { session, player } = setup(['M059_NaturesFertilizer', 'B068_Beanfield'])
     player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.resources.grain = 1
     player.resources.vegetable = 1

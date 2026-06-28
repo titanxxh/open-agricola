@@ -7,9 +7,9 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
-import '../../shared/cards/C/C54_MarketBooth'
+import '../../shared/cards/C/C054_MarketBooth'
 
-const CARD_ID = 'C54_MarketBooth'
+const CARD_ID = 'C054_MarketBooth'
 
 const setupForHarvestField = (options?: {
   builtFences?: number
@@ -38,7 +38,7 @@ const setupForHarvestField = (options?: {
   if (options?.e74HeldFences) {
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: options.e74HeldFences } },
+      E074_AshTrees: { counters: { fences: options.e74HeldFences } },
     }
   }
 
@@ -88,11 +88,11 @@ const setupForPurchase = (options?: { noStableReserve?: boolean }) => {
     player.supplyTokensConsumed = { stable: 1 }
     player.cardStates = {
       ...player.cardStates,
-      B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
+      B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
     }
     state.futureMeeples.push({
       id: 'future-stable',
-      cardId: 'A89_StablePlanner',
+      cardId: 'A089_StablePlanner',
       playerId: player.id,
       round: 6,
       actionId: null,
@@ -117,8 +117,8 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
   return resp
 }
 
-describe('C54_MarketBooth session', () => {
-  it('has no prerequisite (BGA C54_MarketBooth has no isBuyable / prerequisite)', () => {
+describe('C054_MarketBooth session', () => {
+  it('has no prerequisite (BGA C054_MarketBooth has no isBuyable / prerequisite)', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const session = new GameSession()
     const state = session.getState().state

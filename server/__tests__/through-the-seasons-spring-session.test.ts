@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/A/A65_SeedPellets'
-import '../../shared/cards/B/B94_StockProtector'
+import '../../shared/cards/A/A065_SeedPellets'
+import '../../shared/cards/B/B094_StockProtector'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -172,7 +172,7 @@ describe('Through the Seasons Spring rules', () => {
   it('uses hook-dispatched sow doability when building Animal and Fruit branches', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
-    player.minorPlayed.push('A65_SeedPellets')
+    player.minorPlayed.push('A065_SeedPellets')
     player.resources.grain = 0
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
@@ -284,7 +284,7 @@ describe('Through the Seasons Spring rules', () => {
   it('does not veto card-provided free fencing in Spring', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
-    player.occupationPlayed.push('B94_StockProtector')
+    player.occupationPlayed.push('B094_StockProtector')
     player.resources.wood = 0
 
     expect(availableIds(session)).toContain('fencing')
@@ -300,7 +300,7 @@ describe('Through the Seasons Spring rules', () => {
     const session = setupSpring()
     const player = session.state.players[0]!
     player.resources.wood = 4
-    player.minorPlayed.push('B30_WoodPalisades')
+    player.minorPlayed.push('B030_WoodPalisades')
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)

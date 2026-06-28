@@ -29,7 +29,7 @@ const exchanged = (overrides: Partial<Extract<QueryableGameEvent, { type: 'resou
   paidTo: { kind: 'supply' },
   gainedFrom: { kind: 'supply' },
   gainedTo: { kind: 'player', playerId: 'p1' },
-  exchangeSource: 'E78_SleightofHand',
+  exchangeSource: 'E078_SleightofHand',
   ...overrides,
 }) as Extract<QueryableGameEvent, { type: 'resource.exchanged' }>
 
@@ -60,7 +60,7 @@ describe('event provenance helpers', () => {
   })
 
   it('matches resource exchanges by gained resource and source', () => {
-    expect(hasExchangeGained([exchanged()], 'grain', event => event.exchangeSource === 'E78_SleightofHand')).toBe(true)
+    expect(hasExchangeGained([exchanged()], 'grain', event => event.exchangeSource === 'E078_SleightofHand')).toBe(true)
     expect(hasExchangeGained([exchanged()], 'vegetable')).toBe(false)
     expect(hasExchangeGained([exchanged()], 'grain', event => event.exchangeSource === 'other')).toBe(false)
   })

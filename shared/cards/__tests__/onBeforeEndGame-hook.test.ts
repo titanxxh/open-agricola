@@ -8,8 +8,8 @@ describe('runBeforeEndGameHooks', () => {
       id: 'p1',
       resources: { vegetable: 0, sheep:0, boar:0, cattle:0, wood:0, clay:0, reed:0, stone:0, food:0, grain:0, begging:0 },
       improvements: ['Major_Joinery', 'Major_Pottery'],
-      minorPlayed: ['B133_VillagePeasant', 'A2_PieceOfLand'],
-      occupationPlayed: ['A1_Shelter', 'A10_WoodenShed', 'A11_MudPatch'],
+      minorPlayed: ['B133_VillagePeasant', 'A002_PieceOfLand'],
+      occupationPlayed: ['A001_Shelter', 'A010_WoodenShed', 'A011_MudPatch'],
       cardStates: {},
     } as any
     const state = { players: [player] } as any

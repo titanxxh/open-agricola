@@ -69,7 +69,7 @@ export type PayParams = {
  *
  * Listeners on `actions: ['pay']` read these via `context.result.extraData`.
  * This is the canonical signal for "the card I own contributed to this
- * payment" — see E54_Contraband / E122_Cottar / E128_Saddler /
+ * payment" — see E054_Contraband / E122_Cottar / E128_Saddler /
  * E123_ResourceHoarder for examples.
  *
  * Current attribution note: `player._activeActionBonusSources` is still maintained by

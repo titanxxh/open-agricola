@@ -9,10 +9,10 @@ import {
 import type { ActionSpace, GameState, Pasture, PlayerState } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
-import '../E/E33_BeaverColony'
+import '../E/E033_BeaverColony'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'E33_BeaverColony'
+const CARD_ID = 'E033_BeaverColony'
 
 const reedMoved = (
   reed: number,
@@ -84,7 +84,7 @@ const findListener = (id: string) =>
 
 // ─── Pasture blocking ───────────────────────────────────────────────
 
-describe('E33_BeaverColony pasture blocking', () => {
+describe('E033_BeaverColony pasture blocking', () => {
   it('exposes pasture blocking through onComputeAnimalZones', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect?.onComputeAnimalZones).toBeDefined()
@@ -203,7 +203,7 @@ describe('E33_BeaverColony pasture blocking', () => {
 
 // ─── Reed bonus VP ──────────────────────────────────────────────────
 
-describe('E33_BeaverColony reed bonus VP', () => {
+describe('E033_BeaverColony reed bonus VP', () => {
   it('gives bonus VP after collecting reed from reed-bank', () => {
     const listener = findListener('E33-beaver-colony-after-collect')!
     expect(listener).toBeDefined()

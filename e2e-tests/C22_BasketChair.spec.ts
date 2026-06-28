@@ -1,5 +1,5 @@
 /**
- * C22_BasketChair End-to-End Playwright spec.
+ * C022_BasketChair End-to-End Playwright spec.
  *
  * Dev endpoints used (all POST unless noted, body JSON):
  *   POST /api/game/new               — reset to fresh 2-player game
@@ -33,7 +33,7 @@
  *   5. Force P1 as current player; P1 takes `meeting-place`.
  *      → optional minor-improvement choice appears.
  *   6. Accept the optional minor-improvement step → minor-selection choice.
- *   7. Pick C22_BasketChair → pays 1 reed → onBuy fires → optional seq offered.
+ *   7. Pick C022_BasketChair → pays 1 reed → onBuy fires → optional seq offered.
  *   GOLDEN: accept seq → forest freed, heldWorkerId recorded, place-farmer offered,
  *           pick first free space → assert UI overlay + placed space taken.
  *   SKIP:   skip seq → forest still occupied, no heldWorkerId, no UI overlay.
@@ -49,8 +49,8 @@ import {
   FRONTEND_URL,
 } from './fixtures'
 
-const CARD_ID = 'C22_BasketChair'
-const FILLER_MINOR = 'C57_Crudite' // free-cost, no prerequisites — keeps minor-selection >1 option
+const CARD_ID = 'C022_BasketChair'
+const FILLER_MINOR = 'C057_Crudite' // free-cost, no prerequisites — keeps minor-selection >1 option
 
 test.use({ viewport: { width: 1920, height: 1080 } })
 test.setTimeout(120_000)
@@ -186,7 +186,7 @@ async function driveC22Buy(request: Parameters<typeof postJson>[0]) {
     (o: Choice) => o.value === CARD_ID,
   )
   if (!c22Opt) {
-    throw new Error(`C22_BasketChair not found in options: ${JSON.stringify(acceptMinorResp.pending.options)}`)
+    throw new Error(`C022_BasketChair not found in options: ${JSON.stringify(acceptMinorResp.pending.options)}`)
   }
 
   const selC22Resp = await postJson(request, `${BACKEND_URL}/api/game/choice`, {
@@ -212,7 +212,7 @@ async function goToP1View(page: Parameters<typeof saveScreenshot>[0]) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe('C22_BasketChair End-to-End', () => {
+test.describe('C022_BasketChair End-to-End', () => {
   // ──────────────────────────────────────────────────────────────────────────
   // Smoke: page loads without hard JS errors and shows the board
   // ──────────────────────────────────────────────────────────────────────────

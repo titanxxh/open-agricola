@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
-import '../D/D17_DrillHarrow'
-import { D17_DrillHarrow as D17Card } from '../../cards/D/D17_DrillHarrow'
+import '../D/D017_DrillHarrow'
+import { D017_DrillHarrow as D17Card } from '../../cards/D/D017_DrillHarrow'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'D17_DrillHarrow'
+const CARD_ID = 'D017_DrillHarrow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -52,7 +52,7 @@ const createSpace = (id: string): ActionSpace =>
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('D17_DrillHarrow', () => {
+describe('D017_DrillHarrow', () => {
   it('card definition has correct properties', () => {
     expect(D17Card.cost).toEqual({ wood: 1 })
     expect(D17Card.evenMoreSet).toBe(true)

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionFlow } from '../../contract/types'
 
-import '../A/A20_DoubleTurnPlow'
-import { A20_DoubleTurnPlow as A20Card } from '../../cards/A/A20_DoubleTurnPlow'
+import '../A/A020_DoubleTurnPlow'
+import { A020_DoubleTurnPlow as A20Card } from '../../cards/A/A020_DoubleTurnPlow'
 
-const CARD_ID = 'A20_DoubleTurnPlow'
+const CARD_ID = 'A020_DoubleTurnPlow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -40,7 +40,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('A20_DoubleTurnPlow', () => {
+describe('A020_DoubleTurnPlow', () => {
   it('card definition has correct cost and maxRound', () => {
     expect(A20Card.cost).toEqual({ grain: 1 })
     expect(A20Card.maxRound).toBe(5)

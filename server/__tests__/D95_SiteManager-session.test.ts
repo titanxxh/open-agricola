@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { D95_SiteManager } from '../../shared/cards/D/D95_SiteManager'
+import { D095_SiteManager } from '../../shared/cards/D/D095_SiteManager'
 import { occupations } from '../../shared/cards/_lookup'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-const CARD_ID = 'D95_SiteManager'
+const CARD_ID = 'D095_SiteManager'
 
 // Catalog registration is handled by the parent agent; for local testing we
 // splice the card into the occupation registry if absent.
 if (!occupations.some((c) => c.id === CARD_ID)) {
-  occupations.push(D95_SiteManager)
+  occupations.push(D095_SiteManager)
 }
 
-describe('D95_SiteManager session', () => {
+describe('D095_SiteManager session', () => {
   // Deterministic setup: fixed seed + explicit non-card placeholder hands so the
   // dealt-hand randomness from `new GameSession()` never leaks into the test.
   // See the equivalent comment in `worker-identity-fg.test.ts` for the rationale.
@@ -33,7 +33,7 @@ describe('D95_SiteManager session', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.occupationHand = [CARD_ID, 'A085_Homekeeper']
     // Give 5 clay so Fireplace is affordable (2 clay cost) even without substitution
     player.resources = { ...player.resources, food: 10, wood: 0, clay: 5, stone: 0, reed: 0 }
 
@@ -94,7 +94,7 @@ describe('D95_SiteManager session', () => {
     }
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.occupationHand = [CARD_ID, 'A085_Homekeeper']
     // 1 clay (lacking 1) + plenty of food. Greedy substitution will replace the
     // second clay unit with 1 food.
     player.resources = { ...player.resources, food: 10, clay: 1, wood: 0, stone: 0, reed: 0 }
@@ -152,7 +152,7 @@ describe('D95_SiteManager session', () => {
     }
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.occupationHand = [CARD_ID, 'A085_Homekeeper']
     player.resources = {
       ...player.resources,
       food: 5, wood: 2, clay: 0, stone: 2, reed: 0,
@@ -272,7 +272,7 @@ describe('D95_SiteManager session', () => {
     }
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.occupationHand = [CARD_ID, 'A085_Homekeeper']
     // 1 clay + food → Fireplace (cost 2 clay) forces D95 substitution.
     player.resources = { ...player.resources, food: 10, clay: 1, wood: 0, stone: 0, reed: 0 }
     if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
@@ -326,7 +326,7 @@ describe('D95_SiteManager session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.occupationHand = [CARD_ID]
-    player.occupationPlayed = ['A85_Homekeeper']
+    player.occupationPlayed = ['A085_Homekeeper']
     // Second occupation on Lessons costs 1 food. The follow-up Fireplace buy
     // spends 1 clay + 1 food via D95, and must not leak into log.playOccupation.
     player.resources = { ...player.resources, food: 10, clay: 1, wood: 0, stone: 0, reed: 0 }

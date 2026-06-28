@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/C/C98_CubeCutter'
+import '../../shared/cards/C/C098_CubeCutter'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C98_CubeCutter'
+const CARD_ID = 'C098_CubeCutter'
 
-describe('C98_CubeCutter session', () => {
+describe('C098_CubeCutter session', () => {
   it('onBuy gives 1 wood', () => {
     const session = new GameSession()
     const state = session.getState().state

@@ -9,13 +9,13 @@ import { registerAdHocMinorImprovement } from '../registry-runtime'
 import { playerHasCardCapability } from '../helpers/card-type'
 import { B153_Housemaster_impl } from '../B/B153_Housemaster'
 
-import '../A/A60_OrientalFireplace'
-import '../C/C75_Firewood'
+import '../A/A060_OrientalFireplace'
+import '../C/C075_Firewood'
 import '../E/E144_WaresSalesman'
-import '../D/D60_LargePottery'
-import '../B/B68_Beanfield'
-import '../D/D25_WitchesDanceFloor'
-import '../D/D64_BakingCourse'
+import '../D/D060_LargePottery'
+import '../B/B068_Beanfield'
+import '../D/D025_WitchesDanceFloor'
+import '../D/D064_BakingCourse'
 
 registerAdHocMinorImprovement(new MinorImprovement({
   id: 'TEST_WaresSingle',
@@ -61,8 +61,8 @@ const firewoodListener = () =>
 
 const runFirewood = (choice: string) => {
   const player = makePlayer({
-    minorPlayed: ['C75_Firewood'],
-    cardStates: { C75_Firewood: { counters: { wood: 2 } } },
+    minorPlayed: ['C075_Firewood'],
+    cardStates: { C075_Firewood: { counters: { wood: 2 } } },
   })
   return firewoodListener().handler({
     state,
@@ -91,7 +91,7 @@ describe('identity metadata migrations', () => {
   describe('played-card capabilities', () => {
     it('treats Oriental Fireplace as a fireplace-like played major', () => {
       const player = makePlayer({
-        minorPlayed: ['A60_OrientalFireplace'],
+        minorPlayed: ['A060_OrientalFireplace'],
       })
 
       expect(playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'major' })).toBe(true)
@@ -99,14 +99,14 @@ describe('identity metadata migrations', () => {
 
     it('treats Pottery and Large Pottery as pottery-like played majors', () => {
       expect(playerHasCardCapability(makePlayer({ improvements: ['Major_Pottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
-      expect(playerHasCardCapability(makePlayer({ minorPlayed: ['D60_LargePottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
+      expect(playerHasCardCapability(makePlayer({ minorPlayed: ['D060_LargePottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
     })
   })
 
   describe('B153_Housemaster', () => {
     it('scores major-like minors through major identity collection', () => {
       const player = makePlayer({
-        minorPlayed: ['D60_LargePottery'],
+        minorPlayed: ['D060_LargePottery'],
       })
 
       expect(B153_Housemaster_impl.effect.computeBonusScore!(state, player)).toBe(1)
@@ -114,23 +114,23 @@ describe('identity metadata migrations', () => {
 
     it('does not score ordinary minors as majors', () => {
       const player = makePlayer({
-        minorPlayed: ['B68_Beanfield'],
+        minorPlayed: ['B068_Beanfield'],
       })
 
       expect(B153_Housemaster_impl.effect.computeBonusScore!(state, player)).toBe(0)
     })
   })
 
-  describe('C75_Firewood', () => {
+  describe('C075_Firewood', () => {
     it('triggers from explicit fireplace identity on Witches Dance Floor', () => {
-      const result = runFirewood('minor:D25_WitchesDanceFloor')
+      const result = runFirewood('minor:D025_WitchesDanceFloor')
 
       expect(result?.flow?.type).toBe('xor')
       expect((result?.flow as Extract<ActionFlow, { type: 'xor' }>).children).toHaveLength(2)
     })
 
     it('does not trigger from a baking card without fireplace, cooking-hearth, or oven identity', () => {
-      expect(runFirewood('minor:D64_BakingCourse')).toBeUndefined()
+      expect(runFirewood('minor:D064_BakingCourse')).toBeUndefined()
     })
   })
 
@@ -156,7 +156,7 @@ describe('identity metadata migrations', () => {
     })
 
     it('uses production card metadata for wares gain choices', () => {
-      const result = runWaresSalesman('minor:C55_Studio')
+      const result = runWaresSalesman('minor:C055_Studio')
 
       expect(result?.flow?.type).toBe('xor')
       expect((result?.flow as Extract<ActionFlow, { type: 'xor' }>).children.map((child) => child.params)).toEqual([

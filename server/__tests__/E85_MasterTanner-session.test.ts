@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/E/E85_MasterTanner'
+import '../../shared/cards/E/E085_MasterTanner'
 
-describe('E85_MasterTanner session', () => {
-  const CARD_ID = 'E85_MasterTanner'
+describe('E085_MasterTanner session', () => {
+  const CARD_ID = 'E085_MasterTanner'
 
   const setup = () => {
     const session = new GameSession()

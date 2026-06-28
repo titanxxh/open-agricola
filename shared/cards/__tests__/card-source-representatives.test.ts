@@ -39,10 +39,10 @@ describe('Card Source representative migrations', () => {
   })
 
   it('keeps Working Gloves modifiers under Card Source impl and effective in payment', () => {
-    const impl = ALL_CARD_IMPLS['E60_WorkingGloves']
-    const definition = getCardDefinition('E60_WorkingGloves')
+    const impl = ALL_CARD_IMPLS['E060_WorkingGloves']
+    const definition = getCardDefinition('E060_WorkingGloves')
 
-    expect(manifest()['E60_WorkingGloves']?.module).toBe('shared/cards/E/E60_WorkingGloves')
+    expect(manifest()['E060_WorkingGloves']?.module).toBe('shared/cards/E/E060_WorkingGloves')
     expect(definition?.modifier).toBeUndefined()
     expect(definition?.modifiers).toBeUndefined()
     expect(impl?.modifiers).toHaveLength(4)
@@ -52,7 +52,7 @@ describe('Card Source representative migrations', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
-    player.minorPlayed.push('E60_WorkingGloves')
+    player.minorPlayed.push('E060_WorkingGloves')
     player.resources = {
       ...player.resources,
       wood: 1,
@@ -64,7 +64,7 @@ describe('Card Source representative migrations', () => {
     session.loadState(state)
 
     const after = session.getState().state.players[0]!
-    expect(after.activeModifiers.filter((m) => m.cardId === 'E60_WorkingGloves')).toHaveLength(4)
+    expect(after.activeModifiers.filter((m) => m.cardId === 'E060_WorkingGloves')).toHaveLength(4)
 
     const solutions = computeAllBuyableCombinations(
       after,
@@ -80,8 +80,8 @@ describe('Card Source representative migrations', () => {
   })
 
   it('loads Barn Shed listener from Card Source impl through session runtime', () => {
-    expect(manifest()['E66_BarnShed']?.module).toBe('shared/cards/E/E66_BarnShed')
-    expect(ALL_CARD_IMPLS['E66_BarnShed']?.listeners?.map((listener) => listener.id)).toContain(
+    expect(manifest()['E066_BarnShed']?.module).toBe('shared/cards/E/E066_BarnShed')
+    expect(ALL_CARD_IMPLS['E066_BarnShed']?.listeners?.map((listener) => listener.id)).toContain(
       'E66-barn-shed-opponent-forest',
     )
 
@@ -90,7 +90,7 @@ describe('Card Source representative migrations', () => {
     state.currentPlayerIndex = 1
     state.round = 1
     const owner = state.players[0]!
-    owner.minorPlayed.push('E66_BarnShed')
+    owner.minorPlayed.push('E066_BarnShed')
     owner.resources.grain = 0
     setWorkersAtHome(state, owner, 2)
     const opponent = state.players[1]!

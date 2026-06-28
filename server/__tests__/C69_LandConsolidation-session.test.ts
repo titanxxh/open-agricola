@@ -4,9 +4,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { rehydrateState, serializeState } from '../../shared/session/serialization'
 import { EXTRA_CROP_PLACEMENT_CONTEXT_KEY, isExtraCropPlacementActionContext } from '../../shared/actions/helpers/extra-crop-placement-context'
 
-import '../../shared/cards/C/C69_LandConsolidation'
+import '../../shared/cards/C/C069_LandConsolidation'
 import '../../shared/cards/B/B115_TinsmithMaster'
-import '../../shared/cards/E/E71_CowPatty'
+import '../../shared/cards/E/E071_CowPatty'
 
 const c69AnytimeVisible = (resp: ReturnType<GameSession['takeAction']>) =>
   resp.interaction.anytimeActions?.some((entry) => entry.id === 'C69-land-consolidation-anytime') ?? false
@@ -17,7 +17,7 @@ const pendingActionContext = (session: GameSession) =>
     | undefined
   )?.actionContext
 
-const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E71_CowPatty') => {
+const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E071_CowPatty') => {
   const session = new GameSession()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -28,9 +28,9 @@ const setupC69ExtraCropSession = (sourceCard: 'B115_TinsmithMaster' | 'E71_CowPa
   state.roundActionOrder[0] = 'grain-utilization'
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
-  player.minorPlayed.push('C69_LandConsolidation')
+  player.minorPlayed.push('C069_LandConsolidation')
   if (sourceCard === 'B115_TinsmithMaster') player.occupationPlayed.push(sourceCard)
-  if (sourceCard === 'E71_CowPatty') {
+  if (sourceCard === 'E071_CowPatty') {
     player.minorPlayed.push(sourceCard)
     player.resources.cattle = 1
     player.pastures = [{ id: 'p1', size: 1, tiles: [{ row: 0, col: 1 }], stables: 0, animalType: 'cattle', animalCount: 1 }]
@@ -51,7 +51,7 @@ const driveSowUntilExtraCropPrompt = (session: GameSession) => {
   return resp
 }
 
-describe('C69_LandConsolidation session', () => {
+describe('C069_LandConsolidation session', () => {
   it('hides C69 anytime while B115 extra crop is pending', () => {
     const session = setupC69ExtraCropSession('B115_TinsmithMaster')
 
@@ -62,7 +62,7 @@ describe('C69_LandConsolidation session', () => {
   })
 
   it('hides C69 anytime while E71 extra crop is pending', () => {
-    const session = setupC69ExtraCropSession('E71_CowPatty')
+    const session = setupC69ExtraCropSession('E071_CowPatty')
 
     const resp = driveSowUntilExtraCropPrompt(session)
 
@@ -81,7 +81,7 @@ describe('C69_LandConsolidation session', () => {
     state.roundActionOrder[0] = 'grain-utilization'
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.minorPlayed.push('C69_LandConsolidation')
+    player.minorPlayed.push('C069_LandConsolidation')
     player.resources.grain = 1
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
@@ -118,7 +118,7 @@ describe('C69_LandConsolidation session', () => {
     state.currentPlayerIndex = 0
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.minorPlayed.push('C69_LandConsolidation')
+    player.minorPlayed.push('C069_LandConsolidation')
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] }]
     session.loadState(state)
 

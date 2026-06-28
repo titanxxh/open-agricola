@@ -4,18 +4,18 @@ import { getCardEffect } from '../card-effects'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
-import '../A/A29_AleBenches'
-import '../A/A81_InterimStorage'
+import '../A/A029_AleBenches'
+import '../A/A081_InterimStorage'
 import { A123_FrameBuilder as A123Card } from '../../cards/A/A123_FrameBuilder'
-import '../B/B94_StockProtector'
+import '../B/B094_StockProtector'
 import '../B/B103_FieldMerchant'
-import '../B/B34_SpecialFood'
-import '../C/C60_SmallPottersOven'
-import { C60_SmallPottersOven } from '../../cards/C/C60_SmallPottersOven'
-import '../C/C71_Slurry'
+import '../B/B034_SpecialFood'
+import '../C/C060_SmallPottersOven'
+import { C060_SmallPottersOven } from '../../cards/C/C060_SmallPottersOven'
+import '../C/C071_Slurry'
 import '../C/C120_AgriculturalLabourer'
 import '../D/D115_FodderPlanter'
-import '../E/E52_Cubbyhole'
+import '../E/E052_Cubbyhole'
 import '../E/E101_Blighter'
 import { canRenovate, renovateHouseAction } from '../../actions/effects/renovation'
 import { playImprovement } from '../../actions/effects/improvement'
@@ -85,7 +85,7 @@ describe('priority plan implementations', () => {
   it('A81 Interim Storage stores mapped resource before collect', () => {
     const listener = findListener('A81-interim-storage-before-collect')
     const player = createPlayer()
-    player.minorPlayed = ['A81_InterimStorage']
+    player.minorPlayed = ['A081_InterimStorage']
     const space = createSpace('clay-pit')
     space.resources.clay = 2
 
@@ -101,20 +101,20 @@ describe('priority plan implementations', () => {
       type: 'leaf',
       actionId: 'store-on-card',
       params: { wood: 1 },
-      sourceCard: 'A81_InterimStorage',
+      sourceCard: 'A081_InterimStorage',
     })
   })
 
   it('A81 Interim Storage pays out stored goods on round start', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A81_InterimStorage']
+    player.minorPlayed = ['A081_InterimStorage']
     player.cardStates = {
-      A81_InterimStorage: { counters: { wood: 1, clay: 2 } },
+      A081_InterimStorage: { counters: { wood: 1, clay: 2 } },
     }
     const state = createState(player)
     state.round = 7
 
-    const flow = getCardEffect('A81_InterimStorage')?.onRoundStart?.(state, player)
+    const flow = getCardEffect('A081_InterimStorage')?.onRoundStart?.(state, player)
     expect(flow).toMatchObject({
       type: 'seq',
       children: [
@@ -127,7 +127,7 @@ describe('priority plan implementations', () => {
   it('E52 Cubbyhole stores food for rooms built this action', () => {
     const listener = findListener('E52-cubbyhole-after-construct')
     const player = createPlayer()
-    player.minorPlayed = ['E52_Cubbyhole']
+    player.minorPlayed = ['E052_Cubbyhole']
     recordActionSnapshot(player, 1)
     player.roomTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }] as any
 
@@ -143,16 +143,16 @@ describe('priority plan implementations', () => {
       type: 'leaf',
       actionId: 'store-on-card',
       params: { food: 2 },
-      sourceCard: 'E52_Cubbyhole',
+      sourceCard: 'E052_Cubbyhole',
     })
   })
 
   it('E52 Cubbyhole pays out food at feeding phase start', () => {
     const player = createPlayer()
-    player.minorPlayed = ['E52_Cubbyhole']
-    player.cardStates = { E52_Cubbyhole: { counters: { food: 3 } } }
+    player.minorPlayed = ['E052_Cubbyhole']
+    player.cardStates = { E052_Cubbyhole: { counters: { food: 3 } } }
 
-    const flow = getCardEffect('E52_Cubbyhole')?.onStartHarvestFeedingPhase?.(createState(player), player)
+    const flow = getCardEffect('E052_Cubbyhole')?.onStartHarvestFeedingPhase?.(createState(player), player)
     expect(flow).toMatchObject({
       type: 'leaf',
       actionId: 'take-from-card',
@@ -162,10 +162,10 @@ describe('priority plan implementations', () => {
 
   it('A29 Ale-Benches offers optional return-home payment flow', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A29_AleBenches']
+    player.minorPlayed = ['A029_AleBenches']
     player.resources.grain = 1
 
-    const flow = getCardEffect('A29_AleBenches')?.onReturnHome?.(createState(player), player)
+    const flow = getCardEffect('A029_AleBenches')?.onReturnHome?.(createState(player), player)
     expect(flow?.type).toBe('seq')
     if (flow?.type !== 'seq') return
     expect(flow.optional).toBe(true)
@@ -187,12 +187,12 @@ describe('priority plan implementations', () => {
     const beforeListener = findListener('B34-special-food-before-collect')
     const afterListener = findListener('B34-special-food-after-collect')
     const player = createPlayer()
-    player.minorPlayed = ['B34_SpecialFood']
+    player.minorPlayed = ['B034_SpecialFood']
     player.houseAnimalType = 'sheep'
     player.houseAnimalCount = 1
     player.cardStates = {
       ...(player.cardStates ?? {}),
-      B34_SpecialFood: {
+      B034_SpecialFood: {
         extraData: {
           animalsBeforeCollecting: { sheep: 1, boar: 0, cattle: 0 },
         },
@@ -292,7 +292,7 @@ describe('priority plan implementations', () => {
   it('B94 Stock Protector can make fencing doable with bonus wood', () => {
     const listener = findListener('B94-stock-protector-isdoable-fencing')
     const player = createPlayer()
-    player.occupationPlayed = ['B94_StockProtector']
+    player.occupationPlayed = ['B094_StockProtector']
     player.resources.wood = 0
 
     const result = executeCardListener(listener!, {
@@ -310,7 +310,7 @@ describe('priority plan implementations', () => {
   it('B94 Stock Protector does not re-open skipBeforeTriggers continuation', () => {
     const listener = findListener('B94-stock-protector-isdoable-fencing')
     const player = createPlayer()
-    player.occupationPlayed = ['B94_StockProtector']
+    player.occupationPlayed = ['B094_StockProtector']
     player.resources.wood = 0
 
     const result = executeCardListener(listener!, {
@@ -344,22 +344,22 @@ describe('priority plan implementations', () => {
 
   it('C60 Small Potter\'s Oven returns an oven and then yields an onBuy gain flow', () => {
     const player = createPlayer()
-    player.minorHand = ['C60_SmallPottersOven']
+    player.minorHand = ['C060_SmallPottersOven']
     player.improvements = ['Major_ClayOven']
     player.resources.clay = 2
     const state = createState(player)
 
-    const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
+    const result = playImprovement(state, player, 'C060_SmallPottersOven', 'minor')
 
     expect(result.type).toBe('flow')
-    expect(player.minorPlayed).toContain('C60_SmallPottersOven')
+    expect(player.minorPlayed).toContain('C060_SmallPottersOven')
     expect(player.improvements).not.toContain('Major_ClayOven')
     expect(state.availableMajorImprovements).toContain('Major_ClayOven')
     if (result.type !== 'flow') return
     expect(result.flow).toMatchObject({
       type: 'leaf',
       actionId: 'gain',
-      sourceCard: 'C60_SmallPottersOven',
+      sourceCard: 'C060_SmallPottersOven',
       params: { food: 5 },
     })
     expect(player.resources.food).toBe(0)
@@ -367,17 +367,17 @@ describe('priority plan implementations', () => {
   })
 
   it('C60 Small Potter\'s Oven does not encode oven return as returnCards metadata', () => {
-    expect(C60_SmallPottersOven.returnCards).toBeUndefined()
+    expect(C060_SmallPottersOven.returnCards).toBeUndefined()
   })
 
   it('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
     const player = createPlayer()
-    player.minorHand = ['C60_SmallPottersOven']
+    player.minorHand = ['C060_SmallPottersOven']
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
     player.resources.clay = 2
     const state = createState(player)
 
-    const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
+    const result = playImprovement(state, player, 'C060_SmallPottersOven', 'minor')
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
@@ -391,14 +391,14 @@ describe('priority plan implementations', () => {
             {
               type: 'leaf',
               actionId: 'special-effect',
-              sourceCard: 'C60_SmallPottersOven',
+              sourceCard: 'C060_SmallPottersOven',
               choiceLabelKey: 'improvements.Major_ClayOven.name',
               params: { kind: 'return-card-to-board', cardId: 'Major_ClayOven' },
             },
             {
               type: 'leaf',
               actionId: 'special-effect',
-              sourceCard: 'C60_SmallPottersOven',
+              sourceCard: 'C060_SmallPottersOven',
               choiceLabelKey: 'improvements.Major_StoneOven.name',
               params: { kind: 'return-card-to-board', cardId: 'Major_StoneOven' },
             },
@@ -407,7 +407,7 @@ describe('priority plan implementations', () => {
         {
           type: 'leaf',
           actionId: 'gain',
-          sourceCard: 'C60_SmallPottersOven',
+          sourceCard: 'C060_SmallPottersOven',
           params: { food: 5 },
         },
       ],
@@ -417,7 +417,7 @@ describe('priority plan implementations', () => {
   it('C60 Small Potter\'s Oven offers a restricted oven build before baking', () => {
     const listener = findListener('C60-small-potters-oven-before-bake')
     const player = createPlayer()
-    player.minorPlayed = ['C60_SmallPottersOven']
+    player.minorPlayed = ['C060_SmallPottersOven']
     player.resources.clay = 3
     player.resources.stone = 1
     const state = createState(player)
@@ -442,7 +442,7 @@ describe('priority plan implementations', () => {
       actionContext: {
         trueAction: false,
       },
-      sourceCard: 'C60_SmallPottersOven',
+      sourceCard: 'C060_SmallPottersOven',
     })
   })
 
@@ -523,13 +523,13 @@ describe('priority plan implementations', () => {
 
   it('A64 Barley Mill returns an after-reap gain flow', () => {
     const player = createPlayer()
-    player.minorPlayed = ['A64_BarleyMill']
+    player.minorPlayed = ['A064_BarleyMill']
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
-    const result = getCardEffect('A64_BarleyMill')?.onAfterReap?.(
+    const result = getCardEffect('A064_BarleyMill')?.onAfterReap?.(
       createState(player),
       player,
     )
@@ -541,7 +541,7 @@ describe('priority plan implementations', () => {
           type: 'leaf',
           actionId: 'gain',
           params: { food: 2 },
-          sourceCard: 'A64_BarleyMill',
+          sourceCard: 'A064_BarleyMill',
         },
       ],
     })
@@ -550,11 +550,11 @@ describe('priority plan implementations', () => {
 
   it('C71 Slurry returns an optional sow flow after breeding two animal types', () => {
     const player = createPlayer()
-    player.minorPlayed = ['C71_Slurry']
+    player.minorPlayed = ['C071_Slurry']
     player.resources.grain = 1
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
-    const result = getCardEffect('C71_Slurry')?.onEndHarvest?.(
+    const result = getCardEffect('C071_Slurry')?.onEndHarvest?.(
       {
         ...createState(player),
         harvestBreedSummary: {
@@ -573,17 +573,17 @@ describe('priority plan implementations', () => {
       actionId: 'sow',
       optional: true,
       promptKey: 'ui.interactionSlurrySow',
-      sourceCard: 'C71_Slurry',
+      sourceCard: 'C071_Slurry',
     })
   })
 
   it('C71 Slurry does not trigger after breeding only one animal type', () => {
     const player = createPlayer()
-    player.minorPlayed = ['C71_Slurry']
+    player.minorPlayed = ['C071_Slurry']
     player.resources.grain = 1
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
-    const result = getCardEffect('C71_Slurry')?.onEndHarvest?.(
+    const result = getCardEffect('C071_Slurry')?.onEndHarvest?.(
       {
         ...createState(player),
         harvestBreedSummary: {

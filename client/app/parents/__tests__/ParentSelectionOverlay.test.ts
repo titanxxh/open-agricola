@@ -137,7 +137,7 @@ describe('ParentSelectionOverlay', () => {
           {
             id: 'p1',
             occupationHand: ['A102_Grocer', 'A105_BarrowPusher'],
-            minorHand: ['B34_SpecialFood'],
+            minorHand: ['B034_SpecialFood'],
           },
           {
             id: 'p2',

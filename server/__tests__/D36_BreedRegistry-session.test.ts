@@ -3,19 +3,19 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener } from '../../shared/cards/card-listeners'
 import { readCardExtraData, readCardInfobox } from '../../shared/cards/helpers/card-state'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
-import { D36_BreedRegistry_impl } from '../../shared/cards/D/D36_BreedRegistry'
+import { D036_BreedRegistry_impl } from '../../shared/cards/D/D036_BreedRegistry'
 import { EngineStack } from '../../shared/engine'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionExecutionResult, ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D36_BreedRegistry'
+import '../../shared/cards/D/D036_BreedRegistry'
 
-const CARD_ID = 'D36_BreedRegistry'
-const AFTER_SHEEP_GAIN = D36_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-sheep-gain')!
-const AFTER_EXCHANGE_SHEEP_CONVERSION = D36_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-exchange-sheep-conversion')!
-const AFTER_HARVEST_SHEEP_CONVERSION = D36_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-harvest-sheep-conversion')!
+const CARD_ID = 'D036_BreedRegistry'
+const AFTER_SHEEP_GAIN = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-sheep-gain')!
+const AFTER_EXCHANGE_SHEEP_CONVERSION = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-exchange-sheep-conversion')!
+const AFTER_HARVEST_SHEEP_CONVERSION = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-harvest-sheep-conversion')!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -104,7 +104,7 @@ const setupDirectContext = (
   } as unknown as CardListenerContext
 }
 
-describe('D36_BreedRegistry session', () => {
+describe('D036_BreedRegistry session', () => {
   it('keeps the session sheep collect path and records boardSheep from hand', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -234,6 +234,6 @@ describe('D36_BreedRegistry session', () => {
     player.houseAnimalType = 'sheep'
     player.houseAnimalCount = 1
 
-    expect(D36_BreedRegistry_impl.prerequisiteCheck?.(player, state)).toBe(false)
+    expect(D036_BreedRegistry_impl.prerequisiteCheck?.(player, state)).toBe(false)
   })
 })

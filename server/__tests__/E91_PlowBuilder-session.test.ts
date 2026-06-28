@@ -8,12 +8,12 @@ import {
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { dispatchTradeAppliedListener } from '../../shared/actions/helpers/trade-applied-listener'
 
-import '../../shared/cards/E/E91_PlowBuilder'
+import '../../shared/cards/E/E091_PlowBuilder'
 import type { AnytimeAction } from '../../shared/contract/types'
 
-const CARD_ID = 'E91_PlowBuilder'
+const CARD_ID = 'E091_PlowBuilder'
 
-describe('E91_PlowBuilder session', () => {
+describe('E091_PlowBuilder session', () => {
   /**
    * BGA gates the anytime action on a per-harvest `usedJoinery` flag set by
    * an Exchange-event listener (Joinery used during the harvest), not just

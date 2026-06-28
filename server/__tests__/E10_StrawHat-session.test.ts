@@ -8,11 +8,11 @@ import {
   setWorkersAtHome,
 } from '../../shared/domain/player'
 
-import '../../shared/cards/E/E10_StrawHat'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/E/E010_StrawHat'
+import '../../shared/cards/A/A092_AdoptiveParents'
 
-const CARD_ID = 'E10_StrawHat'
-const A92_ID = 'A92_AdoptiveParents'
+const CARD_ID = 'E010_StrawHat'
+const A092_ID = 'A092_AdoptiveParents'
 
 const requestKind = (resp: ReturnType<GameSession['takeAction']>): string =>
   resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : 'idle'
@@ -54,7 +54,7 @@ const setupRoundEnd = () => {
   return session
 }
 
-describe('E10_StrawHat session', () => {
+describe('E010_StrawHat session', () => {
   it('choosing food gains exactly 1 food', () => {
     const session = setupRoundEnd()
     const beforeFood = session.getState().state.players[0]!.resources.food
@@ -101,7 +101,7 @@ describe('E10_StrawHat session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
-    player.occupationPlayed.push(A92_ID)
+    player.occupationPlayed.push(A092_ID)
     player.resources.food = 5
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['A116_WoodCutter']

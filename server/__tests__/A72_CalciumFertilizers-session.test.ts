@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A72_CalciumFertilizers'
+import '../../shared/cards/A/A072_CalciumFertilizers'
 
-const CARD_ID = 'A72_CalciumFertilizers'
+const CARD_ID = 'A072_CalciumFertilizers'
 
-describe('A72_CalciumFertilizers session', () => {
+describe('A072_CalciumFertilizers session', () => {
   /**
    * Setup with A72 already played.
    * Player has sown fields and quarry spaces have accumulated resources.

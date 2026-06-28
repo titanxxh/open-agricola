@@ -162,7 +162,7 @@ describe('PlaceFarmer card integration', () => {
     })
   })
 
-  describe('C25_SteamMachine integration', () => {
+  describe('C025_SteamMachine integration', () => {
     it('allows bake-bread after accumulation space when no workers', () => {
       const listener = {
         id: 'test-C25-after',
@@ -216,7 +216,7 @@ describe('PlaceFarmer card integration', () => {
     })
   })
 
-  describe('C52_HuntsmansHat integration', () => {
+  describe('C052_HuntsmansHat integration', () => {
     it('modifies flow for sheep-market', () => {
       const listener = {
         id: 'test-C52-during',
@@ -249,7 +249,7 @@ describe('PlaceFarmer card integration', () => {
     })
   })
 
-  describe('C75_Firewood integration', () => {
+  describe('C075_Firewood integration', () => {
     it('registers after hook for return home effect', () => {
       const listener = {
         id: 'test-C75-after',

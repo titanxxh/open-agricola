@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/D/D60_LargePottery'
+import '../../shared/cards/D/D060_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 describe('harvest session flow', () => {
@@ -253,7 +253,7 @@ describe('harvest session flow', () => {
 
   it('anytime exchange (D60 LargePottery clay->food) usable in harvest feed', () => {
     const { session, state, playerA } = setupSinglePlayerHarvest()
-    playerA.minorPlayed.push('D60_LargePottery')
+    playerA.minorPlayed.push('D060_LargePottery')
     playerA.resources.clay = 2
     session.loadState(state)
 
@@ -261,7 +261,7 @@ describe('harvest session flow', () => {
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
-      { sourceId: 'D60_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
+      { sourceId: 'D060_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
     ] })
 
     const p = resp.state.players[0]!

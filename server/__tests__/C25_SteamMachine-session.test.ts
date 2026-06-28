@@ -6,11 +6,11 @@ import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/play
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import '../../shared/cards/C/C25_SteamMachine'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/C/C025_SteamMachine'
+import '../../shared/cards/A/A092_AdoptiveParents'
 
-const CARD_ID = 'C25_SteamMachine'
-const A92 = 'A92_AdoptiveParents'
+const CARD_ID = 'C025_SteamMachine'
+const A92 = 'A092_AdoptiveParents'
 
 const setup = (opts: {
   extraTurnNewborns?: number
@@ -100,7 +100,7 @@ const c25ConsumeEvents = (resp: SessionResponse) =>
       !('triggerActionId' in event),
   )
 
-describe('C25_SteamMachine session', () => {
+describe('C025_SteamMachine session', () => {
   it('can skip the optional bake after the last worker uses an accumulation space', () => {
     const session = setup()
 
@@ -218,7 +218,7 @@ describe('C25_SteamMachine session', () => {
   })
 
   it('does not reference A92-specific code in the C25 implementation', () => {
-    const source = readFileSync(join(process.cwd(), 'shared/cards/C/C25_SteamMachine.ts'), 'utf8')
+    const source = readFileSync(join(process.cwd(), 'shared/cards/C/C025_SteamMachine.ts'), 'utf8')
 
     expect(source).not.toMatch(/A92|Adoptive|adoptive|hasAdoptive|cardStates/)
   })

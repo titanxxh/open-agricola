@@ -41,7 +41,7 @@ const playedEvent = (id: string, seq: number): GameEvent => ({
   visibility: 'public',
   actorPlayerId: 'p1',
   type: 'card.played',
-  cardId: 'A1_TestMinor',
+  cardId: 'A001_TestMinor',
   cardType: 'minor',
 })
 
@@ -54,7 +54,7 @@ const cardStateChangedEvent = (id: string, seq: number): GameEvent => ({
   visibility: 'public',
   targetPlayerId: 'p1',
   type: 'card.stateChanged',
-  cardId: 'B21_HayloftBarn',
+  cardId: 'B021_HayloftBarn',
   key: 'food',
   value: 3,
 })
@@ -69,8 +69,8 @@ const silentReplayableEvent = (id: string, seq: number): GameEvent => ({
   actorPlayerId: 'p1',
   type: 'resource.moved',
   resources: { wood: 1 },
-  from: { kind: 'card', cardId: 'A1_Test' },
-  to: { kind: 'card', cardId: 'A2_Test' },
+  from: { kind: 'card', cardId: 'A001_Test' },
+  to: { kind: 'card', cardId: 'A002_Test' },
   reason: 'cardEffect',
 })
 
@@ -219,7 +219,7 @@ describe('buildActionLogTimelineRows', () => {
     const standalonePaid: GameEvent = {
       ...paidEvent('evt-paid-standalone', 7),
       paymentFor: 'minor-improvement',
-      sourceCardId: 'A1_TestMinor',
+      sourceCardId: 'A001_TestMinor',
     } as GameEvent
 
     const buckets = buildActionLogTimelineRows({
@@ -301,7 +301,7 @@ describe('buildActionLogTimelineRows', () => {
         {
           key: 'log.playMinorImprovement',
           params: {
-            improvements: 'A1_TestMinor',
+            improvements: 'A001_TestMinor',
             costResources: { wood: 1 },
           },
         },
@@ -321,7 +321,7 @@ describe('buildActionLogTimelineRows', () => {
         key: 'log.playMinorImprovement',
         params: {
           player: 'Alice',
-          improvements: 'A1_TestMinor',
+          improvements: 'A001_TestMinor',
           costResources: { wood: 1 },
         },
       },
@@ -386,7 +386,7 @@ describe('buildActionLogTimelineRows', () => {
       logEntry: {
         key: 'log.playMinorImprovement',
         params: {
-          improvements: 'A1_TestMinor',
+          improvements: 'A001_TestMinor',
         },
       },
     })

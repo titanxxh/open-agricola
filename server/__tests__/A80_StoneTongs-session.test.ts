@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/A/A80_StoneTongs'
+import '../../shared/cards/A/A080_StoneTongs'
 
-describe('A80_StoneTongs session', () => {
+describe('A080_StoneTongs session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,7 +13,7 @@ describe('A80_StoneTongs session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorHand.push('A80_StoneTongs')
+    player.minorHand.push('A080_StoneTongs')
     setWorkersAtHome(state, player, 2)
     player.resources.stone = 0
 
@@ -26,7 +26,7 @@ describe('A80_StoneTongs session', () => {
     if (westernQuarry) westernQuarry.resources.stone = 3
 
     session.loadState(state)
-    session.devPlayCard(0, 'A80_StoneTongs')
+    session.devPlayCard(0, 'A080_StoneTongs')
     return session
   }
 

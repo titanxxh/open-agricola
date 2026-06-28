@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import '../B/B36_Bottles'
-import { B36_Bottles as B36Card } from '../../cards/B/B36_Bottles'
+import '../B/B036_Bottles'
+import { B036_Bottles as B36Card } from '../../cards/B/B036_Bottles'
 
 import { setActiveWorkerCount } from '../../domain/player'
-const CARD_ID = 'B36_Bottles'
+const CARD_ID = 'B036_Bottles'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -40,7 +40,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('B36_Bottles', () => {
+describe('B036_Bottles', () => {
   it('card definition has 4 VP and empty base cost', () => {
     expect(B36Card.vp).toBe(4)
     expect(B36Card.cost).toEqual({})

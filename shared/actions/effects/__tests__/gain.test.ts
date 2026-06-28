@@ -111,16 +111,16 @@ describe('bonus resource actions', () => {
 
   it('emits resource.moved from card for sourceCard gains', () => {
     const player = makePlayer('p1')
-    const { result, capturedEvents } = callGain(player, { food: 2 }, undefined, { sourceCard: 'B21_HayloftBarn' })
+    const { result, capturedEvents } = callGain(player, { food: 2 }, undefined, { sourceCard: 'B021_HayloftBarn' })
     expect(result.type).toBe('ok')
     expect(capturedEvents).toEqual([
       {
         type: 'resource.moved',
         resources: { food: 2 },
-        from: { kind: 'card', playerId: 'p1', cardId: 'B21_HayloftBarn' },
+        from: { kind: 'card', playerId: 'p1', cardId: 'B021_HayloftBarn' },
         to: { kind: 'player', playerId: 'p1' },
         reason: 'cardEffect',
-        sourceCardId: 'B21_HayloftBarn',
+        sourceCardId: 'B021_HayloftBarn',
       },
     ])
   })

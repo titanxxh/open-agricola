@@ -3,8 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
-import '../../shared/cards/A/A55_JunkRoom'
-import '../../shared/cards/D/D13_Trowel'
+import '../../shared/cards/A/A055_JunkRoom'
+import '../../shared/cards/D/D013_Trowel'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D161_CabbageBuyer'
@@ -251,7 +251,7 @@ const walkPlayerSwitch = (session: GameSession, resp: ReturnType<GameSession['ta
 describe('D161_CabbageBuyer session', () => {
   it('direct tracker opens for non-house renovation action spaces', () => {
     const result = openDirectD161Tracker(setupD161DirectListeners(), {
-      spaceId: 'B1_UpscaleLifestyle',
+      spaceId: 'B001_UpscaleLifestyle',
     })
 
     expect(getD161OfferCost(result?.flow)).toBe(3)
@@ -259,7 +259,7 @@ describe('D161_CabbageBuyer session', () => {
 
   it.each([
     ['no improvement', undefined, 3],
-    ['minor improvement', 'minor:A55_JunkRoom', 2],
+    ['minor improvement', 'minor:A055_JunkRoom', 2],
     ['major improvement', 'major:Major_Fireplace1', 1],
   ] as const)('direct price branch: %s costs %s food', (_label, choice, expectedCost) => {
     const result = openDirectD161Tracker(setupD161DirectListeners(), { choice })
@@ -343,14 +343,14 @@ describe('D161_CabbageBuyer session', () => {
   it('T3: minor improvement built during house-redevelopment — offer costs 2 food', () => {
     const session = setup()
     const state = session.getState().state
-    state.players[1]!.minorHand = ['A55_JunkRoom']
+    state.players[1]!.minorHand = ['A055_JunkRoom']
     session.loadState(state)
 
     const ownerFoodBefore = session.getState().state.players[0]!.resources.food
     const ownerVegBefore = session.getState().state.players[0]!.resources.vegetable ?? 0
 
     let resp = driveRenovation(session, 1).resp
-    resp = buildMinor(session, 1, resp, 'A55_JunkRoom')
+    resp = buildMinor(session, 1, resp, 'A055_JunkRoom')
     resp = walkPlayerSwitch(session, resp)
 
     expect(resp.interaction.stateId).toBe('wait')
@@ -526,7 +526,7 @@ describe('D161_CabbageBuyer session', () => {
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.minorPlayed.push('D13_Trowel')
+    player.minorPlayed.push('D013_Trowel')
     player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
     player.playedCards.push(`occupation:${CARD_ID}`)

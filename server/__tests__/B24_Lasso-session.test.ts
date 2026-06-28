@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { ActionChoiceOption, ActionSpace, Resource } from '../../shared/contract/types'
-import '../../shared/cards/B/B24_Lasso'
+import '../../shared/cards/B/B024_Lasso'
 
-const CARD_ID = 'B24_Lasso'
+const CARD_ID = 'B024_Lasso'
 const MARKET_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
 
 const resources = (values: Partial<Resource> = {}): Resource => ({
@@ -83,7 +83,7 @@ const placedSpaces = (session: GameSession) =>
     .filter((space) => space.takenBy.some((worker) => worker.playerId === 'p1'))
     .map((space) => space.id)
 
-describe('B24_Lasso session', () => {
+describe('B024_Lasso session', () => {
   it('after a non-market first placement does not offer a second placement when no animal market is legal', () => {
     const session = setup()
     const state = session.getState().state

@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/D/D70_StrawManure'
+import '../../shared/cards/D/D070_StrawManure'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-const CARD_ID = 'D70_StrawManure'
+const CARD_ID = 'D070_StrawManure'
 
-describe('D70_StrawManure session', () => {
+describe('D070_StrawManure session', () => {
   const setupHarvest = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -21,7 +21,7 @@ describe('D70_StrawManure session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('D70_StrawManure')
+    player.minorPlayed.push('D070_StrawManure')
     player.resources.grain = 3
 
     // Two vegetable fields with crops + one grain field
@@ -96,7 +96,7 @@ describe('D70_StrawManure session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('D70_StrawManure')
+    player.minorPlayed.push('D070_StrawManure')
     player.resources.grain = 0
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
@@ -122,7 +122,7 @@ describe('D70_StrawManure session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('D70_StrawManure')
+    player.minorPlayed.push('D070_StrawManure')
     player.resources.grain = 3
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },

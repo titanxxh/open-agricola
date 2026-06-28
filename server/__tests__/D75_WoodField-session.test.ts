@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { D75_WoodField } from '../../shared/cards/D/D75_WoodField'
+import { D075_WoodField } from '../../shared/cards/D/D075_WoodField'
 import {
   getMinorImprovementCard,
   isFieldCard,
   implementedMinorImprovementCards,
 } from '../../shared/cards/catalog'
-import '../../shared/cards/D/D75_WoodField'
+import '../../shared/cards/D/D075_WoodField'
 
-const CARD_ID = 'D75_WoodField'
+const CARD_ID = 'D075_WoodField'
 const ROW = -1
 const COL_BASE = 4075
 
@@ -45,9 +45,9 @@ const setup = (options?: {
   return session
 }
 
-describe('D75_WoodField metadata', () => {
+describe('D075_WoodField metadata', () => {
   it('is registered as a field card via isField metadata', () => {
-    expect(D75_WoodField.isField).toBe(true)
+    expect(D075_WoodField.isField).toBe(true)
     expect(isFieldCard(CARD_ID)).toBe(true)
   })
 
@@ -60,14 +60,14 @@ describe('D75_WoodField metadata', () => {
   })
 
   it('carries BGA cost / vp / prerequisite metadata', () => {
-    expect(D75_WoodField.cost).toEqual({ food: 1 })
-    expect(D75_WoodField.vp).toBe(1)
-    expect(D75_WoodField.prerequisite).toBe('1 Occupation')
-    expect(D75_WoodField.occupationPrerequisites).toEqual({ min: 1 })
+    expect(D075_WoodField.cost).toEqual({ food: 1 })
+    expect(D075_WoodField.vp).toBe(1)
+    expect(D075_WoodField.prerequisite).toBe('1 Occupation')
+    expect(D075_WoodField.occupationPrerequisites).toEqual({ min: 1 })
   })
 })
 
-describe('D75_WoodField session', () => {
+describe('D075_WoodField session', () => {
   it('sows 1 wood through the real sow interaction and gains 1 wood on the next harvest', () => {
     const session = setup({ wood: 1 })
 

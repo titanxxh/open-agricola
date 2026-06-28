@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
-import { A95_Angler_impl } from '../../shared/cards/A/A95_Angler'
+import { A095_Angler_impl } from '../../shared/cards/A/A095_Angler'
 
-import '../../shared/cards/A/A95_Angler'
+import '../../shared/cards/A/A095_Angler'
 
-const CARD_ID = 'A95_Angler'
-const TEST_MINOR = 'A6_StorageBarn'
+const CARD_ID = 'A095_Angler'
+const TEST_MINOR = 'A006_StorageBarn'
 
 const setup = (fishingFood: number) => {
   const session = new GameSession()
@@ -50,7 +50,7 @@ const runListener = (
   transactionEvents: DraftGameEvent[],
   resourcesGained: { food?: number },
   actionEvents?: DraftGameEvent[],
-) => A95_Angler_impl.listeners![0]!.handler({
+) => A095_Angler_impl.listeners![0]!.handler({
   state: { players: [{ id: 'p1', occupationPlayed: [CARD_ID] }] },
   player: { id: 'p1' },
   space: { id: 'fishing', gainPerRound: { food: 1 } },
@@ -61,7 +61,7 @@ const runListener = (
   result: { type: 'ok', resourcesGained },
 } as unknown as CardListenerContext)
 
-describe('A95_Angler session', () => {
+describe('A095_Angler session', () => {
   it('offers an optional improvement after collecting up to 2 food from fishing', () => {
     const session = setup(2)
     const foodBefore = session.getState().state.players[0]!.resources.food
@@ -94,7 +94,7 @@ describe('A95_Angler session', () => {
   })
 })
 
-describe('A95_Angler listener provenance guard', () => {
+describe('A095_Angler listener provenance guard', () => {
   it('ignores generic supply/cardEffect food even when result reports food gained', () => {
     const result = runListener([supplyCardEffectFood(2)], { food: 2 })
 

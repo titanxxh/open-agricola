@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/C/C28_TeachersDesk'
+import '../../shared/cards/C/C028_TeachersDesk'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C28_TeachersDesk'
+const CARD_ID = 'C028_TeachersDesk'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('C28_TeachersDesk session', () => {
+describe('C028_TeachersDesk session', () => {
   it('before-place-farmer on major-improvement offers optional occupation with 1 food cost', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
     expect(listener).toBeDefined()

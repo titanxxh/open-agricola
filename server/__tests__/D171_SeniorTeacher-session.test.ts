@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { A28_ForestSchool } from '../../shared/cards/A/A28_ForestSchool'
+import { A028_ForestSchool } from '../../shared/cards/A/A028_ForestSchool'
 import { findTravelingPlayersSpace } from '../../shared/cards/helpers/action-space-categories'
 
 import '../../shared/cards/register-all'
 
 const CARD_ID = 'D171_SeniorTeacher'
 const B155_CARD_ID = 'B155_ArtTeacher'
-const A28_CARD_ID = 'A28_ForestSchool'
+const A028_CARD_ID = 'A028_ForestSchool'
 const OWNER_INDEX = 0
 const PAYER_INDEX = 1
 const PLAYED_OCCUPATION = 'A123_FrameBuilder'
@@ -143,8 +143,8 @@ describe('D171 Senior Teacher', () => {
     const session = setup()
     const state = session.getState().state
     const payer = state.players[PAYER_INDEX]!
-    payer.minorPlayed = [A28_CARD_ID]
-    payer.activeModifiers = [{ ...(A28_ForestSchool.impl.modifiers![0] ?? {}) }]
+    payer.minorPlayed = [A028_CARD_ID]
+    payer.activeModifiers = [{ ...(A028_ForestSchool.impl.modifiers![0] ?? {}) }]
     payer.resources.food = 0
     payer.resources.wood = 1
     session.loadState(state)

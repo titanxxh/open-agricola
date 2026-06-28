@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D117_WoodExpert'
-import '../../shared/cards/B/B81_Handcart'
-import '../../shared/cards/B/B43_Chophouse'
+import '../../shared/cards/B/B081_Handcart'
+import '../../shared/cards/B/B043_Chophouse'
 
 const CARD_ID = 'D117_WoodExpert'
 
@@ -58,11 +58,11 @@ const chooseMinor = (
 
 describe('D117_WoodExpert session — card-purchase cost candidates', () => {
   it('cost wood:1 minor + food=10 wood=2 → multi-solution choice', () => {
-    const session = setup({ food: 10, wood: 2, minor: 'B81_Handcart' })
+    const session = setup({ food: 10, wood: 2, minor: 'B081_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B81_Handcart')
+    resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
@@ -70,30 +70,30 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
   })
 
   it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select', () => {
-    const session = setup({ food: 10, wood: 0, minor: 'B81_Handcart' })
+    const session = setup({ food: 10, wood: 0, minor: 'B081_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B81_Handcart')
+    resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(9) // -1 food (trade)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
   })
 
   it('cost wood minor + food=0 wood=2 → only base affordable, auto-select', () => {
-    const session = setup({ food: 0, wood: 2, minor: 'B81_Handcart' })
+    const session = setup({ food: 0, wood: 2, minor: 'B081_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B81_Handcart')
+    resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(1) // -1 wood
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
   it('cost wood:1 minor → D117 candidate + base wood=1 → both solutions affordable', () => {
-    const session = setup({ food: 10, wood: 1, minor: 'B81_Handcart' })
+    const session = setup({ food: 10, wood: 1, minor: 'B081_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B81_Handcart')
+    resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
@@ -101,10 +101,10 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
 
   it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + D117 candidate + clay-base', () => {
     // D117 appends one candidate for the wood fee and leaves the clay fee alone.
-    const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B43_Chophouse' })
+    const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B043_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B43_Chophouse')
+    resp = chooseMinor(session, resp, 'B043_Chophouse')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
@@ -133,10 +133,10 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
   it('altCosts minor + food=10 wood=2 clay=0 → wood-base + D117 candidate (clay alt unaffordable)', () => {
     // food=10 wood=2 clay=0 — wood-base (wood:2) and D117 candidate (wood:0+food:1)
     // are affordable; clay-base alt (clay:2) is not.
-    const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B43_Chophouse' })
+    const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B043_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
-    resp = chooseMinor(session, resp, 'B43_Chophouse')
+    resp = chooseMinor(session, resp, 'B043_Chophouse')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)

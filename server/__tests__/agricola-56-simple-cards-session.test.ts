@@ -209,7 +209,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     const state = session.getState().state
     state.players[0]!.improvements = ['Major_Well']
     state.players[1]!.improvements = ['Major_Fireplace1', 'Major_Joinery']
-    state.players[2]!.minorPlayed = ['D60_LargePottery']
+    state.players[2]!.minorPlayed = ['D060_LargePottery']
     session.loadState(state)
 
     const updatedState = session.getState().state

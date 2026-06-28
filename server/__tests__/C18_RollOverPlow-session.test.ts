@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/C/C18_RollOverPlow'
+import '../../shared/cards/C/C018_RollOverPlow'
 import type { AnytimeAction } from '../../shared/contract/types';
 
-const CARD_ID = 'C18_RollOverPlow'
+const CARD_ID = 'C018_RollOverPlow'
 
-describe('C18_RollOverPlow session', () => {
+describe('C018_RollOverPlow session', () => {
   const setup = (options?: { includeEmptyField?: boolean }) => {
     const session = new GameSession()
     const state = session.getState().state

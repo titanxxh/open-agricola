@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/A/A11_MudPatch'
+import '../../shared/cards/A/A011_MudPatch'
 import type { ActionFlow } from '../../shared/contract/types'
 
-describe('A11_MudPatch session', () => {
+describe('A011_MudPatch session', () => {
   const setup = (options?: {
     fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
   }) => {
@@ -17,7 +17,7 @@ describe('A11_MudPatch session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorPlayed.push('A11_MudPatch')
+    player.minorPlayed.push('A011_MudPatch')
     if (options?.fields) {
       player.fields = options.fields
     }
@@ -29,7 +29,7 @@ describe('A11_MudPatch session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'A11_MudPatch', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'A011_MudPatch', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
@@ -48,7 +48,7 @@ describe('A11_MudPatch session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
+    const cardZone = zones.find(z => z.id === 'card:A011_MudPatch')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(3)
@@ -68,14 +68,14 @@ describe('A11_MudPatch session', () => {
 
     // 2 empty fields out of 3
     let zones = computeAnimalZones(player)
-    let cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
+    let cardZone = zones.find(z => z.id === 'card:A011_MudPatch')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
 
     // Plant on another field
     player.fields[0]!.stacks.push({ kind: 'vegetable', remaining: 1 })
     zones = computeAnimalZones(player)
-    cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
+    cardZone = zones.find(z => z.id === 'card:A011_MudPatch')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(1)
   })
@@ -91,7 +91,7 @@ describe('A11_MudPatch session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
+    const cardZone = zones.find(z => z.id === 'card:A011_MudPatch')
     expect(cardZone).toBeUndefined()
   })
 
@@ -101,7 +101,7 @@ describe('A11_MudPatch session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:A11_MudPatch')
+    const cardZone = zones.find(z => z.id === 'card:A011_MudPatch')
     expect(cardZone).toBeUndefined()
   })
 })

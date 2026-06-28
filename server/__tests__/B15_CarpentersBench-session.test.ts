@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { B15_CarpentersBench_impl } from '../../shared/cards/B/B15_CarpentersBench'
+import { B015_CarpentersBench_impl } from '../../shared/cards/B/B015_CarpentersBench'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B15_CarpentersBench'
-import '../../shared/cards/E/E16_BriarHedge'
+import '../../shared/cards/B/B015_CarpentersBench'
+import '../../shared/cards/E/E016_BriarHedge'
 
-const CARD_ID = 'B15_CarpentersBench'
-const LISTENER = B15_CarpentersBench_impl.listeners[0]!
+const CARD_ID = 'B015_CarpentersBench'
+const LISTENER = B015_CarpentersBench_impl.listeners[0]!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -49,7 +49,7 @@ const fenceLeaf = (flow: ActionFlow | undefined) => {
   return flow.children.find((child) => child.type === 'leaf' && child.actionId === 'fence')
 }
 
-describe('B15_CarpentersBench session', () => {
+describe('B015_CarpentersBench session', () => {
   it('opens fence option with benchWood from action-space wood events', () => {
     const ctx = directContext([moved()])
     ctx.result = { type: 'ok' }
@@ -110,7 +110,7 @@ describe('B15_CarpentersBench session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.minorPlayed.push(CARD_ID, 'E016_BriarHedge')
     player.resources.wood = 0
     session.loadState(state)
 
@@ -154,7 +154,7 @@ describe('B15_CarpentersBench session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID, 'E16_BriarHedge')
+    player.minorPlayed.push(CARD_ID, 'E016_BriarHedge')
     player.resources.wood = 0
     session.loadState(state)
 

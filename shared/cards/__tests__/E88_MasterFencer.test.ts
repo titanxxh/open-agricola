@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import '../E/E88_MasterFencer'
+import '../E/E088_MasterFencer'
 
-const CARD_ID = 'E88_MasterFencer'
+const CARD_ID = 'E088_MasterFencer'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -32,7 +32,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('E88_MasterFencer', () => {
+describe('E088_MasterFencer', () => {
   it('passes BGA max and free-fence cost through fencePolicy', () => {
     const player = createPlayer()
     const flow = getCardEffect(CARD_ID)!.onRoundStart!(createState(player), player)

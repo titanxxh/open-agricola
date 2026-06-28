@@ -57,10 +57,10 @@ const mkState = (player: PlayerState): GameState => ({
   players: [player],
 } as unknown as GameState)
 
-describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb absent', () => {
+describe('A088_HedgeKeeper fencing regression — scope:action default, max=3, nb absent', () => {
   const a88: TradeModifier = {
     type: 'trade',
-    cardId: 'A88_HedgeKeeper',
+    cardId: 'A088_HedgeKeeper',
     appliesTo: ['fencing'],
     from: {},
     to: { wood: 1 },
@@ -79,7 +79,7 @@ describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb
     // Best solution: 3 free wood swaps → pays the remaining 2 wood.
     const cheapest = sols[0]!
     expect(cheapest.resourcesPaid.wood).toBe(2)
-    const swap = cheapest.tradesUsed.find((t) => t.trade.sourceId === 'A88_HedgeKeeper')
+    const swap = cheapest.tradesUsed.find((t) => t.trade.sourceId === 'A088_HedgeKeeper')
     expect(swap).toBeDefined()
     expect(swap!.times).toBe(3)
   })
@@ -106,7 +106,7 @@ describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb
     )
     expect(sols.length).toBeGreaterThan(0)
     const swapCounts = sols.map(
-      (s) => s.tradesUsed.find((t) => t.trade.sourceId === 'A88_HedgeKeeper')?.times ?? 0,
+      (s) => s.tradesUsed.find((t) => t.trade.sourceId === 'A088_HedgeKeeper')?.times ?? 0,
     )
     expect(Math.max(...swapCounts)).toBe(3)
   })

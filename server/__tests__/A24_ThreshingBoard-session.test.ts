@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import '../../shared/cards/A/A24_ThreshingBoard'
+import '../../shared/cards/A/A024_ThreshingBoard'
 
-const CARD_ID = 'A24_ThreshingBoard'
+const CARD_ID = 'A024_ThreshingBoard'
 
 const setup = () => {
   const session = new GameSession()
@@ -40,7 +40,7 @@ const completeFarmland = (session: GameSession) => {
   return resp
 }
 
-describe('A24_ThreshingBoard session', () => {
+describe('A024_ThreshingBoard session', () => {
   it('can skip the optional bake after farmland', () => {
     const session = setup()
 

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/E/E11_PettingZoo'
+import '../../shared/cards/E/E011_PettingZoo'
 
-describe('E11_PettingZoo session', () => {
+describe('E011_PettingZoo session', () => {
   const setup = (options?: {
     pastures?: {
       id: string
@@ -24,7 +24,7 @@ describe('E11_PettingZoo session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorPlayed.push('E11_PettingZoo')
+    player.minorPlayed.push('E011_PettingZoo')
     if (options?.pastures) {
       player.pastures = options.pastures
     }
@@ -59,7 +59,7 @@ describe('E11_PettingZoo session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:E11_PettingZoo')
+    const cardZone = zones.find(z => z.id === 'card:E011_PettingZoo')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(2)
@@ -85,7 +85,7 @@ describe('E11_PettingZoo session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:E11_PettingZoo')
+    const cardZone = zones.find(z => z.id === 'card:E011_PettingZoo')
     expect(cardZone).toBeUndefined()
   })
 
@@ -99,7 +99,7 @@ describe('E11_PettingZoo session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:E11_PettingZoo')
+    const cardZone = zones.find(z => z.id === 'card:E011_PettingZoo')
     expect(cardZone).toBeUndefined()
   })
 
@@ -122,7 +122,7 @@ describe('E11_PettingZoo session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:E11_PettingZoo')
+    const cardZone = zones.find(z => z.id === 'card:E011_PettingZoo')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(3)
   })
@@ -147,7 +147,7 @@ describe('E11_PettingZoo session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:E11_PettingZoo')
+    const cardZone = zones.find(z => z.id === 'card:E011_PettingZoo')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
   })

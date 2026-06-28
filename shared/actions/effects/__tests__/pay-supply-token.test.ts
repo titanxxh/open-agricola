@@ -51,7 +51,7 @@ describe('pay supply tokens', () => {
   it('does not pay fence from E74 card-held fences', () => {
     const player = makePlayer({
       fenceSegments: Array.from({ length: 10 }, (_, i) => ({ edge: `${i},0-H`, type: 'fence' as const, source: { kind: 'own' as const, ownerPlayerId: 'p1' } })),
-      cardStates: { E74_AshTrees: { counters: { fences: 5 } } },
+      cardStates: { E074_AshTrees: { counters: { fences: 5 } } },
     })
     const state = makeState(player)
     const result = payAction.execute({ state, player, params: { fence: 1 }, sourceCard: 'TestCard', space: undefined as never, eventSink: undefined as never })

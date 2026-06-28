@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('C75_Firewood End-to-End Tests', () => {
+test.describe('C075_Firewood End-to-End Tests', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -19,11 +19,11 @@ test.describe('C75_Firewood End-to-End Tests', () => {
     }
   });
 
-  test('C75_Firewood: should show choice prompt when building oven with wood on card', async ({ page }) => {
-    // This test verifies the core fix: after building an oven, if C75_Firewood has wood,
+  test('C075_Firewood: should show choice prompt when building oven with wood on card', async ({ page }) => {
+    // This test verifies the core fix: after building an oven, if C075_Firewood has wood,
     // a choice prompt should appear to move wood from the card to supply.
 
-    // Note: Setting up the exact state (having C75_Firewood with wood) requires
+    // Note: Setting up the exact state (having C075_Firewood with wood) requires
     // specific game setup. This test documents the expected behavior.
 
     // Verify the game board is visible
@@ -39,7 +39,7 @@ test.describe('C75_Firewood End-to-End Tests', () => {
     await expect(playerFarm).toBeVisible();
 
     // The actual test flow would be:
-    // 1. Play C75_Firewood card (through some mechanism)
+    // 1. Play C075_Firewood card (through some mechanism)
     // 2. Advance rounds to place wood on the card
     // 3. Build an oven (Major_Fireplace1)
     // 4. Verify choice prompt appears with options to move wood

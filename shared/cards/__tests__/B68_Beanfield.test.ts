@@ -3,11 +3,11 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
-import '../B/B68_Beanfield'
-import { B68_Beanfield as B68Card } from '../../cards/B/B68_Beanfield'
+import '../B/B068_Beanfield'
+import { B068_Beanfield as B68Card } from '../../cards/B/B068_Beanfield'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'B68_Beanfield'
+const CARD_ID = 'B068_Beanfield'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -53,7 +53,7 @@ const createSpace = (id: string): ActionSpace =>
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('B68_Beanfield', () => {
+describe('B068_Beanfield', () => {
   it('card definition has correct properties', () => {
     expect(B68Card.cost).toEqual({ food: 1 })
     expect(B68Card.vp).toBe(1)

@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { postJson, getJson, saveState, saveScreenshot, BACKEND_URL, FRONTEND_URL } from './fixtures'
 
-const CARD_ID = 'C52_HuntsmansHat'
+const CARD_ID = 'C052_HuntsmansHat'
 
 test.use({ viewport: { width: 1920, height: 1080 } })
 
-test('C52_HuntsmansHat pig-market grants food per boar', async ({ page, request }) => {
+test('C052_HuntsmansHat pig-market grants food per boar', async ({ page, request }) => {
   const newResp = await postJson(request, `${BACKEND_URL}/api/game/new`)
   saveState('c52-huntsmans-hat-r9-01-new.json', newResp.state)
   await page.goto(`${FRONTEND_URL}/?player=p1`)

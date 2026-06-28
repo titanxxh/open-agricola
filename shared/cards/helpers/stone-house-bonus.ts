@@ -7,7 +7,7 @@ import { familySize } from '../../domain/player'
  * score contributes. Each contributing card calls this helper to decide
  * whether it is the winner (and thus scores) or not (and scores 0).
  *
- * Currently only C30_HalfTimberedHouse and D34_LuxuriousHostel carry this flag.
+ * Currently only C030_HalfTimberedHouse and D034_LuxuriousHostel carry this flag.
  */
 
 type StoneHouseBonusEntry = {
@@ -22,8 +22,8 @@ const computeD34 = (player: PlayerState): number =>
   player.houseType === 'stone' && player.rooms > familySize(player) ? 4 : 0
 
 const BONUS_CARDS = [
-  { id: 'C30_HalfTimberedHouse', compute: computeC30 },
-  { id: 'D34_LuxuriousHostel', compute: computeD34 },
+  { id: 'C030_HalfTimberedHouse', compute: computeC30 },
+  { id: 'D034_LuxuriousHostel', compute: computeD34 },
 ] as const
 
 const getEntries = (player: PlayerState): StoneHouseBonusEntry[] =>

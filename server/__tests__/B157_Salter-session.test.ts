@@ -5,7 +5,7 @@ import '../../shared/cards/B/B157_Salter'
 const CARD_ID = 'B157_Salter'
 const placeholder = ['__test_placeholder__']
 
-// 直接 mutate state（参考 A10_WoodenShed-session.test.ts:13-19 现有模式，不调 loadState）
+// 直接 mutate state（参考 A010_WoodenShed-session.test.ts:13-19 现有模式，不调 loadState）
 const setup = (options?: {
   resources?: Partial<{ sheep: number; boar: number; cattle: number; food: number }>
   pastures?: Array<{ id:string; size:number; tiles:{row:number;col:number}[]; stables:number; animalType:'sheep'|'boar'|'cattle'|null; animalCount:number }>
