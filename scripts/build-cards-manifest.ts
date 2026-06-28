@@ -21,6 +21,7 @@ export type CardMeta = {
   number: number
   /** Construction type: which card class/literal produced this entry. */
   type: 'occupation' | 'minor' | 'major' | 'playerAction'
+  playerActionCardType?: 'minor' | 'occupation'
   category?: string
   desc?: string[]
   cost?: Record<string, number>
@@ -77,7 +78,7 @@ export type CardManifestEntry = {
 export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
-  'id', 'name', 'deck', 'number', 'category', 'desc',
+  'id', 'name', 'deck', 'number', 'playerActionCardType', 'category', 'desc',
   'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
   'maxRound', 'isCookery', 'isBaking', 'passing', 'returnCards',
   'occupationPrerequisites', 'improvementPrerequisites', 'implemented',
@@ -385,6 +386,13 @@ function cardSourceCallToMeta(
   }
   if (typeof meta.id !== 'string') {
     throw new Error(`${filePath}: Card Source meta.id must be a static string`)
+  }
+  if (
+    type === 'playerAction' &&
+    meta.playerActionCardType !== 'minor' &&
+    meta.playerActionCardType !== 'occupation'
+  ) {
+    throw new Error(`${filePath}: definePlayerActionCard meta.playerActionCardType must be 'minor' or 'occupation'`)
   }
   meta.type = type
   return meta as unknown as CardMeta

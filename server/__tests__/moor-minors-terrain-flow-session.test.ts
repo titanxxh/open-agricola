@@ -100,7 +100,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === cardId) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const card = resp.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  const card = resp.interaction.options?.find((option) => option.value === cardId)
   expect(card).toBeDefined()
   resp = session.resolveChoice(0, card!.value)
   expect(resp.ok).toBe(true)

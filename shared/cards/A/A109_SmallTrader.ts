@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isMinorCardId } from '../helpers/card-type'
 
 const CARD_ID = 'A109_SmallTrader'
 const listener: CardListenerRegistration = {
@@ -12,7 +13,8 @@ const listener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice
-    if (!choice || !choice.startsWith('minor:')) return
+    const cardId = choice?.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!cardId || !isMinorCardId(cardId)) return
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
 }

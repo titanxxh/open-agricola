@@ -436,7 +436,7 @@ export const buildMajorImprovementOptions = (
       canAffordMajorImprovement(state, player, improvement.id, actionCardId),
     )
     .map((improvement) => ({
-      value: `major:${improvement.id}`,
+      value: improvement.id,
       labelKey: `improvements.${improvement.id}.name`,
     }))
 
@@ -462,7 +462,7 @@ export const buildMinorImprovementOptions = (
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
     .map((improvement) => ({
-      value: `minor:${improvement.id}`,
+      value: improvement.id,
       labelKey: `minorImprovements.${improvement.id}.name`,
     }))
 

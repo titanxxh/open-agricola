@@ -610,6 +610,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Chapel",
     "deck": "A",
     "number": 39,
+    "playerActionCardType": "minor",
     "category": "POINTS_PROVIDER",
     "desc": [
       "This is an action space for all. A player who uses it gets 3 bonus <SCORE>. If another player uses it, they must first pay you 1 <GRAIN>."
@@ -2424,6 +2425,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Forest Tallyman",
     "deck": "A",
     "number": 162,
+    "playerActionCardType": "occupation",
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
       "Each time both the __Forest__ and __Clay Pit__ accumulation spaces are occupied, you can use this card as an action space to get 2 <CLAY> and 3 <WOOD>."
@@ -3337,6 +3339,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Forest Inn",
     "deck": "B",
     "number": 42,
+    "playerActionCardType": "minor",
     "category": "GOODS_PROVIDER",
     "desc": [
       "This is an action space for all. A player who uses it can exchange 5/7/9 <WOOD> for 8 <WOOD> and 2/4/7 <FOOD>. When another player uses it, they must first pay you 1 <FOOD>."
@@ -6021,6 +6024,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Studio Boat",
     "deck": "C",
     "number": 39,
+    "playerActionCardType": "minor",
     "category": "POINTS_PROVIDER",
     "desc": [
       "Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__)."
@@ -7055,6 +7059,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Collector",
     "deck": "C",
     "number": 104,
+    "playerActionCardType": "occupation",
     "category": "GOODS_PROVIDER",
     "desc": [
       "This card is an action space for you only. When you use it for the 1st/2nd/3rd/4th time, you get 1 <BEGGING> marker and 6/7/8/9 different goods of your choice."
@@ -7878,6 +7883,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Forest Owner",
     "deck": "C",
     "number": 162,
+    "playerActionCardType": "occupation",
     "category": "ACTIONS_BOOSTER",
     "desc": [
       "This card is an action space for all. If another player uses it, they get 3 <WOOD> and must give you 1 <WOOD> from the general supply. If you use it, you get 4 <WOOD>."
@@ -8480,6 +8486,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Pioneering Spirit",
     "deck": "D",
     "number": 23,
+    "playerActionCardType": "minor",
     "category": "ACTIONS_BOOSTER",
     "desc": [
       "This card is an action space for you only. In rounds 3-5, it provides a __Renovation__ action. In rounds 6-8, it provides your choice of 1 <VEGETABLE>, <PIG>, or <CATTLE>."
@@ -9028,6 +9035,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Archway",
     "deck": "D",
     "number": 51,
+    "playerActionCardType": "minor",
     "category": "FOOD_PROVIDER",
     "desc": [
       "This card is an action space for all. A player who uses it immediately gets 1 <FOOD>. Immediately before the returning home phase, they can use an unoccupied action space with the person from this card."
@@ -10155,6 +10163,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Tree Inspector",
     "deck": "D",
     "number": 116,
+    "playerActionCardType": "occupation",
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
       "This card is a __1 <WOOD>__ accumulation space for you only. Each time the newly revealed action space card is a __Quarry__ accumulation space, you must discard all <WOOD> from this card."
@@ -10299,6 +10308,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Hardworking Man",
     "deck": "D",
     "number": 127,
+    "playerActionCardType": "occupation",
     "category": "FARM_PLANNER",
     "desc": [
       "This card is an action space for you only. If each other player has more rooms than you, it provides the __Day Laborer__, __Building Rooms__, and __Major Improvement__ actions (all three)."
@@ -12381,6 +12391,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Alchemists Lab",
     "deck": "E",
     "number": 81,
+    "playerActionCardType": "minor",
     "desc": [
       "This card is an action space for all. A player who uses it gets 1 building resource of each type they already have. If another player uses it, they must first pay you 1 <FOOD>."
     ],
@@ -13498,6 +13509,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "name": "Elder Baker",
     "deck": "E",
     "number": 161,
+    "playerActionCardType": "occupation",
     "desc": [
       "This card is an action space for you only. When you use it, you get 3 <GRAIN>. You can build the __Stone Oven__ major improvement even when taking a __Minor Improvement__ action."
     ],
@@ -15832,10 +15844,12 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
 ]
 
 const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'minor' || card.kind === 'playerAction'
+  card.kind === 'minor' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'minor')
 
 const isOccupation = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'occupation'
+  card.kind === 'occupation' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'occupation')
 
 const isImplemented = (card: GeneratedCatalogCardDefinition) => card.implemented !== false
 

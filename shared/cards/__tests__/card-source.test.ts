@@ -49,7 +49,7 @@ describe('Card Source factories', () => {
       meta: { id: 'TEST_SourceOccupation', name: 'Source Occupation', deck: 'TEST', number: 2, desc: [], players: '1+' },
     }).meta.kind).toBe('occupation')
     expect(definePlayerActionCard({
-      meta: { id: 'TEST_SourceAction', name: 'Source Action', deck: 'TEST', number: 3, desc: [] },
+      meta: { id: 'TEST_SourceAction', name: 'Source Action', deck: 'TEST', number: 3, playerActionCardType: 'minor', desc: [] },
     }).meta.kind).toBe('playerAction')
     expect(defineMajorCard({
       meta: { id: 'Major_SourceMajor', name: 'Source Major', deck: 'major', number: 4, desc: [], cost: { wood: 2 }, vp: 1 },

@@ -54,7 +54,7 @@ describe('A027_OvenSite session', () => {
       if (resp.interaction.stateId !== 'wait') return resp
     }
     const a27Option = resp.interaction.options?.find(
-      (o) => o.value === `minor:${CARD_ID}`,
+      (o) => o.value === CARD_ID,
     )
     expect(a27Option).toBeDefined()
 
@@ -109,7 +109,7 @@ describe('A027_OvenSite session', () => {
       steps += 1
       const options = resp.interaction.options ?? []
       const clayOven = options.find(
-        (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
+        (o) => o.value === 'Major_ClayOven',
       )
       if (clayOven && !clayOvenBought) {
         resp = session.resolveChoice(0, clayOven.value)
@@ -148,7 +148,7 @@ describe('A027_OvenSite session', () => {
       steps += 1
       const options = resp.interaction.options ?? []
       const clayOven = options.find(
-        (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
+        (o) => o.value === 'Major_ClayOven',
       )
       if (clayOven) {
         resp = session.resolveChoice(0, clayOven.value)

@@ -58,7 +58,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     const fireplace = resp.interaction.options?.find(
-      (option) => option.value === 'major:Major_Fireplace1',
+      (option) => option.value === 'Major_Fireplace1',
     )
     expect(fireplace).toBeDefined()
 

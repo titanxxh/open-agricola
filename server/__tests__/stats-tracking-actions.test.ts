@@ -158,7 +158,7 @@ describe('PlayerStats action tracking', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-    const opt = resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
+    const opt = resp.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
     if (!opt) throw new Error('Fireplace1 option missing')
     resp = session.resolveChoice(0, opt.value)
     expect(resp.ok).toBe(true)

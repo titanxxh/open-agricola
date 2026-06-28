@@ -282,7 +282,7 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('choice')
-    const option = resp.interaction.options?.find((entry) => entry.value === 'major:Major_Fireplace1')
+    const option = resp.interaction.options?.find((entry) => entry.value === 'Major_Fireplace1')
     expect(option).toBeDefined()
 
     resp = session.resolveChoice(0, option!.value)

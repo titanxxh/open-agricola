@@ -66,7 +66,7 @@ describe('C095_BasketWeaver session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const basket = options.find(
-        (o) => o.value === 'major:Major_Basket' || o.value === 'Major_Basket',
+        (o) => o.value === 'Major_Basket',
       )
       if (basket && !bought) {
         resp = session.resolveChoice(0, basket.value)

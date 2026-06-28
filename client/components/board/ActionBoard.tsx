@@ -1157,17 +1157,9 @@ export const ActionBoard = ({
             {baseActions.filter((s) => !basePositions[s.id]).map((space) => {
               const canTake = canTakeAction(space, currentPlayer)
               const meta = getCardMeta(space.id)
-              // PlayerActionCards can render as either occupation or minor
-              // depending on which catalog array they historically live in.
-              // Probe i18n (both prefixes are translated, exactly one matches
-              // for each card id) to pick the right style without re-encoding
-              // the catalog membership in the manifest.
               let cardType: 'occupation' | 'minor'
               if (meta?.type === 'playerAction') {
-                const occKey = `occupations.${space.id}.name`
-                cardType = t(locale, occKey) !== occKey
-                  ? 'occupation'
-                  : 'minor'
+                cardType = meta.playerActionCardType ?? 'minor'
               } else {
                 cardType = meta?.type === 'occupation' ? 'occupation' : 'minor'
               }

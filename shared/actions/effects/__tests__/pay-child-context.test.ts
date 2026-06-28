@@ -202,7 +202,7 @@ describe('pay child context', () => {
     const improvementStep = engine.proceed({ state, player, space })
     expect(improvementStep.type).toBe('choice')
     const improvementChoice = improvementStep.type === 'choice'
-      ? improvementStep.choice.options.find((option) => option.value === `minor:${CARD_ID}`)
+      ? improvementStep.choice.options.find((option) => option.value === CARD_ID)
       : undefined
     expect(improvementChoice).toBeDefined()
 

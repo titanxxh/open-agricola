@@ -49,7 +49,7 @@ describe('A143 + B95 stacking', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0
@@ -71,7 +71,7 @@ describe('A143 + B95 stacking', () => {
     const session = setup(2) // no extra rooms, B95 no-op
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0

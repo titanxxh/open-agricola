@@ -173,7 +173,7 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
     expect(result?.extraOptions).toBeDefined()
     const values = (result!.extraOptions ?? []).map((o) => o.value).sort()
     for (const major of ALLOWED_MAJORS) {
-      expect(values).toContain(`major:${major}`)
+      expect(values).toContain(major)
     }
     for (const opt of result!.extraOptions ?? []) {
       expect(opt.sourceCard).toBe(CARD_ID)
@@ -222,6 +222,6 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
       'B131_Equipper',
     )
 
-    expect(extras.some((option) => option.value === 'major:Major_Joinery')).toBe(false)
+    expect(extras.some((option) => option.value === 'Major_Joinery')).toBe(false)
   })
 })

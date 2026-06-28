@@ -78,7 +78,7 @@ const resolve = (
     sourceCard: 'C060_SmallPottersOven',
     actionContext,
   }
-  return improvementAction.resolveChoice!(ctx, 'major:Major_ClayOven')
+  return improvementAction.resolveChoice!(ctx, 'Major_ClayOven')
 }
 
 describe('improvement trueAction context', () => {

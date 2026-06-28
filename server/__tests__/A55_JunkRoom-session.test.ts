@@ -35,7 +35,7 @@ describe('A055_JunkRoom session log dedupe', () => {
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const bucksawOption = resp.interaction.options?.find((option) => option.value === 'minor:A037_Bucksaw')
+      const bucksawOption = resp.interaction.options?.find((option) => option.value === 'A037_Bucksaw')
       if (bucksawOption) {
         resp = session.resolveChoice(0, bucksawOption.value)
         expect(resp.ok).toBe(true)

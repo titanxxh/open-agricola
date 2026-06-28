@@ -188,10 +188,12 @@ ${definitionArray(catalogSources, catalogMetas)}
 ]
 
 const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'minor' || card.kind === 'playerAction'
+  card.kind === 'minor' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'minor')
 
 const isOccupation = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'occupation'
+  card.kind === 'occupation' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'occupation')
 
 const isImplemented = (card: GeneratedCatalogCardDefinition) => card.implemented !== false
 

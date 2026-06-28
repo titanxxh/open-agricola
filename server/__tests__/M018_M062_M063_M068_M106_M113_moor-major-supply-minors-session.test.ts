@@ -105,10 +105,10 @@ describe('Moor major-supply and upgrade minors', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const values = resp.interaction.options?.map((option) => option.value) ?? []
-    expect(values).toContain('major:Major_Joinery')
-    expect(values).not.toContain('major:Major_Moor_FurnitureStall')
+    expect(values).toContain('Major_Joinery')
+    expect(values).not.toContain('Major_Moor_FurnitureStall')
 
-    resp = session.resolveChoice(0, 'major:Major_Joinery')
+    resp = session.resolveChoice(0, 'Major_Joinery')
     expect(resp.ok).toBe(true)
     resp = choosePaymentIfNeeded(session)
 
@@ -127,7 +127,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const resp = playMinor(session, 'M018_RegisterOfCraftsmen')
 
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('major:Major_Joinery')
+      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('Major_Joinery')
     }
     expect(resp.state.players[0]!.improvements).not.toContain('Major_Joinery')
   })

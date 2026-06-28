@@ -145,9 +145,9 @@ const driveRenovation = (session: GameSession, actorIdx: number) => {
       resp = session.resolveChoice(actorIdx, 'clay')
       break
     }
-    // If we see improvement options (major:/minor:/skip) stop here
+    // If we see improvement options, stop here
     const hasImprovementChoice = opts.some(
-      (o) => o.value === '__skip__' || o.value.startsWith('major:') || o.value.startsWith('minor:'),
+      (o) => o.value === '__skip__' || o.value.startsWith('Major_') || /^[A-Z]\d+_/.test(o.value),
     )
     if (hasImprovementChoice) break
     // Otherwise keep going
@@ -193,7 +193,7 @@ const enterImprovementChoice = (
 const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, majorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
   if (resp.interaction.stateId !== 'wait') return resp
-  const opt = resp.interaction.options?.find((o) => o.value === `major:${majorId}`)
+  const opt = resp.interaction.options?.find((o) => o.value === majorId)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   // Drain any sub-choices (e.g. fireplace mode selection)
@@ -219,7 +219,7 @@ const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<Gam
 const buildMinor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, minorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
   if (resp.interaction.stateId !== 'wait') return resp
-  const opt = resp.interaction.options?.find((o) => o.value === `minor:${minorId}`)
+  const opt = resp.interaction.options?.find((o) => o.value === minorId)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   let safety = 5
@@ -259,8 +259,8 @@ describe('D161_CabbageBuyer session', () => {
 
   it.each([
     ['no improvement', undefined, 3],
-    ['minor improvement', 'minor:A055_JunkRoom', 2],
-    ['major improvement', 'major:Major_Fireplace1', 1],
+    ['minor improvement', 'A055_JunkRoom', 2],
+    ['major improvement', 'Major_Fireplace1', 1],
   ] as const)('direct price branch: %s costs %s food', (_label, choice, expectedCost) => {
     const result = openDirectD161Tracker(setupD161DirectListeners(), { choice })
 

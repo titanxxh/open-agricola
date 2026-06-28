@@ -1602,10 +1602,7 @@ export const FarmBoard = ({
                       devMode={devMode}
                       onClick={() => {
                         if (canSelect) {
-                          const value = isSelectingImprovementAny
-                            ? `minor:${cardId}`
-                            : cardId
-                          resolveChoice(value)
+                          resolveChoice(cardId)
                         }
                       }}
                       disabled={

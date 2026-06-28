@@ -151,9 +151,9 @@ describe('Farmers of the Moor compatibility regressions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('major:Major_Joinery')
+    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('Major_Joinery')
 
-    resp = session.resolveChoice(0, 'major:Major_Joinery')
+    resp = session.resolveChoice(0, 'Major_Joinery')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')

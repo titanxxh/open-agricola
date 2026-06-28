@@ -88,7 +88,7 @@ describe('A053_Claypipe session flow', () => {
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'minor:A053_Claypipe')
+      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'A053_Claypipe')
       if (claypipeOption) {
         resp = session.resolveChoice(0, claypipeOption.value)
         expect(resp.ok).toBe(true)

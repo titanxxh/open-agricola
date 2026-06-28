@@ -71,7 +71,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   if (resp.interaction.sourceCard !== minorId) {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return resp
-    const minorOption = resp.interaction.options?.find((option) => option.value === `minor:${minorId}`)
+    const minorOption = resp.interaction.options?.find((option) => option.value === minorId)
     expect(minorOption).toBeDefined()
     resp = session.resolveChoice(0, minorOption!.value)
   }
@@ -156,7 +156,7 @@ describe('D074_RoyalWood session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') return
-    const joineryOption = resp.interaction.options?.find((option) => option.value === 'major:Major_Joinery')
+    const joineryOption = resp.interaction.options?.find((option) => option.value === 'Major_Joinery')
     expect(joineryOption).toBeDefined()
     resp = session.resolveChoice(0, joineryOption!.value)
     expect(resp.ok).toBe(true)

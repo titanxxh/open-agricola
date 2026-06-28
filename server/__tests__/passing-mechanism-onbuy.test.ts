@@ -17,18 +17,18 @@ const buyMinor = (
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
   let cardPrompt = response
-  const directOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  const directOption = cardPrompt.interaction.options?.find((option) => option.value === cardId)
   if (!directOption) {
     const improvementOption = cardPrompt.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
     expect(improvementOption).toBeDefined()
     cardPrompt = session.resolveChoice(playerIndex, improvementOption!.value)
     expect(cardPrompt.ok).toBe(true)
     if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
-    if (!cardPrompt.interaction.options?.some((option) => option.value === `minor:${cardId}`)) {
+    if (!cardPrompt.interaction.options?.some((option) => option.value === cardId)) {
       return cardPrompt
     }
   }
-  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   return session.resolveChoice(playerIndex, cardOption!.value)
 }

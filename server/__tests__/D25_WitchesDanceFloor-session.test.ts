@@ -332,7 +332,7 @@ describe('D025_WitchesDanceFloor session', () => {
 
       // Step 2: choose Major_CookingHearth1
       const cookingHearthOption = resp.interaction.stateId === 'wait'
-        ? resp.interaction.options?.find((o) => o.value === 'major:Major_CookingHearth1')
+        ? resp.interaction.options?.find((o) => o.value === 'Major_CookingHearth1')
         : undefined
       expect(cookingHearthOption).toBeDefined()
       resp = session.resolveChoice(0, cookingHearthOption!.value)

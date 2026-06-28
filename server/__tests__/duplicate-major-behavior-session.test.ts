@@ -42,10 +42,10 @@ const buyMajor = (session: GameSession, id: string) => {
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
     const option = resp.interaction.options?.find(
-      (candidate: ActionChoiceOption) => candidate.value === `major:${id}`,
+      (candidate: ActionChoiceOption) => candidate.value === id,
     )
     expect(option).toBeDefined()
-    resp = session.resolveChoice(0, `major:${id}`)
+    resp = session.resolveChoice(0, id)
     expect(resp.ok).toBe(true)
   }
   return resp

@@ -67,7 +67,7 @@ const playMinor = (session: GameSession, playerIndex: number, cardId: string) =>
   }
   if (resp.interaction.stateId !== 'wait') throw new Error('expected minor choice')
   const option = resp.interaction.options?.find(
-    (candidate: ActionChoiceOption) => candidate.value === `minor:${cardId}`,
+    (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
   resp = session.resolveChoice(playerIndex, option!.value)
@@ -80,7 +80,7 @@ const playMajor = (session: GameSession, playerIndex: number, cardId: string) =>
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
   const option = resp.interaction.options?.find(
-    (candidate: ActionChoiceOption) => candidate.value === `major:${cardId}`,
+    (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
   resp = session.resolveChoice(playerIndex, option!.value)
