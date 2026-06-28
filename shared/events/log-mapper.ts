@@ -68,9 +68,19 @@ const MOOR_SPECIAL_ACTION_IDS = new Set([
   'illicit-work',
 ])
 
+const BUILT_IN_LEAF_ACTION_NAMES: Record<string, string> = {
+  construct: 'actions.construct.name',
+  fence: 'actions.fencing.name',
+  plow: 'actions.plow.name',
+  'renovate-house': 'actions.renovate-house.name',
+  stables: 'actions.stables.name',
+}
+
 const actionName = (ctx: EventLogMapperContext, actionId?: string): string | undefined =>
   actionId
-    ? ctx.actionNames?.[actionId] ?? (MOOR_SPECIAL_ACTION_IDS.has(actionId) ? `moor.specialActions.${actionId}` : actionId)
+    ? ctx.actionNames?.[actionId] ??
+      BUILT_IN_LEAF_ACTION_NAMES[actionId] ??
+      (MOOR_SPECIAL_ACTION_IDS.has(actionId) ? `moor.specialActions.${actionId}` : actionId)
     : undefined
 
 const mapActionAccumulated = (
