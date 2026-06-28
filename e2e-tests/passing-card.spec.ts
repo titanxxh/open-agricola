@@ -150,10 +150,10 @@ test.describe('passing-card: A001_Shelter minor', () => {
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1500)
 
-    const logPanel = page.locator('.log')
+    const logPanel = page.locator('.action-log')
     await expect(logPanel).toBeVisible({ timeout: 10_000 })
 
-    const logEntries = logPanel.locator('.log-entry-with-cards')
+    const logEntries = logPanel.locator('[data-testid^="action-log-row-"]')
     const count = await logEntries.count()
     expect(count).toBeGreaterThan(0)
 

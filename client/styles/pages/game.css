@@ -4155,39 +4155,6 @@
   font-weight: 700;
   cursor: pointer;
 }
-.log {
-  background: #f2f2f2;
-  border-radius: 12px;
-  padding: 12px;
-}
-.log-bottom {
-  margin-top: clamp(12px, 2vw, 20px);
-}
-.log-sidebar {
-  align-self: start;
-  position: sticky;
-  top: calc(var(--game-header-height) + var(--game-header-gap));
-  margin-top: 0;
-  max-height: calc(100vh - var(--game-header-height) - var(--game-header-gap) - var(--interaction-bar-max-height) - var(--spacing-md));
-  max-height: calc(100dvh - var(--game-header-height) - var(--game-header-gap) - var(--interaction-bar-max-height) - var(--spacing-md));
-  overflow-y: auto;
-}
-.log h3 {
-  margin-top: 0;
-  margin-bottom: 8px;
-}
-.log ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-}
-.log-entry-with-cards {
-  line-height: 1.45;
-}
 .log-card-link {
   position: relative;
   cursor: help;
@@ -4534,13 +4501,6 @@
       gap: 8px;
     }
 
-  .log-sidebar {
-      position: static;
-      top: auto;
-      max-height: none;
-      overflow: visible;
-    }
-
   /* Action board: remove wrapper chrome so board fills full width */
 
   .actions {
@@ -4599,21 +4559,6 @@
       margin-bottom: 4px;
     }
 
-  .log-bottom {
-      padding: 8px;
-      margin-top: 8px;
-    }
-
-  .log h3 {
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-  .log ul {
-      max-height: 200px;
-      overflow-y: auto;
-      font-size: 12px;
-    }
 }
 /* ══════════ COMPACT HEADER ══════════ */
 /* ── Compact Header ─────────────────────── */
