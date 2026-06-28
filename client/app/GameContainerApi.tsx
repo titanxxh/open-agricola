@@ -2463,6 +2463,7 @@ export const GameContainerApi = () => {
         confirmPlayerSwitch={confirmPlayerSwitch}
         playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
+        pendingFenceEdgesLength={pendingFenceEdges.length + pendingPalisadeEdges.length}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingFarmHandSelected={pendingFarmHand !== null}
         pendingSowSelectionsLength={sowSelectedCount}
