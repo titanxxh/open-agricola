@@ -32,9 +32,20 @@ export type AnimalZone = {
   allowedAnimalType?: AnimalType | null
   cardId?: string
   pastureIndex?: number
+  farmPosition?: { row: number; col: number }
+  countsFarmyardSpaceAsUnused?: boolean
+  displaySource?: 'played-card' | 'farm-position'
+  exclusiveCardZoneLimit?: number
 }
 
 type AnimalType = AnimalKey
+
+export const buildCardAnimalZoneId = (
+  cardId: string,
+  position?: { row: number; col: number },
+): string => position
+  ? `card:${cardId}@${positionKey(position)}`
+  : `card:${cardId}`
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
@@ -207,7 +218,16 @@ const rehydrateAnimalHolderZones = (
     if (typeof player.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
     const fixedType = fixedAnimalTypeForZone(state, zone)
     const extraData = player.cardStates?.[zone.cardId]?.extraData
-    const counts = normalizeAnimalCountsForZone(state, player, zone, extraData)
+    const countsByZone = extraData?.animalCountsByZone
+    const keyedCounts = countsByZone && typeof countsByZone === 'object'
+      ? (countsByZone as Record<string, unknown>)[zone.id]
+      : undefined
+    const stored = keyedCounts !== undefined
+      ? keyedCounts
+      : zone.id === buildCardAnimalZoneId(zone.cardId)
+        ? extraData
+        : undefined
+    const counts = normalizeAnimalCountsForZone(state, player, zone, stored)
     applyAnimalCountsToZone(zone, counts, fixedType)
   }
 }

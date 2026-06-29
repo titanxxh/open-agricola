@@ -202,6 +202,8 @@ describe('Card Source representative migrations', () => {
       'M030_FarmAnimalMarket',
       'M031_LivestockMarket',
       'M032_PeatHut',
+      'M034_HomeWood',
+      'M035_HorseTrough',
       'M036_PeatMoss',
       'M037_BuildingPlan',
       'M038_NatureReserve',

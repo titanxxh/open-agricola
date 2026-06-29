@@ -9,6 +9,7 @@ import type {
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard } from '../../domain'
 import {
+  buildCardAnimalZoneId,
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
 } from '../../domain/animal-zones'
@@ -42,6 +43,23 @@ const addAnimalCounts = (
   for (const key of keys) target[key] = (target[key] ?? 0) + Math.max(0, counts[key] ?? 0)
 }
 
+const writeCountsByZone = (
+  extraData: Record<string, unknown>,
+  entries: Map<string, Partial<Record<AnimalKey, number>>>,
+) => {
+  const next: Record<string, unknown> = {}
+  for (const [zoneId, counts] of entries) {
+    const slot: Record<string, unknown> = {}
+    writeAnimalHolderCounts(slot, counts)
+    if (Object.keys(slot).length > 0) next[zoneId] = slot
+  }
+  if (Object.keys(next).length > 0) extraData.animalCountsByZone = next
+  else delete extraData.animalCountsByZone
+  delete extraData.animalCounts
+  delete extraData.animalType
+  delete extraData.held
+}
+
 export const applyReorganizeMutate = (
   state: GameState,
   player: PlayerState,
@@ -53,6 +71,15 @@ export const applyReorganizeMutate = (
   const animalKeys = animalKeysForState(state)
   const normalizeAnimalType = (type: AnimalKey | null | undefined): AnimalKey | null =>
     type && animalKeys.includes(type) ? type : null
+  const cardAssignmentForZone = (zoneId: string): unknown => {
+    const assignments = zones.filter((z) => z.zoneType === 'card' && z.id === zoneId)
+    if (assignments.length <= 1) return assignments[0]
+    const animalCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+    for (const assignment of assignments) {
+      addAnimalCounts(animalCounts, readAnimalCountsForZoneAssignment(assignment), animalKeys)
+    }
+    return { animalCounts }
+  }
 
   const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
   player.pastures = player.pastures.map((p) => {
@@ -93,40 +120,50 @@ export const applyReorganizeMutate = (
   const cardCountsById = new Map<string, ReturnType<typeof createAnimalCounts>>()
   for (const [cardId, cardZones] of cardZonesById) {
     const existing = player.cardStates?.[cardId]
-    const zoneIds = new Set(cardZones.map((zone) => zone.id))
     const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
-    let preferredAnimalType: AnimalKey | null = null
-    zones
-      .filter((z) => z.zoneType === 'card' && zoneIds.has(z.id))
-      .forEach((assigned) => {
-        preferredAnimalType ??= normalizeAnimalType(assigned.animalType)
-        addAnimalCounts(assignedCounts, readAnimalCountsForZoneAssignment(assigned), animalKeys)
-      })
-    const baseZone = {
-      ...cardZones[0]!,
-      capacity: Math.max(...cardZones.map((zone) => cap(zone.id)), 0),
+    const countsByZone = new Map<string, ReturnType<typeof createAnimalCounts>>()
+    const useZoneStorage = cardZones.length > 1 || cardZones.some((zone) =>
+      zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
+    )
+    const exclusiveLimit = Math.max(
+      0,
+      Math.floor(cardZones.find((zone) => zone.exclusiveCardZoneLimit !== undefined)?.exclusiveCardZoneLimit ?? Number.POSITIVE_INFINITY),
+    )
+    let occupiedExclusiveZones = 0
+    for (const zone of cardZones) {
+      const assigned = cardAssignmentForZone(zone.id)
+      let counts = normalizeAnimalCountsForZone(state, player, zone, assigned)
+      if (sumAnimalCounts(counts) > 0 && occupiedExclusiveZones >= exclusiveLimit) {
+        counts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+      }
+      if (sumAnimalCounts(counts) > 0 && Number.isFinite(exclusiveLimit)) {
+        occupiedExclusiveZones += 1
+      }
+      countsByZone.set(zone.id, counts)
+      addAnimalCounts(assignedCounts, counts, animalKeys)
     }
-    const counts = normalizeAnimalCountsForZone(state, player, baseZone, {
-      animalType: preferredAnimalType,
-      animalCounts: assignedCounts,
-    })
-    cardCountsById.set(cardId, counts)
+    cardCountsById.set(cardId, assignedCounts)
     if (typeof existing?.counters?.held === 'number') continue
-    if (sumAnimalCounts(counts) <= 0 && !existing?.extraData) continue
+    if (sumAnimalCounts(assignedCounts) <= 0 && !existing?.extraData) continue
     player.cardStates ??= {}
     const nextState = { ...(player.cardStates[cardId] ?? {}) }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
-    writeAnimalHolderCounts(extraData, counts)
+    if (useZoneStorage) writeCountsByZone(extraData, countsByZone)
+    else writeAnimalHolderCounts(extraData, assignedCounts)
     nextState.extraData = extraData
     player.cardStates[cardId] = nextState
   }
   for (const [cardId, existing] of Object.entries(player.cardStates ?? {})) {
     if (cardZonesById.has(cardId)) continue
     if (typeof existing?.counters?.held === 'number') continue
-    if (sumAnimalCounts(readAnimalHolderCounts(existing?.extraData)) <= 0) continue
+    const existingExtraData = existing?.extraData as Record<string, unknown> | undefined
+    const zoneCounts = existingExtraData?.animalCountsByZone
+    const hasZoneCounts = !!zoneCounts && typeof zoneCounts === 'object' && Object.keys(zoneCounts).length > 0
+    if (sumAnimalCounts(readAnimalHolderCounts(existing?.extraData)) <= 0 && !hasZoneCounts) continue
     const nextState = { ...existing }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
     writeAnimalHolderCounts(extraData, createAnimalCounts())
+    delete extraData.animalCountsByZone
     nextState.extraData = extraData
     player.cardStates![cardId] = nextState
   }
@@ -206,6 +243,9 @@ export const reorganizeAction: ActionDefinition = {
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+      ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
+      ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
+      ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
       capacity: zone.capacity,
     }))
     return {
