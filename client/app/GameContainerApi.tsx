@@ -87,6 +87,7 @@ import {
   buildFarmCardDisplayMap,
   buildPastureDisplayMap,
   buildStableDisplayMap,
+  computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
   wouldExceedExclusiveCardZoneLimit,
 } from './hooks/use-animal-reorg-flow'
@@ -1530,10 +1531,7 @@ export const GameContainerApi = () => {
     const playerIndex = pendingAnimalReorg?.playerIndex ?? state.currentPlayerIndex
     const player = state.players[playerIndex]
     if (!player) return null
-    return REORG_ANIMAL_TYPES.reduce((acc, animal) => {
-      acc[animal] = player.resources[animal] ?? 0
-      return acc
-    }, emptyAnimalTotals())
+    return computeReorgAvailableAnimals(player)
   }, [pendingAnimalReorg, state])
   const reorgTotals = useMemo(() => {
     if (!animalReorg) return emptyAnimalTotals()
@@ -1719,12 +1717,7 @@ export const GameContainerApi = () => {
         emptyAnimalTotals(),
       )
 
-      const available = {
-        sheep: player.resources.sheep,
-        boar: player.resources.boar,
-        cattle: player.resources.cattle,
-        horse: player.resources.horse ?? 0,
-      }
+      const available = computeReorgAvailableAnimals(player)
 
       if (delta > 0) {
         if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
