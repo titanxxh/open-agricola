@@ -112,7 +112,8 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
-import { getUsedFarmyardTileKeys, positionKey } from '../domain/farm.ts'
+import { positionKey } from '../domain/farm.ts'
+import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
@@ -4954,6 +4955,17 @@ export class GameCore {
       : null
     if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
       return this.respond(false, 'invalid selection count')
+    }
+    const validPositionGroups = Array.isArray(interactionContext?.validPositionGroups)
+      ? interactionContext.validPositionGroups
+          .filter((group): group is FarmTilePosition[] => Array.isArray(group))
+          .map((group) => group.map(positionKey).sort().join('|'))
+      : null
+    if (validPositionGroups && validPositionGroups.length > 0) {
+      const selectedGroup = positions.map(positionKey).sort().join('|')
+      if (!validPositionGroups.includes(selectedGroup)) {
+        return this.respond(false, 'invalid selection position')
+      }
     }
 
     this.pushHistory()

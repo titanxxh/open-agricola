@@ -1,6 +1,27 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import {
+  makeClearedSpaceTokenListener,
+  makeFarmyardGoodsClaimListener,
+} from './moor-farmyard-space-token'
+import { allImprovementCount } from './moor-batch1-helpers'
 
 const CARD_ID = 'M092_AridField'
+
+const cardImpl = {
+  listeners: [
+    makeClearedSpaceTokenListener({
+      cardId: CARD_ID,
+      listenerId: 'M092-arid-field-after-cut-peat',
+      actions: ['cut-peat'],
+      kind: 'farmyard-goods-token',
+      resources: { fuel: 1, food: 1 },
+    }),
+    makeFarmyardGoodsClaimListener(CARD_ID),
+  ],
+  prerequisiteCheck: (player) => allImprovementCount(player) >= 3,
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M092_AridField = defineMinorCard({
   meta: {
@@ -14,7 +35,8 @@ export const M092_AridField = defineMinorCard({
     ],
     cost: {},
     prerequisite: "3 Improvements",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })

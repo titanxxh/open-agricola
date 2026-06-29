@@ -21,7 +21,7 @@ import type {
   Resource,
   Trade,
 } from '../../../contract/types'
-import { getAllTilePositions, positionKey } from '../../../domain/farm'
+import { getFarmyardTilePositions, positionKey } from '../../../domain/farm'
 import { resolveCostPaymentSelection } from './payment-choice-result'
 import { executeResolvedTypedFlatPayment } from './typed-flat'
 import { canPayCost } from './enumerate'
@@ -111,11 +111,12 @@ const countAvailableRoomTiles = (player: PlayerState) => {
   player.fields.forEach((field) =>
     occupied.add(positionKey({ row: field.row, col: field.col })),
   )
+  player.farmTerrain?.forEach((tile) => occupied.add(positionKey(tile)))
   player.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   player.pastures
     .flatMap((pasture) => pasture.tiles)
     .forEach((tile) => occupied.add(positionKey(tile)))
-  return getAllTilePositions().filter((tile) => !occupied.has(positionKey(tile))).length
+  return getFarmyardTilePositions(player).filter((tile) => !occupied.has(positionKey(tile))).length
 }
 
 export const getMaxBuildableRooms = (

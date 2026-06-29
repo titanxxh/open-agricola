@@ -4,6 +4,7 @@ import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../dom
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
+import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import type { AnimalKey } from '../contract/animals'
 
 /**
@@ -740,7 +741,7 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
-  const lockedKeys = new Set<string>()
+  const lockedKeys = getPlacementBlockedFarmyardSpaceKeys(player)
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.computeLockedFarmTiles) continue

@@ -295,13 +295,20 @@ export type FenceSegmentSource =
   | { kind: 'own'; ownerPlayerId: string }
   | { kind: 'borrowed'; ownerPlayerId: string }
 export type FenceSegment = { edge: string; type: FenceSegmentType; source?: FenceSegmentSource }
+export type FarmyardExtension = {
+  id: string
+  sourceCardId?: string
+  tiles: FarmTilePosition[]
+}
 
 export type PlayerState = {
   id: string
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
+  farmyardExtensions?: FarmyardExtension[]
   farmTerrain?: FarmTerrainTile[]
+  farmyardSpaceStates?: FarmyardSpaceState[]
   workers: Worker[]
   sickWorkerIds?: string[]
   rooms: number
@@ -348,6 +355,23 @@ export type PlayerState = {
 export type FarmTilePosition = {
   row: number
   col: number
+}
+
+export type FarmyardSpaceStateKind =
+  | 'blocked-farmyard-space'
+  | 'farmyard-goods-token'
+  | 'field-goods-token'
+  | 'non-field-crop-space'
+
+export type FarmyardSpaceState = {
+  spaceKey: string
+  sourceCardId: string
+  kind: FarmyardSpaceStateKind
+  resources?: Partial<Resource>
+  crop?: CropStack
+  bonusVp?: number
+  claimPolicy?: 'when-no-longer-unused' | 'when-sowed'
+  blocksPlacement?: boolean
 }
 
 export type Pasture = {
@@ -1052,6 +1076,7 @@ export type InteractionSelection =
       maxSelections: number
       minSelections?: number
       allowedSelectionCounts?: number[]
+      validPositionGroups?: FarmTilePosition[][]
     }
   | {
       kind: 'occupation-hand'

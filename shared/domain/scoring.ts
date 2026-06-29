@@ -1,5 +1,5 @@
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
-import { FARM_COLS, FARM_ROWS } from '../domain/farm.ts'
+import { getFarmyardTileCount } from '../domain/farm.ts'
 import { fieldHasCrop } from '../domain/field.ts'
 import { getUsedFarmyardTileKeys } from './farmyard-usage.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -302,8 +302,6 @@ const scoreByRanges = (quantity: number, ranges: string[]) => {
   return 0
 }
 
-const totalTiles = FARM_ROWS * FARM_COLS
-
 const playedCardType = (
   player: PlayerState,
   cardId: string,
@@ -448,7 +446,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     }
 
     const usedTiles = getUsedFarmyardTileKeys(player)
-    const rawEmptyCount = Math.max(0, totalTiles - usedTiles.size)
+    const rawEmptyCount = Math.max(0, getFarmyardTileCount(player) - usedTiles.size)
     const hiddenRaw =
       player.cardStates?.D132_HideFarmer?.extraData?.hiddenSpaces
     const hiddenSpaces =

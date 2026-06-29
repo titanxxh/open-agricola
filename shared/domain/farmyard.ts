@@ -10,7 +10,17 @@ import type {
   ExactCost,
   Resource,
 } from '../contract/types.ts'
-import { isBorderEdge, getAllTilePositions, positionKey } from '../domain/farm.ts'
+import {
+  createDefaultRoomTiles,
+  getFarmyardEdgeIds,
+  getFarmyardTileKeySet,
+  getFarmyardTilePositions,
+  isFarmyardBorderEdge,
+  isFarmyardEdge,
+  isWithinFarmyard,
+  parseEdgeId,
+  positionKey,
+} from '../domain/farm.ts'
 import {
   canAffordTypedFlatCost,
   getMaxBuildableRooms,
@@ -80,6 +90,7 @@ export type PlayerFarmState = {
   rooms: number
   houseType: 'wood' | 'clay' | 'stone'
   fields: FarmField[]
+  farmyardExtensions?: PlayerState['farmyardExtensions']
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
   farmTerrain?: PlayerState['farmTerrain']
@@ -152,8 +163,13 @@ export type FenceValidationOptions = {
   sourcePolicy?: FenceSourcePolicy
   segmentBounds?: FenceSegmentBounds
   newPastureBounds?: FencePastureBounds
+  newRegionBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
   preserveAnimalTotals?: boolean
+  connectionPolicy?: 'allowDisconnected'
+  allowedNewRegionTiles?: FarmTilePosition[]
+  allowTerrainInNewRegions?: boolean
+  suppressTerrainRegions?: boolean
   ordinaryFenceBuildLimit?: number
   availableOrdinaryFenceTokens?: number
   fenceSources?: Record<string, string>
@@ -172,6 +188,12 @@ export type PlowValidationError = {
     | 'NOT_ADJACENT'
     | 'FENCED'
     | 'LOCKED'
+}
+
+export type PlowAdjacencyPolicy = 'default' | 'ignore' | 'notAdjacentToFields'
+
+export type PlowValidationOptions = {
+  adjacencyPolicy?: PlowAdjacencyPolicy
 }
 
 export type PlowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
@@ -247,8 +269,6 @@ export type StableSelectionResult =
 // Local geometry helpers (previously private in legacy modules).
 // ---------------------------------------------------------------------------
 
-const FARM_ROWS = 3
-const FARM_COLS = 5
 const MAX_FENCES = 15
 const MAX_STABLE_COUNT = 4
 // Wood cost per stable (mirrors `shared/actions/effects/fencing.stableWoodCost = 2`).
@@ -257,41 +277,8 @@ const STABLE_WOOD_COST = 2
 
 const localPositionKey = (pos: FarmTilePosition) => `${pos.row}-${pos.col}`
 
-const isWithinFarm = (pos: FarmTilePosition) =>
-  pos.row >= 0 && pos.row < FARM_ROWS && pos.col >= 0 && pos.col < FARM_COLS
-
-const allTilePositions = (): FarmTilePosition[] => {
-  const positions: FarmTilePosition[] = []
-  for (let row = 0; row < FARM_ROWS; row += 1) {
-    for (let col = 0; col < FARM_COLS; col += 1) {
-      positions.push({ row, col })
-    }
-  }
-  return positions
-}
-
-const createDefaultRoomTiles = (rooms: number) => {
-  const positions: FarmTilePosition[] = []
-  for (let col = 0; col < FARM_COLS; col += 1) {
-    for (let row = FARM_ROWS - 1; row >= 0; row -= 1) {
-      positions.push({ row, col })
-    }
-  }
-  return positions.slice(0, Math.max(0, rooms))
-}
-
-const parseEdgeId = (edgeId: string) => {
-  const match = edgeId.match(/^(H|V)-(\d+)-(\d+)$/)
-  if (!match) return null
-  const row = Number(match[2])
-  const col = Number(match[3])
-  if (match[1] === 'H') {
-    if (row < 0 || row > FARM_ROWS || col < 0 || col >= FARM_COLS) return null
-  } else {
-    if (row < 0 || row >= FARM_ROWS || col < 0 || col > FARM_COLS) return null
-  }
-  return { type: match[1] as 'H' | 'V', row, col }
-}
+const regionKey = (tiles: FarmTilePosition[]) =>
+  tiles.map(localPositionKey).sort().join('|')
 
 const getEdgeVertices = (edgeId: string): FarmTilePosition[] => {
   const parsed = parseEdgeId(edgeId)
@@ -329,20 +316,8 @@ const edgeBetweenTiles = (from: FarmTilePosition, to: FarmTilePosition) => {
 // them without going through the `Farmyard` class wrapper.
 // ---------------------------------------------------------------------------
 
-export const getAllEdgeIds = () => {
-  const edges: string[] = []
-  for (let row = 0; row <= FARM_ROWS; row += 1) {
-    for (let col = 0; col < FARM_COLS; col += 1) {
-      edges.push(`H-${row}-${col}`)
-    }
-  }
-  for (let row = 0; row < FARM_ROWS; row += 1) {
-    for (let col = 0; col <= FARM_COLS; col += 1) {
-      edges.push(`V-${row}-${col}`)
-    }
-  }
-  return edges
-}
+export const getAllEdgeIds = (player?: Pick<PlayerFarmState, 'farmyardExtensions'>) =>
+  getFarmyardEdgeIds(player)
 
 export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   const desiredRooms = player.rooms ?? 2
@@ -350,9 +325,11 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
     player.roomTiles && player.roomTiles.length > 0
       ? [...player.roomTiles]
       : createDefaultRoomTiles(desiredRooms)
+  const farmyardExtensions = player.farmyardExtensions ?? []
+  const farmyardTileKeys = getFarmyardTileKeySet({ farmyardExtensions })
   if (roomTiles.length < desiredRooms) {
     const used = new Set(roomTiles.map(localPositionKey))
-    allTilePositions().forEach((pos) => {
+    getFarmyardTilePositions({ farmyardExtensions }).forEach((pos) => {
       if (roomTiles.length >= desiredRooms) return
       const key = localPositionKey(pos)
       if (used.has(key)) return
@@ -366,16 +343,14 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   const used = new Set(roomTiles.map(localPositionKey))
   const farmTerrain = (player.farmTerrain ?? []).map((tile) => ({ ...tile }))
   farmTerrain.forEach((tile) => used.add(localPositionKey(tile)))
-  const allPositions = allTilePositions()
+  const allPositions = getFarmyardTilePositions({ farmyardExtensions })
   const nextEmpty = () =>
     allPositions.find((pos) => !used.has(localPositionKey(pos)))
   const normalizedFields = (player.fields ?? []).flatMap((field) => {
     const row = Number.isFinite(field.row) ? field.row : -1
     const col = Number.isFinite(field.col) ? field.col : -1
-    const validRow = row >= 0 && row < FARM_ROWS
-    const validCol = col >= 0 && col < FARM_COLS
     const key = `${row}-${col}`
-    if (validRow && validCol && !used.has(key)) {
+    if (farmyardTileKeys.has(key) && !used.has(key)) {
       used.add(key)
       return [{ ...field, row, col }]
     }
@@ -391,6 +366,7 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   )
   const stableTiles = (player.stableTiles ?? []).filter((tile) => {
     const key = localPositionKey(tile)
+    if (!farmyardTileKeys.has(key)) return false
     if (usedTiles.has(key)) return false
     usedTiles.add(key)
     return true
@@ -406,10 +382,13 @@ export function normalizePlayerFarm<T extends PlayerFarmState>(player: T): T {
   }
 }
 
-export const computeFencedRegions = (edgeSet: Set<string>) => {
-  const visited = Array.from({ length: FARM_ROWS }, () =>
-    Array.from({ length: FARM_COLS }, () => false),
-  )
+export const computeFencedRegions = (
+  edgeSet: Set<string>,
+  player?: Pick<PlayerFarmState, 'farmyardExtensions'>,
+) => {
+  const farmTiles = getFarmyardTilePositions(player)
+  const farmTileKeys = new Set(farmTiles.map(localPositionKey))
+  const visited = new Set<string>()
   const regions: { tiles: FarmTilePosition[]; fenced: boolean }[] = []
   const directions = [
     {
@@ -433,43 +412,38 @@ export const computeFencedRegions = (edgeSet: Set<string>) => {
       edge: (row: number, col: number) => `V-${row}-${col + 1}`,
     },
   ]
-  for (let row = 0; row < FARM_ROWS; row += 1) {
-    for (let col = 0; col < FARM_COLS; col += 1) {
-      if (visited[row][col]) continue
-      const queue: FarmTilePosition[] = [{ row, col }]
-      visited[row][col] = true
-      const tiles: FarmTilePosition[] = []
-      let fenced = true
-      while (queue.length > 0) {
-        const current = queue.shift()
-        if (!current) continue
-        tiles.push(current)
-        directions.forEach((dir) => {
-          const next = {
-            row: current.row + dir.dr,
-            col: current.col + dir.dc,
+  for (const tile of farmTiles) {
+    const tileKey = localPositionKey(tile)
+    if (visited.has(tileKey)) continue
+    const queue: FarmTilePosition[] = [tile]
+    visited.add(tileKey)
+    const tiles: FarmTilePosition[] = []
+    let fenced = true
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (!current) continue
+      tiles.push(current)
+      directions.forEach((dir) => {
+        const next = {
+          row: current.row + dir.dr,
+          col: current.col + dir.dc,
+        }
+        const nextKey = localPositionKey(next)
+        if (!farmTileKeys.has(nextKey)) {
+          if (!edgeSet.has(dir.edge(current.row, current.col))) {
+            fenced = false
           }
-          if (
-            next.row < 0 ||
-            next.row >= FARM_ROWS ||
-            next.col < 0 ||
-            next.col >= FARM_COLS
-          ) {
-            if (!edgeSet.has(dir.edge(current.row, current.col))) {
-              fenced = false
-            }
-            return
-          }
-          const edgeId = edgeBetweenTiles(current, next)
-          if (edgeId && edgeSet.has(edgeId)) return
-          if (!visited[next.row][next.col]) {
-            visited[next.row][next.col] = true
-            queue.push(next)
-          }
-        })
-      }
-      regions.push({ tiles, fenced })
+          return
+        }
+        const edgeId = edgeBetweenTiles(current, next)
+        if (edgeId && edgeSet.has(edgeId)) return
+        if (!visited.has(nextKey)) {
+          visited.add(nextKey)
+          queue.push(next)
+        }
+      })
     }
+    regions.push({ tiles, fenced })
   }
   return regions
 }
@@ -589,7 +563,7 @@ const enforcePastureAnimalCapacity = (
 const getFencedTileKeys = (player: PlayerFarmState) => {
   const edgeSet = new Set((player.fenceSegments ?? []).map((s) => s.edge))
   if (edgeSet.size === 0) return new Set<string>()
-  const regions = computeFencedRegions(edgeSet).filter((region) => region.fenced)
+  const regions = computeFencedRegions(edgeSet, player).filter((region) => region.fenced)
   const fencedKeys = new Set<string>()
   regions.forEach((region) => {
     region.tiles.forEach((tile) => fencedKeys.add(localPositionKey(tile)))
@@ -601,14 +575,15 @@ export const validatePlowSelection = <T extends PlayerFarmState>(
   player: T,
   tile?: FarmTilePosition,
   lockedKeys?: Set<string>,
+  options: PlowValidationOptions = {},
 ): PlowValidationResult<T> => {
   if (!tile) {
     return { ok: false, error: { code: 'NO_SELECTION' } }
   }
-  if (!isWithinFarm(tile)) {
+  const normalized = normalizePlayerFarm(player)
+  if (!isWithinFarmyard(normalized, tile)) {
     return { ok: false, error: { code: 'INVALID_POSITION' } }
   }
-  const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(localPositionKey))
   normalized.farmTerrain?.forEach((tile) => occupied.add(localPositionKey(tile)))
   normalized.fields.forEach((field) =>
@@ -641,7 +616,10 @@ export const validatePlowSelection = <T extends PlayerFarmState>(
     const adjacent = deltas.some((delta) =>
       fieldKeys.has(`${tile.row + delta.dr}-${tile.col + delta.dc}`),
     )
-    if (!adjacent) {
+    if (options.adjacencyPolicy === 'notAdjacentToFields' && adjacent) {
+      return { ok: false, error: { code: 'NOT_ADJACENT' } }
+    }
+    if ((options.adjacencyPolicy ?? 'default') === 'default' && !adjacent) {
       return { ok: false, error: { code: 'NOT_ADJACENT' } }
     }
   }
@@ -706,7 +684,7 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     if (!allowedHere.includes(crop)) {
       return { ok: false, error: { code: 'INVALID_CROP' } }
     }
-    if (!isExtraField && !isWithinFarm(pos)) {
+    if (!isExtraField && !isWithinFarmyard(normalized, pos)) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     if (used.has(key)) continue
@@ -783,22 +761,23 @@ export const validateRoomSelection = (
   if (rooms.length === 0) {
     return { ok: false, code: 'NO_SELECTION' }
   }
-  const roomSet = new Set(player.roomTiles.map(localPositionKey))
+  const normalized = normalizePlayerFarm(player)
+  const roomSet = new Set(normalized.roomTiles.map(localPositionKey))
   const fieldSet = new Set(
-    (player.fields ?? []).map((field) => localPositionKey(field)),
+    (normalized.fields ?? []).map((field) => localPositionKey(field)),
   )
   const stableSet = new Set(
-    (player.stableTiles ?? []).map((tile) => localPositionKey(tile)),
+    (normalized.stableTiles ?? []).map((tile) => localPositionKey(tile)),
   )
   const pastureSet = new Set(
-    (player.pastures ?? [])
+    (normalized.pastures ?? [])
       .flatMap((pasture) => pasture.tiles ?? [])
       .map(localPositionKey),
   )
-  const terrainSet = new Set((player.farmTerrain ?? []).map(localPositionKey))
+  const terrainSet = new Set((normalized.farmTerrain ?? []).map(localPositionKey))
   const selectedSet = new Set<string>()
   for (const room of rooms) {
-    if (!isWithinFarm(room)) {
+    if (!isWithinFarmyard(normalized, room)) {
       return { ok: false, code: 'INVALID_POSITION' }
     }
     const key = localPositionKey(room)
@@ -821,7 +800,7 @@ export const validateRoomSelection = (
     return { ok: false, code: 'NO_SELECTION' }
   }
   const visited = new Set(roomSet)
-  const queue = player.roomTiles.map((tile) => ({ row: tile.row, col: tile.col }))
+  const queue = normalized.roomTiles.map((tile) => ({ row: tile.row, col: tile.col }))
   const directions = [
     { dr: -1, dc: 0 },
     { dr: 1, dc: 0 },
@@ -833,7 +812,7 @@ export const validateRoomSelection = (
     if (!current) continue
     directions.forEach((dir) => {
       const next = { row: current.row + dir.dr, col: current.col + dir.dc }
-      if (!isWithinFarm(next)) return
+      if (!isWithinFarmyard(normalized, next)) return
       const key = localPositionKey(next)
       if (!selectedSet.has(key) || visited.has(key)) return
       visited.add(key)
@@ -855,17 +834,18 @@ export const validateStableSelection = (
   if (stables.length === 0) {
     return { ok: false, code: 'NO_SELECTION' }
   }
-  const roomSet = new Set(player.roomTiles.map(localPositionKey))
+  const normalized = normalizePlayerFarm(player)
+  const roomSet = new Set(normalized.roomTiles.map(localPositionKey))
   const fieldSet = new Set(
-    (player.fields ?? []).map((field) => localPositionKey(field)),
+    (normalized.fields ?? []).map((field) => localPositionKey(field)),
   )
   const stableSet = new Set(
-    (player.stableTiles ?? []).map((tile) => localPositionKey(tile)),
+    (normalized.stableTiles ?? []).map((tile) => localPositionKey(tile)),
   )
-  const terrainSet = new Set((player.farmTerrain ?? []).map(localPositionKey))
+  const terrainSet = new Set((normalized.farmTerrain ?? []).map(localPositionKey))
   const selectedSet = new Set<string>()
   for (const stable of stables) {
-    if (!isWithinFarm(stable)) {
+    if (!isWithinFarmyard(normalized, stable)) {
       return { ok: false, code: 'INVALID_POSITION' }
     }
     const key = localPositionKey(stable)
@@ -902,7 +882,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
 
   const allInputEdges = [...edges, ...palisadeEdges]
   const parsedEdges = allInputEdges.map((edge) => parseEdgeId(edge))
-  if (parsedEdges.some((edge) => edge === null)) {
+  if (
+    parsedEdges.some((edge) => edge === null) ||
+    allInputEdges.some((edge) => !isFarmyardEdge(normalized, edge))
+  ) {
     return {
       ok: false,
       error: {
@@ -1094,7 +1077,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const invalidPalisade = newPalisadeEdges.find((e) => !isBorderEdge(e))
+  const invalidPalisade = newPalisadeEdges.find((e) => !isFarmyardBorderEdge(normalized, e))
   if (invalidPalisade) {
     return {
       ok: false,
@@ -1160,7 +1143,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
 
   const existingEdges = new Set(existingEdgeIds)
   const allNewEdges = [...newFenceEdges, ...newPalisadeEdges]
-  if (existingEdges.size > 0) {
+  if (existingEdges.size > 0 && options.connectionPolicy !== 'allowDisconnected') {
     const existingVertices = new Set(
       Array.from(existingEdges).flatMap((edge) =>
         getEdgeVertices(edge).map(localPositionKey),
@@ -1186,7 +1169,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   }
 
   const edgeSet = new Set([...existingEdges, ...allNewEdges])
-  const regions = computeFencedRegions(edgeSet)
+  const regions = computeFencedRegions(edgeSet, normalized)
   const fencedRegions = regions.filter((region) => region.fenced)
   if (fencedRegions.length === 0) {
     return {
@@ -1201,6 +1184,57 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
+  const previousPastureKeys = new Set(
+    normalized.pastures.map((pasture) => regionKey(pasture.tiles)),
+  )
+  const changedRegions = fencedRegions.filter((region) =>
+    !previousPastureKeys.has(regionKey(region.tiles)),
+  )
+  const allowedRegionKeys = options.allowedNewRegionTiles
+    ? new Set(options.allowedNewRegionTiles.map(localPositionKey))
+    : undefined
+  if (
+    allowedRegionKeys &&
+    changedRegions.some((region) =>
+      region.tiles.some((tile) => !allowedRegionKeys.has(localPositionKey(tile))),
+    )
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: 'PASTURE_BOUNDS_NOT_MET',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  const newRegionBounds = options.newRegionBounds
+  if (newRegionBounds) {
+    const count = changedRegions.length
+    const totalSize = changedRegions.reduce((sum, region) => sum + region.tiles.length, 0)
+    const countBounds = newRegionBounds.count
+    const sizeBounds = newRegionBounds.totalSize
+    const countTooLow = countBounds?.min !== undefined && count < countBounds.min
+    const countTooHigh = countBounds?.max !== undefined && count > countBounds.max
+    const sizeTooLow = sizeBounds?.min !== undefined && totalSize < sizeBounds.min
+    const sizeTooHigh = sizeBounds?.max !== undefined && totalSize > sizeBounds.max
+    if (countTooLow || countTooHigh || sizeTooLow || sizeTooHigh) {
+      return {
+        ok: false,
+        error: {
+          code: 'PASTURE_BOUNDS_NOT_MET',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
+    }
+  }
+
+  const changedRegionKeys = new Set(changedRegions.map((region) => regionKey(region.tiles)))
   const roomSet = new Set(normalized.roomTiles.map(localPositionKey))
   const fieldSet = new Set(
     normalized.fields.map((field) =>
@@ -1210,10 +1244,18 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const terrainSet = new Set((normalized.farmTerrain ?? []).map(localPositionKey))
   const occupiedRegion = fencedRegions.find((region) =>
     region.tiles.some(
-      (tile) =>
-        roomSet.has(localPositionKey(tile)) ||
-        fieldSet.has(localPositionKey(tile)) ||
-        terrainSet.has(localPositionKey(tile)),
+      (tile) => {
+        const key = localPositionKey(tile)
+        return roomSet.has(key) ||
+          fieldSet.has(key) ||
+          (
+            terrainSet.has(key) &&
+            !(
+              options.allowTerrainInNewRegions &&
+              changedRegionKeys.has(regionKey(region.tiles))
+            )
+          )
+      },
     ),
   )
   if (occupiedRegion) {
@@ -1248,12 +1290,12 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   }
 
   const stableSet = new Set(normalized.stableTiles.map(localPositionKey))
-  const previousPastureKeys = new Set(
-    normalized.pastures.map((pasture) =>
-      pasture.tiles.map(localPositionKey).sort().join('|'),
-    ),
-  )
-  const pastures: Pasture[] = fencedRegions.map((region, index) => ({
+  const pastureRegions = options.suppressTerrainRegions
+    ? fencedRegions.filter((region) =>
+      !region.tiles.some((tile) => terrainSet.has(localPositionKey(tile))),
+    )
+    : fencedRegions
+  const pastures: Pasture[] = pastureRegions.map((region, index) => ({
     id: `pasture-${index + 1}`,
     size: region.tiles.length,
     tiles: region.tiles,
@@ -1264,7 +1306,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     animalCount: 0,
   }))
   const newPastures = pastures.filter((pasture) => {
-    const pastureKey = pasture.tiles.map(localPositionKey).sort().join('|')
+    const pastureKey = regionKey(pasture.tiles)
     return !previousPastureKeys.has(pastureKey)
   })
   const newPastureCount = Math.max(0, pastures.length - normalized.pastures.length)
@@ -1429,7 +1471,7 @@ export const tryAddRoomTile = (
   for (const pasture of player.pastures ?? []) {
     for (const tile of pasture.tiles ?? []) used.add(positionKey(tile))
   }
-  for (const pos of getAllTilePositions()) {
+  for (const pos of getFarmyardTilePositions(player)) {
     if (used.has(positionKey(pos))) continue
     player.roomTiles = [...(player.roomTiles ?? []), pos]
     player.rooms = (player.rooms ?? 0) + 1
@@ -1494,7 +1536,7 @@ export const buildRoomFarmInteraction = (
     .flatMap((pasture) => pasture.tiles)
     .forEach((tile) => occupied.add(positionKey(tile)))
   const lockedKeys = collectLockedFarmTileKeys(player)
-  const selectableTiles = getAllTilePositions().filter((tile) => {
+  const selectableTiles = getFarmyardTilePositions(normalized).filter((tile) => {
     const key = positionKey(tile)
     return !occupied.has(key) && !lockedKeys.has(key)
   })
@@ -1537,7 +1579,7 @@ export const buildStableFarmInteraction = (
   normalized.fields.forEach((field) => occupied.add(positionKey(field)))
   normalized.stableTiles.forEach((tile) => occupied.add(positionKey(tile)))
   const lockedKeys = collectLockedFarmTileKeys(player)
-  let selectableTiles = getAllTilePositions().filter((tile) => {
+  let selectableTiles = getFarmyardTilePositions(normalized).filter((tile) => {
     const key = positionKey(tile)
     return !occupied.has(key) && !lockedKeys.has(key)
   })
@@ -1589,7 +1631,7 @@ export const buildPlowFarmInteraction = (
     canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
-    ? getAllTilePositions().filter(
+    ? getFarmyardTilePositions(normalized).filter(
         (tile) => validatePlowSelection(normalized, tile, lockedKeys).ok,
       )
     : []
@@ -1726,6 +1768,18 @@ export const buildFarmPositionSelectionInteraction = (
         return [{ row, col }]
       })
     : null
+  const validPositionGroups = Array.isArray(actionContext?.validPositionGroups)
+    ? actionContext.validPositionGroups.flatMap((group) => {
+        if (!Array.isArray(group)) return []
+        const positions = group.flatMap((tile) => {
+          const row = Number((tile as { row?: unknown }).row)
+          const col = Number((tile as { col?: unknown }).col)
+          if (!Number.isFinite(row) || !Number.isFinite(col)) return []
+          return [{ row, col }]
+        })
+        return positions.length > 0 ? [positions] : []
+      })
+    : undefined
   const filter = actionContext?.positionFilter as string | undefined
   const maxSelections = (actionContext?.maxSelections as number) ?? 1
   const minSelections = (actionContext?.minSelections as number) ?? 1
@@ -1758,6 +1812,7 @@ export const buildFarmPositionSelectionInteraction = (
     maxSelections,
     minSelections,
     ...(allowedSelectionCounts ? { allowedSelectionCounts } : {}),
+    ...(validPositionGroups ? { validPositionGroups } : {}),
   }
 }
 
@@ -1768,7 +1823,7 @@ export const buildFenceFarmInteraction = (
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const existing = new Set((normalized.fenceSegments ?? []).map((s) => s.edge))
-  const selectableEdges = getAllEdgeIds().filter(
+  const selectableEdges = getAllEdgeIds(normalized).filter(
     (edgeId) => !existing.has(edgeId),
   )
   const extraWood = spaceId === 'farm-redevelopment' ? 1 : 0
@@ -1846,8 +1901,9 @@ export class Farmyard {
   canPlow(
     coord: FarmTilePosition | undefined,
     lockedKeys?: Set<string>,
+    options?: PlowValidationOptions,
   ): PlowValidationResult<PlayerState> {
-    return validatePlowSelection(this.player, coord, lockedKeys)
+    return validatePlowSelection(this.player, coord, lockedKeys, options)
   }
 
   /** Validate a sow selection (one or more fields with crop assignments). */
