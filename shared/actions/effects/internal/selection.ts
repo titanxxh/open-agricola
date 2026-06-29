@@ -1,7 +1,7 @@
 import type { ActionDefinition, GameState, PlayerState } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { playerBoard } from '../../../domain'
-import { getUsedFarmyardTileKeys } from '../../../domain/farm'
+import { getUsedFarmyardTileKeys } from '../../../domain/farmyard-usage'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
@@ -64,6 +64,15 @@ const validateFarmPositions = (
     : null
   if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
     return 'invalid selection count'
+  }
+  const validPositionGroups = Array.isArray(actionContext?.validPositionGroups)
+    ? actionContext.validPositionGroups
+        .filter((group): group is Array<{ row: number; col: number }> => Array.isArray(group))
+        .map((group) => group.map((pos) => `${pos.row}-${pos.col}`).sort().join('|'))
+    : null
+  if (validPositionGroups && validPositionGroups.length > 0) {
+    const selectedGroup = [...positions].sort().join('|')
+    if (!validPositionGroups.includes(selectedGroup)) return 'invalid selection position'
   }
 
   return null

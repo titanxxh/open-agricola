@@ -1,6 +1,26 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M043_WildFields'
+
+const plowLeaf = {
+  type: 'leaf' as const,
+  actionId: 'plow',
+  optional: true,
+  sourceCard: CARD_ID,
+  actionContext: { adjacencyPolicy: 'notAdjacentToFields' },
+}
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'seq' as const,
+      children: [plowLeaf, plowLeaf],
+    }),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M043_WildFields = defineMinorCard({
   meta: {
@@ -16,7 +36,10 @@ export const M043_WildFields = defineMinorCard({
         "vegetable": 2
     },
     prerequisite: "2 Fields",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M043_WildFields_impl = M043_WildFields.impl

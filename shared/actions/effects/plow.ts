@@ -8,7 +8,8 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import { getAllTilePositions, positionKey } from '../../domain/farm'
+import { getFarmyardTilePositions, positionKey } from '../../domain/farm'
+import type { PlowAdjacencyPolicy, PlowValidationOptions } from '../../domain/farmyard'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
@@ -55,7 +56,10 @@ const isAdjacentToField = (
   )
 }
 
-export const getPlowableTiles = (player: PlayerState) => {
+export const getPlowableTiles = (
+  player: PlayerState,
+  options: PlowValidationOptions = {},
+) => {
   const occupied = getOccupiedKeys(player)
   const lockedKeys = collectLockedFarmTileKeys(player)
   const fieldKeys = new Set(
@@ -63,17 +67,19 @@ export const getPlowableTiles = (player: PlayerState) => {
       positionKey({ row: field.row, col: field.col }),
     ),
   )
-  if (fieldKeys.size === 0) {
-    return getAllTilePositions().filter((pos) => {
+  if (fieldKeys.size === 0 || options.adjacencyPolicy === 'ignore') {
+    return getFarmyardTilePositions(player).filter((pos) => {
       const key = positionKey(pos)
       return !occupied.has(key) && !lockedKeys.has(key)
     })
   }
-  return getAllTilePositions().filter((pos) => {
+  return getFarmyardTilePositions(player).filter((pos) => {
     const key = positionKey(pos)
     if (occupied.has(key)) return false
     if (lockedKeys.has(key)) return false
-    return isAdjacentToField(pos, fieldKeys)
+    const adjacent = isAdjacentToField(pos, fieldKeys)
+    if (options.adjacencyPolicy === 'notAdjacentToFields') return !adjacent
+    return adjacent
   })
 }
 
@@ -117,11 +123,24 @@ const readAllowedTiles = (
   return allowedTiles.filter(isFarmTilePosition)
 }
 
+const readPlowValidationOptions = (
+  actionContext: Record<string, unknown> | undefined,
+): PlowValidationOptions => {
+  const rawPolicy = actionContext?.adjacencyPolicy
+  const adjacencyPolicy: PlowAdjacencyPolicy =
+    rawPolicy === 'ignore' || actionContext?.unrestricted === true
+      ? 'ignore'
+      : rawPolicy === 'notAdjacentToFields'
+        ? 'notAdjacentToFields'
+        : 'default'
+  return { adjacencyPolicy }
+}
+
 const getAvailablePlowTiles = (
   player: PlayerState,
   actionContext: Record<string, unknown> | undefined,
 ) => {
-  const plowableTiles = getPlowableTiles(player)
+  const plowableTiles = getPlowableTiles(player, readPlowValidationOptions(actionContext))
   const allowedTiles = readAllowedTiles(actionContext)
   if (!allowedTiles) return plowableTiles
   const allowedKeys = new Set(allowedTiles.map(positionKey))
@@ -180,7 +199,11 @@ const finalizePlow = (
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const idx = ctx.state.players.indexOf(ctx.player)
-  const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
+  const validated = playerBoard(ctx.state, idx).farmyard.canPlow(
+    tile,
+    lockedKeys,
+    readPlowValidationOptions(ctx.actionContext),
+  )
   if (!validated.ok) return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
   const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
   if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
@@ -255,7 +278,11 @@ export const plowAction: ActionDefinition = {
         | undefined
       const tile = farmPayload?.tile
       if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
-      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
+      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(
+        tile,
+        lockedKeys,
+        readPlowValidationOptions(ctx.actionContext),
+      )
       if (!validated.ok) {
         return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
       }
@@ -266,7 +293,11 @@ export const plowAction: ActionDefinition = {
     if (payload && choice === 'confirm') {
       const tile = (payload as { tile?: unknown }).tile
       if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
-      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
+      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(
+        tile,
+        lockedKeys,
+        readPlowValidationOptions(ctx.actionContext),
+      )
       if (!validated.ok) {
         return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
       }

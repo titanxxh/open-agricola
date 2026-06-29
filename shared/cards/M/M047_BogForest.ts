@@ -1,6 +1,16 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import { buildCoverTerrainFlow } from '../../moor/terrain-flow'
 
 const CARD_ID = 'M047_BogForest'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => buildCoverTerrainFlow(CARD_ID, player, 'moor', 'forest'),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M047_BogForest = defineMinorCard({
   meta: {
@@ -16,7 +26,10 @@ export const M047_BogForest = defineMinorCard({
         "vegetable": 1
     },
     prerequisite: "3 Improvements",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M047_BogForest_impl = M047_BogForest.impl

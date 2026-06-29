@@ -166,6 +166,47 @@ const createFarmBoardProps = (
 })
 
 describe('FarmBoard', () => {
+  it('renders extension spaces inside the farm grid and submits real coordinates', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    player.farmyardExtensions = [{
+      id: 'ext-1',
+      sourceCardId: 'M050_FarmExtension',
+      tiles: [{ row: -1, col: 0 }, { row: -1, col: 1 }],
+    }]
+    const togglePositionSelection = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmGridColumns: 3,
+          farmCells: [
+            { key: '0-0', type: 'post' },
+            { key: '0-1', type: 'fence-h', fenceId: 'H--1-0' },
+            { key: '0-2', type: 'post' },
+            { key: '1-0', type: 'fence-v', fenceId: 'V--1-0' },
+            { key: '1-1', type: 'tile', tileRow: -1, tileCol: 0 },
+            { key: '1-2', type: 'fence-v', fenceId: 'V--1-1' },
+            { key: '2-0', type: 'post' },
+            { key: '2-1', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: '2-2', type: 'post' },
+          ],
+          positionSelectableSet: new Set(['-1-0']),
+          togglePositionSelection,
+        })}
+      />,
+    )
+    const grid = container.querySelector('.farm-grid')
+    const tile = container.querySelector('[data-farm-tile-key="-1-0"]')
+
+    expect(grid).not.toBeNull()
+    expect(tile).not.toBeNull()
+    expect(grid!.contains(tile)).toBe(true)
+    expect(tile).toHaveAttribute('title', 'Empty')
+
+    fireEvent.click(tile!)
+    expect(togglePositionSelection).toHaveBeenCalledWith({ row: -1, col: 0 })
+  })
+
   it('renders supply capacities with icons in the compact resource panel', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

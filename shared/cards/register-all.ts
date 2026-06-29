@@ -900,13 +900,20 @@ import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
 import { M032_PeatHut } from './M/M032_PeatHut'
 import { M036_PeatMoss } from './M/M036_PeatMoss'
 import { M037_BuildingPlan } from './M/M037_BuildingPlan'
+import { M038_NatureReserve } from './M/M038_NatureReserve'
+import { M039_SpecialPasture } from './M/M039_SpecialPasture'
 import { M040_MoorFire } from './M/M040_MoorFire'
 import { M041_CattleCollar } from './M/M041_CattleCollar'
 import { M042_DeepPlow } from './M/M042_DeepPlow'
+import { M043_WildFields } from './M/M043_WildFields'
 import { M044_Swamp } from './M/M044_Swamp'
 import { M045_TreeNursery } from './M/M045_TreeNursery'
+import { M046_Thicket } from './M/M046_Thicket'
+import { M047_BogForest } from './M/M047_BogForest'
 import { M048_ForestSwamp } from './M/M048_ForestSwamp'
 import { M049_SurveyorsMap } from './M/M049_SurveyorsMap'
+import { M050_FarmExtension } from './M/M050_FarmExtension'
+import { M051_MoorEnclosures } from './M/M051_MoorEnclosures'
 import { M054_AgriculturalImplement } from './M/M054_AgriculturalImplement'
 import { M055_ToolShed } from './M/M055_ToolShed'
 import { M058_PeatFertilizer } from './M/M058_PeatFertilizer'
@@ -915,11 +922,13 @@ import { M060_SowingMachine } from './M/M060_SowingMachine'
 import { M061_HayWagon } from './M/M061_HayWagon'
 import { M062_HearthBrush } from './M/M062_HearthBrush'
 import { M063_PastoralLetter } from './M/M063_PastoralLetter'
+import { M064_FamilyBurialPlot } from './M/M064_FamilyBurialPlot'
 import { M065_FireBrigade } from './M/M065_FireBrigade'
 import { M066_LandParcel } from './M/M066_LandParcel'
 import { M067_ChamberOfCommerce } from './M/M067_ChamberOfCommerce'
 import { M068_Church } from './M/M068_Church'
 import { M069_LeatherSaddle } from './M/M069_LeatherSaddle'
+import { M070_MoorArchaeology } from './M/M070_MoorArchaeology'
 import { M071_BogBody } from './M/M071_BogBody'
 import { M072_OvenDamper } from './M/M072_OvenDamper'
 import { M073_StockBreedingPrize } from './M/M073_StockBreedingPrize'
@@ -938,7 +947,10 @@ import { M088_PeatIron } from './M/M088_PeatIron'
 import { M089_BirthingHouse } from './M/M089_BirthingHouse'
 import { M090_WinterStorehouse } from './M/M090_WinterStorehouse'
 import { M091_RoutineWork } from './M/M091_RoutineWork'
+import { M092_AridField } from './M/M092_AridField'
 import { M094_PeatBath } from './M/M094_PeatBath'
+import { M095_FallowFields } from './M/M095_FallowFields'
+import { M096_FallowLand } from './M/M096_FallowLand'
 import { M097_VillageHall } from './M/M097_VillageHall'
 import { M098_FishSmokehouse } from './M/M098_FishSmokehouse'
 import { M099_HealingClay } from './M/M099_HealingClay'
@@ -949,6 +961,8 @@ import { M107_PotRoastRecipe } from './M/M107_PotRoastRecipe'
 import { M108_GrainDistillery } from './M/M108_GrainDistillery'
 import { M109_Malthouse } from './M/M109_Malthouse'
 import { M110_FarmCart } from './M/M110_FarmCart'
+import { M111_NoTillFarming } from './M/M111_NoTillFarming'
+import { M112_PeatAshFertilizer } from './M/M112_PeatAshFertilizer'
 import { M113_LivingHistoryMuseum } from './M/M113_LivingHistoryMuseum'
 import { M114_RiversideWoods } from './M/M114_RiversideWoods'
 import { M115_OakBark } from './M/M115_OakBark'
@@ -1886,13 +1900,20 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M032_PeatHut': M032_PeatHut.impl,
   'M036_PeatMoss': M036_PeatMoss.impl,
   'M037_BuildingPlan': M037_BuildingPlan.impl,
+  'M038_NatureReserve': M038_NatureReserve.impl,
+  'M039_SpecialPasture': M039_SpecialPasture.impl,
   'M040_MoorFire': M040_MoorFire.impl,
   'M041_CattleCollar': M041_CattleCollar.impl,
   'M042_DeepPlow': M042_DeepPlow.impl,
+  'M043_WildFields': M043_WildFields.impl,
   'M044_Swamp': M044_Swamp.impl,
   'M045_TreeNursery': M045_TreeNursery.impl,
+  'M046_Thicket': M046_Thicket.impl,
+  'M047_BogForest': M047_BogForest.impl,
   'M048_ForestSwamp': M048_ForestSwamp.impl,
   'M049_SurveyorsMap': M049_SurveyorsMap.impl,
+  'M050_FarmExtension': M050_FarmExtension.impl,
+  'M051_MoorEnclosures': M051_MoorEnclosures.impl,
   'M054_AgriculturalImplement': M054_AgriculturalImplement.impl,
   'M055_ToolShed': M055_ToolShed.impl,
   'M058_PeatFertilizer': M058_PeatFertilizer.impl,
@@ -1901,11 +1922,13 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M061_HayWagon': M061_HayWagon.impl,
   'M062_HearthBrush': M062_HearthBrush.impl,
   'M063_PastoralLetter': M063_PastoralLetter.impl,
+  'M064_FamilyBurialPlot': M064_FamilyBurialPlot.impl,
   'M065_FireBrigade': M065_FireBrigade.impl,
   'M066_LandParcel': M066_LandParcel.impl,
   'M067_ChamberOfCommerce': M067_ChamberOfCommerce.impl,
   'M068_Church': M068_Church.impl,
   'M069_LeatherSaddle': M069_LeatherSaddle.impl,
+  'M070_MoorArchaeology': M070_MoorArchaeology.impl,
   'M071_BogBody': M071_BogBody.impl,
   'M072_OvenDamper': M072_OvenDamper.impl,
   'M073_StockBreedingPrize': M073_StockBreedingPrize.impl,
@@ -1924,7 +1947,10 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M089_BirthingHouse': M089_BirthingHouse.impl,
   'M090_WinterStorehouse': M090_WinterStorehouse.impl,
   'M091_RoutineWork': M091_RoutineWork.impl,
+  'M092_AridField': M092_AridField.impl,
   'M094_PeatBath': M094_PeatBath.impl,
+  'M095_FallowFields': M095_FallowFields.impl,
+  'M096_FallowLand': M096_FallowLand.impl,
   'M097_VillageHall': M097_VillageHall.impl,
   'M098_FishSmokehouse': M098_FishSmokehouse.impl,
   'M099_HealingClay': M099_HealingClay.impl,
@@ -1935,6 +1961,8 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M108_GrainDistillery': M108_GrainDistillery.impl,
   'M109_Malthouse': M109_Malthouse.impl,
   'M110_FarmCart': M110_FarmCart.impl,
+  'M111_NoTillFarming': M111_NoTillFarming.impl,
+  'M112_PeatAshFertilizer': M112_PeatAshFertilizer.impl,
   'M113_LivingHistoryMuseum': M113_LivingHistoryMuseum.impl,
   'M114_RiversideWoods': M114_RiversideWoods.impl,
   'M115_OakBark': M115_OakBark.impl,

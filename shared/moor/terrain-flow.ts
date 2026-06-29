@@ -1,12 +1,25 @@
 import type { ActionFlow, FarmTilePosition, PlayerState, Resource } from '../contract/types'
-import { getAllTilePositions, getUsedFarmyardTileKeys, parsePositionKey, positionKey } from '../domain/farm'
+import {
+  getFarmyardTilePositions,
+  isWithinFarmyard,
+  parsePositionKey,
+  positionKey,
+} from '../domain/farm'
+import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage'
+import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import { registerSelectionEffect } from '../actions/helpers/selection-effect-registry'
-import { replaceTerrainWithField } from './farm-terrain'
+import {
+  coverVisibleTerrain,
+  getVisibleFarmTerrain,
+  getVisibleTerrainTiles,
+  removeVisibleTerrain,
+  replaceTerrainWithField,
+} from './farm-terrain'
 import type { FarmTerrainKind } from './types'
 
 const TERRAIN_SELECTION_EFFECT = 'moor-terrain-flow'
 
-type TerrainSelectionMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field'
+type TerrainSelectionMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'
 
 type BuildTerrainSelectionLeafOptions = {
   sourceCard: string
@@ -35,14 +48,15 @@ const parsePositions = (positions: string[]): FarmTilePosition[] =>
 export const getTerrainTiles = (
   player: Pick<PlayerState, 'farmTerrain'>,
   kind?: FarmTerrainKind,
-): FarmTilePosition[] =>
-  (player.farmTerrain ?? [])
-    .filter((tile) => kind === undefined || tile.kind === kind)
-    .map(({ row, col }) => ({ row, col }))
+): FarmTilePosition[] => getVisibleTerrainTiles(player, kind)
 
 export const getUnusedTerrainTiles = (player: PlayerState): FarmTilePosition[] => {
   const used = getUsedFarmyardTileKeys(player)
-  return getAllTilePositions().filter((tile) => !used.has(positionKey(tile)))
+  const blocked = getPlacementBlockedFarmyardSpaceKeys(player)
+  return getFarmyardTilePositions(player).filter((tile) => {
+    const key = positionKey(tile)
+    return !used.has(key) && !blocked.has(key)
+  })
 }
 
 const hasAdjacentField = (player: PlayerState, tile: FarmTilePosition): boolean => {
@@ -112,6 +126,27 @@ export const buildForestToMoorFlow = (
   })
 }
 
+export const buildCoverTerrainFlow = (
+  sourceCard: string,
+  player: PlayerState,
+  fromKind: FarmTerrainKind,
+  toKind: FarmTerrainKind,
+  maxSelections?: number,
+): ActionFlow | undefined => {
+  const selectableTiles = getTerrainTiles(player, fromKind).filter((tile) =>
+    getVisibleFarmTerrain(player, tile)?.covered === undefined)
+  if (selectableTiles.length === 0) return
+  return buildTerrainSelectionLeaf({
+    sourceCard,
+    mode: 'cover',
+    fromKind,
+    toKind,
+    selectableTiles,
+    minSelections: 0,
+    maxSelections: Math.min(maxSelections ?? selectableTiles.length, selectableTiles.length),
+  })
+}
+
 export const buildRemoveTerrainFlow = (
   sourceCard: string,
   player: PlayerState,
@@ -139,12 +174,7 @@ const removeTerrain = (
   tile: FarmTilePosition,
   kind: FarmTerrainKind,
 ): boolean => {
-  const key = positionKey(tile)
-  const index = (player.farmTerrain ?? []).findIndex((entry) =>
-    positionKey(entry) === key && entry.kind === kind)
-  if (index < 0) return false
-  player.farmTerrain = player.farmTerrain!.filter((_, idx) => idx !== index)
-  return true
+  return removeVisibleTerrain(player, tile, kind).ok
 }
 
 const replaceTerrainKind = (
@@ -183,12 +213,15 @@ registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCa
   const selected = parsePositions(positions)
   let changed = 0
   const used = mode === 'place' ? getUsedFarmyardTileKeys(player) : null
+  const blocked = mode === 'place' ? getPlacementBlockedFarmyardSpaceKeys(player) : null
 
   for (const tile of selected) {
     if (mode === 'place' && isTerrainKind(kind)) {
-      if (used?.has(positionKey(tile))) continue
+      const key = positionKey(tile)
+      if (!isWithinFarmyard(player, tile)) continue
+      if (used?.has(key) || blocked?.has(key)) continue
       player.farmTerrain = [...(player.farmTerrain ?? []), { ...tile, kind }]
-      used?.add(positionKey(tile))
+      used?.add(key)
       changed += 1
     } else if (mode === 'remove' && isTerrainKind(kind)) {
       if (removeTerrain(player, tile, kind)) changed += 1
@@ -196,6 +229,8 @@ registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCa
       if (replaceTerrainKind(player, tile, fromKind, toKind)) changed += 1
     } else if (mode === 'replace-with-field' && isTerrainKind(fromKind)) {
       if (replaceTerrainWithField(player, tile, fromKind).ok) changed += 1
+    } else if (mode === 'cover' && isTerrainKind(fromKind) && isTerrainKind(toKind)) {
+      if (coverVisibleTerrain(player, tile, fromKind, toKind)) changed += 1
     }
   }
 

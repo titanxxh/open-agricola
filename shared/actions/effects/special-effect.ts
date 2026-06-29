@@ -3,8 +3,10 @@ import type {
   FenceSegment,
   FenceSegmentType,
   GameState,
+  FarmyardSpaceState,
   PlayerState,
   Resource,
+  SupplyTokenKey,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import {
@@ -37,6 +39,12 @@ import {
   canAddScoringReserve,
   normalizeScoringReserveResources,
 } from '../../domain/scoring-reserve'
+import { addFarmyardSpaceState, getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
+import { claimFarmyardGoodsTokens, claimFieldGoodsTokens } from '../../domain/farmyard-space-token-claims'
+import {
+  addConsumedSupplyTokenCount,
+  getOwnOrdinaryFenceReserveCount,
+} from '../../domain/supply-tokens'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -65,6 +73,11 @@ export type SpecialEffectParams =
   | { kind: 'return-card-to-board'; cardId: string }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
+  | { kind: 'add-farmyard-space-state'; state: FarmyardSpaceState }
+  | { kind: 'claim-farmyard-goods-tokens' }
+  | { kind: 'claim-field-goods-tokens'; positions?: Array<{ row: number; col: number }> }
+  | { kind: 'grow-field-and-non-field-crops' }
+  | { kind: 'consume-supply-token'; key: SupplyTokenKey; amount?: number }
   | { kind: 'clear-pending-fence-bonus' }
   | { kind: 'consume-pending-extra-turns' }
   | { kind: 'remove-future-meeples'; rounds?: number[] }
@@ -326,6 +339,101 @@ export const specialEffectAction: ActionDefinition = {
           targetPlayerId: target.id,
         })
         return { type: 'ok' }
+      case 'add-farmyard-space-state':
+        addFarmyardSpaceState(target, p.state)
+        return { type: 'ok' }
+      case 'claim-farmyard-goods-tokens': {
+        const gained = claimFarmyardGoodsTokens(target, sourceCard)
+        if (Object.keys(gained).length > 0) {
+          eventSink?.emit<'resource.moved'>({
+            type: 'resource.moved',
+            resources: gained,
+            from: { kind: 'card', playerId: target.id, cardId: sourceCard },
+            to: { kind: 'player', playerId: target.id },
+            reason: 'cardEffect',
+            sourceCardId: sourceCard,
+          })
+        }
+        return { type: 'ok' }
+      }
+      case 'claim-field-goods-tokens': {
+        const positions = Array.isArray(p.positions)
+          ? p.positions.filter((pos): pos is { row: number; col: number } =>
+              Number.isFinite(pos?.row) && Number.isFinite(pos?.col),
+            )
+          : undefined
+        const gained = claimFieldGoodsTokens(target, sourceCard, positions)
+        if (Object.keys(gained).length > 0) {
+          eventSink?.emit<'resource.moved'>({
+            type: 'resource.moved',
+            resources: gained,
+            from: { kind: 'card', playerId: target.id, cardId: sourceCard },
+            to: { kind: 'player', playerId: target.id },
+            reason: 'cardEffect',
+            sourceCardId: sourceCard,
+          })
+        }
+        return { type: 'ok' }
+      }
+      case 'grow-field-and-non-field-crops': {
+        const crops: Array<{
+          location: { kind: 'field'; playerId: string; row: number; col: number }
+          crop: 'grain' | 'vegetable'
+          amount: number
+        }> = []
+        for (const field of target.fields) {
+          const stack = field.stacks.find((entry) =>
+            (entry.kind === 'grain' || entry.kind === 'vegetable') && entry.remaining > 0,
+          )
+          if (!stack) continue
+          const crop = stack.kind
+          if (crop !== 'grain' && crop !== 'vegetable') continue
+          stack.remaining += 1
+          crops.push({
+            location: { kind: 'field', playerId: target.id, row: field.row, col: field.col },
+            crop,
+            amount: 1,
+          })
+        }
+        target.farmyardSpaceStates = getFarmyardSpaceStates(target).map((entry) => {
+          if (
+            entry.kind !== 'non-field-crop-space' ||
+            !entry.crop ||
+            (entry.crop.kind !== 'grain' && entry.crop.kind !== 'vegetable') ||
+            entry.crop.remaining <= 0
+          ) {
+            return entry
+          }
+          return {
+            ...entry,
+            crop: { ...entry.crop, remaining: entry.crop.remaining + 1 },
+          }
+        })
+        if (crops.length > 0) {
+          eventSink?.emit<'farm.cropAdded'>({
+            type: 'farm.cropAdded',
+            sourceCardId: sourceCard,
+            crops,
+            reason: 'cardEffect',
+          })
+        }
+        return { type: 'ok' }
+      }
+      case 'consume-supply-token': {
+        const amount = p.amount ?? 1
+        if (amount <= 0) return { type: 'ok' }
+        if (p.key !== 'fence') return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        const available = getOwnOrdinaryFenceReserveCount(target)
+        if (available < amount) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        addConsumedSupplyTokenCount(target, p.key, amount)
+        eventSink?.emit<'farm.fenceConsumed'>({
+          type: 'farm.fenceConsumed',
+          sourceCardId: sourceCard,
+          count: amount,
+          reason: 'cardEffect',
+        })
+        return { type: 'ok' }
+      }
       case 'clear-pending-fence-bonus':
         clearPendingFenceBonus(target)
         emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus', null)

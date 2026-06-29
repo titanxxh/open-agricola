@@ -20,10 +20,12 @@ const setup = (opts?: { food?: number; grain?: number }) => {
     food: opts?.food ?? 2,
     grain: opts?.grain ?? 0,
   }
-  if (!player.minorHand.includes(CARD_ID)) {
-    player.minorHand.push(CARD_ID)
-  }
-  state.players[1]!.workersAvailable = 2
+  player.minorHand = [CARD_ID]
+  player.occupationHand = ['__test_placeholder__']
+  const opponent = state.players[1]!
+  opponent.minorHand = ['__test_placeholder__']
+  opponent.occupationHand = ['__test_placeholder__']
+  opponent.workersAvailable = 2
 
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
   if (!majorImprovement) throw new Error('major-improvement missing')
@@ -49,6 +51,7 @@ const playD83 = (session: GameSession) => {
   const resp = enterImprovementChoice(session)
   if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
   if (resp.interaction.stateId !== 'wait') return resp
+  if (resp.interaction.promptKey === 'prompt.selectPayment') return resp
   const d83Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
   expect(d83Option).toBeDefined()
   return session.resolveChoice(0, d83Option!.value)

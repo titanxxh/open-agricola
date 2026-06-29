@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -19,7 +19,7 @@ import {
   getPlayerPanelSupplySummary,
   type PlayerPanelSupplySummary,
 } from '../../../shared/domain/player-panel-summary'
-import { isBorderEdge } from '../../../shared/domain/farm'
+import { isFarmyardBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'
@@ -237,7 +237,7 @@ const SowChoiceButtons = ({
 
 type FarmCell = {
   key: string
-  type: 'tile' | 'post' | 'fence-h' | 'fence-v'
+  type: 'tile' | 'post' | 'fence-h' | 'fence-v' | 'void'
   tileRow?: number
   tileCol?: number
   fenceId?: string
@@ -340,6 +340,7 @@ export type FarmBoardProps = {
   nextStartPlayerId: string
   playedCards: string[]
   farmCells: FarmCell[]
+  farmGridColumns?: number
   roomPositions: Set<string>
   fieldPositions: Set<string>
   fieldMap: Map<string, FieldInfo>
@@ -690,6 +691,7 @@ export const FarmBoard = ({
   nextStartPlayerId,
   playedCards,
   farmCells,
+  farmGridColumns = 11,
   roomPositions,
   fieldPositions,
   fieldMap,
@@ -751,6 +753,18 @@ export const FarmBoard = ({
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
+  const gridColumns = Math.max(1, farmGridColumns)
+  const farmGridRows = Math.max(1, Math.ceil(farmCells.length / gridColumns))
+  const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string } = {
+    '--farm-grid-ratio': `${Math.floor(gridColumns / 2) + Math.ceil(gridColumns / 2) * 18 / 110}`,
+    gridTemplateColumns: Array.from({ length: gridColumns }, (_, index) =>
+      index % 2 === 0 ? 'var(--fence)' : 'var(--tile)',
+    ).join(' '),
+    gridTemplateRows: Array.from({ length: farmGridRows }, (_, index) =>
+      index % 2 === 0 ? 'var(--fence)' : 'var(--tile)',
+    ).join(' '),
+    maxWidth: `calc(var(--tile) * ${Math.floor(gridColumns / 2)} + var(--fence) * ${Math.ceil(gridColumns / 2)} + 2px)`,
+  }
   const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
   const compactLabels = locale === 'zh'
     ? {
@@ -904,8 +918,11 @@ export const FarmBoard = ({
         </div>
       </div>
     </div>
-    <div className="farm-grid">
+    <div className="farm-grid" style={farmGridStyle}>
       {farmCells.map((cell) => {
+        if (cell.type === 'void') {
+          return <div key={cell.key} className="farm-cell farm-void" />
+        }
         if (cell.type === 'tile') {
           const tileRow = cell.tileRow ?? 0
           const tileCol = cell.tileCol ?? 0
@@ -1222,7 +1239,7 @@ export const FarmBoard = ({
           const isPending = isPendingFence || isPendingPalisade
           const isActive = isExisting || isPending
           const blockedForPalisade =
-            fencePlacementMode === 'palisade' && !!edgeId && !isBorderEdge(edgeId)
+            fencePlacementMode === 'palisade' && !!edgeId && !isFarmyardBorderEdge(displayPlayer, edgeId)
           const isSelectable =
             isInteractive &&
             !!edgeId &&

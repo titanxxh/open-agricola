@@ -1,6 +1,16 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import { buildCoverTerrainFlow } from '../../moor/terrain-flow'
 
 const CARD_ID = 'M046_Thicket'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => buildCoverTerrainFlow(CARD_ID, player, 'forest', 'forest', 2),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M046_Thicket = defineMinorCard({
   meta: {
@@ -14,7 +24,10 @@ export const M046_Thicket = defineMinorCard({
     ],
     cost: {},
     prerequisite: "4 Forests",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M046_Thicket_impl = M046_Thicket.impl

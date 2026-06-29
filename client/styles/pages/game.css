@@ -2894,7 +2894,8 @@
 /* ══════════ FARM GRID ══════════ */
 .farm-grid {
   display: grid;
-  --tile: clamp(46px, calc(100cqw / 5.981818), 110px);
+  --farm-grid-ratio: 5.981818;
+  --tile: clamp(36px, calc(100cqw / var(--farm-grid-ratio)), 110px);
   --fence: calc(var(--tile) * 18 / 110);
   grid-template-columns: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence) var(--tile) var(--fence)
@@ -2915,6 +2916,9 @@
 .farm-cell {
   width: 100%;
   height: 100%;
+}
+.farm-void {
+  pointer-events: none;
 }
 .farm-tile {
   display: flex;

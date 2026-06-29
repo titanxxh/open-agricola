@@ -1,6 +1,16 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import { buildFarmyardExtensionSelectionFlow } from './moor-farmyard-extension'
 
 const CARD_ID = 'M051_MoorEnclosures'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => buildFarmyardExtensionSelectionFlow(CARD_ID, player, true),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M051_MoorEnclosures = defineMinorCard({
   meta: {
@@ -17,7 +27,10 @@ export const M051_MoorEnclosures = defineMinorCard({
     },
     vp: 1,
     prerequisite: "Clay House",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M051_MoorEnclosures_impl = M051_MoorEnclosures.impl
