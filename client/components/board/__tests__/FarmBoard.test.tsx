@@ -34,6 +34,7 @@ beforeAll(async () => {
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
+    M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -302,6 +303,37 @@ describe('FarmBoard', () => {
     expect(html).toContain(
       '<span class="pasture-control-label">Sheep</span><button>-</button><span class="pasture-control-value">1</span><button disabled="">+</button>',
     )
+  })
+
+  it('renders farm-position card animal zones on the farm tile instead of the played card', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M034_HomeWood']
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'forest' }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['M034_HomeWood'],
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
+          farmCardDisplayMap: new Map([
+            ['0-0', {
+              zoneId: 'card:M034_HomeWood@0-0',
+              capacity: 1,
+              animalType: 'horse',
+              animalCount: 1,
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('data-testid="farm-card-reorg-card:M034_HomeWood@0-0"')
+    expect(html).toContain('res-icon-horse')
+    expect(html).not.toContain('played-card-reorg')
   })
 
   it('renders kept Parent Cards from portrait assets', () => {

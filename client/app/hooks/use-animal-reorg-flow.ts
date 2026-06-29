@@ -117,10 +117,28 @@ export const buildCardDisplayMap = (
 ) => {
   const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
   animalReorg?.zones
-    .filter((zone) => zone.zoneType === 'card')
+    .filter((zone) => zone.zoneType === 'card' && !zone.farmPosition)
     .forEach((zone) => {
       const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
       map.set(cardId, {
+        animalType: zone.animalType,
+        animalCount: zone.animalCount,
+        animalCounts: zone.animalCounts,
+        capacity: zone.capacity,
+        zoneId: zone.id,
+      })
+    })
+  return map
+}
+
+export const buildFarmCardDisplayMap = (
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  animalReorg?.zones
+    .filter((zone) => zone.zoneType === 'card' && zone.farmPosition)
+    .forEach((zone) => {
+      map.set(positionKey(zone.farmPosition!), {
         animalType: zone.animalType,
         animalCount: zone.animalCount,
         animalCounts: zone.animalCounts,

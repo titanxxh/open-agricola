@@ -1620,6 +1620,9 @@ export class GameCore {
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+      ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
+      ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
+      ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
       capacity: zone.capacity,
     }))
   }
