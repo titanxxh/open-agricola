@@ -14307,7 +14307,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "1 Horse",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15839,7 +15839,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
