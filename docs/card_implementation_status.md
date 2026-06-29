@@ -793,7 +793,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B164_SheepWhisperer` | 已对齐 |  |
 | `B165_GameProvider` | 已对齐 | 已限制 1/3/4 块 grain field，并在 effect 前校验 selectableTiles |
 | `B166_CattleFeeder` | 已对齐 |  |
-| `B167_StableSergeant` | 已对齐 |  |
+| `B167_StableSergeant` | 已对齐 | onBuy 使用共享最终总量动物容纳 helper；不能同时容纳 sheep / boar / cattle 时不弹支付奖励 flow。 |
 | `B168_PastureMaster` | 已对齐 |  |
 | `B169_LivestockSustainer` | 已对齐 | 5+ 产品扩展实现：按其他玩家当前 major identity 数量提供混养 animal-holder card zone，含 `alsoCountsAs: ['major']` 的 minor，不计 owner 自己的 major，容量上限 8，major 离场后动态缩容；animal zone 计算只读回显 `animalCounts`，animal reorg 后从通用 card-zone `animalCounts` 恢复各物种，容量归零或缩容后的失效存储在 reorg 写回时清理。 |
 | `B170_CorralBuilder` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。Pig Market / Cattle Market reveal 的 round start 独立触发，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow；若一格牧场非法则不补偿。 |
@@ -815,7 +815,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C006_StoneClearing` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `C007_BladeShears` | 已对齐 |  |
 | `C008_PlantFertilizer` | 已对齐 |  |
-| `C009_AutomaticWaterTrough` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
+| `C009_AutomaticWaterTrough` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；可购买动物候选使用共享最终总量动物容纳 helper。 |
 | `C010_BunkBeds` | 已对齐 |  |
 | `C011_WildlifeReserve` | 已对齐 | Farmers of the Moor 启用时仍只允许 sheep / boar / cattle 各 1，horse 会被 card-zone invalid-animal 校验拒绝。 |
 | `C012_CattleFarm` | 已对齐 |  |
