@@ -566,6 +566,7 @@ export const zh = {
   },
   actions: {
     'future-meeples': { name: '未来资源', description: '将资源放置到未来回合' },
+    'pass-minor-card-to-left': { name: '传递小改良', description: '将一张小改良传给左手玩家' },
     'season-winter-romantic-evening': { name: '浪漫夜晚', description: '无房间生人' },
     'season-spring-animal-and-fruit': {
       name: '动物与果实',

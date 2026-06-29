@@ -12,6 +12,7 @@ import type {
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
+import { readAllPublicCardMarkers } from '../../../shared/cards/helpers/public-card-markers'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import type { ParentCardId } from '../../../shared/parents'
@@ -832,6 +833,7 @@ export const FarmBoard = ({
     })
   }
   const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
+  const publicCardMarkers = readAllPublicCardMarkers(displayPlayer)
   const farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>()
   readFarmTerrainMarkers(displayPlayer).forEach((marker) => {
     const key = `${marker.row}-${marker.col}`
@@ -893,6 +895,24 @@ export const FarmBoard = ({
             <CompactResourceItem iconClass="res-icon-fence-icon" value={`${summary.fence.used}/${summary.fence.limit}`} label={`${compactLabels.fence}: ${summary.fence.used}/${summary.fence.limit}`} />
             <CompactResourceItem iconClass="res-icon-barn" value={`${summary.stable.used}/${summary.stable.limit}`} label={`${compactLabels.stable}: ${summary.stable.used}/${summary.stable.limit}`} />
           </span>
+          {publicCardMarkers.length > 0 ? (<>
+            <span className="res-compact-divider" />
+            <span className="player-public-card-markers" data-testid="player-public-card-markers">
+              {publicCardMarkers.map((marker) => (
+                <span
+                  key={`${marker.cardId}-${marker.id}`}
+                  className="public-card-marker"
+                  data-testid={`public-card-marker-${marker.sourceCardId}-${marker.id}`}
+                  title={marker.score ? `${marker.label} ${marker.score > 0 ? '+' : ''}${marker.score}` : marker.label}
+                >
+                  <span className="public-card-marker-label">{marker.label}</span>
+                  {marker.score ? (
+                    <span className="public-card-marker-score">{marker.score > 0 ? `+${marker.score}` : marker.score}</span>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          </>) : null}
         </div>
       </div>
       <div className="player-tabs-container">

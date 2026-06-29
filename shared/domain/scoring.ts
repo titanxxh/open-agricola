@@ -22,6 +22,7 @@ import {
   sumSelectedScoringReserve,
 } from './scoring-reserve.ts'
 import { getParentCardDefinition } from '../parents'
+import { readAllPublicCardMarkers } from '../cards/helpers/public-card-markers.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -645,6 +646,18 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
             ...(cardType ? { cardType } : {}),
           })
         }
+      })
+    }
+    for (const marker of readAllPublicCardMarkers(player)) {
+      const score = marker.score ?? 0
+      if (score === 0) continue
+      const cardType = playedCardType(player, marker.sourceCardId)
+      cardBonusVp += score
+      cardBonusEntries.push({
+        type: 'bonus',
+        score,
+        cardId: marker.sourceCardId,
+        ...(cardType ? { cardType } : {}),
       })
     }
 

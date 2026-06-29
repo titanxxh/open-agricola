@@ -3519,7 +3519,12 @@ export class GameCore {
           this.engineStack.pop()
           this.pendingStageSwitchFromPlayerIndex = ownerIdx
           try {
-            this.resumeStageFlow(stageResume)
+            this.deferPrivateEventDrainDepth += 1
+            try {
+              this.resumeStageFlow(stageResume)
+            } finally {
+              this.deferPrivateEventDrainDepth -= 1
+            }
           } finally {
             this.pendingStageSwitchFromPlayerIndex = null
           }
