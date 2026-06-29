@@ -171,6 +171,7 @@ const cardImpl = {
       capacity: held,
       animalType: 'boar',
       animalCount: pigsInC148,
+      allowedAnimalType: 'boar',
     })
   },
   /**

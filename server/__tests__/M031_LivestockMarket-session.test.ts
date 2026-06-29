@@ -4,6 +4,7 @@ import { M031_LivestockMarket } from '../../shared/cards/M/M031_LivestockMarket'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionFlow, PlayerState, Resource, Trade } from '../../shared/contract/types'
+import '../../shared/cards/C/C148_MudWallower'
 
 const CARD_ID = 'M031_LivestockMarket'
 const PLACEHOLDER = '__test_placeholder__'
@@ -65,6 +66,41 @@ const makeSingleExchangeBoard = (player: PlayerState) => {
   ]
   player.houseAnimalType = 'sheep'
   player.houseAnimalCount = 1
+}
+
+const makeC148NetNeutralBoarBoard = (player: PlayerState) => {
+  player.minorHand = [CARD_ID]
+  player.occupationPlayed = ['C148_MudWallower']
+  player.cardStates = {
+    C148_MudWallower: { counters: { counter: 0, held: 1 } },
+  }
+  player.resources = fullResources({ sheep: 4, boar: 1 })
+  player.pastures = [
+    {
+      id: 'sheep-pasture',
+      size: 2,
+      tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 4,
+    },
+    {
+      id: 'boar-pasture',
+      size: 1,
+      tiles: [{ row: 2, col: 0 }],
+      stables: 0,
+      animalType: null,
+      animalCount: 0,
+    },
+    {
+      id: 'cattle-pasture',
+      size: 1,
+      tiles: [{ row: 2, col: 1 }],
+      stables: 0,
+      animalType: null,
+      animalCount: 0,
+    },
+  ]
 }
 
 const playMinor = (session: GameSession) => {
@@ -154,5 +190,31 @@ describe('M031_LivestockMarket session', () => {
     expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'sheep', animalCount: 4 })
     expect(resp.state.players[0]!.houseAnimalType).toBe('boar')
     expect(resp.state.players[0]!.houseAnimalCount).toBe(1)
+  })
+
+  it('spends C148-held boar on net-neutral boar exchanges when no board boar is available', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    makeC148NetNeutralBoarBoard(player)
+    session.loadState(state)
+
+    let resp = playMinor(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const exchangeOption = resp.interaction.options?.find((option) => {
+      const preview = option.effectPreview
+      return preview?.kind === 'resourceExchange'
+        && preview.resourcesPaid?.sheep === 1
+        && preview.resourcesPaid?.boar === 1
+        && preview.resourcesGained?.boar === 1
+        && preview.resourcesGained?.cattle === 1
+    })
+    expect(exchangeOption).toBeDefined()
+
+    resp = session.resolveChoice(0, exchangeOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 1, cattle: 1 })
+    expect(resp.state.players[0]!.cardStates.C148_MudWallower?.counters?.held).toBe(0)
   })
 })

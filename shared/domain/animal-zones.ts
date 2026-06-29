@@ -359,9 +359,6 @@ const createAccommodationWorkZone = (
     animalCount: 0,
     animalType: null,
   }
-  if (!('allowedAnimalType' in workZone) && zone.zoneType === 'card' && isAnimalKeyForState(state, zone.animalType)) {
-    workZone.allowedAnimalType = zone.animalType
-  }
   return workZone
 }
 

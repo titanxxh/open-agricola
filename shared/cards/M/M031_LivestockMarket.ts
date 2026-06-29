@@ -79,7 +79,17 @@ const exchangeLeaf = (trade: Trade): ActionFlow => ({
   type: 'leaf',
   actionId: 'exchange',
   sourceCard: CARD_ID,
-  actionContext: { directTrade: trade },
+  actionContext: {
+    directTrade: trade,
+    ...((trade.from.boar ?? 0) > 0
+      ? {
+        animalPaymentPreference: {
+          animal: 'boar',
+          avoid: [{ kind: 'cardCounter', cardId: 'C148_MudWallower', counterKey: 'held' }],
+        },
+      }
+      : {}),
+  },
   choiceLabelKey: 'ui.interactionResourceExchange',
   choiceLabelParams: {
     resourcesPaid: trade.from,
