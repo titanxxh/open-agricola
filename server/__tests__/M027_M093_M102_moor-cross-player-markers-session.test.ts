@@ -207,6 +207,19 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
       transactionEvents: [cardPassed(source.id, owner.id)],
     })
     expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual([])
+
+    const soloSession = setup(1)
+    const soloState = soloSession.getState().state
+    const solo = soloState.players[0]!
+    solo.minorPlayed = [M093]
+    const soloResult = runCardListeners({
+      state: soloState,
+      player: solo,
+      actionId: 'pass-minor-card-to-left',
+      phase: 'after',
+      transactionEvents: [cardPassed(solo.id, solo.id)],
+    })
+    expect(soloResult.flatMap((entry) => actionIds(entry.flow))).toEqual([])
   })
 
   it('M102 rewards the current holder, passes left at harvest start, and moves ownership on later harvests', () => {

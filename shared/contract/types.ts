@@ -1032,6 +1032,7 @@ export type InteractionAnimalReorgZone = {
   animalCount: number
   animalCounts?: Partial<Record<AnimalKey, number>>
   allowedAnimalType?: AnimalKey | null
+  allowedAnimalTypes?: AnimalKey[]
   capacity: number
   farmPosition?: FarmTilePosition
   countsFarmyardSpaceAsUnused?: boolean

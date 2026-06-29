@@ -125,12 +125,6 @@ import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize } from '../domain/player.ts'
-import { getAssignedAnimalsByType } from '../domain/animals.ts'
-import {
-  createAnimalCounts,
-  readAnimalHolderCounts,
-  sumAnimalCounts,
-} from '../domain/animal-holder-state.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
@@ -1220,32 +1214,17 @@ export class GameCore {
   }
 
   private getAssignedAnimalCountForPending(p: PlayerState) {
-    const assigned = { ...getAssignedAnimalsByType(p) }
     const idx = this.state.players.indexOf(p)
     const animalKeys = animalKeysForState(this.state)
-    if (idx < 0) {
-      return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
-    }
-    const visibleByCardId = new Map<string, ReturnType<typeof createAnimalCounts>>()
+    if (idx < 0) return 0
+    let assigned = 0
     for (const zone of playerBoard(this.state, idx).animals.zones()) {
-      if (zone.zoneType !== 'card' || !zone.cardId) continue
-      const counts = visibleByCardId.get(zone.cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
       const zoneCounts = readAnimalCountsForZoneAssignment(zone)
       for (const key of animalKeys) {
-        counts[key] = (counts[key] ?? 0) + (zoneCounts[key] ?? 0)
-      }
-      visibleByCardId.set(zone.cardId, counts)
-    }
-    for (const [cardId, cardState] of Object.entries(p.cardStates ?? {})) {
-      if (typeof cardState?.counters?.held === 'number') continue
-      const stored = readAnimalHolderCounts(cardState?.extraData)
-      const visible = visibleByCardId.get(cardId) ?? createAnimalCounts(this.state.enableFarmersOfTheMoor === true)
-      if (sumAnimalCounts(stored) <= 0 && sumAnimalCounts(visible) <= 0) continue
-      for (const key of animalKeys) {
-        assigned[key] = (assigned[key] ?? 0) + (visible[key] ?? 0) - (stored[key] ?? 0)
+        assigned += zoneCounts[key] ?? 0
       }
     }
-    return animalKeys.reduce((sum, key) => sum + (assigned[key] ?? 0), 0)
+    return assigned
   }
 
   private hasPendingAnimals(p: PlayerState) {

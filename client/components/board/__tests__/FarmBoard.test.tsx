@@ -36,6 +36,7 @@ beforeAll(async () => {
     D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
     M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
     M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
+    M035_HorseTrough: manifestEntry('M035_HorseTrough', 'Horse Trough', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -416,6 +417,41 @@ describe('FarmBoard', () => {
     expect(html).toContain('data-testid="farm-card-reorg-card:M034_HomeWood@0-0"')
     expect(html).toContain('res-icon-horse')
     expect(html).not.toContain('played-card-reorg')
+  })
+
+  it('disables farm-position card animal controls rejected by zone metadata', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M034_HomeWood']
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'forest' }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['M034_HomeWood'],
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 1, boar: 1, cattle: 0, horse: 1 },
+          farmCardDisplayMap: new Map([
+            ['0-0', {
+              zoneId: 'card:M034_HomeWood@0-0',
+              capacity: 1,
+              animalType: null,
+              animalCount: 0,
+              allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain(
+      '<span class="pasture-control-label">Sheep</span><button disabled="">-</button><span class="pasture-control-value">0</span><button disabled="">+</button>',
+    )
+    expect(html).toContain(
+      '<span class="pasture-control-label">Boar</span><button disabled="">-</button><span class="pasture-control-value">0</span><button>+</button>',
+    )
   })
 
   it('renders kept Parent Cards from portrait assets', () => {

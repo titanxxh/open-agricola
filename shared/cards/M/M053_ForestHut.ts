@@ -26,6 +26,30 @@ const selectedTile = (context: CardListenerContext): FarmTilePosition | undefine
   return Number.isInteger(row) && Number.isInteger(col) ? { row, col } : undefined
 }
 
+const terrainSelectionTiles = (context: CardListenerContext): FarmTilePosition[] => {
+  const extraData = context.result && context.result.type !== 'fail' ? context.result.extraData : undefined
+  const selected = extraData?.selectedPositions
+  if (!Array.isArray(selected)) return []
+  return selected.flatMap((entry) =>
+    typeof entry === 'string'
+      ? (parsePositionKey(entry) ? [parsePositionKey(entry)!] : [])
+      : [])
+}
+
+const selectedForestRemovalTiles = (context: CardListenerContext): FarmTilePosition[] => {
+  if (context.actionId === 'fell-trees' || context.actionId === 'slash-and-burn') {
+    const tile = selectedTile(context)
+    return tile ? [tile] : []
+  }
+  if (context.actionId !== 'selection') return []
+  const mode = context.actionContext?.terrainMode
+  const removesForest =
+    (mode === 'remove' && context.actionContext?.terrainKind === 'forest') ||
+    ((mode === 'replace-kind' || mode === 'replace-with-field') &&
+      context.actionContext?.terrainFromKind === 'forest')
+  return removesForest ? terrainSelectionTiles(context) : []
+}
+
 const clearForestMarker = (player: Parameters<typeof writeCardExtraData>[0]) => {
   writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, undefined)
   writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
@@ -72,11 +96,10 @@ const unlockListener: CardListenerRegistration = {
   id: 'M053-forest-hut-after-forest-removed',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'slash-and-burn'],
+  actions: ['fell-trees', 'slash-and-burn', 'selection'],
   handler: (context) => {
-    if (context.actionId === 'fell-trees' && context.extraData?.terrainCleared === false) return
     const bound = readCardExtraData<FarmTilePosition>(context.player, CARD_ID, BOUND_FOREST_KEY)
-    if (!sameTile(bound, selectedTile(context))) return
+    if (!selectedForestRemovalTiles(context).some((tile) => sameTile(bound, tile))) return
     const workerId = readCardExtraData<string>(context.player, CARD_ID, TEMP_WORKER_KEY)
     if (!workerId) return
     const worker = (context.player.workers ?? []).find((entry) => entry.id === workerId)

@@ -4,6 +4,7 @@ import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
   buildCardDisplayMap,
+  buildFarmCardDisplayMap,
   buildPastureDisplayMap,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
@@ -164,6 +165,32 @@ describe('use-animal-reorg-flow helpers', () => {
       animalCount: 1,
       capacity: 1,
       zoneId: 'card:C148_MudWallower',
+    })
+  })
+
+  it('builds farm-card display from persisted per-zone storage after reorg', () => {
+    const target = player()
+    target.cardStates = {
+      M034_HomeWood: {
+        extraData: {
+          animalCountsByZone: {
+            'card:M034_HomeWood@0-0': {
+              animalCounts: { horse: 1 },
+              capacity: 1,
+              allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+            },
+          },
+        },
+      },
+    }
+    const display = buildFarmCardDisplayMap(target, null)
+    expect(display.get('0-0')).toEqual({
+      animalType: 'horse',
+      animalCount: 1,
+      animalCounts: { horse: 1 },
+      capacity: 1,
+      zoneId: 'card:M034_HomeWood@0-0',
+      allowedAnimalTypes: ['boar', 'cattle', 'horse'],
     })
   })
 
