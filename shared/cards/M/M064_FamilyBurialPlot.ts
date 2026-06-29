@@ -36,6 +36,7 @@ const cardImpl = {
         type: 'leaf',
         actionId: 'selection',
         sourceCard: CARD_ID,
+        optional: true,
         actionContext: {
           selectionKind: 'farm-position',
           selectableTiles,

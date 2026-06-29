@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow, FarmTilePosition } from '../../contract/types'
+import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
 import type { ExtraSowableField } from '../card-effects'
 import { getFarmyardTilePositions, parsePositionKey, positionKey } from '../../domain/farm'
 import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
@@ -16,14 +16,14 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M111_NoTillFarming'
 const DISCARD_EFFECT = 'm111-no-till-farming-discard-crops'
 
-const cropSpaces = (player: Parameters<typeof getFarmyardSpaceStates>[0]) =>
+const cropSpaces = (player: PlayerState) =>
   getFarmyardSpaceStates(player).filter((state) =>
     state.sourceCardId === CARD_ID &&
     state.kind === 'non-field-crop-space' &&
     (state.crop?.remaining ?? 0) > 0,
   )
 
-const discardableTiles = (player: Parameters<typeof getFarmyardSpaceStates>[0]): FarmTilePosition[] =>
+const discardableTiles = (player: PlayerState): FarmTilePosition[] =>
   cropSpaces(player).flatMap((state) => {
     const tile = parsePositionKey(state.spaceKey)
     return tile ? [tile] : []
@@ -39,6 +39,27 @@ registerSelectionEffect(DISCARD_EFFECT, ({ player, positions }) => {
     ),
   )
 })
+
+const reapCropSpaces = (player: PlayerState) => {
+  const next = []
+  for (const state of getFarmyardSpaceStates(player)) {
+    if (
+      state.sourceCardId !== CARD_ID ||
+      state.kind !== 'non-field-crop-space' ||
+      !state.crop ||
+      state.crop.remaining <= 0
+    ) {
+      next.push(state)
+      continue
+    }
+    player.resources[state.crop.kind] += 1
+    const remaining = state.crop.remaining - 1
+    if (remaining > 0) {
+      next.push({ ...state, crop: { ...state.crop, remaining } })
+    }
+  }
+  player.farmyardSpaceStates = next
+}
 
 const anytimeListener: CardListenerRegistration = {
   id: 'M111-no-till-farming-discard-crops',
@@ -99,6 +120,9 @@ const cardImpl = {
         crop: { kind: crop, remaining: crop === 'grain' ? 3 : 2 },
       })
       return true
+    },
+    onHarvestFieldPhase: (_state, player) => {
+      reapCropSpaces(player)
     },
   },
   listeners: [anytimeListener],

@@ -974,7 +974,7 @@ export const FarmBoard = ({
               : null
           const allowedSowCrops = sowSelectableMap.get(tileKey) ?? []
           const isSowSelectable =
-            isInteractive && isEmptyField && allowedSowCrops.length > 0
+            isInteractive && (isEmptyField || !fieldInfo) && allowedSowCrops.length > 0
           const currentSowChoice = isInteractive ? (pendingSowSelections[tileKey] ?? '') : ''
           const availableGrain =
             sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)

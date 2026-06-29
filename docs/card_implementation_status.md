@@ -418,8 +418,8 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M023_EdgeOfTheForest` | 已对齐 | onBuy 用 terrain-adjacency helper 统计 fenced forest-field edge 得 food、fenced forest-moor edge 得 fuel；重复 fence segment 不重复计数。 |
 | `M036_PeatMoss` | 已对齐 | no visible moors 前置；木房建房成本通过 construct `scope:'unit'` trade modifier 降为每房 3 wood + 1 reed。 |
 | `M037_BuildingPlan` | 已对齐 | 每次一次建至少 2 rooms 后，可选以 `trueAction:false` 建最多 2 个免费 stables。 |
-| `M038_NatureReserve` | 已对齐 | onBuy 通过 `fencePolicy` 免费围住 1 个含 visible/Covered terrain 且邻接既有 pasture 的格；terrain 全清前只记录在本卡 `cardStates`，清空后转为普通 pasture。 |
-| `M039_SpecialPasture` | 已对齐 | onBuy 通过 `fencePolicy.connectionPolicy:'allowDisconnected'` 免费围 1 个不邻接既有 pasture 的单格；后续普通 fence 仍使用默认连接规则。 |
+| `M038_NatureReserve` | 已对齐 | onBuy 通过 `fencePolicy` 免费围住 1 个含 visible/Covered terrain 且邻接既有 pasture 的格；terrain 全清前只记录在本卡 `cardStates`，清空后转为普通 pasture；Slash and Burn 形成的 field 不会转为 pasture。 |
+| `M039_SpecialPasture` | 已对齐 | onBuy 通过 `fencePolicy.connectionPolicy:'allowDisconnected'` 免费围 1 个不邻接既有 pasture 的单格，且限制为 4 根 fence；后续普通 fence 仍使用默认连接规则。 |
 | `M040_MoorFire` | 已对齐 | 前置 2 moors；只在剩 1 个 visible moor 时暴露 anytime moor-to-field flow。 |
 | `M041_CattleCollar` | 已对齐 | round 8+ 前置；Farmland / Cultivation / Slash and Burn 后如有 cattle，可选额外 `plow`。 |
 | `M042_DeepPlow` | 已对齐 | 前置 2 improvements；onBuy 可放 1 个 moor；使用 Farmland / Cultivation 后可按 adjacency 规则把 1 个 moor 换成 field。 |
@@ -1351,7 +1351,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M061_HayWagon` | 已对齐 | 2 horses 前置；after collect 只统计本次从 actionSpace 移给玩家的 building resources，达到 wood 3 / clay 3 / reed 2 / stone 2 后可选非 worker Build Rooms 或 Renovation。 |
 | `M062_HearthBrush` | 已对齐 | onBuy 将 Tiled Oven move up；从下一轮起每次 person action 后可选购买 Tiled Oven，special action 不触发；拥有 Tiled Oven 终局 +1；session 测试覆盖本轮不触发、下一轮 person action 触发、special action 不触发、资源门槛和 supply move-up。 |
 | `M063_PastoralLetter` | 已对齐 | onBuy 将 Village Church move up；从下一轮起每次 person action 后可选购买 Village Church，special action 不触发；Church 和 Village Church 各 +1；session 测试覆盖触发上下文、supply move-up 与计分。 |
-| `M064_FamilyBurialPlot` | 已对齐 | stone house 前置；onBuy 在 unused farmyard space 放置 blocked farmyard space state，计为占用且终局 +1 bonus VP；session 测试覆盖购买、阻塞占用和计分。 |
+| `M064_FamilyBurialPlot` | 已对齐 | stone house 前置；onBuy 可选在 unused farmyard space 放置 blocked farmyard space state，计为占用且终局 +1 bonus VP；session 测试覆盖接受/跳过、阻塞占用和计分。 |
 | `M065_FireBrigade` | 已对齐 | 需要 4+ food 和 4+ fuel，onBuy 给 2 food，并按 2-5 visible forests 给 1-4 bonus VP；session 测试覆盖 bonus VP。 |
 | `M067_ChamberOfCommerce` | 已对齐 | onBuy 给 1 wood 和 1 reed，终局按 Joinery / Pottery / Basketmaker 家族建筑数量给分；session 测试覆盖即时资源与 craft 计分。 |
 | `M068_Church` | 已对齐 | 通过 `returnCards` 升级 Village Church，打出得 2 food；returning home 每轮可选支付 1 fuel 得 1 bonus VP；session 测试覆盖升级、即时 food 和返回家阶段 flow。 |
@@ -1377,7 +1377,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M107_PotRoastRecipe` | 已对齐 | 需要 2+ horse，且拥有 fireplace / cooking hearth 家族时通过 computeExchanges 增加 horse -> 2 food；session 测试覆盖 cookery 门槛。 |
 | `M108_GrainDistillery` | 已对齐 | harvest exchange 每次最多 fuel + grain -> 5 food；终局用 `computeCostedBonus` 按 fuel + grain 成对换 VP，不能和 Peat-charcoal Kiln 等 costed bonus 双重占用同一份资源；session 测试覆盖 exchange、costed 计分和竞争选择。 |
 | `M109_Malthouse` | 已对齐 | Cut Peat 后可选准确支付 1 grain 获得 4 food；无 grain 时不弹选择。 |
-| `M111_NoTillFarming` | 已对齐 | 2 fields 前置；通过 extra sowable field 在 unused farmyard spaces 种 grain/vegetable，状态仍算 unused；有 crop 时 placement lock 阻止 build/plow/fence/terrain 覆盖，anytime selection 可丢弃选中 crop。 |
+| `M111_NoTillFarming` | 已对齐 | 2 fields 前置；通过 extra sowable field 在 unused farmyard spaces 种 grain/vegetable，状态仍算 unused；FarmBoard 在真实 farmyard tile 上渲染 on-board extra sow 控件；有 crop 时 placement lock 阻止 build/plow/fence/terrain 覆盖，harvest field phase 收获 non-field crop，anytime selection 可丢弃选中 crop。 |
 | `M112_PeatAshFertilizer` | 已对齐 | Cut Peat 前可选让普通田和 non-field crop space 中已有 grain/vegetable 各加 1 同类 crop；空田/空 non-field space 不增长，Cut Peat 仍正常结算。 |
 | `M113_LivingHistoryMuseum` | 已对齐 | clay house 前置；按 Museum of the Moors cost listener 模式给 FoM major upgrade 按对应 building resource -1；session 测试覆盖前置和 Tiled Oven / Riding Stables 折扣。 |
 | `M115_OakBark` | 已对齐 | `2 Major Improvements` 前置走通用 prerequisite parser，含 `alsoCountsAs: ['major']` 的 dual-type minor；onBuy 给 2 wood，boar / cattle / horse 换 food 后用 `resource.exchanged` 等量给 wood；session 测试覆盖资源事件触发。 |
