@@ -20,6 +20,7 @@ describe('C009_AutomaticWaterTrough session', () => {
     // game rules but we use it to simulate a saturated state).
     player.houseAnimalType = 'sheep' as never
     player.houseAnimalCount = 1
+    player.resources.sheep = 1
     // Also put a sheep already in any default stable / pasture so no zone
     // has spare capacity. Player has no pastures by default so house +
     // stables-only is enough.
@@ -67,10 +68,53 @@ describe('C009_AutomaticWaterTrough session', () => {
     // be undefined.
     player.houseAnimalType = 'sheep' as never
     player.houseAnimalCount = 1
+    player.resources.sheep = 1
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
+  })
+
+  it('onBuy uses final animal totals when animals can be reorganized', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.resources.food = 5
+    player.resources.sheep = 1
+    player.resources.boar = 1
+    player.pastures = [
+      {
+        id: 'p1',
+        size: 1,
+        tiles: [{ row: 0, col: 0 }],
+        stables: 0,
+        animalType: 'sheep',
+        animalCount: 1,
+      },
+    ]
+    player.houseAnimalType = 'boar'
+    player.houseAnimalCount = 1
+    session.loadState(state)
+
+    const effect = getCardEffect(CARD_ID)
+    const flow = effect!.onBuy!(state, player) as ActionFlow
+    expect(flow).toBeDefined()
+    expect(flow.type).toBe('xor')
+    const xor = flow as Extract<ActionFlow, { type: 'xor' }>
+    expect(xor.children.length).toBe(2)
+    expect(xor.children.some((child) => child.type === 'leaf' && child.params?.sheep === 1)).toBe(true)
+    expect(
+      xor.children.some((child) =>
+        child.type === 'seq' &&
+        child.children.some((nested) => nested.type === 'leaf' && nested.params?.boar === 1)),
+    ).toBe(true)
+    expect(
+      xor.children.some((child) =>
+        child.type === 'seq' &&
+        child.children.some((nested) => nested.type === 'leaf' && nested.params?.cattle === 1)),
+    ).toBe(false)
   })
 })
