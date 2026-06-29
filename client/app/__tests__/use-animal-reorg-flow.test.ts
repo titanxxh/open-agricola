@@ -11,6 +11,7 @@ import {
   buildStableDisplayMap,
   hasUnassignedAnimals,
   shouldShowAnimalDiscardPrompt,
+  wouldExceedExclusiveCardZoneLimit,
 } from '../hooks/use-animal-reorg-flow'
 
 const resources = (): Resource => ({
@@ -164,6 +165,33 @@ describe('use-animal-reorg-flow helpers', () => {
       capacity: 1,
       zoneId: 'card:C148_MudWallower',
     })
+  })
+
+  it('blocks assigning a second occupied card zone past exclusive limit', () => {
+    const reorg = animalReorgState()
+    reorg.zones.push(
+      {
+        id: 'card:M035_HorseTrough@0,0',
+        zoneType: 'card',
+        cardId: 'M035_HorseTrough',
+        animalType: 'horse',
+        animalCount: 1,
+        capacity: 1,
+        exclusiveCardZoneLimit: 1,
+      },
+      {
+        id: 'card:M035_HorseTrough@0,1',
+        zoneType: 'card',
+        cardId: 'M035_HorseTrough',
+        animalType: null,
+        animalCount: 0,
+        capacity: 1,
+        exclusiveCardZoneLimit: 1,
+      },
+    )
+
+    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(true)
+    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,0')).toBe(false)
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

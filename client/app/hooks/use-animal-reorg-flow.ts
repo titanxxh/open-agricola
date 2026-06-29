@@ -16,6 +16,32 @@ type AnimalDisplay = {
   animalCounts?: Partial<Record<AnimalType, number>>
 }
 
+const interactionZoneAnimalTotal = (zone: AnimalReorgState['zones'][number]) => {
+  const animalCounts = zone.animalCounts
+  if (animalCounts) {
+    return ALL_ANIMAL_KEYS.reduce((sum, animal) => sum + Math.max(0, animalCounts[animal] ?? 0), 0)
+  }
+  return Math.max(0, zone.animalCount ?? 0)
+}
+
+export const wouldExceedExclusiveCardZoneLimit = (
+  zones: AnimalReorgState['zones'],
+  zoneId: string,
+) => {
+  const target = zones.find((zone) => zone.id === zoneId)
+  if (!target || target.zoneType !== 'card' || !target.cardId) return false
+  if (target.exclusiveCardZoneLimit === undefined) return false
+  if (interactionZoneAnimalTotal(target) > 0) return false
+  const limit = Math.max(0, Math.floor(target.exclusiveCardZoneLimit))
+  const occupied = zones.filter((zone) =>
+    zone.id !== target.id &&
+    zone.zoneType === 'card' &&
+    zone.cardId === target.cardId &&
+    interactionZoneAnimalTotal(zone) > 0
+  ).length
+  return occupied >= limit
+}
+
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
   Boolean(remaining && ALL_ANIMAL_KEYS.some((animal) => remaining[animal] > 0))
 

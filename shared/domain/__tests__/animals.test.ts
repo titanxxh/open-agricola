@@ -82,6 +82,22 @@ describe('getAssignedAnimalsByType', () => {
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 2, cattle: 0 })
   })
 
+  it('counts per-zone animal-holder card storage', () => {
+    const p = mkPlayer({
+      cardStates: {
+        M034_HomeWood: {
+          extraData: {
+            animalCountsByZone: {
+              'card:M034_HomeWood@0,0': { animalCounts: { sheep: 2 } },
+              'card:M034_HomeWood@0,1': { animalCounts: { cattle: 1 } },
+            },
+          },
+        },
+      } as unknown as PlayerState['cardStates'],
+    })
+    expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 2, boar: 0, cattle: 1 })
+  })
+
   it('ignores cardStates.counters.held (C148-style permanent capacity counter)', () => {
     // C148_MudWallower uses counters.held as permanent capacity, not current
     // count, so we intentionally do NOT sum it here. See animals.ts JSDoc.

@@ -6,15 +6,18 @@ import { Scoring } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { resolveCardCostWithModifiersDetailed } from '../../shared/actions/payment/internal'
 import { runCardListeners } from '../../shared/cards/card-listeners'
+import { passMinorCardToLeftAction } from '../../shared/actions/effects/internal/pass-minor-card-to-left'
 
 import '../../shared/cards/B/B004_WoodPile'
 import '../../shared/cards/M/M027_GardenPath'
 import '../../shared/cards/M/M093_FarmhandsQuarters'
 import '../../shared/cards/M/M102_SavingsDeposit'
+import '../../shared/cards/M/M104_WildHarvest'
 
 const M027 = 'M027_GardenPath'
 const M093 = 'M093_FarmhandsQuarters'
 const M102 = 'M102_SavingsDeposit'
+const M104 = 'M104_WildHarvest'
 const PASSING_MINOR = 'B004_WoodPile'
 const PLACEHOLDER = '__test_placeholder__'
 
@@ -35,9 +38,9 @@ const resources = (overrides: Partial<Resource> = {}): Resource => ({
   ...overrides,
 })
 
-const setup = () => {
+const setup = (playerCount = 3) => {
   const session = new GameSession(411, undefined, {
-    playerCount: 3,
+    playerCount,
     enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
   })
@@ -261,5 +264,49 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     expect(second.state.players[1]!.minorPlayed).not.toContain(M102)
     expect(second.state.players[1]!.cardStates?.[M102]).toBeUndefined()
     expect(second.state.players[2]!.minorHand).toContain(M102)
+  })
+
+  it('M102 does not skip later harvest-start hooks after passing itself left', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      player.resources = resources({ food: 20, clay: 99, fuel: 99 })
+      player.minorHand = [PLACEHOLDER]
+      player.farmTerrain = Array.from({ length: 14 }, (_, index) => ({ row: 0, col: index, kind: 'forest' as const }))
+      setActiveWorkerCount(player, 1)
+      markAllWorkersUsed(state, player)
+    })
+    state.players[0]!.minorPlayed = [M102, M104]
+    session.loadState(state)
+
+    const resp = session.performRoundEnd()
+    const gainedSources = resp.state.events
+      .filter((event) => event.type === 'resource.moved' && event.actorPlayerId === resp.state.players[0]!.id)
+      .map((event) => event.sourceCardId)
+    expect(gainedSources).toEqual(expect.arrayContaining([M102, M104]))
+    expect(resp.state.players[1]!.minorHand).toContain(M102)
+  })
+
+  it('M102 removes itself without failing when there is no left player', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    state.players = [player]
+    player.minorPlayed = [M102]
+    player.minorHand = [PLACEHOLDER]
+    player.cardStates = { [M102]: { extraData: { stale: true } } }
+
+    const result = passMinorCardToLeftAction.execute({
+      state,
+      player,
+      params: { cardId: M102 },
+      sourceCard: M102,
+    } as never)
+    expect(result).toEqual({ type: 'ok' })
+    expect(player.minorPlayed).not.toContain(M102)
+    expect(player.minorHand).not.toContain(M102)
+    expect(player.cardStates?.[M102]).toBeUndefined()
   })
 })
