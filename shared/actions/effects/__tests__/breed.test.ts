@@ -179,6 +179,26 @@ describe('breed core helper', () => {
     expect(player.resources.horse).toBe(3)
   })
 
+  it('does not breed M084 lying horses', () => {
+    const player = makePlayer({
+      minorPlayed: ['M084_BogPony'],
+      cardStates: {
+        M084_BogPony: { extraData: { animalCounts: { horse: 1 } } },
+      },
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, horse: 2, begging: 0,
+      },
+      pastures: [makePasture(1)],
+    } as Partial<PlayerState>)
+    const state = { ...makeState(player), enableFarmersOfTheMoor: true } as GameState
+
+    const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
+
+    expect(breedSummary.resources.horse).toBeUndefined()
+    expect(player.resources.horse).toBe(2)
+  })
+
   it('keeps horses out of default harvest breeding when Farmers of the Moor is disabled', () => {
     const player = makePlayer({
       resources: {

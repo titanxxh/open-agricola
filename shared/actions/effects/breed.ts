@@ -13,10 +13,21 @@ import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
 import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
+import { getCardDefinitionById } from '../../cards/helpers/card-type'
+import { readAnimalHolderCounts } from '../../domain/animal-holder-state'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
   sourceCard: string
+}
+
+const countBreedableAnimals = (player: PlayerState, type: BreedAnimalType): number => {
+  let nonBreedableCardAnimals = 0
+  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
+    if (getCardDefinitionById(cardId)?.animalHolder === true) continue
+    nonBreedableCardAnimals += readAnimalHolderCounts(state?.extraData)[type] ?? 0
+  }
+  return Math.max(0, (player.resources[type] ?? 0) - nonBreedableCardAnimals)
 }
 
 export const canBreedAnimals = (
@@ -28,7 +39,7 @@ export const canBreedAnimals = (
   const freeCapacity = getTotalAnimalCapacity(player, state)
   for (const type of types) {
     if (freeCapacity <= 0) return false
-    if ((player.resources[type] ?? 0) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    if (countBreedableAnimals(player, type) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
     return true
   }
   return false
@@ -56,7 +67,7 @@ export const breed = (
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   for (const type of types) {
     if (freeCapacity <= 0) break
-    if ((player.resources[type] ?? 0) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    if (countBreedableAnimals(player, type) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
     player.resources[type] += 1
     summary.resources[type] = 1
     summary.animalTypes += 1
