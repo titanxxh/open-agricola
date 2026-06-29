@@ -60,7 +60,7 @@ describe('B148_PetBroker session', () => {
     expect(cardZone!.animalType).toBe('sheep')
   })
 
-  it('keeps sheep assigned to its unkeyed card zone during reorganization', () => {
+  it('keeps sheep assigned to its card zone during reorganization', () => {
     const session = setup()
 
     let resp = session.devSetResources(0, { sheep: 1, boar: 1 })
@@ -83,5 +83,11 @@ describe('B148_PetBroker session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.sheep).toBe(1)
     expect(resp.state.players[0]!.resources.boar).toBe(0)
+
+    const zones = computeAnimalZones(resp.state.players[0]!, resp.state)
+    const cardZone = zones.find(z => z.id === 'card:B148_PetBroker')
+    expect(cardZone?.cardId).toBe('B148_PetBroker')
+    expect(cardZone?.animalType).toBe('sheep')
+    expect(cardZone?.animalCount).toBe(1)
   })
 })

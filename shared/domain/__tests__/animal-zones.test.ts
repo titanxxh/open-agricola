@@ -5,6 +5,7 @@ import { getActiveCardRegistry } from '../../cards/active-registry.ts'
 import {
   canAccommodateAllAnimals,
   canAccommodateAnimalTotals,
+  computeAnimalZones,
   type AnimalZone,
 } from '../animal-zones.ts'
 import { playerBoard } from '../index.ts'
@@ -92,6 +93,49 @@ describe('AnimalZones', () => {
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
     expect(canAccommodateAnimalTotals(state, player, { boar: 1 })).toBe(false)
+  })
+
+  it('attaches the source card id to card zones added by a card effect', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: (_player, zones) => {
+        zones.push({
+          id: `card:${TEST_CARD}`,
+          zoneType: 'card',
+          capacity: 1,
+          animalType: 'sheep',
+          animalCount: 0,
+        } as AnimalZone)
+      },
+    })
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ occupationPlayed: [TEST_CARD] })
+    const cardZone = computeAnimalZones(player, state).find((zone) => zone.id === `card:${TEST_CARD}`)
+
+    expect(cardZone?.cardId).toBe(TEST_CARD)
+  })
+
+  it('memoizes equivalent work-zone states for impossible final totals', () => {
+    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
+    const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace'] })
+    player.resources.sheep = 8
+    player.resources.boar = 6
+    player.resources.cattle = 0
+    player.resources.horse = 0
+    player.pastures = Array.from({ length: 7 }, (_, index) => ({
+      id: `p${index}`,
+      size: 1,
+      tiles: [{ row: 0, col: index }],
+      stables: 0,
+      animalType: index < 4 ? 'sheep' : 'boar',
+      animalCount: 2,
+    }))
+
+    const start = Date.now()
+    expect(canAccommodateAnimalTotals(state, player, { sheep: 7, boar: 7 })).toBe(false)
+    expect(Date.now() - start).toBeLessThan(1000)
   })
 
   it('rejects assignments blocked by card-zone validation', () => {
