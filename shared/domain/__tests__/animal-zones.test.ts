@@ -322,4 +322,46 @@ describe('AnimalZones', () => {
     expect(player.houseAnimalType).toBe('sheep')
     expect(player.houseAnimalCount).toBe(1)
   })
+
+  it('enforceCapacity keeps private horses off visible zones', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.horse = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBeNull()
+    expect(player.houseAnimalCount).toBe(0)
+    expect(player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+  })
+
+  it('enforceCapacity preserves private horses when visible capacity is occupied', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.resources.horse = 1
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.sheep).toBe(1)
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+  })
 })
