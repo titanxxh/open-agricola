@@ -1033,6 +1033,9 @@ export type InteractionAnimalReorgZone = {
   animalCounts?: Partial<Record<AnimalKey, number>>
   allowedAnimalType?: AnimalKey | null
   capacity: number
+  farmPosition?: FarmTilePosition
+  countsFarmyardSpaceAsUnused?: boolean
+  displaySource?: 'played-card' | 'farm-position'
 }
 
 export type InteractionFarmSelection =

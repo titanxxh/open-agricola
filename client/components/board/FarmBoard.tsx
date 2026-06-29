@@ -374,6 +374,7 @@ export type FarmBoardProps = {
     { animalType: AnimalType | null; animalCount: number }
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
+  farmCardDisplayMap?: Map<string, CardAnimalDisplay>
   isReorgActive: boolean
   reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
@@ -719,6 +720,7 @@ export const FarmBoard = ({
   houseDisplay,
   stableDisplayMap,
   cardDisplayMap = new Map(),
+  farmCardDisplayMap = new Map(),
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
@@ -1003,6 +1005,7 @@ export const FarmBoard = ({
                 : '0/1'
               : null
           const stableDisplay = stableDisplayMap.get(tileKey)
+          const farmCardDisplay = farmCardDisplayMap.get(tileKey)
           const stableLabel = stableDisplay
             ? stableDisplay.animalType
               ? `${stableDisplay.animalCount}${t(
@@ -1210,6 +1213,60 @@ export const FarmBoard = ({
                             <button
                               onClick={() =>
                                 adjustReorgAnimal(`stable:${tileKey}`, animalType, 1)
+                              }
+                              disabled={!isInteractive || !canIncrease}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {farmCardDisplay ? (
+                <div
+                  className="pasture-info farm-card-reorg"
+                  data-testid={`farm-card-reorg-${farmCardDisplay.zoneId}`}
+                >
+                  <div className="pasture-count">
+                    <AnimalCount
+                      count={farmCardDisplay.animalCount}
+                      animalType={farmCardDisplay.animalType}
+                      capacity={farmCardDisplay.capacity}
+                    />
+                  </div>
+                  {isReorgActive ? (
+                    <div className="pasture-controls">
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
+                        const cardAnimalCounts = farmCardDisplay.animalCounts ?? {}
+                        const count =
+                          cardAnimalCounts[animalType] ??
+                          (farmCardDisplay.animalType === animalType ? farmCardDisplay.animalCount : 0)
+                        const totalCount = sumAnimalCounts(cardAnimalCounts) || farmCardDisplay.animalCount
+                        const canDecrease = count > 0
+                        const canIncrease =
+                          (reorgRemaining?.[animalType] ?? 0) > 0 &&
+                          farmCardDisplay.capacity > 0 &&
+                          totalCount < farmCardDisplay.capacity
+                        return (
+                          <div key={animalType} className="pasture-control-row">
+                            <span className="pasture-control-label">
+                              {t(locale, `resources.${animalType}`)}
+                            </span>
+                            <button
+                              onClick={() =>
+                                adjustReorgAnimal(farmCardDisplay.zoneId, animalType, -1)
+                              }
+                              disabled={!isInteractive || !canDecrease}
+                            >
+                              -
+                            </button>
+                            <span className="pasture-control-value">{count}</span>
+                            <button
+                              onClick={() =>
+                                adjustReorgAnimal(farmCardDisplay.zoneId, animalType, 1)
                               }
                               disabled={!isInteractive || !canIncrease}
                             >
