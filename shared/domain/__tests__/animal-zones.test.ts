@@ -52,6 +52,23 @@ describe('AnimalZones', () => {
     expect(canAccommodateAllAnimals(state, player, ['sheep', 'boar'])).toBe(false)
   })
 
+  it('ignores private card animals when checking visible accommodation totals', () => {
+    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
+    const player = playerWithPasture({
+      pastures: [],
+      minorPlayed: ['M084_BogPony'],
+      cardStates: {
+        M084_BogPony: {
+          extraData: { privateAnimalCounts: { horse: 1 } },
+        },
+      } as never,
+    })
+    player.resources.horse = 1
+
+    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(true)
+    expect(canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 })).toBe(true)
+  })
+
   it('allows mixed animals only in explicitly mixed card zones', () => {
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')

@@ -13,6 +13,7 @@ import {
   sumAnimalCounts,
   type AnimalCounts,
 } from './animal-holder-state.ts'
+import { getPrivateAnimalsByType } from './animals.ts'
 
 // ---------------------------------------------------------------------------
 // AnimalZone type and computation helpers (formerly in
@@ -406,6 +407,19 @@ const targetAnimalList = (
   )
 }
 
+const visibleTargetAnimalCounts = (
+  player: PlayerState,
+  targetCounts: Partial<Record<AnimalType, number>>,
+): Partial<Record<AnimalType, number>> => {
+  const privateCounts = getPrivateAnimalsByType(player)
+  if (sumAnimalCounts(privateCounts) <= 0) return targetCounts
+  const visibleCounts = { ...targetCounts }
+  for (const key of ALL_ANIMAL_KEYS) {
+    visibleCounts[key] = Math.max(0, (visibleCounts[key] ?? 0) - (privateCounts[key] ?? 0))
+  }
+  return visibleCounts
+}
+
 const candidateZoneWithAnimal = (
   zone: AnimalAccommodationWorkZone,
   type: AnimalType,
@@ -455,7 +469,7 @@ export const canAccommodateAnimalTotals = (
   player: PlayerState,
   targetCounts: Partial<Record<AnimalType, number>>,
 ): boolean => {
-  const animals = targetAnimalList(state, targetCounts)
+  const animals = targetAnimalList(state, visibleTargetAnimalCounts(player, targetCounts))
   if (!animals) return false
   const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
   const animalKeys = animalKeysForState(state)
