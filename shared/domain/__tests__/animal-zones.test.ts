@@ -85,6 +85,7 @@ describe('AnimalZones', () => {
           capacity: 2,
           animalType: 'sheep',
           animalCount: 0,
+          allowedAnimalType: 'sheep',
         } as AnimalZone,
       ],
     })
@@ -93,6 +94,39 @@ describe('AnimalZones', () => {
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
     expect(canAccommodateAnimalTotals(state, player, { boar: 1 })).toBe(false)
+  })
+
+  it('does not freeze flexible card zones to their current animal type', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: () => [
+        {
+          id: `card:${TEST_CARD}`,
+          zoneType: 'card',
+          capacity: 3,
+          animalType: null,
+          animalCount: 0,
+        } as AnimalZone,
+      ],
+    })
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({
+      occupationPlayed: [TEST_CARD],
+      minorPlayed: ['D012_MilkingPlace'],
+      pastures: [],
+      cardStates: {
+        [TEST_CARD]: {
+          extraData: {
+            animalCounts: { sheep: 3 },
+          },
+        },
+      },
+    })
+    player.resources.sheep = 3
+
+    expect(canAccommodateAnimalTotals(state, player, { boar: 3 })).toBe(true)
   })
 
   it('attaches the source card id to card zones added by a card effect', () => {

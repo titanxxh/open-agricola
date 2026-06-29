@@ -36,6 +36,7 @@ const cardImpl = {
       capacity: pairs * 2,
       animalType: 'sheep',
       animalCount: Math.min(countHeldSheep(player), pairs * 2),
+      allowedAnimalType: 'sheep',
     })
   },
 },

@@ -18,6 +18,7 @@ const cardImpl = {
       capacity: emptyFields,
       animalType: 'boar',
       animalCount: 0,
+      allowedAnimalType: 'boar',
     })
   },
 },
