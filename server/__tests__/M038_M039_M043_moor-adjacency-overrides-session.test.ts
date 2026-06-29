@@ -189,6 +189,18 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     }).ok).toBe(false)
   })
 
+  it('M039 rejects extra free fence segments outside the one-space special pasture', () => {
+    const session = setup('M039_SpecialPasture', addPasture00)
+
+    const committed = commitFence(session, playMinor(session, 'M039_SpecialPasture'), [
+      ...edgesForTile(2, 4),
+      'H-2-3',
+    ])
+
+    expect(committed.ok).toBe(false)
+    expect(committed.state.players[0]!.pastures).toHaveLength(1)
+  })
+
   it('M043 plows up to two non-adjacent fields and ordinary later plowing remains adjacent', () => {
     const session = setup('M043_WildFields', (player) => {
       player.fields = [
@@ -239,5 +251,27 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     expect(resp.state.players[0]!.pastures.some((pasture) =>
       pasture.tiles.some((tile) => tile.row === 0 && tile.col === 1),
     )).toBe(true)
+  })
+
+  it('M038 does not convert a Slash and Burn field into a pasture', () => {
+    const session = setup('M038_NatureReserve', (player) => {
+      addPasture00(player)
+      player.farmTerrain = [{ row: 0, col: 1, kind: 'forest' }]
+    })
+
+    let resp = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(resp.ok).toBe(true)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    resp = session.takeSpecialAction(0, specialCardFor(session, 'slash-and-burn').id, 'slash-and-burn', {
+      tile: { row: 0, col: 1 },
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toContainEqual({ row: 0, col: 1, stacks: [] })
+    expect(resp.state.players[0]!.pastures).toHaveLength(1)
+    expect(resp.state.players[0]!.pastures.some((pasture) =>
+      pasture.tiles.some((tile) => tile.row === 0 && tile.col === 1),
+    )).toBe(false)
   })
 })

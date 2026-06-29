@@ -6,6 +6,7 @@ import { getUnusedTerrainTiles } from '../../shared/moor/terrain-flow'
 import { playerBoard } from '../../shared/domain'
 import { reap } from '../../shared/actions/effects/reap'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { FarmTilePosition, FarmyardSpaceState, PlayerState, Resource } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
@@ -290,6 +291,40 @@ describe('Moor field goods and non-field crop spaces', () => {
     expect(statesOf(after, 'M111_NoTillFarming', 'non-field-crop-space').map((state) => state.spaceKey))
       .toEqual(['0-1'])
     expect(getUnusedTerrainTiles(after)).toContainEqual({ row: 0, col: 0 })
+  })
+
+  it('M111 reaps one crop from each non-field crop space during harvest field phase', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M111_NoTillFarming']
+    player.farmyardSpaceStates = [
+      {
+        spaceKey: '0-0',
+        sourceCardId: 'M111_NoTillFarming',
+        kind: 'non-field-crop-space',
+        crop: { kind: 'grain', remaining: 2 },
+      },
+      {
+        spaceKey: '0-1',
+        sourceCardId: 'M111_NoTillFarming',
+        kind: 'non-field-crop-space',
+        crop: { kind: 'vegetable', remaining: 1 },
+      },
+    ]
+    session.loadState(session.state)
+
+    runCardEffectHook(session.state, player, 'M111_NoTillFarming', 'onHarvestFieldPhase')
+
+    expect(player.resources.grain).toBe(1)
+    expect(player.resources.vegetable).toBe(1)
+    expect(statesOf(player, 'M111_NoTillFarming', 'non-field-crop-space')).toEqual([
+      {
+        spaceKey: '0-0',
+        sourceCardId: 'M111_NoTillFarming',
+        kind: 'non-field-crop-space',
+        crop: { kind: 'grain', remaining: 1 },
+      },
+    ])
   })
 
   it('M112 optionally grows existing ordinary and non-field crops once before Cut Peat', () => {

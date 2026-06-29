@@ -818,6 +818,23 @@ describe('FarmBoard', () => {
     expect(html).toContain('-1-68-sow-choice')
   })
 
+  it('renders sow controls on on-board extra sow targets that are not fields', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          sowRemaining: { grain: 1, vegetable: 0, wood: 0, stone: 0 },
+          sowSelectableMap: new Map([['0-0', ['grain']]]),
+          updateSowSelection: () => {},
+        })}
+      />,
+    )
+
+    expect(html).toContain('0-0-sow-choice')
+    expect(html).not.toContain('extra-sow-tray')
+  })
+
   it('renders held-worker overlay when cardStates.heldWorkerId is set', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),
