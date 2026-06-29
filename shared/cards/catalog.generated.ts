@@ -14240,7 +14240,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "food": 1
     },
     "prerequisite": "4 Horses",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14257,7 +14257,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

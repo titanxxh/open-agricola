@@ -220,6 +220,8 @@ describe('Card Source representative migrations', () => {
       'M049_SurveyorsMap',
       'M050_FarmExtension',
       'M051_MoorEnclosures',
+      'M052_WeddingCoach',
+      'M053_ForestHut',
       'M054_AgriculturalImplement',
       'M055_ToolShed',
       'M056_PeatCuttingRights',

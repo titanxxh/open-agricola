@@ -40,6 +40,36 @@ const placeFarmer = (
   return { type: 'ok', workerId: worker.id }
 }
 
+const readTemporarySupplyWorker = (
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+) => {
+  if (actionContext?.fromSupply !== true || actionContext?.temporaryFromSupply !== true) return null
+  const workerId = actionContext.temporaryWorkerId
+  if (typeof workerId !== 'string') return null
+  return (player.workers ?? []).find((worker) =>
+    worker.id === workerId &&
+    worker.isActive !== true &&
+    worker.removedFromSupply === true,
+  ) ?? null
+}
+
+const placeTemporarySupplyWorker = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  workerId: string,
+): ActionExecutionResult & { workerId?: string } => {
+  const alreadyPlaced = state.actionSpaces.some((candidate) =>
+    candidate.takenBy.some((worker) => worker.playerId === player.id && worker.workerId === workerId),
+  )
+  if (alreadyPlaced) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+  addWorkerRef(space, player.id, workerId)
+  addLinkedSpaceBlocks(state, space, player.id, workerId)
+  recordRoundPlacement(player, space.id, workerId)
+  return { type: 'ok', workerId }
+}
+
 const collectBeforePlacementFlows = (
   state: GameState,
   player: PlayerState,
@@ -73,8 +103,9 @@ export const placeFarmerAction: ActionDefinition = {
   descriptionKey: 'actions.place-farmer.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    smallestAvailableWorker(state, player) !== null,
+  canBeExecutedByPlayer: (state, player, context) =>
+    smallestAvailableWorker(state, player) !== null ||
+    readTemporarySupplyWorker(player, context?.actionContext) !== null,
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
@@ -202,12 +233,17 @@ export const placeFarmerAction: ActionDefinition = {
       }
     }
 
-    if (actionContext?.fromSupply) {
+    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)
+    if (actionContext?.fromSupply && !temporarySupplyWorker) {
       const supply = inactiveWorkersInSupply(player)[0]
       if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }
-    let allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+    let allowed = computeAllowedPlacementSpaces(state, player, {
+      sourceCard,
+      actionContext,
+      ignoreWorkerAvailability: temporarySupplyWorker !== null,
+    })
     // BGA `constraints` (e.g. C125 Nightworker restricts to building-resource
     // accumulation spaces of types the player has 0 of). Caller passes a
     // string[] of space ids via `actionContext.constraints`; we intersect it
@@ -245,7 +281,12 @@ export const placeFarmerAction: ActionDefinition = {
     const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
-    let allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)
+    let allowed = computeAllowedPlacementSpaces(state, player, {
+      sourceCard,
+      actionContext,
+      ignoreWorkerAvailability: temporarySupplyWorker !== null,
+    })
     const constraints = actionContext?.constraints as string[] | undefined
     if (Array.isArray(constraints) && constraints.length > 0) {
       const allowSet = new Set(constraints)
@@ -256,7 +297,9 @@ export const placeFarmerAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
 
-    const placeResult = placeFarmer(state, player, targetSpace)
+    const placeResult = temporarySupplyWorker
+      ? placeTemporarySupplyWorker(state, player, targetSpace, temporarySupplyWorker.id)
+      : placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
     eventSink?.emit<'worker.placed'>({
       type: 'worker.placed',
