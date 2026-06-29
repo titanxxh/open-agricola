@@ -12,7 +12,7 @@
 - 尽可能覆盖 4 人 Farmers 版图上的特殊行动、扩展行动格、回合行动格和常见 pending 流程。
 - 持续发现规则、UI、同步、log 显示问题。
 - 只要游戏还能继续，就记录问题后继续玩，覆盖中后期和终局。
-- 每个问题必须带完整触发路径，后续可以按 seed + trace 复现。
+- 每个问题必须带完整触发路径，后续可以按 snapshot + trace 复现。
 
 ## 非目标
 
@@ -28,9 +28,9 @@
 
 按最小可验证切片推进，不要一次性做完整 4-agent 系统：
 
-- **M0（不接 LLM）**：用脚本固定 / 启发式策略把 Moor harness 跑通——特殊行动、供暖、喂养、trace、coverage、log + sync 检查、snapshot、replay 全部打通并能玩到终局。
-- **M1**：接入 player agent 决策，验证开局规划与每步 intent 能解释路线 / 覆盖。
-- **M2**：批量多局 + bug 去重 + 复现命令稳定。
+- **M0（当前脚本）**：不接 LLM，用启发式策略把 Moor harness 跑通——特殊行动、供暖、喂养、trace、summary、snapshot，并能单局玩到终局。
+- **M1**：接入 player agent 决策，验证开局规划与每步 intent 能解释路线 / 覆盖，并输出 plans / coverage。
+- **M2**：批量多局 + bug 去重 + 截图 + 稳定 replay 命令。
 
 ## 角色
 
@@ -98,13 +98,13 @@
 
 ## Agent 编排机制
 
-第一版定稿如下：
+当前 M0 定稿如下：
 
-- **harness**：`scripts/agent-playtest.ts` 只做 harness——驱动 4 个 Playwright page、采集视角化 context、执行 UI 操作、写 trace / coverage / bug / snapshot；不内嵌 LLM。
-- **player agent**：主 agent 用 Agent 工具派生 4 个 player subagent，各固定扮演 `p1`–`p4`，复用本仓库 agent 生态。
-- **通信**：harness 与 subagent 通过 JSON 文件落盘交换——harness 写 `context-p{k}.json`，subagent 回写 `intent-p{k}.json`；文件天然进 trace、可审计、replay 友好。
-- **调用节奏**：harness 对每个玩家串行调用——轮到 `p_k` 时只发 `p_k` 的视角化 context，拿回 intent 再落子，避免 4 个 agent 并发乱点（与现有 `ws-dual-player.spec.ts` 的单页驱动一致）。
-- **视角裁剪由主 agent 负责**：从全量 state 按 `p_k` 视角过滤，注入的 `privateState` 只含 `p_k` 自己的资源 / 农场 / 手牌 / pending，落盘前断言不含其他玩家手牌或暗牌。
+- **harness**：`scripts/agent-playtest.ts` 只做 harness——驱动 4 个 Playwright page、执行 UI 操作、写 trace / summary / snapshot；不内嵌 LLM。
+- **player agent**：M1 再接入 4 个 player subagent；当前脚本只用启发式策略。
+- **通信**：M1 使用 JSON 文件落盘交换——harness 写 `context-p{k}.json`，subagent 回写 `intent-p{k}.json`。
+- **调用节奏**：M1 对每个玩家串行调用——轮到 `p_k` 时只发 `p_k` 的视角化 context，拿回 intent 再落子，避免 4 个 agent 并发乱点（与现有 `ws-dual-player.spec.ts` 的单页驱动一致）。
+- **视角裁剪**：M1 从全量 state 按 `p_k` 视角过滤，注入的 `privateState` 只含 `p_k` 自己的资源 / 农场 / 手牌 / pending，落盘前断言不含其他玩家手牌或暗牌。
 
 ## 运行入口
 
@@ -112,14 +112,11 @@
 
 ```bash
 ./restart-intranet.sh --preview --moor --players 4
-pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --out artifacts/agent-playtest/manual
+FRONTEND_URL=<restart 输出的 preview URL>
+pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --url "$FRONTEND_URL" --out artifacts/agent-playtest/manual
 ```
 
-批量：
-
-```bash
-pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --games 20 --agents 4 --out artifacts/agent-playtest/batch
-```
+当前脚本只跑单局；`--games` / `--agents` 尚未实现，会直接报错。批量多局属于 M2。
 
 复现：当前脚本输出 `trace.json` 和 `snapshots/step-*.json`；先用快照定位，再按 trace 手动复跑关键段。
 
@@ -127,23 +124,21 @@ pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --games 20 --agents 4
 
 第一版定稿如下：
 
-- **房间来源**：用 `restart-intranet.sh --moor --players 4`（`restart-intranet.sh:69`）的**持久化固定 dev4 Farmers 房间**（SQLite，跨重启存活；`ensureFixedDevRooms` 在后端启动时建好，发牌持久固定）。4 个 page 各用 dev4 房间的 `p1`–`p4` 视角进入。批量多局前先 reset dev 房（`./restart-intranet.sh` 重置流程）再重建。
-- **复现锚点 = state 快照，不依赖 seed**：WS 主链路建房 seed 恒为 `undefined`（`ws-server.ts:53`、`room.ts:208`），无法指定 seed，第一版**不**改这条主路径。复现改用 step-0 与关键步的完整 state 快照——replay 时 `GameSession(rehydrateState(snapshot))` 重建再重放 trace 命令。dev4 发牌本身持久固定，快照 + 命令序列即可稳定复现。`bugs.jsonl` 的 `seed` 字段记录从 state 读出的本局实际 seed，仅供参考。
-- **base URL**：`--preview` 用 vite preview + LAN_IP + 独立端口（`restart-intranet.sh:524`），不是 `fixtures.ts` 默认的 `localhost:5173`。harness 取 URL 的方式（解析 restart 输出 / 环境变量）要写明。
+- **房间来源**：用 `restart-intranet.sh --moor --players 4`（`restart-intranet.sh:69`）的**持久化固定 dev4 Farmers 房间**（SQLite，跨重启存活；`ensureFixedDevRooms` 在后端启动时建好，发牌持久固定）。4 个 page 各用 dev4 房间的 `p1`–`p4` 视角进入。
+- **复现锚点 = state 快照，不依赖 seed**：WS 主链路建房 seed 恒为 `undefined`（`ws-server.ts:53`、`room.ts:208`），无法指定 seed，第一版**不**改这条主路径。复现改用 step-0 与关键步的完整 state 快照。dev4 发牌本身持久固定，快照 + 命令序列即可稳定定位。
+- **base URL**：`--preview` 用 vite preview + LAN_IP + 独立端口（`restart-intranet.sh:524`），不是 `fixtures.ts` 默认的 `localhost:5173`。harness 必须传 `--url`，也可用 `FRONTEND_URL` 作为默认值。
 
 ## 输出目录
 
 所有输出写到 `artifacts/agent-playtest/<run-id>/`。
 
-必须生成：
+当前脚本生成：
 
 - `trace.json`：完整命令 trace。
-- `plans.json`：规则摘要来源、每名玩家手牌文字、4 个 player agent 的开局路线和后续重大改 plan 记录。
-- `coverage.json`：行动格、回合行动格、pending 类型、log/sync 检查覆盖情况。
-- `bugs.jsonl`：问题列表。
-- `summary.json`：本局摘要，含终局每个玩家的 scoring breakdown（按规则逐项核对算分）。
+- `summary.json`：本局摘要，含参数、步数、停止原因、最终回合和是否终局。
 - `snapshots/step-<n>.json`：关键 state 快照。
-- `screenshots/step-<n>-p<k>.png`：关键 UI 截图。
+
+尚未生成：`plans.json`、`coverage.json`、`bugs.jsonl`、截图、逐项 scoring breakdown。这些属于 M1/M2。
 
 `artifacts/` 已被 git ignore，输出不进仓库。
 
@@ -164,18 +159,8 @@ pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --games 20 --agents 4
     "logLength": 81,
     "eventSeq": 146
   },
-  "planContext": {
-    "familyGrowthPlan": "need reed + wood, then build room before round 5",
-    "scorePlan": "fields+sow, support with minor hand",
-    "coverageTarget": "first use of grain-seeds"
-  },
-  "intent": "take grain-seeds",
-  "alternatives": ["take forest", "take day-laborer"],
-  "reason": "supports sow route and covers unused base action",
-  "uiAction": {
-    "kind": "click",
-    "selector": "[data-action-id=\"grain-seeds\"]"
-  },
+  "intent": {"kind": "take-action", "actionId": "grain-seeds", "domHint": "grain-seeds"},
+  "progressed": true,
   "after": {
     "phase": "work",
     "pending": "confirmNextPlayer",
@@ -186,7 +171,7 @@ pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --games 20 --agents 4
 }
 ```
 
-Trace 必须从新局开始记录，不只记录 bug 附近几步。`bugs.jsonl` 可以额外带 `triggerPath`，截取最近 10-30 步，但 replay 以完整 `trace.json` 为准。
+Trace 必须从新局开始记录，不只记录 bug 附近几步。当前脚本不输出 `bugs.jsonl`；发现问题时用完整 `trace.json` 和最近的 `snapshots/step-*.json` 定位。
 
 ## 选择器约定
 
@@ -215,7 +200,7 @@ UI 操作和采集基于已存在的真实选择器，不要新造：
 - `publicActionContext`: 4 人 Farmers 行动格、特殊行动卡状态、已揭示回合行动格、当前 base + Moor major improvement 供应。
 - `privateState`: 只包含该玩家自己的资源、农场、手牌、已打出卡牌和 pending。
 
-每个 player agent 必须输出并写入 `plans.json`：
+接入 player agent 后，每个 player agent 必须输出并写入 `plans.json`：
 
 ```json
 {
@@ -248,7 +233,7 @@ UI 操作和采集基于已存在的真实选择器，不要新造：
 
 ## 行动覆盖策略
 
-主 agent 维护 `coverage.json`，至少包含：
+接入 coverage 后，主 agent 维护 `coverage.json`，至少包含：
 
 - `actionSpaces`: 每个 base / 4 人 / round action space 被使用次数、首次使用 step、使用玩家。
 - `moorSpecialActions`: 每种特殊行动、每张特殊行动卡、免费/2 食物借用、地形目标类型的覆盖次数。
@@ -270,7 +255,7 @@ UI 操作和采集基于已存在的真实选择器，不要新造：
 
 ## Bug 记录格式
 
-每条一行 JSON：
+M2 接入 `bugs.jsonl` 后，每条一行 JSON：
 
 ```json
 {
@@ -334,7 +319,7 @@ UI 操作和采集基于已存在的真实选择器，不要新造：
 - pending 连续重试后不变化。
 - 状态已经损坏到不能安全执行下一步。
 
-非阻塞问题即使重复出现，也要继续玩。为了避免刷屏，`bugs.jsonl` 对同一 `signature` 可以只写首个完整 bug，后续写 `duplicateOf` 和出现次数。
+非阻塞问题即使重复出现，也要继续玩。接入 `bugs.jsonl` 后，同一 `signature` 可以只写首个完整 bug，后续写 `duplicateOf` 和出现次数。
 
 ## 执行兜底与异常处理
 
@@ -423,18 +408,16 @@ Player agent 优先选择能推进游戏的操作：
 
 ## 完成标准
 
-第一版完成后应能做到：
+当前脚本完成后应能做到：
 
 - 单局 4 人可从新局自动玩到终局，除非出现 blocking bug。
-- 4 个玩家都有基于规则摘要和手牌文字的开局规划，且 trace 能解释每次行动为什么服务于路线或覆盖目标。
+- trace 能解释每步是行动格、特殊行动还是 pending。
 - 不应出现所有玩家整局固定重复同两个行动格的机械策略。
-- `coverage.json` 能看出本局覆盖了哪些行动格，哪些因为局面原因没覆盖。
-- 非 blocking bug 不会中断整局。
-- `bugs.jsonl` 中每个问题都有 seed、step、player、triggerPath、snapshotPath。
-- log 问题能区分遗漏、重复、顺序错、文本错、取消态错。
-- 4 个玩家页面的公共 log 会被比较。
+- pending 和 farm-select 不应让 harness 卡死。
 - 输出全部落在 `artifacts/agent-playtest/`。
-- 玩到终局时 dump 最终 scoring breakdown，并按规则逐项核对算分是否正确。
+- 当前脚本至少输出 `trace.json`、`summary.json` 和 `snapshots/step-*.json`。
+
+M1/M2 再补 plans、coverage、bugs、截图、log/sync 比较和逐项 scoring breakdown。
 
 ## 验证命令
 
@@ -442,7 +425,8 @@ Player agent 优先选择能推进游戏的操作：
 
 ```bash
 ./restart-intranet.sh --preview --moor --players 4
-pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --out artifacts/agent-playtest/smoke
+FRONTEND_URL=<restart 输出的 preview URL>
+pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --url "$FRONTEND_URL" --out artifacts/agent-playtest/smoke
 pnpm run lint
 pnpm run build
 ```

@@ -15,6 +15,25 @@ describe('agent-playtest Moor mode', () => {
     expect(() => parseArgs(['--replay', 'trace.json'])).toThrow('--replay is not implemented')
   })
 
+  it('rejects documented-but-unimplemented batch flags', () => {
+    expect(() => parseArgs(['--url', 'http://localhost:5173', '--games', '20'])).toThrow('--games is not implemented')
+    expect(() => parseArgs(['--url', 'http://localhost:5173', '--agents', '4'])).toThrow('--agents is not implemented')
+  })
+
+  it('requires a frontend URL unless FRONTEND_URL is set', () => {
+    const oldUrl = process.env.FRONTEND_URL
+    delete process.env.FRONTEND_URL
+    try {
+      expect(() => parseArgs(['--moor'])).toThrow('--url is required')
+    } finally {
+      if (oldUrl === undefined) {
+        delete process.env.FRONTEND_URL
+      } else {
+        process.env.FRONTEND_URL = oldUrl
+      }
+    }
+  })
+
   it('adds Farmers of the Moor room flags to player URLs', () => {
     const args = parseArgs([
       '--players', '4',
@@ -24,7 +43,7 @@ describe('agent-playtest Moor mode', () => {
     ])
 
     expect(args.moor).toBe(true)
-    expect(args.maxSteps).toBe(320)
+    expect(args.maxSteps).toBe(500)
     expect(buildPlayerUrl(args, 3)).toBe(
       'http://localhost:5173/?player=p3&transport=ws&room=dev4&devMode=1&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true',
     )
@@ -53,7 +72,8 @@ describe('agent-playtest Moor mode', () => {
   })
 
   it('lets the harness click revealed round cards and prepare farm-select prompts', () => {
-    expect(AVAILABLE_ACTION_SELECTOR).toBe('[data-action-id] button.action-card:not([disabled])')
+    expect(AVAILABLE_ACTION_SELECTOR).toContain('[data-action-id] button.action-card:not([disabled])')
+    expect(AVAILABLE_ACTION_SELECTOR).toContain('[data-action-id] .player-card:not(.unselectable)')
     expect(FARM_SELECT_PREPARE_SELECTORS).toContain('.farm-tile.selectable')
     expect(FARM_SELECT_PREPARE_SELECTORS).toContain('.farm-fence-h.selectable')
     expect(FARM_SELECT_PREPARE_SELECTORS).toContain('.sow-choice-button')
