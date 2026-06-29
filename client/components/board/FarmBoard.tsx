@@ -52,6 +52,7 @@ type FarmTerrainMarker = {
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
+const M084_BOG_PONY_ID = 'M084_BogPony'
 const PARENT_CARD_PREVIEW_WIDTH = 320
 const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 560) / 735)
 
@@ -1569,6 +1570,18 @@ export const FarmBoard = ({
           )
           const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
           const cardDisplay = cardDisplayMap.get(rawId)
+          const extraAnimalCounts = displayPlayer.cardStates?.[rawId]?.extraData as
+            | { animalCounts?: { horse?: number } }
+            | undefined
+          const m084LyingHorses =
+            rawId === M084_BOG_PONY_ID
+              ? Math.max(
+                0,
+                Math.floor(
+                  Number(extraAnimalCounts?.animalCounts?.horse ?? 0),
+                ),
+              )
+              : 0
 
           return (
             <div key={`played-${index}`} className="played-card-slot">
@@ -1586,6 +1599,15 @@ export const FarmBoard = ({
                 heldWorkerId={heldWorkerId}
                 playerColor={displayPlayer.color}
               />
+              {m084LyingHorses > 0 ? (
+                <div
+                  className="played-card-readonly-animals"
+                  aria-label={`Bog Pony lying horses: ${m084LyingHorses}`}
+                >
+                  <span className="res-icon res-icon-horse" aria-hidden="true" />
+                  <span>{m084LyingHorses}</span>
+                </div>
+              ) : null}
               {isReorgActive && cardDisplay ? (
                 <div className="played-card-reorg">
                   <AnimalCount

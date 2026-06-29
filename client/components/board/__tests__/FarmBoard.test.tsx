@@ -37,6 +37,7 @@ beforeAll(async () => {
     M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
     M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
     M035_HorseTrough: manifestEntry('M035_HorseTrough', 'Horse Trough', 'minor'),
+    M084_BogPony: manifestEntry('M084_BogPony', 'Bog Pony', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -602,6 +603,27 @@ describe('FarmBoard', () => {
     expect(html).toContain('played-card-reorg')
     expect(html).toContain('res-icon-boar')
     expect(html).toContain('>1<span')
+  })
+
+  it('renders M084 lying horses as read-only played-card state', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M084_BogPony']
+    player.cardStates = {
+      M084_BogPony: { extraData: { animalCounts: { horse: 2 } } },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['minor:M084_BogPony'],
+        })}
+      />,
+    )
+
+    expect(html).toContain('played-card-readonly-animals')
+    expect(html).toContain('res-icon-horse')
+    expect(html).toContain('>2</span>')
+    expect(html).not.toContain('played-card-reorg')
   })
 
   it('keeps compact panel icon values grouped with accessible labels and the animation anchor', () => {

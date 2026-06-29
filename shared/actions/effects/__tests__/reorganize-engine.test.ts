@@ -9,6 +9,7 @@ import type {
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
+import '../../../cards/M/M084_BogPony'
 
 const dummySpace: ActionSpace = {
   id: '__subflow:reorganize',
@@ -280,5 +281,42 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.boar).toBe(1)
     expect(ctx.player.resources.cattle).toBe(1)
     expect(ctx.player.resources.horse).toBe(0)
+  })
+
+  it('preserves M084 lying horses outside editable animal reorg zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 2 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { animalCounts: { horse: 1 } } },
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 1,
+            tiles: [{ row: 0, col: 0 }],
+            stables: 0,
+            animalType: 'horse',
+            animalCount: 1,
+          },
+        ],
+      },
+    })
+    const request = reorganizeAction.execute(ctx)
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(request.request.zones.map((zone) => zone.id)).not.toContain('card:M084_BogPony')
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(2)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.animalCounts).toMatchObject({ horse: 1 })
   })
 })
