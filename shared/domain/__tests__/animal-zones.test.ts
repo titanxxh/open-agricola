@@ -72,6 +72,28 @@ describe('AnimalZones', () => {
     expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(true)
   })
 
+  it('preserves fixed animal type on card zones when checking final totals', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: () => [
+        {
+          id: `card:${TEST_CARD}`,
+          zoneType: 'card',
+          capacity: 2,
+          animalType: 'sheep',
+          animalCount: 0,
+        } as AnimalZone,
+      ],
+    })
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ occupationPlayed: [TEST_CARD], minorPlayed: ['D012_MilkingPlace'], pastures: [] })
+
+    expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
+    expect(canAccommodateAnimalTotals(state, player, { boar: 1 })).toBe(false)
+  })
+
   it('rejects assignments blocked by card-zone validation', () => {
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')

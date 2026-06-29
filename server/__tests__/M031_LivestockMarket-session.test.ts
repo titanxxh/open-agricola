@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { M031_LivestockMarket } from '../../shared/cards/M/M031_LivestockMarket'
 import { getCardEffect } from '../../shared/cards/card-effects'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionFlow, PlayerState, Resource, Trade } from '../../shared/contract/types'
 
 const CARD_ID = 'M031_LivestockMarket'
@@ -86,6 +88,18 @@ const directTrades = (flow: ActionFlow | undefined): Trade[] => {
 }
 
 describe('M031_LivestockMarket session', () => {
+  it('requires at least 5 total animals', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    player.resources = fullResources({ sheep: 2, boar: 2 })
+    expect(meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state)).toBe(false)
+
+    player.resources = fullResources({ sheep: 2, boar: 2, cattle: 1 })
+    expect(meetsCardPrerequisites(player, M031_LivestockMarket, state.round, state)).toBe(true)
+  })
+
   it('onBuy enumerates only exchange candidates whose final animal totals fit', () => {
     const session = setup()
     const state = session.getState().state

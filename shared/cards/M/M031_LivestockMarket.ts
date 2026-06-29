@@ -18,6 +18,9 @@ const NEXT_ANIMAL: Record<ExchangeAnimal, AnimalKey> = {
 const animalCount = (player: PlayerState, type: AnimalKey) =>
   Math.max(0, Math.floor(player.resources[type] ?? 0))
 
+const totalAnimalCount = (player: PlayerState) =>
+  ALL_ANIMAL_KEYS.reduce((sum, type) => sum + animalCount(player, type), 0)
+
 const compactResourceMap = (counts: Partial<Record<AnimalKey, number>>): Partial<Resource> => {
   const result: Partial<Resource> = {}
   for (const type of ALL_ANIMAL_KEYS) {
@@ -90,6 +93,7 @@ const exchangeLeaf = (trade: Trade): ActionFlow => ({
 })
 
 const cardImpl = {
+  prerequisiteCheck: (player) => totalAnimalCount(player) >= 5,
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {

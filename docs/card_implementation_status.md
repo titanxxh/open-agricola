@@ -1345,7 +1345,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M028_OutOnTheWallaby` | 已对齐 | onBuy 根据已拥有 Joinery / Pottery / Basketmaker 家族 major 给 wood / clay / reed；session 测试覆盖无 craft building 时不触发。 |
 | `M029_Tinker` | 已对齐 | 需要 3+ major improvement；只有拥有 craft building 时 onBuy 给 wood / clay / reed / stone 各 1；session 测试覆盖无 craft building 可打出但无奖励。 |
 | `M030_FarmAnimalMarket` | 已对齐 | onBuy 可选通过 exchange 支付 2 sheep 获得 1 cattle 和 1 horse，已安置 sheep 会从 pasture / house / stable / animal-holder 同步移除；session 测试覆盖无 sheep 时不弹选择与已安置 sheep。 |
-| `M031_LivestockMarket` | 已对齐 | onBuy 枚举最多 3 只 sheep / boar / cattle 同时升档交换，只保留共享最终总量动物容纳 helper 判定可容纳的候选；选择后通过普通 exchange 触发系统 animal-reorg。 |
+| `M031_LivestockMarket` | 已对齐 | 5 animals 前置通过 inline prerequisite 执行；onBuy 枚举最多 3 只 sheep / boar / cattle 同时升档交换，只保留共享最终总量动物容纳 helper 判定可容纳的候选；选择后通过普通 exchange 触发系统 animal-reorg。 |
 | `M032_PeatHut` | 已对齐 | 提供 1 点 extra room capacity，供暖需求 +1；可替代 Renovation action 免费给 wood house 加 1 wooden room，只有存在合法 room tile 时才暴露，且建房成功后才移除此牌；session 测试覆盖 capacity、转换 room flow 与满农场不退牌。 |
 | `M036_PeatMoss` | 已对齐 | no visible moors 前置；木房建房成本通过 active construct `scope:'unit'` trade modifier 降为每房 3 wood + 1 reed，覆盖 action-space 可行动性、单房和多房支付。 |
 | `M037_BuildingPlan` | 已对齐 | after construct 读取 action snapshot，本次至少建 2 rooms 才触发；可选以 `trueAction:false` 建最多 2 个免费 stables。 |
