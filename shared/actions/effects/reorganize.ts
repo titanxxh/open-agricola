@@ -10,6 +10,7 @@ import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard } from '../../domain'
 import {
   buildCardAnimalZoneId,
+  type AnimalZone,
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
 } from '../../domain/animal-zones'
@@ -46,11 +47,24 @@ const addAnimalCounts = (
 const writeCountsByZone = (
   extraData: Record<string, unknown>,
   entries: Map<string, Partial<Record<AnimalKey, number>>>,
+  zonesById: Map<string, AnimalZone>,
+  allowedTypesByZone: Map<string, AnimalKey[]>,
 ) => {
   const next: Record<string, unknown> = {}
   for (const [zoneId, counts] of entries) {
+    if (sumAnimalCounts(counts) <= 0) continue
     const slot: Record<string, unknown> = {}
     writeAnimalHolderCounts(slot, counts)
+    const zone = zonesById.get(zoneId)
+    if (zone) {
+      slot.capacity = zone.capacity
+      if (zone.allowedAnimalType !== undefined) slot.allowedAnimalType = zone.allowedAnimalType
+      if (zone.farmPosition) slot.farmPosition = zone.farmPosition
+    }
+    const allowedAnimalTypes = allowedTypesByZone.get(zoneId)
+    if (allowedAnimalTypes && allowedAnimalTypes.length > 0) {
+      slot.allowedAnimalTypes = allowedAnimalTypes
+    }
     if (Object.keys(slot).length > 0) next[zoneId] = slot
   }
   if (Object.keys(next).length > 0) extraData.animalCountsByZone = next
@@ -58,6 +72,20 @@ const writeCountsByZone = (
   delete extraData.animalCounts
   delete extraData.animalType
   delete extraData.held
+}
+
+const allowedAnimalTypesForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+  animalKeys: readonly AnimalKey[],
+): AnimalKey[] => {
+  return animalKeys.filter((animal) => {
+    const candidate = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+    candidate[animal] = 1
+    const normalized = normalizeAnimalCountsForZone(state, player, zone, { animalCounts: candidate })
+    return (normalized[animal] ?? 0) > 0
+  })
 }
 
 export const applyReorganizeMutate = (
@@ -122,6 +150,7 @@ export const applyReorganizeMutate = (
     const existing = player.cardStates?.[cardId]
     const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
     const countsByZone = new Map<string, ReturnType<typeof createAnimalCounts>>()
+    const allowedTypesByZone = new Map<string, AnimalKey[]>()
     const useZoneStorage = cardZones.length > 1 || cardZones.some((zone) =>
       zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
     )
@@ -131,6 +160,7 @@ export const applyReorganizeMutate = (
     )
     let occupiedExclusiveZones = 0
     for (const zone of cardZones) {
+      allowedTypesByZone.set(zone.id, allowedAnimalTypesForZone(state, player, zone, animalKeys))
       const assigned = cardAssignmentForZone(zone.id)
       let counts = normalizeAnimalCountsForZone(state, player, zone, assigned)
       if (sumAnimalCounts(counts) > 0 && occupiedExclusiveZones >= exclusiveLimit) {
@@ -148,8 +178,14 @@ export const applyReorganizeMutate = (
     player.cardStates ??= {}
     const nextState = { ...(player.cardStates[cardId] ?? {}) }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
-    if (useZoneStorage) writeCountsByZone(extraData, countsByZone)
-    else writeAnimalHolderCounts(extraData, assignedCounts)
+    if (useZoneStorage) {
+      writeCountsByZone(
+        extraData,
+        countsByZone,
+        new Map(cardZones.map((zone) => [zone.id, zone])),
+        allowedTypesByZone,
+      )
+    } else writeAnimalHolderCounts(extraData, assignedCounts)
     nextState.extraData = extraData
     player.cardStates[cardId] = nextState
   }
@@ -243,6 +279,7 @@ export const reorganizeAction: ActionDefinition = {
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: allowedAnimalTypesForZone(ctx.state, ctx.player, zone, animalKeysForState(ctx.state)) } : {}),
       ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),

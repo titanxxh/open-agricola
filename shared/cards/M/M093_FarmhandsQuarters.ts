@@ -55,6 +55,7 @@ const rightHandListener: CardListenerRegistration = {
     const owner = context.ownerPlayer
     const rightPlayer = rightPlayerOf(context)
     if (!owner || !rightPlayer) return undefined
+    if (rightPlayer.id === owner.id) return undefined
     const passed = context.eventQuery.find('card.passed', (event) =>
       event.toPlayerId === owner.id && event.fromPlayerId === rightPlayer.id
     )
