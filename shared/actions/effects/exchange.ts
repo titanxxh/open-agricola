@@ -27,7 +27,7 @@ import {
 import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges } from '../../cards/card-listeners'
-import { isMajorCardId } from '../../cards/helpers/card-type'
+import { getCardDefinitionById, isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { subtractAnimalsFromBoard } from '../../domain/animals'
@@ -90,6 +90,27 @@ const takeFromCardCounter = (
   const take = Math.min(current, amount)
   counters[source.counterKey] = current - take
   return take
+}
+
+const takeFromCardLocalAnimals = (
+  player: PlayerState,
+  animal: AnimalResourceKey,
+  amount: number,
+): number => {
+  let remaining = amount
+  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
+    if (remaining <= 0) break
+    if (getCardDefinitionById(cardId)?.animalHolder === true) continue
+    const extra = state?.extraData as Record<string, unknown> | undefined
+    if (!extra) continue
+    const counts = readAnimalHolderCounts(extra)
+    const take = Math.min(counts[animal] ?? 0, remaining)
+    if (take <= 0) continue
+    counts[animal] -= take
+    writeAnimalHolderCounts(extra, counts)
+    remaining -= take
+  }
+  return amount - remaining
 }
 
 const takeFromBoardAnimals = (
@@ -394,7 +415,12 @@ export const applyTrade = (
     ) {
       deductAnimalWithPreference(player, key, amount, animalPaymentPreference)
     } else if (amount > 0 && isAnimalResourceKey(key)) {
-      subtractAnimalsFromBoard(player, { [key]: amount })
+      const cardLocalTaken = takeFromCardLocalAnimals(player, key, amount)
+      if (cardLocalTaken > 0) {
+        player.resources[key] = Math.max(0, (player.resources[key] ?? 0) - cardLocalTaken)
+      }
+      const remaining = amount - cardLocalTaken
+      if (remaining > 0) subtractAnimalsFromBoard(player, { [key]: remaining })
     } else {
       player.resources[key] -= amount
     }
