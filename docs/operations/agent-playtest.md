@@ -48,7 +48,7 @@
 - 执行 player agent 返回的操作。
 - 每步后采集 state、UI、log、截图和 trace。
 - 判断问题是否 blocking。
-- 写入 bug JSONL 和 replay trace。
+- 写入 bug JSONL、trace 和关键 state 快照。
 
 ### Player agent
 
@@ -121,11 +121,7 @@ pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --out artifacts/agent
 pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --games 20 --agents 4 --out artifacts/agent-playtest/batch
 ```
 
-复现：
-
-```bash
-pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/<run-id>/trace.json
-```
+复现：当前脚本输出 `trace.json` 和 `snapshots/step-*.json`；先用快照定位，再按 trace 手动复跑关键段。
 
 ### 环境与可复现约束
 
@@ -294,7 +290,7 @@ UI 操作和采集基于已存在的真实选择器，不要新造：
   ],
   "expected": "One visible feed conversion row for p2",
   "actual": "Two identical feed conversion rows",
-  "replay": "pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/run-20260628-001/trace.json --stop-at 84",
+  "repro": "load snapshots/step-084.json, then continue from the recorded trace context",
   "snapshotPath": "snapshots/step-084.json",
   "screenshotPath": "screenshots/step-084-p2.png",
   "uiLogRows": ["..."],
@@ -416,7 +412,7 @@ Player agent 优先选择能推进游戏的操作：
 
 每个 bug 必须满足至少一种复现方式：
 
-- `--replay trace.json --stop-at <step>` 能到达出问题前一步。
+- `snapshots/step-<n>.json` 能到达出问题前一步。
 - `snapshotPath` 能直接加载到接近出问题的状态。
 
 如果某 bug 无法稳定复现，仍记录，但必须标记：
@@ -434,7 +430,7 @@ Player agent 优先选择能推进游戏的操作：
 - 不应出现所有玩家整局固定重复同两个行动格的机械策略。
 - `coverage.json` 能看出本局覆盖了哪些行动格，哪些因为局面原因没覆盖。
 - 非 blocking bug 不会中断整局。
-- `bugs.jsonl` 中每个问题都有 seed、step、player、triggerPath、replay 命令。
+- `bugs.jsonl` 中每个问题都有 seed、step、player、triggerPath、snapshotPath。
 - log 问题能区分遗漏、重复、顺序错、文本错、取消态错。
 - 4 个玩家页面的公共 log 会被比较。
 - 输出全部落在 `artifacts/agent-playtest/`。
@@ -447,7 +443,6 @@ Player agent 优先选择能推进游戏的操作：
 ```bash
 ./restart-intranet.sh --preview --moor --players 4
 pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --out artifacts/agent-playtest/smoke
-pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/smoke/trace.json
 pnpm run lint
 pnpm run build
 ```
