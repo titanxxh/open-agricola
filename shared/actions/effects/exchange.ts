@@ -31,6 +31,7 @@ import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { subtractAnimalsFromBoard } from '../../domain/animals'
+import { readAnimalHolderCounts, writeAnimalHolderCounts } from '../../domain/animal-holder-state'
 
 type AnimalResourceKey = AnimalKey
 type CardCounterAnimalSource = {
@@ -122,6 +123,26 @@ const takeFromBoardAnimals = (
   return amount - remaining
 }
 
+const takeFromAnimalHolderCards = (
+  player: PlayerState,
+  animal: AnimalResourceKey,
+  amount: number,
+): number => {
+  let remaining = amount
+  for (const state of Object.values(player.cardStates ?? {})) {
+    if (remaining <= 0) break
+    const extra = state?.extraData as Record<string, unknown> | undefined
+    if (!extra) continue
+    const counts = readAnimalHolderCounts(extra)
+    const take = Math.min(counts[animal] ?? 0, remaining)
+    if (take <= 0) continue
+    counts[animal] -= take
+    writeAnimalHolderCounts(extra, counts)
+    remaining -= take
+  }
+  return amount - remaining
+}
+
 const deductAnimalWithPreference = (
   player: PlayerState,
   animal: AnimalResourceKey,
@@ -135,6 +156,9 @@ const deductAnimalWithPreference = (
   }
   if (remaining > 0) {
     remaining -= takeFromBoardAnimals(player, animal, remaining)
+  }
+  if (remaining > 0) {
+    remaining -= takeFromAnimalHolderCards(player, animal, remaining)
   }
   for (const source of preference.avoid ?? []) {
     if (remaining <= 0) break

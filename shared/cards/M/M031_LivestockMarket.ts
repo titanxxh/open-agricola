@@ -1,10 +1,12 @@
 import { defineMinorCard } from '../card-source'
 import { canAccommodateAnimalTotals } from '../../domain/animal-zones'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../contract/animals'
 import type { ActionFlow, GameState, PlayerState, Resource, Trade } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M031_LivestockMarket'
+const MUD_WALLOWER_ID = 'C148_MudWallower'
 
 const EXCHANGE_ANIMALS = ['sheep', 'boar', 'cattle'] as const
 type ExchangeAnimal = typeof EXCHANGE_ANIMALS[number]
@@ -58,16 +60,53 @@ const targetCountsAfterTrade = (
   return target
 }
 
-const livestockMarketTrades = (state: GameState, player: PlayerState): Trade[] => {
-  const trades: Trade[] = []
+const mudWallowerBoarPaid = (player: PlayerState, trade: Trade): number => {
+  const boarPaid = trade.from.boar ?? 0
+  if (boarPaid <= 0) return 0
+  const assignedBoars = getAssignedAnimalsByType(player).boar ?? 0
+  const mudWallowerBoars = Math.min(
+    player.cardStates?.[MUD_WALLOWER_ID]?.counters?.held ?? 0,
+    Math.max(0, animalCount(player, 'boar') - assignedBoars),
+  )
+  return Math.min(Math.max(0, boarPaid - assignedBoars), mudWallowerBoars)
+}
+
+const withMudWallowerPaymentCapacity = (player: PlayerState, boarPaid: number): PlayerState => {
+  if (boarPaid <= 0) return player
+  const cardState = player.cardStates?.[MUD_WALLOWER_ID]
+  if (!cardState?.counters) return player
+  return {
+    ...player,
+    cardStates: {
+      ...player.cardStates,
+      [MUD_WALLOWER_ID]: {
+        ...cardState,
+        counters: {
+          ...cardState.counters,
+          held: Math.max(0, (cardState.counters.held ?? 0) - boarPaid),
+        },
+      },
+    },
+  }
+}
+
+type LivestockMarketTrade = {
+  trade: Trade
+  mudWallowerBoarPaid: number
+}
+
+const livestockMarketTrades = (state: GameState, player: PlayerState): LivestockMarketTrade[] => {
+  const trades: LivestockMarketTrade[] = []
   for (let sheep = 0; sheep <= Math.min(3, animalCount(player, 'sheep')); sheep += 1) {
     for (let boar = 0; boar <= Math.min(3 - sheep, animalCount(player, 'boar')); boar += 1) {
       for (let cattle = 0; cattle <= Math.min(3 - sheep - boar, animalCount(player, 'cattle')); cattle += 1) {
         const total = sheep + boar + cattle
         if (total <= 0 || total > 3) continue
         const trade = buildTrade({ sheep, boar, cattle })
-        if (canAccommodateAnimalTotals(state, player, targetCountsAfterTrade(player, trade))) {
-          trades.push(trade)
+        const mudWallowerPaid = mudWallowerBoarPaid(player, trade)
+        const accommodationPlayer = withMudWallowerPaymentCapacity(player, mudWallowerPaid)
+        if (canAccommodateAnimalTotals(state, accommodationPlayer, targetCountsAfterTrade(player, trade))) {
+          trades.push({ trade, mudWallowerBoarPaid: mudWallowerPaid })
         }
       }
     }
@@ -75,17 +114,17 @@ const livestockMarketTrades = (state: GameState, player: PlayerState): Trade[] =
   return trades
 }
 
-const exchangeLeaf = (trade: Trade): ActionFlow => ({
+const exchangeLeaf = (trade: Trade, mudWallowerBoarPaid: number): ActionFlow => ({
   type: 'leaf',
   actionId: 'exchange',
   sourceCard: CARD_ID,
   actionContext: {
     directTrade: trade,
-    ...((trade.from.boar ?? 0) > 0
+    ...(mudWallowerBoarPaid > 0
       ? {
         animalPaymentPreference: {
           animal: 'boar',
-          avoid: [{ kind: 'cardCounter', cardId: 'C148_MudWallower', counterKey: 'held' }],
+          avoid: [{ kind: 'cardCounter', cardId: MUD_WALLOWER_ID, counterKey: 'held' }],
         },
       }
       : {}),
@@ -107,7 +146,8 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
-      const children = livestockMarketTrades(state, player).map(exchangeLeaf)
+      const children = livestockMarketTrades(state, player)
+        .map(({ trade, mudWallowerBoarPaid }) => exchangeLeaf(trade, mudWallowerBoarPaid))
       if (children.length === 0) return undefined
       return {
         type: 'xor' as const,
