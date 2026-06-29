@@ -127,6 +127,7 @@ import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
+import { getPrivateAnimalsByType } from '../domain/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -1223,6 +1224,10 @@ export class GameCore {
       for (const key of animalKeys) {
         assigned += zoneCounts[key] ?? 0
       }
+    }
+    const privateCounts = getPrivateAnimalsByType(p)
+    for (const key of animalKeys) {
+      assigned += privateCounts[key] ?? 0
     }
     return assigned
   }

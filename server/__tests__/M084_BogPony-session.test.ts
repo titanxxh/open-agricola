@@ -58,7 +58,7 @@ const setup = () => {
   }
   const player = state.players[0]!
   player.minorPlayed = [CARD_ID]
-  player.cardStates = { [CARD_ID]: { extraData: { animalCounts: { horse: 0 } } } }
+  player.cardStates = { [CARD_ID]: { extraData: { privateAnimalCounts: { horse: 0 } } } }
   session.loadState(state)
   return session
 }
@@ -97,7 +97,59 @@ describe('M084 Bog Pony session', () => {
     expect(updated.resources.fuel).toBe(2)
     expect(updated.resources.horse).toBe(1)
     expect(updated.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
-    expect(updated.cardStates[CARD_ID]?.extraData?.animalCounts).toMatchObject({ horse: 1 })
+    expect(updated.cardStates[CARD_ID]?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
     expect(resp.interaction.anytimeActions.map((action: AnytimeAction) => action.id)).not.toContain(ANYTIME_ID)
+  })
+
+  it('lies a zone-backed standing horse on the card', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources = fullResources({ horse: 1, fuel: 0 })
+    player.minorPlayed = [CARD_ID, 'M035_HorseTrough']
+    player.cardStates = {
+      [CARD_ID]: { extraData: { privateAnimalCounts: { horse: 0 } } },
+      M035_HorseTrough: {
+        extraData: {
+          animalCountsByZone: {
+            'card:M035_HorseTrough@0,0': { animalCounts: { horse: 1 } },
+          },
+        },
+      },
+    }
+    session.loadState(state)
+
+    expect(enterActiveInteraction(session)).toContain(ANYTIME_ID)
+
+    const resp = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(resp.ok).toBe(true)
+    const updated = resp.state.players[0]!
+    const troughZone = updated.cardStates.M035_HorseTrough?.extraData?.animalCountsByZone?.['card:M035_HorseTrough@0,0']
+    expect(updated.resources).toMatchObject({ horse: 1, fuel: 2 })
+    expect(updated.cardStates[CARD_ID]?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(troughZone?.animalCounts?.horse ?? 0).toBe(0)
+  })
+
+  it('does not open animal reorg after lying a horse during a normal action', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources = fullResources({ horse: 1, fuel: 0 })
+    player.pastures = [{
+      id: 'horse-pasture',
+      size: 1,
+      tiles: [{ row: 1, col: 0 }],
+      stables: 0,
+      animalType: 'horse',
+      animalCount: 1,
+    }]
+    session.loadState(state)
+
+    expect(enterActiveInteraction(session)).toContain(ANYTIME_ID)
+    expect(session.takeAnytimeAction(0, ANYTIME_ID).ok).toBe(true)
+    const resp = session.commitSelectionChoice(0, { tile: { row: 0, col: 3 } })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : null).not.toBe('animal-reorg')
   })
 })

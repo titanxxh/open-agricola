@@ -290,7 +290,7 @@ describe('reorganizeAction.resolveChoice', () => {
         minorPlayed: ['M084_BogPony'],
         resources: { sheep: 0, boar: 0, cattle: 0, horse: 2 } as never,
         cardStates: {
-          M084_BogPony: { extraData: { animalCounts: { horse: 1 } } },
+          M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
         } as never,
         pastures: [
           {
@@ -317,6 +317,27 @@ describe('reorganizeAction.resolveChoice', () => {
 
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.horse).toBe(2)
-    expect(ctx.player.cardStates.M084_BogPony?.extraData?.animalCounts).toMatchObject({ horse: 1 })
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+  })
+
+  it('clears stale ordinary card-zone animals when the zone disappears', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: { sheep: 0, boar: 1, cattle: 0 } as never,
+        cardStates: {
+          A011_MudPatch: { extraData: { animalCounts: { boar: 1 } } },
+        } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.boar).toBe(0)
+    expect(ctx.player.cardStates.A011_MudPatch?.extraData?.animalCounts).toBeUndefined()
   })
 })

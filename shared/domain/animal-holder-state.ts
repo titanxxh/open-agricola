@@ -89,6 +89,27 @@ export const writeAnimalHolderCounts = (
   }
 }
 
+export const readPrivateAnimalCounts = (value: unknown): AnimalCounts => {
+  const counts = createAnimalCounts()
+  if (!value || typeof value !== 'object') return counts
+  const data = value as { privateAnimalCounts?: unknown }
+  if (!data.privateAnimalCounts || typeof data.privateAnimalCounts !== 'object') return counts
+  const animalCounts = data.privateAnimalCounts as Record<string, unknown>
+  for (const key of ALL_ANIMAL_KEYS) {
+    counts[key] = readPositiveInt(animalCounts[key])
+  }
+  return counts
+}
+
+export const writePrivateAnimalCounts = (
+  extraData: Record<string, unknown>,
+  counts: Partial<Record<AnimalKey, number>>,
+): void => {
+  const compact = compactAnimalCounts(counts)
+  if (Object.keys(compact).length === 0) delete extraData.privateAnimalCounts
+  else extraData.privateAnimalCounts = compact
+}
+
 export const clampAnimalCountsToCapacity = (
   counts: AnimalCounts,
   capacity: number,
