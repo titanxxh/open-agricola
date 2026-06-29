@@ -143,6 +143,8 @@ type StateView = {
   occ: Record<string, string[]>
 }
 
+type WorkerRef = { playerId?: unknown }
+
 export const actingPlayerIndex = (view: { currentPlayerIndex: number; pending: Pending | null }): number =>
   view.pending?.type !== 'confirm-next-player' && typeof view.pending?.playerIndex === 'number'
     ? view.pending.playerIndex
@@ -156,13 +158,19 @@ const occupationMap = (state: Record<string, unknown>): Record<string, string[]>
   if (Array.isArray(spaces)) {
     for (const a of spaces as Array<Record<string, unknown>>) {
       const takenBy = a.takenBy
-      if (Array.isArray(takenBy) && takenBy.length > 0) map[a.id as string] = takenBy as string[]
+      if (Array.isArray(takenBy) && takenBy.length > 0) {
+        map[a.id as string] = takenBy.flatMap((ref: unknown) => {
+          if (typeof ref === 'string') return [ref]
+          const playerId = (ref as WorkerRef | null)?.playerId
+          return typeof playerId === 'string' ? [playerId] : []
+        })
+      }
     }
   }
   return map
 }
 
-const viewFromPayload = (p: ObsPayload | null): StateView | null => {
+export const viewFromPayload = (p: ObsPayload | null): StateView | null => {
   if (!p) return null
   const state = (p.state ?? {}) as Record<string, unknown>
   const players = Array.isArray(state.players) ? (state.players as Array<Record<string, unknown>>) : []
@@ -229,7 +237,7 @@ const syncPage = async (page: Page, expectedTaken: number, timeoutMs = 4000): Pr
 }
 
 // Authoritative attribution: which space did playerId newly occupy?
-const findNewAction = (before: StateView, after: StateView, playerId: string): string | null => {
+export const findNewAction = (before: StateView, after: StateView, playerId: string): string | null => {
   for (const [id, takenBy] of Object.entries(after.occ)) {
     const had = before.occ[id]?.includes(playerId) ?? false
     if (!had && takenBy.includes(playerId)) return id
@@ -260,6 +268,8 @@ const openPages = async (browser: Browser, args: Args, obs: PageObserver): Promi
 const actionCard = (page: Page, name: string) => page.locator('.action-card', { hasText: name })
 
 const resetNewGame = async (page: Page, seed?: number): Promise<void> => {
+  const scoringClose = page.locator('.scoring-overlay button', { hasText: 'Close' }).first()
+  if ((await scoringClose.count()) > 0) await scoringClose.click()
   if (seed !== undefined) {
     await page.locator('.dev-panel .seed-input input').fill(String(seed))
   }
@@ -267,8 +277,16 @@ const resetNewGame = async (page: Page, seed?: number): Promise<void> => {
   await actionCard(page, 'Farmland').first().waitFor({ state: 'visible', timeout: 15000 })
 }
 
+export const AVAILABLE_ACTION_SELECTOR = '[data-action-id] button.action-card:not([disabled])'
+export const FARM_SELECT_PREPARE_SELECTORS = [
+  '.sow-choice-button:not(.sow-choice-clear):not(.active):not([disabled])',
+  '.farm-tile.selectable:not(.selected)',
+  '.farm-fence-h.selectable:not(.selected)',
+  '.farm-fence-v.selectable:not(.selected)',
+].join(', ')
+
 const clickFirstAvailableAction = async (page: Page): Promise<string | null> => {
-  const buttons = page.locator('[data-action-id]:not(.round) button.action-card:not([disabled])')
+  const buttons = page.locator(AVAILABLE_ACTION_SELECTOR)
   if ((await buttons.count()) === 0) return null
   const btn = buttons.first()
   const actionId = await btn.evaluate(
@@ -276,6 +294,11 @@ const clickFirstAvailableAction = async (page: Page): Promise<string | null> => 
   )
   await btn.click()
   return actionId ?? 'unknown'
+}
+
+const prepareFarmSelection = async (page: Page): Promise<void> => {
+  const target = page.locator(FARM_SELECT_PREPARE_SELECTORS).first()
+  if ((await target.count()) > 0) await target.click()
 }
 
 const clickMoorSpecialAction = async (page: Page): Promise<string | null> => {
@@ -390,6 +413,7 @@ const runPlay = async (browser: Browser, args: Args, outDir: string): Promise<vo
       }
     } else if (before.pending) {
       intentKind = `pending:${before.pending.type}`
+      if (before.pending.type === 'farm-select') await prepareFarmSelection(page)
       const ok = await clickInteractionPrimary(page)
       if (!ok) {
         stopReason = `pending:${before.pending.type}@p${activeIdx + 1}`
