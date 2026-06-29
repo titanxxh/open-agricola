@@ -208,6 +208,17 @@ export const normalizeAnimalCountsForZone = (
   return counts
 }
 
+export const getAllowedAnimalTypesForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): AnimalType[] => animalKeysForState(state).filter((animal) => {
+  const candidate = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  candidate[animal] = 1
+  const normalized = normalizeAnimalCountsForZone(state, player, zone, { animalCounts: candidate })
+  return (normalized[animal] ?? 0) > 0
+})
+
 const rehydrateAnimalHolderZones = (
   state: GameState,
   player: PlayerState,
@@ -413,10 +424,22 @@ const candidateZoneWithAnimal = (
 const canPlaceAnimalInWorkZone = (
   state: GameState,
   player: PlayerState,
+  zones: AnimalAccommodationWorkZone[],
+  zoneIndex: number,
   zone: AnimalAccommodationWorkZone,
   type: AnimalType,
 ): AnimalAccommodationWorkZone | null => {
   if (zone.blocked || zone.animalCount >= zone.capacity) return null
+  if (zone.zoneType === 'card' && zone.cardId && zone.animalCount === 0 && zone.exclusiveCardZoneLimit !== undefined) {
+    const limit = Math.max(0, Math.floor(zone.exclusiveCardZoneLimit))
+    const occupied = zones.filter((entry, index) =>
+      index !== zoneIndex &&
+      entry.zoneType === 'card' &&
+      entry.cardId === zone.cardId &&
+      entry.animalCount > 0
+    ).length
+    if (occupied >= limit) return null
+  }
   if ('allowedAnimalType' in zone && zone.allowedAnimalType !== null && zone.allowedAnimalType !== type) {
     return null
   }
@@ -447,7 +470,7 @@ export const canAccommodateAnimalTotals = (
     const key = stateKey(index, currentZones)
     if (failedStates.has(key)) return false
     for (let i = 0; i < currentZones.length; i += 1) {
-      const nextZone = canPlaceAnimalInWorkZone(state, player, currentZones[i]!, type)
+      const nextZone = canPlaceAnimalInWorkZone(state, player, currentZones, i, currentZones[i]!, type)
       if (!nextZone) continue
       const nextZones = [...currentZones]
       nextZones[i] = nextZone

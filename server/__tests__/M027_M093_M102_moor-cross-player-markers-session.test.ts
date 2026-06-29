@@ -7,6 +7,7 @@ import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../.
 import { resolveCardCostWithModifiersDetailed } from '../../shared/actions/payment/internal'
 import { runCardListeners } from '../../shared/cards/card-listeners'
 import { passMinorCardToLeftAction } from '../../shared/actions/effects/internal/pass-minor-card-to-left'
+import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B004_WoodPile'
 import '../../shared/cards/M/M027_GardenPath'
@@ -157,6 +158,17 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
       total: -1,
       entries: [expect.objectContaining({ cardId: M027, score: -1 })],
     }))
+  })
+
+  it('M027 does not mark the owner as their own left player in solo', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    const owner = state.players[0]!
+
+    const flow = getCardEffect(M027)?.onBuy?.(state, owner)
+
+    expect(actionIds(flow)).toEqual(['gain'])
+    expect(owner.cardStates?.[M027]?.extraData?.publicCardMarkers).toBeUndefined()
   })
 
   it('M093 derives exactly-one building-resource-to-fuel candidates for major improvements', () => {

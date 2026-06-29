@@ -195,6 +195,37 @@ describe('AnimalZones', () => {
     expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(false)
   })
 
+  it('enforces exclusive card-zone limits when checking final totals', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: () => [
+        {
+          id: `card:${TEST_CARD}@0-0`,
+          zoneType: 'card',
+          cardId: TEST_CARD,
+          capacity: 2,
+          allowedAnimalType: 'horse',
+          exclusiveCardZoneLimit: 1,
+        } as AnimalZone,
+        {
+          id: `card:${TEST_CARD}@0-1`,
+          zoneType: 'card',
+          cardId: TEST_CARD,
+          capacity: 2,
+          allowedAnimalType: 'horse',
+          exclusiveCardZoneLimit: 1,
+        } as AnimalZone,
+      ],
+    })
+    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
+    const player = playerWithPasture({ minorPlayed: [TEST_CARD], pastures: [] })
+
+    expect(canAccommodateAnimalTotals(state, player, { horse: 3 })).toBe(true)
+    expect(canAccommodateAnimalTotals(state, player, { horse: 4 })).toBe(false)
+  })
+
   it('gates horse accommodation on Farmers of the Moor', () => {
     const session = new GameSession()
     const player = session.getState().state.players[0]
