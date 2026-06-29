@@ -186,6 +186,7 @@ const runAfterSpecialActionListenersNow = (
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
+  terrainCleared?: boolean,
   snapshots?: readonly AfterSpecialActionListenerSnapshot[],
 ) => {
   const context = {
@@ -195,7 +196,10 @@ const runAfterSpecialActionListenersNow = (
     actionId,
     phase: 'after',
     result: { type: 'ok' },
-    extraData: { payload },
+    extraData: {
+      payload,
+      ...(terrainCleared === false ? { terrainCleared: false } : {}),
+    },
   } satisfies CardListenerContextInput
   const listenerFlows = snapshots
     ? snapshots.flatMap((snapshot) => {
@@ -220,11 +224,12 @@ const runAfterSpecialActionListenersNow = (
 const afterSpecialActionListenersLeaf = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
+  terrainCleared: boolean | undefined,
   snapshots: readonly AfterSpecialActionListenerSnapshot[],
 ): ActionFlow => ({
   type: 'leaf',
   actionId: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
-  actionContext: { actionId, payload, snapshots },
+  actionContext: { actionId, payload, terrainCleared, snapshots },
 })
 
 const snapshotAfterSpecialActionListeners = (
@@ -253,16 +258,16 @@ const runAfterSpecialActionListeners = (
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
-  result: { followUpFlow?: ActionFlow },
+  result: { followUpFlow?: ActionFlow; terrainCleared?: boolean },
 ) => {
   if (result.followUpFlow) {
     const snapshots = snapshotAfterSpecialActionListeners(state, player, actionId, payload)
     return combineFlows([
       result.followUpFlow,
-      afterSpecialActionListenersLeaf(actionId, payload, snapshots),
+      afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots),
     ])
   }
-  return runAfterSpecialActionListenersNow(state, player, actionId, payload)
+  return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared)
 }
 
 export const moorSpecialActionAfterListenersAction: ActionDefinition = {
@@ -278,10 +283,18 @@ export const moorSpecialActionAfterListenersAction: ActionDefinition = {
       return { type: 'ok' }
     }
     const payload = (actionContext?.payload ?? {}) as MoorSpecialActionPayload
+    const terrainCleared = actionContext?.terrainCleared
     const snapshots = Array.isArray(actionContext?.snapshots)
       ? actionContext.snapshots as AfterSpecialActionListenerSnapshot[]
       : undefined
-    const followUpFlow = runAfterSpecialActionListenersNow(state, player, actionId, payload, snapshots)
+    const followUpFlow = runAfterSpecialActionListenersNow(
+      state,
+      player,
+      actionId,
+      payload,
+      typeof terrainCleared === 'boolean' ? terrainCleared : undefined,
+      snapshots,
+    )
     return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
   },
 }

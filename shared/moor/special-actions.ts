@@ -4,7 +4,12 @@ import { getMajorCard } from '../cards/major'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { positionKey } from '../domain/farm'
 import { improvementAction } from '../actions/effects/improvement'
-import { replaceTerrainWithField } from './farm-terrain'
+import {
+  hasVisibleTerrain,
+  hasVisibleTerrainWithoutCovered,
+  removeVisibleTerrain,
+  replaceTerrainWithField,
+} from './farm-terrain'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
 
 export type MoorSpecialActionPayload = {
@@ -62,30 +67,6 @@ export const isMoorSpecialActionCardUsableByPlayer = (
   if (card.location.kind === 'market') return true
   if (card.location.kind === 'playerFaceUp') return card.location.playerId !== playerId
   return false
-}
-
-const removeTerrain = (
-  player: PlayerState,
-  tile: FarmTilePosition | undefined,
-  kind: 'forest' | 'moor',
-): boolean => {
-  if (!tile) return false
-  const key = positionKey(tile)
-  const index = (player.farmTerrain ?? []).findIndex((entry) => positionKey(entry) === key)
-  if (index < 0 || player.farmTerrain![index]!.kind !== kind) return false
-  player.farmTerrain = player.farmTerrain!.filter((_, idx) => idx !== index)
-  return true
-}
-
-const hasTerrain = (
-  player: PlayerState,
-  tile: FarmTilePosition | undefined,
-  kind: 'forest' | 'moor',
-): boolean => {
-  if (!tile) return false
-  const key = positionKey(tile)
-  return (player.farmTerrain ?? []).some((entry) =>
-    positionKey(entry) === key && entry.kind === kind)
 }
 
 const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boolean => {
@@ -232,13 +213,13 @@ export const validateMoorSpecialActionEffect = (
   if (!player || !state.farmersOfTheMoor) return { ok: false, error: 'farmers of the moor unavailable' }
   switch (actionId) {
     case 'cut-peat':
-      if (!hasTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
+      if (!hasVisibleTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
       break
     case 'fell-trees':
-      if (!hasTerrain(player, payload.tile, 'forest')) return { ok: false, error: 'terrain unavailable' }
+      if (!hasVisibleTerrain(player, payload.tile, 'forest')) return { ok: false, error: 'terrain unavailable' }
       break
     case 'slash-and-burn':
-      if (!payload.tile || !hasTerrain(player, payload.tile, 'forest')) {
+      if (!payload.tile || !hasVisibleTerrainWithoutCovered(player, payload.tile, 'forest')) {
         return { ok: false, error: 'terrain unavailable' }
       }
       if ((player.fields ?? []).length > 0 && !hasAdjacentField(player.fields, payload.tile)) {
@@ -265,20 +246,27 @@ export const validateMoorSpecialActionEffect = (
   return { ok: true }
 }
 
+export type MoorSpecialActionResult =
+  | { ok: true; followUpFlow?: ActionFlow; terrainCleared?: boolean }
+  | { ok: false; error: string }
+
 const executeMoorSpecialActionEffect = (
   state: GameState,
   playerIndex: number,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
   eventSink?: EventSink,
-): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
+): MoorSpecialActionResult => {
   const player = state.players[playerIndex]!
   let followUpFlow: ActionFlow | undefined
+  let terrainCleared: boolean | undefined
 
   switch (actionId) {
     case 'cut-peat': {
       const before = { ...player.resources }
-      if (!removeTerrain(player, payload.tile, 'moor')) return { ok: false, error: 'terrain unavailable' }
+      const removed = removeVisibleTerrain(player, payload.tile, 'moor')
+      if (!removed.ok) return { ok: false, error: 'terrain unavailable' }
+      terrainCleared = removed.cleared
       player.resources.fuel = (player.resources.fuel ?? 0) + 3
       applyMoorSpecialActionBonuses(state, player, actionId)
       emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
@@ -286,7 +274,9 @@ const executeMoorSpecialActionEffect = (
     }
     case 'fell-trees': {
       const before = { ...player.resources }
-      if (!removeTerrain(player, payload.tile, 'forest')) return { ok: false, error: 'terrain unavailable' }
+      const removed = removeVisibleTerrain(player, payload.tile, 'forest')
+      if (!removed.ok) return { ok: false, error: 'terrain unavailable' }
+      terrainCleared = removed.cleared
       player.resources.wood += 2
       applyMoorSpecialActionBonuses(state, player, actionId)
       emitGain(eventSink, player, actionId, resourceDelta(before, player.resources))
@@ -333,7 +323,11 @@ const executeMoorSpecialActionEffect = (
       return { ok: false, error: 'special action unavailable' }
   }
 
-  return followUpFlow ? { ok: true, followUpFlow } : { ok: true }
+  return {
+    ok: true,
+    ...(followUpFlow ? { followUpFlow } : {}),
+    ...(terrainCleared !== undefined ? { terrainCleared } : {}),
+  }
 }
 
 export const applyMoorSpecialActionEffect = (
@@ -342,7 +336,7 @@ export const applyMoorSpecialActionEffect = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
   eventSink?: EventSink,
-): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
+): MoorSpecialActionResult => {
   const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
   if (!validation.ok) return validation
   return executeMoorSpecialActionEffect(state, playerIndex, actionId, payload, eventSink)
@@ -355,7 +349,7 @@ export const applyMoorSpecialAction = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
   eventSink?: EventSink,
-): { ok: true; followUpFlow?: ActionFlow } | { ok: false; error: string } => {
+): MoorSpecialActionResult => {
   const validation = validateMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
   if (!validation.ok) return validation
   const player = state.players[playerIndex]!

@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { FarmTilePosition } from '../../contract/types'
-import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../domain/farm'
+import { getFarmyardTilePositions, positionKey } from '../../domain/farm'
+import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -23,7 +24,7 @@ const cardImpl = {
     const usedKeys = getUsedFarmyardTileKeys(player)
     const roomKeys = new Set(player.roomTiles.map(positionKey))
     const lockedTiles: FarmTilePosition[] = []
-    for (const tile of getAllTilePositions()) {
+    for (const tile of getFarmyardTilePositions(player)) {
       const key = positionKey(tile)
       if (usedKeys.has(key)) continue
       const adjacentToRoom = DELTAS.some((d) =>
@@ -38,7 +39,7 @@ const cardImpl = {
     if (!locked || locked.length === 0) return []
     const usedKeys = getUsedFarmyardTileKeys(player)
     const lockedKeys = new Set(locked.map(positionKey))
-    const hasNonLockedFree = getAllTilePositions().some((tile) => {
+    const hasNonLockedFree = getFarmyardTilePositions(player).some((tile) => {
       const key = positionKey(tile)
       return !usedKeys.has(key) && !lockedKeys.has(key)
     })
