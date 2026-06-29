@@ -6,6 +6,7 @@ import {
   createAnimalCounts,
   isAnimalKey,
   readAnimalHolderCounts,
+  readPrivateAnimalCounts,
   sumAnimalCounts,
   writeAnimalHolderCounts,
 } from './animal-holder-state'
@@ -89,6 +90,14 @@ export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
   }
   for (const state of Object.values(player.cardStates ?? {})) {
     addCounts(result, readAnimalHolderCountsWithZones(state?.extraData))
+  }
+  return result
+}
+
+export const getPrivateAnimalsByType = (player: PlayerState): AnimalCounts => {
+  const result: AnimalCounts = { ...ZERO }
+  for (const state of Object.values(player.cardStates ?? {})) {
+    addCounts(result, readPrivateAnimalCounts(state?.extraData))
   }
   return result
 }

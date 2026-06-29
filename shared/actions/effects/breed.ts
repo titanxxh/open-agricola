@@ -13,8 +13,7 @@ import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
 import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
-import { getCardDefinitionById } from '../../cards/helpers/card-type'
-import { readAnimalHolderCounts } from '../../domain/animal-holder-state'
+import { getPrivateAnimalsByType } from '../../domain/animals'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
@@ -22,12 +21,7 @@ export type BreedOptions = {
 }
 
 const countBreedableAnimals = (player: PlayerState, type: BreedAnimalType): number => {
-  let nonBreedableCardAnimals = 0
-  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
-    if (getCardDefinitionById(cardId)?.animalHolder === true) continue
-    nonBreedableCardAnimals += readAnimalHolderCounts(state?.extraData)[type] ?? 0
-  }
-  return Math.max(0, (player.resources[type] ?? 0) - nonBreedableCardAnimals)
+  return Math.max(0, (player.resources[type] ?? 0) - (getPrivateAnimalsByType(player)[type] ?? 0))
 }
 
 export const canBreedAnimals = (

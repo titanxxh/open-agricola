@@ -27,11 +27,16 @@ import {
 import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges } from '../../cards/card-listeners'
-import { getCardDefinitionById, isMajorCardId } from '../../cards/helpers/card-type'
+import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { subtractAnimalsFromBoard } from '../../domain/animals'
-import { readAnimalHolderCounts, writeAnimalHolderCounts } from '../../domain/animal-holder-state'
+import {
+  readAnimalHolderCounts,
+  readPrivateAnimalCounts,
+  writeAnimalHolderCounts,
+  writePrivateAnimalCounts,
+} from '../../domain/animal-holder-state'
 
 type AnimalResourceKey = AnimalKey
 type CardCounterAnimalSource = {
@@ -92,22 +97,21 @@ const takeFromCardCounter = (
   return take
 }
 
-const takeFromCardLocalAnimals = (
+const takeFromPrivateAnimals = (
   player: PlayerState,
   animal: AnimalResourceKey,
   amount: number,
 ): number => {
   let remaining = amount
-  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
+  for (const state of Object.values(player.cardStates ?? {})) {
     if (remaining <= 0) break
-    if (getCardDefinitionById(cardId)?.animalHolder === true) continue
     const extra = state?.extraData as Record<string, unknown> | undefined
     if (!extra) continue
-    const counts = readAnimalHolderCounts(extra)
+    const counts = readPrivateAnimalCounts(extra)
     const take = Math.min(counts[animal] ?? 0, remaining)
     if (take <= 0) continue
     counts[animal] -= take
-    writeAnimalHolderCounts(extra, counts)
+    writePrivateAnimalCounts(extra, counts)
     remaining -= take
   }
   return amount - remaining
@@ -415,11 +419,11 @@ export const applyTrade = (
     ) {
       deductAnimalWithPreference(player, key, amount, animalPaymentPreference)
     } else if (amount > 0 && isAnimalResourceKey(key)) {
-      const cardLocalTaken = takeFromCardLocalAnimals(player, key, amount)
-      if (cardLocalTaken > 0) {
-        player.resources[key] = Math.max(0, (player.resources[key] ?? 0) - cardLocalTaken)
+      const privateTaken = takeFromPrivateAnimals(player, key, amount)
+      if (privateTaken > 0) {
+        player.resources[key] = Math.max(0, (player.resources[key] ?? 0) - privateTaken)
       }
-      const remaining = amount - cardLocalTaken
+      const remaining = amount - privateTaken
       if (remaining > 0) subtractAnimalsFromBoard(player, { [key]: remaining })
     } else {
       player.resources[key] -= amount

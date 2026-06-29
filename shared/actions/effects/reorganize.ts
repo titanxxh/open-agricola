@@ -18,10 +18,10 @@ import {
 import {
   createAnimalCounts,
   readAnimalHolderCounts,
+  readPrivateAnimalCounts,
   sumAnimalCounts,
   writeAnimalHolderCounts,
 } from '../../domain/animal-holder-state'
-import { getCardDefinitionById } from '../../cards/helpers/card-type'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -75,9 +75,6 @@ const writeCountsByZone = (
   delete extraData.animalType
   delete extraData.held
 }
-
-const isEditableAnimalHolderCard = (cardId: string): boolean =>
-  getCardDefinitionById(cardId)?.animalHolder === true
 
 export const applyReorganizeMutate = (
   state: GameState,
@@ -187,7 +184,6 @@ export const applyReorganizeMutate = (
     const zoneCounts = existingExtraData?.animalCountsByZone
     const hasZoneCounts = !!zoneCounts && typeof zoneCounts === 'object' && Object.keys(zoneCounts).length > 0
     if (sumAnimalCounts(readAnimalHolderCounts(existing?.extraData)) <= 0 && !hasZoneCounts) continue
-    if (!isEditableAnimalHolderCard(cardId)) continue
     const nextState = { ...existing }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
     writeAnimalHolderCounts(extraData, createAnimalCounts())
@@ -210,10 +206,8 @@ export const applyReorganizeMutate = (
       addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
   for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts, animalKeys)
-  for (const [cardId, existing] of Object.entries(player.cardStates ?? {})) {
-    if (cardZonesById.has(cardId)) continue
-    if (isEditableAnimalHolderCard(cardId)) continue
-    addAnimalCounts(totals, readAnimalHolderCounts(existing?.extraData), animalKeys)
+  for (const existing of Object.values(player.cardStates ?? {})) {
+    addAnimalCounts(totals, readPrivateAnimalCounts(existing?.extraData), animalKeys)
   }
   for (const animal of animalKeys) player.resources[animal] = totals[animal] ?? 0
 }
