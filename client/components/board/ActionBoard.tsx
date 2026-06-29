@@ -1157,6 +1157,35 @@ export const ActionBoard = ({
             {baseActions.filter((s) => !basePositions[s.id]).map((space) => {
               const canTake = canTakeAction(space, currentPlayer)
               const meta = getCardMeta(space.id)
+              if (!meta) {
+                return (
+                  <div
+                    key={space.id}
+                    className={[
+                      'player-action-card-wrapper',
+                      actionSpaceSelectionActive && canTake && 'choice-available',
+                      actionSpaceSelectionActive && !canTake && 'choice-unavailable',
+                    ].filter(Boolean).join(' ')}
+                    data-action-id={space.id}
+                    style={{ height: 150 }}
+                    onMouseEnter={(e) => showTooltip(e, space)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <button
+                      className="action-card action-s"
+                      onClick={() => takeAction(space)}
+                      disabled={!canTake}
+                    >
+                      <h4 className="action-header">{t(locale, space.nameKey)}</h4>
+                      <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+                      <div className="action-footer" />
+                    </button>
+                    {renderFarmerHolder(space)}
+                    {renderExclusiveUseMarker(space)}
+                    {renderBlockedMarker(space)}
+                  </div>
+                )
+              }
               let cardType: 'occupation' | 'minor'
               if (meta?.type === 'playerAction') {
                 cardType = meta.playerActionCardType ?? 'minor'
@@ -1174,6 +1203,7 @@ export const ActionBoard = ({
                     actionSpaceSelectionActive && canTake && 'choice-available',
                     actionSpaceSelectionActive && !canTake && 'choice-unavailable',
                   ].filter(Boolean).join(' ')}
+                  data-action-id={space.id}
                 >
                   <PlayerCard
                     locale={locale}

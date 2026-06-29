@@ -5,6 +5,7 @@ import type { GameEvent } from '../../../shared/contract/events'
 import {
   applyPublicEventCancellationSnapshot,
   buildCompactScoreRows,
+  canTakeVisibleMoorSpecialAction,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
@@ -26,6 +27,8 @@ import {
 } from '../game-container-helpers'
 import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
 import type { ActionSpace } from '../../../shared/contract/types'
+import type { GameState, PlayerState } from '../../../shared/contract/types'
+import type { MoorSpecialActionCardState } from '../../../shared/moor/types'
 import type { PlayerScoreSummary } from '../../../shared/domain/scoring'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
@@ -114,6 +117,30 @@ describe('GameContainerApi WS player identity', () => {
     expect(farmCommitErrorMessageKey('stable', 'LIMIT_REACHED')).toBe('ui.stableErrorLimit')
     expect(farmCommitErrorMessageKey('plow', 'FENCED')).toBe('ui.plowErrorFenced')
     expect(farmCommitErrorMessageKey('sow', 'NO_SELECTION')).toBe('ui.sowErrorNoSelection')
+  })
+
+  it('disables Moor special actions when all workers at home are sick', () => {
+    const player = {
+      id: 'p1',
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0, fuel: 0, horse: 0,
+      },
+      workers: [{ id: '1', isActive: true, isNewborn: false }],
+      sickWorkerIds: ['1'],
+    } as PlayerState
+    const state = { players: [player], currentPlayerIndex: 0, actionSpaces: [] } as unknown as GameState
+    const card = {
+      id: 'moor-special-hiring-fair',
+      players: [4],
+      actions: ['hiring-fair'],
+      image: '',
+      location: { kind: 'market' },
+    } as MoorSpecialActionCardState
+
+    expect(canTakeVisibleMoorSpecialAction(state, player, card, 'hiring-fair')).toBe(false)
+    player.sickWorkerIds = []
+    expect(canTakeVisibleMoorSpecialAction(state, player, card, 'hiring-fair')).toBe(true)
   })
 
   it('maps compact score card bonus VP from the unified category only', () => {

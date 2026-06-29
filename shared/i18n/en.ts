@@ -579,6 +579,7 @@ export const en = {
   },
   actions: {
     'future-meeples': { name: 'Future Resources', description: 'Place future resources on upcoming rounds' },
+    'pass-minor-card-to-left': { name: 'Pass minor improvement', description: 'Pass a minor improvement to the player on the left' },
     'season-winter-romantic-evening': { name: 'Romantic Evening', description: 'Family growth without room' },
     'season-spring-animal-and-fruit': {
       name: 'Animal and Fruit',

@@ -12,6 +12,7 @@ import type {
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
+import { readAllPublicCardMarkers } from '../../../shared/cards/helpers/public-card-markers'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import type { ParentCardId } from '../../../shared/parents'
@@ -37,8 +38,17 @@ type CardAnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalType, number>>
+  allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
   capacity: number
   zoneId: string
+}
+type FarmTerrainMarker = {
+  row: number
+  col: number
+  kind: string
+  workerId?: string
+  sourceCard?: string
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
@@ -328,6 +338,29 @@ const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
 const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
   color ? BGA_FENCE_COLORS[color] : undefined
 
+const isFarmTerrainMarker = (value: unknown): value is FarmTerrainMarker => {
+  if (!value || typeof value !== 'object') return false
+  const marker = value as Partial<FarmTerrainMarker>
+  return Number.isInteger(marker.row) && Number.isInteger(marker.col) && typeof marker.kind === 'string'
+}
+
+const readFarmTerrainMarkers = (player: PlayerState): FarmTerrainMarker[] =>
+  Object.entries(player.cardStates ?? {}).flatMap(([cardId, state]) => {
+    const raw = state.extraData?.farmTerrainMarkers
+    if (!Array.isArray(raw)) return []
+    return raw.filter(isFarmTerrainMarker).map((marker) => ({
+      ...marker,
+      sourceCard: typeof marker.sourceCard === 'string' ? marker.sourceCard : cardId,
+      workerId: typeof marker.workerId === 'string' ? marker.workerId : undefined,
+    }))
+  })
+
+const canCardZoneAcceptAnimal = (display: CardAnimalDisplay, animalType: AnimalType) => {
+  if (display.allowedAnimalTypes && !display.allowedAnimalTypes.includes(animalType)) return false
+  if (display.allowedAnimalType && display.allowedAnimalType !== animalType) return false
+  return true
+}
+
 export type FarmBoardProps = {
   locale: Locale
   players: PlayerState[]
@@ -374,6 +407,7 @@ export type FarmBoardProps = {
     { animalType: AnimalType | null; animalCount: number }
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
+  farmCardDisplayMap?: Map<string, CardAnimalDisplay>
   isReorgActive: boolean
   reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
@@ -719,6 +753,7 @@ export const FarmBoard = ({
   houseDisplay,
   stableDisplayMap,
   cardDisplayMap = new Map(),
+  farmCardDisplayMap = new Map(),
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
@@ -806,6 +841,12 @@ export const FarmBoard = ({
     })
   }
   const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
+  const publicCardMarkers = readAllPublicCardMarkers(displayPlayer)
+  const farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>()
+  readFarmTerrainMarkers(displayPlayer).forEach((marker) => {
+    const key = `${marker.row}-${marker.col}`
+    farmTerrainMarkerMap.set(key, [...(farmTerrainMarkerMap.get(key) ?? []), marker])
+  })
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -862,6 +903,24 @@ export const FarmBoard = ({
             <CompactResourceItem iconClass="res-icon-fence-icon" value={`${summary.fence.used}/${summary.fence.limit}`} label={`${compactLabels.fence}: ${summary.fence.used}/${summary.fence.limit}`} />
             <CompactResourceItem iconClass="res-icon-barn" value={`${summary.stable.used}/${summary.stable.limit}`} label={`${compactLabels.stable}: ${summary.stable.used}/${summary.stable.limit}`} />
           </span>
+          {publicCardMarkers.length > 0 ? (<>
+            <span className="res-compact-divider" />
+            <span className="player-public-card-markers" data-testid="player-public-card-markers">
+              {publicCardMarkers.map((marker) => (
+                <span
+                  key={`${marker.cardId}-${marker.id}`}
+                  className="public-card-marker"
+                  data-testid={`public-card-marker-${marker.sourceCardId}-${marker.id}`}
+                  title={marker.score ? `${marker.label} ${marker.score > 0 ? '+' : ''}${marker.score}` : marker.label}
+                >
+                  <span className="public-card-marker-label">{marker.label}</span>
+                  {marker.score ? (
+                    <span className="public-card-marker-score">{marker.score > 0 ? `+${marker.score}` : marker.score}</span>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          </>) : null}
         </div>
       </div>
       <div className="player-tabs-container">
@@ -933,6 +992,7 @@ export const FarmBoard = ({
           const terrain = (displayPlayer.farmTerrain ?? []).find(
             (tile) => tile.row === tileRow && tile.col === tileCol,
           )
+          const terrainMarkers = farmTerrainMarkerMap.get(tileKey) ?? []
           const terrainLabel =
             terrain?.kind === 'forest'
               ? t(locale, 'ui.tileForest')
@@ -1003,6 +1063,7 @@ export const FarmBoard = ({
                 : '0/1'
               : null
           const stableDisplay = stableDisplayMap.get(tileKey)
+          const farmCardDisplay = farmCardDisplayMap.get(tileKey)
           const stableLabel = stableDisplay
             ? stableDisplay.animalType
               ? `${stableDisplay.animalCount}${t(
@@ -1210,6 +1271,70 @@ export const FarmBoard = ({
                             <button
                               onClick={() =>
                                 adjustReorgAnimal(`stable:${tileKey}`, animalType, 1)
+                              }
+                              disabled={!isInteractive || !canIncrease}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {terrainMarkers.map((marker, index) =>
+                marker.kind === 'person' ? (
+                  <div
+                    key={`${marker.sourceCard}-${marker.workerId ?? index}`}
+                    className={`action-farmer action-farmer-${displayPlayer.color} farm-terrain-marker-person`}
+                    data-testid={`farm-terrain-marker-${marker.sourceCard}-${tileKey}`}
+                  />
+                ) : null,
+              )}
+              {farmCardDisplay ? (
+                <div
+                  className="pasture-info farm-card-reorg"
+                  data-testid={`farm-card-reorg-${farmCardDisplay.zoneId}`}
+                >
+                  <div className="pasture-count">
+                    <AnimalCount
+                      count={farmCardDisplay.animalCount}
+                      animalType={farmCardDisplay.animalType}
+                      capacity={farmCardDisplay.capacity}
+                    />
+                  </div>
+                  {isReorgActive ? (
+                    <div className="pasture-controls">
+                      {ANIMAL_CONTROL_TYPES.map((animalType) => {
+                        const cardAnimalCounts = farmCardDisplay.animalCounts ?? {}
+                        const count =
+                          cardAnimalCounts[animalType] ??
+                          (farmCardDisplay.animalType === animalType ? farmCardDisplay.animalCount : 0)
+                        const totalCount = sumAnimalCounts(cardAnimalCounts) || farmCardDisplay.animalCount
+                        const canDecrease = count > 0
+                        const canIncrease =
+                          canCardZoneAcceptAnimal(farmCardDisplay, animalType) &&
+                          (reorgRemaining?.[animalType] ?? 0) > 0 &&
+                          farmCardDisplay.capacity > 0 &&
+                          totalCount < farmCardDisplay.capacity
+                        return (
+                          <div key={animalType} className="pasture-control-row">
+                            <span className="pasture-control-label">
+                              {t(locale, `resources.${animalType}`)}
+                            </span>
+                            <button
+                              onClick={() =>
+                                adjustReorgAnimal(farmCardDisplay.zoneId, animalType, -1)
+                              }
+                              disabled={!isInteractive || !canDecrease}
+                            >
+                              -
+                            </button>
+                            <span className="pasture-control-value">{count}</span>
+                            <button
+                              onClick={() =>
+                                adjustReorgAnimal(farmCardDisplay.zoneId, animalType, 1)
                               }
                               disabled={!isInteractive || !canIncrease}
                             >

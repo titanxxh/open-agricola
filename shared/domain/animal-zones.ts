@@ -6,6 +6,7 @@ import { playerHasCardCapability } from '../cards/helpers/card-type.ts'
 import {
   clampAnimalCountsToCapacity,
   compactAnimalCounts,
+  createAnimalCounts,
   isAnimalKey,
   readAnimalHolderCounts,
   singleAnimalType,
@@ -31,9 +32,20 @@ export type AnimalZone = {
   allowedAnimalType?: AnimalType | null
   cardId?: string
   pastureIndex?: number
+  farmPosition?: { row: number; col: number }
+  countsFarmyardSpaceAsUnused?: boolean
+  displaySource?: 'played-card' | 'farm-position'
+  exclusiveCardZoneLimit?: number
 }
 
 type AnimalType = AnimalKey
+
+export const buildCardAnimalZoneId = (
+  cardId: string,
+  position?: { row: number; col: number },
+): string => position
+  ? `card:${cardId}@${positionKey(position)}`
+  : `card:${cardId}`
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
@@ -196,6 +208,17 @@ export const normalizeAnimalCountsForZone = (
   return counts
 }
 
+export const getAllowedAnimalTypesForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): AnimalType[] => animalKeysForState(state).filter((animal) => {
+  const candidate = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  candidate[animal] = 1
+  const normalized = normalizeAnimalCountsForZone(state, player, zone, { animalCounts: candidate })
+  return (normalized[animal] ?? 0) > 0
+})
+
 const rehydrateAnimalHolderZones = (
   state: GameState,
   player: PlayerState,
@@ -206,7 +229,16 @@ const rehydrateAnimalHolderZones = (
     if (typeof player.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
     const fixedType = fixedAnimalTypeForZone(state, zone)
     const extraData = player.cardStates?.[zone.cardId]?.extraData
-    const counts = normalizeAnimalCountsForZone(state, player, zone, extraData)
+    const countsByZone = extraData?.animalCountsByZone
+    const keyedCounts = countsByZone && typeof countsByZone === 'object'
+      ? (countsByZone as Record<string, unknown>)[zone.id]
+      : undefined
+    const stored = keyedCounts !== undefined
+      ? keyedCounts
+      : zone.id === buildCardAnimalZoneId(zone.cardId)
+        ? extraData
+        : undefined
+    const counts = normalizeAnimalCountsForZone(state, player, zone, stored)
     applyAnimalCountsToZone(zone, counts, fixedType)
   }
 }
@@ -265,9 +297,14 @@ export const computeAnimalZones = (
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onComputeAnimalZones) {
+      const firstNewZoneIndex = zones.length
       const result = effect.onComputeAnimalZones(player, zones, state)
       if (Array.isArray(result)) {
         zones.push(...result)
+      }
+      for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
+        const zone = zones[i]!
+        if (zone.zoneType === 'card' && !zone.cardId) zone.cardId = cardId
       }
     }
   }
@@ -336,6 +373,130 @@ export const computeInvalidAnimalsForZone = (
     }
     throw err
   }
+}
+
+type AnimalAccommodationWorkZone = AnimalZone & {
+  animalCounts: AnimalCounts
+  animalCount: number
+}
+
+const createAccommodationWorkZone = (
+  state: GameState,
+  zone: AnimalZone,
+): AnimalAccommodationWorkZone => {
+  const workZone: AnimalAccommodationWorkZone = {
+    ...zone,
+    animalCounts: createAnimalCounts(state.enableFarmersOfTheMoor === true),
+    animalCount: 0,
+    animalType: null,
+  }
+  return workZone
+}
+
+const targetAnimalList = (
+  state: GameState,
+  targetCounts: Partial<Record<AnimalType, number>>,
+): AnimalType[] | null => {
+  const keys = animalKeysForState(state)
+  for (const key of ALL_ANIMAL_KEYS) {
+    if (!keys.includes(key) && (targetCounts[key] ?? 0) > 0) return null
+  }
+  return keys.flatMap((key) =>
+    Array.from({ length: Math.max(0, Math.floor(targetCounts[key] ?? 0)) }, () => key),
+  )
+}
+
+const candidateZoneWithAnimal = (
+  zone: AnimalAccommodationWorkZone,
+  type: AnimalType,
+): AnimalAccommodationWorkZone => {
+  const animalCounts = { ...zone.animalCounts }
+  animalCounts[type] = (animalCounts[type] ?? 0) + 1
+  const animalCount = zone.animalCount + 1
+  return {
+    ...zone,
+    animalCounts,
+    animalCount,
+    animalType: singleAnimalType(animalCounts),
+  }
+}
+
+const canPlaceAnimalInWorkZone = (
+  state: GameState,
+  player: PlayerState,
+  zones: AnimalAccommodationWorkZone[],
+  zoneIndex: number,
+  zone: AnimalAccommodationWorkZone,
+  type: AnimalType,
+): AnimalAccommodationWorkZone | null => {
+  if (zone.blocked || zone.animalCount >= zone.capacity) return null
+  if (zone.zoneType === 'card' && zone.cardId && zone.animalCount === 0 && zone.exclusiveCardZoneLimit !== undefined) {
+    const limit = Math.max(0, Math.floor(zone.exclusiveCardZoneLimit))
+    const occupied = zones.filter((entry, index) =>
+      index !== zoneIndex &&
+      entry.zoneType === 'card' &&
+      entry.cardId === zone.cardId &&
+      entry.animalCount > 0
+    ).length
+    if (occupied >= limit) return null
+  }
+  if ('allowedAnimalType' in zone && zone.allowedAnimalType !== null && zone.allowedAnimalType !== type) {
+    return null
+  }
+  if (!allowsMixedAnimalTypes(zone) && zone.animalCount > 0 && (zone.animalCounts[type] ?? 0) <= 0) {
+    return null
+  }
+  const next = candidateZoneWithAnimal(zone, type)
+  return computeInvalidAnimalsForZone(state, player, next).length === 0 ? next : null
+}
+
+export const canAccommodateAnimalTotals = (
+  state: GameState,
+  player: PlayerState,
+  targetCounts: Partial<Record<AnimalType, number>>,
+): boolean => {
+  const animals = targetAnimalList(state, targetCounts)
+  if (!animals) return false
+  const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
+  const animalKeys = animalKeysForState(state)
+  const failedStates = new Set<string>()
+  const stateKey = (index: number, currentZones: AnimalAccommodationWorkZone[]) =>
+    `${index}|${currentZones.map((zone) =>
+      `${zone.animalCount}:${animalKeys.map((key) => zone.animalCounts[key] ?? 0).join(',')}`,
+    ).join('|')}`
+  const placeFrom = (index: number, currentZones: AnimalAccommodationWorkZone[]): boolean => {
+    const type = animals[index]
+    if (!type) return true
+    const key = stateKey(index, currentZones)
+    if (failedStates.has(key)) return false
+    for (let i = 0; i < currentZones.length; i += 1) {
+      const nextZone = canPlaceAnimalInWorkZone(state, player, currentZones, i, currentZones[i]!, type)
+      if (!nextZone) continue
+      const nextZones = [...currentZones]
+      nextZones[i] = nextZone
+      if (placeFrom(index + 1, nextZones)) return true
+    }
+    failedStates.add(key)
+    return false
+  }
+  return placeFrom(0, zones)
+}
+
+export const canAccommodateAllAnimals = (
+  state: GameState,
+  player: PlayerState,
+  animals: readonly AnimalType[],
+): boolean => {
+  const targetCounts: Partial<Record<AnimalType, number>> = {}
+  const enabledAnimals = animalKeysForState(state)
+  for (const type of animals) {
+    if (!enabledAnimals.includes(type)) return false
+    targetCounts[type] = (targetCounts[type] ?? player.resources[type] ?? 0) + 1
+  }
+  for (const type of enabledAnimals) {
+    targetCounts[type] ??= player.resources[type] ?? 0
+  }
+  return canAccommodateAnimalTotals(state, player, targetCounts)
 }
 
 /**

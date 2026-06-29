@@ -4,6 +4,7 @@ import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
   buildCardDisplayMap,
+  buildFarmCardDisplayMap,
   buildPastureDisplayMap,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
@@ -11,6 +12,7 @@ import {
   buildStableDisplayMap,
   hasUnassignedAnimals,
   shouldShowAnimalDiscardPrompt,
+  wouldExceedExclusiveCardZoneLimit,
 } from '../hooks/use-animal-reorg-flow'
 
 const resources = (): Resource => ({
@@ -164,6 +166,59 @@ describe('use-animal-reorg-flow helpers', () => {
       capacity: 1,
       zoneId: 'card:C148_MudWallower',
     })
+  })
+
+  it('builds farm-card display from persisted per-zone storage after reorg', () => {
+    const target = player()
+    target.cardStates = {
+      M034_HomeWood: {
+        extraData: {
+          animalCountsByZone: {
+            'card:M034_HomeWood@0-0': {
+              animalCounts: { horse: 1 },
+              capacity: 1,
+              allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+            },
+          },
+        },
+      },
+    }
+    const display = buildFarmCardDisplayMap(target, null)
+    expect(display.get('0-0')).toEqual({
+      animalType: 'horse',
+      animalCount: 1,
+      animalCounts: { horse: 1 },
+      capacity: 1,
+      zoneId: 'card:M034_HomeWood@0-0',
+      allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+    })
+  })
+
+  it('blocks assigning a second occupied card zone past exclusive limit', () => {
+    const reorg = animalReorgState()
+    reorg.zones.push(
+      {
+        id: 'card:M035_HorseTrough@0,0',
+        zoneType: 'card',
+        cardId: 'M035_HorseTrough',
+        animalType: 'horse',
+        animalCount: 1,
+        capacity: 1,
+        exclusiveCardZoneLimit: 1,
+      },
+      {
+        id: 'card:M035_HorseTrough@0,1',
+        zoneType: 'card',
+        cardId: 'M035_HorseTrough',
+        animalType: null,
+        animalCount: 0,
+        capacity: 1,
+        exclusiveCardZoneLimit: 1,
+      },
+    )
+
+    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,1')).toBe(true)
+    expect(wouldExceedExclusiveCardZoneLimit(reorg.zones, 'card:M035_HorseTrough@0,0')).toBe(false)
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

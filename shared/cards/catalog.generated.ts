@@ -13819,7 +13819,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "prerequisite": "At Least 1 Forest",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -13885,7 +13885,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "prerequisite": "5 Animals",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -13935,7 +13935,8 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "3 Improvements",
-    "implemented": false,
+    "animalHolder": true,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -13951,7 +13952,8 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {
       "stone": 1
     },
-    "implemented": false,
+    "animalHolder": true,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14238,7 +14240,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "food": 1
     },
     "prerequisite": "4 Horses",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14255,7 +14257,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -14305,7 +14307,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "1 Horse",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15024,7 +15026,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 1,
       "reed": 1
     },
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15157,7 +15159,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "prerequisite": "see below",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15174,7 +15176,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "vegetable": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15837,7 +15839,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "clay": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

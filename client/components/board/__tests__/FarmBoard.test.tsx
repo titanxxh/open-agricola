@@ -34,6 +34,9 @@ beforeAll(async () => {
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
+    M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
+    M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
+    M035_HorseTrough: manifestEntry('M035_HorseTrough', 'Horse Trough', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -252,6 +255,87 @@ describe('FarmBoard', () => {
     expect(html).toContain('res-icon-horse')
   })
 
+  it('renders card terrain markers inside their terrain tiles', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+    ]
+    player.cardStates = {
+      M053_ForestHut: {
+        counters: {},
+        infobox: undefined,
+        stack: [],
+        extraData: {
+          farmTerrainMarkers: [{
+            row: 0,
+            col: 0,
+            kind: 'person',
+            workerId: '3',
+            sourceCard: 'M053_ForestHut',
+          }],
+        },
+      },
+    }
+
+    const boardOverrides = {
+      farmCells: [
+        { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+        { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+      ],
+    }
+    const htmlWith = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player, boardOverrides)} />,
+    )
+    expect(htmlWith).toContain('data-testid="farm-terrain-marker-M053_ForestHut-0-0"')
+    expect(htmlWith).not.toContain('data-testid="farm-terrain-marker-M053_ForestHut-0-1"')
+
+    const playerWithoutMarker: PlayerState = {
+      ...player,
+      cardStates: {
+        M053_ForestHut: {
+          counters: {},
+          infobox: undefined,
+          stack: [],
+          extraData: { farmTerrainMarkers: [] },
+        },
+      },
+    }
+    const htmlWithout = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(playerWithoutMarker, boardOverrides)} />,
+    )
+    expect(htmlWithout).not.toContain('farm-terrain-marker-M053_ForestHut')
+  })
+
+  it('renders public card markers in the player summary area', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.cardStates = {
+      M027_GardenPath: {
+        counters: {},
+        infobox: undefined,
+        stack: [],
+        extraData: {
+          publicCardMarkers: [{
+            id: 'garden-path',
+            label: 'Garden Path',
+            score: -1,
+            sourceCardId: 'M027_GardenPath',
+            sourcePlayerId: 'p2',
+          }],
+        },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('data-testid="player-public-card-markers"')
+    expect(html).toContain('data-testid="public-card-marker-M027_GardenPath-garden-path"')
+    expect(html).toContain('Garden Path')
+    expect(html).not.toContain('farm-terrain-marker-M027_GardenPath')
+  })
+
   it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.houseAnimalType = 'horse'
@@ -301,6 +385,72 @@ describe('FarmBoard', () => {
 
     expect(html).toContain(
       '<span class="pasture-control-label">Sheep</span><button>-</button><span class="pasture-control-value">1</span><button disabled="">+</button>',
+    )
+  })
+
+  it('renders farm-position card animal zones on the farm tile instead of the played card', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M034_HomeWood']
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'forest' }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['M034_HomeWood'],
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
+          farmCardDisplayMap: new Map([
+            ['0-0', {
+              zoneId: 'card:M034_HomeWood@0-0',
+              capacity: 1,
+              animalType: 'horse',
+              animalCount: 1,
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('data-testid="farm-card-reorg-card:M034_HomeWood@0-0"')
+    expect(html).toContain('res-icon-horse')
+    expect(html).not.toContain('played-card-reorg')
+  })
+
+  it('disables farm-position card animal controls rejected by zone metadata', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M034_HomeWood']
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'forest' }]
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['M034_HomeWood'],
+          farmCells: [
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+          ],
+          isReorgActive: true,
+          reorgRemaining: { sheep: 1, boar: 1, cattle: 0, horse: 1 },
+          farmCardDisplayMap: new Map([
+            ['0-0', {
+              zoneId: 'card:M034_HomeWood@0-0',
+              capacity: 1,
+              animalType: null,
+              animalCount: 0,
+              allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+            }],
+          ]),
+        })}
+      />,
+    )
+
+    expect(html).toContain(
+      '<span class="pasture-control-label">Sheep</span><button disabled="">-</button><span class="pasture-control-value">0</span><button disabled="">+</button>',
+    )
+    expect(html).toContain(
+      '<span class="pasture-control-label">Boar</span><button disabled="">-</button><span class="pasture-control-value">0</span><button>+</button>',
     )
   })
 

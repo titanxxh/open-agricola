@@ -2,7 +2,12 @@ import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
-import { positionKey } from '../../../shared/domain/farm'
+import { parsePositionKey, positionKey } from '../../../shared/domain/farm'
+import {
+  compactAnimalCounts,
+  readAnimalHolderCounts,
+  sumAnimalCounts,
+} from '../../../shared/domain/animal-holder-state'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
@@ -14,6 +19,34 @@ type AnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalType, number>>
+  allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
+}
+
+const interactionZoneAnimalTotal = (zone: AnimalReorgState['zones'][number]) => {
+  const animalCounts = zone.animalCounts
+  if (animalCounts) {
+    return ALL_ANIMAL_KEYS.reduce((sum, animal) => sum + Math.max(0, animalCounts[animal] ?? 0), 0)
+  }
+  return Math.max(0, zone.animalCount ?? 0)
+}
+
+export const wouldExceedExclusiveCardZoneLimit = (
+  zones: AnimalReorgState['zones'],
+  zoneId: string,
+) => {
+  const target = zones.find((zone) => zone.id === zoneId)
+  if (!target || target.zoneType !== 'card' || !target.cardId) return false
+  if (target.exclusiveCardZoneLimit === undefined) return false
+  if (interactionZoneAnimalTotal(target) > 0) return false
+  const limit = Math.max(0, Math.floor(target.exclusiveCardZoneLimit))
+  const occupied = zones.filter((zone) =>
+    zone.id !== target.id &&
+    zone.zoneType === 'card' &&
+    zone.cardId === target.cardId &&
+    interactionZoneAnimalTotal(zone) > 0
+  ).length
+  return occupied >= limit
 }
 
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
@@ -117,13 +150,84 @@ export const buildCardDisplayMap = (
 ) => {
   const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
   animalReorg?.zones
-    .filter((zone) => zone.zoneType === 'card')
+    .filter((zone) => zone.zoneType === 'card' && !zone.farmPosition)
     .forEach((zone) => {
       const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
       map.set(cardId, {
         animalType: zone.animalType,
         animalCount: zone.animalCount,
         animalCounts: zone.animalCounts,
+        allowedAnimalType: zone.allowedAnimalType,
+        allowedAnimalTypes: zone.allowedAnimalTypes,
+        capacity: zone.capacity,
+        zoneId: zone.id,
+      })
+    })
+  return map
+}
+
+const animalTypeFromCounts = (counts: Partial<Record<AnimalType, number>>): AnimalType | null => {
+  const used = ALL_ANIMAL_KEYS.filter((animal) => (counts[animal] ?? 0) > 0)
+  return used.length === 1 ? used[0]! : null
+}
+
+const readAllowedAnimalType = (value: unknown): AnimalType | null | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const type = (value as { allowedAnimalType?: unknown }).allowedAnimalType
+  if (type === null) return null
+  return ALL_ANIMAL_KEYS.includes(type as AnimalType) ? type as AnimalType : undefined
+}
+
+const readAllowedAnimalTypes = (value: unknown): AnimalType[] | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const types = (value as { allowedAnimalTypes?: unknown }).allowedAnimalTypes
+  if (!Array.isArray(types)) return undefined
+  return types.filter((type): type is AnimalType => ALL_ANIMAL_KEYS.includes(type as AnimalType))
+}
+
+const readCapacity = (value: unknown, fallback: number) => {
+  if (!value || typeof value !== 'object') return fallback
+  const capacity = (value as { capacity?: unknown }).capacity
+  return typeof capacity === 'number' && Number.isFinite(capacity)
+    ? Math.max(0, Math.floor(capacity))
+    : fallback
+}
+
+export const buildFarmCardDisplayMap = (
+  player: PlayerState | null | undefined,
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  Object.values(player?.cardStates ?? {}).forEach((state) => {
+    const countsByZone = state?.extraData?.animalCountsByZone
+    if (!countsByZone || typeof countsByZone !== 'object') return
+    Object.entries(countsByZone as Record<string, unknown>).forEach(([zoneId, stored]) => {
+      const position = parsePositionKey(zoneId.split('@')[1] ?? '')
+      if (!position) return
+      const animalCounts = readAnimalHolderCounts(stored)
+      const animalCount = sumAnimalCounts(animalCounts)
+      if (animalCount <= 0) return
+      const compact = compactAnimalCounts(animalCounts)
+      map.set(positionKey(position), {
+        animalType: animalTypeFromCounts(compact),
+        animalCount,
+        animalCounts: compact,
+        allowedAnimalType: readAllowedAnimalType(stored),
+        allowedAnimalTypes: readAllowedAnimalTypes(stored),
+        capacity: readCapacity(stored, animalCount),
+        zoneId,
+      })
+    })
+  })
+  animalReorg?.zones
+    .filter((zone) => zone.zoneType === 'card' && zone.farmPosition)
+    .forEach((zone) => {
+      map.set(positionKey(zone.farmPosition!), {
+        animalType: zone.animalType,
+        animalCount: zone.animalCount,
+        animalCounts: zone.animalCounts,
+        allowedAnimalType: zone.allowedAnimalType,
+        allowedAnimalTypes: zone.allowedAnimalTypes,
         capacity: zone.capacity,
         zoneId: zone.id,
       })

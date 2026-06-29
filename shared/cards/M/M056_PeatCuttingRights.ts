@@ -1,6 +1,34 @@
 import { defineMinorCard } from '../card-source'
+import type { CardImpl } from '../registry'
+import {
+  scheduledOffersRoundStartFlow,
+  writeScheduledOffers,
+  type ScheduledOffer,
+} from '../../actions/effects/internal/scheduled-offers'
 
 const CARD_ID = 'M056_PeatCuttingRights'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const offers: ScheduledOffer[] = [4, 7]
+        .map((offset): ScheduledOffer => ({
+          id: `${CARD_ID}-${state.round + offset}`,
+          kind: 'moor-special-action',
+          dueRound: state.round + offset,
+          actionId: 'cut-peat',
+          cost: {},
+          consumed: false,
+        }))
+        .filter((offer) => offer.dueRound <= 14)
+      if (offers.length === 0) return
+      writeScheduledOffers(player, CARD_ID, offers)
+    },
+    onRoundStart: (state, player) => scheduledOffersRoundStartFlow(state, player, CARD_ID),
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M056_PeatCuttingRights = defineMinorCard({
   meta: {
@@ -14,7 +42,10 @@ export const M056_PeatCuttingRights = defineMinorCard({
     ],
     cost: {},
     prerequisite: "1 Horse",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M056_PeatCuttingRights_impl = M056_PeatCuttingRights.impl

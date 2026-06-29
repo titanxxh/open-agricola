@@ -62,6 +62,7 @@ import {
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
+  canTakeVisibleMoorSpecialAction,
   enableFarmersOfTheMoorFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
@@ -83,9 +84,11 @@ import {
 import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
   buildCardDisplayMap,
+  buildFarmCardDisplayMap,
   buildPastureDisplayMap,
   buildStableDisplayMap,
   shouldShowAnimalDiscardPrompt,
+  wouldExceedExclusiveCardZoneLimit,
 } from './hooks/use-animal-reorg-flow'
 import {
   collectPrivateEventNotifications,
@@ -684,17 +687,7 @@ export const GameContainerApi = () => {
   const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId !== 'idle') return false
-    if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
-    const borrowFood = card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id ? 2 : 0
-    const actionFood =
-      actionId === 'horse-market' && [2, 5, 6].includes(state.players.length) ? 1
-        : actionId === 'illicit-work' ? 1
-          : 0
-    const actionFuel = actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
-    return (
-      currentPlayer.resources.food >= borrowFood + actionFood &&
-      (currentPlayer.resources.fuel ?? 0) >= actionFuel
-    )
+    return canTakeVisibleMoorSpecialAction(state, currentPlayer, card, actionId)
   }, [currentPlayer, interaction.stateId, isInteractive, state])
 
   const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
@@ -1528,6 +1521,9 @@ export const GameContainerApi = () => {
   const cardDisplayMap = useMemo(() => {
     return buildCardDisplayMap(animalReorg)
   }, [animalReorg])
+  const farmCardDisplayMap = useMemo(() => {
+    return buildFarmCardDisplayMap(displayPlayer, animalReorg)
+  }, [displayPlayer, animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
@@ -1731,6 +1727,7 @@ export const GameContainerApi = () => {
       }
 
       if (delta > 0) {
+        if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
         const baseTotals = { ...totals }
         const currentCounts = zoneAnimalCounts(current)
         addAnimalCounts(baseTotals, {
@@ -2442,7 +2439,7 @@ export const GameContainerApi = () => {
               positionSelectableSet={combinedPositionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
               hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
               fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}

@@ -519,6 +519,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `place-farmer-on-space` 是指定目标额外放人的 internal action。它从当前 owner 家里取可用工人放到 `params.spaceId`，然后默认返回目标 action 的 `expandFlow` leaf；`params.allowOccupied` 只跳过 occupied 检查，不跳过 linked block / round availability / action executability / worker supply。需要 piggyback 或固定目标连锁放人的卡牌应使用该 internal action，不要在 listener handler 内直接改 `ActionSpace.takenBy`。
 
+`pass-minor-card-to-left` 是跨玩家传递已打出小改良的 internal action。它从当前玩家的 `minorPlayed` / `improvements` 移除目标卡，清理该卡在原玩家的 `cardStates`，把卡加入左手玩家 `minorHand`，发送 `card.passed` public event 和目标玩家私有 `cardEffectHandChanged`；后续触发条件应消费 `card.passed` provenance，不直接扫描手牌差异。
+
 额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
 
 ### 7.4 payment/
@@ -685,9 +687,15 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `reap` 是可由 ActionFlow/internal 执行的内部 action；私人田地收获通过 `trigger: { phase: 'private-field-phase', cardId: sourceCard }` 进入同一 action，不启动完整 Harvest：先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
 
-`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
+`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。`place-farmer` 也支持 `actionContext.temporaryFromSupply + temporaryWorkerId` 放置由卡牌保留的 supply worker；该 worker 不标 active、不计 family/housing/feeding/scoring，生命周期由卡牌在 `onReturnHome` 清理。
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`futureMeepleActions` 是 round-start 内部 stage：普通资源到期时先按 player 合并成一个内部 `receive` action transaction，`resource.moved.reason='receive'` 且每个 entry 保留自己的 `sourceCardId`，因此 Receive listener 会触发一次，Gain listener 不会被隐式触发；`FutureMeepleResourceMap.field/stable` 到期后仍由 `applyFutureMeeples` 消费 token，再把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`。entry 可携带 `actionContext`，用于 D91 这类付费 plow。该 stage 完成后继续普通 `onRoundStart`，不重复 round-start 初始化。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
+
+阶段 hook 子流程产生 privateEvents 时，嵌套 `respond()` 不得提前 drain 外层 response buffer；`stageResume` 恢复阶段需要把私有事件保留到最外层响应统一发送。
+
+阶段 hook 子流程可能移除正在结算的卡牌（例如传牌）。`stageResume` 除 numeric `cardIndex` 外还保存 `resumeAfterCardId`；恢复时若该卡仍在 played-card 列表中，从它之后继续，若已被移除，则从旧 index 前一位继续，避免跳过原本紧随其后的同阶段 hook。
+
+未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。执行时先消费 token，再按当前状态决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
 
 ### 7.7 Listener activation purity + BGA 对齐
 
@@ -854,7 +862,9 @@ export const A123_FrameBuilder = defineOccupationCard({
 - 只服务单卡或少数卡牌的历史记录优先落到 `cardStates[cardId].extraData`；如需覆盖卡牌打出前历史，使用显式 hand-zone listener，而不是新增全局 stat。
 - 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
 - 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
-- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。
+- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把 newborn 直接放到卡上，避免其在回家前占用行动格或被再次用作容量来源。
+- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；FarmBoard 只把 marker 渲染在对应 terrain tile 内，规则仍由后端卡牌状态裁定。
+- 卡牌可在目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers` 写入跨玩家公开 marker；helper 汇总后由 scoring 写入 `cardBonusVp`，FarmBoard 只在原玩家摘要区域展示，不把 marker 贴到农场板外侧。
 
 ### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
 
@@ -950,7 +960,7 @@ shared/domain/
 ├── player-board.ts    PlayerBoard（playerBoard 工厂）
 ├── farmyard.ts        农场布局 / normalizePlayerFarm
 ├── pasture.ts         围栏验证 / computePasturesFromFences
-├── animal-zones.ts    动物分区容量（getTotalAnimalCapacity / getPastureCapacity）
+├── animal-zones.ts    动物分区容量与容纳判定（getTotalAnimalCapacity / getPastureCapacity / canAccommodateAnimalTotals）
 ├── animals.ts         动物模型
 ├── scoring.ts         计分 / PlayerScoreSummary
 ├── scoring-reserve.ts 终局 Scoring Reserve 读取 / 汇总 / 扣 scoring clone
@@ -966,11 +976,19 @@ shared/domain/
 
 `Card Bonus VP` 的统一 score category 是 `cardBonusVp`：所有由卡牌产生的非印刷 bonus VP 都进入该 category，并尽量在 `ScoreEntry.type='bonus'` 上保留 `cardId` / `cardType` attribution。它不同于 printed Cards VP；卡牌本身印刷分仍进入 `cards` category，compact/live score 也必须保持 `cards` 与 `cardBonusVp` 分离。旧 `cardsBonus`、`cardStateBonusVp`、`cardBonus` score shapes 不保留，客户端和文档都不应读取、合并或兼容这些旧 key。
 
+公开卡牌 marker 也属于 `cardBonusVp`：`publicCardMarkers` 可提供正负分，`ScoreEntry.type='bonus'` 使用 marker 的 `sourceCardId` attribution，不新增独立 score category。
+
 `computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D011_LawnFertilizer 这类 size-one pasture replacement 总是在 A012_DrinkingTrough / B072_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
 
 `AnimalZone.houseAnimalZone?: boolean` 标记“视作 house 动物区”的非 house zone。`computeAnimalZones` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，会统一移除普通 `zoneType === 'house'` 和 `houseAnimalZone === true` 的 zone。House-zone 规则统计必须使用 `isHouseAnimalZone()` / `countHouseAnimals()`，不要再直接读取 `player.houseAnimalCount` 后漏掉 D148_DomesticianExpert 这类 tagged zone。
 
-`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B086_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。pasture capacity replacement/additive 不再放在这里，改走 `computePastureCapacityModifiers`。
+动物“可容纳”问题统一走 `canAccommodateAnimalTotals(state, player, targetCounts)` 或 add-only wrapper `canAccommodateAllAnimals(state, player, animals)`。它们按最终动物总量搜索合法 zone assignment，允许后续系统 `reorganize` 重新分配；卡牌不得用“当前任一 zone 是否还能塞下一只”的局部判断替代，否则会错误拒绝可通过重整达成的合法状态。搜索会 memoize 已失败的工作区分配状态，避免 M031 这类多候选交换在 impossible late-game farm 上重复枚举等价分支；`exclusiveCardZoneLimit` 也必须在搜索期生效，避免候选被误判为可通过多个同卡 zone 容纳；如果候选本身会永久降低 holder 容量（例如 C148 held 被支付），候选过滤必须用支付后的容量。
+
+`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B086_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。当前卡牌 effect 新增的 `zoneType:'card'` zone 若没有显式 `cardId`，`computeAnimalZones` 会自动补为当前 card id，保证 animal-reorg 写回和可容纳判断使用同一个可持久化 zone 身份。固定动物类型必须显式写 `allowedAnimalType`；`animalType` 是当前可见占用类型，不能被最终总量可容纳搜索当成印刷限制。pasture capacity replacement/additive 不再放在这里，改走 `computePastureCapacityModifiers`。
+
+farm-position backed card zones 可把动物写入 `cardStates[cardId].extraData.animalCountsByZone`。动物统计和消费 helper（例如 `getAssignedAnimalsByType()` / `subtractAnimalsFromBoard()`）必须同时读写 legacy `animalCounts` / `held` 与 per-zone `animalCountsByZone`，否则后续 reorg 会从 stale per-zone state 重新 hydrate 已消费动物。`exclusiveCardZoneLimit` / `allowedAnimalTypes` 是后端算出的 zone metadata，必须随 `InteractionAnimalReorgZone` 传给前端；前者由统一 reorg helper 阻止超过 limit 的多 zone 分配，后者用于 UI 禁用后端一定会拒绝的动物类型。前端不写具体卡牌 id 规则。
+
+farm-position backed card animal zone 使用 `AnimalZone.farmPosition` / `countsFarmyardSpaceAsUnused` / `displaySource:'farm-position'` 进入 `InteractionAnimalReorgZone`，前端 FarmBoard 只把后端给出的 zone 渲染到对应农场格，不自行判断合法格。普通单 zone animal-holder 继续写 `cardStates[cardId].extraData.animalCounts`；同一卡多农场格 zone 写 `cardStates[cardId].extraData.animalCountsByZone[zoneId]`，并随非空 zone 持久化 `capacity` / `allowedAnimalType` / `allowedAnimalTypes` / `farmPosition` 供非 active reorg 状态继续显示。zone 消失时由 animal reorg 写回清理。需要“多个候选格但只能选一个”的卡牌使用 `exclusiveCardZoneLimit`，避免同一卡多个候选 zone 同时容纳动物。
 
 **Special-stable card-effect 扩展点**：`getSpecialStablePositions?(state, player) => FarmTilePosition[]` + `applySpecialStable?(state, player, position) => boolean` + `getBuiltSpecialStables?(player) => FarmTilePosition[]`。在 Farm-Expansion 的 Build Stables `farm-select` 里，核心 `shared/actions/effects/stables.ts` 通过 `card-effects.ts` 的 `collectSpecialStablePositions(state, player)`（聚合所有卡的候选，每项带 `sourceCardId`）和 `applySpecialStableAt(state, player, position)`（委派给接受该格的卡，返回 `sourceCardId`）发现并结算这些“非 `stableTiles` 普通格”的特殊 stable。候选注入协议字段 `farmHandPositions`（字段名为前端兼容保留），结算时填 `farm.stableBuilt` item 的 `kind:'special'` + `sourceCardId`。门控为通用的 `actionContext.farmHand === true`——仅 Farm-Expansion stables leaf wrapper 设置，E148 / A089 / C94 等其他“建 stable”入口不提供特殊 stable。当前唯一实现者是 B085_FarmHand（2×2 田地中心），核心 stables 文件不再 import 任何具体卡牌。
 

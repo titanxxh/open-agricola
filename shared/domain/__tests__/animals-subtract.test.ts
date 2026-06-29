@@ -82,6 +82,26 @@ describe('subtractAnimalsFromBoard', () => {
     expect((p.cardStates!.C148_MudWallower.extraData as any).held).toBe(1)
   })
 
+  it('animal-holder 卡 animalCountsByZone', () => {
+    const p = createPlayer({
+      resources: { ...emptyResources(), sheep: 2 },
+      cardStates: {
+        M034_HomeWood: {
+          extraData: {
+            animalCountsByZone: {
+              'card:M034_HomeWood@0,0': { animalCounts: { sheep: 2 } },
+            },
+          },
+        } as any,
+      },
+    })
+    subtractAnimalsFromBoard(p, { sheep: 1 })
+    expect(p.resources.sheep).toBe(1)
+    const zone = ((p.cardStates!.M034_HomeWood.extraData as any).animalCountsByZone as any)['card:M034_HomeWood@0,0']
+    expect(zone.animalCounts.sheep).toBe(1)
+    expect(zone.held).toBe(1)
+  })
+
   it('多 type 同时', () => {
     const p = createPlayer({
       resources: { ...emptyResources(), sheep: 1, boar: 1 },

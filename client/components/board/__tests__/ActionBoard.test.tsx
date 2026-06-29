@@ -77,6 +77,65 @@ const expectActionStyle = (
 }
 
 describe('ActionBoard', () => {
+  it('renders non-card dynamic action spaces as clickable action buttons', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const takeAction = vi.fn()
+
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('moor-infirmary', 'actions.moor-infirmary.name')]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={takeAction}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    const holder = container.querySelector('[data-action-id="moor-infirmary"]')
+    expect(holder).not.toBeNull()
+    expect(holder?.className).not.toContain('action-card-holder')
+    fireEvent.click(screen.getByRole('button', { name: /Infirmary/ }))
+    expect(takeAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'moor-infirmary' }))
+  })
+
+  it('renders card dynamic action spaces with action ids for the playtest harness', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const takeAction = vi.fn()
+
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('D023_PioneeringSpirit', 'cards.D023_PioneeringSpirit.name')]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={takeAction}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    const holder = container.querySelector('[data-action-id="D023_PioneeringSpirit"]')
+    expect(holder?.querySelector('.player-card:not(.unselectable)')).not.toBeNull()
+    fireEvent.click(holder!.querySelector('.player-card')!)
+    expect(takeAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'D023_PioneeringSpirit' }))
+  })
+
   it('renders owner-labeled action-space resource attachments from card state', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
