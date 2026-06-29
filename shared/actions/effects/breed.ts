@@ -108,6 +108,7 @@ export const breedAction: ActionDefinition = {
         ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
         ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
         ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
+        ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
         capacity: zone.capacity,
       }))
       return {

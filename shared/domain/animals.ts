@@ -13,6 +13,49 @@ export type { AnimalKey }
 
 const ZERO: AnimalCounts = createAnimalCounts()
 
+const addCounts = (
+  target: AnimalCounts,
+  counts: Partial<Record<AnimalKey, number>>,
+) => {
+  for (const key of ALL_ANIMAL_KEYS) {
+    const amount = counts[key] ?? 0
+    if (amount > 0) target[key] = (target[key] ?? 0) + amount
+  }
+}
+
+const readAnimalHolderCountsWithZones = (extraData: unknown): AnimalCounts => {
+  const total = readAnimalHolderCounts(extraData)
+  if (!extraData || typeof extraData !== 'object') return total
+  const zoneCounts = (extraData as { animalCountsByZone?: unknown }).animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return total
+  for (const entry of Object.values(zoneCounts)) {
+    addCounts(total, readAnimalHolderCounts(entry))
+  }
+  return total
+}
+
+const subtractFromCountsByZone = (
+  extraData: Record<string, unknown>,
+  type: AnimalKey,
+  amount: number,
+) => {
+  let remaining = amount
+  const zoneCounts = extraData.animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return remaining
+  for (const entry of Object.values(zoneCounts)) {
+    if (remaining <= 0) break
+    if (!entry || typeof entry !== 'object') continue
+    const zoneExtra = entry as Record<string, unknown>
+    const counts = readAnimalHolderCounts(zoneExtra)
+    const take = Math.min(counts[type] ?? 0, remaining)
+    if (take <= 0) continue
+    counts[type] -= take
+    writeAnimalHolderCounts(zoneExtra, counts)
+    remaining -= take
+  }
+  return remaining
+}
+
 /**
  * Count animals placed on a player's board (pasture + house + stable + animal-holder cards).
  * Does NOT include reserve / unassigned animals — for total persisted count use
@@ -45,11 +88,7 @@ export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
     if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
   }
   for (const state of Object.values(player.cardStates ?? {})) {
-    const counts = readAnimalHolderCounts(state?.extraData)
-    for (const key of ALL_ANIMAL_KEYS) {
-      const amount = counts[key] ?? 0
-      if (amount > 0) result[key] = (result[key] ?? 0) + amount
-    }
+    addCounts(result, readAnimalHolderCountsWithZones(state?.extraData))
   }
   return result
 }
@@ -111,10 +150,14 @@ export const subtractAnimalsFromBoard = (
         if (!extra) continue
         const counts = readAnimalHolderCounts(extra)
         const take = Math.min(counts[type] ?? 0, remaining)
-        if (take <= 0) continue
-        counts[type] -= take
-        writeAnimalHolderCounts(extra, counts)
-        remaining -= take
+        if (take > 0) {
+          counts[type] -= take
+          writeAnimalHolderCounts(extra, counts)
+          remaining -= take
+        }
+        if (remaining > 0) {
+          remaining = subtractFromCountsByZone(extra, type, remaining)
+        }
       }
     }
     // 5. player.resources total

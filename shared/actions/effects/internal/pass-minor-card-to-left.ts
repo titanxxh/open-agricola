@@ -30,12 +30,12 @@ export const passMinorCardToLeftAction: ActionDefinition = {
     const cardId = readCardId(params)
     if (!cardId) return { type: 'fail', errorKey: 'log.cardEffectFail' }
     const target = leftPlayerOf(state.players, player)
-    if (!target || target.id === player.id) return { type: 'fail', errorKey: 'log.cardEffectFail' }
     const removed = removeCard(player.minorPlayed, cardId) || removeCard(player.improvements, cardId)
     if (!removed) return { type: 'fail', errorKey: 'log.cardEffectFail' }
     if (player.cardStates) {
       delete player.cardStates[cardId]
     }
+    if (!target || target.id === player.id) return { type: 'ok' }
     if (!target.minorHand.includes(cardId)) {
       target.minorHand.push(cardId)
     }
