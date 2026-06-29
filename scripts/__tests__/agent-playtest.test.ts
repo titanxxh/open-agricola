@@ -11,6 +11,10 @@ import {
 } from '../agent-playtest'
 
 describe('agent-playtest Moor mode', () => {
+  it('rejects the documented-but-unimplemented replay flag', () => {
+    expect(() => parseArgs(['--replay', 'trace.json'])).toThrow('--replay is not implemented')
+  })
+
   it('adds Farmers of the Moor room flags to player URLs', () => {
     const args = parseArgs([
       '--players', '4',

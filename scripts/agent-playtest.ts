@@ -96,6 +96,9 @@ export type Args = {
 }
 
 export const parseArgs = (argv: string[]): Args => {
+  if (argv.includes('--replay')) {
+    throw new Error('--replay is not implemented; use trace.json plus snapshots/step-*.json for reproduction')
+  }
   const get = (name: string, fallback: string): string => {
     const i = argv.indexOf(`--${name}`)
     return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback
