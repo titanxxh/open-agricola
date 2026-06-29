@@ -98,6 +98,16 @@ describe('M084 Bog Pony session', () => {
     expect(updated.resources.horse).toBe(1)
     expect(updated.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
     expect(updated.cardStates[CARD_ID]?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        resources: { fuel: 2 },
+        from: { kind: 'card', playerId: updated.id, cardId: CARD_ID },
+        to: { kind: 'player', playerId: updated.id },
+        reason: 'cardEffect',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
     expect(resp.interaction.anytimeActions.map((action: AnytimeAction) => action.id)).not.toContain(ANYTIME_ID)
   })
 

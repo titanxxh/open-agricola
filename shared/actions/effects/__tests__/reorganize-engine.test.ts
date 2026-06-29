@@ -320,6 +320,31 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
   })
 
+  it('does not let reorg payload assign M084 private horses to visible zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 1 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+        } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.houseAnimalType).toBeNull()
+    expect(ctx.player.houseAnimalCount).toBe(0)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+  })
+
   it('clears stale ordinary card-zone animals when the zone disappears', () => {
     const ctx = makeCtx({
       player: {
