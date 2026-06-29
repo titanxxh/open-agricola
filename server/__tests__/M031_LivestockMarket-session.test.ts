@@ -4,6 +4,7 @@ import { M031_LivestockMarket } from '../../shared/cards/M/M031_LivestockMarket'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionFlow, PlayerState, Resource, Trade } from '../../shared/contract/types'
+import '../../shared/cards/B/B012_Stockyard'
 import '../../shared/cards/C/C148_MudWallower'
 
 const CARD_ID = 'M031_LivestockMarket'
@@ -99,6 +100,44 @@ const makeC148NetNeutralBoarBoard = (player: PlayerState) => {
       stables: 0,
       animalType: null,
       animalCount: 0,
+    },
+  ]
+}
+
+const makeC148CapacityTrapBoard = (player: PlayerState) => {
+  player.minorHand = [CARD_ID]
+  player.occupationPlayed = ['C148_MudWallower']
+  player.cardStates = {
+    C148_MudWallower: { counters: { counter: 0, held: 1 } },
+  }
+  player.resources = fullResources({ sheep: 4, boar: 1 })
+  player.pastures = [
+    {
+      id: 'sheep-pasture',
+      size: 2,
+      tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 4,
+    },
+  ]
+}
+
+const makeStockyardNetNeutralBoarBoard = (player: PlayerState) => {
+  player.minorHand = [CARD_ID]
+  player.minorPlayed = ['B012_Stockyard']
+  player.cardStates = {
+    B012_Stockyard: { extraData: { animalCounts: { boar: 1 } } },
+  }
+  player.resources = fullResources({ sheep: 4, boar: 1 })
+  player.pastures = [
+    {
+      id: 'sheep-pasture',
+      size: 2,
+      tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 4,
     },
   ]
 }
@@ -216,5 +255,50 @@ describe('M031_LivestockMarket session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 1, cattle: 1 })
     expect(resp.state.players[0]!.cardStates.C148_MudWallower?.counters?.held).toBe(0)
+  })
+
+  it('filters net-neutral boar exchanges that only fit before C148 payment reduces capacity', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    makeC148CapacityTrapBoard(player)
+    player.minorPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    const effect = getCardEffect(CARD_ID)
+    expect(effect).not.toBeNull()
+    const flow = effect!.onBuy!(state, player) as ActionFlow
+    expect(directTrades(flow)).not.toContainEqual({
+      from: { sheep: 1, boar: 1 },
+      to: { boar: 1, cattle: 1 },
+      sourceId: CARD_ID,
+    })
+  })
+
+  it('deducts boar from normal animal-holder cards on net-neutral boar exchanges', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    makeStockyardNetNeutralBoarBoard(player)
+    session.loadState(state)
+
+    let resp = playMinor(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const exchangeOption = resp.interaction.options?.find((option) => {
+      const preview = option.effectPreview
+      return preview?.kind === 'resourceExchange'
+        && preview.resourcesPaid?.sheep === 1
+        && preview.resourcesPaid?.boar === 1
+        && preview.resourcesGained?.boar === 1
+        && preview.resourcesGained?.cattle === 1
+    })
+    expect(exchangeOption).toBeDefined()
+
+    resp = session.resolveChoice(0, exchangeOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 1, cattle: 1 })
+    const animalCounts = resp.state.players[0]!.cardStates.B012_Stockyard?.extraData?.animalCounts as Record<string, number> | undefined
+    expect(animalCounts?.boar ?? 0).toBe(0)
   })
 })
