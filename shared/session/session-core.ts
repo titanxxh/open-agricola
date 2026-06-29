@@ -393,6 +393,7 @@ type StageResumeState = {
     trigger?: import('../actions/effects/reorganize').ReorganizeTrigger
     originPlayerIndex?: number | null
     triggerActionId?: string | null
+    resumeAfterCardId?: string | null
   }
 }
 
@@ -1623,6 +1624,7 @@ export class GameCore {
       ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
+      ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
       capacity: zone.capacity,
     }))
   }
@@ -2617,6 +2619,7 @@ export class GameCore {
     hook: StageCardEffectHook,
     playerIndex = 0,
     cardIndex = 0,
+    extra?: StageResumeState['extra'],
   ) {
     if (cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
       return this.continueParallelStageHook(hook, playerIndex)
@@ -2628,17 +2631,32 @@ export class GameCore {
         ...this.getPlayerEffectCardIds(player),
         ...this.getPlayerHandEffectCardIds(player, hook),
       ]
-      const startCardIndex = currentPlayerIndex === playerIndex ? cardIndex : 0
+      const startCardIndex = currentPlayerIndex === playerIndex
+        ? this.resolveStageStartCardIndex(cards, cardIndex, extra?.resumeAfterCardId)
+        : 0
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
         const flow = runCardEffectHook(this.state, player, cardId, hook)
         if (!flow) continue
-        this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
+        this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1, currentPlayerIndex, {
+          resumeAfterCardId: cardId,
+        })
         return true
       }
     }
     return false
+  }
+
+  private resolveStageStartCardIndex(
+    cards: string[],
+    cardIndex: number,
+    resumeAfterCardId?: string | null,
+  ) {
+    if (!resumeAfterCardId) return cardIndex
+    const liveIndex = cards.indexOf(resumeAfterCardId)
+    if (liveIndex >= 0) return liveIndex + 1
+    return Math.max(0, cardIndex - 1)
   }
 
   private stageFlowNeedsPlayerInteraction(flow: ActionFlow): boolean {
@@ -2851,8 +2869,8 @@ export class GameCore {
     return this.continueFromStartHarvest()
   }
 
-  private continueFromStartHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onStartHarvest', playerIndex, cardIndex)) {
+  private continueFromStartHarvest(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
+    if (this.continueStageHook('onStartHarvest', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
     return this.continueHarvestFieldStart()
@@ -3323,7 +3341,7 @@ export class GameCore {
         this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onStartHarvest':
-        this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex)
+        this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra)
         return
       case 'onStartHarvestFieldPhase':
         this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex)

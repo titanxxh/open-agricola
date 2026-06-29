@@ -88,6 +88,7 @@ import {
   buildPastureDisplayMap,
   buildStableDisplayMap,
   shouldShowAnimalDiscardPrompt,
+  wouldExceedExclusiveCardZoneLimit,
 } from './hooks/use-animal-reorg-flow'
 import {
   collectPrivateEventNotifications,
@@ -1726,6 +1727,7 @@ export const GameContainerApi = () => {
       }
 
       if (delta > 0) {
+        if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
         const baseTotals = { ...totals }
         const currentCounts = zoneAnimalCounts(current)
         addAnimalCounts(baseTotals, {
