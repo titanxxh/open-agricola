@@ -7,9 +7,10 @@ import type {
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import {
-  readAnimalHolderCounts,
-  writeAnimalHolderCounts,
+  readPrivateAnimalCounts,
+  writePrivateAnimalCounts,
 } from '../../domain/animal-holder-state'
+import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
 import { ensureCardState } from '../helpers/card-state'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
@@ -18,61 +19,24 @@ const CARD_ID = 'M084_BogPony'
 const ACTION_ID = 'card_M084_BogPony_lie-horse'
 
 const countStandingHorses = (player: PlayerState): number => {
-  let horses = 0
-  for (const pasture of player.pastures ?? []) {
-    if (pasture.animalType === 'horse') horses += pasture.animalCount
-  }
-  if (player.houseAnimalType === 'horse') horses += player.houseAnimalCount
-  for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal === 'horse') horses += 1
-  }
-  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
-    if (cardId === CARD_ID) continue
-    const extraData = state?.extraData as Record<string, unknown> | undefined
-    if (!extraData) continue
-    const counts = readAnimalHolderCounts(extraData)
-    horses += counts.horse ?? 0
-  }
-  return horses
+  return getAssignedAnimalsByType(player).horse ?? 0
 }
 
 const moveStandingHorseToCard = (player: PlayerState): boolean => {
-  for (const pasture of player.pastures ?? []) {
-    if (pasture.animalType !== 'horse' || pasture.animalCount <= 0) continue
-    pasture.animalCount -= 1
-    if (pasture.animalCount <= 0) pasture.animalType = null
-    return true
-  }
-  if (player.houseAnimalType === 'horse' && player.houseAnimalCount > 0) {
-    player.houseAnimalCount -= 1
-    if (player.houseAnimalCount <= 0) player.houseAnimalType = null
-    return true
-  }
-  for (const [key, animal] of Object.entries(player.stableAnimals ?? {})) {
-    if (animal !== 'horse') continue
-    player.stableAnimals[key] = null
-    return true
-  }
-  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
-    if (cardId === CARD_ID) continue
-    const extraData = state?.extraData as Record<string, unknown> | undefined
-    if (!extraData) continue
-    const counts = readAnimalHolderCounts(extraData)
-    if ((counts.horse ?? 0) <= 0) continue
-    counts.horse = (counts.horse ?? 0) - 1
-    writeAnimalHolderCounts(extraData, counts)
-    return true
-  }
-  return false
+  if (countStandingHorses(player) <= 0) return false
+  const totalHorses = player.resources.horse ?? 0
+  subtractAnimalsFromBoard(player, { horse: 1 })
+  player.resources.horse = totalHorses
+  return true
 }
 
 const lieHorse = (player: PlayerState): ActionExecutionResult => {
   if (!moveStandingHorseToCard(player)) return { type: 'fail', errorKey: 'log.specialEffectFail' }
   const cardState = ensureCardState(player, CARD_ID)
   const extraData = { ...((cardState.extraData as Record<string, unknown> | undefined) ?? {}) }
-  const counts = readAnimalHolderCounts(extraData)
+  const counts = readPrivateAnimalCounts(extraData)
   counts.horse = (counts.horse ?? 0) + 1
-  writeAnimalHolderCounts(extraData, counts)
+  writePrivateAnimalCounts(extraData, counts)
   cardState.extraData = extraData
   player.resources.fuel = (player.resources.fuel ?? 0) + 2
   return { type: 'ok' }

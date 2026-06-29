@@ -1571,14 +1571,14 @@ export const FarmBoard = ({
           const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
           const cardDisplay = cardDisplayMap.get(rawId)
           const extraAnimalCounts = displayPlayer.cardStates?.[rawId]?.extraData as
-            | { animalCounts?: { horse?: number } }
+            | { privateAnimalCounts?: { horse?: number } }
             | undefined
           const m084LyingHorses =
             rawId === M084_BOG_PONY_ID
               ? Math.max(
                 0,
                 Math.floor(
-                  Number(extraAnimalCounts?.animalCounts?.horse ?? 0),
+                  Number(extraAnimalCounts?.privateAnimalCounts?.horse ?? 0),
                 ),
               )
               : 0

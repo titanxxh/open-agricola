@@ -154,7 +154,7 @@ describe('applyTrade', () => {
     const player = createMockPlayer({ horse: 2, food: 0 })
     player.minorPlayed = ['M084_BogPony']
     player.cardStates = {
-      M084_BogPony: { extraData: { animalCounts: { horse: 1 } } },
+      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
     }
     player.pastures = [{
       id: 'pasture-1',
@@ -170,8 +170,31 @@ describe('applyTrade', () => {
 
     expect(player.resources.horse).toBe(1)
     expect(player.resources.food).toBe(2)
-    expect(player.cardStates.M084_BogPony?.extraData?.animalCounts?.horse ?? 0).toBe(0)
+    expect(player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts?.horse ?? 0).toBe(0)
     expect(player.pastures[0]).toMatchObject({ animalType: 'horse', animalCount: 1 })
+  })
+
+  it('does not prioritize ordinary card-zone animals before board animals', () => {
+    const player = createMockPlayer({ horse: 2, food: 0 })
+    player.cardStates = {
+      M035_HorseTrough: { extraData: { animalCounts: { horse: 1 } } },
+    }
+    player.pastures = [{
+      id: 'pasture-1',
+      size: 1,
+      tiles: [{ row: 0, col: 0 }],
+      stables: 0,
+      animalType: 'horse',
+      animalCount: 1,
+    }]
+    const trade: Trade = { from: { horse: 1 }, to: { food: 2 } }
+
+    applyTrade(player, trade)
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.resources.food).toBe(2)
+    expect(player.cardStates.M035_HorseTrough?.extraData?.animalCounts?.horse ?? 0).toBe(1)
+    expect(player.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
   })
 })
 
