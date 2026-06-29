@@ -222,6 +222,7 @@ describe('Card Source representative migrations', () => {
       'M051_MoorEnclosures',
       'M054_AgriculturalImplement',
       'M055_ToolShed',
+      'M056_PeatCuttingRights',
       'M058_PeatFertilizer',
       'M059_NaturesFertilizer',
       'M060_SowingMachine',
@@ -292,6 +293,7 @@ describe('Card Source representative migrations', () => {
       'M128_Workbench',
       'M129_PlowhorseMarket',
       'M130_Nosebag',
+      'M131_CattleStall',
     ].sort()
 
     expect(moorMinors.map((entry) => entry.meta.number)).toEqual(

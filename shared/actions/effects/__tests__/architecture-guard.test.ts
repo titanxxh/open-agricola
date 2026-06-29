@@ -59,6 +59,7 @@ describe('effects architecture guard', () => {
       'reorganize',
       'reserve-fence-bonus',
       'return-to-space',
+      'scheduled-offer',
       'season-summer-bread-or-sell',
       'season-summer-sell-grain',
       'selection',
