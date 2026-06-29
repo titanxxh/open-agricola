@@ -37,6 +37,7 @@ import { activateCardEffectAction } from './effects/internal/activate-card-effec
 import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { scheduledOfferAction } from './effects/internal/scheduled-offers'
+import { passMinorCardToLeftAction } from './effects/internal/pass-minor-card-to-left'
 import { specialEffectAction } from './effects/special-effect'
 import { reapAction } from './effects/reap'
 import { completeParentFatherAction } from '../parents/father-completion'
@@ -86,6 +87,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   drawOrdinaryCardsAction,
   placeFarmerOnSpaceAction,
   scheduledOfferAction,
+  passMinorCardToLeftAction,
   specialEffectAction,
   reapAction,
   completeParentFatherAction,

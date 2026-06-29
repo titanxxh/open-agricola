@@ -894,6 +894,7 @@ import { M023_EdgeOfTheForest } from './M/M023_EdgeOfTheForest'
 import { M024_BasicSupplies } from './M/M024_BasicSupplies'
 import { M025_HouseholdInventory } from './M/M025_HouseholdInventory'
 import { M026_ChimneyHood } from './M/M026_ChimneyHood'
+import { M027_GardenPath } from './M/M027_GardenPath'
 import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
 import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
@@ -954,6 +955,7 @@ import { M089_BirthingHouse } from './M/M089_BirthingHouse'
 import { M090_WinterStorehouse } from './M/M090_WinterStorehouse'
 import { M091_RoutineWork } from './M/M091_RoutineWork'
 import { M092_AridField } from './M/M092_AridField'
+import { M093_FarmhandsQuarters } from './M/M093_FarmhandsQuarters'
 import { M094_PeatBath } from './M/M094_PeatBath'
 import { M095_FallowFields } from './M/M095_FallowFields'
 import { M096_FallowLand } from './M/M096_FallowLand'
@@ -962,6 +964,7 @@ import { M098_FishSmokehouse } from './M/M098_FishSmokehouse'
 import { M099_HealingClay } from './M/M099_HealingClay'
 import { M100_Pheromones } from './M/M100_Pheromones'
 import { M101_ButchersBlock } from './M/M101_ButchersBlock'
+import { M102_SavingsDeposit } from './M/M102_SavingsDeposit'
 import { M103_ForestKindergarten } from './M/M103_ForestKindergarten'
 import { M104_WildHarvest } from './M/M104_WildHarvest'
 import { M107_PotRoastRecipe } from './M/M107_PotRoastRecipe'
@@ -1902,6 +1905,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M024_BasicSupplies': M024_BasicSupplies.impl,
   'M025_HouseholdInventory': M025_HouseholdInventory.impl,
   'M026_ChimneyHood': M026_ChimneyHood.impl,
+  'M027_GardenPath': M027_GardenPath.impl,
   'M028_OutOnTheWallaby': M028_OutOnTheWallaby.impl,
   'M029_Tinker': M029_Tinker.impl,
   'M030_FarmAnimalMarket': M030_FarmAnimalMarket.impl,
@@ -1962,6 +1966,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M090_WinterStorehouse': M090_WinterStorehouse.impl,
   'M091_RoutineWork': M091_RoutineWork.impl,
   'M092_AridField': M092_AridField.impl,
+  'M093_FarmhandsQuarters': M093_FarmhandsQuarters.impl,
   'M094_PeatBath': M094_PeatBath.impl,
   'M095_FallowFields': M095_FallowFields.impl,
   'M096_FallowLand': M096_FallowLand.impl,
@@ -1970,6 +1975,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M099_HealingClay': M099_HealingClay.impl,
   'M100_Pheromones': M100_Pheromones.impl,
   'M101_ButchersBlock': M101_ButchersBlock.impl,
+  'M102_SavingsDeposit': M102_SavingsDeposit.impl,
   'M103_ForestKindergarten': M103_ForestKindergarten.impl,
   'M104_WildHarvest': M104_WildHarvest.impl,
   'M107_PotRoastRecipe': M107_PotRoastRecipe.impl,

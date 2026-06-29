@@ -13819,7 +13819,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "prerequisite": "At Least 1 Forest",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15026,7 +15026,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 1,
       "reed": 1
     },
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
@@ -15176,7 +15176,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "vegetable": 2
     },
     "vp": 1,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
