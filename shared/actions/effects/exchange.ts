@@ -738,8 +738,9 @@ export const anytimeExchangeAction: ActionDefinition = {
       if (!canAffordTrade(player, directTrade, 1)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
+      const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
       const preResources = { ...player.resources }
-      applyTrade(player, directTrade, 1)
+      applyTrade(player, directTrade, 1, animalPaymentPreference)
       recordCookeryConversion(player, directTrade, 1)
       if (directTrade.sideEffect) {
         applyTradeSideEffect(
