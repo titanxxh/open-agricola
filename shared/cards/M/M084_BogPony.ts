@@ -2,9 +2,11 @@ import { defineMinorCard } from '../card-source'
 import type {
   ActionDefinition,
   ActionExecutionResult,
+  ActionMutationContext,
   PlayerState,
 } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainAction } from '../../actions/effects/gain'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import {
   readPrivateAnimalCounts,
@@ -30,7 +32,8 @@ const moveStandingHorseToCard = (player: PlayerState): boolean => {
   return true
 }
 
-const lieHorse = (player: PlayerState): ActionExecutionResult => {
+const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
+  const { player } = ctx
   if (!moveStandingHorseToCard(player)) return { type: 'fail', errorKey: 'log.specialEffectFail' }
   const cardState = ensureCardState(player, CARD_ID)
   const extraData = { ...((cardState.extraData as Record<string, unknown> | undefined) ?? {}) }
@@ -38,8 +41,11 @@ const lieHorse = (player: PlayerState): ActionExecutionResult => {
   counts.horse = (counts.horse ?? 0) + 1
   writePrivateAnimalCounts(extraData, counts)
   cardState.extraData = extraData
-  player.resources.fuel = (player.resources.fuel ?? 0) + 2
-  return { type: 'ok' }
+  return gainAction.execute({
+    ...ctx,
+    params: { fuel: 2 },
+    sourceCard: ctx.sourceCard ?? CARD_ID,
+  })
 }
 
 export const bogPonyLieHorseAction: ActionDefinition = {
@@ -49,7 +55,7 @@ export const bogPonyLieHorseAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => lieHorse(player),
+  execute: (ctx) => lieHorse(ctx),
 }
 
 registerAdHocAction(bogPonyLieHorseAction)
