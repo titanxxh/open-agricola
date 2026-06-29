@@ -161,6 +161,22 @@ describe('computeScores', () => {
     })
   })
 
+  it('scores M084 lying horses as half-value horses', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['M084_BogPony']
+    player.cardStates = {
+      M084_BogPony: { extraData: { animalCounts: { horse: 1 } } },
+    }
+    player.resources.horse = 2
+    const state = { ...createState(player), enableFarmersOfTheMoor: true } as GameState
+    const [result] = computeScores(state)
+
+    expect(result.categories.find((category) => category.key === 'horses')).toMatchObject({
+      total: 1.5,
+      quantity: 2,
+    })
+  })
+
   it('scores Soldier from wood and stone pairs', () => {
     const player = createPlayer()
     player.occupationPlayed = ['C133_Soldier']
