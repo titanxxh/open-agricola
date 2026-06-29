@@ -1,66 +1,52 @@
 import { chromium, type Browser, type Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-
-// Minimal WebSocket typing so the script doesn't depend on the DOM lib.
-declare const WebSocket: {
-  new (url: string): {
-    onopen: (() => void) | null
-    onmessage: ((ev: { data: unknown }) => void) | null
-    onerror: (() => void) | null
-    send(data: string): void
-    close(): void
-  }
-}
+import { pathToFileURL } from 'node:url'
 
 type ObsPayload = Record<string, unknown>
 
-// Read-only WS observer: joins the room and tracks the latest authoritative
-// snapshot pushed by the server (payload.state / payload.pending / payload.log),
-// bypassing the fire-and-forget sqlite persistence lag.
-class WsObserver {
-  private ws: { close(): void } | null = null
+class PageObserver {
   private _latest: ObsPayload | null = null
   private _updates = 0
 
-  constructor(
-    private readonly wsUrl: string,
-    private readonly roomId: string,
-    private readonly playerIndex = 0,
-  ) {}
-
-  connect(timeoutMs = 15000): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.wsUrl)
-      this.ws = ws
-      const timer = setTimeout(() => reject(new Error('observer connect timeout')), timeoutMs)
-      ws.onopen = () => {
-        ws.send(
-          JSON.stringify({ type: 'joinRoom', roomId: this.roomId, requestedPlayerIndex: this.playerIndex }),
-        )
-      }
-      ws.onmessage = (ev) => {
+  attach(page: Page): void {
+    page.on('websocket', (ws) => {
+      ws.on('framereceived', ({ payload }) => {
+        if (typeof payload !== 'string') return
         let msg: Record<string, unknown>
         try {
-          msg = JSON.parse(ev.data as string) as Record<string, unknown>
+          msg = JSON.parse(payload) as Record<string, unknown>
         } catch {
           return
         }
         if (msg.type === 'stateUpdate') {
           this._latest = msg.payload as ObsPayload
           this._updates++
-          clearTimeout(timer)
-          resolve()
-        } else if (msg.type === 'error' && !this._latest) {
-          clearTimeout(timer)
-          reject(new Error(String(msg.error)))
         }
-      }
-      ws.onerror = () => {
-        clearTimeout(timer)
-        reject(new Error('observer ws error'))
-      }
+      })
     })
+  }
+
+  async waitForInitial(timeoutMs = 15000): Promise<void> {
+    let waited = 0
+    while (waited < timeoutMs) {
+      if (this._latest) return
+      await new Promise((r) => setTimeout(r, 200))
+      waited += 200
+    }
+    throw new Error('observer connect timeout')
+  }
+
+  async waitForNextUpdateAfter(action: () => Promise<void>, timeoutMs = 15000): Promise<void> {
+    const prev = this._updates
+    await action()
+    let waited = 0
+    while (waited < timeoutMs) {
+      if (this._updates > prev) return
+      await new Promise((r) => setTimeout(r, 200))
+      waited += 200
+    }
+    throw new Error('observer update timeout')
   }
 
   latest(): ObsPayload | null {
@@ -81,16 +67,24 @@ class WsObserver {
     return false
   }
 
-  close(): void {
-    this.ws?.close()
+  close(): void {}
+}
+
+const pendingFromPayload = (p: ObsPayload): Pending | null => {
+  const interaction = p.interaction as Record<string, unknown> | undefined
+  if (!interaction || interaction.stateId !== 'wait') return null
+  const request = interaction.request as Record<string, unknown> | undefined
+  const kind = typeof request?.kind === 'string' ? request.kind : 'wait'
+  return {
+    ...interaction,
+    type: kind === 'confirm-player-switch' ? 'confirm-next-player' : kind,
+    playerIndex: typeof interaction.playerIndex === 'number' ? interaction.playerIndex : undefined,
   }
 }
 
-const wsUrlFromHttp = (httpUrl: string): string => `ws://${new URL(httpUrl).hostname}:5175/ws`
-
 // ── Args ─────────────────────────────────────────────────────────────────────
 
-type Args = {
+export type Args = {
   players: number
   room: string
   url: string
@@ -98,23 +92,40 @@ type Args = {
   seed?: number
   maxSteps: number
   observe: boolean
+  moor: boolean
 }
 
-const parseArgs = (argv: string[]): Args => {
+export const parseArgs = (argv: string[]): Args => {
   const get = (name: string, fallback: string): string => {
     const i = argv.indexOf(`--${name}`)
     return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback
   }
   const seedRaw = get('seed', '')
+  const moor = argv.includes('--moor')
+  const maxStepsRaw = get('max-steps', '')
   return {
     players: Number(get('players', '4')),
     room: get('room', 'dev4'),
     url: get('url', process.env.FRONTEND_URL ?? 'http://localhost:5173'),
     out: get('out', 'artifacts/agent-playtest/play'),
     seed: seedRaw === '' ? undefined : Number(seedRaw),
-    maxSteps: Number(get('max-steps', '120')),
+    maxSteps: Number(maxStepsRaw === '' ? (moor ? '320' : '120') : maxStepsRaw),
     observe: argv.includes('--observe'),
+    moor,
   }
+}
+
+export const buildPlayerUrl = (args: Args, playerNumber: number): string => {
+  const url = new URL(args.url)
+  url.searchParams.set('player', `p${playerNumber}`)
+  url.searchParams.set('transport', 'ws')
+  url.searchParams.set('room', args.room)
+  url.searchParams.set('devMode', '1')
+  if (args.moor) {
+    url.searchParams.set('enableFarmersOfTheMoor', 'true')
+    url.searchParams.set('allowIncompleteFarmersOfTheMoorMinorDeal', 'true')
+  }
+  return url.toString()
 }
 
 // ── State view (from observer payload) ───────────────────────────────────────
@@ -131,6 +142,11 @@ type StateView = {
   playerIds: string[]
   occ: Record<string, string[]>
 }
+
+export const actingPlayerIndex = (view: { currentPlayerIndex: number; pending: Pending | null }): number =>
+  view.pending?.type !== 'confirm-next-player' && typeof view.pending?.playerIndex === 'number'
+    ? view.pending.playerIndex
+    : view.currentPlayerIndex
 
 const num = (v: unknown, fallback = -1): number => (typeof v === 'number' ? v : fallback)
 
@@ -149,11 +165,11 @@ const occupationMap = (state: Record<string, unknown>): Record<string, string[]>
 const viewFromPayload = (p: ObsPayload | null): StateView | null => {
   if (!p) return null
   const state = (p.state ?? {}) as Record<string, unknown>
-  const players = Array.isArray(p.players) ? (p.players as Array<Record<string, unknown>>) : []
-  const log = p.log
+  const players = Array.isArray(state.players) ? (state.players as Array<Record<string, unknown>>) : []
+  const log = state.log
   return {
     state,
-    pending: (p.pending ?? null) as Pending | null,
+    pending: pendingFromPayload(p),
     round: num(state.round),
     currentPlayerIndex: num(state.currentPlayerIndex, 0),
     gameOver: state.gameOver === true,
@@ -177,7 +193,7 @@ const sigOf = (v: StateView): string =>
 // WS broadcasts can arrive out of order (reset/join floods); wait until the
 // observer's view stops changing before trusting it for a decision.
 const waitStable = async (
-  obs: WsObserver,
+  obs: PageObserver,
   stableMs = 700,
   timeoutMs = 8000,
 ): Promise<StateView | null> => {
@@ -223,15 +239,16 @@ const findNewAction = (before: StateView, after: StateView, playerId: string): s
 
 // ── Page helpers ─────────────────────────────────────────────────────────────
 
-const openPages = async (browser: Browser, args: Args): Promise<Page[]> => {
+const openPages = async (browser: Browser, args: Args, obs: PageObserver): Promise<Page[]> => {
   const pages: Page[] = []
   for (let k = 1; k <= args.players; k++) {
     const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
     const page = await ctx.newPage()
+    obs.attach(page)
     await page.addInitScript(() => {
       window.localStorage.setItem('open-agricola-locale-v2', 'en')
     })
-    await page.goto(`${args.url}/?player=p${k}&transport=ws&room=${args.room}&devMode=1`, {
+    await page.goto(buildPlayerUrl(args, k), {
       waitUntil: 'domcontentloaded',
     })
     await page.waitForSelector('[data-action-id]', { timeout: 30000 })
@@ -251,7 +268,7 @@ const resetNewGame = async (page: Page, seed?: number): Promise<void> => {
 }
 
 const clickFirstAvailableAction = async (page: Page): Promise<string | null> => {
-  const buttons = page.locator('.action-card-holder:not(.round) button.action-card:not([disabled])')
+  const buttons = page.locator('[data-action-id]:not(.round) button.action-card:not([disabled])')
   if ((await buttons.count()) === 0) return null
   const btn = buttons.first()
   const actionId = await btn.evaluate(
@@ -261,13 +278,55 @@ const clickFirstAvailableAction = async (page: Page): Promise<string | null> => 
   return actionId ?? 'unknown'
 }
 
-// Click the primary enabled button inside the interaction bar (confirm / first option).
-const clickInteractionPrimary = async (page: Page): Promise<boolean> => {
-  const btn = page
+const clickMoorSpecialAction = async (page: Page): Promise<string | null> => {
+  const immediate = page
     .locator(
-      '.interaction-bar button:not([disabled]), .interaction-actions button:not([disabled]), .interaction-bar__body button:not([disabled])',
+      [
+        '.special-action-card__image-action[aria-label="Hiring Fair"]:not([disabled])',
+        '.special-action-card__image-action[aria-label="Horse Market"]:not([disabled])',
+        '.special-action-card__image-action[aria-label="Black Market"]:not([disabled])',
+        '.special-action-card__image-action[aria-label="Illicit Work"]:not([disabled])',
+      ].join(', '),
     )
     .first()
+  if ((await immediate.count()) > 0) {
+    const label = await immediate.getAttribute('aria-label')
+    await immediate.click()
+    return label ? `moor:${label}` : 'moor:special-action'
+  }
+
+  const terrain = page
+    .locator(
+      [
+        '.special-action-card__image-action[aria-label="Cut Peat"]:not([disabled])',
+        '.special-action-card__image-action[aria-label="Fell Trees"]:not([disabled])',
+        '.special-action-card__image-action[aria-label="Slash and Burn"]:not([disabled])',
+      ].join(', '),
+    )
+    .first()
+  if ((await terrain.count()) === 0) return null
+  const label = await terrain.getAttribute('aria-label')
+  await terrain.click()
+  const tile = page.locator('.farm-tile.selectable').first()
+  try {
+    await tile.waitFor({ state: 'visible', timeout: 2000 })
+  } catch {
+    return null
+  }
+  await tile.click()
+  return label ? `moor:${label}` : 'moor:terrain'
+}
+
+// Click the primary enabled button inside the interaction bar (confirm / first option).
+const clickInteractionPrimary = async (page: Page): Promise<boolean> => {
+  const confirm = page.locator('.interaction-actions button:not([disabled])', { hasText: /confirm/i }).first()
+  const btn = (await confirm.count()) > 0
+    ? confirm
+    : page
+      .locator(
+        '.interaction-actions button:not([disabled]), .interaction-bar__body button:not([disabled])',
+      )
+      .first()
   try {
     await btn.waitFor({ state: 'visible', timeout: 5000 })
   } catch {
@@ -283,14 +342,16 @@ const runPlay = async (browser: Browser, args: Args, outDir: string): Promise<vo
   const snapDir = join(outDir, 'snapshots')
   mkdirSync(snapDir, { recursive: true })
 
-  const obs = new WsObserver(wsUrlFromHttp(args.url), args.room, 0)
-  await obs.connect()
-  const pages = await openPages(browser, args)
+  const obs = new PageObserver()
+  const pages = await openPages(browser, args, obs)
+  await obs.waitForInitial()
 
   // Reset to a fresh game from the current active player's page.
   const start = viewFromPayload(obs.latest())
   if (!start) throw new Error('observer produced no state')
-  await resetNewGame(pages[start.currentPlayerIndex] ?? pages[0], args.seed)
+  await obs.waitForNextUpdateAfter(async () => {
+    await resetNewGame(pages[actingPlayerIndex(start)] ?? pages[0], args.seed)
+  })
   await waitStable(obs)
 
   const trace: unknown[] = []
@@ -308,7 +369,7 @@ const runPlay = async (browser: Browser, args: Args, outDir: string): Promise<vo
       stopReason = 'gameOver'
       break
     }
-    const activeIdx = before.currentPlayerIndex
+    const activeIdx = actingPlayerIndex(before)
     const page = pages[activeIdx]
     if (!page) {
       stopReason = `no-page-for-index-${activeIdx}`
@@ -328,14 +389,19 @@ const runPlay = async (browser: Browser, args: Args, outDir: string): Promise<vo
         break
       }
     } else if (before.pending) {
-      // Slice 2c target: complex pending (farm-select / feed / choice). Record & stop.
-      stopReason = `pending:${before.pending.type}@p${activeIdx + 1}`
-      writeFileSync(join(snapDir, `step-${step}-pending.json`), JSON.stringify(before, null, 2))
-      break
+      intentKind = `pending:${before.pending.type}`
+      const ok = await clickInteractionPrimary(page)
+      if (!ok) {
+        stopReason = `pending:${before.pending.type}@p${activeIdx + 1}`
+        writeFileSync(join(snapDir, `step-${step}-pending.json`), JSON.stringify(before, null, 2))
+        break
+      }
     } else {
       intentKind = 'take-action'
       await syncPage(page, Object.keys(before.occ).length)
-      domHint = await clickFirstAvailableAction(page)
+      domHint = args.moor
+        ? (await clickMoorSpecialAction(page)) ?? await clickFirstAvailableAction(page)
+        : await clickFirstAvailableAction(page)
       if (!domHint) {
         noProgress++
         if (noProgress >= 3) {
@@ -391,13 +457,17 @@ const runPlay = async (browser: Browser, args: Args, outDir: string): Promise<vo
 // ── Observe mode (verify WS observer) ────────────────────────────────────────
 
 const runObserve = async (args: Args, outDir: string): Promise<void> => {
-  const obs = new WsObserver(wsUrlFromHttp(args.url), args.room, 0)
-  await obs.connect()
+  const browser = await chromium.launch()
+  const obs = new PageObserver()
+  const pages = await openPages(browser, args, obs)
+  await obs.waitForInitial()
   await new Promise((r) => setTimeout(r, 1000))
   const v = viewFromPayload(obs.latest())
   console.log('[observe]', v ? JSON.stringify(brief(v)) : 'no payload')
   if (v) writeFileSync(join(outDir, 'observe.json'), JSON.stringify(obs.latest(), null, 2))
   obs.close()
+  for (const page of pages) await page.context().close()
+  await browser.close()
 }
 
 // ── Entry ────────────────────────────────────────────────────────────────────
@@ -422,7 +492,9 @@ const main = async (): Promise<void> => {
   console.log(`[done] output: ${outDir}`)
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}
