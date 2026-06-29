@@ -95,9 +95,11 @@ export const applyReorganizeMutate = (
     const existing = player.cardStates?.[cardId]
     const zoneIds = new Set(cardZones.map((zone) => zone.id))
     const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+    let preferredAnimalType: AnimalKey | null = null
     zones
       .filter((z) => z.zoneType === 'card' && zoneIds.has(z.id))
       .forEach((assigned) => {
+        preferredAnimalType ??= normalizeAnimalType(assigned.animalType)
         addAnimalCounts(assignedCounts, readAnimalCountsForZoneAssignment(assigned), animalKeys)
       })
     const baseZone = {
@@ -105,6 +107,7 @@ export const applyReorganizeMutate = (
       capacity: Math.max(...cardZones.map((zone) => cap(zone.id)), 0),
     }
     const counts = normalizeAnimalCountsForZone(state, player, baseZone, {
+      animalType: preferredAnimalType,
       animalCounts: assignedCounts,
     })
     cardCountsById.set(cardId, counts)

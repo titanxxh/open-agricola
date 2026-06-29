@@ -266,9 +266,14 @@ export const computeAnimalZones = (
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onComputeAnimalZones) {
+      const firstNewZoneIndex = zones.length
       const result = effect.onComputeAnimalZones(player, zones, state)
       if (Array.isArray(result)) {
         zones.push(...result)
+      }
+      for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
+        const zone = zones[i]!
+        if (zone.zoneType === 'card' && !zone.cardId) zone.cardId = cardId
       }
     }
   }
@@ -413,9 +418,17 @@ export const canAccommodateAnimalTotals = (
   const animals = targetAnimalList(state, targetCounts)
   if (!animals) return false
   const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
+  const animalKeys = animalKeysForState(state)
+  const failedStates = new Set<string>()
+  const stateKey = (index: number, currentZones: AnimalAccommodationWorkZone[]) =>
+    `${index}|${currentZones.map((zone) =>
+      `${zone.animalCount}:${animalKeys.map((key) => zone.animalCounts[key] ?? 0).join(',')}`,
+    ).join('|')}`
   const placeFrom = (index: number, currentZones: AnimalAccommodationWorkZone[]): boolean => {
     const type = animals[index]
     if (!type) return true
+    const key = stateKey(index, currentZones)
+    if (failedStates.has(key)) return false
     for (let i = 0; i < currentZones.length; i += 1) {
       const nextZone = canPlaceAnimalInWorkZone(state, player, currentZones[i]!, type)
       if (!nextZone) continue
@@ -423,6 +436,7 @@ export const canAccommodateAnimalTotals = (
       nextZones[i] = nextZone
       if (placeFrom(index + 1, nextZones)) return true
     }
+    failedStates.add(key)
     return false
   }
   return placeFrom(0, zones)
