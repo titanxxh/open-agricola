@@ -17,7 +17,7 @@ const cardImpl = {
     id: CARD_ID,
     onBuy: (state, player) => {
       const leftPlayer = leftPlayerOf(state, player.id)
-      if (leftPlayer) {
+      if (leftPlayer && leftPlayer.id !== player.id) {
         addPublicCardMarker(leftPlayer, CARD_ID, {
           id: 'garden-path',
           label: 'Garden Path',
