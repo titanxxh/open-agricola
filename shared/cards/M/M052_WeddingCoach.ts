@@ -1,6 +1,31 @@
 import { defineMinorCard } from '../card-source'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M052_WeddingCoach'
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (_state, player) => {
+      if (!hasInactiveWorkerInSupply(player)) return
+      return {
+        type: 'seq',
+        optional: true,
+        children: [{
+          type: 'leaf',
+          actionId: 'family-growth',
+          sourceCard: CARD_ID,
+          actionContext: {
+            skipRoomCheck: true,
+            holdNewbornOnCard: CARD_ID,
+          },
+        }],
+      }
+    },
+  },
+  reaches: [] as readonly string[],
+} satisfies CardImpl
 
 export const M052_WeddingCoach = defineMinorCard({
   meta: {
@@ -17,7 +42,10 @@ export const M052_WeddingCoach = defineMinorCard({
         "food": 1
     },
     prerequisite: "4 Horses",
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M052_WeddingCoach_impl = M052_WeddingCoach.impl

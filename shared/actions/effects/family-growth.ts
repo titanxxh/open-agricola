@@ -8,6 +8,7 @@ import type { EventSink } from '../../contract/events'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
 import { activateSmallestInactive, familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import { addWorkerRef } from '../../domain/space'
+import { holdWorkerOnCard } from '../../cards/helpers/card-held-workers'
 
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
@@ -17,11 +18,14 @@ const growFamilyCore = (
   player: PlayerState,
   fgSpaceId: string,
   eventSink?: EventSink,
+  options: { holdNewbornOnCard?: string } = {},
 ): ActionExecutionResult => {
   const newborn = activateSmallestInactive(player)
   if (!newborn) return { type: 'fail', errorKey: 'log.familyFull' }
   const fgSpace = state.actionSpaces.find((s) => s.id === fgSpaceId)
-  if (fgSpace) {
+  if (options.holdNewbornOnCard) {
+    holdWorkerOnCard(player, options.holdNewbornOnCard, newborn.id)
+  } else if (fgSpace) {
     // Push newborn WorkerRef onto the FG space.
     // Deliberately NOT calling recordRoundPlacement — newborns don't count as placements.
     addWorkerRef(fgSpace, player.id, newborn.id)
@@ -29,7 +33,7 @@ const growFamilyCore = (
   eventSink?.emit<'worker.placed'>({
     type: 'worker.placed',
     workerId: newborn.id,
-    spaceId: fgSpaceId,
+    spaceId: options.holdNewbornOnCard ? `card:${options.holdNewbornOnCard}` : fgSpaceId,
   })
   return { type: 'ok' }
 }
@@ -58,6 +62,10 @@ export const familyGrowthAction: ActionDefinition = {
     if (!skipRoom && effectiveRooms(player) <= familySize(player)) {
       return { type: 'fail', errorKey: 'log.familyGrowthFail' }
     }
-    return growFamilyCore(state, player, space.id, eventSink)
+    const holdNewbornOnCard =
+      typeof actionContext?.holdNewbornOnCard === 'string'
+        ? actionContext.holdNewbornOnCard
+        : undefined
+    return growFamilyCore(state, player, space.id, eventSink, { holdNewbornOnCard })
   },
 }

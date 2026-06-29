@@ -253,6 +253,58 @@ describe('FarmBoard', () => {
     expect(html).toContain('res-icon-horse')
   })
 
+  it('renders card terrain markers inside their terrain tiles', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.farmTerrain = [
+      { row: 0, col: 0, kind: 'forest' },
+      { row: 0, col: 1, kind: 'forest' },
+    ]
+    player.cardStates = {
+      M053_ForestHut: {
+        counters: {},
+        infobox: undefined,
+        stack: [],
+        extraData: {
+          farmTerrainMarkers: [{
+            row: 0,
+            col: 0,
+            kind: 'person',
+            workerId: '3',
+            sourceCard: 'M053_ForestHut',
+          }],
+        },
+      },
+    }
+
+    const boardOverrides = {
+      farmCells: [
+        { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+        { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+      ],
+    }
+    const htmlWith = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player, boardOverrides)} />,
+    )
+    expect(htmlWith).toContain('data-testid="farm-terrain-marker-M053_ForestHut-0-0"')
+    expect(htmlWith).not.toContain('data-testid="farm-terrain-marker-M053_ForestHut-0-1"')
+
+    const playerWithoutMarker: PlayerState = {
+      ...player,
+      cardStates: {
+        M053_ForestHut: {
+          counters: {},
+          infobox: undefined,
+          stack: [],
+          extraData: { farmTerrainMarkers: [] },
+        },
+      },
+    }
+    const htmlWithout = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(playerWithoutMarker, boardOverrides)} />,
+    )
+    expect(htmlWithout).not.toContain('farm-terrain-marker-M053_ForestHut')
+  })
+
   it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.houseAnimalType = 'horse'

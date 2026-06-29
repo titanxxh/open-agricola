@@ -40,6 +40,13 @@ type CardAnimalDisplay = {
   capacity: number
   zoneId: string
 }
+type FarmTerrainMarker = {
+  row: number
+  col: number
+  kind: string
+  workerId?: string
+  sourceCard?: string
+}
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
 const PARENT_CARD_PREVIEW_WIDTH = 320
@@ -327,6 +334,23 @@ const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
 
 const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
   color ? BGA_FENCE_COLORS[color] : undefined
+
+const isFarmTerrainMarker = (value: unknown): value is FarmTerrainMarker => {
+  if (!value || typeof value !== 'object') return false
+  const marker = value as Partial<FarmTerrainMarker>
+  return Number.isInteger(marker.row) && Number.isInteger(marker.col) && typeof marker.kind === 'string'
+}
+
+const readFarmTerrainMarkers = (player: PlayerState): FarmTerrainMarker[] =>
+  Object.entries(player.cardStates ?? {}).flatMap(([cardId, state]) => {
+    const raw = state.extraData?.farmTerrainMarkers
+    if (!Array.isArray(raw)) return []
+    return raw.filter(isFarmTerrainMarker).map((marker) => ({
+      ...marker,
+      sourceCard: typeof marker.sourceCard === 'string' ? marker.sourceCard : cardId,
+      workerId: typeof marker.workerId === 'string' ? marker.workerId : undefined,
+    }))
+  })
 
 export type FarmBoardProps = {
   locale: Locale
@@ -808,6 +832,11 @@ export const FarmBoard = ({
     })
   }
   const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
+  const farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>()
+  readFarmTerrainMarkers(displayPlayer).forEach((marker) => {
+    const key = `${marker.row}-${marker.col}`
+    farmTerrainMarkerMap.set(key, [...(farmTerrainMarkerMap.get(key) ?? []), marker])
+  })
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -935,6 +964,7 @@ export const FarmBoard = ({
           const terrain = (displayPlayer.farmTerrain ?? []).find(
             (tile) => tile.row === tileRow && tile.col === tileCol,
           )
+          const terrainMarkers = farmTerrainMarkerMap.get(tileKey) ?? []
           const terrainLabel =
             terrain?.kind === 'forest'
               ? t(locale, 'ui.tileForest')
@@ -1225,6 +1255,15 @@ export const FarmBoard = ({
                   ) : null}
                 </div>
               ) : null}
+              {terrainMarkers.map((marker, index) =>
+                marker.kind === 'person' ? (
+                  <div
+                    key={`${marker.sourceCard}-${marker.workerId ?? index}`}
+                    className={`action-farmer action-farmer-${displayPlayer.color} farm-terrain-marker-person`}
+                    data-testid={`farm-terrain-marker-${marker.sourceCard}-${tileKey}`}
+                  />
+                ) : null,
+              )}
               {farmCardDisplay ? (
                 <div
                   className="pasture-info farm-card-reorg"
