@@ -2820,6 +2820,38 @@
   margin: 0 4px;
   flex-shrink: 0;
 }
+.player-public-card-markers {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.public-card-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  max-width: 160px;
+  padding: 2px 6px;
+  border: 1px solid #b8aa8c;
+  border-radius: 6px;
+  background: #f8f5ee;
+  color: #2a1a00;
+  font-size: 12px;
+  line-height: 1.1;
+}
+.public-card-marker-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-card-marker-score {
+  flex-shrink: 0;
+  color: #8f1f1f;
+  font-weight: 800;
+}
 .player-tabs-container {
   display: flex;
   flex-direction: column;

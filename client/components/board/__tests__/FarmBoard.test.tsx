@@ -34,6 +34,7 @@ beforeAll(async () => {
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
+    M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
     M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
   }
   __resetCardsManifestCache()
@@ -303,6 +304,35 @@ describe('FarmBoard', () => {
       <FarmBoard {...createFarmBoardProps(playerWithoutMarker, boardOverrides)} />,
     )
     expect(htmlWithout).not.toContain('farm-terrain-marker-M053_ForestHut')
+  })
+
+  it('renders public card markers in the player summary area', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.cardStates = {
+      M027_GardenPath: {
+        counters: {},
+        infobox: undefined,
+        stack: [],
+        extraData: {
+          publicCardMarkers: [{
+            id: 'garden-path',
+            label: 'Garden Path',
+            score: -1,
+            sourceCardId: 'M027_GardenPath',
+            sourcePlayerId: 'p2',
+          }],
+        },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player)} />,
+    )
+
+    expect(html).toContain('data-testid="player-public-card-markers"')
+    expect(html).toContain('data-testid="public-card-marker-M027_GardenPath-garden-path"')
+    expect(html).toContain('Garden Path')
+    expect(html).not.toContain('farm-terrain-marker-M027_GardenPath')
   })
 
   it('renders horse as a house animal and reorg control when Farmers of the Moor is enabled', () => {

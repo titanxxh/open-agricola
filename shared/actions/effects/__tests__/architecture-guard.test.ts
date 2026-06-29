@@ -46,6 +46,7 @@ describe('effects architecture guard', () => {
       'move-farmer-to-space',
       'occupation',
       'occupation-gate',
+      'pass-minor-card-to-left',
       'pay',
       'place-farmer',
       'place-farmer-on-space',
