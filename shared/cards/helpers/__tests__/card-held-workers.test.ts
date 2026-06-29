@@ -13,37 +13,37 @@ const makePlayer = (): PlayerState =>
 describe('card-held-workers', () => {
   it('holds and reads a worker id on a card', () => {
     const p = makePlayer()
-    holdWorkerOnCard(p, 'C22_BasketChair', '3')
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBe('3')
+    holdWorkerOnCard(p, 'C022_BasketChair', '3')
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBe('3')
   })
 
   it('returns undefined when no worker is held', () => {
     const p = makePlayer()
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBeUndefined()
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBeUndefined()
   })
 
   it('overwrites an existing hold', () => {
     const p = makePlayer()
-    holdWorkerOnCard(p, 'C22_BasketChair', '3')
-    holdWorkerOnCard(p, 'C22_BasketChair', '4')
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBe('4')
+    holdWorkerOnCard(p, 'C022_BasketChair', '3')
+    holdWorkerOnCard(p, 'C022_BasketChair', '4')
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBe('4')
   })
 
   it('release returns the previously held worker id and clears it', () => {
     const p = makePlayer()
-    holdWorkerOnCard(p, 'C22_BasketChair', '3')
-    expect(releaseWorkerFromCard(p, 'C22_BasketChair')).toBe('3')
-    expect(getWorkerHeldOnCard(p, 'C22_BasketChair')).toBeUndefined()
+    holdWorkerOnCard(p, 'C022_BasketChair', '3')
+    expect(releaseWorkerFromCard(p, 'C022_BasketChair')).toBe('3')
+    expect(getWorkerHeldOnCard(p, 'C022_BasketChair')).toBeUndefined()
   })
 
   it('release is a no-op when nothing is held', () => {
     const p = makePlayer()
-    expect(releaseWorkerFromCard(p, 'C22_BasketChair')).toBeUndefined()
+    expect(releaseWorkerFromCard(p, 'C022_BasketChair')).toBeUndefined()
   })
 
   it('getCardHeldWorkerIds aggregates across cards', () => {
     const p = makePlayer()
-    holdWorkerOnCard(p, 'C22_BasketChair', '3')
+    holdWorkerOnCard(p, 'C022_BasketChair', '3')
     holdWorkerOnCard(p, 'X_OtherCard', '4')
     expect(getCardHeldWorkerIds(p)).toEqual(new Set(['3', '4']))
   })

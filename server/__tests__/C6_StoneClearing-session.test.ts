@@ -5,14 +5,14 @@ import { reap } from '../../shared/actions/effects/reap'
 import { fieldIsEmpty } from '../../shared/domain/field'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C6_StoneClearing'
-import '../../shared/cards/D/D63_Lynchet'
-import '../../shared/cards/A/A11_MudPatch'
+import '../../shared/cards/C/C006_StoneClearing'
+import '../../shared/cards/D/D063_Lynchet'
+import '../../shared/cards/A/A011_MudPatch'
 
 /**
  * C6 Stone Clearing — full BGA alignment.
  *
- * BGA `C6_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
+ * BGA `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
  * those fields are considered planted until the next field-phase reap, where
  * the standard reap path moves the stone to the player's reserve.
  *
@@ -20,7 +20,7 @@ import '../../shared/cards/A/A11_MudPatch'
  * empty `player.fields` entry. No leaf is returned — stone is granted by the
  * reap main path next harvest.
  */
-describe('C6_StoneClearing session (BGA-aligned)', () => {
+describe('C006_StoneClearing session (BGA-aligned)', () => {
   const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -28,7 +28,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.minorPlayed.push('C6_StoneClearing')
+    player.minorPlayed.push('C006_StoneClearing')
     player.fields = fields
     session.loadState(state)
     return session
@@ -44,7 +44,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const player = state.players[0]!
     const beforeStone = player.resources.stone ?? 0
 
-    const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
     // `runCardEffectHook` coerces `undefined` return to `null` (card-effects.ts:253).
     expect(flow).toBeNull()
 
@@ -61,7 +61,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
 
     for (const f of player.fields) {
       expect(f.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
@@ -74,7 +74,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
     expect(flow).toBeNull()
     expect(player.fields).toEqual([])
   })
@@ -88,7 +88,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
 
     expect(player.fields[0]!.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
     expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
@@ -104,7 +104,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const player = state.players[0]!
     const beforeStone = player.resources.stone ?? 0
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
 
     const result = reap(state, player)
@@ -128,7 +128,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     const beforeGrain = player.resources.grain ?? 0
     const beforeStone = player.resources.stone ?? 0
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
     const result = reap(state, player)
 
     expect((player.resources.grain ?? 0) - beforeGrain).toBe(1)
@@ -140,7 +140,7 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
   })
 })
 
-describe('C6_StoneClearing cross-card integration', () => {
+describe('C006_StoneClearing cross-card integration', () => {
   it('D63 Lynchet: stone fields adjacent to room tiles count for the food bonus', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -148,8 +148,8 @@ describe('C6_StoneClearing cross-card integration', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.minorPlayed.push('C6_StoneClearing')
-    player.minorPlayed.push('D63_Lynchet')
+    player.minorPlayed.push('C006_StoneClearing')
+    player.minorPlayed.push('D063_Lynchet')
 
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     player.fields = [
@@ -158,7 +158,7 @@ describe('C6_StoneClearing cross-card integration', () => {
     ]
     session.loadState(state)
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
 
     const result = reap(state, player)
@@ -169,7 +169,7 @@ describe('C6_StoneClearing cross-card integration', () => {
       [player.id]: result.reapSummary,
     }
 
-    const flow = runCardEffectHook(state, player, 'D63_Lynchet', 'onAfterReap')
+    const flow = runCardEffectHook(state, player, 'D063_Lynchet', 'onAfterReap')
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -183,7 +183,7 @@ describe('C6_StoneClearing cross-card integration', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.minorPlayed.push('C6_StoneClearing')
+    player.minorPlayed.push('C006_StoneClearing')
     player.fields = [
       { row: 1, col: 0, stacks: [] },
       { row: 1, col: 1, stacks: [] },
@@ -192,7 +192,7 @@ describe('C6_StoneClearing cross-card integration', () => {
 
     expect(player.fields.every(fieldIsEmpty)).toBe(true)
 
-    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
 
     expect(player.fields.every((f) => !fieldIsEmpty(f))).toBe(true)
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)

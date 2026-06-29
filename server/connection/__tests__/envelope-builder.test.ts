@@ -63,11 +63,11 @@ describe('buildEnvelope', () => {
       interaction: {
         stateId: 'wait' as const,
         playerIndex: 0,
-        sourceCard: 'E78_SleightofHand',
+        sourceCard: 'E078_SleightofHand',
         promptKey: 'ui.interactionSleightOfHand' as const,
         request: {
           kind: 'resource-batch-exchange-select' as const,
-          cardId: 'E78_SleightofHand',
+          cardId: 'E078_SleightofHand',
           discardAvailableByResource: { wood: 2, clay: 1 },
           receiveResources: ['wood', 'clay', 'reed', 'stone'] as const,
           maxTotal: 4,
@@ -110,7 +110,7 @@ describe('buildEnvelope', () => {
         type: 'private.promptShown',
         recipientPlayerId: p0.id,
         promptKind: 'resource-batch-exchange-select',
-        sourceCard: 'E78_SleightofHand',
+        sourceCard: 'E078_SleightofHand',
       }),
     ])
     expect(other.payload.privateEvents ?? []).toEqual([])
@@ -191,8 +191,8 @@ describe('buildEnvelope', () => {
       const next = session.getState()
       next.state.players = next.state.players.slice(0, 2)
       next.state.currentPlayerIndex = 0
-      next.state.players[0]!.minorHand = ['D36_BreedRegistry']
-      next.cardAvailability = { 'minor:D36_BreedRegistry': true }
+      next.state.players[0]!.minorHand = ['D036_BreedRegistry']
+      next.cardAvailability = { 'minor:D036_BreedRegistry': true }
       return next
     })
     const p0 = resp.state.players[0]!
@@ -223,7 +223,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
 
-    expect(active.payload.cardAvailability).toEqual({ 'minor:D36_BreedRegistry': true })
+    expect(active.payload.cardAvailability).toEqual({ 'minor:D036_BreedRegistry': true })
     expect(other.payload.cardAvailability).toBeUndefined()
     expect(observer.payload.cardAvailability).toBeUndefined()
   })
@@ -236,11 +236,11 @@ describe('buildEnvelope', () => {
       state.players = state.players.slice(0, 2)
       const p0 = state.players[0]!
       const p1 = state.players[1]!
-      p0.minorHand = ['D36_BreedRegistry']
-      p1.minorHand = ['D36_BreedRegistry']
+      p0.minorHand = ['D036_BreedRegistry']
+      p1.minorHand = ['D036_BreedRegistry']
       p0.cardStates = {
         ...p0.cardStates,
-        D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+        D036_BreedRegistry: { extraData: { boardSheep: 1 } },
       }
       const hiddenEvent: GameEvent = {
         schemaVersion: 1,
@@ -251,7 +251,7 @@ describe('buildEnvelope', () => {
         type: 'card.triggered',
         visibility: 'public',
         actorPlayerId: p0.id,
-        cardId: 'D36_BreedRegistry',
+        cardId: 'D036_BreedRegistry',
       }
       const visibleEvent: GameEvent = {
         schemaVersion: 1,

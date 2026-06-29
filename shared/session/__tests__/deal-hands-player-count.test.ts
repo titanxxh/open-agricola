@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cardAllowedForPlayerCount } from '../../cards/player-count-filter'
-import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
+import { getMinorImprovementCard, getOccupationCard, minorImprovementIds, occupationIds } from '../../cards/catalog'
 import { createInitialState, dealHands } from '../state-bootstrap'
 import { MinorImprovement } from '../../cards/registry-display'
 import { registerAdHocMinorImprovement } from '../../cards/registry-runtime'
@@ -40,6 +40,14 @@ registerAdHocMinorImprovement(
 )
 
 const playerCounts = [1, 2, 3, 4, 5, 6] as const
+
+describe('dealHands — player-action card type', () => {
+  it('keeps player-action occupations out of the minor pool', () => {
+    expect(minorImprovementIds).toContain('D023_PioneeringSpirit')
+    expect(minorImprovementIds).not.toContain('D116_TreeInspector')
+    expect(occupationIds).toContain('D116_TreeInspector')
+  })
+})
 
 describe('dealHands — player-count filter (built-in pool)', () => {
   for (const playerCount of playerCounts) {

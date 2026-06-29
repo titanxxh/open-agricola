@@ -5,14 +5,14 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 
-import '../../shared/cards/B/B18_GrasslandHarrow'
+import '../../shared/cards/B/B018_GrasslandHarrow'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
-const CARD_ID = 'B18_GrasslandHarrow'
+const CARD_ID = 'B018_GrasslandHarrow'
 
 const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('B18_GrasslandHarrow after-pay future field', () => {
+describe('B018_GrasslandHarrow after-pay future field', () => {
   const setupState = (round: number, resources: Partial<Record<string, number>>) => {
     const session = new GameSession()
     const state = session.getState().state

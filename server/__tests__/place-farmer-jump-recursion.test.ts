@@ -145,8 +145,7 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
     let majorPromptSeen = false
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       const opts = resp.interaction.options ?? []
-      // Detect the major-improvement buy prompt by looking for option values prefixed with `major:`.
-      if (opts.some(o => /^major:/.test(o.value))) {
+      if (opts.some(o => /^Major_/.test(o.value))) {
         majorPromptSeen = true
         // skip without buying (the parity assertion is just that the prompt surfaced)
         const skip = opts.find(o => o.value === '__skip__')

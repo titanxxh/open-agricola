@@ -18,7 +18,7 @@ describe('future meeple round-start actions', () => {
     player.startPlayer = true
     state.futureMeeples = [{
       id: 'future-field',
-      cardId: 'A19_Handplow',
+      cardId: 'A019_Handplow',
       playerId: player.id,
       round: 2,
       actionId: null,
@@ -57,7 +57,7 @@ describe('future meeple round-start actions', () => {
     player.startPlayer = true
     state.futureMeeples = [{
       id: 'future-stable',
-      cardId: 'A89_StablePlanner',
+      cardId: 'A089_StablePlanner',
       playerId: player.id,
       round: 2,
       actionId: null,
@@ -100,7 +100,7 @@ describe('future meeple round-start actions', () => {
     player.resources.food = 1
     state.futureMeeples = [{
       id: 'future-paid-field',
-      cardId: 'D91_Plowman',
+      cardId: 'D091_Plowman',
       playerId: player.id,
       round: 2,
       actionId: null,

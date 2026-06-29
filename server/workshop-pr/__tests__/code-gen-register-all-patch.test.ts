@@ -56,19 +56,19 @@ export type AllCardImpls = typeof ALL_CARD_IMPLS
     const existing = `// GENERATED ...
 import './catalog'
 
-import { C99_Source } from './C/C99_Source'
-import { D1_Source } from './D/D1_Source'
+import { C099_Source } from './C/C099_Source'
+import { D001_Source } from './D/D001_Source'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
-  'C99_Source': C99_Source.impl,
-  'D1_Source': D1_Source.impl,
+  'C099_Source': C099_Source.impl,
+  'D001_Source': D001_Source.impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS
 `
     const patched = patchRegisterAll(existing, { card_id: 'CUSTOM_First' })
-    expect(patched).toMatch(/C99_Source.*\n.*CUSTOM_First.*\n.*D1_Source/s)
-    expect(patched).toMatch(/'C99_Source'.*\n.*'CUSTOM_First': CUSTOM_First\.impl,\n.*'D1_Source'/s)
+    expect(patched).toMatch(/C099_Source.*\n.*CUSTOM_First.*\n.*D001_Source/s)
+    expect(patched).toMatch(/'C099_Source'.*\n.*'CUSTOM_First': CUSTOM_First\.impl,\n.*'D001_Source'/s)
   })
 
   it('is idempotent when card already present', () => {
@@ -89,7 +89,7 @@ describe('patchCatalogGenerated', () => {
   const baseCatalog = `// generated
 export const catalogCardDefinitions = [
   {
-    "id": "C99_Source",
+    "id": "C099_Source",
     "name": "C",
     "deck": "C",
     "number": 99,
@@ -97,7 +97,7 @@ export const catalogCardDefinitions = [
     "kind": "minor"
   },
   {
-    "id": "D1_Source",
+    "id": "D001_Source",
     "name": "D",
     "deck": "D",
     "number": 1,
@@ -121,14 +121,14 @@ export const CUSTOM_First = defineMinorCard({
       card_type: 'minor',
       card_content: cardContent,
     })
-    expect(patched).toMatch(/"id": "C99_Source"[\s\S]*"id": "CUSTOM_First"[\s\S]*"id": "D1_Source"/)
+    expect(patched).toMatch(/"id": "C099_Source"[\s\S]*"id": "CUSTOM_First"[\s\S]*"id": "D001_Source"/)
     expect(patched).toContain(`"kind": "minor"`)
     expect(patched).toContain(`"vp": 1`)
   })
 
   it('is idempotent when catalog already contains the card', () => {
     expect(patchCatalogGenerated(baseCatalog, {
-      card_id: 'C99_Source',
+      card_id: 'C099_Source',
       card_type: 'minor',
       card_content: '',
     })).toBe(baseCatalog)

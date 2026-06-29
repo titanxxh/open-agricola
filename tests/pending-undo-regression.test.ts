@@ -103,10 +103,10 @@ describe('pending choice types + undo regression', () => {
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('major-improvement')
       state.availableMajorImprovements = []
-      player.minorHand = ['C60_SmallPottersOven']
+      player.minorHand = ['C060_SmallPottersOven']
 
       const session = new GameSession(state)
-      session.devPlayCard(0, 'B75_WoodWorkshop')
+      session.devPlayCard(0, 'B075_WoodWorkshop')
 
       expect(hasAvailableAction(session, 'major-improvement')).toBe(true)
     })
@@ -116,11 +116,11 @@ describe('pending choice types + undo regression', () => {
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('major-improvement')
       state.availableMajorImprovements = []
-      player.minorHand = ['A7_GardenersKnife']
+      player.minorHand = ['A007_GardenersKnife']
       player.resources.wood = 0
 
       const session = new GameSession(state)
-      session.devPlayCard(0, 'B75_WoodWorkshop')
+      session.devPlayCard(0, 'B075_WoodWorkshop')
 
       expect(hasAvailableAction(session, 'major-improvement')).toBe(true)
     })
@@ -154,7 +154,7 @@ describe('pending choice types + undo regression', () => {
       const state = createInitialState(42)
       state.roundActionOrder = openRoundAction('grain-utilization')
       const session = new GameSession(state)
-      session.devPlayCard(0, 'A94_LazySowman')
+      session.devPlayCard(0, 'A094_LazySowman')
 
       expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
     })
@@ -170,7 +170,7 @@ describe('pending choice types + undo regression', () => {
       state.players[0]!.resources.grain = 0
       state.players[0]!.resources.vegetable = 0
       const session = new GameSession(state)
-      session.devPlayCard(0, 'A65_SeedPellets')
+      session.devPlayCard(0, 'A065_SeedPellets')
 
       expect(hasAvailableAction(session, 'grain-utilization')).toBe(true)
     })
@@ -182,7 +182,7 @@ describe('pending choice types + undo regression', () => {
       state.players[0]!.resources.grain = 0
       state.players[0]!.resources.vegetable = 0
       const session = new GameSession(state)
-      session.devPlayCard(0, 'A65_SeedPellets')
+      session.devPlayCard(0, 'A065_SeedPellets')
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)

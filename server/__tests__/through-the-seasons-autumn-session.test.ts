@@ -48,6 +48,17 @@ const chooseByLabel = (
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
 
+const expectChoiceLabelValue = (
+  resp: SessionResponse,
+  labelKey: string,
+) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
+  const option = resp.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  expect(option).toBeDefined()
+  return option!.value
+}
+
 const hasPaidResources = (
   option: { labelParams?: Record<string, unknown> },
   expected: Record<string, number>,
@@ -76,12 +87,10 @@ describe('Through the Seasons Autumn rules', () => {
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
     opponent.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
     const vegetableBefore = player.resources.vegetable
+    const start = session.takeAction(0, autumnActionId)
+    expectChoiceLabelValue(start, 'actions.reap.name')
 
-    let resp = chooseByLabel(
-      session,
-      session.takeAction(0, autumnActionId),
-      'actions.private-field-phase.name',
-    )
+    let resp = chooseByLabel(session, start, 'actions.reap.name')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
@@ -114,7 +123,7 @@ describe('Through the Seasons Autumn rules', () => {
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = chooseByLabel(session, resp, 'actions.private-field-phase.name')
+    resp = chooseByLabel(session, resp, 'actions.reap.name')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.vegetable).toBe(2)
@@ -155,7 +164,7 @@ describe('Through the Seasons Autumn rules', () => {
     const session = setupAutumn()
     const player = session.state.players[0]!
     player.improvements = ['Major_Pottery']
-    player.minorHand = ['D60_LargePottery']
+    player.minorHand = ['D060_LargePottery']
     player.resources = {
       ...player.resources,
       clay: 1,
@@ -169,7 +178,7 @@ describe('Through the Seasons Autumn rules', () => {
     const resp = session.takeAction(0, 'major-improvement')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain('D60_LargePottery')
+    expect(resp.state.players[0]!.minorPlayed).toContain('D060_LargePottery')
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
   })

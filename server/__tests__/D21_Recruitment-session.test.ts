@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { D21_Recruitment } from '../../shared/cards/D/D21_Recruitment'
+import { D021_Recruitment } from '../../shared/cards/D/D021_Recruitment'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
-const CARD_ID = 'D21_Recruitment'
+const CARD_ID = 'D021_Recruitment'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('D21_Recruitment session', () => {
+describe('D021_Recruitment session', () => {
   const setup = (round: number, rooms: number, familySize: number) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -145,7 +145,7 @@ describe('D21_Recruitment session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       // Default fresh game: 2 active farmers, both at home → buy must be blocked
-      expect(meetsCardPrerequisites(player, D21_Recruitment, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, D021_Recruitment, state.round, state)).toBe(false)
     })
 
     it('allows buy when all active farmers have been placed (no people left at home)', () => {
@@ -154,7 +154,7 @@ describe('D21_Recruitment session', () => {
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
       markAllWorkersUsed(state, player)
-      expect(meetsCardPrerequisites(player, D21_Recruitment, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, D021_Recruitment, state.round, state)).toBe(true)
     })
   })
 

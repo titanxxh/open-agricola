@@ -5,7 +5,7 @@ import { specialEffectAction } from '../../actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState, ActionSpace } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
-import '../E/E74_AshTrees'
+import '../E/E074_AshTrees'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -15,9 +15,9 @@ const createPlayer = (id = 'p1'): PlayerState =>
       vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
     cardStates: {
-      E74_AshTrees: { counters: { fences: 5 } },
+      E074_AshTrees: { counters: { fences: 5 } },
     },
-    minorPlayed: ['E74_AshTrees'],
+    minorPlayed: ['E074_AshTrees'],
     fences: 0,
     pastures: [],
     fenceSegments: [],
@@ -51,12 +51,12 @@ const executeSpecialEffectLeaves = (
   })
 }
 
-describe('E74_AshTrees infobox', () => {
+describe('E074_AshTrees infobox', () => {
   it('writes infobox "n / 5" reflecting remaining free fences after fence', () => {
     const listener = getRegisteredCardListeners().find((l) => l.id === 'E74-ash-trees-after-fence')!
     const player = createPlayer()
     // Simulate having consumed 2 free fences -> counters shows 3 left
-    player.cardStates!.E74_AshTrees!.counters!.fences = 3
+    player.cardStates!.E074_AshTrees!.counters!.fences = 3
 
     const state = createState(player)
     const result = executeCardListener(listener, {
@@ -68,6 +68,6 @@ describe('E74_AshTrees infobox', () => {
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
-    expect(readCardInfobox(player, 'E74_AshTrees')).toBe('3 / 5')
+    expect(readCardInfobox(player, 'E074_AshTrees')).toBe('3 / 5')
   })
 })

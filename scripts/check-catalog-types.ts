@@ -6,9 +6,12 @@ import '../server/game/authoritative-session'
 import '../shared/cards/register-all'
 import { minorImprovementCards, occupationCards } from '../shared/cards/catalog'
 
-const misInOcc = occupationCards.filter((c) => c.kind !== 'occupation')
+const cardType = (c: { kind: string; playerActionCardType?: string }) =>
+  c.kind === 'playerAction' ? c.playerActionCardType : c.kind
+
+const misInOcc = occupationCards.filter((c) => cardType(c) !== 'occupation')
 const misInMinor = minorImprovementCards.filter(
-  (c) => c.kind !== 'minor' && c.kind !== 'playerAction',
+  (c) => cardType(c) !== 'minor',
 )
 
 let failed = false

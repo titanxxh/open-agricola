@@ -81,11 +81,11 @@ describe('recordPaymentStats', () => {
     const solution: PaymentSolution = {
       resourcesPaid: {},
       tradesUsed: [],
-      bonusUsed: 'E16_BriarHedge',
+      bonusUsed: 'E016_BriarHedge',
       cardUsed: undefined,
     }
-    recordPaymentStats(player, solution, { 'E16_BriarHedge': { wood: 1 } })
-    expect(readCardResourceStats(player, 'E16_BriarHedge')?.saved).toEqual({ wood: 1 })
+    recordPaymentStats(player, solution, { 'E016_BriarHedge': { wood: 1 } })
+    expect(readCardResourceStats(player, 'E016_BriarHedge')?.saved).toEqual({ wood: 1 })
   })
 
   it('multiple trades from different cards stack independently', () => {

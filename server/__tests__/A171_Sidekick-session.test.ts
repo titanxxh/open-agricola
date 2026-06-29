@@ -6,7 +6,7 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A171_Sidekick'
 import '../../shared/cards/A/A156_Buyer'
-import '../../shared/cards/C/C4_WritingBoards'
+import '../../shared/cards/C/C004_WritingBoards'
 
 const CARD_ID = 'A171_Sidekick'
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
@@ -164,7 +164,7 @@ describe('A171 Sidekick session', () => {
     const session = setup({
       food: 1,
       roundActionOrder: ['major-improvement', 'eastern-quarry'],
-      minorHand: ['C4_WritingBoards'],
+      minorHand: ['C004_WritingBoards'],
     })
 
     const resp = session.takeAction(0, 'eastern-quarry')

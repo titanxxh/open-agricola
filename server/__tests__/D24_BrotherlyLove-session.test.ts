@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import { workersAvailable, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/D/D24_BrotherlyLove'
+import '../../shared/cards/D/D024_BrotherlyLove'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -25,7 +25,7 @@ const setup = (options?: {
   player.rooms = 5
 
   if (options?.withCard ?? true) {
-    player.minorPlayed.push('D24_BrotherlyLove')
+    player.minorPlayed.push('D024_BrotherlyLove')
   }
 
   // Simulate 3 farmers already placed by marking spaces as taken by the player
@@ -53,7 +53,7 @@ const setup = (options?: {
   return session
 }
 
-describe('D24_BrotherlyLove session', () => {
+describe('D024_BrotherlyLove session', () => {
   it('with card and 4 family, 1 worker left: own-farmer spaces are available', () => {
     const state = setup({ withCard: true, workersAvailable: 1 }).getState()
     expect(state.ok).toBe(true)

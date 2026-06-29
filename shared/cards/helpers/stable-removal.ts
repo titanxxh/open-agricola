@@ -13,10 +13,10 @@ import { positionKey } from '../../domain/farm'
  * §3.5.1 for the encapsulation rule.
  *
  * The B85 FarmHand stable is persisted on
- * `player.cardStates.B85_FarmHand.extraData.position`. These helpers are
+ * `player.cardStates.B085_FarmHand.extraData.position`. These helpers are
  * the ONLY place outside B85's own file that reads / mutates that field.
  */
-const FARMHAND_CARD_ID = 'B85_FarmHand'
+const FARMHAND_CARD_ID = 'B085_FarmHand'
 const FARMHAND_POSITION_KEY = 'position'
 
 const readFarmHandPosition = (

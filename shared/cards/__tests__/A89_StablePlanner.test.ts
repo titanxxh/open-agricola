@@ -5,9 +5,9 @@ import { futureMeeplesAction } from '../../actions/effects/internal/future-meepl
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 
-import '../A/A89_StablePlanner'
+import '../A/A089_StablePlanner'
 
-const CARD_ID = 'A89_StablePlanner'
+const CARD_ID = 'A089_StablePlanner'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -78,7 +78,7 @@ const executeLeaf = (
   }
 }
 
-describe('A89_StablePlanner', () => {
+describe('A089_StablePlanner', () => {
   it('onBuy offers prefix choices at +3, +6, +9 without reserving before acceptance', () => {
     const player = createPlayer()
     const state = createState(player)

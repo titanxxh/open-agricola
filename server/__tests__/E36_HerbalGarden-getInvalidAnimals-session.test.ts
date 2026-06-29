@@ -3,19 +3,19 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/E/E36_HerbalGarden'
+import '../../shared/cards/E/E036_HerbalGarden'
 
 // E36 HerbalGarden: BGA moved this restriction to PlayerBoard.php main path.
 // We enforce via `onComputeAnimalZones` blocking one pasture (cap=0). Hook
 // returns [] for parity.
-describe('E36_HerbalGarden getInvalidAnimals', () => {
+describe('E036_HerbalGarden getInvalidAnimals', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.minorPlayed.push('E36_HerbalGarden')
+    player.minorPlayed.push('E036_HerbalGarden')
     player.pastures = [
       {
         id: 'p1',
@@ -39,7 +39,7 @@ describe('E36_HerbalGarden getInvalidAnimals', () => {
   }
 
   it('hook is registered on the card', () => {
-    const effect = getCardEffect('E36_HerbalGarden')
+    const effect = getCardEffect('E036_HerbalGarden')
     expect(effect?.getInvalidAnimals).toBeDefined()
   })
 

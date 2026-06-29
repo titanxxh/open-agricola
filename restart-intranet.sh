@@ -56,7 +56,7 @@ usage() {
   cat <<'EOF'
 Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
                              [--players N | -p N | --players=N | -p=N]
-                             [--parents] [--seasons] [--draft] [--preview]
+                             [--parents] [--seasons] [--moor] [--draft] [--preview]
                              [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
@@ -71,6 +71,8 @@ backend restarts independently.
                                  always printed; the selected one is marked.
   --parents                      Enable Parent Cards for fixed dev rooms.
   --seasons                      Enable Through the Seasons for fixed dev rooms.
+  --moor                         Enable Farmers of the Moor for fixed dev
+                                 rooms, allowing the incomplete FoM minor pool.
   --draft                        Start fixed dev rooms in simultaneous draft
                                  mode with draft pool size 7. Requires a reset.
   --preview                      Build the frontend and serve dist with
@@ -83,6 +85,7 @@ KILL_ONLY=0
 PLAYERS="4"
 PARENTS_ENABLED=0
 SEASONS_ENABLED=0
+MOOR_ENABLED=0
 DRAFT_ENABLED=0
 PREVIEW_ENABLED=0
 while [ $# -gt 0 ]; do
@@ -109,6 +112,10 @@ while [ $# -gt 0 ]; do
       ;;
     --seasons)
       SEASONS_ENABLED=1
+      shift
+      ;;
+    --moor)
+      MOOR_ENABLED=1
       shift
       ;;
     --draft)
@@ -293,6 +300,35 @@ try {
 EOF
 }
 
+dev_rooms_without_farmers_of_the_moor() {
+  DB_PATH="$DB_PATH" node <<'EOF'
+const fs = require('node:fs')
+const Database = require('better-sqlite3')
+
+const dbPath = process.env.DB_PATH
+if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
+
+const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+try {
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
+  if (!table) process.exit(0)
+  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
+  const missing = rows.filter((row) => {
+    if (!row.state_json) return true
+    try {
+      const state = JSON.parse(row.state_json)
+      return state.enableFarmersOfTheMoor !== true
+    } catch {
+      return true
+    }
+  })
+  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
+} finally {
+  db.close()
+}
+EOF
+}
+
 confirm_dev_room_reset() {
   local reason="$1"
   local answer=""
@@ -408,6 +444,12 @@ else
       RESET_REASONS+=("existing fixed dev room(s) are not Through the Seasons games: $MISSING_SEASONS_ROOMS.")
     fi
   fi
+  if [ "$MOOR_ENABLED" -eq 1 ]; then
+    MISSING_MOOR_ROOMS="$(dev_rooms_without_farmers_of_the_moor)"
+    if [ -n "$MISSING_MOOR_ROOMS" ]; then
+      RESET_REASONS+=("existing fixed dev room(s) are not Farmers of the Moor games: $MISSING_MOOR_ROOMS.")
+    fi
+  fi
   if [ "${#RESET_REASONS[@]}" -gt 0 ]; then
     RESET_REASON="${RESET_REASONS[*]}"
   fi
@@ -435,6 +477,7 @@ if [ "$PREVIEW_ENABLED" -eq 1 ]; then
     env \
       VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
       VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+      VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
       BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL" \
       "$PNPM_BIN" run build
   else
@@ -445,6 +488,7 @@ if [ "$PREVIEW_ENABLED" -eq 1 ]; then
     env \
       VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
       VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+      VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
       "$PNPM_BIN" run build
     rm -rf "$SCRIPT_DIR/dist/bga-img"
     mkdir -p "$SCRIPT_DIR/dist/bga-img"
@@ -464,6 +508,8 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PUBLIC_APP_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
+  DEV_ENABLE_FARMERS_OF_THE_MOOR="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
+  DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
   DEV_DRAFT_POOL_SIZE=7 \
   BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
@@ -479,6 +525,7 @@ if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
     VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
     VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+    VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" preview --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 else
   echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
@@ -509,6 +556,9 @@ if [ "$PARENTS_ENABLED" -eq 1 ]; then
 fi
 if [ "$SEASONS_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableThroughTheSeasons=true"
+fi
+if [ "$MOOR_ENABLED" -eq 1 ]; then
+  DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true"
 fi
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftMode=simultaneous&draftPoolSize=7"

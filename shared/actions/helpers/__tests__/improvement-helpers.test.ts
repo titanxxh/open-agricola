@@ -25,11 +25,11 @@ describe('getPrintedImprovementResourceCost', () => {
   })
 
   it('reads minor costs', () => {
-    expect(getPrintedImprovementResourceCost('C82_HardwareStore', 'clay')).toBe(1)
+    expect(getPrintedImprovementResourceCost('C082_HardwareStore', 'clay')).toBe(1)
   })
 
   it('reads minor altCosts', () => {
-    expect(getPrintedImprovementResourceCost('C65_Granary', 'clay')).toBe(3)
+    expect(getPrintedImprovementResourceCost('C065_Granary', 'clay')).toBe(3)
   })
 
   it('uses the maximum matching base cost candidate instead of summing cost and altCosts', () => {

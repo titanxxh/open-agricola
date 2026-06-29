@@ -8,11 +8,11 @@ import {
 } from '../../../cards/helpers/card-state'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import { hasPendingExtraTurn } from '../../../cards/card-effects'
-import { A92_AdoptiveParents } from '../../../cards/A/A92_AdoptiveParents'
+import { A092_AdoptiveParents } from '../../../cards/A/A092_AdoptiveParents'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../../domain/player'
 import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
-import '../../../cards/A/A92_AdoptiveParents'
+import '../../../cards/A/A092_AdoptiveParents'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -44,7 +44,7 @@ const makeCtx = (
 })
 
 const CARD_ID = 'TEST_CARD'
-const A92 = A92_AdoptiveParents.id
+const A92 = A092_AdoptiveParents.id
 
 const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
   emit: (event) => {
@@ -1084,7 +1084,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     let result = specialEffectAction.execute({
       ...makeCtx(
         player,
-        { kind: 'add-resource-to-space', target: { kind: 'card', cardId: 'D75_WoodField' }, resource: 'wood', amount: 2 },
+        { kind: 'add-resource-to-space', target: { kind: 'card', cardId: 'D075_WoodField' }, resource: 'wood', amount: 2 },
         CARD_ID,
         state,
       ),
@@ -1102,12 +1102,12 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     expect(result.type).toBe('ok')
-    expect(player.cardStates.D75_WoodField?.counters?.wood).toBe(2)
+    expect(player.cardStates.D075_WoodField?.counters?.wood).toBe(2)
     expect(events).toEqual([
       expect.objectContaining({
         type: 'resource.accumulated',
         resources: { wood: 2 },
-        to: { kind: 'card', playerId: player.id, cardId: 'D75_WoodField' },
+        to: { kind: 'card', playerId: player.id, cardId: 'D075_WoodField' },
       }),
       expect.objectContaining({
         type: 'resource.accumulated',
@@ -1121,7 +1121,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     const player = makePlayer()
     const events: DraftGameEvent[] = []
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
-    player.cardStates.D75_WoodField = {
+    player.cardStates.D075_WoodField = {
       extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
 
@@ -1132,7 +1132,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           kind: 'plant-additional-good',
           locations: [
             { kind: 'field', row: 0, col: 0 },
-            { kind: 'card-field', cardId: 'D75_WoodField' },
+            { kind: 'card-field', cardId: 'D075_WoodField' },
           ],
         },
         CARD_ID,
@@ -1142,14 +1142,14 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
     expect(result.type).toBe('ok')
     expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
-    expect(player.cardStates.D75_WoodField?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 2 }])
+    expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 2 }])
     expect(events).toEqual([
       expect.objectContaining({
         type: 'farm.cropAdded',
         reason: 'cardEffect',
         crops: [
           { location: { kind: 'field', playerId: player.id, row: 0, col: 0 }, crop: 'grain', amount: 1 },
-          { location: { kind: 'card', playerId: player.id, cardId: 'D75_WoodField' }, crop: 'wood', amount: 1 },
+          { location: { kind: 'card', playerId: player.id, cardId: 'D075_WoodField' }, crop: 'wood', amount: 1 },
         ],
       }),
     ])

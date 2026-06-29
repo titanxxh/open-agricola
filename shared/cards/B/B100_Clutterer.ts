@@ -10,17 +10,9 @@ const hasAccumulationText = (desc: string[]): boolean =>
 
 const getPlayedCardDesc = (choice: string | undefined): string[] | undefined => {
   if (!choice) return undefined
-  if (choice.startsWith('minor:')) {
-    const card = getRegisteredMinorImprovement(choice.replace('minor:', ''))
-    return card?.desc
-  }
-  if (choice.startsWith('major:')) {
-    // Major improvements don't have "accumulation" in their text
-    return undefined
-  }
-  // Occupation: choice is raw card ID
-  const card = getRegisteredOccupation(choice)
-  return card?.desc
+  const cardId = choice.replace(/^major:/, '').replace(/^minor:/, '')
+  return getRegisteredMinorImprovement(cardId)?.desc
+    ?? getRegisteredOccupation(cardId)?.desc
 }
 
 const afterImprovementListener: CardListenerRegistration = {

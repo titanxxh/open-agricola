@@ -5,6 +5,7 @@ import type {
   ActionSpace,
   Bonus,
   ComplexCost,
+  FarmTilePosition,
   FenceSegment,
   FenceSegmentType,
   GameState,
@@ -24,7 +25,14 @@ import {
 } from '../payment/internal/typed-flat'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { getAllEdgeIds, playerBoard, normalizePlayerFarm } from '../../domain'
-import { FARM_COLS, FARM_ROWS, isBorderEdge } from '../../domain/farm'
+import {
+  FARM_COLS,
+  FARM_ROWS,
+  getFarmyardEdgeIds,
+  getFarmyardTileCount,
+  getFarmyardTilePositions,
+  isFarmyardBorderEdge,
+} from '../../domain/farm'
 import type {
   FenceCostPolicy,
   FencePastureBounds,
@@ -64,11 +72,16 @@ export type FenceActionPolicy = {
   sourcePolicy?: FenceSourcePolicy
   segmentBounds?: FenceSegmentBounds
   newPastureBounds?: FencePastureBounds
+  newRegionBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
   paymentBudget?: PaymentResourceMap
   pastureBounds?: FenceValidationOptions['pastureBounds']
   cancelPolicy?: 'allowCancel' | 'forbidCancel'
   preserveAnimalTotals?: boolean
+  connectionPolicy?: FenceValidationOptions['connectionPolicy']
+  allowedNewRegionTiles?: FarmTilePosition[]
+  allowTerrainInNewRegions?: boolean
+  suppressTerrainRegions?: boolean
   promptHintKey?: string
 }
 
@@ -77,6 +90,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isFenceSegmentType = (value: unknown): value is FenceSegmentType =>
   value === 'fence' || value === 'palisade'
+
+const isFarmTilePosition = (value: unknown): value is FarmTilePosition => {
+  if (!isRecord(value)) return false
+  return typeof value.row === 'number' && typeof value.col === 'number'
+}
 
 const readBorrowedDonorCaps = (value: unknown): Record<string, number> | undefined => {
   if (!isRecord(value)) return undefined
@@ -127,6 +145,9 @@ export function readFenceActionPolicy(
     newPastureBounds: isRecord(source.newPastureBounds)
       ? (source.newPastureBounds as FencePastureBounds)
       : undefined,
+    newRegionBounds: isRecord(source.newRegionBounds)
+      ? (source.newRegionBounds as FencePastureBounds)
+      : undefined,
     costPolicy: isRecord(source.costPolicy)
       ? (source.costPolicy as FenceCostPolicy)
       : undefined,
@@ -143,6 +164,21 @@ export function readFenceActionPolicy(
       typeof source.preserveAnimalTotals === 'boolean'
         ? source.preserveAnimalTotals
         : undefined,
+    connectionPolicy:
+      source.connectionPolicy === 'allowDisconnected'
+        ? 'allowDisconnected'
+        : undefined,
+    allowedNewRegionTiles: Array.isArray(source.allowedNewRegionTiles)
+      ? source.allowedNewRegionTiles.filter(isFarmTilePosition)
+      : undefined,
+    allowTerrainInNewRegions:
+      typeof source.allowTerrainInNewRegions === 'boolean'
+        ? source.allowTerrainInNewRegions
+        : undefined,
+    suppressTerrainRegions:
+      typeof source.suppressTerrainRegions === 'boolean'
+        ? source.suppressTerrainRegions
+        : undefined,
     promptHintKey:
       typeof source.promptHintKey === 'string'
         ? source.promptHintKey
@@ -155,19 +191,29 @@ const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
   policy.newPastureBounds !== undefined ||
+  policy.newRegionBounds !== undefined ||
   policy.costPolicy !== undefined ||
   policy.paymentBudget !== undefined ||
   policy.pastureBounds !== undefined ||
   policy.cancelPolicy !== undefined ||
-  policy.preserveAnimalTotals !== undefined
+  policy.preserveAnimalTotals !== undefined ||
+  policy.connectionPolicy !== undefined ||
+  policy.allowedNewRegionTiles !== undefined ||
+  policy.allowTerrainInNewRegions !== undefined ||
+  policy.suppressTerrainRegions !== undefined
 
 const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
   policy.newPastureBounds !== undefined ||
+  policy.newRegionBounds !== undefined ||
   policy.costPolicy !== undefined ||
   policy.paymentBudget !== undefined ||
-  policy.pastureBounds !== undefined
+  policy.pastureBounds !== undefined ||
+  policy.connectionPolicy !== undefined ||
+  policy.allowedNewRegionTiles !== undefined ||
+  policy.allowTerrainInNewRegions !== undefined ||
+  policy.suppressTerrainRegions !== undefined
 
 const borrowedPolicyWithCurrentCaps = (
   state: GameState,
@@ -261,6 +307,7 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
   }
   const minPastureSize =
     policy.newPastureBounds?.totalSize?.min ??
+    policy.newRegionBounds?.totalSize?.min ??
     policy.pastureBounds?.newPastureSize?.min
   if (minPastureSize !== undefined) {
     return minPerimeterForFarmCells(minPastureSize)
@@ -275,6 +322,7 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
 const inferMinimumPolicyOrdinarySegments = (policy: FenceActionPolicy): number => {
   const minPastureSize =
     policy.newPastureBounds?.totalSize?.min ??
+    policy.newRegionBounds?.totalSize?.min ??
     policy.pastureBounds?.newPastureSize?.min
   if (minPastureSize !== undefined) {
     return minOrdinaryPerimeterForFarmCells(minPastureSize)
@@ -312,7 +360,9 @@ const canStartWithFencePolicy = (
     segmentBounds?.fence?.max ?? maxTotal,
   )
   const maxPalisade = Math.min(
-    allowedPalisade ? 2 * (FARM_ROWS + FARM_COLS) : 0,
+    allowedPalisade
+      ? getFarmyardEdgeIds(player).filter((edge) => isFarmyardBorderEdge(player, edge)).length
+      : 0,
     segmentBounds?.palisade?.max ?? maxTotal,
   )
   const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
@@ -343,15 +393,8 @@ const canStartWithFencePolicy = (
   return false
 }
 
-const farmTiles = (): Array<{ row: number; col: number }> => {
-  const tiles: Array<{ row: number; col: number }> = []
-  for (let row = 0; row < FARM_ROWS; row += 1) {
-    for (let col = 0; col < FARM_COLS; col += 1) {
-      tiles.push({ row, col })
-    }
-  }
-  return tiles
-}
+const farmTiles = (player: PlayerState): Array<{ row: number; col: number }> =>
+  getFarmyardTilePositions(player)
 
 const perimeterEdges = (tiles: Array<{ row: number; col: number }>): string[] => {
   const keys = new Set(tiles.map((tile) => `${tile.row}-${tile.col}`))
@@ -386,12 +429,16 @@ const connected = (tiles: Array<{ row: number; col: number }>): boolean => {
   return remaining.size === 0
 }
 
-const connectedTileSetCache = new Map<number, Array<Array<{ row: number; col: number }>>>()
+const connectedTileSetCache = new Map<string, Array<Array<{ row: number; col: number }>>>()
 
-const connectedTileSets = (size: number): Array<Array<{ row: number; col: number }>> => {
-  const cached = connectedTileSetCache.get(size)
+const connectedTileSets = (
+  player: PlayerState,
+  size: number,
+): Array<Array<{ row: number; col: number }>> => {
+  const all = farmTiles(player)
+  const cacheKey = `${size}:${all.map((tile) => `${tile.row}-${tile.col}`).join('|')}`
+  const cached = connectedTileSetCache.get(cacheKey)
   if (cached) return cached
-  const all = farmTiles()
   const results: Array<Array<{ row: number; col: number }>> = []
   const choose = (start: number, picked: Array<{ row: number; col: number }>) => {
     if (picked.length === size) {
@@ -405,26 +452,30 @@ const connectedTileSets = (size: number): Array<Array<{ row: number; col: number
     }
   }
   choose(0, [])
-  connectedTileSetCache.set(size, results)
+  connectedTileSetCache.set(cacheKey, results)
   return results
 }
 
-const candidatePastureSizes = (policy: FenceActionPolicy): number[] => {
+const candidatePastureSizes = (player: PlayerState, policy: FenceActionPolicy): number[] => {
   const hasPastureSizeBound =
     policy.newPastureBounds?.totalSize?.min !== undefined ||
     policy.newPastureBounds?.totalSize?.max !== undefined ||
+    policy.newRegionBounds?.totalSize?.min !== undefined ||
+    policy.newRegionBounds?.totalSize?.max !== undefined ||
     policy.pastureBounds?.newPastureSize?.min !== undefined ||
     policy.pastureBounds?.newPastureSize?.max !== undefined
   const min =
     policy.newPastureBounds?.totalSize?.min ??
+    policy.newRegionBounds?.totalSize?.min ??
     policy.pastureBounds?.newPastureSize?.min ??
     1
   const max =
     policy.newPastureBounds?.totalSize?.max ??
+    policy.newRegionBounds?.totalSize?.max ??
     policy.pastureBounds?.newPastureSize?.max ??
-    (hasPastureSizeBound ? min : FARM_ROWS * FARM_COLS)
+    (hasPastureSizeBound ? min : getFarmyardTileCount(player))
   const sizes: number[] = []
-  for (let size = Math.max(1, min); size <= Math.min(max, FARM_ROWS * FARM_COLS); size += 1) {
+  for (let size = Math.max(1, min); size <= Math.min(max, getFarmyardTileCount(player)); size += 1) {
     sizes.push(size)
   }
   return sizes
@@ -453,7 +504,7 @@ const candidateFenceSpecs = (
   if (allowsFence) specs.push({ edges: perimeter, palisadeEdges: [] })
   if (!allowsPalisade) return specs
 
-  const borderNew = newPerimeter.filter(isBorderEdge)
+  const borderNew = newPerimeter.filter((edge) => isFarmyardBorderEdge(player, edge))
   for (let palisadeCount = 1; palisadeCount <= borderNew.length; palisadeCount += 1) {
     const palisadeSet = new Set(borderNew.slice(0, palisadeCount))
     const ordinaryEdges = newPerimeter.filter((edge) => !palisadeSet.has(edge))
@@ -476,9 +527,9 @@ const hasPossibleFenceCommit = (
   const options = fenceValidationOptions(player, playerCanBuildPalisades(player), policy)
   const lockedKeys = collectLockedFarmTileKeys(player)
   const existing = new Set((player.fenceSegments ?? []).map((segment) => segment.edge))
-  const allEdgeIds = new Set(getAllEdgeIds())
-  for (const size of candidatePastureSizes(policy)) {
-    for (const tiles of connectedTileSets(size)) {
+  const allEdgeIds = new Set(getAllEdgeIds(player))
+  for (const size of candidatePastureSizes(player, policy)) {
+    for (const tiles of connectedTileSets(player, size)) {
       const perimeter = perimeterEdges(tiles).filter((edge) => allEdgeIds.has(edge))
       if (perimeter.every((edge) => existing.has(edge))) continue
       for (const spec of candidateFenceSpecs(perimeter, player, policy)) {
@@ -516,9 +567,14 @@ const fenceValidationOptions = (
     sourcePolicy: policy.sourcePolicy,
     segmentBounds: policy.segmentBounds,
     newPastureBounds: policy.newPastureBounds,
+    newRegionBounds: policy.newRegionBounds,
     costPolicy: policy.costPolicy,
     pastureBounds: policy.pastureBounds,
     preserveAnimalTotals: policy.preserveAnimalTotals,
+    connectionPolicy: policy.connectionPolicy,
+    allowedNewRegionTiles: policy.allowedNewRegionTiles,
+    allowTerrainInNewRegions: policy.allowTerrainInNewRegions,
+    suppressTerrainRegions: policy.suppressTerrainRegions,
     ordinaryFenceBuildLimit: borrowedCapacity ?? getOwnOrdinaryFenceBuildLimit(player),
     availableOrdinaryFenceTokens:
       borrowedCapacity ?? getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences,
@@ -573,7 +629,7 @@ export const canStartFencing = (
   if (ordinaryCapacity < minimumFenceSegments) {
     return false
   }
-  if (getTotalPastureCells(player) >= maxPastureCells) return false
+  if (getTotalPastureCells(player) >= getFarmyardTileCount(player)) return false
   const free = selectedFreeFences + Math.max(0, -(costOverride?.wood ?? 0))
   if (free > 0) {
     const woodCount = player.resources.wood ?? 0

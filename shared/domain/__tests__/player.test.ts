@@ -93,9 +93,9 @@ describe('player helpers', () => {
   it('workersAtHome excludes workers held on a card', () => {
     const p = makePlayer([makeWorker('1'), makeWorker('2')])
     const s = emptyState([p])
-    holdWorkerOnCard(p, 'C22_BasketChair', '1')
+    holdWorkerOnCard(p, 'C022_BasketChair', '1')
     expect(workersAtHome(s, p).map((w) => w.id)).toEqual(['2'])
-    releaseWorkerFromCard(p, 'C22_BasketChair')
+    releaseWorkerFromCard(p, 'C022_BasketChair')
     expect(workersAtHome(s, p).map((w) => w.id).sort()).toEqual(['1', '2'])
   })
 })

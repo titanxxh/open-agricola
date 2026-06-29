@@ -1,5 +1,6 @@
 import type { PlayerState } from '../contract/types'
-import { FARM_COLS, FARM_ROWS, positionKey } from './farm'
+import { getFarmyardTileCount, positionKey } from './farm'
+import { getBlockedFarmyardSpaceKeys } from './farmyard-space-states'
 import { computeFencedRegions } from './farmyard'
 
 export const getPastureTileKeys = (player: PlayerState) => {
@@ -12,7 +13,7 @@ export const getPastureTileKeys = (player: PlayerState) => {
   )
   if (needsDerivedPastureTiles && player.fenceSegments.length > 0) {
     const edgeSet = new Set(player.fenceSegments.map((s) => s.edge))
-    computeFencedRegions(edgeSet)
+    computeFencedRegions(edgeSet, player)
       .filter((region) => region.fenced)
       .forEach((region) => {
         region.tiles.forEach((tile) => keys.add(positionKey(tile)))
@@ -30,8 +31,9 @@ export const getUsedFarmyardTileKeys = (player: PlayerState) => {
   )
   player.stableTiles.forEach((tile) => used.add(positionKey(tile)))
   getPastureTileKeys(player).forEach((key) => used.add(key))
+  getBlockedFarmyardSpaceKeys(player).forEach((key) => used.add(key))
   return used
 }
 
 export const countUnusedFarmyardSpaces = (player: PlayerState) =>
-  FARM_ROWS * FARM_COLS - getUsedFarmyardTileKeys(player).size
+  getFarmyardTileCount(player) - getUsedFarmyardTileKeys(player).size

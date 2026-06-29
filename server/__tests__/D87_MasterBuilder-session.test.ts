@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/D/D87_MasterBuilder'
+import '../../shared/cards/D/D087_MasterBuilder'
 
-describe('D87_MasterBuilder session', () => {
+describe('D087_MasterBuilder session', () => {
   const roomTiles = (count: number) => [
     ...Array.from({ length: Math.min(count, 5) }, (_, col) => ({ row: 0, col })),
     ...Array.from({ length: Math.max(0, count - 5) }, (_, col) => ({ row: 1, col })),
@@ -18,12 +18,12 @@ describe('D87_MasterBuilder session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('D87_MasterBuilder')
+    player.occupationHand.push('D087_MasterBuilder')
     player.resources.food = 10
     player.rooms = options?.rooms ?? 5
     player.roomTiles = roomTiles(player.rooms)
     session.loadState(state)
-    session.devPlayCard(0, 'D87_MasterBuilder')
+    session.devPlayCard(0, 'D087_MasterBuilder')
     return session
   }
 
@@ -54,7 +54,7 @@ describe('D87_MasterBuilder session', () => {
     const updatedPlayer = built.state.players[0]!
     expect(updatedPlayer.rooms).toBe(initialRooms + 1)
     expect(updatedPlayer.roomTiles).toContainEqual({ row: 1, col: 0 })
-    expect(isCardFlagged(updatedPlayer, 'D87_MasterBuilder')).toBe(true)
+    expect(isCardFlagged(updatedPlayer, 'D087_MasterBuilder')).toBe(true)
   })
 
   it('NOT available with rooms < 5', () => {

@@ -28,7 +28,12 @@ export type PaymentResource = Resource & Record<SupplyTokenKey, number>
 export type CardProvidedPaymentResourceKey = `${string}:${string}`
 export type PaymentResourceKey = keyof PaymentResource | CardProvidedPaymentResourceKey
 export type PaymentResourceMap = Partial<Record<PaymentResourceKey, number>>
-export type FutureMeepleResourceMap = Partial<Resource> & { field?: number; stable?: number }
+export type FutureMeepleResourceMap = Partial<Resource> & {
+  field?: number
+  stable?: number
+  forest?: number
+  moor?: number
+}
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
@@ -290,13 +295,20 @@ export type FenceSegmentSource =
   | { kind: 'own'; ownerPlayerId: string }
   | { kind: 'borrowed'; ownerPlayerId: string }
 export type FenceSegment = { edge: string; type: FenceSegmentType; source?: FenceSegmentSource }
+export type FarmyardExtension = {
+  id: string
+  sourceCardId?: string
+  tiles: FarmTilePosition[]
+}
 
 export type PlayerState = {
   id: string
   name: string
   color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
+  farmyardExtensions?: FarmyardExtension[]
   farmTerrain?: FarmTerrainTile[]
+  farmyardSpaceStates?: FarmyardSpaceState[]
   workers: Worker[]
   sickWorkerIds?: string[]
   rooms: number
@@ -343,6 +355,23 @@ export type PlayerState = {
 export type FarmTilePosition = {
   row: number
   col: number
+}
+
+export type FarmyardSpaceStateKind =
+  | 'blocked-farmyard-space'
+  | 'farmyard-goods-token'
+  | 'field-goods-token'
+  | 'non-field-crop-space'
+
+export type FarmyardSpaceState = {
+  spaceKey: string
+  sourceCardId: string
+  kind: FarmyardSpaceStateKind
+  resources?: Partial<Resource>
+  crop?: CropStack
+  bonusVp?: number
+  claimPolicy?: 'when-no-longer-unused' | 'when-sowed'
+  blocksPlacement?: boolean
 }
 
 export type Pasture = {
@@ -568,7 +597,7 @@ export type GameState = {
   /**
    * Number of feeding phases that have completed (incremented once at the
    * start of each breeding phase, after all players have fed).
-   * Consumed by A148_Woolgrower / B86_TruffleSearcher animal capacity.
+   * Consumed by A148_Woolgrower / B086_TruffleSearcher animal capacity.
    * Mirrors BGA `Globals::getCompletedFeedingPhases()`.
    */
   completedFeedingPhases: number
@@ -578,7 +607,7 @@ export type CanBeExecutedByPlayerContext = {
   /**
    * The card id that originated this action invocation, if any. Forwarded so
    * doable checks can route through the same per-card cost/effect modifiers
-   * that pay-time uses (e.g. D95 Site Manager treats `actionCardId === 'D95_SiteManager'`
+   * that pay-time uses (e.g. D95 Site Manager treats `actionCardId === 'D095_SiteManager'`
    * as the trigger for its food-for-resource substitution).
    */
   sourceCard?: string
@@ -722,6 +751,7 @@ export type ActionFlow =
       params?: Record<string, unknown>
       sourceCard?: string
       actionContext?: Record<string, unknown>
+      optionId?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
       effectPreview?: ChoiceEffectPreview
@@ -745,6 +775,7 @@ export type ActionFlow =
       type: 'seq' | 'or' | 'xor' | 'parallel'
       promptKey?: PromptKey
       children: ActionFlow[]
+      optionId?: string
       optional?: boolean
       mode?: 'all' | 'trigger-select'
       sourceCard?: string
@@ -1045,6 +1076,7 @@ export type InteractionSelection =
       maxSelections: number
       minSelections?: number
       allowedSelectionCounts?: number[]
+      validPositionGroups?: FarmTilePosition[][]
     }
   | {
       kind: 'occupation-hand'

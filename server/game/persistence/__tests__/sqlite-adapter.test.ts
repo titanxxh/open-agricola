@@ -29,6 +29,10 @@ const setupDb = () => {
       status TEXT NOT NULL DEFAULT 'waiting',
       version INTEGER NOT NULL DEFAULT 0,
       custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      enable_parent_cards INTEGER NOT NULL DEFAULT 0,
+      enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
+      enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
+      allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -113,6 +117,25 @@ describe('SqliteRoomPersistence', () => {
     p.save('r1', STATE, meta)
     const snap = p.load('r1') as RoomSnapshot
     expect(snap.meta.customCardDbIds).toEqual(['card-1', 'card-2'])
+  })
+
+  it('save → load preserves room expansion flags', () => {
+    const meta: RoomMeta = {
+      ...META,
+      enableParentCards: true,
+      enableThroughTheSeasons: true,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    }
+
+    p.save('r1', STATE, meta)
+
+    expect(p.load('r1')?.meta).toMatchObject({
+      enableParentCards: true,
+      enableThroughTheSeasons: true,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
   })
 
   it('second save bumps version (optimistic concurrency token)', () => {

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D39_TruffleSlicer'
+import '../../shared/cards/D/D039_TruffleSlicer'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'D39_TruffleSlicer'
+const CARD_ID = 'D039_TruffleSlicer'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -66,7 +66,7 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('D39_TruffleSlicer', () => {
+describe('D039_TruffleSlicer', () => {
   it('triggers optional pay 1 food for 1 bonus VP on forest space with boar', () => {
     const listener = findListener('D39-truffle-slicer-after-place-farmer')
     expect(listener).toBeDefined()

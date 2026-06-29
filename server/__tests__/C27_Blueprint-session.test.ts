@@ -8,10 +8,10 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
-import '../../shared/cards/C/C27_Blueprint'
+import '../../shared/cards/C/C027_Blueprint'
 import '../../shared/cards/B/B131_Equipper'
 
-const CARD_ID = 'C27_Blueprint'
+const CARD_ID = 'C027_Blueprint'
 const ROUTING_LISTENER_ID = 'C27-blueprint-compute-choice-candidates'
 
 const findListener = (id: string) =>
@@ -20,11 +20,11 @@ const findListener = (id: string) =>
 /**
  * C27 Blueprint — verify-only.
  *
- * BGA `Cards/C/C27_Blueprint.php::onPlayerComputeCardCosts` clones every
+ * BGA `Cards/C/C027_Blueprint.php::onPlayerComputeCardCosts` clones every
  * matching stone cost trade for `Major_Joinery`, `Major_Pottery`,
  * `Major_Basket` only. OA mirrors that with card-purchase cost candidates.
  */
-describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () => {
+describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -124,14 +124,14 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
 })
 
 /**
- * BGA `C27_Blueprint`'s second behavior — "you can build the major
+ * BGA `C027_Blueprint`'s second behavior — "you can build the major
  * improvements ... even when taking a Minor Improvement action" — is
  * implemented via a `computeChoiceCandidates` listener that injects the 3
  * allowed majors into the minor-improvement choice list (mirrors D131
  * CraftsmanshipPromoter pattern). The cost discount is handled by the
  * card-purchase candidate pipeline above.
  */
-describe('C27_Blueprint session — minor-improvement routing for 3 majors', () => {
+describe('C027_Blueprint session — minor-improvement routing for 3 majors', () => {
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
   const setupWithResources = (overrides?: { playC27?: boolean }) => {
@@ -173,7 +173,7 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
     expect(result?.extraOptions).toBeDefined()
     const values = (result!.extraOptions ?? []).map((o) => o.value).sort()
     for (const major of ALLOWED_MAJORS) {
-      expect(values).toContain(`major:${major}`)
+      expect(values).toContain(major)
     }
     for (const opt of result!.extraOptions ?? []) {
       expect(opt.sourceCard).toBe(CARD_ID)
@@ -222,6 +222,6 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
       'B131_Equipper',
     )
 
-    expect(extras.some((option) => option.value === 'major:Major_Joinery')).toBe(false)
+    expect(extras.some((option) => option.value === 'Major_Joinery')).toBe(false)
   })
 })

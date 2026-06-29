@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/E/E95_Miller'
+import '../../shared/cards/E/E095_Miller'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-describe('E95_Miller session', () => {
+describe('E095_Miller session', () => {
   /**
    * Setup: 2-player game.
    * p0 = Miller owner, has a Fireplace and grain for baking.
@@ -18,7 +18,7 @@ describe('E95_Miller session', () => {
     state.currentPlayerIndex = 1 // opponent's turn
 
     const owner = state.players[0]!
-    owner.occupationPlayed.push('E95_Miller')
+    owner.occupationPlayed.push('E095_Miller')
     // Give owner a Fireplace for baking
     owner.improvements.push('Major_Fireplace1')
     state.availableMajorImprovements = state.availableMajorImprovements.filter(
@@ -155,7 +155,7 @@ describe('E95_Miller session', () => {
     setWorkersAtHome(state, owner, 2) // Give enough resources to buy an occupation (food: 1 for second occ) and a Fireplace (clay: 2)
     owner.resources = { ...owner.resources, food: 5, clay: 5 }
     // Put Miller in occupation hand — add a second occupation so auto-select doesn't skip the choice
-    owner.occupationHand = ['E95_Miller', 'A85_Homekeeper']
+    owner.occupationHand = ['E095_Miller', 'A085_Homekeeper']
 
     // Make sure Fireplace is available
     if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
@@ -172,7 +172,7 @@ describe('E95_Miller session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const millerOption = resp.interaction.options?.find(
-      (o: ActionChoiceOption) => o.value === 'E95_Miller',
+      (o: ActionChoiceOption) => o.value === 'E095_Miller',
     )
     expect(millerOption).toBeDefined()
     resp = session.resolveChoice(0, millerOption!.value)
@@ -193,7 +193,7 @@ describe('E95_Miller session', () => {
     }
 
     // Verify the card was played
-    expect(resp.state.players[0]!.occupationPlayed).toContain('E95_Miller')
+    expect(resp.state.players[0]!.occupationPlayed).toContain('E095_Miller')
   })
 
   it('onBuy allows purchasing a baking improvement', () => {
@@ -205,7 +205,7 @@ describe('E95_Miller session', () => {
     setWorkersAtHome(state, owner, 2)
     owner.resources = { ...owner.resources, food: 5, clay: 5 }
     // Add a second occupation so the choice isn't auto-resolved
-    owner.occupationHand = ['E95_Miller', 'A85_Homekeeper']
+    owner.occupationHand = ['E095_Miller', 'A085_Homekeeper']
 
     // Make sure Fireplace is available
     if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
@@ -221,7 +221,7 @@ describe('E95_Miller session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const millerOption = resp.interaction.options?.find(
-      (o: ActionChoiceOption) => o.value === 'E95_Miller',
+      (o: ActionChoiceOption) => o.value === 'E095_Miller',
     )
     expect(millerOption).toBeDefined()
     resp = session.resolveChoice(0, millerOption!.value)
@@ -234,7 +234,7 @@ describe('E95_Miller session', () => {
       const options = resp.interaction.options ?? []
       // Find fireplace option
       const fireplaceOption = options.find(
-        (o: ActionChoiceOption) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
+        (o: ActionChoiceOption) => o.value === 'Major_Fireplace1',
       )
       // Find activate (non-skip) option
       const activateOption = options.find(
@@ -250,7 +250,7 @@ describe('E95_Miller session', () => {
     }
 
     // Verify the card was played and improvement was purchased
-    expect(resp.state.players[0]!.occupationPlayed).toContain('E95_Miller')
+    expect(resp.state.players[0]!.occupationPlayed).toContain('E095_Miller')
     expect(resp.state.players[0]!.improvements).toContain('Major_Fireplace1')
   })
 })

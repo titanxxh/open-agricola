@@ -1,0 +1,38 @@
+import { defineMinorCard } from '../card-source'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'A051_DriftNetBoat'
+const listener: CardListenerRegistration = {
+  id: 'A51-drift-net-boat-after-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.space || context.space.id !== 'fishing') return
+    return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
+  },
+}
+
+const cardImpl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl
+
+export const A051_DriftNetBoat = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Drift-Net Boat',
+    deck: 'A',
+    number: 51,
+    category: 'FOOD_PROVIDER',
+    desc: ['Each time you use the __Fishing__ accumulation space, you get an additional 2 <FOOD>.'],
+    cost: { wood: 1, reed: 1 },
+    vp: 1,
+  },
+  impl: cardImpl,
+})
+
+export const A051_DriftNetBoat_impl = A051_DriftNetBoat.impl

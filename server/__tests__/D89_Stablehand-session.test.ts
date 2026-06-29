@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-import '../../shared/cards/D/D89_Stablehand'
+import '../../shared/cards/D/D089_Stablehand'
 
-const CARD_ID = 'D89_Stablehand'
+const CARD_ID = 'D089_Stablehand'
 
 const fenceBuilt = (
   newPastures: Array<{ tiles?: unknown[] }>,
@@ -27,7 +27,7 @@ const setup = () => {
   return { state, player, listener: listener! }
 }
 
-describe('D89_Stablehand fence provenance', () => {
+describe('D089_Stablehand fence provenance', () => {
   it('offers one optional stable after a new pasture fence event', () => {
     const { state, player, listener } = setup()
     const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }])]

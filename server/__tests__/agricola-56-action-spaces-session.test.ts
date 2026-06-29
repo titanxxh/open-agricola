@@ -310,6 +310,6 @@ describe('5/6 expansion action spaces', () => {
     const resp = late.takeAction(0, 'improvement-6')
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.options?.some((option) => option.value.startsWith('major:'))).toBe(true)
+    expect(resp.interaction.options?.some((option) => option.value.startsWith('Major_'))).toBe(true)
   })
 })

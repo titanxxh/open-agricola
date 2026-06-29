@@ -8,7 +8,14 @@ import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
-import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import {
+  getFarmyardBounds,
+  getFarmyardTileKeySet,
+  getAdjacentTilesForEdge,
+  isFarmyardBorderEdge,
+  parsePositionKey,
+  positionKey,
+} from '../../shared/domain/farm'
 import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
@@ -674,14 +681,20 @@ export const GameContainerApi = () => {
     })
   }, [state, transport, isInteractive, interaction])
 
-  const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState) => {
+  const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId !== 'idle') return false
     if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
-    if (card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id) {
-      return currentPlayer.resources.food >= 2
-    }
-    return true
+    const borrowFood = card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id ? 2 : 0
+    const actionFood =
+      actionId === 'horse-market' && [2, 5, 6].includes(state.players.length) ? 1
+        : actionId === 'illicit-work' ? 1
+          : 0
+    const actionFuel = actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+    return (
+      currentPlayer.resources.food >= borrowFood + actionFood &&
+      (currentPlayer.resources.fuel ?? 0) >= actionFuel
+    )
   }, [currentPlayer, interaction.stateId, isInteractive, state])
 
   const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
@@ -1401,22 +1414,71 @@ export const GameContainerApi = () => {
   const sowErrorText: string | null = sowError
     ? t(locale, farmCommitErrorMessageKey('sow', sowError))
     : null
-  const farmCells = useMemo(() => {
-    const rows = 7; const cols = 11
-    const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
+  const farmGrid = useMemo(() => {
+    if (!displayPlayer) return { cells: [], columns: 11 }
+    const bounds = { ...getFarmyardBounds(displayPlayer) }
+    const tileKeys = new Set(getFarmyardTileKeySet(displayPlayer))
+    const pendingSelectionTiles =
+      interaction.stateId === 'wait' &&
+      selectionInteraction?.kind === 'farm-position' &&
+      state?.players[interaction.playerIndex]?.id === displayPlayer.id
+        ? selectionInteraction.selectablePositions
+        : []
+    pendingSelectionTiles.forEach((tile) => {
+      tileKeys.add(positionKey(tile))
+      bounds.minRow = Math.min(bounds.minRow, tile.row)
+      bounds.maxRow = Math.max(bounds.maxRow, tile.row)
+      bounds.minCol = Math.min(bounds.minCol, tile.col)
+      bounds.maxCol = Math.max(bounds.maxCol, tile.col)
+    })
+    const rows = (bounds.maxRow - bounds.minRow + 1) * 2 + 1
+    const cols = (bounds.maxCol - bounds.minCol + 1) * 2 + 1
+    const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v' | 'void'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
+    const hasAdjacentTileForPost = (boundaryRow: number, boundaryCol: number) =>
+      [
+        { row: boundaryRow - 1, col: boundaryCol - 1 },
+        { row: boundaryRow - 1, col: boundaryCol },
+        { row: boundaryRow, col: boundaryCol - 1 },
+        { row: boundaryRow, col: boundaryCol },
+      ].some((tile) => tileKeys.has(positionKey(tile)))
+    const hasAdjacentTileForEdge = (edgeId: string) =>
+      getAdjacentTilesForEdge(edgeId).some((tile) => tileKeys.has(positionKey(tile)))
     for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
       const isTile = row % 2 === 1 && col % 2 === 1
       const isPost = row % 2 === 0 && col % 2 === 0
       const isFenceH = row % 2 === 0 && col % 2 === 1
       const isFenceV = row % 2 === 1 && col % 2 === 0
+      const tileRow = isTile ? bounds.minRow + (row - 1) / 2 : undefined
+      const tileCol = isTile ? bounds.minCol + (col - 1) / 2 : undefined
+      const boundaryRow = bounds.minRow + row / 2
+      const boundaryCol = bounds.minCol + col / 2
+      const fenceId = isFenceH
+        ? `H-${boundaryRow}-${bounds.minCol + (col - 1) / 2}`
+        : isFenceV
+          ? `V-${bounds.minRow + (row - 1) / 2}-${boundaryCol}`
+          : undefined
+      const type =
+        isTile
+          ? tileKeys.has(positionKey({ row: tileRow!, col: tileCol! })) ? 'tile' : 'void'
+          : isFenceH || isFenceV
+            ? fenceId && hasAdjacentTileForEdge(fenceId)
+              ? isFenceH ? 'fence-h' : 'fence-v'
+              : 'void'
+            : isPost && hasAdjacentTileForPost(boundaryRow, boundaryCol)
+              ? 'post'
+              : 'void'
       cells.push({
-        key: `${row}-${col}`, type: isTile ? 'tile' : isPost ? 'post' : isFenceH ? 'fence-h' : 'fence-v',
-        tileRow: isTile ? (row - 1) / 2 : undefined, tileCol: isTile ? (col - 1) / 2 : undefined,
-        fenceId: isFenceH ? `H-${row / 2}-${(col - 1) / 2}` : isFenceV ? `V-${(row - 1) / 2}-${col / 2}` : undefined,
+        key: `${row}-${col}`,
+        type,
+        tileRow,
+        tileCol,
+        fenceId,
       })
     }
-    return cells
-  }, [])
+    return { cells, columns: cols }
+  }, [displayPlayer, interaction, selectionInteraction, state?.players])
+  const farmCells = farmGrid.cells
+  const farmGridColumns = farmGrid.columns
 
   const pastureTiles = useMemo(() => {
     const map = new Map<string, { pastureId: string; isCorner: boolean }>()
@@ -1632,8 +1694,11 @@ export const GameContainerApi = () => {
     toggleFenceEdge(
       edgeId,
       isBorrowedFenceSelection && borrowedFenceSource
-        ? { donorCaps: borrowedFenceSource.donorCaps }
-        : undefined,
+        ? {
+            donorCaps: borrowedFenceSource.donorCaps,
+            isBorderEdge: (candidate) => isFarmyardBorderEdge(displayPlayer ?? undefined, candidate),
+          }
+        : { isBorderEdge: (candidate) => isFarmyardBorderEdge(displayPlayer ?? undefined, candidate) },
     )
   const setViewPlayerIdSafe = useCallback((value: string) => {
     setViewPlayerId(value)
@@ -2365,7 +2430,7 @@ export const GameContainerApi = () => {
               activePlayerId={activePlayer?.id}
               currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-              playedCards={playedCards} farmCells={farmCells} roomPositions={roomPositions} fieldPositions={fieldPositions}
+              playedCards={playedCards} farmCells={farmCells} farmGridColumns={farmGridColumns} roomPositions={roomPositions} fieldPositions={fieldPositions}
               fieldMap={fieldMap} stablePositions={stablePositions}
               pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
               pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
@@ -2457,6 +2522,7 @@ export const GameContainerApi = () => {
         confirmPlayerSwitch={confirmPlayerSwitch}
         playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
         pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
+        pendingFenceEdgesLength={pendingFenceEdges.length + pendingPalisadeEdges.length}
         pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
         pendingFarmHandSelected={pendingFarmHand !== null}
         pendingSowSelectionsLength={sowSelectedCount}

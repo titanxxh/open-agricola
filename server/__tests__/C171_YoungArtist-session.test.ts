@@ -4,14 +4,14 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C171_YoungArtist'
-import '../../shared/cards/A/A16_RammedClay'
-import '../../shared/cards/C/C15_Trellis'
-import '../../shared/cards/C/C23_JobContract'
-import '../../shared/cards/C/C4_WritingBoards'
+import '../../shared/cards/A/A016_RammedClay'
+import '../../shared/cards/C/C015_Trellis'
+import '../../shared/cards/C/C023_JobContract'
+import '../../shared/cards/C/C004_WritingBoards'
 
 const CARD_ID = 'C171_YoungArtist'
-const MINOR_ID = 'A16_RammedClay'
-const DRAWN_MINORS = ['C15_Trellis', 'C23_JobContract'] as const
+const MINOR_ID = 'A016_RammedClay'
+const DRAWN_MINORS = ['C015_Trellis', 'C023_JobContract'] as const
 
 const setupSession = ({
   food = 1,
@@ -47,7 +47,7 @@ const resolveMinorIfPrompt = (
   cardId: string,
 ) => {
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  const option = resp.interaction.options?.find((entry) => entry.value === cardId)
   if (!option) return resp
   return session.resolveChoice(resp.interaction.playerIndex, option.value)
 }
@@ -115,7 +115,7 @@ describe('C171_YoungArtist', () => {
   })
 
   it('does not offer a Minor Improvement branch that becomes unaffordable after the Young Artist food fee', () => {
-    const session = setupSession({ food: 1, minorHand: ['C4_WritingBoards'], minorDeck: [] })
+    const session = setupSession({ food: 1, minorHand: ['C004_WritingBoards'], minorDeck: [] })
 
     const resp = session.performRoundEnd()
 
@@ -123,12 +123,12 @@ describe('C171_YoungArtist', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).not.toBe('wait')
     expect(owner.resources.food).toBe(1)
-    expect(owner.minorHand).toEqual(['C4_WritingBoards'])
-    expect(owner.minorPlayed).not.toContain('C4_WritingBoards')
+    expect(owner.minorHand).toEqual(['C004_WritingBoards'])
+    expect(owner.minorPlayed).not.toContain('C004_WritingBoards')
   })
 
   it('draws only the remaining ordinary minor when fewer than 2 cards are available', () => {
-    const session = setupSession({ minorDeck: ['C15_Trellis'] })
+    const session = setupSession({ minorDeck: ['C015_Trellis'] })
 
     let resp = session.performRoundEnd()
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
@@ -136,7 +136,7 @@ describe('C171_YoungArtist', () => {
 
     const owner = resp.state.players[0]!
     expect(owner.resources.food).toBe(0)
-    expect(owner.minorHand).toEqual(['__test_placeholder__', 'C15_Trellis'])
+    expect(owner.minorHand).toEqual(['__test_placeholder__', 'C015_Trellis'])
     expect(resp.state.ordinaryCardDecks.minor).toEqual([])
   })
 

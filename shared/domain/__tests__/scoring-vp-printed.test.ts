@@ -5,7 +5,7 @@ import { Occupation } from '../../cards/registry-display'
 import { registerAdHocOccupation } from '../../cards/registry-runtime'
 
 // Self-register the minor we use as a fixture
-import '../../cards/B/B68_Beanfield'
+import '../../cards/B/B068_Beanfield'
 
 // In-test fixture occupation: tests register an ad-hoc occupation so
 // `getRegisteredOccupation('__TEST_OCC_VP__')` resolves. At time of writing no
@@ -89,11 +89,11 @@ const cardsCategoryEntries = (player: PlayerState) => {
 describe('computeScores: printed vp on minors and occupations', () => {
   it('adds the printed vp of a minor improvement to its cards-category entry', () => {
     const player = createPlayer()
-    player.minorPlayed = ['B68_Beanfield']
+    player.minorPlayed = ['B068_Beanfield']
 
     const entries = cardsCategoryEntries(player)
     const entry = entries.find(
-      (e) => e.type === 'card' && e.cardId === 'B68_Beanfield',
+      (e) => e.type === 'card' && e.cardId === 'B068_Beanfield',
     )
     expect(entry).toBeDefined()
     expect(entry && 'score' in entry ? entry.score : undefined).toBe(1)

@@ -16,10 +16,10 @@ import { handleGameRoute, setSession } from '../game-router.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import type { GameEvent } from '../../shared/contract/events.ts'
 
-import '../../shared/cards/E/E78_SleightofHand'
-import '../../shared/cards/D/D36_BreedRegistry'
+import '../../shared/cards/E/E078_SleightofHand'
+import '../../shared/cards/D/D036_BreedRegistry'
 
-const E78_CARD_ID = 'E78_SleightofHand'
+const E078_CARD_ID = 'E078_SleightofHand'
 
 type MockRes = ServerResponse & { statusCode: number; body: string }
 
@@ -68,7 +68,7 @@ const setupE78BatchPromptSession = () => {
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   const player = state.players[0]!
-  player.minorHand = [E78_CARD_ID]
+  player.minorHand = [E078_CARD_ID]
   player.occupationPlayed = ['occ-1', 'occ-2', 'occ-3']
   player.resources.wood = 2
   player.resources.clay = 1
@@ -203,7 +203,7 @@ describe('HTTP privacy + seat binding', () => {
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.currentPlayerIndex = 0
-      state.players[0]!.minorHand = ['D36_BreedRegistry']
+      state.players[0]!.minorHand = ['D036_BreedRegistry']
       state.players[1]!.minorHand = ['__test_placeholder__']
       state.players[1]!.occupationHand = ['__test_placeholder__']
       session.loadState(state)
@@ -212,7 +212,7 @@ describe('HTTP privacy + seat binding', () => {
       const ownerRes = mockRes()
       await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p1' }), ownerRes)
       const owner = JSON.parse(ownerRes.body)
-      expect(Object.prototype.hasOwnProperty.call(owner.cardAvailability, 'minor:D36_BreedRegistry')).toBe(true)
+      expect(Object.prototype.hasOwnProperty.call(owner.cardAvailability, 'minor:D036_BreedRegistry')).toBe(true)
 
       const otherRes = mockRes()
       await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p2' }), otherRes)
@@ -227,10 +227,10 @@ describe('HTTP privacy + seat binding', () => {
       const state = resp.state
       state.players = state.players.slice(0, 2)
       const p1 = state.players[0]!
-      p1.minorHand = ['D36_BreedRegistry']
+      p1.minorHand = ['D036_BreedRegistry']
       p1.cardStates = {
         ...p1.cardStates,
-        D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+        D036_BreedRegistry: { extraData: { boardSheep: 1 } },
       }
       const hiddenEvent: GameEvent = {
         schemaVersion: 1,
@@ -241,7 +241,7 @@ describe('HTTP privacy + seat binding', () => {
         type: 'card.triggered',
         visibility: 'public',
         actorPlayerId: p1.id,
-        cardId: 'D36_BreedRegistry',
+        cardId: 'D036_BreedRegistry',
       }
       const visibleEvent: GameEvent = {
         schemaVersion: 1,
@@ -608,7 +608,7 @@ describe('HTTP privacy + seat binding', () => {
           type: 'private.promptShown',
           recipientPlayerId: 'p1',
           promptKind: 'resource-batch-exchange-select',
-          sourceCard: E78_CARD_ID,
+          sourceCard: E078_CARD_ID,
         }),
       ])
 
@@ -658,7 +658,7 @@ describe('HTTP privacy + seat binding', () => {
       const exchangedEvent = commitData.state.events.find((event: {
         type: string
         sourceCardId?: string
-      }) => event.type === 'resource.exchanged' && event.sourceCardId === E78_CARD_ID)
+      }) => event.type === 'resource.exchanged' && event.sourceCardId === E078_CARD_ID)
       expect(exchangedEvent).toBeDefined()
       const previousMaxSeq = maxEventSeq(commitData.state.events)
 

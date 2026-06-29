@@ -4,7 +4,7 @@ import { createPartialTakeFromSpaceLeaf } from '../partial-take'
 describe('createPartialTakeFromSpaceLeaf', () => {
   it('creates a collect leaf with partial-take actionContext and display metadata', () => {
     expect(createPartialTakeFromSpaceLeaf({
-      sourceCard: 'B81_Handcart',
+      sourceCard: 'B081_Handcart',
       spaceId: 'forest',
       spaceName: 'actions.forest.name',
       resource: 'wood',
@@ -12,7 +12,7 @@ describe('createPartialTakeFromSpaceLeaf', () => {
     })).toEqual({
       type: 'leaf',
       actionId: 'collect',
-      sourceCard: 'B81_Handcart',
+      sourceCard: 'B081_Handcart',
       actionContext: { spaceId: 'forest', resource: 'wood', amount: 1 },
       choiceLabelKey: 'ui.interactionTakeFromSpace',
       choiceLabelParams: {
@@ -25,7 +25,7 @@ describe('createPartialTakeFromSpaceLeaf', () => {
 
   it('can attach a resource preview for card effects that need it', () => {
     expect(createPartialTakeFromSpaceLeaf({
-      sourceCard: 'E5_NightLoot',
+      sourceCard: 'E005_NightLoot',
       spaceId: 'reed-bank',
       resource: 'reed',
       includeEffectPreview: true,

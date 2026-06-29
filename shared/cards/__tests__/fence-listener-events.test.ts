@@ -3,7 +3,7 @@ import type { DraftGameEvent } from '../../contract/events'
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { isCardFlagged } from '../helpers/card-state'
-import { B27_Toolbox_impl } from '../B/B27_Toolbox'
+import { B027_Toolbox_impl } from '../B/B027_Toolbox'
 import { B140_FarmyardWorker_impl } from '../B/B140_FarmyardWorker'
 
 const resources = (overrides: Partial<Resource> = {}): Resource => ({
@@ -79,12 +79,12 @@ const listenerById = (
 
 describe('fence listener event guards', () => {
   it('B27 Toolbox ignores fence cancel/no-op after-hook', () => {
-    const actor = player('B27_Toolbox')
-    const listener = listenerById(B27_Toolbox_impl.listeners, 'B27-flag-fencing')
+    const actor = player('B027_Toolbox')
+    const listener = listenerById(B027_Toolbox_impl.listeners, 'B27-flag-fencing')
 
     listener.handler(context(actor, []))
 
-    expect(isCardFlagged(actor, 'B27_Toolbox')).toBe(false)
+    expect(isCardFlagged(actor, 'B027_Toolbox')).toBe(false)
   })
 
   it('B140 FarmyardWorker ignores fence cancel/no-op after-hook', () => {

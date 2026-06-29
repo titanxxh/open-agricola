@@ -4,7 +4,7 @@ import type { PlayerState } from '../../contract/types'
 import { requireActiveCardRegistry } from '../active-registry'
 import type { CardListenerRegistration } from '../card-listeners'
 
-const CARD_ID = 'B65_GrainDepot'
+const CARD_ID = 'B065_GrainDepot'
 const HOOK_CARD = 'HookFreeGrainDepot'
 
 const isZeroPayment = (resources: Record<string, number> | undefined) =>
@@ -20,7 +20,7 @@ const setWorkersAtHome = (player: PlayerState, count: number) => {
 
 describe('B65 Grain Depot', () => {
   afterEach(() => {
-    requireActiveCardRegistry('B65_GrainDepot.test')
+    requireActiveCardRegistry('B065_GrainDepot.test')
       .removeListenersWhere((listener) => listener.id === 'hook-free-grain-depot')
   })
 
@@ -54,7 +54,7 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
@@ -117,7 +117,7 @@ describe('B65 Grain Depot', () => {
         }
       },
     }
-    requireActiveCardRegistry('B65_GrainDepot.test').registerListener(hook)
+    requireActiveCardRegistry('B065_GrainDepot.test').registerListener(hook)
 
     const liveState = session.getState().state
     const player = liveState.players[0]!
@@ -141,7 +141,7 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
-import { C72_FestivalPlanning_impl } from '../C/C72_FestivalPlanning'
-import { E25_BumperCrop_impl } from '../E/E25_BumperCrop'
+import { C072_FestivalPlanning_impl } from '../C/C072_FestivalPlanning'
+import { E025_BumperCrop_impl } from '../E/E025_BumperCrop'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -36,21 +36,22 @@ describe('Private Field Phase cards', () => {
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
     ])
 
-    const flow = C72_FestivalPlanning_impl.effect.onBuy!(state(player), player) as ActionFlow
+    const flow = C072_FestivalPlanning_impl.effect.onBuy!(state(player), player) as ActionFlow
 
     expect(flow).toEqual({
       type: 'seq',
       children: [
         {
           type: 'leaf',
-          actionId: 'private-field-phase',
-          sourceCard: 'C72_FestivalPlanning',
+          actionId: 'reap',
+          sourceCard: 'C072_FestivalPlanning',
+          actionContext: { trigger: { phase: 'private-field-phase' } },
         },
         {
           type: 'leaf',
           actionId: 'improvement',
           optional: true,
-          sourceCard: 'C72_FestivalPlanning',
+          sourceCard: 'C072_FestivalPlanning',
         },
       ],
     })
@@ -61,7 +62,7 @@ describe('Private Field Phase cards', () => {
       { row: 0, col: 0, stacks: [] },
     ])
 
-    const flow = C72_FestivalPlanning_impl.effect.onBuy!(state(player), player) as ActionFlow
+    const flow = C072_FestivalPlanning_impl.effect.onBuy!(state(player), player) as ActionFlow
 
     expect(flow).toEqual({
       type: 'seq',
@@ -70,7 +71,7 @@ describe('Private Field Phase cards', () => {
           type: 'leaf',
           actionId: 'improvement',
           optional: true,
-          sourceCard: 'C72_FestivalPlanning',
+          sourceCard: 'C072_FestivalPlanning',
         },
       ],
     })
@@ -78,17 +79,18 @@ describe('Private Field Phase cards', () => {
 
   it('C72 Festival Planning runs Private Field Phase when only Card Fields have crops', () => {
     const player = playerWithFields([])
-    player.minorPlayed = ['E68_CherryOrchard']
+    player.minorPlayed = ['E068_CherryOrchard']
     player.cardStates = {
-      E68_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } },
+      E068_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } },
     }
 
-    const flow = C72_FestivalPlanning_impl.effect.onBuy!(state(player), player) as Extract<ActionFlow, { type: 'seq' }>
+    const flow = C072_FestivalPlanning_impl.effect.onBuy!(state(player), player) as Extract<ActionFlow, { type: 'seq' }>
 
     expect(flow.children[0]).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
-      sourceCard: 'C72_FestivalPlanning',
+      actionId: 'reap',
+      sourceCard: 'C072_FestivalPlanning',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 
@@ -97,12 +99,13 @@ describe('Private Field Phase cards', () => {
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
     ])
 
-    const flow = E25_BumperCrop_impl.effect.onBuy!(state(player), player)
+    const flow = E025_BumperCrop_impl.effect.onBuy!(state(player), player)
 
     expect(flow).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
-      sourceCard: 'E25_BumperCrop',
+      actionId: 'reap',
+      sourceCard: 'E025_BumperCrop',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 
@@ -111,7 +114,7 @@ describe('Private Field Phase cards', () => {
       { row: 0, col: 0, stacks: [] },
     ])
 
-    expect(E25_BumperCrop_impl.effect.onBuy!(state(player), player)).toBeUndefined()
+    expect(E025_BumperCrop_impl.effect.onBuy!(state(player), player)).toBeUndefined()
   })
 
   it('E25 Bumper Crop runs Private Field Phase when only Card Fields have crops', () => {
@@ -121,10 +124,11 @@ describe('Private Field Phase cards', () => {
       B113_PlantBreeder: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
     }
 
-    expect(E25_BumperCrop_impl.effect.onBuy!(state(player), player)).toEqual({
+    expect(E025_BumperCrop_impl.effect.onBuy!(state(player), player)).toEqual({
       type: 'leaf',
-      actionId: 'private-field-phase',
-      sourceCard: 'E25_BumperCrop',
+      actionId: 'reap',
+      sourceCard: 'E025_BumperCrop',
+      actionContext: { trigger: { phase: 'private-field-phase' } },
     })
   })
 })

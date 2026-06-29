@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { InteractionState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B75_WoodWorkshop'
-import '../../shared/cards/A/A48_ShavingHorse'
+import '../../shared/cards/B/B075_WoodWorkshop'
+import '../../shared/cards/A/A048_ShavingHorse'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-const B75 = 'B75_WoodWorkshop'
-const A48 = 'A48_ShavingHorse'
-const WOOD_MINOR = 'C13_WoodSlideHammer'
-const FOOD_MINOR = 'A5_ClayEmbankment'
+const B75 = 'B075_WoodWorkshop'
+const A48 = 'A048_ShavingHorse'
+const WOOD_MINOR = 'C013_WoodSlideHammer'
+const FOOD_MINOR = 'A005_ClayEmbankment'
 
 const setup = (overrides: {
   wood?: number
@@ -63,7 +63,7 @@ const expectWait = (resp: SessionResponse): WaitResponse => {
   return resp as WaitResponse
 }
 
-describe('B75_WoodWorkshop session', () => {
+describe('B075_WoodWorkshop session', () => {
   it('uses mandatory B75 before trigger to play a wood-cost minor', () => {
     const session = setup({ wood: 0, minorHand: [WOOD_MINOR] })
 

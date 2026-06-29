@@ -5,16 +5,16 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
-import { C81_MaterialHub } from '../../shared/cards/C/C81_MaterialHub'
+import { C081_MaterialHub } from '../../shared/cards/C/C081_MaterialHub'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow, Resource } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C81_MaterialHub'
+import '../../shared/cards/C/C081_MaterialHub'
 
-const CARD_ID = 'C81_MaterialHub'
+const CARD_ID = 'C081_MaterialHub'
 
 const findCollectListener = () =>
   getRegisteredCardListeners().find((listener) => listener.id === 'C81-material-hub-after-collect')
@@ -65,14 +65,14 @@ const runCollectListener = (
   } as unknown as CardListenerContext, { ownerPlayerId: owner.id })?.flow
 }
 
-describe('C81_MaterialHub prerequisite', () => {
+describe('C081_MaterialHub prerequisite', () => {
   it('blocks when no reed in supply', () => {
     const session = new GameSession()
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.reed = 0
     player.resources.stone = 2
-    expect(meetsCardPrerequisites(player, C81_MaterialHub, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(false)
   })
 
   it('blocks when no stone in supply', () => {
@@ -81,7 +81,7 @@ describe('C81_MaterialHub prerequisite', () => {
     const player = state.players[0]!
     player.resources.reed = 2
     player.resources.stone = 0
-    expect(meetsCardPrerequisites(player, C81_MaterialHub, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(false)
   })
 
   it('allows when both reed and stone are >= 1', () => {
@@ -90,11 +90,11 @@ describe('C81_MaterialHub prerequisite', () => {
     const player = state.players[0]!
     player.resources.reed = 1
     player.resources.stone = 1
-    expect(meetsCardPrerequisites(player, C81_MaterialHub, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, C081_MaterialHub, state.round, state)).toBe(true)
   })
 })
 
-describe('C81_MaterialHub action-space provenance', () => {
+describe('C081_MaterialHub action-space provenance', () => {
   it('releases a stored resource when the trigger player takes enough from an action space', () => {
     const { trigger } = setupListener()
     const events = [moved({ wood: 5 }, trigger.id)]

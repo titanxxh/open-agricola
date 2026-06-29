@@ -119,7 +119,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       {
         fee: { wood: 1 },
         trades: [{ from: { clay: 1 }, to: { wood: 1 }, max: 1, scope: 'action' }],
-        bonuses: [{ discount: { wood: 1, grain: -1 }, optional: true, sources: ['D88_Millwright'] }],
+        bonuses: [{ discount: { wood: 1, grain: -1 }, optional: true, sources: ['D088_Millwright'] }],
       },
       undefined,
       'fencing',
@@ -136,14 +136,14 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       baseTestPlayer({ clay: 1, grain: 1 }),
       {
         fee: { wood: 1 },
-        trades: [{ from: { clay: 1 }, to: { wood: 1 }, scope: 'unit', sourceId: 'A16_RammedClay' }],
+        trades: [{ from: { clay: 1 }, to: { wood: 1 }, scope: 'unit', sourceId: 'A016_RammedClay' }],
         bonuses: [{
           choices: [
             { discount: { wood: 1, grain: -1 } },
             { discount: { clay: 1, grain: -1 } },
           ],
           optional: true,
-          sources: ['D88_Millwright'],
+          sources: ['D088_Millwright'],
         }],
       },
       undefined,
@@ -152,7 +152,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
 
     expect(combo.some((sol) =>
       JSON.stringify(nonZeroPaid(sol)) === JSON.stringify({ grain: 1 }) &&
-      JSON.stringify(sources(sol)) === JSON.stringify(['A16_RammedClay', 'D88_Millwright']),
+      JSON.stringify(sources(sol)) === JSON.stringify(['A016_RammedClay', 'D088_Millwright']),
     )).toBe(true)
   })
 
@@ -267,7 +267,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       bonuses: [{
         discount: { stone: 1 },
         optional: true,
-        sources: ['C27_Blueprint'],
+        sources: ['C027_Blueprint'],
       }],
     }
 
@@ -279,7 +279,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     })).toBe(false)
     expect(sols.some((s) => {
       const paid = nonZeroPaid(s)
-      return paid.wood === 2 && paid.stone === 1 && s.bonusUsed === 'C27_Blueprint'
+      return paid.wood === 2 && paid.stone === 1 && s.bonusUsed === 'C027_Blueprint'
     })).toBe(true)
   })
 
@@ -385,7 +385,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
         discount: { reed: 99 },
         capDiscountAtCost: true,
         optional: true,
-        sources: ['C14_StrawThatchedRoof'],
+        sources: ['C014_StrawThatchedRoof'],
       }],
     }
 

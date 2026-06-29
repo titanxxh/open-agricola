@@ -4,8 +4,10 @@ import { getRegisteredMinorImprovement } from '../registry-display'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { fieldHasCrop } from '../../domain/field'
+import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import { getActiveCardRegistry } from '../active-registry'
 import { readCardExtraData } from './card-state'
+import type { AnimalKey } from '../../contract/animals'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -62,6 +64,22 @@ const countBakingImprovements = (player: PlayerState) =>
 const countCookingImprovements = (player: PlayerState) =>
   collectCardsAs(player, 'major').filter(cardHasCookery).length
 
+const animalKeyFromText = (text: string): AnimalKey | null => {
+  switch (text.toLowerCase()) {
+    case 'sheep':
+      return 'sheep'
+    case 'boar':
+      return 'boar'
+    case 'cattle':
+      return 'cattle'
+    case 'horse':
+    case 'horses':
+      return 'horse'
+    default:
+      return null
+  }
+}
+
 const meetsNumericPrerequisite = (
   count: number,
   prerequisite?: { min?: number; max?: number },
@@ -96,9 +114,31 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
     return player.pastures.length >= Number(pastureMatch[1])
   }
 
+  const animalMatch = trimmed.match(/^(\d+)\s+(Sheep|Boar|Cattle|Horses?)$/i)
+  if (animalMatch) {
+    const key = animalKeyFromText(animalMatch[2]!)
+    return key !== null && (player.resources[key] ?? 0) >= Number(animalMatch[1])
+  }
+
+  const exactAnimalMatch = trimmed.match(/^Exactly\s+(\d+)\s+(Sheep|Boar|Cattle|Horses?)$/i)
+  if (exactAnimalMatch) {
+    const key = animalKeyFromText(exactAnimalMatch[2]!)
+    return key !== null && (player.resources[key] ?? 0) === Number(exactAnimalMatch[1])
+  }
+
   const majorImprovementsMatch = trimmed.match(/^(\d+)\s+Major Improvements?$/i)
   if (majorImprovementsMatch) {
     return countMajorImprovements(player) >= Number(majorImprovementsMatch[1])
+  }
+
+  const atMostImprovementsMatch = trimmed.match(/^At Most\s+(\d+)\s+Improvements?$/i)
+  if (atMostImprovementsMatch) {
+    return countAllImprovements(player) <= Number(atMostImprovementsMatch[1])
+  }
+
+  const improvementsMatch = trimmed.match(/^(\d+)\s+Improvements?$/i)
+  if (improvementsMatch) {
+    return countAllImprovements(player) >= Number(improvementsMatch[1])
   }
 
   const bakingMatch = trimmed.match(/^(\d+)\s+Baking Improvements?$/i)
@@ -114,6 +154,10 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
     return countOccupations(player) === 0
   }
 
+  if (/^No Improvements$/i.test(trimmed)) {
+    return countAllImprovements(player) === 0
+  }
+
   const atMostOccupationsMatch = trimmed.match(/^At Most\s+(\d+)\s+Occupations?$/i)
   if (atMostOccupationsMatch) {
     return countOccupations(player) <= Number(atMostOccupationsMatch[1])
@@ -126,6 +170,16 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
 
   if (/^No Field Tiles$/i.test(trimmed)) {
     return countFields(player) === 0
+  }
+
+  if (/^No Unused Farmyard Spaces$/i.test(trimmed)) {
+    return countUnusedFarmyardSpaces(player) === 0
+  }
+
+  const atLeastTerrainMatch = trimmed.match(/^At Least\s+(\d+)\s+(Moor|Forest)s?$/i)
+  if (atLeastTerrainMatch) {
+    const kind = atLeastTerrainMatch[2]!.toLowerCase()
+    return (player.farmTerrain ?? []).filter((tile) => tile.kind === kind).length >= Number(atLeastTerrainMatch[1])
   }
 
   const exactFieldTilesMatch = trimmed.match(/^Exactly\s+(\d+)\s+Field Tiles?$/i)

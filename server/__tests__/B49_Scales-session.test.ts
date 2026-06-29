@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/A/A1_Shelter'
-import '../../shared/cards/A/A37_Bucksaw'
+import '../../shared/cards/A/A001_Shelter'
+import '../../shared/cards/A/A037_Bucksaw'
 import '../../shared/cards/D/D152_Patron'
-import '../../shared/cards/B/B49_Scales'
+import '../../shared/cards/B/B049_Scales'
 
-const CARD_ID = 'B49_Scales'
+const CARD_ID = 'B049_Scales'
 const PLACEHOLDER = '__test_placeholder__'
 
 const setup = (opts: {
@@ -95,10 +95,10 @@ const finishOptionalPrompts = (
   return resp
 }
 
-describe('B49_Scales session', () => {
+describe('B049_Scales session', () => {
   it('gains 2 food after a normal improvement makes occupation and improvement counts equal', () => {
     const session = setup({
-      minorHand: ['A37_Bucksaw', 'C69_LandConsolidation'],
+      minorHand: ['A037_Bucksaw', 'C069_LandConsolidation'],
       minorPlayed: [CARD_ID],
       occupationPlayed: ['A123_FrameBuilder', 'D152_Patron'],
       wood: 1,
@@ -107,16 +107,16 @@ describe('B49_Scales session', () => {
 
     const resp = finishOptionalPrompts(
       session,
-      chooseMeetingPlaceMinor(session, 'A37_Bucksaw'),
+      chooseMeetingPlaceMinor(session, 'A037_Bucksaw'),
     )
 
     const player = resp.state.players[0]!
-    expect(player.minorPlayed).toContain('A37_Bucksaw')
+    expect(player.minorPlayed).toContain('A037_Bucksaw')
     expect(player.resources.food).toBe(2)
-    expect(playedEvents(resp.state, 'A37_Bucksaw')).toContainEqual(expect.objectContaining({
+    expect(playedEvents(resp.state, 'A037_Bucksaw')).toContainEqual(expect.objectContaining({
       type: 'card.played',
       actorPlayerId: player.id,
-      cardId: 'A37_Bucksaw',
+      cardId: 'A037_Bucksaw',
       cardType: 'minor',
       sourceActionId: 'improvement',
     }))
@@ -124,7 +124,7 @@ describe('B49_Scales session', () => {
 
   it('does not gain food for a passing improvement even when counts remain equal', () => {
     const session = setup({
-      minorHand: ['A1_Shelter', 'C69_LandConsolidation'],
+      minorHand: ['A001_Shelter', 'C069_LandConsolidation'],
       minorPlayed: [CARD_ID],
       occupationPlayed: ['A123_FrameBuilder'],
       food: 0,
@@ -132,17 +132,17 @@ describe('B49_Scales session', () => {
 
     const resp = finishOptionalPrompts(
       session,
-      chooseMeetingPlaceMinor(session, 'A1_Shelter'),
+      chooseMeetingPlaceMinor(session, 'A001_Shelter'),
     )
 
     const player = resp.state.players[0]!
-    expect(player.minorPlayed).not.toContain('A1_Shelter')
-    expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
+    expect(player.minorPlayed).not.toContain('A001_Shelter')
+    expect(resp.state.players[1]!.minorHand).toContain('A001_Shelter')
     expect(player.occupationPlayed.length).toBe(
       player.minorPlayed.length + player.improvements.length,
     )
     expect(player.resources.food).toBe(0)
-    expect(playedEvents(resp.state, 'A1_Shelter')).toHaveLength(0)
+    expect(playedEvents(resp.state, 'A001_Shelter')).toHaveLength(0)
   })
 
   it('gains 2 food after a major improvement makes occupation and improvement counts equal', () => {

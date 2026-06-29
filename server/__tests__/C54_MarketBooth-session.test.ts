@@ -7,9 +7,9 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
-import '../../shared/cards/C/C54_MarketBooth'
+import '../../shared/cards/C/C054_MarketBooth'
 
-const CARD_ID = 'C54_MarketBooth'
+const CARD_ID = 'C054_MarketBooth'
 
 const setupForHarvestField = (options?: {
   builtFences?: number
@@ -38,7 +38,7 @@ const setupForHarvestField = (options?: {
   if (options?.e74HeldFences) {
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: options.e74HeldFences } },
+      E074_AshTrees: { counters: { fences: options.e74HeldFences } },
     }
   }
 
@@ -88,11 +88,11 @@ const setupForPurchase = (options?: { noStableReserve?: boolean }) => {
     player.supplyTokensConsumed = { stable: 1 }
     player.cardStates = {
       ...player.cardStates,
-      B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
+      B085_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
     }
     state.futureMeeples.push({
       id: 'future-stable',
-      cardId: 'A89_StablePlanner',
+      cardId: 'A089_StablePlanner',
       playerId: player.id,
       round: 6,
       actionId: null,
@@ -109,7 +109,7 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
   let safety = 10
   while (safety-- > 0 && resp.interaction.stateId === 'wait') {
     const options = resp.interaction.options ?? []
-    if (options.some((option) => option.value === `minor:${CARD_ID}`)) break
+    if (options.some((option) => option.value === CARD_ID)) break
     const accept = options.find((option) => option.value !== '__skip__')
     if (!accept) break
     resp = session.resolveChoice(0, accept.value)
@@ -117,8 +117,8 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
   return resp
 }
 
-describe('C54_MarketBooth session', () => {
-  it('has no prerequisite (BGA C54_MarketBooth has no isBuyable / prerequisite)', () => {
+describe('C054_MarketBooth session', () => {
+  it('has no prerequisite (BGA C054_MarketBooth has no isBuyable / prerequisite)', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const session = new GameSession()
     const state = session.getState().state
@@ -152,7 +152,7 @@ describe('C54_MarketBooth session', () => {
     const session = setupForPurchase({ noStableReserve: true })
     const resp = takeMeetingPlaceToMinorOptions(session)
     const options = resp.interaction.stateId === 'wait' ? resp.interaction.options ?? [] : []
-    expect(options.some((entry) => entry.value === `minor:${CARD_ID}`)).toBe(false)
+    expect(options.some((entry) => entry.value === CARD_ID)).toBe(false)
   })
 
   it('on harvest field phase end, accepting pays grain + reserve fence and grants 5 food', () => {

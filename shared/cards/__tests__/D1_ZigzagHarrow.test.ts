@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { computeZigzagCandidates } from '../D/D1_ZigzagHarrow'
+import { computeZigzagCandidates } from '../D/D001_ZigzagHarrow'
 import { getRegisteredMinorImprovement } from '../registry-display'
 import { requireActiveCardRegistry } from '../active-registry'
-import '../D/D1_ZigzagHarrow'
+import '../D/D001_ZigzagHarrow'
 import type { Field, PlayerState } from '../../contract/types'
 
-const CARD_ID = 'D1_ZigzagHarrow'
+const CARD_ID = 'D001_ZigzagHarrow'
 
 const makeField = (row: number, col: number): Field => ({ row, col, stacks: [] })
 
@@ -18,7 +18,7 @@ const makePlayer = (fieldPositions: Array<[number, number]>): PlayerState =>
 const sortKey = (positions: { row: number; col: number }[]) =>
   positions.map((p) => `${p.row}-${p.col}`).sort()
 
-describe('D1_ZigzagHarrow.computeZigzagCandidates (BGA geometry port)', () => {
+describe('D001_ZigzagHarrow.computeZigzagCandidates (BGA geometry port)', () => {
   it('returns empty when player has no fields', () => {
     expect(computeZigzagCandidates(makePlayer([]))).toEqual([])
   })
@@ -81,7 +81,7 @@ describe('D1_ZigzagHarrow.computeZigzagCandidates (BGA geometry port)', () => {
   })
 })
 
-describe('D1_ZigzagHarrow.prerequisiteCheck (registered handler)', () => {
+describe('D001_ZigzagHarrow.prerequisiteCheck (registered handler)', () => {
   it('is wired to zigzag candidate geometry, not a fields-count fallback', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     expect(card).toBeDefined()

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B19_MoldboardPlow'
+import '../../shared/cards/B/B019_MoldboardPlow'
 import '../../shared/cards/B/B173_Sweeper'
 import '../../shared/cards/C/C172_FieldCounter'
 import '../../shared/cards/D/D173_TownClerk'
@@ -67,7 +67,7 @@ const playMinor = (session: GameSession, playerIndex: number, cardId: string) =>
   }
   if (resp.interaction.stateId !== 'wait') throw new Error('expected minor choice')
   const option = resp.interaction.options?.find(
-    (candidate: ActionChoiceOption) => candidate.value === `minor:${cardId}`,
+    (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
   resp = session.resolveChoice(playerIndex, option!.value)
@@ -80,7 +80,7 @@ const playMajor = (session: GameSession, playerIndex: number, cardId: string) =>
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
   const option = resp.interaction.options?.find(
-    (candidate: ActionChoiceOption) => candidate.value === `major:${cardId}`,
+    (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
   resp = session.resolveChoice(playerIndex, option!.value)
@@ -108,9 +108,9 @@ describe('5+ stored-food cashout occupations', () => {
     const session = setupOwnerCard('C172_FieldCounter', 1)
     const state = session.getState().state
     const opponent = state.players[1]!
-    opponent.minorPlayed = ['B19_MoldboardPlow']
+    opponent.minorPlayed = ['B019_MoldboardPlow']
     opponent.cardStates ??= {}
-    opponent.cardStates.B19_MoldboardPlow = { stack: ['field', 'field'] }
+    opponent.cardStates.B019_MoldboardPlow = { stack: ['field', 'field'] }
     session.loadState(state)
 
     let resp = session.takeAction(1, 'farmland')
@@ -150,10 +150,10 @@ describe('5+ stored-food cashout occupations', () => {
     const dualTypeMinor = setupOwnerCard('D173_TownClerk')
     state = dualTypeMinor.getState().state
     const owner = state.players[0]!
-    owner.minorHand = ['D25_WitchesDanceFloor']
+    owner.minorHand = ['D025_WitchesDanceFloor']
     dualTypeMinor.loadState(state)
 
-    playMinor(dualTypeMinor, 0, 'D25_WitchesDanceFloor')
+    playMinor(dualTypeMinor, 0, 'D025_WitchesDanceFloor')
     expect(storedFood(dualTypeMinor, 'D173_TownClerk')).toBe(1)
 
     const ordinaryMinor = setupOwnerCard('D173_TownClerk')
@@ -161,10 +161,10 @@ describe('5+ stored-food cashout occupations', () => {
     const ordinaryOwner = state.players[0]!
     ordinaryOwner.resources.wood = 5
     ordinaryOwner.resources.clay = 5
-    ordinaryOwner.minorHand = ['A55_JunkRoom']
+    ordinaryOwner.minorHand = ['A055_JunkRoom']
     ordinaryMinor.loadState(state)
 
-    playMinor(ordinaryMinor, 0, 'A55_JunkRoom')
+    playMinor(ordinaryMinor, 0, 'A055_JunkRoom')
     expect(storedFood(ordinaryMinor, 'D173_TownClerk')).toBe(0)
   })
 

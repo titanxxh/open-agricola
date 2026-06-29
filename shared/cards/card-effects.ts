@@ -4,6 +4,7 @@ import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../dom
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
+import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import type { AnimalKey } from '../contract/animals'
 
 /**
@@ -165,6 +166,14 @@ export const cardEffectHooks: CardEffectField[] = [
 ]
 
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
+export type FlowEffectContext = {
+  triggerActionId?: string
+}
+type FlowEffectHandlerWithContext = (
+  state: GameState,
+  player: PlayerState,
+  ctx?: FlowEffectContext,
+) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 export type BeforeEndGameScope = 'owner' | 'allPlayers'
 export type BeforeEndGameDispatchMode = 'serial' | 'select'
@@ -230,7 +239,7 @@ export type CardEffect = {
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler
-  onEndTurn?: FlowEffectHandler
+  onEndTurn?: FlowEffectHandlerWithContext
   onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: FlowEffectHandler
   onStartReturnHome?: FlowEffectHandler
@@ -357,6 +366,7 @@ export const runCardEffectHook = (
   cardId: string,
   hook: FlowCardEffectHook,
   paymentInfo?: PaymentInfo,
+  ctx?: FlowEffectContext,
 ): ActionFlow | null => {
   const effect = getCardEffect(cardId)
   const handler = effect?.[hook]
@@ -364,6 +374,9 @@ export const runCardEffectHook = (
   try {
     if (hook === 'onBuy') {
       return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo) ?? null
+    }
+    if (hook === 'onEndTurn') {
+      return (handler as FlowEffectHandlerWithContext)(state, player, ctx) ?? null
     }
     return (handler as FlowEffectHandler)(state, player) ?? null
   } catch (err) {
@@ -728,7 +741,7 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
     ...player.minorPlayed,
     ...player.occupationPlayed,
   ]
-  const lockedKeys = new Set<string>()
+  const lockedKeys = getPlacementBlockedFarmyardSpaceKeys(player)
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (!effect?.computeLockedFarmTiles) continue

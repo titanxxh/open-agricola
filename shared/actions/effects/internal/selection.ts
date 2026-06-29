@@ -1,6 +1,7 @@
 import type { ActionDefinition, GameState, PlayerState } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { playerBoard } from '../../../domain'
+import { getUsedFarmyardTileKeys } from '../../../domain/farmyard-usage'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
@@ -23,9 +24,14 @@ const validateFarmPositions = (
   }
 
   const selected = new Set<string>()
+  const requireUnusedTerrainTile = actionContext?.terrainMode === 'place'
+  const usedFarmyardTiles = requireUnusedTerrainTile
+    ? getUsedFarmyardTileKeys(player)
+    : null
   for (const position of positions) {
     if (selected.has(position)) return 'duplicate selection position'
     selected.add(position)
+    if (usedFarmyardTiles?.has(position)) return 'invalid selection position'
   }
 
   const playerIndex = state?.players.indexOf(player) ?? -1
@@ -58,6 +64,15 @@ const validateFarmPositions = (
     : null
   if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
     return 'invalid selection count'
+  }
+  const validPositionGroups = Array.isArray(actionContext?.validPositionGroups)
+    ? actionContext.validPositionGroups
+        .filter((group): group is Array<{ row: number; col: number }> => Array.isArray(group))
+        .map((group) => group.map((pos) => `${pos.row}-${pos.col}`).sort().join('|'))
+    : null
+  if (validPositionGroups && validPositionGroups.length > 0) {
+    const selectedGroup = [...positions].sort().join('|')
+    if (!validPositionGroups.includes(selectedGroup)) return 'invalid selection position'
   }
 
   return null
@@ -137,7 +152,7 @@ export const selectionAction: ActionDefinition = {
     const extraData: Record<string, unknown> = { selectedPositions: positions }
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
-      const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state })
+      const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state, actionContext })
       if (followup) {
         return { type: 'flow', flow: followup, extraData }
       }

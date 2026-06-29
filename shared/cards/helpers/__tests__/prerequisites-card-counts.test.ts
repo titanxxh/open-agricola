@@ -3,7 +3,7 @@ import type { PlayerState } from '../../../contract/types'
 import { meetsCardPrerequisites } from '../prerequisites'
 import { MinorImprovement } from '../../registry-display'
 import { registerAdHocMinorImprovement } from '../../registry-runtime'
-import { C70_LettucePatch } from '../../../cards/C/C70_LettucePatch'
+import { C070_LettucePatch } from '../../../cards/C/C070_LettucePatch'
 
 // Register a throwaway field-providing minor for this test file only
 registerAdHocMinorImprovement(
@@ -30,7 +30,17 @@ registerAdHocMinorImprovement(
 
 type MinimalPlayer = Pick<
   PlayerState,
-  'occupationPlayed' | 'extraOccupationsFromCards' | 'fields' | 'pastures' | 'improvements' | 'minorPlayed' | 'cardStates'
+  | 'occupationPlayed'
+  | 'extraOccupationsFromCards'
+  | 'fields'
+  | 'pastures'
+  | 'improvements'
+  | 'minorPlayed'
+  | 'cardStates'
+  | 'roomTiles'
+  | 'stableTiles'
+  | 'farmTerrain'
+  | 'resources'
 >
 
 function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
@@ -42,6 +52,10 @@ function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
     improvements: [],
     minorPlayed: [],
     cardStates: {},
+    roomTiles: [],
+    stableTiles: [],
+    farmTerrain: [],
+    resources: {},
     ...overrides,
   } as unknown as PlayerState
 }
@@ -75,6 +89,16 @@ describe('prerequisites: providesField card-provided fields', () => {
     })
     const card = { prerequisite: '1 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(false)
+  })
+
+  it('supports animal count clauses', () => {
+    const player = makePlayer({
+      resources: { sheep: 1 },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '1 Sheep' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Sheep' })).toBe(false)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'Exactly 1 Sheep' })).toBe(true)
   })
 })
 
@@ -110,14 +134,48 @@ describe('prerequisites: extraOccupationsFromCards counts toward occupations', (
 describe('C70 Lettuce Patch as providesField', () => {
   it('C70 counts as a field for "2 Fields" prerequisite', () => {
     // Ensure card is registered
-    expect(C70_LettucePatch.providesField).toBe(true)
+    expect(C070_LettucePatch.providesField).toBe(true)
 
     const player = makePlayer({
       fields: [{ row: 1, col: 1, crop: null } as unknown as PlayerState['fields'][0]],
-      minorPlayed: ['C70_LettucePatch'],
+      minorPlayed: ['C070_LettucePatch'],
     })
     const card = { prerequisite: '2 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(true)
+  })
+})
+
+describe('prerequisites: Farmers of the Moor text clauses', () => {
+  it('counts all improvements for generic improvement prerequisites', () => {
+    const player = makePlayer({
+      improvements: ['Major_Well'],
+      minorPlayed: ['A037_Bucksaw'],
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Improvements' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: '3 Improvements' })).toBe(false)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'At Most 2 Improvements' })).toBe(true)
+    expect(meetsCardPrerequisites(player, { prerequisite: 'At Most 1 Improvement' })).toBe(false)
+  })
+
+  it('supports terrain and unused farmyard clauses', () => {
+    const fullFarm = makePlayer({
+      roomTiles: Array.from({ length: 15 }, (_, index) => ({
+        row: Math.floor(index / 5),
+        col: index % 5,
+      })),
+      farmTerrain: [{ row: 0, col: 0, kind: 'moor' }],
+    })
+    const openFarm = makePlayer({
+      roomTiles: [{ row: 0, col: 0 }],
+      farmTerrain: [{ row: 1, col: 0, kind: 'forest' }],
+    })
+
+    expect(meetsCardPrerequisites(fullFarm, { prerequisite: 'No Unused Farmyard Spaces' })).toBe(true)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'No Unused Farmyard Spaces' })).toBe(false)
+    expect(meetsCardPrerequisites(fullFarm, { prerequisite: 'At Least 1 Moor' })).toBe(true)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'At Least 1 Moor' })).toBe(false)
+    expect(meetsCardPrerequisites(openFarm, { prerequisite: 'At Least 1 Forest' })).toBe(true)
   })
 })
 

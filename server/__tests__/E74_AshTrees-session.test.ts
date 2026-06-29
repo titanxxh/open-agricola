@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/E/E74_AshTrees'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/E/E074_AshTrees'
+import '../../shared/cards/B/B030_WoodPalisades'
 
 const edgesForTile = (row: number, col: number) => [
   `H-${row}-${col}`,
@@ -12,7 +12,7 @@ const edgesForTile = (row: number, col: number) => [
   `V-${row}-${col + 1}`,
 ]
 
-describe('E74_AshTrees session flow', () => {
+describe('E074_AshTrees session flow', () => {
   it('lets fencing reach fence selection using stored free fences', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -25,10 +25,10 @@ describe('E74_AshTrees session flow', () => {
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
-    player.minorPlayed.push('E74_AshTrees')
+    player.minorPlayed.push('E074_AshTrees')
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: 4 } },
+      E074_AshTrees: { counters: { fences: 4 } },
     }
 
     session.loadState(state)
@@ -70,7 +70,7 @@ describe('E74_AshTrees session flow', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.E74_AshTrees?.counters?.fences).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.E074_AshTrees?.counters?.fences).toBe(0)
   })
 
   it('freeFences only discount fences, palisades still cost full wood (with B30)', () => {
@@ -84,10 +84,10 @@ describe('E74_AshTrees session flow', () => {
     // 2 palisade edges * 2 wood = 4
     // total = 4 wood
     player.resources.wood = 4
-    player.minorPlayed.push('E74_AshTrees', 'B30_WoodPalisades')
+    player.minorPlayed.push('E074_AshTrees', 'B030_WoodPalisades')
     player.cardStates = {
       ...player.cardStates,
-      E74_AshTrees: { counters: { fences: 5 } },
+      E074_AshTrees: { counters: { fences: 5 } },
     }
 
     session.loadState(state)
@@ -118,6 +118,6 @@ describe('E74_AshTrees session flow', () => {
     const result = resp.state.players[0]!
     expect(result.resources.wood).toBe(0)
     // counter decrements by 2 (newFenceEdges.length), not 5 — palisades do NOT decrement E74 counter
-    expect(result.cardStates?.E74_AshTrees?.counters?.fences).toBe(3)
+    expect(result.cardStates?.E074_AshTrees?.counters?.fences).toBe(3)
   })
 })

@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import '../../shared/cards/D/D180_PartTimeWorker'
 import '../../shared/cards/A/A108_MushroomCollector'
-import '../../shared/cards/A/A56_Basket'
+import '../../shared/cards/A/A056_Basket'
 import '../../shared/cards/A/A171_Sidekick'
 
 const CARD_ID = 'D180_PartTimeWorker'
-const MINOR_CARDS = new Set(['A56_Basket'])
+const MINOR_CARDS = new Set(['A056_Basket'])
 
 const setup = (cards: string[], forestResources: Partial<Resource>) => {
   const session = new GameSession(42, undefined, { playerCount: 5 })
@@ -82,14 +82,14 @@ describe('D180 Part-Time Worker session', () => {
   })
 
   it('coexists with two other return-to-space optional cards in the same collect sequence', () => {
-    const session = setup(['A108_MushroomCollector', 'A56_Basket', CARD_ID], { wood: 6 })
+    const session = setup(['A108_MushroomCollector', 'A056_Basket', CARD_ID], { wood: 6 })
 
     let resp = session.takeAction(0, 'forest')
     resp = chooseFrom(session, resp, 'A108_MushroomCollector')
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 5, food: 2 })
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(1)
 
-    resp = chooseFrom(session, resp, 'A56_Basket')
+    resp = chooseFrom(session, resp, 'A056_Basket')
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 3, food: 5 })
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(3)
 

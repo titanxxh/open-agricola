@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/D/D20_TurnwrestPlow'
+import '../../shared/cards/D/D020_TurnwrestPlow'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
-describe('D20_TurnwrestPlow session', () => {
+describe('D020_TurnwrestPlow session', () => {
   const setup = (round = 1) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -14,9 +14,9 @@ describe('D20_TurnwrestPlow session', () => {
     state.round = round
 
     const player = state.players[0]!
-    player.minorPlayed.push('D20_TurnwrestPlow')
+    player.minorPlayed.push('D020_TurnwrestPlow')
     if (!player.cardStates) player.cardStates = {}
-    player.cardStates['D20_TurnwrestPlow'] = { stack: ['field', 'field'] }
+    player.cardStates['D020_TurnwrestPlow'] = { stack: ['field', 'field'] }
 
     session.loadState(state)
     return session
@@ -25,7 +25,7 @@ describe('D20_TurnwrestPlow session', () => {
   it('stack has 2 field tiles after setup', () => {
     const session = setup()
     const state = session.getState().state
-    const stack = getCardStack(state.players[0]!, 'D20_TurnwrestPlow')
+    const stack = getCardStack(state.players[0]!, 'D020_TurnwrestPlow')
     expect(stack).toEqual(['field', 'field'])
   })
 
@@ -65,7 +65,7 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Stack should be empty (2 - 2)
-    const stack = getCardStack(resp.state.players[0]!, 'D20_TurnwrestPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
     expect(stack.length).toBe(0)
 
     // 3 fields (farmland + 2 from card)
@@ -115,7 +115,7 @@ describe('D20_TurnwrestPlow session', () => {
     }
 
     // Stack should have ≤ 1 field left (depending on whether we used 1 or 2 plows).
-    const stack = getCardStack(resp.state.players[0]!, 'D20_TurnwrestPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
     expect(stack.length).toBeLessThanOrEqual(1)
   })
 
@@ -131,7 +131,7 @@ describe('D20_TurnwrestPlow session', () => {
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 
-    const stack = getCardStack(resp.state.players[0]!, 'D20_TurnwrestPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
     expect(stack.length).toBe(2)
     expect(resp.state.players[0]!.fields.length).toBe(1)
   })
@@ -145,7 +145,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     // No choice offered from card (grain-seeds may have its own choices though)
     // Stack should be unchanged
-    const stack = getCardStack(resp.state.players[0]!, 'D20_TurnwrestPlow')
+    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
     expect(stack.length).toBe(2)
   })
 })

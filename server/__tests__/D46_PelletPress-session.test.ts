@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import '../../shared/cards/D/D46_PelletPress'
+import '../../shared/cards/D/D046_PelletPress'
 import type { FutureMeeple } from '../../shared/contract/types'
 
-describe('D46_PelletPress session', () => {
+describe('D046_PelletPress session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -16,7 +16,7 @@ describe('D46_PelletPress session', () => {
     player.resources.reed = 3
     player.resources.food = 0
     // Directly place card
-    player.minorPlayed.push('D46_PelletPress')
+    player.minorPlayed.push('D046_PelletPress')
     session.loadState(state)
     return session
   }
@@ -29,8 +29,8 @@ describe('D46_PelletPress session', () => {
     expect(resp2.ok).toBe(true)
     const p = resp2.state.players[0]!
     expect(p.resources.reed).toBe(2)
-    expect(isCardFlagged(p, 'D46_PelletPress')).toBe(true)
-    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'D46_PelletPress')
+    expect(isCardFlagged(p, 'D046_PelletPress')).toBe(true)
+    const fm = resp2.state.futureMeeples?.filter((m: FutureMeeple) => m.cardId === 'D046_PelletPress')
     expect(fm).toHaveLength(4)
     expect(fm![0].round).toBe(4)
     expect(fm![1].round).toBe(5)

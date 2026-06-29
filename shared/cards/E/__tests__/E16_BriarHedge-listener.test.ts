@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { E16_BriarHedge_impl } from '../E16_BriarHedge'
+import { E016_BriarHedge_impl } from '../E016_BriarHedge'
 import type { CardListenerContext } from '../../card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../../contract/types'
 
@@ -21,7 +21,7 @@ const makeCtx = (params: Record<string, unknown>): CardListenerContext => {
 describe('E16 BriarHedge fence listener', () => {
   it('Pass #1 (no newFenceEdges): returns potential max border edges as wood delta', () => {
     const ctx = makeCtx({})
-    const listener = E16_BriarHedge_impl.listeners![0]!
+    const listener = E016_BriarHedge_impl.listeners![0]!
     const result = listener.handler(ctx)
     expect(result?.costs?.wood).toBeLessThan(0)
     expect(Math.abs(result!.costs!.wood!)).toBe(16)
@@ -29,7 +29,7 @@ describe('E16 BriarHedge fence listener', () => {
 
   it('Pass #2 (newFenceEdges = empty): returns 0 wood delta', () => {
     const ctx = makeCtx({ newFenceEdges: [], newPalisadeEdges: [] })
-    const listener = E16_BriarHedge_impl.listeners![0]!
+    const listener = E016_BriarHedge_impl.listeners![0]!
     const result = listener.handler(ctx)
     expect(result?.costs?.wood ?? 0).toBe(0)
   })
@@ -39,7 +39,7 @@ describe('E16 BriarHedge fence listener', () => {
       newFenceEdges: ['H-0-0', 'H-0-1'],
       newPalisadeEdges: [],
     })
-    const listener = E16_BriarHedge_impl.listeners![0]!
+    const listener = E016_BriarHedge_impl.listeners![0]!
     const result = listener.handler(ctx)
     expect(result?.costs?.wood).toBe(-2)
   })

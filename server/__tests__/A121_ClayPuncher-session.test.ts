@@ -65,7 +65,7 @@ describe('A121_ClayPuncher session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     // Need an occupation in hand for lessons to be usable (must be in catalog)
-    player.occupationHand.push('A93_BedMaker')
+    player.occupationHand.push('A093_BedMaker')
     const clayBefore = player.resources.clay
     session.loadState(state)
 
@@ -75,7 +75,7 @@ describe('A121_ClayPuncher session', () => {
     // lessons action prompts for occupation choice
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
@@ -94,7 +94,7 @@ describe('A121_ClayPuncher session', () => {
     const session = setup(3)
     const state = session.getState().state
     const player = state.players[0]!
-    player.occupationHand.push('A93_BedMaker')
+    player.occupationHand.push('A093_BedMaker')
     const clayBefore = player.resources.clay
     session.loadState(state)
 
@@ -103,7 +103,7 @@ describe('A121_ClayPuncher session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

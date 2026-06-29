@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/D/D12_MilkingPlace'
+import '../../shared/cards/D/D012_MilkingPlace'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-describe('D12_MilkingPlace session', () => {
+describe('D012_MilkingPlace session', () => {
   /**
-   * D12_MilkingPlace is not in catalog.ts, so devPlayCard misclassifies it as
+   * D012_MilkingPlace is not in catalog.ts, so devPlayCard misclassifies it as
    * an occupation. We manually push it into minorPlayed instead.
    */
   const setup = () => {
@@ -20,7 +20,7 @@ describe('D12_MilkingPlace session', () => {
 
     const player = state.players[0]!
     // Manually add to minorPlayed since devPlayCard can't resolve non-catalog minors
-    player.minorPlayed.push('D12_MilkingPlace')
+    player.minorPlayed.push('D012_MilkingPlace')
     session.loadState(state)
     return session
   }

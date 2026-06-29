@@ -5,6 +5,7 @@ import { getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isMajorCardId } from '../helpers/card-type'
 
 const CARD_ID = 'C115_Sower'
 const updateInfobox = (reedCount: number): ActionFlow => {
@@ -34,7 +35,8 @@ const afterImprovementListener: CardListenerRegistration = {
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice
-    if (!choice || !choice.startsWith('major:')) return
+    const cardId = choice?.replace(/^major:/, '').replace(/^minor:/, '')
+    if (!cardId || !isMajorCardId(cardId)) return
     const newCount = getCardStack(context.player, CARD_ID).length + 1
     return {
       flow: {

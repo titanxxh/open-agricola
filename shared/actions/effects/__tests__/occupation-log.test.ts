@@ -14,14 +14,14 @@ import { internalActionDefinitions } from '../../internal-actions'
 import { playOccupation, playOccupationAction } from '../occupation'
 import { clearActionHooks, registerActionHook } from '../../hooks'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
-import '../../../cards/A/A85_Homekeeper'
-import '../../../cards/B/B93_Confidant'
+import '../../../cards/A/A085_Homekeeper'
+import '../../../cards/B/B093_Confidant'
 import '../../../cards/C/C107_Baker'
 import '../../../cards/C/C116_FurnitureMaker'
 import '../../../cards/A/A123_FrameBuilder'
 
 const FLOW_CARD_ID = 'C107_Baker'
-const OK_CARD_ID = 'A85_Homekeeper'
+const OK_CARD_ID = 'A085_Homekeeper'
 const SELF_AFTER_CARD_ID = 'B155_ArtTeacher'
 const GRANT_SOURCE_CARD_ID = 'C152_Puppeteer'
 
@@ -176,7 +176,7 @@ describe('occupation play result', () => {
   it('returns ok when a card-driven occupation prompt has no playable options', () => {
     const state = createState()
     const player = createPlayer({
-      occupationHand: ['B93_Confidant'],
+      occupationHand: ['B093_Confidant'],
       resources: {
         wood: 0,
         clay: 0,
@@ -202,7 +202,7 @@ describe('occupation play result', () => {
     })
 
     expect(result.type).toBe('ok')
-    expect(player.occupationPlayed).not.toContain('B93_Confidant')
+    expect(player.occupationPlayed).not.toContain('B093_Confidant')
   })
 
   it('plays plain occupation without legacy log payload', () => {
@@ -235,7 +235,7 @@ describe('occupation play result', () => {
     const state = createState()
     const player = createPlayer({
       occupationHand: [FLOW_CARD_ID],
-      _activeActionBonusSources: ['D95_SiteManager'],
+      _activeActionBonusSources: ['D095_SiteManager'],
       resources: {
         wood: 0,
         clay: 2,

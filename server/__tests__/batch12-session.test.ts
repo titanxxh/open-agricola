@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/A/A54_Credit'
-import '../../shared/cards/A/A96_TaskArtisan'
+import '../../shared/cards/A/A054_Credit'
+import '../../shared/cards/A/A096_TaskArtisan'
 import '../../shared/cards/A/A129_Swagman'
-import '../../shared/cards/B/B16_MiningHammer'
+import '../../shared/cards/B/B016_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
-import '../../shared/cards/A/A82_WorkCertificate'
+import '../../shared/cards/A/A082_WorkCertificate'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 // ===== A54 Credit session tests =====
-describe('A54_Credit session', () => {
+describe('A054_Credit session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -22,7 +22,7 @@ describe('A54_Credit session', () => {
 
     const player = state.players[0]!
     // Manually add card (devPlayCard fails for non-catalog cards)
-    player.minorPlayed.push('A54_Credit')
+    player.minorPlayed.push('A054_Credit')
     player.resources.food = 10
     session.loadState(state)
     return session
@@ -31,12 +31,12 @@ describe('A54_Credit session', () => {
   it('credit card effect: player has card after setup', () => {
     const session = setup()
     const after = session.getState().state
-    expect(after.players[0]!.minorPlayed).toContain('A54_Credit')
+    expect(after.players[0]!.minorPlayed).toContain('A054_Credit')
   })
 })
 
 // ===== A96 Task Artisan session tests =====
-describe('A96_TaskArtisan session', () => {
+describe('A096_TaskArtisan session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -47,7 +47,7 @@ describe('A96_TaskArtisan session', () => {
     state.roundActionOrder[4] = 'western-quarry'
 
     const player = state.players[0]!
-    player.occupationPlayed.push('A96_TaskArtisan')
+    player.occupationPlayed.push('A096_TaskArtisan')
     player.resources.food = 10
     player.resources.wood = 0
     session.loadState(state)
@@ -57,12 +57,12 @@ describe('A96_TaskArtisan session', () => {
   it('card is registered as played', () => {
     const session = setup()
     const after = session.getState().state
-    expect(after.players[0]!.occupationPlayed).toContain('A96_TaskArtisan')
+    expect(after.players[0]!.occupationPlayed).toContain('A096_TaskArtisan')
   })
 })
 
 // ===== B16 Mining Hammer session tests =====
-describe('B16_MiningHammer session', () => {
+describe('B016_MiningHammer session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -71,7 +71,7 @@ describe('B16_MiningHammer session', () => {
     state.round = 5
 
     const player = state.players[0]!
-    player.minorPlayed.push('B16_MiningHammer')
+    player.minorPlayed.push('B016_MiningHammer')
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
     state.players[1]!.minorHand = ['__test_placeholder__']
@@ -96,7 +96,7 @@ describe('B16_MiningHammer session', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     setWorkersAtHome(state, state.players[1]!, 0)
-    player.minorHand = ['B16_MiningHammer', 'C69_LandConsolidation']
+    player.minorHand = ['B016_MiningHammer', 'C069_LandConsolidation']
     player.occupationHand = ['__test_placeholder__']
     state.players[1]!.minorHand = ['__test_placeholder__']
     state.players[1]!.occupationHand = ['__test_placeholder__']
@@ -122,23 +122,23 @@ describe('B16_MiningHammer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, 'B16_MiningHammer')
+    resp = session.resolveChoice(0, 'B016_MiningHammer')
     expect(resp.ok).toBe(true)
 
     const after = resp.state.players[0]!
-    expect(after.minorPlayed).toContain('B16_MiningHammer')
+    expect(after.minorPlayed).toContain('B016_MiningHammer')
     expect(after.resources.wood).toBe(0)
     expect(after.resources.food).toBe(1)
     expect(resp.state.events).toContainEqual(expect.objectContaining({
       type: 'card.played',
-      cardId: 'B16_MiningHammer',
+      cardId: 'B016_MiningHammer',
       cardType: 'minor',
       sourceActionId: 'improvement',
     }))
     expect(resp.state.log).toContainEqual(expect.objectContaining({
       key: 'log.cardEffectGain',
       params: expect.objectContaining({
-        cardId: 'B16_MiningHammer',
+        cardId: 'B016_MiningHammer',
         gain: { food: 1 },
       }),
     }))
@@ -165,7 +165,7 @@ describe('B16_MiningHammer session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     const stableOption = resp.interaction.options?.find(
-      (option) => option.sourceCard === 'B16_MiningHammer' && option.value !== '__skip__',
+      (option) => option.sourceCard === 'B016_MiningHammer' && option.value !== '__skip__',
     )
     expect(stableOption).toBeDefined()
     resp = session.resolveChoice(0, stableOption!.value)
@@ -173,7 +173,7 @@ describe('B16_MiningHammer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionStableSelect')
-    expect(resp.interaction.sourceCard).toBe('B16_MiningHammer')
+    expect(resp.interaction.sourceCard).toBe('B016_MiningHammer')
     expect(resp.interaction.farm?.maxSelections).toBe(1)
 
     const tile = resp.interaction.farm?.selectableTiles[0]
@@ -345,7 +345,7 @@ describe('A129_Swagman session', () => {
 })
 
 // ===== A82 Work Certificate session tests =====
-describe('A82_WorkCertificate session', () => {
+describe('A082_WorkCertificate session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -354,7 +354,7 @@ describe('A82_WorkCertificate session', () => {
     state.round = 3
 
     const player = state.players[0]!
-    player.minorPlayed.push('A82_WorkCertificate')
+    player.minorPlayed.push('A082_WorkCertificate')
     player.occupationPlayed = ['occ1', 'occ2', 'occ3']
     player.resources.food = 10
 
@@ -384,7 +384,7 @@ describe('A82_WorkCertificate session', () => {
       const req = resp.interaction.request
       if (req.kind === 'select-trigger') {
         // Activate A82 listener via select-trigger
-        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A082_WorkCertificate')
         resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
         safety--
         continue
@@ -417,7 +417,7 @@ describe('A82_WorkCertificate session', () => {
     while (resp.interaction.stateId === 'wait' && safety > 0) {
       const req = resp.interaction.request
       if (req.kind === 'select-trigger') {
-        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A082_WorkCertificate')
         resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
         safety--
         continue
@@ -479,7 +479,7 @@ describe('A82_WorkCertificate session', () => {
     while (resp.interaction.stateId === 'wait' && safety > 0) {
       const req = resp.interaction.request
       if (req.kind === 'select-trigger') {
-        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A082_WorkCertificate')
         resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
         safety--
         continue

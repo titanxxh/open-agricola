@@ -3,9 +3,9 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/contract/types'
 import { isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 
-import '../../shared/cards/C/C23_JobContract'
+import '../../shared/cards/C/C023_JobContract'
 
-const CARD_ID = 'C23_JobContract'
+const CARD_ID = 'C023_JobContract'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -56,7 +56,7 @@ const createState = (
 const findListener = () =>
   getRegisteredCardListeners().find((l) => l.id === 'C23-job-contract-after-day-laborer')
 
-describe('C23_JobContract listener', () => {
+describe('C023_JobContract listener', () => {
   it('is registered on place-farmer after', () => {
     const listener = findListener()
     expect(listener).toBeDefined()
@@ -69,7 +69,7 @@ describe('C23_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const otherSpace = createSpace('grain-seeds', player.id)
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [otherSpace, lessonsSpace])
@@ -86,7 +86,7 @@ describe('C23_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons', 'p2') // taken by someone else
     const state = createState([player], [daySpace, lessonsSpace])
@@ -129,7 +129,7 @@ describe('C23_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])
@@ -153,7 +153,7 @@ describe('C23_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     // occupationPlayed = [] means 0 food on 'lessons'
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')
@@ -170,7 +170,7 @@ describe('C23_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    player.occupationHand = ['A9_SheepFarmer']
+    player.occupationHand = ['A009_SheepFarmer']
     player.occupationPlayed.push('some_occ') // >= 1 played
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')

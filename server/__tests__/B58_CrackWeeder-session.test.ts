@@ -3,13 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/B/B58_CrackWeeder'
+import '../../shared/cards/B/B058_CrackWeeder'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'B58_CrackWeeder'
+const CARD_ID = 'B058_CrackWeeder'
 
-describe('B58_CrackWeeder session', () => {
+describe('B058_CrackWeeder session', () => {
   it('onBuy returns a gain-1-food flow', () => {
     const session = new GameSession()
     const state = session.getState().state

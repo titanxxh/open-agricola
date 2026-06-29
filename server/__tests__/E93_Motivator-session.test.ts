@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
-import '../../shared/cards/E/E93_Motivator'
+import '../../shared/cards/E/E093_Motivator'
 
-const CARD_ID = 'E93_Motivator'
+const CARD_ID = 'E093_Motivator'
 
-describe('E93_Motivator session', () => {
+describe('E093_Motivator session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

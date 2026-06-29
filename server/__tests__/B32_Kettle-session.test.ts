@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { PlayerState, GameState } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B32_Kettle'
+import '../../shared/cards/B/B032_Kettle'
 
-const CARD_ID = 'B32_Kettle'
+const CARD_ID = 'B032_Kettle'
 
 const bonusScore = (state: GameState, player: PlayerState) => {
   const handler = getCardEffect(CARD_ID)?.computeBonusScore
@@ -36,7 +36,7 @@ const enter = (session: GameSession) => {
   return resp
 }
 
-describe('B32_Kettle session', () => {
+describe('B032_Kettle session', () => {
   it('1-grain trade gives 3 food and 0 bonus VP', () => {
     const session = setup()
     enter(session)

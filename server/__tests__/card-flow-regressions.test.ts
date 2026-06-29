@@ -3,20 +3,20 @@ import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
-import '../../shared/cards/A/A17_ReclamationPlow'
+import '../../shared/cards/A/A017_ReclamationPlow'
 import '../../shared/cards/D/D150_GodlySpouse'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
 describe('card flow regressions', () => {
-  it('A17_ReclamationPlow still triggers after animal reorg resumes the collect flow', () => {
+  it('A017_ReclamationPlow still triggers after animal reorg resumes the collect flow', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.minorPlayed.push('A17_ReclamationPlow')
+    player.minorPlayed.push('A017_ReclamationPlow')
 
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')
@@ -41,19 +41,19 @@ describe('card flow regressions', () => {
     expect(skip).toBeDefined()
 
     resp = session.resolveChoice(0, skip!.value)
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBeFalsy()
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.flagged).toBeFalsy()
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.infobox).toBeUndefined()
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
-  it('A17_ReclamationPlow does not prompt again after confirming the plow choice', () => {
+  it('A017_ReclamationPlow does not prompt again after confirming the plow choice', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    player.minorPlayed.push('A17_ReclamationPlow')
+    player.minorPlayed.push('A017_ReclamationPlow')
 
     const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')
     if (!sheepMarket) throw new Error('sheep-market missing')
@@ -92,8 +92,8 @@ describe('card flow regressions', () => {
 
     resp = session.commitSelectionChoice(0, { tile })
     expect(resp.state.players[0]!.fields.length).toBe(1)
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
-    expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.flagged).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.infobox).toBe('✓')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 

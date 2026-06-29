@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/E/E96_Elder'
+import '../../shared/cards/E/E096_Elder'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E96_Elder'
+const CARD_ID = 'E096_Elder'
 
-describe('E96_Elder session', () => {
-  it('at round 1, offers optional free play of E96_Elder from hand', () => {
+describe('E096_Elder session', () => {
+  it('at round 1, offers optional free play of E096_Elder from hand', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

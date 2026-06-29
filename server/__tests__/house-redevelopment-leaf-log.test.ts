@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A55_JunkRoom'
+import '../../shared/cards/A/A055_JunkRoom'
 
 /**
  * Regression: when a SEQ wraps multiple leaves (renovate-house + optional
@@ -25,7 +25,7 @@ describe('house-redevelopment leaf-flush logging', () => {
     owner.resources.clay = 5
     owner.resources.reed = 5
     owner.resources.food = 5
-    owner.minorHand = ['A55_JunkRoom']
+    owner.minorHand = ['A055_JunkRoom']
     state.availableMajorImprovements = ['Major_Fireplace1']
     session.loadState(state)
 
@@ -47,7 +47,7 @@ describe('house-redevelopment leaf-flush logging', () => {
 
     expect(resp2.interaction.promptKey).toBe('ui.interactionChooseImprovement')
     expect(resp2.interaction.options?.map((option) => option.value)).toEqual(
-      expect.arrayContaining(['major:Major_Fireplace1', 'minor:A55_JunkRoom']),
+      expect.arrayContaining(['Major_Fireplace1', 'A055_JunkRoom']),
     )
   })
 

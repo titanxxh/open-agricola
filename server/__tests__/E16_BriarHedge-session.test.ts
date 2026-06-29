@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
-import '../../shared/cards/E/E16_BriarHedge'
-import { E16_BriarHedge } from '../../shared/cards/E/E16_BriarHedge'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/E/E016_BriarHedge'
+import { E016_BriarHedge } from '../../shared/cards/E/E016_BriarHedge'
+import '../../shared/cards/B/B030_WoodPalisades'
 
-describe('E16_BriarHedge session', () => {
+describe('E016_BriarHedge session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -20,7 +20,7 @@ describe('E16_BriarHedge session', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(false)
   })
 
   it('blocked with only sheep + pig (missing cattle)', () => {
@@ -31,7 +31,7 @@ describe('E16_BriarHedge session', () => {
       { id: 'p1', size: 1, stables: 0, tiles: [{ row: 0, col: 0 }], animalType: 'sheep', animalCount: 1 },
       { id: 'p2', size: 1, stables: 0, tiles: [{ row: 0, col: 1 }], animalType: 'boar', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(false)
   })
 
   it('playable with 1 of each animal type on the board', () => {
@@ -43,7 +43,7 @@ describe('E16_BriarHedge session', () => {
       { id: 'p2', size: 1, stables: 0, tiles: [{ row: 0, col: 1 }], animalType: 'boar', animalCount: 1 },
       { id: 'p3', size: 1, stables: 0, tiles: [{ row: 0, col: 2 }], animalType: 'cattle', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
   })
 
   it('animals in house and stables count', () => {
@@ -56,7 +56,7 @@ describe('E16_BriarHedge session', () => {
     player.pastures = [
       { id: 'p3', size: 1, stables: 0, tiles: [{ row: 1, col: 0 }], animalType: 'cattle', animalCount: 1 },
     ]
-    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
   })
 
   it('animals held on animal-holder cards count', () => {
@@ -71,7 +71,7 @@ describe('E16_BriarHedge session', () => {
         extraData: { held: 1, animalType: 'cattle' },
       },
     }
-    expect(meetsCardPrerequisites(player, E16_BriarHedge, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, E016_BriarHedge, state.round, state)).toBe(true)
   })
 })
 
@@ -83,8 +83,8 @@ describe('E16 BriarHedge — border-fence discount', () => {
     state.currentPlayerIndex = 0
     const player = state.players[0]!
     player.resources = { ...player.resources, wood: opts.wood }
-    if (opts.withCard !== false) player.minorPlayed.push('E16_BriarHedge')
-    if (opts.withB30) player.minorPlayed.push('B30_WoodPalisades')
+    if (opts.withCard !== false) player.minorPlayed.push('E016_BriarHedge')
+    if (opts.withB30) player.minorPlayed.push('B030_WoodPalisades')
     session.loadState(state)
     return session
   }

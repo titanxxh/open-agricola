@@ -3,6 +3,7 @@
 import type { Resource, PaymentResourceMap, TradeSideEffect, ComplexCost } from './types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
+export type PlayerActionCardType = Extract<CardType, 'minor' | 'occupation'>
 
 export type ExchangeWindow = 'anytime' | 'harvest' | 'bake-bread'
 
@@ -39,6 +40,7 @@ export type CardDefinition = {
   number: number
   category?: string
   desc: string[]
+  playerActionCardType?: PlayerActionCardType
   cost?: PaymentResourceMap | ComplexCost
   altCosts?: PaymentResourceMap[]
   vp?: number
@@ -79,6 +81,7 @@ export type CardDefinition = {
   requiresFarmersOfTheMoor?: boolean
   heatingRoomDiscount?: number
   heatingFuelCap?: number
+  heatingWoodToFuelDiscount?: number
   moorSpecialActionBonuses?: readonly {
     actionId: 'cut-peat' | 'fell-trees'
     resource: keyof Resource

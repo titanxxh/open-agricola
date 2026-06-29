@@ -132,7 +132,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     }
   })
 
-  it('runs Farmers of the Moor draft as occupations before published-pool minors when FoM minors are absent', () => {
+  it('runs Farmers of the Moor draft as occupations before FoM minors before published-pool minors', () => {
     const session = new GameSession(123456, undefined, {
       playerCount: 2,
       enableFarmersOfTheMoor: true,
@@ -155,6 +155,25 @@ describe('GameSession.submitDraftPick — happy paths', () => {
       }
     }
 
+    const moorMinorStage = session.getState().state
+    expect(moorMinorStage.phase).toBe('draft')
+    expect(moorMinorStage.draft!.stage).toBe('farmersOfTheMoorMinor')
+    expect(moorMinorStage.draft!.round).toBe(1)
+    expect(moorMinorStage.draft!.totalRounds).toBe(4)
+    for (const pid of ['p1', 'p2']) {
+      expect(moorMinorStage.draft!.pools[pid].occ).toEqual([])
+      expect(moorMinorStage.draft!.pools[pid].minor).toHaveLength(4)
+      expect(moorMinorStage.draft!.kept[pid].occ).toHaveLength(7)
+      expect(moorMinorStage.draft!.kept[pid].minor).toHaveLength(0)
+    }
+
+    for (let round = 1; round <= 3; round += 1) {
+      for (const pid of ['p1', 'p2']) {
+        const resp = session.submitDraftPick(pid, firstMinorPick(session, pid))
+        expect(resp.ok).toBe(true)
+      }
+    }
+
     const publishedStage = session.getState().state
     expect(publishedStage.phase).toBe('draft')
     expect(publishedStage.draft!.stage).toBe('publishedMinor')
@@ -164,7 +183,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
       expect(publishedStage.draft!.pools[pid].occ).toEqual([])
       expect(publishedStage.draft!.pools[pid].minor).toHaveLength(3)
       expect(publishedStage.draft!.kept[pid].occ).toHaveLength(7)
-      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(0)
+      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(4)
     }
 
     for (let round = 1; round <= 2; round += 1) {
@@ -179,7 +198,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     expect(final.draft).toBeNull()
     for (const player of final.players) {
       expect(player.occupationHand).toHaveLength(7)
-      expect(player.minorHand).toHaveLength(3)
+      expect(player.minorHand).toHaveLength(7)
     }
   })
 

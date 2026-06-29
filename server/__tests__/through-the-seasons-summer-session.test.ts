@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/A/A97_Freshman'
-import '../../shared/cards/B/B77_LoamPit'
-import '../../shared/cards/C/C37_DwellingMound'
+import '../../shared/cards/A/A097_Freshman'
+import '../../shared/cards/B/B077_LoamPit'
+import '../../shared/cards/C/C037_DwellingMound'
 
 type SeasonId = 'winter' | 'spring' | 'summer' | 'autumn'
 type SeasonsState = {
@@ -169,7 +169,7 @@ describe('Through the Seasons Summer rules', () => {
   it('hides Summer plowing when compute-cost hooks make plowing unaffordable', () => {
     const session = setupSummer()
     const player = session.state.players[0]!
-    player.minorPlayed.push('C37_DwellingMound')
+    player.minorPlayed.push('C037_DwellingMound')
     player.resources.food = 0
     player.resources.grain = 0
 
@@ -184,7 +184,7 @@ describe('Through the Seasons Summer rules', () => {
     const session = setupSummer()
     const player = session.state.players[0]!
     fillFarmyardWithFields(session)
-    player.occupationPlayed.push('A97_Freshman')
+    player.occupationPlayed.push('A097_Freshman')
     player.occupationHand = ['A114_SeasonalWorker']
     player.resources.grain = 0
 
@@ -220,7 +220,7 @@ describe('Through the Seasons Summer rules', () => {
   it('adds Summer Day Laborer grain only once when card gain leaves run under the space', () => {
     const session = setupSummer()
     const player = session.state.players[0]!
-    player.minorPlayed.push('B77_LoamPit')
+    player.minorPlayed.push('B077_LoamPit')
     const grainBefore = player.resources.grain
     const foodBefore = player.resources.food
     const clayBefore = player.resources.clay
@@ -251,7 +251,7 @@ describe('Through the Seasons Summer rules', () => {
     const session = setupSummer()
     const player = session.state.players[0]!
     Object.assign(player.resources, { wood: 10, reed: 4 })
-    player.minorPlayed.push('B85_FarmHand')
+    player.minorPlayed.push('B085_FarmHand')
 
     let resp = session.takeAction(0, 'farm-expansion')
     resp = chooseByLabel(session, resp, 'actions.construct.name')

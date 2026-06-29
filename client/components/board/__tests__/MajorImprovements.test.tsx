@@ -5,8 +5,18 @@ import { fireEvent, render } from '@testing-library/react'
 import { MajorImprovements } from '../MajorImprovements'
 
 vi.mock('../../common/PlayerCard', () => ({
-  PlayerCard: ({ cardId, onClick, disabled }: { cardId: string; onClick?: () => void; disabled?: boolean }) => (
-    <button data-card-anchor={cardId} disabled={disabled} onClick={onClick}>
+  PlayerCard: ({
+    cardId,
+    onClick,
+    disabled,
+    className,
+  }: {
+    cardId: string
+    onClick?: () => void
+    disabled?: boolean
+    className?: string
+  }) => (
+    <button className={className} data-card-anchor={cardId} disabled={disabled} onClick={onClick}>
       {cardId}
     </button>
   ),
@@ -24,7 +34,7 @@ const baseProps = {
 }
 
 describe('MajorImprovements', () => {
-  it('renders stack count data and selects only the visible top card', () => {
+  it('renders stacked cards and selects only the visible top card', () => {
     const resolveChoice = vi.fn()
     const { container, getByTestId } = render(
       <MajorImprovements
@@ -44,10 +54,13 @@ describe('MajorImprovements', () => {
     const visible = container.querySelector('[data-card-anchor="Major_Well"]')
     const covered = container.querySelector('[data-card-anchor="Major_Well2"]')
     expect(visible).not.toBeNull()
-    expect(covered).toBeNull()
+    expect(covered).not.toBeNull()
+    expect(covered).toHaveClass('major-stack-card-covered')
 
+    fireEvent.click(covered!)
+    expect(resolveChoice).not.toHaveBeenCalled()
     fireEvent.click(visible!)
-    expect(resolveChoice).toHaveBeenCalledWith('major:Major_Well')
+    expect(resolveChoice).toHaveBeenCalledWith('Major_Well')
   })
 
   it('preserves flat fallback when stack supply is absent', () => {

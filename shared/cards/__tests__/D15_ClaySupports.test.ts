@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
-import { D15_ClaySupports } from '../../cards/D/D15_ClaySupports'
+import { D015_ClaySupports } from '../../cards/D/D015_ClaySupports'
 import type { CostModifier, PlayerState } from '../../contract/types'
 
 const makePlayer = (
@@ -44,17 +44,17 @@ const makePlayer = (
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
-  activeModifiers: [...(D15_ClaySupports.impl.modifiers ?? [])] as CostModifier[],
+  activeModifiers: [...(D015_ClaySupports.impl.modifiers ?? [])] as CostModifier[],
   cardStates: {},
   stats: {} as any,
 })
 
-describe('D15_ClaySupports unit-scope trade migration', () => {
+describe('D015_ClaySupports unit-scope trade migration', () => {
   it('static modifier shape: scope:unit, houseTypeClay condition', () => {
-    expect(D15_ClaySupports.impl.modifiers?.[0]).toBeDefined()
-    expect(D15_ClaySupports.impl.modifiers?.[0]).toMatchObject({
+    expect(D015_ClaySupports.impl.modifiers?.[0]).toBeDefined()
+    expect(D015_ClaySupports.impl.modifiers?.[0]).toMatchObject({
       type: 'trade',
-      cardId: 'D15_ClaySupports',
+      cardId: 'D015_ClaySupports',
       appliesTo: ['construct'],
       scope: 'unit',
       from: { wood: 1 },

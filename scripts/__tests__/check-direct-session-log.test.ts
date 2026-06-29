@@ -13,7 +13,7 @@ const writeFixture = (root: string, rel: string, content: string): void => {
 describe('check-direct-session-log', () => {
   it('reports forbidden runtime state.log mutation with file and line', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
-    writeFixture(root, 'shared/cards/A/A1_Bad.ts', [
+    writeFixture(root, 'shared/cards/A/A001_Bad.ts', [
       'export function bad(state: any) {',
       "  state.log.unshift({ key: 'log.bad' })",
       '  state.log[0] = { key: "log.badIndex" }',
@@ -63,27 +63,27 @@ describe('check-direct-session-log', () => {
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 2,
         kind: 'state-log-write',
       }),
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 3,
         kind: 'state-log-write',
       }),
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 4,
         kind: 'state-log-write',
       }),
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 5,
         kind: 'state-log-write',
       }),
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 6,
         kind: 'state-log-write',
       }),
@@ -810,7 +810,7 @@ describe('check-direct-session-log', () => {
 
   it('rejects arbitrary derived log cache writer callsites', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
-    writeFixture(root, 'shared/cards/A/A1_Bad.ts', [
+    writeFixture(root, 'shared/cards/A/A001_Bad.ts', [
       "import { prependDerivedLogEntries } from '../../../events/log-cache'",
       'export function bad(state: any, entries: any[]) {',
       '  prependDerivedLogEntries(state, entries)',
@@ -846,7 +846,7 @@ describe('check-direct-session-log', () => {
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        file: 'shared/cards/A/A1_Bad.ts',
+        file: 'shared/cards/A/A001_Bad.ts',
         line: 3,
         kind: 'log-cache-writer-call',
       }),

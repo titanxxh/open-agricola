@@ -39,7 +39,7 @@ describe('bake exchange UI helpers', () => {
 
   it('derives non-major bake options from card exchange metadata', () => {
     expect(
-      getBakeExchangeInfo('E63_IronOven', {
+      getBakeExchangeInfo('E063_IronOven', {
         exchanges: [
           {
             from: { grain: 1 },
@@ -54,9 +54,9 @@ describe('bake exchange UI helpers', () => {
 
   it('builds bake info for major and metadata-backed card sources', () => {
     const info = buildBakeExchangeInfo(
-      ['Major_Fireplace1', 'E63_IronOven', 'NotABakeSource'],
+      ['Major_Fireplace1', 'E063_IronOven', 'NotABakeSource'],
       (cardId) =>
-        cardId === 'E63_IronOven'
+        cardId === 'E063_IronOven'
           ? {
               exchanges: [
                 {
@@ -74,7 +74,7 @@ describe('bake exchange UI helpers', () => {
       food: 2,
       max: Number.POSITIVE_INFINITY,
     })
-    expect(info.E63_IronOven).toEqual({ food: 6, max: 1 })
+    expect(info.E063_IronOven).toEqual({ food: 6, max: 1 })
     expect(info.NotABakeSource).toBeUndefined()
   })
 

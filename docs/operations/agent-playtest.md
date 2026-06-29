@@ -1,0 +1,412 @@
+# Agent Playtest Spec
+
+## 目标
+
+第一版只验证 4 人局。4 个 player agent 各固定扮演一个玩家，主 agent 负责协调、执行、记录、复现材料归档。
+
+核心目标：
+
+- 让 4 个 agent 通过真实 UI 实际玩完一局，并尽量像正常玩家一样追求更高分。
+- 每个 player agent 在开局先读取自己的手牌，制定本局路线，再按路线动态调整。
+- 优先让每个玩家尽早扩建农舍并 `grow family`，而不是机械重复拿资源。
+- 尽可能覆盖 4 人 base 版图上的不同行动格、回合行动格和常见 pending 流程。
+- 持续发现规则、UI、同步、log 显示问题。
+- 只要游戏还能继续，就记录问题后继续玩，覆盖中后期和终局。
+- 每个问题必须带完整触发路径，后续可以按 seed + trace 复现。
+
+## 非目标
+
+- 第一版不跑 2/3/5/6 人局。
+- 第一版不跑 Moor / Seasons / Parents 扩展；启动方式使用 base 4 人 preview 局。
+- 第一版不覆盖旧 `LogPanel`，只看当前 `ActionLog`。
+- 第一版不做卡牌专项穷举。
+- 第一版不追求最强 AI，只要求行动有规划、覆盖面足够广、不会故意走非法路径。
+- 第一版不要求发现 bug 后自动修复。
+- 第一版不把输出文件 commit。
+
+## 实现里程碑
+
+按最小可验证切片推进，不要一次性做完整 4-agent 系统：
+
+- **M0（不接 LLM）**：用脚本固定 / 启发式策略把 harness 跑通——建房、`grow family`、喂养、trace、coverage、log + sync 检查、snapshot、replay 全部打通并能玩到终局。
+- **M1**：接入 player agent 决策，验证开局规划与每步 intent 能解释路线 / 覆盖。
+- **M2**：批量多局 + bug 去重 + 复现命令稳定。
+
+## 角色
+
+### 主 agent
+
+主 agent 是唯一执行者：
+
+- 创建 4 人游戏。
+- 打开 4 个 Playwright browser context/page，分别作为 `p1`、`p2`、`p3`、`p4`。
+- 开局读取 `output/rules/agricola-re-rules-summary.md`，把基础规则摘要注入给每个 player agent。
+- 开局采集每个玩家自己的手牌、卡牌文字、初始农场、资源、可见 major improvement、已揭示行动格。
+- 让每个 player agent 先输出本局 `openingPlan`。
+- 在轮到某玩家时，把该玩家当前可见信息交给对应 player agent。
+- 维护行动覆盖 ledger，告诉当前 player agent 哪些行动格本局还没覆盖或覆盖太少。
+- 执行 player agent 返回的操作。
+- 每步后采集 state、UI、log、截图和 trace。
+- 判断问题是否 blocking。
+- 写入 bug JSONL 和 replay trace。
+
+### Player agent
+
+每个 player agent 只扮演一个玩家：
+
+- 只基于自己的 UI 可见信息、可用按钮、当前提示、自己的手牌和主 agent 给出的公共覆盖信息做选择。
+- 不直接访问其他玩家私有信息。
+- 开局必须先阅读规则摘要和自己手牌的完整文字，再返回路线规划：家庭增长、喂养、职业/小改/大改、农场发展、主要得分来源。
+- 每个回合必须按路线和当前局面选择行动，不能无理由每轮重复同一两个行动。
+- 返回一个可执行意图，例如“打出职业 A123 支撑扩建”“拿 reed 准备建房”“grow family”“确认当前 pending”。
+- 可以报告它观察到的问题，例如按钮看不懂、log 重复、资源显示异常。
+
+第一版 player agent 不直接操作浏览器；主 agent 负责把意图转成 Playwright 操作，避免 4 个 agent 同时乱点。
+
+## Agent 编排机制
+
+第一版定稿如下：
+
+- **harness**：`scripts/agent-playtest.ts` 只做 harness——驱动 4 个 Playwright page、采集视角化 context、执行 UI 操作、写 trace / coverage / bug / snapshot；不内嵌 LLM。
+- **player agent**：主 agent 用 Agent 工具派生 4 个 player subagent，各固定扮演 `p1`–`p4`，复用本仓库 agent 生态。
+- **通信**：harness 与 subagent 通过 JSON 文件落盘交换——harness 写 `context-p{k}.json`，subagent 回写 `intent-p{k}.json`；文件天然进 trace、可审计、replay 友好。
+- **调用节奏**：harness 对每个玩家串行调用——轮到 `p_k` 时只发 `p_k` 的视角化 context，拿回 intent 再落子，避免 4 个 agent 并发乱点（与现有 `ws-dual-player.spec.ts` 的单页驱动一致）。
+- **视角裁剪由主 agent 负责**：从全量 state 按 `p_k` 视角过滤，注入的 `privateState` 只含 `p_k` 自己的资源 / 农场 / 手牌 / pending，落盘前断言不含其他玩家手牌或暗牌。
+
+## 运行入口
+
+建议命令：
+
+```bash
+./restart-intranet.sh --preview --players 4
+pnpm exec tsx scripts/agent-playtest.ts --players 4 --out artifacts/agent-playtest/manual
+```
+
+批量：
+
+```bash
+pnpm exec tsx scripts/agent-playtest.ts --players 4 --games 20 --agents 4 --out artifacts/agent-playtest/batch
+```
+
+复现：
+
+```bash
+pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/<run-id>/trace.json
+```
+
+### 环境与可复现约束
+
+第一版定稿如下：
+
+- **房间来源**：用 `restart-intranet.sh --players 4`（`restart-intranet.sh:69`）的**持久化固定 dev4 房间**（SQLite，跨重启存活；`ensureFixedDevRooms` 在后端启动时建好，发牌持久固定）。4 个 page 各用 dev4 房间的 `p1`–`p4` 视角进入。批量多局前先 reset dev 房（`./restart-intranet.sh` 重置流程）再重建。
+- **复现锚点 = state 快照，不依赖 seed**：WS 主链路建房 seed 恒为 `undefined`（`ws-server.ts:53`、`room.ts:208`），无法指定 seed，第一版**不**改这条主路径。复现改用 step-0 与关键步的完整 state 快照——replay 时 `GameSession(rehydrateState(snapshot))` 重建再重放 trace 命令。dev4 发牌本身持久固定，快照 + 命令序列即可稳定复现。`bugs.jsonl` 的 `seed` 字段记录从 state 读出的本局实际 seed，仅供参考。
+- **base URL**：`--preview` 用 vite preview + LAN_IP + 独立端口（`restart-intranet.sh:524`），不是 `fixtures.ts` 默认的 `localhost:5173`。harness 取 URL 的方式（解析 restart 输出 / 环境变量）要写明。
+
+## 输出目录
+
+所有输出写到 `artifacts/agent-playtest/<run-id>/`。
+
+必须生成：
+
+- `trace.json`：完整命令 trace。
+- `plans.json`：规则摘要来源、每名玩家手牌文字、4 个 player agent 的开局路线和后续重大改 plan 记录。
+- `coverage.json`：行动格、回合行动格、pending 类型、log/sync 检查覆盖情况。
+- `bugs.jsonl`：问题列表。
+- `summary.json`：本局摘要，含终局每个玩家的 scoring breakdown（按规则逐项核对算分）。
+- `snapshots/step-<n>.json`：关键 state 快照。
+- `screenshots/step-<n>-p<k>.png`：关键 UI 截图。
+
+`artifacts/` 已被 git ignore，输出不进仓库。
+
+## Trace 格式
+
+每一步 trace 至少包含：
+
+```json
+{
+  "step": 42,
+  "round": 5,
+  "activePlayer": "p3",
+  "playerAgent": "p3",
+  "before": {
+    "phase": "work",
+    "pending": "choice",
+    "currentPlayer": "p3",
+    "logLength": 81,
+    "eventSeq": 146
+  },
+  "planContext": {
+    "familyGrowthPlan": "need reed + wood, then build room before round 5",
+    "scorePlan": "fields+sow, support with minor hand",
+    "coverageTarget": "first use of grain-seeds"
+  },
+  "intent": "take grain-seeds",
+  "alternatives": ["take forest", "take day-laborer"],
+  "reason": "supports sow route and covers unused base action",
+  "uiAction": {
+    "kind": "click",
+    "selector": "[data-action-id=\"grain-seeds\"]"
+  },
+  "after": {
+    "phase": "work",
+    "pending": "confirmNextPlayer",
+    "currentPlayer": "p3",
+    "logLength": 83,
+    "eventSeq": 150
+  }
+}
+```
+
+Trace 必须从新局开始记录，不只记录 bug 附近几步。`bugs.jsonl` 可以额外带 `triggerPath`，截取最近 10-30 步，但 replay 以完整 `trace.json` 为准。
+
+## 选择器约定
+
+UI 操作和采集基于已存在的真实选择器，不要新造：
+
+- 行动格：`[data-action-id="<id>"]`（`ActionBoard.tsx:1037` / `1099`）；`<id>` 取自后端 action space id，Trace 示例里的 `grain-seeds` 仅为占位，实际以页面 `data-action-id` 为准。
+- 行动格占用态：`.action-card-holder.taken`（见 `ws-dual-player.spec.ts`）。
+- ActionLog 行：`[data-testid^="action-log-row-"]`（`ActionLog.tsx:221`，后缀是 `row.key` 不是 step）；容器 `.action-log`、空态 `.action-log__empty`、取消态 class `action-log__entry--canceled` / `action-log__text--canceled`。
+
+## 开局规划
+
+主 agent 在第一步行动前，对每个玩家单独采集：
+
+- 基础规则摘要：读取 `output/rules/agricola-re-rules-summary.md`。
+- 手牌职业、小改的 id、名称、类型、cost、prerequisite、vp、passing、desc / UI 可见文本。
+- 初始资源、农场、家庭成员、房间数。
+- 当前 major improvement 供应。
+- 已揭示行动格和 4 人 base 行动格列表。
+
+主 agent 注入给 player agent 的上下文必须包含：
+
+- `rulesSummary`: 来自 `output/rules/agricola-re-rules-summary.md` 的规则摘要；至少覆盖流程、行动格、建房/家庭增长、收获/喂养、动物/农场容量、计分。
+- `handCardText`: 该玩家 7 张职业和 7 张小改的完整文字；不能只给 card id / 名称。
+- `publicActionContext`: 4 人 base 行动格、已揭示回合行动格、当前 major improvement 供应。
+- `privateState`: 只包含该玩家自己的资源、农场、手牌、已打出卡牌和 pending。
+
+每个 player agent 必须输出并写入 `plans.json`：
+
+```json
+{
+  "player": "p2",
+  "rulesContext": {
+    "sourcePath": "output/rules/agricola-re-rules-summary.md",
+    "sections": ["flow", "action-spaces", "house-growth", "harvest", "scoring"]
+  },
+  "handCardText": [
+    {
+      "id": "A131_CraftTeacher",
+      "type": "occupation",
+      "name": "Craft Teacher",
+      "desc": ["..."]
+    }
+  ],
+  "openingPlan": {
+    "familyGrowth": "优先拿 wood/reed，尽量第 4-6 轮前建房并 grow family",
+    "feeding": "用 day-laborer/fishing/major cooking 兜底",
+    "cards": ["A131_CraftTeacher", "B135_NutritionExpert"],
+    "farm": "至少 plow+sow 一次，后期用 fences/animals 补分",
+    "scoring": "family > fields/crops > animals > cards",
+    "coverageTargets": ["lessons-4", "major-improvement", "farm-expansion", "wish-children"]
+  }
+}
+```
+
+开局规划不是死脚本。主 agent 每轮把最新资源、手牌变化、已用行动、未覆盖行动传回当前 player agent；player agent 可以返回 `planUpdate`，但必须说明为什么偏离原路线。
+
+## 行动覆盖策略
+
+主 agent 维护 `coverage.json`，至少包含：
+
+- `actionSpaces`: 每个 base / 4 人 / round action space 被使用次数、首次使用 step、使用玩家。
+- `pendingKinds`: choice、farm-select、feed、animal-reorg、confirm-next-player 等 pending 覆盖次数。
+- `logChecks`: 每步 ActionLog 一致性、重复行、关键行动可读性检查结果。
+- `playerDiversity`: 每个玩家使用过的唯一行动格数量、重复行动次数。
+
+覆盖目标：
+
+- 每个已揭示且可执行的 base / 4 人行动格，整局尽量至少使用 1 次。
+- 每个回合行动格在揭示后尽量至少使用 1 次。
+- 家庭增长相关链路必须主动尝试：`farm-expansion` / 建房 / `wish-children` 或 `urgent-wish-children`。
+- 食物、职业、小改、大改、plow、sow、fence、animals、renovation 都应尽量覆盖，除非局面资源确实不允许。
+
+覆盖不能凌驾规则目标：不能为了覆盖故意点明显无收益或破坏继续游戏的路径。覆盖分只是 tie-breaker；家庭增长、喂养和得分路线优先。
+
+## Bug 记录格式
+
+每条一行 JSON：
+
+```json
+{
+  "id": "run-20260628-001-bug-0007",
+  "seed": 12345,
+  "players": 4,
+  "step": 84,
+  "round": 9,
+  "player": "p2",
+  "severity": "blocking",
+  "category": "log",
+  "summary": "ActionLog duplicated harvest feed entry",
+  "triggerPath": [
+    {"step": 80, "player": "p4", "intent": "take fishing"},
+    {"step": 81, "player": "p1", "intent": "confirm"},
+    {"step": 82, "player": "p2", "intent": "take major improvement"}
+  ],
+  "expected": "One visible feed conversion row for p2",
+  "actual": "Two identical feed conversion rows",
+  "replay": "pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/run-20260628-001/trace.json --stop-at 84",
+  "snapshotPath": "snapshots/step-084.json",
+  "screenshotPath": "screenshots/step-084-p2.png",
+  "uiLogRows": ["..."],
+  "stateLogKeys": ["log.action", "log.actionDetail"],
+  "eventSummary": ["resource.moved seq=148", "action.detail seq=149"]
+}
+```
+
+## 问题分类
+
+`category`：
+
+- `rule`：规则结果错误。
+- `ui`：UI 显示、按钮、交互错误。
+- `log`：行动记录遗漏、重复、顺序、文本、取消态错误。
+- `sync`：不同玩家页面状态不一致。
+- `crash`：前端或后端异常。
+- `stuck`：游戏无法继续。
+
+`severity`：
+
+- `blocking`：当前局无法继续。
+- `nonblocking`：记录后继续玩。
+
+## 继续游戏规则
+
+主 agent 发现问题后必须先判断是否还能继续。
+
+继续玩的情况：
+
+- log 文本不合理，但按钮还能操作。
+- UI 显示不一致，但刷新或切换玩家后还能继续。
+- 规则结果可疑，但 engine 仍有合法下一步。
+- 同一类问题重复出现。
+
+停止当前局的情况：
+
+- 页面 crash 或无法恢复。
+- 后端命令 crash。
+- 当前玩家没有任何可执行 UI 操作，但 session 认为应该行动。
+- pending 连续重试后不变化。
+- 状态已经损坏到不能安全执行下一步。
+
+非阻塞问题即使重复出现，也要继续玩。为了避免刷屏，`bugs.jsonl` 对同一 `signature` 可以只写首个完整 bug，后续写 `duplicateOf` 和出现次数。
+
+## 执行兜底与异常处理
+
+防止 harness 永久挂死或空转，必须有硬性 guard：
+
+- 全局：整局总步数上限、整局 wall-clock 上限，超限即判 `stuck` 收尾。
+- 单步：player agent 决策超时；返回非法 / 不可执行 intent（行动格已占用、资源不足、按钮 disabled）时，主 agent 回传可执行行动列表让其重选，重选次数封顶，仍失败则记 bug 并按"停止当前局"处理。
+- pending：同一 pending 连续重试 N 次状态不变即判 blocking。
+
+## Log 专项检查
+
+每步后主 agent 采集：
+
+- `.action-log` 可见文本。
+- `[data-testid^="action-log-row-"]` 行文本、class、顺序。
+- `state.log` key 和 params 摘要。
+- event timeline 摘要。
+- 当前回合头。
+
+必须检查：
+
+- UI log 不应为空，除非 state/event 也没有可显示记录。
+- 关键行动至少有一条可读记录。
+- 同一行动或卡牌效果不应重复显示同一行。
+- newest-first 顺序必须符合 timeline。
+- undo/cancel 后，canceled 行要被过滤或显示为 canceled，不能混成正常行动。
+- 玩家名、卡牌名、资源数量、行动格名必须可读。
+- 4 个玩家页面看到的公共 log 应一致。
+
+## 同步检查
+
+每个完整 action 后，主 agent 对 4 个页面做轻量一致性检查：
+
+- 当前 round 一致。
+- 当前玩家提示一致。
+- 公共 action board 占用一致。
+- `.action-log` 最新 N 行一致。
+- 分数/资源只检查当前玩家自己的可见区域，不比较私有手牌。
+
+## Player agent 决策约束
+
+Player agent 优先选择能推进游戏的操作：
+
+1. 当前有 pending，就先处理 pending；如果有多个选项，选择符合路线且最能推进当前目标的选项。
+2. 若能安全推进家庭增长链路，优先拿建房资源、建房、`grow family`。
+3. 保证下一次 harvest 有喂养方案；缺食物时优先补食物或 cooking 能力。
+4. 根据手牌路线选择职业、小改、大改、plow、sow、fence、animals、renovation。
+5. 在多个行动收益接近时，优先选择本局未覆盖或该玩家未尝试过的行动格。
+6. 如果连续重复同一个行动格，必须在返回结果里说明原因，例如“喂养压力”或“建房缺 reed”。
+7. 不为了触发 bug 故意乱点非法按钮；非法路径只作为额外探索，不是第一版主线。
+
+此外，收获阶段（field / feed / breed）不是行动格，但是规则正确性高发区：必须把每个 harvest pending 当作正式决策记录进 trace 与 coverage；喂养前先确认有可行喂养方案，宁可早建 cooking、早囤食物。
+
+每次返回意图使用结构化 JSON；非行动格决策（farm-select 选格子、feed 选兑换、improvement 选卡、harvest 喂养）必须通过 `params` 表达，仅 `actionId` 不足以落子：
+
+```json
+{
+  "player": "p3",
+  "intent": "take-action",
+  "actionId": "farm-expansion",
+  "params": {"farmCell": [1, 2], "buildType": "wood-room"},
+  "reason": "need third room before family growth; also covers farm-expansion",
+  "expectedBenefit": ["family-growth", "coverage"],
+  "alternatives": [
+    {"actionId": "forest", "reason": "wood backup"},
+    {"actionId": "lessons-4", "reason": "card route, lower priority"}
+  ],
+  "planUpdate": null,
+  "observations": []
+}
+```
+
+## 可复现性要求
+
+每个 bug 必须满足至少一种复现方式：
+
+- `--replay trace.json --stop-at <step>` 能到达出问题前一步。
+- `snapshotPath` 能直接加载到接近出问题的状态。
+
+如果某 bug 无法稳定复现，仍记录，但必须标记：
+
+```json
+{"reproStability": "flaky"}
+```
+
+## 完成标准
+
+第一版完成后应能做到：
+
+- 单局 4 人可从新局自动玩到终局，除非出现 blocking bug。
+- 4 个玩家都有基于规则摘要和手牌文字的开局规划，且 trace 能解释每次行动为什么服务于路线或覆盖目标。
+- 不应出现所有玩家整局固定重复同两个行动格的机械策略。
+- `coverage.json` 能看出本局覆盖了哪些行动格，哪些因为局面原因没覆盖。
+- 非 blocking bug 不会中断整局。
+- `bugs.jsonl` 中每个问题都有 seed、step、player、triggerPath、replay 命令。
+- log 问题能区分遗漏、重复、顺序错、文本错、取消态错。
+- 4 个玩家页面的公共 log 会被比较。
+- 输出全部落在 `artifacts/agent-playtest/`。
+- 玩到终局时 dump 最终 scoring breakdown，并按规则逐项核对算分是否正确。
+
+## 验证命令
+
+实现后至少跑：
+
+```bash
+./restart-intranet.sh --preview --players 4
+pnpm exec tsx scripts/agent-playtest.ts --players 4 --out artifacts/agent-playtest/smoke
+pnpm exec tsx scripts/agent-playtest.ts --replay artifacts/agent-playtest/smoke/trace.json
+pnpm run lint
+pnpm run build
+```

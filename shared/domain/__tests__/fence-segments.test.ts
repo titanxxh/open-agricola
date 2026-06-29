@@ -73,7 +73,7 @@ describe('fence segment helpers', () => {
       { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
       { edge: 'H-0-1', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
     ])
-    player.cardStates = { E74_AshTrees: { counters: { fences: 5 } } }
+    player.cardStates = { E074_AshTrees: { counters: { fences: 5 } } }
     player.supplyTokensConsumed = { fence: 1 }
 
     expect(getOwnOrdinaryFenceReserveCount(player)).toBe(7)

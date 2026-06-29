@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
-import { B95_MasterBricklayer } from '../../shared/cards/B/B95_MasterBricklayer'
+import { B095_MasterBricklayer } from '../../shared/cards/B/B095_MasterBricklayer'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
-void B95_MasterBricklayer
+void B095_MasterBricklayer
 
 describe('A143 + B95 stacking', () => {
   const setup = (rooms: number) => {
@@ -18,7 +18,7 @@ describe('A143 + B95 stacking', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
-    player.occupationPlayed = ['A143_Stonecutter', 'B95_MasterBricklayer']
+    player.occupationPlayed = ['A143_Stonecutter', 'B095_MasterBricklayer']
     player.rooms = rooms
     player.resources = {
       ...player.resources,
@@ -49,7 +49,7 @@ describe('A143 + B95 stacking', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0
@@ -71,7 +71,7 @@ describe('A143 + B95 stacking', () => {
     const session = setup(2) // no extra rooms, B95 no-op
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0

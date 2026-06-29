@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { A27_OvenSite } from '../../shared/cards/A/A27_OvenSite'
+import { A027_OvenSite } from '../../shared/cards/A/A027_OvenSite'
 import { minorImprovements } from '../../shared/cards/_lookup'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'A27_OvenSite'
+const CARD_ID = 'A027_OvenSite'
 
 // Catalog registration is handled by the parent agent; for local testing we
 // splice the card into the minor-improvements registry if absent.
 if (!minorImprovements.some((c) => c.id === CARD_ID)) {
-  minorImprovements.push(A27_OvenSite)
+  minorImprovements.push(A027_OvenSite)
 }
 
-describe('A27_OvenSite session', () => {
+describe('A027_OvenSite session', () => {
   const playA27 = (session: GameSession) => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -54,7 +54,7 @@ describe('A27_OvenSite session', () => {
       if (resp.interaction.stateId !== 'wait') return resp
     }
     const a27Option = resp.interaction.options?.find(
-      (o) => o.value === `minor:${CARD_ID}`,
+      (o) => o.value === CARD_ID,
     )
     expect(a27Option).toBeDefined()
 
@@ -109,7 +109,7 @@ describe('A27_OvenSite session', () => {
       steps += 1
       const options = resp.interaction.options ?? []
       const clayOven = options.find(
-        (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
+        (o) => o.value === 'Major_ClayOven',
       )
       if (clayOven && !clayOvenBought) {
         resp = session.resolveChoice(0, clayOven.value)
@@ -148,7 +148,7 @@ describe('A27_OvenSite session', () => {
       steps += 1
       const options = resp.interaction.options ?? []
       const clayOven = options.find(
-        (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
+        (o) => o.value === 'Major_ClayOven',
       )
       if (clayOven) {
         resp = session.resolveChoice(0, clayOven.value)
@@ -175,7 +175,7 @@ describe('A27_OvenSite session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = []
-      expect(meetsCardPrerequisites(player, A27_OvenSite, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, A027_OvenSite, state.round, state)).toBe(false)
     })
 
     it('allows when player owns Fireplace1 and CookingHearth1', () => {
@@ -183,7 +183,7 @@ describe('A27_OvenSite session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']
-      expect(meetsCardPrerequisites(player, A27_OvenSite, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, A027_OvenSite, state.round, state)).toBe(true)
     })
   })
 })

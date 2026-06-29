@@ -4,10 +4,10 @@ import { computeScores , ScoreEntry } from '../../shared/domain/scoring'
 import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/contract/types'
 import { positionKey } from '../../shared/domain/farm'
 
-import { B38_FutureBuildingSite } from '../../shared/cards/B/B38_FutureBuildingSite'
+import { B038_FutureBuildingSite } from '../../shared/cards/B/B038_FutureBuildingSite'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'B38_FutureBuildingSite'
+const CARD_ID = 'B038_FutureBuildingSite'
 
 // Default 2-player layout: rooms at (2,0) and (1,0).
 // Locked tiles (adjacent to rooms, but not rooms themselves): (0,0), (1,1), (2,1)
@@ -64,8 +64,8 @@ const vpForCards = (session: GameSession) => {
 
 describe('B38 FutureBuildingSite — session', () => {
   it('card has vp=3 and maxRound=4', () => {
-    expect(B38_FutureBuildingSite.vp).toBe(3)
-    expect(B38_FutureBuildingSite.maxRound).toBe(4)
+    expect(B038_FutureBuildingSite.vp).toBe(3)
+    expect(B038_FutureBuildingSite.maxRound).toBe(4)
   })
 
   it('onBuy computes correct locked tiles for default 2-player layout', () => {
@@ -287,7 +287,7 @@ describe('B38 FutureBuildingSite — session', () => {
       const state = session.getState().state
       state.round = 5
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B38_FutureBuildingSite, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state)).toBe(false)
     })
 
     it('allows when round <= 4', () => {
@@ -295,7 +295,7 @@ describe('B38 FutureBuildingSite — session', () => {
       const state = session.getState().state
       state.round = 4
       const player = state.players[0]!
-      expect(meetsCardPrerequisites(player, B38_FutureBuildingSite, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state)).toBe(true)
     })
   })
 })

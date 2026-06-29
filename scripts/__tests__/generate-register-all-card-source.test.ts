@@ -14,19 +14,35 @@ describe('generate-register-all Card Source', () => {
     fs.mkdirSync(path.join(cardsRoot, '__stubs__'), { recursive: true })
 
     fs.writeFileSync(
-      path.join(cardsRoot, 'B', 'B1_Source.ts'),
+      path.join(cardsRoot, 'B', 'B001_Source.ts'),
       `import { defineOccupationCard } from '../card-source'\n` +
-      `export const B1_Source = defineOccupationCard({\n` +
-      `  meta: { id: 'B1_Source', name: 'Source', deck: 'B', number: 1, desc: [], players: '1+' },\n` +
-      `  impl: { effect: { id: 'B1_Source' }, reaches: ['lessons'] },\n` +
+      `export const B001_Source = defineOccupationCard({\n` +
+      `  meta: { id: 'B001_Source', name: 'Source', deck: 'B', number: 1, desc: [], players: '1+' },\n` +
+      `  impl: { effect: { id: 'B001_Source' }, reaches: ['lessons'] },\n` +
       `})\n`,
       'utf8',
     )
     fs.writeFileSync(
-      path.join(cardsRoot, 'B', 'B2_MetaOnly.ts'),
+      path.join(cardsRoot, 'B', 'B002_MetaOnly.ts'),
       `import { defineMinorCard } from '../card-source'\n` +
-      `export const B2_MetaOnly = defineMinorCard({\n` +
-      `  meta: { id: 'B2_MetaOnly', name: 'Meta Only', deck: 'B', number: 2, desc: [], cost: {} },\n` +
+      `export const B002_MetaOnly = defineMinorCard({\n` +
+      `  meta: { id: 'B002_MetaOnly', name: 'Meta Only', deck: 'B', number: 2, desc: [], cost: {} },\n` +
+      `})\n`,
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(cardsRoot, 'B', 'B003_ActionMinor.ts'),
+      `import { definePlayerActionCard } from '../card-source'\n` +
+      `export const B003_ActionMinor = definePlayerActionCard({\n` +
+      `  meta: { id: 'B003_ActionMinor', name: 'Action Minor', deck: 'B', number: 3, playerActionCardType: 'minor', desc: [] },\n` +
+      `})\n`,
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(cardsRoot, 'B', 'B104_ActionOccupation.ts'),
+      `import { definePlayerActionCard } from '../card-source'\n` +
+      `export const B104_ActionOccupation = definePlayerActionCard({\n` +
+      `  meta: { id: 'B104_ActionOccupation', name: 'Action Occupation', deck: 'B', number: 104, playerActionCardType: 'occupation', desc: [], players: '1+' },\n` +
       `})\n`,
       'utf8',
     )
@@ -42,13 +58,17 @@ describe('generate-register-all Card Source', () => {
 
     const result = buildRegisterAll({ repoRoot: tmp })
 
-    expect(result.registerAll).toContain(`import { B1_Source } from './B/B1_Source'`)
-    expect(result.registerAll).toContain(`'B1_Source': B1_Source.impl`)
+    expect(result.registerAll).toContain(`import { B001_Source } from './B/B001_Source'`)
+    expect(result.registerAll).toContain(`'B001_Source': B001_Source.impl`)
     expect(result.registerAll).toContain(`import { STUB_Source } from './__stubs__/STUB_Source'`)
     expect(result.registerAll).toContain(`'STUB_Source': STUB_Source.impl`)
-    expect(result.registerAll).not.toContain('B2_MetaOnly')
+    expect(result.registerAll).not.toContain('B002_MetaOnly')
     expect(result.catalogGenerated).toContain('export const catalogCardDefinitions')
-    expect(result.catalogGenerated).toContain('"id": "B2_MetaOnly"')
+    expect(result.catalogGenerated).toContain('"id": "B002_MetaOnly"')
+    expect(result.catalogGenerated).toContain('"id": "B003_ActionMinor"')
+    expect(result.catalogGenerated).toContain('"playerActionCardType": "occupation"')
+    expect(result.catalogGenerated).toContain(`card.playerActionCardType === 'minor'`)
+    expect(result.catalogGenerated).toContain(`card.playerActionCardType === 'occupation'`)
     expect(result.catalogGenerated).not.toContain('STUB_Source')
 
     fs.rmSync(tmp, { recursive: true, force: true })

@@ -5,9 +5,9 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState } from '../../shared/contract/types'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import '../../shared/cards/C/C57_Crudite'
+import '../../shared/cards/C/C057_Crudite'
 
-const CARD_ID = 'C57_Crudite'
+const CARD_ID = 'C057_Crudite'
 const ANYTIME_ID = 'C57-crudite-anytime'
 
 const createPlayer = (id = 'p1'): PlayerState =>
@@ -124,7 +124,7 @@ const hasC57Selection = (resp: ReturnType<GameSession['performRoundEnd']>) =>
 const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>
   session.commitSelectionChoice(0, { positions })
 
-describe('C57_Crudite', () => {
+describe('C057_Crudite', () => {
   it('onBuy offers pay 3 food for 1 vegetable when player has food', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()

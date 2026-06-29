@@ -20,7 +20,7 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
       resourcesPaid: { stone: 1 },
       tradesUsed: [
         {
-          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C88_CarpentersApprentice' },
+          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C088_CarpentersApprentice' },
           times: 1,
         },
       ],
@@ -31,7 +31,7 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
     executePaymentSolution(player, solution)
 
     expect(player.resources.stone).toBe(4)
-    const stats = readCardResourceStats(player, 'C88_CarpentersApprentice')
+    const stats = readCardResourceStats(player, 'C088_CarpentersApprentice')
     expect(stats?.saved).toEqual({ wood: 2 })
     expect(stats?.paid).toEqual({ stone: 1 })
   })
@@ -42,7 +42,7 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
       resourcesPaid: { stone: 3 },
       tradesUsed: [
         {
-          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C16_FieldFences' },
+          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C016_FieldFences' },
           times: 3,
         },
       ],
@@ -52,7 +52,7 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
 
     executePaymentSolution(player, solution)
 
-    const stats = readCardResourceStats(player, 'C16_FieldFences')
+    const stats = readCardResourceStats(player, 'C016_FieldFences')
     expect(stats?.saved).toEqual({ wood: 6 })
     expect(stats?.paid).toEqual({ stone: 3 })
   })
@@ -63,7 +63,7 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
       resourcesPaid: { stone: 1 },
       tradesUsed: [
         {
-          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C88_CarpentersApprentice' },
+          trade: { from: { wood: 2 }, to: { stone: 1 }, sourceId: 'C088_CarpentersApprentice' },
           times: 1,
         },
       ],
@@ -74,6 +74,6 @@ describe('executePaymentSolution + recordPaymentStats integration', () => {
     executePaymentSolution(player, solution, { trackStats: false })
 
     expect(player.resources.stone).toBe(4)
-    expect(readCardResourceStats(player, 'C88_CarpentersApprentice')).toBeUndefined()
+    expect(readCardResourceStats(player, 'C088_CarpentersApprentice')).toBeUndefined()
   })
 })

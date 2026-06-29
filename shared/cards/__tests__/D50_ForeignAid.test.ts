@@ -3,12 +3,12 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
-import '../D/D50_ForeignAid'
-import { getBlockedSpaceIds } from '../D/D50_ForeignAid'
+import '../D/D050_ForeignAid'
+import { getBlockedSpaceIds } from '../D/D050_ForeignAid'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'D50_ForeignAid'
+const CARD_ID = 'D050_ForeignAid'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -68,7 +68,7 @@ const createState = (...players: PlayerState[]): GameState =>
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
-describe('D50_ForeignAid', () => {
+describe('D050_ForeignAid', () => {
   describe('onBuy', () => {
     it('returns gain 6 food flow', () => {
       const effect = getCardEffect(CARD_ID)

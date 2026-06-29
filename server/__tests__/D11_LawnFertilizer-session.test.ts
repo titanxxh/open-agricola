@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/A/A12_DrinkingTrough'
-import '../../shared/cards/D/D11_LawnFertilizer'
+import '../../shared/cards/A/A012_DrinkingTrough'
+import '../../shared/cards/D/D011_LawnFertilizer'
 
-const CARD_ID = 'D11_LawnFertilizer'
+const CARD_ID = 'D011_LawnFertilizer'
 
-describe('D11_LawnFertilizer session', () => {
+describe('D011_LawnFertilizer session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -40,11 +40,11 @@ describe('D11_LawnFertilizer session', () => {
     expect(zones[0]!.capacity).toBe(6)
   })
 
-  it('size-1 pasture with A12_DrinkingTrough → capacity 5 (3 + 2)', () => {
+  it('size-1 pasture with A012_DrinkingTrough → capacity 5 (3 + 2)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
-    player.minorPlayed.push('A12_DrinkingTrough')
+    player.minorPlayed.push('A012_DrinkingTrough')
     player.minorPlayed.push(CARD_ID)
     player.pastures = [
       { id: 'p1', size: 1, stables: 0, tiles: [{ row: 0, col: 0 }], animalType: null, animalCount: 0 },

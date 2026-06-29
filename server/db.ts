@@ -328,6 +328,19 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX idx_email_verification_expires ON email_verification_tokens(expires_at);
       `,
     },
+    {
+      version: 14,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN enable_parent_cards INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rooms ADD COLUMN enable_through_the_seasons INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rooms ADD COLUMN enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rooms ADD COLUMN allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0;
+        UPDATE rooms SET enable_parent_cards = 1 WHERE state_json LIKE '%"enableParentCards":true%';
+        UPDATE rooms SET enable_through_the_seasons = 1 WHERE state_json LIKE '%"enableThroughTheSeasons":true%';
+        UPDATE rooms SET enable_farmers_of_the_moor = 1 WHERE state_json LIKE '%"enableFarmersOfTheMoor":true%';
+        UPDATE rooms SET allow_incomplete_farmers_of_the_moor_minor_deal = 1 WHERE state_json LIKE '%"enableFarmersOfTheMoor":true%';
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

@@ -16,7 +16,7 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/E/E123_ResourceHoarder'
 
 const CARD_ID = 'E123_ResourceHoarder'
-const C14_ID = 'C14_StrawThatchedRoof'
+const C014_ID = 'C014_StrawThatchedRoof'
 
 const emptyResources = (): Resource => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -317,11 +317,11 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const player = createPlayer({
       resources: { ...emptyResources(), clay: 2 },
       occupationPlayed: [CARD_ID],
-      minorPlayed: [C14_ID],
+      minorPlayed: [C014_ID],
       cardStates: { [CARD_ID]: { stack: ['reed'] } },
       activeModifiers: [{
         type: 'bonus',
-        cardId: C14_ID,
+        cardId: C014_ID,
         appliesTo: ['renovation'],
         discount: { reed: 99 },
         capDiscountAtCost: true,
@@ -348,7 +348,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
         ((entry.labelParams as { sourceCards?: string[] } | undefined)?.sourceCards ?? []).join('+'),
       )
       expect(sourceSets).toEqual([
-        C14_ID,
+        C014_ID,
         CARD_ID,
       ])
       return options[0]!.value
@@ -368,13 +368,13 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     player.rooms = 2
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     player.occupationPlayed = [CARD_ID]
-    player.minorPlayed = [C14_ID]
+    player.minorPlayed = [C014_ID]
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
     player.cardStates = { [CARD_ID]: { stack: ['stone', 'reed'] } }
     player.activeModifiers = [{
       type: 'bonus',
-      cardId: C14_ID,
+      cardId: C014_ID,
       appliesTo: ['renovation'],
       discount: { reed: 99 },
       capDiscountAtCost: true,
@@ -404,7 +404,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const player = createPlayer({
       resources: { ...emptyResources(), wood: 5 },
       occupationPlayed: [CARD_ID],
-      minorPlayed: [C14_ID],
+      minorPlayed: [C014_ID],
       cardStates: { [CARD_ID]: { stack: ['reed'] } },
     })
     const state = mkState(player)
@@ -412,7 +412,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
       fee: { wood: 5, reed: 2 },
       bonuses: [
         {
-          sources: [C14_ID],
+          sources: [C014_ID],
           optional: false,
           discount: { reed: 99 },
           capDiscountAtCost: true,
@@ -436,7 +436,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
         }
         return params.resourcesPaid?.wood === 5 &&
           params.sourceCards?.length === 1 &&
-          params.sourceCards[0] === C14_ID
+          params.sourceCards[0] === C014_ID
       })
       expect(option).toBeDefined()
       return option!.value
@@ -446,7 +446,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
       expect.objectContaining({
         type: 'resource.paid',
         resources: { wood: 5 },
-        bonusSources: [C14_ID],
+        bonusSources: [C014_ID],
       }),
     ]))
 

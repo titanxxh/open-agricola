@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { playImprovement } from '../improvement'
 
-import '../../../cards/A/A7_GardenersKnife'
-import '../../../cards/B/B75_WoodWorkshop'
-import '../../../cards/C/C60_SmallPottersOven'
+import '../../../cards/A/A007_GardenersKnife'
+import '../../../cards/B/B075_WoodWorkshop'
+import '../../../cards/C/C060_SmallPottersOven'
 import '../../../cards/E/E130_Overachiever'
 
 const createState = (): GameState => ({
@@ -47,7 +47,7 @@ const createPlayer = (): PlayerState => ({
   roomTiles: [],
   stableTiles: [],
   improvements: [],
-  minorHand: ['A53_Claypipe'],
+  minorHand: ['A053_Claypipe'],
   minorPlayed: [],
   occupationHand: [],
   occupationPlayed: [],houseAnimalType: null,
@@ -65,10 +65,10 @@ describe('improvement logging', () => {
   it('plays minor improvement', () => {
     const state = createState()
     const player = createPlayer()
-    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const result = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(player.minorPlayed).toContain('A53_Claypipe')
+    expect(player.minorPlayed).toContain('A053_Claypipe')
     expect(player.resources.clay).toBe(2)
   })
 
@@ -76,13 +76,13 @@ describe('improvement logging', () => {
     const state = createState()
     const player = createPlayer()
     player.resources.clay = 1
-    player.minorHand = ['A53_Claypipe']
-    player.minorPlayed = ['A53_Claypipe']
+    player.minorHand = ['A053_Claypipe']
+    player.minorPlayed = ['A053_Claypipe']
 
-    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const result = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
 
     expect(result.type).toBe('ok')
-    expect(player.minorPlayed).toEqual(['A53_Claypipe'])
+    expect(player.minorPlayed).toEqual(['A053_Claypipe'])
   })
 
 
@@ -134,13 +134,13 @@ describe('improvement logging', () => {
     const player = createPlayer()
     player.resources.clay = 0
     player.resources.wood = 0
-    player.minorHand = ['A7_GardenersKnife']
-    player.minorPlayed = ['B75_WoodWorkshop']
+    player.minorHand = ['A007_GardenersKnife']
+    player.minorPlayed = ['B075_WoodWorkshop']
 
-    const result = playImprovement(state, player, 'minor:A7_GardenersKnife', 'any')
+    const result = playImprovement(state, player, 'minor:A007_GardenersKnife', 'any')
 
     expect(result.type).toBe('fail')
-    expect(player.minorPlayed).toEqual(['B75_WoodWorkshop'])
+    expect(player.minorPlayed).toEqual(['B075_WoodWorkshop'])
     expect(player.resources.wood).toBe(0)
   })
 
@@ -148,21 +148,21 @@ describe('improvement logging', () => {
     const state = createState()
     const player = createPlayer()
     player.resources.clay = 2
-    player.minorHand = ['C60_SmallPottersOven']
+    player.minorHand = ['C060_SmallPottersOven']
     player.improvements = ['Major_ClayOven']
 
-    const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
+    const result = playImprovement(state, player, 'C060_SmallPottersOven', 'minor')
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
     expect(result.extraData?.improvementPayment).toEqual({
-      improvementId: 'C60_SmallPottersOven',
+      improvementId: 'C060_SmallPottersOven',
       resourcesPaid: { clay: 2 },
     })
     expect(result.flow).toMatchObject({
       type: 'leaf',
       actionId: 'gain',
-      sourceCard: 'C60_SmallPottersOven',
+      sourceCard: 'C060_SmallPottersOven',
       params: { food: 5 },
     })
     expect(player.resources.clay).toBe(0)
@@ -176,16 +176,16 @@ describe('improvement logging', () => {
     state.availableMajorImprovements = []
     const player = createPlayer()
     player.resources.clay = 0
-    player.minorHand = ['A53_Claypipe']
+    player.minorHand = ['A053_Claypipe']
     player.occupationPlayed = ['E130_Overachiever']
 
     // Without sourceCard, cannot afford (clay = 0, Claypipe costs 1 clay)
-    const resultWithout = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+    const resultWithout = playImprovement(state, player, 'minor:A053_Claypipe', 'any')
     expect(resultWithout.type).toBe('fail')
 
     // With sourceCard = E130_Overachiever, discount applies
-    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any', undefined, 'E130_Overachiever')
+    const result = playImprovement(state, player, 'minor:A053_Claypipe', 'any', undefined, 'E130_Overachiever')
     expect(result.type).toBe('ok')
-    expect(player.minorPlayed).toContain('A53_Claypipe')
+    expect(player.minorPlayed).toContain('A053_Claypipe')
   })
 })

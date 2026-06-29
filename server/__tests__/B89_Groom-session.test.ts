@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
-import '../../shared/cards/B/B89_Groom'
+import '../../shared/cards/B/B089_Groom'
 import type { ActionFlow } from '../../shared/contract/types'
 
-describe('B89_Groom session', () => {
+describe('B089_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -14,12 +14,12 @@ describe('B89_Groom session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('B89_Groom')
+    player.occupationHand.push('B089_Groom')
     player.houseType = options?.houseType ?? 'stone'
     player.resources.wood = 0
     player.resources.food = 10
     session.loadState(state)
-    session.devPlayCard(0, 'B89_Groom')
+    session.devPlayCard(0, 'B089_Groom')
     return session
   }
 
@@ -28,7 +28,7 @@ describe('B89_Groom session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBuy')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -42,7 +42,7 @@ describe('B89_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3 // enough for stable
 
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -59,7 +59,7 @@ describe('B89_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 0
 
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
     // BGA does not block at trigger time — payability is checked when player
     // chooses to act. Effect must still emit the leaf.
     expect(flow).not.toBeNull()
@@ -75,7 +75,7 @@ describe('B89_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
     expect(flow).toBeNull()
   })
 
@@ -85,7 +85,7 @@ describe('B89_Groom session', () => {
     const player = state.players[0]!
     player.resources.wood = 3
 
-    const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
+    const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
     expect(flow).toBeNull()
   })
 })

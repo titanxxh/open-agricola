@@ -695,6 +695,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Horse Slaughterhouse",
     "deck": "major",
     "number": 102,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -702,6 +703,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": false,
     "isCookery": true,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",
@@ -764,6 +766,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Cookhouse",
     "deck": "major",
     "number": 104,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "fee": {
         "clay": 6
@@ -785,6 +788,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "isCookery": true,
     "isBaking": true,
     "cookingHearthIdentity": true,
+    "requiresFarmersOfTheMoor": true,
     "returnCards": [
       "Major_Fireplace1",
       "Major_Fireplace2",
@@ -882,6 +886,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Peat-charcoal Kiln",
     "deck": "major",
     "number": 105,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "stone": 1
     },
@@ -898,9 +903,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     ],
     "desc": [
       "[Special action: Cut Peat]",
-      "Gain 1 extra fuel, or 2 extra fuel if you have at least 1 horse.",
+      "+1<FUEL> if you have 0<HORSE>; +2<FUEL> if you have at least 1<HORSE>.",
       "[Scoring]",
-      "3/5 fuel <ARROW> 1/2 bonus points."
+      "3/5<FUEL> <ARROW-1X> 1/2<SCORE>"
     ],
     "kind": "major"
   },
@@ -909,6 +914,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Forester's Lodge",
     "deck": "major",
     "number": 106,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "wood": 1,
       "clay": 2
@@ -926,9 +932,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     ],
     "desc": [
       "[Special action: Fell Trees]",
-      "Gain 1 extra wood, or 2 extra wood if you have at least 1 horse.",
+      "Gain 1 extra <WOOD>, or 2 extra <WOOD> if you have at least 1<HORSE>.",
       "[Scoring]",
-      "Gain 1 bonus point for each forest in your farmyard."
+      "Gain 1 <SCORE> for each forest in your farmyard."
     ],
     "kind": "major"
   },
@@ -937,6 +943,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Riding Stables",
     "deck": "major",
     "number": 107,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "wood": 2,
       "clay": 1,
@@ -946,8 +953,8 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": false,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Place 1 food on each remaining round space.",
-      "At the start of each round, gain that food if you have at least 2 horses."
+      "Place 1 <FOOD> on each remaining round space.",
+      "At the start of each round, gain that <FOOD> if you have at least 2<HORSE>."
     ],
     "kind": "major"
   },
@@ -956,6 +963,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Museum of the Moors",
     "deck": "major",
     "number": 108,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "clay": 1,
       "reed": 1,
@@ -965,15 +973,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": false,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Selected major improvements cost you 1 fewer matching building resource."
+      "These major improvements cost you 1 building resource less:",
+      "Well 1 <STONE>      Clay Oven 1 <CLAY>",
+      "Joinery 1 <WOOD>      Stone Oven 1 <STONE>",
+      "Pottery 1 <CLAY>      Forester's Lodge 1 <CLAY>",
+      "Basketmaker's Workshop 1 <REED>"
     ],
     "kind": "major"
   },
   {
     "id": "Major_Moor_HeatingOven",
-    "name": "Furnace",
+    "name": "Heating Oven",
     "deck": "major",
     "number": 109,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -984,16 +997,17 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "heatingRoomDiscount": 1,
     "desc": [
-      "Immediately gain 2 fuel.",
+      "Immediately gain 2<FUEL>.",
       "When heating, heat 1 fewer room than you have."
     ],
     "kind": "major"
   },
   {
     "id": "Major_Moor_TiledOven",
-    "name": "Heating Stove",
+    "name": "Tiled Oven",
     "deck": "major",
     "number": 110,
+    "category": "GOODS_PROVIDER",
     "cost": {
       "clay": 2,
       "stone": 1
@@ -1004,7 +1018,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "heatingFuelCap": 1,
     "desc": [
-      "Regardless of house size, you need at most 1 fuel to heat your entire home."
+      "Regardless of house size, you need at most 1<FUEL> to heat your entire home."
     ],
     "kind": "major"
   },
@@ -1013,6 +1027,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Village Church",
     "deck": "major",
     "number": 111,
+    "category": "POINTS_PROVIDER",
     "cost": {
       "wood": 2,
       "stone": 4
@@ -1021,9 +1036,9 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "extraVp": true,
     "requiresFarmersOfTheMoor": true,
     "desc": [
-      "Immediately gain 2 food.",
       "[Harvest]",
-      "Once each harvest, you may pay 1 fuel to gain 1 bonus point."
+      "1<FUEL> <ARROW-1X> 1<SCORE>",
+      "Immediately gain 2<FOOD>."
     ],
     "kind": "major"
   },
@@ -1032,6 +1047,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Furniture Stall",
     "deck": "major",
     "number": 112,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "wood": 1,
       "stone": 1
@@ -1041,7 +1057,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange wood for the same amount of clay."
+      "1<WOOD> <ARROW> 1<CLAY>"
     ],
     "exchanges": [
       {
@@ -1064,6 +1080,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Ceramics Stall",
     "deck": "major",
     "number": 113,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -1073,7 +1090,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange clay for the same amount of wood."
+      "1<CLAY> <ARROW> 1<WOOD>"
     ],
     "exchanges": [
       {
@@ -1096,6 +1113,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Basket Stall",
     "deck": "major",
     "number": 114,
+    "category": "BUILDING_RESOURCE_PROVIDER",
     "cost": {
       "reed": 1,
       "stone": 1
@@ -1105,7 +1123,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
-      "Exchange reed for the same amount of other building resources."
+      "1<REED> <ARROW> 1<WOOD> / <CLAY> / <STONE>"
     ],
     "exchanges": [
       {
@@ -1334,6 +1352,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Cookhouse",
     "deck": "major",
     "number": 103,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "fee": {
         "clay": 6
@@ -1355,6 +1374,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "isCookery": true,
     "isBaking": true,
     "cookingHearthIdentity": true,
+    "requiresFarmersOfTheMoor": true,
     "returnCards": [
       "Major_Fireplace1",
       "Major_Fireplace2",
@@ -1452,6 +1472,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "name": "Horse Slaughterhouse",
     "deck": "major",
     "number": 101,
+    "category": "FOOD_PROVIDER",
     "cost": {
       "clay": 1,
       "stone": 1
@@ -1459,6 +1480,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": false,
     "isCookery": true,
+    "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Anytime]",
       "<SHEEP> <ARROW> 1<FOOD>      <PIG> <ARROW> 1<FOOD>",

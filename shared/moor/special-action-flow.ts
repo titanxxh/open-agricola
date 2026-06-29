@@ -1,0 +1,366 @@
+import type { ActionChoiceOption, ActionDefinition, ActionFlow, GameState, PlayerState } from '../contract/types'
+import {
+  executeCardListener,
+  getListenerById,
+  getMatchingListeners,
+  runCardListeners,
+  type CardListenerContextInput,
+  type CardListenerOwnerOptions,
+  type CardListenerZone,
+} from '../cards/card-listeners'
+import {
+  applyMoorSpecialActionEffect,
+  applyMoorSpecialAction,
+  createMoorSpecialActionSpace,
+  isMoorSpecialActionId,
+  isMoorSpecialActionCardUsableByPlayer,
+  validateMoorSpecialActionEffect,
+  type MoorSpecialActionPayload,
+} from './special-actions'
+import type { MoorSpecialActionId } from './types'
+
+export const MOOR_SPECIAL_ACTION_APPLY_ACTION_ID = 'moor-special-action-apply'
+export const MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID = 'moor-special-action-choice'
+export const MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID = 'moor-special-action-after-listeners'
+
+const MOOR_SPECIAL_ACTION_IDS: MoorSpecialActionId[] = [
+  'cut-peat',
+  'fell-trees',
+  'slash-and-burn',
+  'hiring-fair',
+  'horse-market',
+  'black-market',
+  'illicit-work',
+]
+
+const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
+  if (flows.length === 0) return undefined
+  if (flows.length === 1) return flows[0]
+  return { type: 'seq', children: flows }
+}
+
+type AfterSpecialActionListenerSnapshot = {
+  listenerId: string
+  ownerPlayerId?: string
+  ownerCardId?: string
+  ownerCardZone?: CardListenerZone
+}
+
+const readParams = (params?: Record<string, unknown>) => {
+  const cardId = params?.cardId
+  const actionId = params?.actionId
+  if (typeof cardId !== 'string' || typeof actionId !== 'string') return null
+  if (!isMoorSpecialActionId(actionId)) return null
+  return {
+    cardId,
+    actionId,
+    payload: (params?.payload ?? {}) as MoorSpecialActionPayload,
+  }
+}
+
+const readActionIds = (actionContext?: Record<string, unknown>): MoorSpecialActionId[] => {
+  const actionIds = actionContext?.actionIds
+  if (!Array.isArray(actionIds)) return [...MOOR_SPECIAL_ACTION_IDS]
+  return actionIds.filter((actionId): actionId is MoorSpecialActionId =>
+    typeof actionId === 'string' && isMoorSpecialActionId(actionId),
+  )
+}
+
+const optionLabel = (actionId: MoorSpecialActionId) => `moor.specialActions.${actionId}`
+
+const tilePayloads = (
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+): MoorSpecialActionPayload[] => {
+  if (actionId !== 'cut-peat' && actionId !== 'fell-trees' && actionId !== 'slash-and-burn') {
+    return [{}]
+  }
+  const kind = actionId === 'cut-peat' ? 'moor' : 'forest'
+  return (player.farmTerrain ?? [])
+    .filter((tile) => tile.kind === kind)
+    .map(({ row, col }) => ({ tile: { row, col } }))
+}
+
+const takeCardOptions = (
+  state: GameState,
+  player: PlayerState,
+): ActionChoiceOption[] =>
+  (state.farmersOfTheMoor?.specialActionCards ?? [])
+    .filter((card) => {
+      if (!isMoorSpecialActionCardUsableByPlayer(card, player.id)) return false
+      return card.location.kind === 'market' || player.resources.food >= 2
+    })
+    .map((card) => ({
+      value: `card:${card.id}`,
+      labelKey: optionLabel(card.actions[0]!),
+    }))
+
+type ActionChoice = {
+  value: string
+  actionId: MoorSpecialActionId
+  payload: MoorSpecialActionPayload
+}
+
+const actionChoiceValue = (
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+) => {
+  const tile = payload.tile
+  return tile ? `action:${actionId}:${tile.row}:${tile.col}` : `action:${actionId}`
+}
+
+const actionChoices = (
+  state: GameState,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): ActionChoice[] => {
+  const playerIndex = state.players.indexOf(player)
+  if (playerIndex < 0) return []
+  return readActionIds(actionContext).flatMap((actionId) =>
+    tilePayloads(player, actionId).flatMap((payload) => {
+      const validation = validateMoorSpecialActionEffect(state, playerIndex, actionId, payload)
+      if (!validation.ok) return []
+      return [{ value: actionChoiceValue(actionId, payload), actionId, payload }]
+    }),
+  )
+}
+
+const takeActionOptions = (
+  state: GameState,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): ActionChoiceOption[] =>
+  actionChoices(state, player, actionContext).map((choice) => ({
+    value: choice.value,
+    labelKey: optionLabel(choice.actionId),
+  }))
+
+const choiceMode = (actionContext?: Record<string, unknown>) =>
+  actionContext?.mode === 'take-card' ? 'take-card' : 'take-action'
+
+export const hasMoorSpecialActionChoice = (
+  state: GameState,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): boolean =>
+  choiceMode(actionContext) === 'take-card'
+    ? takeCardOptions(state, player).length > 0
+    : actionChoices(state, player, actionContext).length > 0
+
+const parseActionChoice = (value: string): { actionId: MoorSpecialActionId; payload: MoorSpecialActionPayload } | null => {
+  const parts = value.split(':')
+  if (parts[0] !== 'action') return null
+  const actionId = parts[1]
+  if (!actionId || !isMoorSpecialActionId(actionId)) return null
+  if (parts.length === 4) {
+    const row = Number(parts[2])
+    const col = Number(parts[3])
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return null
+    return { actionId, payload: { tile: { row, col } } }
+  }
+  return { actionId, payload: {} }
+}
+
+const takeSpecialActionCard = (
+  state: GameState,
+  player: PlayerState,
+  value: string,
+) => {
+  const cardId = value.startsWith('card:') ? value.slice('card:'.length) : ''
+  const card = state.farmersOfTheMoor?.specialActionCards.find((candidate) => candidate.id === cardId)
+  if (!card || !isMoorSpecialActionCardUsableByPlayer(card, player.id)) {
+    return { type: 'fail' as const, errorKey: 'special action unavailable' }
+  }
+  if (card.location.kind === 'market') {
+    card.location = { kind: 'playerFaceUp', playerId: player.id }
+    return { type: 'ok' as const }
+  }
+  if (player.resources.food < 2) return { type: 'fail' as const, errorKey: 'not enough food' }
+  player.resources.food -= 2
+  card.location = { kind: 'playerFaceDown', playerId: player.id }
+  return { type: 'ok' as const }
+}
+
+const runAfterSpecialActionListenersNow = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+  terrainCleared?: boolean,
+  snapshots?: readonly AfterSpecialActionListenerSnapshot[],
+) => {
+  const context = {
+    state,
+    player,
+    space: createMoorSpecialActionSpace(actionId),
+    actionId,
+    phase: 'after',
+    result: { type: 'ok' },
+    extraData: {
+      payload,
+      ...(terrainCleared === false ? { terrainCleared: false } : {}),
+    },
+  } satisfies CardListenerContextInput
+  const listenerFlows = snapshots
+    ? snapshots.flatMap((snapshot) => {
+      const registration = getListenerById(snapshot.listenerId)
+      if (!registration) return []
+      const owner: CardListenerOwnerOptions = {
+        ownerPlayerId: snapshot.ownerPlayerId,
+        ownerCardId: snapshot.ownerCardId,
+        ownerCardZone: snapshot.ownerCardZone,
+      }
+      const flow = executeCardListener(registration, context, owner)?.flow
+      if (!flow) return []
+      return snapshot.ownerPlayerId && !flow.targetPlayerId
+        ? [{ ...flow, targetPlayerId: snapshot.ownerPlayerId }]
+        : [flow]
+    })
+    : runCardListeners(context, undefined, { stampFlowOwner: true }).map((entry) => entry.flow)
+    .filter((flow): flow is ActionFlow => !!flow)
+  return combineFlows(listenerFlows)
+}
+
+const afterSpecialActionListenersLeaf = (
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+  terrainCleared: boolean | undefined,
+  snapshots: readonly AfterSpecialActionListenerSnapshot[],
+): ActionFlow => ({
+  type: 'leaf',
+  actionId: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
+  actionContext: { actionId, payload, terrainCleared, snapshots },
+})
+
+const snapshotAfterSpecialActionListeners = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+): AfterSpecialActionListenerSnapshot[] =>
+  getMatchingListeners({
+    state,
+    player,
+    space: createMoorSpecialActionSpace(actionId),
+    actionId,
+    phase: 'after',
+    result: { type: 'ok' },
+    extraData: { payload },
+  }).map((entry) => ({
+    listenerId: entry.registration.id,
+    ...(entry.ownerPlayerId ? { ownerPlayerId: entry.ownerPlayerId } : {}),
+    ...(entry.cardId ? { ownerCardId: entry.cardId } : {}),
+    ...(entry.ownerCardZone ? { ownerCardZone: entry.ownerCardZone } : {}),
+  }))
+
+const runAfterSpecialActionListeners = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+  result: { followUpFlow?: ActionFlow; terrainCleared?: boolean },
+) => {
+  if (result.followUpFlow) {
+    const snapshots = snapshotAfterSpecialActionListeners(state, player, actionId, payload)
+    return combineFlows([
+      result.followUpFlow,
+      afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots),
+    ])
+  }
+  return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared)
+}
+
+export const moorSpecialActionAfterListenersAction: ActionDefinition = {
+  id: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player, actionContext }) => {
+    const actionId = actionContext?.actionId
+    if (typeof actionId !== 'string' || !isMoorSpecialActionId(actionId)) {
+      return { type: 'ok' }
+    }
+    const payload = (actionContext?.payload ?? {}) as MoorSpecialActionPayload
+    const terrainCleared = actionContext?.terrainCleared
+    const snapshots = Array.isArray(actionContext?.snapshots)
+      ? actionContext.snapshots as AfterSpecialActionListenerSnapshot[]
+      : undefined
+    const followUpFlow = runAfterSpecialActionListenersNow(
+      state,
+      player,
+      actionId,
+      payload,
+      typeof terrainCleared === 'boolean' ? terrainCleared : undefined,
+      snapshots,
+    )
+    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+  },
+}
+
+export const moorSpecialActionChoiceAction: ActionDefinition = {
+  id: MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID,
+  nameKey: 'actions.moor-special-action-choice.name',
+  descriptionKey: 'actions.moor-special-action-choice.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (state, player, context) =>
+    hasMoorSpecialActionChoice(state, player, context?.actionContext),
+  execute: ({ state, player, actionContext }) => {
+    const options = choiceMode(actionContext) === 'take-card'
+      ? takeCardOptions(state, player)
+      : takeActionOptions(state, player, actionContext)
+    if (options.length === 0) return { type: 'fail', errorKey: 'special action unavailable' }
+    return {
+      type: 'request',
+      request: { kind: 'choice', options },
+      promptKey: 'ui.interactionFlowSelect',
+    }
+  },
+  resolveChoice: ({ state, player, actionContext, eventSink }, choice) => {
+    if (choiceMode(actionContext) === 'take-card') {
+      return takeSpecialActionCard(state, player, choice)
+    }
+    const parsed = parseActionChoice(choice)
+    if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }
+    const allowed = readActionIds(actionContext)
+    if (!allowed.includes(parsed.actionId)) {
+      return { type: 'fail', errorKey: 'special action unavailable' }
+    }
+    const playerIndex = state.players.indexOf(player)
+    if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
+    const result = applyMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, eventSink)
+    if (!result.ok) return { type: 'fail', errorKey: result.error }
+    const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result)
+    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+  },
+}
+
+export const moorSpecialActionApplyAction: ActionDefinition = {
+  id: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+  nameKey: 'actions.moor-special-action-apply.name',
+  descriptionKey: 'actions.moor-special-action-apply.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player, params, eventSink }) => {
+    const parsed = readParams(params)
+    if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }
+    const playerIndex = state.players.findIndex((candidate) => candidate.id === player.id)
+    if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
+
+    const result = applyMoorSpecialAction(
+      state,
+      playerIndex,
+      parsed.cardId,
+      parsed.actionId,
+      parsed.payload,
+      eventSink,
+    )
+    if (!result.ok) return { type: 'fail', errorKey: result.error }
+
+    const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result)
+    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+  },
+}

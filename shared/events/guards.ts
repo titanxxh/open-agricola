@@ -84,6 +84,8 @@ const futureMeepleResourceKeys = new Set([
   ...REAL_RESOURCE_KEYS,
   'field',
   'stable',
+  'forest',
+  'moor',
 ])
 
 const privatePayloadKeys = new Set([

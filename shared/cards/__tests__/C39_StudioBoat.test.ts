@@ -3,10 +3,10 @@ import { getCardEffect } from '../card-effects'
 import { getPlayerActionSpaceConfig } from '../player-action-space'
 import type { GameState, PlayerState, ActionSpace, Resource } from '../../contract/types'
 
-import '../C/C39_StudioBoat'
+import '../C/C039_StudioBoat'
 import type { ActionExecutionContext } from '../../contract/types'
 
-const CARD_ID = 'C39_StudioBoat'
+const CARD_ID = 'C039_StudioBoat'
 
 const emptyResources: Resource = {
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -53,7 +53,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as GameState
 
-describe('C39_StudioBoat', () => {
+describe('C039_StudioBoat', () => {
   describe('PlayerActionSpace registration', () => {
     it('is registered as a player action space', () => {
       const config = getPlayerActionSpaceConfig(CARD_ID)
@@ -238,28 +238,28 @@ describe('C39_StudioBoat', () => {
   })
 })
 
-describe('C39_StudioBoat prerequisite (BGA: 1 Occupation min)', () => {
+describe('C039_StudioBoat prerequisite (BGA: 1 Occupation min)', () => {
   it('declares occupationPrerequisites: { min: 1 }', async () => {
-    const { C39_StudioBoat } = await import('../../cards/C/C39_StudioBoat')
-    expect(C39_StudioBoat.occupationPrerequisites).toEqual({ min: 1 })
+    const { C039_StudioBoat } = await import('../../cards/C/C039_StudioBoat')
+    expect(C039_StudioBoat.occupationPrerequisites).toEqual({ min: 1 })
   })
 
   it('declares prerequisite text "1 Occupation"', async () => {
-    const { C39_StudioBoat } = await import('../../cards/C/C39_StudioBoat')
-    expect(C39_StudioBoat.prerequisite).toBe('1 Occupation')
+    const { C039_StudioBoat } = await import('../../cards/C/C039_StudioBoat')
+    expect(C039_StudioBoat.prerequisite).toBe('1 Occupation')
   })
 
   it('meetsCardPrerequisites: 0 occupations → false', async () => {
-    const { C39_StudioBoat } = await import('../../cards/C/C39_StudioBoat')
+    const { C039_StudioBoat } = await import('../../cards/C/C039_StudioBoat')
     const { meetsCardPrerequisites } = await import('../helpers/prerequisites')
     const player = { occupationPlayed: [], minorPlayed: [], improvements: [], cardStates: {} } as unknown as PlayerState
-    expect(meetsCardPrerequisites(player, C39_StudioBoat, 1)).toBe(false)
+    expect(meetsCardPrerequisites(player, C039_StudioBoat, 1)).toBe(false)
   })
 
   it('meetsCardPrerequisites: 1 occupation → true', async () => {
-    const { C39_StudioBoat } = await import('../../cards/C/C39_StudioBoat')
+    const { C039_StudioBoat } = await import('../../cards/C/C039_StudioBoat')
     const { meetsCardPrerequisites } = await import('../helpers/prerequisites')
     const player = { occupationPlayed: ['Some_Occ'], minorPlayed: [], improvements: [], cardStates: {} } as unknown as PlayerState
-    expect(meetsCardPrerequisites(player, C39_StudioBoat, 1)).toBe(true)
+    expect(meetsCardPrerequisites(player, C039_StudioBoat, 1)).toBe(true)
   })
 })

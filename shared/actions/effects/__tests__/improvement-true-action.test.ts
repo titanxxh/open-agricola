@@ -75,10 +75,10 @@ const resolve = (
     player,
     space: makeSpace(),
     params,
-    sourceCard: 'C60_SmallPottersOven',
+    sourceCard: 'C060_SmallPottersOven',
     actionContext,
   }
-  return improvementAction.resolveChoice!(ctx, 'major:Major_ClayOven')
+  return improvementAction.resolveChoice!(ctx, 'Major_ClayOven')
 }
 
 describe('improvement trueAction context', () => {

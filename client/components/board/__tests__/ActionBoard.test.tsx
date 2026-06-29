@@ -3,6 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
 import { ACTION_SPACE_ATTACHMENTS_KEY } from '../../../../shared/cards/helpers/card-state'
@@ -351,18 +353,18 @@ describe('ActionBoard', () => {
     expect(html).toContain('icon-token icon-token--spaced-plus')
   })
 
-  it('does not render C22_BasketChair as an action-board space even when it is in minorPlayed', () => {
+  it('does not render C022_BasketChair as an action-board space even when it is in minorPlayed', () => {
     // C22 is a MinorImprovement, NOT a PlayerActionCard (no registerPlayerActionSpace).
     // It must never appear in baseActions / ActionBoard tiles.
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
     // Simulate C22 already played — it should be in minorPlayed but NOT in actionSpaces.
-    playerA.minorPlayed = ['C22_BasketChair']
+    playerA.minorPlayed = ['C022_BasketChair']
 
     const html = renderToStaticMarkup(
       <ActionBoard
         locale="en"
-        baseActions={[]}   // actionSpaces does NOT contain C22_BasketChair
+        baseActions={[]}   // actionSpaces does NOT contain C022_BasketChair
         roundSlots={[]}
         currentPlayer={playerA}
         players={[playerA, playerB]}
@@ -375,7 +377,7 @@ describe('ActionBoard', () => {
     )
 
     // The PlayerCard inner div carries data-id={cardId}; absence confirms C22 is not rendered.
-    expect(html).not.toContain('data-id="C22_BasketChair"')
+    expect(html).not.toContain('data-id="C022_BasketChair"')
   })
 
   it('shows owner name when hovering future meeple resources', () => {
@@ -385,7 +387,7 @@ describe('ActionBoard', () => {
     const futureMeeples: FutureMeeple[] = [
       {
         id: 'fm-1',
-        cardId: 'A74_StableTree',
+        cardId: 'A074_StableTree',
         playerId: 'p1',
         round: 3,
         actionId: 'sheep-market',
@@ -474,13 +476,29 @@ describe('ActionBoard', () => {
         actionId: null,
         resources: { field: 1 },
       },
+      {
+        id: 'fm-forest',
+        cardId: 'M045_TreeNursery',
+        playerId: 'p2',
+        round: 13,
+        actionId: null,
+        resources: { forest: 1 },
+      },
+      {
+        id: 'fm-moor',
+        cardId: 'M044_Swamp',
+        playerId: 'p1',
+        round: 13,
+        actionId: null,
+        resources: { moor: 1 },
+      },
     ]
 
     const html = renderToStaticMarkup(
       <ActionBoard
         locale="en"
         baseActions={[]}
-        roundSlots={[{ round: 4, action: sheepMarket }, { round: 12 }]}
+        roundSlots={[{ round: 4, action: sheepMarket }, { round: 12 }, { round: 13 }]}
         currentPlayer={playerA}
         players={[playerA, playerB]}
         futureMeeples={futureMeeples}
@@ -497,6 +515,19 @@ describe('ActionBoard', () => {
     expect(html).toContain('res-icon-sheep')
     expect(html).toContain('title="PlayerA: Field"')
     expect(html).toContain('res-icon-field')
+    expect(html).toContain('title="PlayerB: Forest"')
+    expect(html).toContain('res-icon-forest')
+    expect(html).toContain('title="PlayerA: Moor"')
+    expect(html).toContain('res-icon-moor')
+  })
+
+  it('defines future terrain resource icon classes', () => {
+    const css = readFileSync(join(process.cwd(), 'client/styles/pages/game.css'), 'utf8')
+
+    expect(css).toMatch(/\.res-icon-forest\s*\{/)
+    expect(css).toMatch(/\.res-icon-moor\s*\{/)
+    expect(css).toContain('/assets/moor/terrain/forest.webp')
+    expect(css).toContain('/assets/moor/terrain/moor.webp')
   })
 
   it('renders exclusive-use round slot as locked for non-owner before its normal round', () => {
@@ -504,7 +535,7 @@ describe('ActionBoard', () => {
     const viewer = createPlayer('p2', 'Bob', 'blue')
     const action = {
       ...createAction('round14', 'actions.round14.name'),
-      exclusiveUse: { playerId: 'p1', sourceCardId: 'B23_FinalScenario', untilRound: 14 },
+      exclusiveUse: { playerId: 'p1', sourceCardId: 'B023_FinalScenario', untilRound: 14 },
     }
     const html = renderToStaticMarkup(
       <ActionBoard

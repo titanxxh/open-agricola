@@ -3,15 +3,15 @@ import type { ActionFlow } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
 import { A144_Sequestrator_impl } from '../A/A144_Sequestrator'
-import { B48_ForestStone_impl } from '../B/B48_ForestStone'
+import { B048_ForestStone_impl } from '../B/B048_ForestStone'
 import { C148_MudWallower_impl } from '../C/C148_MudWallower'
-import { D27_Retraining_impl } from '../D/D27_Retraining'
+import { D027_Retraining_impl } from '../D/D027_Retraining'
 import { E103_Wolf_impl } from '../E/E103_Wolf'
 
 const SEQUESTRATOR_CARD_ID = 'A144_Sequestrator'
-const CARD_ID = 'B48_ForestStone'
+const CARD_ID = 'B048_ForestStone'
 const MUD_WALLOWER_CARD_ID = 'C148_MudWallower'
-const RETRAINING_CARD_ID = 'D27_Retraining'
+const RETRAINING_CARD_ID = 'D027_Retraining'
 const WOLF_CARD_ID = 'E103_Wolf'
 
 const makeB48Context = (
@@ -206,7 +206,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 wood handler returns flow without decrementing stored food immediately', () => {
-    const listener = B48_ForestStone_impl.listeners![0]!
+    const listener = B048_ForestStone_impl.listeners![0]!
     const ctx = makeB48Context(2, { wood: 3 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -234,7 +234,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 wood handler returns no flow when stored food is empty', () => {
-    const listener = B48_ForestStone_impl.listeners![0]!
+    const listener = B048_ForestStone_impl.listeners![0]!
     const ctx = makeB48Context(0, { wood: 3 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -245,7 +245,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 stone handler returns flow without incrementing stored food immediately', () => {
-    const listener = B48_ForestStone_impl.listeners![1]!
+    const listener = B048_ForestStone_impl.listeners![1]!
     const ctx = makeB48Context(2, { stone: 1 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -419,7 +419,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 renovation handler returns set-flag flow without mutating immediately', () => {
-    const listener = D27_Retraining_impl.listeners![0]!
+    const listener = D027_Retraining_impl.listeners![0]!
     const ctx = makeD27Context(false)
     ctx.actionId = 'renovate-house'
     ctx.space = { id: 'renovate-house' } as never
@@ -437,7 +437,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns clear-flag plus optional swap without reserving the board', () => {
-    const listener = D27_Retraining_impl.listeners![1]!
+    const listener = D027_Retraining_impl.listeners![1]!
     const ctx = makeD27Context(true, ['Major_Joinery'], ['Major_Pottery'])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)
@@ -476,7 +476,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns only clear-flag when no swap is available', () => {
-    const listener = D27_Retraining_impl.listeners![1]!
+    const listener = D027_Retraining_impl.listeners![1]!
     const ctx = makeD27Context(true, ['Major_Joinery'], [])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)
@@ -494,7 +494,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns no flow when not flagged', () => {
-    const listener = D27_Retraining_impl.listeners![1]!
+    const listener = D027_Retraining_impl.listeners![1]!
     const ctx = makeD27Context(false, ['Major_Joinery'], ['Major_Pottery'])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)

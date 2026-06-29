@@ -21,7 +21,7 @@ export const getOwnOrdinaryFenceBuildLimit = (player: PlayerState): number =>
   Math.max(0, MAX_ORDINARY_FENCE_PIECES - readConsumedSupplyTokenCount(player, 'fence'))
 
 export const getOwnOrdinaryFenceHeldOnCardsCount = (player: PlayerState): number => {
-  const ashTrees = player.cardStates?.E74_AshTrees?.counters?.fences ?? 0
+  const ashTrees = player.cardStates?.E074_AshTrees?.counters?.fences ?? 0
   return Math.max(0, ashTrees)
 }
 

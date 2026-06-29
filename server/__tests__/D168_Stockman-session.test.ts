@@ -43,7 +43,7 @@ describe('D168_Stockman session', () => {
       player.stableTiles = [{ row: 2, col: 2 }]
       player.cardStates = {
         __actionSnapshot__: { extraData: { stableTiles: 1 } },
-        B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+        B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })
     expect(result).toBeDefined()

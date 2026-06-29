@@ -31,21 +31,21 @@
 
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { A3_PaperKnife_impl } from '../../shared/cards/A/A3_PaperKnife'
+import { A003_PaperKnife_impl } from '../../shared/cards/A/A003_PaperKnife'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 
-import '../../shared/cards/A/A3_PaperKnife'
-import { A3_PaperKnife } from '../../shared/cards/A/A3_PaperKnife'
+import '../../shared/cards/A/A003_PaperKnife'
+import { A003_PaperKnife } from '../../shared/cards/A/A003_PaperKnife'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'A3_PaperKnife'
+const CARD_ID = 'A003_PaperKnife'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -82,49 +82,49 @@ const createState = (players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('A3_PaperKnife prerequisite', () => {
+describe('A003_PaperKnife prerequisite', () => {
   it('registers "3 Occupations In Hand" as a custom prerequisite', () => {
     const player = createPlayer('p1')
     player.occupationHand = []
-    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
+    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
 
     player.occupationHand = ['A1', 'A2']
-    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
+    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
 
     player.occupationHand = ['A1', 'A2', 'A3']
-    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
 
     player.occupationHand = ['A1', 'A2', 'A3', 'A4']
-    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
+    expect(A003_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
   })
 
   it('is enforced by meetsCardPrerequisites on the card definition', () => {
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper']
-    expect(meetsCardPrerequisites(player, A3_PaperKnife)).toBe(false)
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
+    expect(meetsCardPrerequisites(player, A003_PaperKnife)).toBe(false)
 
-    player.occupationHand.push('A27_OvenSite')
-    expect(meetsCardPrerequisites(player, A3_PaperKnife)).toBe(true)
+    player.occupationHand.push('A027_OvenSite')
+    expect(meetsCardPrerequisites(player, A003_PaperKnife)).toBe(true)
   })
 })
 
-describe('A3_PaperKnife onBuy', () => {
+describe('A003_PaperKnife onBuy', () => {
   it('does nothing when fewer than 3 occupations in hand', () => {
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper']
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper']
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
     // Hand unchanged.
-    expect(player.occupationHand).toEqual(['A9_SheepFarmer', 'A124_Knapper'])
+    expect(player.occupationHand).toEqual(['A009_SheepFarmer', 'A124_Knapper'])
     expect(player.occupationPlayed).toEqual([])
   })
 
   it('onBuy emits a selection leaf (occupation-hand, min=max=3) when ≥3 occupations in hand', () => {
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
@@ -141,12 +141,12 @@ describe('A3_PaperKnife onBuy', () => {
     expect(ctx.selectionKind).toBe('occupation-hand')
     expect(ctx.minSelections).toBe(3)
     expect(ctx.maxSelections).toBe(3)
-    expect(ctx.selectableCards).toEqual(['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite'])
+    expect(ctx.selectableCards).toEqual(['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite'])
   })
 
   it('does not consume any resources or mutate hand in onBuy', () => {
     const player = createPlayer('p1')
-    player.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
+    player.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     player.resources.food = 5
     const state = createState([player])
     const effect = getCardEffect(CARD_ID)
@@ -160,8 +160,8 @@ describe('A3_PaperKnife onBuy', () => {
   it('onBuy selectableCards snapshot matches occupation hand at call time', () => {
     const a = createPlayer('p1')
     const b = createPlayer('p1')
-    a.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
-    b.occupationHand = ['A9_SheepFarmer', 'A124_Knapper', 'A27_OvenSite']
+    a.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
+    b.occupationHand = ['A009_SheepFarmer', 'A124_Knapper', 'A027_OvenSite']
     const stateA = createState([a])
     const stateB = createState([b])
     const effect = getCardEffect(CARD_ID)!
@@ -178,7 +178,7 @@ describe('A3_PaperKnife onBuy', () => {
 // Session-tier behavioral tests (TDD — FAILING against current simplified impl)
 // ===========================================================================
 
-const SESSION_CARD_ID = 'A3_PaperKnife'
+const SESSION_CARD_ID = 'A003_PaperKnife'
 const OCC_A = 'A116_WoodCutter'
 const OCC_B = 'A117_WoodCarrier'
 const OCC_C = 'A118_Treegardener'
@@ -186,7 +186,7 @@ const OCC_D = 'A119_FirewoodCollector'
 
 /**
  * Build a standard 2-player session in round 1, p0 current player.
- * p0 has A3_PaperKnife in minorHand, occupations in occupationHand, and 1 wood (A3's cost).
+ * p0 has A003_PaperKnife in minorHand, occupations in occupationHand, and 1 wood (A3's cost).
  */
 const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[] } = {}) => {
   const { wood = 1, gameSeed = 42, occHand = [OCC_A, OCC_B, OCC_C, OCC_D] } = opts
@@ -216,7 +216,7 @@ const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[
 
 /**
  * Drive the meeting-place -> A3 onBuy path.
- * Returns the resp AFTER resolving 'minor:A3_PaperKnife'.
+ * Returns the resp AFTER resolving 'minor:A003_PaperKnife'.
  * In the target impl this should leave interaction.stateId === 'wait'
  * with kind 'occupation-hand'.
  */
@@ -239,7 +239,7 @@ const playA3 = (session: GameSession) => {
     return cardPrompt
   }
   const cardOption = cardPrompt.interaction.options?.find(
-    (option) => option.value === `minor:${SESSION_CARD_ID}`,
+    (option) => option.value === SESSION_CARD_ID,
   )
   expect(cardOption).toBeDefined()
   return session.resolveChoice(0, cardOption!.value)
@@ -248,7 +248,7 @@ const playA3 = (session: GameSession) => {
 // ---------------------------------------------------------------------------
 // Case 1: onBuy emits a selection pending with kind='occupation-hand', min=max=3
 // ---------------------------------------------------------------------------
-describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
+describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
   it('case 1: onBuy emits occupation-hand selection pending with min=max=3', () => {
     const session = makeSession({ wood: 1 })
 
@@ -412,7 +412,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
       return
     }
 
-    const a3Option = cardPrompt.interaction.options?.find(o => o.value === `minor:${SESSION_CARD_ID}`)
+    const a3Option = cardPrompt.interaction.options?.find(o => o.value === SESSION_CARD_ID)
     if (!a3Option) {
       // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
       return
@@ -438,7 +438,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     p0.minorHand = [SESSION_CARD_ID]
     p0.resources.wood = 1
     // Pre-load one minor improvement so A117 onBuy has an improvement to count.
-    p0.minorPlayed = ['A10_WoodenShed']
+    p0.minorPlayed = ['A010_WoodenShed']
 
     session.loadState(state)
 
@@ -462,7 +462,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
 
     if (pick === OCC_B) {
       // A117 onBuy fired → grants wood per improvement.
-      // p0 has A10_WoodenShed in minorPlayed (pre-loaded) + A3 was just added to minorPlayed
+      // p0 has A010_WoodenShed in minorPlayed (pre-loaded) + A3 was just added to minorPlayed
       // = at least 2 minor improvements, so wood should increase by >= 2.
       // Use >= woodAfterA3Pay + 1 as a conservative lower bound to accommodate timing variance.
       // This assertion would FAIL on the pre-rewrite impl (which bypasses onBuy entirely).

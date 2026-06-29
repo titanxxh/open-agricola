@@ -20,7 +20,7 @@ describe('event guards', () => {
   it('accepts public json-safe events under size limit', () => {
     const event = {
       ...baseEvent,
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       key: 'foodCount',
       type: 'card.stateChanged',
       value: 3,
@@ -50,7 +50,7 @@ describe('event guards', () => {
       type: 'action.exclusiveUseCleared',
       actionId: 'round-14-action',
       playerId: 'p1',
-      sourceCardId: 'B23_FinalScenario',
+      sourceCardId: 'B023_FinalScenario',
     })).not.toThrow()
   })
 
@@ -76,7 +76,7 @@ describe('event guards', () => {
       actionId: 'forest',
       detailParts: {
         gains: { wood: 3 },
-        minorHand: ['E78_SleightofHand'],
+        minorHand: ['E078_SleightofHand'],
       },
     })).toThrow(/private payload/)
   })
@@ -108,7 +108,7 @@ describe('event guards', () => {
       ...baseEvent,
       type: 'futureMeeple.queued',
       playerId: 'p1',
-      cardId: 'A89_StablePlanner',
+      cardId: 'A089_StablePlanner',
       entries: [{ round: 6, resources: { stable: 1 } }],
     })).not.toThrow()
   })
@@ -285,7 +285,7 @@ describe('event guards', () => {
       {
         type: 'futureMeeple.queued',
         playerId: 'p1',
-        cardId: 'E47_SyrupTap',
+        cardId: 'E047_SyrupTap',
         entries: [{ resources: { wood: 1 } }],
       },
       /entries\[0\]\.round/,
@@ -355,7 +355,7 @@ describe('event guards', () => {
       from: { kind: 'supply' },
       to: { kind: 'player', playerId: 'p1' },
       reason: 'gain',
-      privateHand: ['E1_PrivateCard'],
+      privateHand: ['E001_PrivateCard'],
     })).toThrow(/Unknown GameEvent field privateHand/)
   })
 
@@ -370,7 +370,7 @@ describe('event guards', () => {
       visibility: 'public',
       resources: { wood: 1 },
       from: { kind: 'supply' },
-      to: { kind: 'player', playerId: 'p1', minorHand: ['E1_PrivateCard'] },
+      to: { kind: 'player', playerId: 'p1', minorHand: ['E001_PrivateCard'] },
       reason: 'gain',
     })).toThrow(/to/)
 
@@ -444,14 +444,14 @@ describe('event guards', () => {
       phase: 'work',
       type: 'card.stateChanged',
       visibility: 'public',
-      cardId: 'B21_HayloftBarn',
+      cardId: 'B021_HayloftBarn',
       key: 'foodCount',
       targetPlayerId: 'p1',
     }
 
     expect(() => assertKnownGameEventShape({ ...base, value: [null, 'x', 1, true, [2]] })).not.toThrow()
     expect(() => assertKnownGameEventShape({ ...base, value: { public: true } })).toThrow(/value/)
-    expect(() => assertKnownGameEventShape({ ...base, value: [{ minorHand: ['E1_PrivateCard'] }] })).toThrow(/value/)
+    expect(() => assertKnownGameEventShape({ ...base, value: [{ minorHand: ['E001_PrivateCard'] }] })).toThrow(/value/)
   })
 
   it('rejects events over the size limit', () => {

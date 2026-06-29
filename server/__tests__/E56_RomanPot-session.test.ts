@@ -4,9 +4,9 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/E/E56_RomanPot'
+import '../../shared/cards/E/E056_RomanPot'
 
-const CARD_ID = 'E56_RomanPot'
+const CARD_ID = 'E056_RomanPot'
 
 const setup = (options?: { playerCount?: number; foodCount?: number }) => {
   const playerCount = options?.playerCount ?? 2
@@ -33,7 +33,7 @@ const setup = (options?: { playerCount?: number; foodCount?: number }) => {
   return session
 }
 
-describe('E56_RomanPot session', () => {
+describe('E056_RomanPot session', () => {
   it('onBuy sets foodCount to 4', () => {
     const session = new GameSession()
     const state = session.getState().state

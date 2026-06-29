@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A75_LumberMill } from '../../shared/cards/A/A75_LumberMill'
+import { A075_LumberMill } from '../../shared/cards/A/A075_LumberMill'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
-const CARD_ID = 'A75_LumberMill'
+const CARD_ID = 'A075_LumberMill'
 
 // Touch the import so the listener side-effect remains referenced.
-void A75_LumberMill
+void A075_LumberMill
 
-describe('A75_LumberMill session', () => {
+describe('A075_LumberMill session', () => {
   const setup = (resources: Partial<Record<string, number>>) => {
     const session = new GameSession()
     const state = session.getState().state

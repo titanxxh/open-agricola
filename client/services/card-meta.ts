@@ -22,6 +22,7 @@ export type CardMeta = {
   number: number
   /** Construction type: mirrors the backing card class. */
   type?: 'occupation' | 'minor' | 'major' | 'playerAction'
+  playerActionCardType?: 'minor' | 'occupation'
   category?: string
   desc?: string[]
   cost?: Record<string, number>

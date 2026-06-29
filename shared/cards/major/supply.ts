@@ -219,6 +219,24 @@ export const returnMajorImprovementToSupply = (
   syncAvailableMajorImprovementsFromSupply(state)
 }
 
+export const moveMajorImprovementToSupplyTop = (
+  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  cardId: string,
+): void => {
+  if (!state.majorImprovementSupply) return
+  state.majorImprovementSupply = state.majorImprovementSupply.map((stack) => {
+    if (!stack.cardIds.includes(cardId)) return stack
+    return recomputeVisible({
+      ...stack,
+      cardIds: [
+        cardId,
+        ...stack.cardIds.filter((id) => id !== cardId),
+      ],
+    })
+  })
+  syncAvailableMajorImprovementsFromSupply(state)
+}
+
 export const swapMajorImprovementWithSupply = (
   state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
   fromCardId: string,

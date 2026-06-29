@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { C1_Overhaul_impl } from '../C1_Overhaul'
+import { C001_Overhaul_impl } from '../C001_Overhaul'
 import type { ActionFlow, GameState, PlayerState } from '../../../contract/types'
 
 const makePlayer = (ownFenceCount: number): PlayerState => {
@@ -16,7 +16,7 @@ const makePlayer = (ownFenceCount: number): PlayerState => {
 }
 
 const runOnBuy = (ownFenceCount: number) =>
-  C1_Overhaul_impl.effect.onBuy({} as GameState, makePlayer(ownFenceCount))
+  C001_Overhaul_impl.effect.onBuy({} as GameState, makePlayer(ownFenceCount))
 
 const expectC1RebuildFlow = (
   flow: ActionFlow | undefined,
@@ -29,7 +29,7 @@ const expectC1RebuildFlow = (
       {
         type: 'leaf',
         actionId: 'special-effect',
-        sourceCard: 'C1_Overhaul',
+        sourceCard: 'C001_Overhaul',
         params: {
           kind: 'consume-fence',
           count,
@@ -40,7 +40,7 @@ const expectC1RebuildFlow = (
       {
         type: 'leaf',
         actionId: 'fence',
-        sourceCard: 'C1_Overhaul',
+        sourceCard: 'C001_Overhaul',
         actionContext: {
           trueAction: false,
           fencePolicy: {
@@ -60,7 +60,7 @@ const expectC1RebuildFlow = (
 
 describe('C1 Overhaul onBuy policy flow', () => {
   it('does not register the removed fence-discount listener', () => {
-    expect(C1_Overhaul_impl.listeners ?? []).toEqual([])
+    expect(C001_Overhaul_impl.listeners ?? []).toEqual([])
   })
 
   it('returns undefined when the buyer has no own ordinary fences', () => {
@@ -76,7 +76,7 @@ describe('C1 Overhaul onBuy policy flow', () => {
   })
 
   it('does not use c1Active or c1MaxRebuild card state logic', () => {
-    const serialized = JSON.stringify(C1_Overhaul_impl)
+    const serialized = JSON.stringify(C001_Overhaul_impl)
     expect(serialized).not.toContain('C1-fence-discount')
     expect(serialized).not.toContain('c1Active')
     expect(serialized).not.toContain('c1MaxRebuild')

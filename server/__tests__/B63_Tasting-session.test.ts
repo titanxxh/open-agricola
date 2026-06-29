@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B63_Tasting'
+import '../../shared/cards/B/B063_Tasting'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
-const CARD_ID = 'B63_Tasting'
+const CARD_ID = 'B063_Tasting'
 
-describe('B63_Tasting session', () => {
+describe('B063_Tasting session', () => {
   const setup = (grain = 2, opts?: { food?: number; playerCount?: number }) => {
     const session = opts?.playerCount
       ? new GameSession(42, undefined, { playerCount: opts.playerCount })
@@ -24,7 +24,7 @@ describe('B63_Tasting session', () => {
     setWorkersAtHome(state, player, 2)
     player.resources.food = opts?.food ?? player.resources.food
     player.resources.grain = grain
-    player.occupationHand = ['A93_BedMaker', 'A110_Roughcaster']
+    player.occupationHand = ['A093_BedMaker', 'A110_Roughcaster']
     player.minorHand = ['__test_placeholder__']
 
     state.players[1]!.workersAvailable = 2
@@ -62,7 +62,7 @@ describe('B63_Tasting session', () => {
         o.value?.startsWith?.('exchange') ||
         o.value === '__accept__',
       )
-      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       if (payOpt) {
         resp = session.resolveChoice(0, payOpt.value)
       } else if (occOpt) {
@@ -104,12 +104,12 @@ describe('B63_Tasting session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('choice')
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseOccupation')
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('A93_BedMaker')
+    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('A093_BedMaker')
 
-    resp = session.resolveChoice(0, 'A93_BedMaker')
+    resp = session.resolveChoice(0, 'A093_BedMaker')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)
-    expect(resp.state.players[0]!.occupationPlayed).toContain('A93_BedMaker')
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A093_BedMaker')
   })
 
   it('skipping exchange leaves grain unchanged', () => {
@@ -122,11 +122,11 @@ describe('B63_Tasting session', () => {
       if (resp.interaction.request.kind !== 'choice') break
       const options = resp.interaction.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
-      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+      const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (occOpt) {
-        resp = session.resolveChoice(0, 'A93_BedMaker')
+        resp = session.resolveChoice(0, 'A093_BedMaker')
       } else {
         const first = options[0]
         if (!first) break

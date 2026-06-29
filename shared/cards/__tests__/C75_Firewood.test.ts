@@ -4,11 +4,11 @@ import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 // Import card to register its effects/listeners
-import '../C/C75_Firewood'
+import '../C/C075_Firewood'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'C75_Firewood'
+const CARD_ID = 'C075_Firewood'
 
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'player1',
@@ -59,7 +59,7 @@ const createState = (player: PlayerState): GameState => ({
   roundPhase: 'work',
 }) as GameState
 
-describe('C75_Firewood', () => {
+describe('C075_Firewood', () => {
   describe('onReturnHome effect (accumulate wood)', () => {
     it('should add 1 wood to card each round', () => {
       const effect = getCardEffect(CARD_ID)!

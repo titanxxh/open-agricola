@@ -4,10 +4,10 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { plowAction } from '../../shared/actions/effects/plow'
 import type { ActionFlow, ActionSpace } from '../../shared/contract/types'
 
-import { D1_ZigzagHarrow } from '../../shared/cards/D/D1_ZigzagHarrow'
+import { D001_ZigzagHarrow } from '../../shared/cards/D/D001_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-describe('D1_ZigzagHarrow session', () => {
+describe('D001_ZigzagHarrow session', () => {
   const setupZigzagState = (withStable = false) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -25,13 +25,13 @@ describe('D1_ZigzagHarrow session', () => {
       { row: 1, col: 0 },
     ]
     player.stableTiles = withStable ? [{ row: 1, col: 4 }] : []
-    player.minorPlayed.push('D1_ZigzagHarrow')
+    player.minorPlayed.push('D001_ZigzagHarrow')
     session.loadState(state)
     return { state, player }
   }
 
   const getD1PlowLeaf = (state: ReturnType<typeof setupZigzagState>['state'], player: ReturnType<typeof setupZigzagState>['player']) => {
-    const flow = runCardEffectHook(state, player, 'D1_ZigzagHarrow', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'D001_ZigzagHarrow', 'onBuy')
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -43,7 +43,7 @@ describe('D1_ZigzagHarrow session', () => {
     const { state, player } = setupZigzagState(true)
     const leaf = getD1PlowLeaf(state, player)
     expect(leaf.optional).toBe(true)
-    expect(leaf.sourceCard).toBe('D1_ZigzagHarrow')
+    expect(leaf.sourceCard).toBe('D001_ZigzagHarrow')
     expect(leaf.actionContext?.allowedTiles).toEqual([
       { row: 1, col: 4 },
       { row: -1, col: 2 },
@@ -96,7 +96,7 @@ describe('D1_ZigzagHarrow session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [{ row: 0, col: 0, stacks: [] }]
-      expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, D001_ZigzagHarrow, state.round, state)).toBe(false)
     })
 
     it('allows when fields can complete a zigzag pattern', () => {
@@ -108,7 +108,7 @@ describe('D1_ZigzagHarrow session', () => {
         { row: 0, col: 1, stacks: [] },
         { row: 1, col: 1, stacks: [] },
       ]
-      expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, D001_ZigzagHarrow, state.round, state)).toBe(true)
     })
 
     it('allows when a raw zigzag candidate is occupied by a stable', () => {
@@ -121,7 +121,7 @@ describe('D1_ZigzagHarrow session', () => {
         { row: 1, col: 3, stacks: [] },
       ]
       player.stableTiles = [{ row: 1, col: 4 }]
-      expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, D001_ZigzagHarrow, state.round, state)).toBe(true)
     })
   })
 })

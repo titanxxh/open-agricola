@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 const CARD_ID = 'A180_AnimalBrander'
 
@@ -56,17 +55,16 @@ describe('A180 Animal Brander', () => {
 
     let resp = session.takeAction(0, 'animal-market-56')
 
-    const sheep = findOption(resp, (option) =>
-      JSON.stringify(option.descriptionPreview).includes('option-sheep'),
-    )
+    const sheep = findOption(resp, (option) => option.labelKey === 'actions.animal-market-56.option-sheep')
     expect(sheep).toBeDefined()
 
     resp = session.resolveChoice(0, sheep!.value)
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(4)
+    resp = resolveAnimalReorgs(session, resp, 'sheep')
 
     const doubled = findOption(resp, (option) => option.sourceCard === CARD_ID)
     expect(doubled).toBeDefined()
-    const original = findOption(resp, (option) => option.sourceCard !== CARD_ID)
-    expect(original).toBeDefined()
 
     resp = resolveAnimalReorgs(session, session.resolveChoice(0, doubled!.value), 'sheep')
 
@@ -78,12 +76,13 @@ describe('A180 Animal Brander', () => {
     const session = setup(3)
 
     let resp = session.takeAction(0, 'animal-market-56')
-    const cattle = findOption(resp, (option) =>
-      JSON.stringify(option.descriptionPreview).includes('option-cattle'),
-    )
+    const cattle = findOption(resp, (option) => option.labelKey === 'actions.animal-market-56.option-cattle')
     expect(cattle).toBeDefined()
 
     resp = session.resolveChoice(0, cattle!.value)
+    expect(resp.state.players[0]!.resources.cattle).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    resp = resolveAnimalReorgs(session, resp, 'cattle')
     const doubled = findOption(resp, (option) => option.sourceCard === CARD_ID)
     expect(doubled).toBeDefined()
 
@@ -93,20 +92,35 @@ describe('A180 Animal Brander', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
+  it('does not offer the doubled sheep branch when the player starts Animal Market with no food', () => {
+    const session = setup(0)
+
+    let resp = session.takeAction(0, 'animal-market-56')
+    const sheep = findOption(resp, (option) => option.labelKey === 'actions.animal-market-56.option-sheep')
+    expect(sheep).toBeDefined()
+
+    resp = session.resolveChoice(0, sheep!.value)
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    resp = resolveAnimalReorgs(session, resp, 'sheep')
+
+    expect(findOption(resp, (option) => option.sourceCard === CARD_ID)).toBeUndefined()
+  })
+
   it('preserves the original cattle branch when declining Animal Brander', () => {
     const session = setup(3)
 
     let resp = session.takeAction(0, 'animal-market-56')
-    const cattle = findOption(resp, (option) =>
-      JSON.stringify(option.descriptionPreview).includes('option-cattle'),
-    )
+    const cattle = findOption(resp, (option) => option.labelKey === 'actions.animal-market-56.option-cattle')
     expect(cattle).toBeDefined()
 
     resp = session.resolveChoice(0, cattle!.value)
-    const original = findOption(resp, (option) => option.sourceCard !== CARD_ID)
-    expect(original).toBeDefined()
+    expect(resp.state.players[0]!.resources.cattle).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    resp = resolveAnimalReorgs(session, resp, 'cattle')
+    expect(findOption(resp, (option) => option.sourceCard === CARD_ID)).toBeDefined()
 
-    resp = resolveAnimalReorgs(session, session.resolveChoice(0, original!.value), 'cattle')
+    resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.state.players[0]!.resources.cattle).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(2)
@@ -114,21 +128,16 @@ describe('A180 Animal Brander', () => {
 
   it('does not offer the doubled cattle branch unless the player can pay all 3 food', () => {
     const session = setup(2)
-    const state = session.getState().state
-    const player = state.players[0]!
-    const space = state.actionSpaces.find((entry) => entry.id === 'animal-market-56')!
-    const listener = getRegisteredCardListeners().find((entry) => entry.id === 'A180-animal-brander-replace-animal-market')!
 
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      ownerPlayer: player,
-      triggerPlayer: player,
-      space,
-      actionId: 'animal-market-cattle-56',
-      phase: 'computeReplace',
-    } as unknown as CardListenerContext)
+    let resp = session.takeAction(0, 'animal-market-56')
+    const cattle = findOption(resp, (option) => option.labelKey === 'actions.animal-market-56.option-cattle')
+    expect(cattle).toBeDefined()
 
-    expect(result).toBeUndefined()
+    resp = session.resolveChoice(0, cattle!.value)
+    expect(resp.state.players[0]!.resources.cattle).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    resp = resolveAnimalReorgs(session, resp, 'cattle')
+
+    expect(findOption(resp, (option) => option.sourceCard === CARD_ID)).toBeUndefined()
   })
 })

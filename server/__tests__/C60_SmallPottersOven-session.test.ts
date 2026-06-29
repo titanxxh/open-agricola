@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D106_WhiskyDistiller'
-import '../../shared/cards/C/C60_SmallPottersOven'
-import '../../shared/cards/D/D66_PotterCeramics'
+import '../../shared/cards/C/C060_SmallPottersOven'
+import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/__stubs__/STUB_BeforeBakeGainClay'
 
 const setupBakeViaC60 = (
@@ -24,7 +24,7 @@ const setupBakeViaC60 = (
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
-  player.minorPlayed.push('C60_SmallPottersOven', ...(overrides.extraPlayedCards ?? []))
+  player.minorPlayed.push('C060_SmallPottersOven', ...(overrides.extraPlayedCards ?? []))
   player.resources = {
     ...player.resources,
     grain,
@@ -44,7 +44,7 @@ const setupBakeViaC60 = (
   return session
 }
 
-describe('C60_SmallPottersOven server session', () => {
+describe('C060_SmallPottersOven server session', () => {
   it('returns the only oven from onBuy and logs separate cardEffectGain on play', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -54,7 +54,7 @@ describe('C60_SmallPottersOven server session', () => {
     const player = state.players[0]!
     player.resources.clay = 2
     player.resources.food = 0
-    player.minorHand = ['C60_SmallPottersOven']
+    player.minorHand = ['C060_SmallPottersOven']
     player.improvements = ['Major_ClayOven']
 
     session.loadState(state)
@@ -65,13 +65,13 @@ describe('C60_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     const c60Option = resp.interaction.options?.find(
-      (option) => option.value === 'minor:C60_SmallPottersOven',
+      (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
 
     resp = session.resolveChoice(0, c60Option!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain('C60_SmallPottersOven')
+    expect(resp.state.players[0]!.minorPlayed).toContain('C060_SmallPottersOven')
     expect(resp.state.players[0]!.improvements).not.toContain('Major_ClayOven')
     expect(resp.state.availableMajorImprovements).toContain('Major_ClayOven')
     expect(resp.state.players[0]!.resources.clay).toBe(0)
@@ -80,14 +80,14 @@ describe('C60_SmallPottersOven server session', () => {
     const playLog = resp.state.log.find(
       (entry) => entry.key === 'log.playMinorImprovement',
     )
-    expect(playLog?.params?.improvements).toBe('C60_SmallPottersOven')
+    expect(playLog?.params?.improvements).toBe('C060_SmallPottersOven')
     expect(playLog?.params?.returnedCards).toBeUndefined()
     expect(playLog?.params?.costResources).toEqual({ clay: 2 })
 
     const gainLog = resp.state.log.find(
       (entry) =>
         entry.key === 'log.cardEffectGain' &&
-        entry.params?.cardId === 'C60_SmallPottersOven',
+        entry.params?.cardId === 'C060_SmallPottersOven',
     )
     expect(gainLog?.params?.gain).toEqual({ food: 5 })
   })
@@ -101,7 +101,7 @@ describe('C60_SmallPottersOven server session', () => {
     const player = state.players[0]!
     player.resources.clay = 2
     player.resources.food = 0
-    player.minorHand = ['C60_SmallPottersOven']
+    player.minorHand = ['C060_SmallPottersOven']
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
 
     session.loadState(state)
@@ -112,7 +112,7 @@ describe('C60_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     const c60Option = resp.interaction.options?.find(
-      (option) => option.value === 'minor:C60_SmallPottersOven',
+      (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
 
@@ -133,7 +133,7 @@ describe('C60_SmallPottersOven server session', () => {
 
     resp = session.resolveChoice(0, returnStone!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain('C60_SmallPottersOven')
+    expect(resp.state.players[0]!.minorPlayed).toContain('C060_SmallPottersOven')
     expect(resp.state.players[0]!.improvements).toContain('Major_ClayOven')
     expect(resp.state.players[0]!.improvements).not.toContain('Major_StoneOven')
     expect(resp.state.availableMajorImprovements).toContain('Major_StoneOven')
@@ -197,7 +197,7 @@ describe('C60_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseImprovement')
     const stoneOption = resp.interaction.options?.find(
-      (option) => option.value === 'major:Major_StoneOven',
+      (option) => option.value === 'Major_StoneOven',
     )
     expect(stoneOption).toBeDefined()
 
@@ -313,7 +313,7 @@ describe('C60_SmallPottersOven server session', () => {
 
   it('keeps C60 optional when D66 can unlock bake without buying an oven', () => {
     const session = setupBakeViaC60(0, {
-      extraPlayedCards: ['D66_PotterCeramics'],
+      extraPlayedCards: ['D066_PotterCeramics'],
       improvements: ['Major_Fireplace1'],
       clay: 6,
     })
@@ -335,12 +335,12 @@ describe('C60_SmallPottersOven server session', () => {
     }
 
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D66_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
   })
 
   it('allows C60 to create the oven source before D66 creates grain', () => {
     const session = setupBakeViaC60(0, {
-      extraPlayedCards: ['D66_PotterCeramics'],
+      extraPlayedCards: ['D066_PotterCeramics'],
       clay: 6,
     })
 
@@ -371,9 +371,9 @@ describe('C60_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D66_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
 
-    resp = session.resolveChoice(0, 'D66_PotterCeramics')
+    resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       resp = session.resolveChoice(0, 'Major_ClayOven')
@@ -385,7 +385,7 @@ describe('C60_SmallPottersOven server session', () => {
 
   it('allows C60 plus STUB plus D66 to build oven, gain clay, gain grain, then bake', () => {
     const session = setupBakeViaC60(0, {
-      extraPlayedCards: ['STUB_BeforeBakeGainClay', 'D66_PotterCeramics'],
+      extraPlayedCards: ['STUB_BeforeBakeGainClay', 'D066_PotterCeramics'],
       clay: 3,
     })
 
@@ -412,7 +412,7 @@ describe('C60_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D66_PotterCeramics')?.disabled).toBe(true)
+    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).toBe(true)
     expect(resp.interaction.options?.find((option) => option.value === 'STUB_BeforeBakeGainClay')?.disabled).not.toBe(true)
 
     resp = session.resolveChoice(0, 'STUB_BeforeBakeGainClay')
@@ -421,9 +421,9 @@ describe('C60_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D66_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
 
-    resp = session.resolveChoice(0, 'D66_PotterCeramics')
+    resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       resp = session.resolveChoice(0, 'Major_ClayOven')

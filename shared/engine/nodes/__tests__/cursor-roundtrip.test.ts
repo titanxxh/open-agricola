@@ -92,6 +92,24 @@ describe('cursor round-trip', () => {
     expect(rebuilt.toCursor()).toEqual(c1)
   })
 
+  it('composite nodes preserve choice labels through toCursor', () => {
+    const child = new ActionNode('seq-label-child', 'gain-wood')
+    const original = new SequenceNode('seq-label', [child])
+    original.choiceLabelKey = 'ui.choice.seq'
+    original.choiceLabelParams = { count: 1 }
+
+    const c1 = original.toCursor()
+    const rebuilt = new SequenceNode(c1.id, [child])
+    rebuilt.choiceLabelKey = c1.data.choiceLabelKey as string | undefined
+    rebuilt.choiceLabelParams = c1.data.choiceLabelParams as Record<string, unknown> | undefined
+
+    expect(c1.data).toMatchObject({
+      choiceLabelKey: 'ui.choice.seq',
+      choiceLabelParams: { count: 1 },
+    })
+    expect(rebuilt.toCursor()).toEqual(c1)
+  })
+
   it('ParallelNode preserves childrenIds through toCursor', () => {
     const a = new ActionNode('par-child-a', 'gain-wood')
     const b = new ActionNode('par-child-b', 'gain-clay')
@@ -113,7 +131,7 @@ describe('cursor round-trip', () => {
     original.pendingContextSnapshot = {
       params: undefined,
       costs: undefined,
-      sourceCard: 'D7_X',
+      sourceCard: 'D007_X',
       actionContext: undefined,
     }
     const c1 = original.toCursor()

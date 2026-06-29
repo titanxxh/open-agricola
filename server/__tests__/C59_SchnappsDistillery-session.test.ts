@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/C/C59_SchnappsDistillery'
+import '../../shared/cards/C/C059_SchnappsDistillery'
 
-describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
+describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -23,7 +23,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     playerB.name = 'PlayerB'
 
     // PlayerA needs 2 food (familySize=1 * 2), has C59 + 2 vegetables
-    playerA.minorPlayed.push('C59_SchnappsDistillery')
+    playerA.minorPlayed.push('C059_SchnappsDistillery')
     playerA.resources.vegetable = 2
 
     // PlayerB: skip feeding complications
@@ -44,7 +44,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     // Client sends 2 vegetable conversions for C59 (max=1). Server must cap.
     resp = session.resolveChoice(0, 'confirm', { selections: [
       {
-        sourceId: 'C59_SchnappsDistillery',
+        sourceId: 'C059_SchnappsDistillery',
         exchangeIndex: 0,
         count: 2,
         sourceName: 'Schnapps Distillery',
@@ -69,7 +69,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
       {
-        sourceId: 'C59_SchnappsDistillery',
+        sourceId: 'C059_SchnappsDistillery',
         exchangeIndex: 0,
         count: 1,
         sourceName: 'Schnapps Distillery',

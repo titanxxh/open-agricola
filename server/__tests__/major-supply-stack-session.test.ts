@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { createInitialState } from '../../shared/session/state-bootstrap'
 import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D27_Retraining'
+import '../../shared/cards/D/D027_Retraining'
 
 type MajorSupplyStack = {
   familyId: string
@@ -118,10 +118,10 @@ const buildMajor = (session: GameSession, id: string) => {
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
     const option = resp.interaction.options?.find(
-      (candidate: ActionChoiceOption) => candidate.value === `major:${id}`,
+      (candidate: ActionChoiceOption) => candidate.value === id,
     )
     expect(option).toBeDefined()
-    resp = session.resolveChoice(0, `major:${id}`)
+    resp = session.resolveChoice(0, id)
     expect(resp.ok).toBe(true)
   }
   return session.getState().state
@@ -193,9 +193,9 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).not.toContain('major:Major_Moor_HorseSlaughterhouse1')
+    expect(resp.interaction.options?.map((option) => option.value)).not.toContain('Major_Moor_HorseSlaughterhouse1')
 
-    resp = session.resolveChoice(0, 'major:Major_Fireplace1')
+    resp = session.resolveChoice(0, 'Major_Fireplace1')
     expect(resp.ok).toBe(true)
     expect(resp.state.availableMajorImprovements).toContain('Major_Moor_HorseSlaughterhouse1')
 
@@ -204,7 +204,7 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('major:Major_Moor_HorseSlaughterhouse1')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_HorseSlaughterhouse1')
   })
 
   it('offers Farmers of the Moor-only top stack majors for purchase', () => {
@@ -214,8 +214,8 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('major:Major_Moor_PeatCharcoalKiln')
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('major:Major_Moor_ForestersLodge')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_PeatCharcoalKiln')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_ForestersLodge')
   })
 
   it('returns a Cooking Hearth to its Farmers of the Moor stack when buying Cookhouse as an upgrade', () => {
@@ -246,8 +246,8 @@ describe('major improvement supply stacks', () => {
 
     state = session.getState().state
     const player = state.players[0]!
-    player.minorPlayed.push('D27_Retraining')
-    setCardFlag(player, 'D27_Retraining', true)
+    player.minorPlayed.push('D027_Retraining')
+    setCardFlag(player, 'D027_Retraining', true)
     resetMajorActionForPlayer0(session)
 
     let resp = session.takeAction(0, 'forest')

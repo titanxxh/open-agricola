@@ -4,9 +4,9 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import type { ActionChoiceOption, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B132_EstateMaster'
-import '../../shared/cards/B/B50_ButterChurn'
-import '../../shared/cards/D/D38_MilkingStool'
-import '../../shared/cards/D/D72_StableManure'
+import '../../shared/cards/B/B050_ButterChurn'
+import '../../shared/cards/D/D038_MilkingStool'
+import '../../shared/cards/D/D072_StableManure'
 import '../../shared/cards/E/E112_GrainThief'
 
 describe('harvest reaction flow', () => {
@@ -79,7 +79,7 @@ describe('harvest reaction flow', () => {
   it('auto-runs mandatory non-interactive harvest field hooks without trigger-select pending', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
-    player.minorPlayed.push('B50_ButterChurn')
+    player.minorPlayed.push('B050_ButterChurn')
     player.pastures = [
       { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
       { id: 'cattle-pasture', size: 2, tiles: [], stables: 0, animalType: 'cattle', animalCount: 2 },
@@ -97,7 +97,7 @@ describe('harvest reaction flow', () => {
   it('auto-runs Milking Stool without trigger-select pending', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
-    player.occupationPlayed.push('D38_MilkingStool')
+    player.occupationPlayed.push('D038_MilkingStool')
     player.resources.cattle = 1
     player.houseAnimalType = 'cattle'
     player.houseAnimalCount = 1
@@ -114,7 +114,7 @@ describe('harvest reaction flow', () => {
   it('keeps Stable Manure harvest field selection interactive', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
-    player.minorPlayed.push('D72_StableManure')
+    player.minorPlayed.push('D072_StableManure')
     player.fields = [
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 2 }] },
@@ -124,11 +124,11 @@ describe('harvest reaction flow', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    resp = resolveCardTrigger(session, resp, 'D72_StableManure')
+    resp = resolveCardTrigger(session, resp, 'D072_StableManure')
     resp = acceptOptional(session, resp)
 
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.sourceCard).toBe('D72_StableManure')
+    expect(resp.interaction.sourceCard).toBe('D072_StableManure')
     expect(resp.interaction.selection?.kind).toBe('farm-position')
   })
 

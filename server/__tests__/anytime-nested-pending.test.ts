@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/B/B32_Kettle'
+import '../../shared/cards/B/B032_Kettle'
 import '../../shared/cards/C/C115_Sower'
 import '../../shared/cards/D/D106_WhiskyDistiller'
 
-const KETTLE = 'B32_Kettle'
+const KETTLE = 'B032_Kettle'
 const WHISKY = 'D106_WhiskyDistiller'
 const WHISKY_ANYTIME_ID = 'D106-whisky-distiller-anytime'
 const SOWER = 'C115_Sower'

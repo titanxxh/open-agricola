@@ -124,13 +124,13 @@ describe('buildCardsManifest — Card Source projection', () => {
     fs.mkdirSync(path.join(cardsDisplayRoot, 'A'), { recursive: true })
     fs.mkdirSync(sourceDeckDir, { recursive: true })
     fs.writeFileSync(
-      path.join(sourceDeckDir, 'A1_SourceMinor.ts'),
+      path.join(sourceDeckDir, 'A001_SourceMinor.ts'),
       `import { defineMinorCard } from '../card-source'\n` +
-      `const CARD_ID = 'A1_SourceMinor'\n` +
+      `const CARD_ID = 'A001_SourceMinor'\n` +
       `const CARD_DESC = ['A source minor.']\n` +
       `const CARD_COST = { wood: 1, clay: 2 }\n` +
       `function explode() { throw new Error('runtime impl executed') }\n` +
-      `export const A1_SourceMinor = defineMinorCard({\n` +
+      `export const A001_SourceMinor = defineMinorCard({\n` +
       `  meta: {\n` +
       `    id: CARD_ID,\n` +
       `    name: 'Source Minor',\n` +
@@ -146,9 +146,9 @@ describe('buildCardsManifest — Card Source projection', () => {
 
     const manifest = buildCardsManifest(cardsDisplayRoot)
 
-    expect(manifest['A1_SourceMinor']).toBeDefined()
-    expect(manifest['A1_SourceMinor'].meta).toEqual({
-      id: 'A1_SourceMinor',
+    expect(manifest['A001_SourceMinor']).toBeDefined()
+    expect(manifest['A001_SourceMinor'].meta).toEqual({
+      id: 'A001_SourceMinor',
       name: 'Source Minor',
       deck: 'A',
       number: 1,
@@ -156,8 +156,8 @@ describe('buildCardsManifest — Card Source projection', () => {
       desc: ['A source minor.'],
       cost: { wood: 1, clay: 2 },
     })
-    expect(manifest['A1_SourceMinor'].module).toMatch(/shared\/cards\/A\/A1_SourceMinor$/)
-    expect(manifest['A1_SourceMinor'].meta).not.toHaveProperty('modifiers')
+    expect(manifest['A001_SourceMinor'].module).toMatch(/shared\/cards\/A\/A001_SourceMinor$/)
+    expect(manifest['A001_SourceMinor'].meta).not.toHaveProperty('modifiers')
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })
@@ -169,17 +169,17 @@ describe('buildCardsManifest — Card Source projection', () => {
     fs.mkdirSync(path.join(cardsDisplayRoot, 'B'), { recursive: true })
     fs.mkdirSync(sourceDeckDir, { recursive: true })
     fs.writeFileSync(
-      path.join(sourceDeckDir, 'B1_DynamicSource.ts'),
+      path.join(sourceDeckDir, 'B001_DynamicSource.ts'),
       `import { defineOccupationCard } from '../card-source'\n` +
-      `const CARD_ID = 'B1_DynamicSource'\n` +
+      `const CARD_ID = 'B001_DynamicSource'\n` +
       `const makeName = () => 'Dynamic Source'\n` +
-      `export const B1_DynamicSource = defineOccupationCard({\n` +
+      `export const B001_DynamicSource = defineOccupationCard({\n` +
       `  meta: { id: CARD_ID, name: makeName(), deck: 'B', number: 1, desc: [], players: '1+' },\n` +
       `})\n`,
       'utf8',
     )
 
-    expect(() => buildCardsManifest(cardsDisplayRoot)).toThrow(/B1_DynamicSource\.ts.*meta\.name/)
+    expect(() => buildCardsManifest(cardsDisplayRoot)).toThrow(/B001_DynamicSource\.ts.*meta\.name/)
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })

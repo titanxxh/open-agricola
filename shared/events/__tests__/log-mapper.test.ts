@@ -146,8 +146,8 @@ describe('eventsToLogEntries', () => {
         visibility: 'public',
         actorPlayerId: 'p1',
         sourceActionId: 'improvement',
-        sourceCardId: 'D20_TurnwrestPlow',
-        cardId: 'D20_TurnwrestPlow',
+        sourceCardId: 'D020_TurnwrestPlow',
+        cardId: 'D020_TurnwrestPlow',
         cardType: 'minor',
       },
     ] satisfies GameEvent[]
@@ -157,7 +157,7 @@ describe('eventsToLogEntries', () => {
         key: 'log.playMinorImprovement',
         params: {
           player: 'Alice',
-          improvements: 'D20_TurnwrestPlow',
+          improvements: 'D020_TurnwrestPlow',
           costResources: { food: 1 },
         },
       },
@@ -338,7 +338,7 @@ describe('eventsToLogEntries', () => {
         seq: 3,
         type: 'farm.stableBuilt',
         stables: [{ playerId: 'p1', row: 0, col: 1 }],
-        sourceCardId: 'A89_StablePlanner',
+        sourceCardId: 'A089_StablePlanner',
       },
     ] satisfies GameEvent[]
 
@@ -394,7 +394,7 @@ describe('eventsToLogEntries', () => {
         visibility: 'public',
         actionId: 'round14',
         playerId: 'p1',
-        sourceCardId: 'B23_FinalScenario',
+        sourceCardId: 'B023_FinalScenario',
         untilRound: 14,
       },
       {
@@ -407,17 +407,17 @@ describe('eventsToLogEntries', () => {
         visibility: 'public',
         actionId: 'round14',
         playerId: 'p1',
-        sourceCardId: 'B23_FinalScenario',
+        sourceCardId: 'B023_FinalScenario',
       },
     ] satisfies GameEvent[]
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { round14: 'Round 14 Action' } })).toEqual([
       {
         key: 'log.actionExclusiveUseCleared',
-        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B23_FinalScenario' },
+        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B023_FinalScenario' },
       },
       {
         key: 'log.actionExclusiveUseSet',
-        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B23_FinalScenario' },
+        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B023_FinalScenario' },
       },
       {
         key: 'log.actionRevealed',
@@ -460,7 +460,7 @@ describe('eventsToLogEntries', () => {
         actorPlayerId: 'p1',
         type: 'resource.accumulated',
         resources: { food: 2 },
-        to: { kind: 'card', playerId: 'p1', cardId: 'B48_ForestStone' },
+        to: { kind: 'card', playerId: 'p1', cardId: 'B048_ForestStone' },
       },
       {
         schemaVersion: 1,
@@ -486,7 +486,7 @@ describe('eventsToLogEntries', () => {
       },
       {
         key: 'log.resourceAccumulated',
-        params: { target: 'card', cardId: 'B48_ForestStone', player: 'Alice', resources: { food: 2 } },
+        params: { target: 'card', cardId: 'B048_ForestStone', player: 'Alice', resources: { food: 2 } },
       },
       {
         key: 'log.resourceAccumulated',
@@ -521,7 +521,7 @@ describe('eventsToLogEntries', () => {
         visibility: 'public',
         type: 'resource.accumulated',
         resources: {},
-        to: { kind: 'card', cardId: 'B48_ForestStone' },
+        to: { kind: 'card', cardId: 'B048_ForestStone' },
         silent: true,
       },
     ] satisfies GameEvent[]
@@ -805,7 +805,7 @@ describe('eventsToLogEntries', () => {
         id: '1',
         seq: 1,
         type: 'card.triggered',
-        cardId: 'B48_ForestStone',
+        cardId: 'B048_ForestStone',
         triggerActionId: 'forest',
         replacement: true,
         optional: true,
@@ -816,7 +816,7 @@ describe('eventsToLogEntries', () => {
         id: '2',
         seq: 2,
         type: 'card.infoboxChanged',
-        cardId: 'B48_ForestStone',
+        cardId: 'B048_ForestStone',
         text: '2 wood',
         targetPlayerId: 'p1',
       },
@@ -825,7 +825,7 @@ describe('eventsToLogEntries', () => {
         id: '3',
         seq: 3,
         type: 'card.stackChanged',
-        cardId: 'B48_ForestStone',
+        cardId: 'B048_ForestStone',
         targetPlayerId: 'p1',
         resources: { wood: 2, food: 0 },
         delta: 2,
@@ -837,8 +837,8 @@ describe('eventsToLogEntries', () => {
         seq: 4,
         type: 'card.swappedWithBoard',
         playerId: 'p1',
-        fromPlayerCardId: 'A1_FromHand',
-        toPlayerCardId: 'A2_FromBoard',
+        fromPlayerCardId: 'A001_FromHand',
+        toPlayerCardId: 'A002_FromBoard',
       },
       {
         ...base,
@@ -846,7 +846,7 @@ describe('eventsToLogEntries', () => {
         seq: 5,
         type: 'card.returnedToBoard',
         playerId: 'p1',
-        cardId: 'A2_FromBoard',
+        cardId: 'A002_FromBoard',
       },
       {
         ...base,
@@ -854,7 +854,7 @@ describe('eventsToLogEntries', () => {
         seq: 6,
         type: 'card.destroyed',
         playerId: 'p1',
-        cardId: 'A3_Destroyed',
+        cardId: 'A003_Destroyed',
         reason: 'cardEffect',
       },
       {
@@ -864,7 +864,7 @@ describe('eventsToLogEntries', () => {
         type: 'card.passed',
         fromPlayerId: 'p1',
         toPlayerId: 'p2',
-        cardId: 'A4_Passed',
+        cardId: 'A004_Passed',
       },
     ] satisfies GameEvent[]
 
@@ -883,13 +883,13 @@ describe('eventsToLogEntries', () => {
       'log.cardTriggered',
     ])
     expect(entries).toEqual([
-      { key: 'log.cardPassed', params: { fromPlayer: 'Alice', toPlayer: 'Bob', cardId: 'A4_Passed' } },
-      { key: 'log.cardDestroyed', params: { player: 'Alice', cardId: 'A3_Destroyed' } },
-      { key: 'log.cardReturnedToBoard', params: { player: 'Alice', cardId: 'A2_FromBoard' } },
-      { key: 'log.cardSwappedWithBoard', params: { player: 'Alice', fromCardId: 'A1_FromHand', toCardId: 'A2_FromBoard' } },
-      { key: 'log.cardStackChanged', params: { cardId: 'B48_ForestStone', resources: { wood: 2 }, delta: 2, reason: 'store' } },
-      { key: 'log.cardInfoboxChanged', params: { cardId: 'B48_ForestStone', text: '2 wood' } },
-      { key: 'log.cardTriggered', params: { cardId: 'B48_ForestStone', triggerAction: 'Forest', replacement: true, optional: true, declined: true } },
+      { key: 'log.cardPassed', params: { fromPlayer: 'Alice', toPlayer: 'Bob', cardId: 'A004_Passed' } },
+      { key: 'log.cardDestroyed', params: { player: 'Alice', cardId: 'A003_Destroyed' } },
+      { key: 'log.cardReturnedToBoard', params: { player: 'Alice', cardId: 'A002_FromBoard' } },
+      { key: 'log.cardSwappedWithBoard', params: { player: 'Alice', fromCardId: 'A001_FromHand', toCardId: 'A002_FromBoard' } },
+      { key: 'log.cardStackChanged', params: { cardId: 'B048_ForestStone', resources: { wood: 2 }, delta: 2, reason: 'store' } },
+      { key: 'log.cardInfoboxChanged', params: { cardId: 'B048_ForestStone', text: '2 wood' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B048_ForestStone', triggerAction: 'Forest', replacement: true, optional: true, declined: true } },
     ])
   })
 

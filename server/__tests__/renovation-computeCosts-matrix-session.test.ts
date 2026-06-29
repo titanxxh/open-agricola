@@ -126,7 +126,7 @@ describe('renovation computeCosts matrix', () => {
     expect(totalOf(cost)).toEqual({ reed: 1, stone: 1 })
   })
 
-  it('D81_RoofLadder wood→clay 3 rooms — total = 3 clay (reed waived)', () => {
+  it('D081_RoofLadder wood→clay 3 rooms — total = 3 clay (reed waived)', () => {
     // D81 hook: { reed: -1 } per-action
     const player = createPlayer({ rooms: 3, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'clay' }, { reed: -1 })
@@ -136,7 +136,7 @@ describe('renovation computeCosts matrix', () => {
     expect(totalOf(cost)).toEqual({ reed: 0, clay: 3 })
   })
 
-  it('D13_Trowel wood→stone 3 rooms — total = 3 stone + 3 reed + 3 food', () => {
+  it('D013_Trowel wood→stone 3 rooms — total = 3 stone + 3 reed + 3 food', () => {
     // D13 hook for wood→stone: { food: rooms, reed: rooms - 1 } = { food: 3, reed: 2 }
     const player = createPlayer({ rooms: 3, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'stone' }, { food: 3, reed: 2 })
@@ -163,7 +163,7 @@ describe('renovation computeCosts matrix', () => {
     expect(totalOf(cost)).toEqual({ reed: 1, stone: 1 })
   })
 
-  it.skip('E27_PiggyBank does not target renovation', () => {
+  it.skip('E027_PiggyBank does not target renovation', () => {
     // E27 hook only attaches to `improvement` actions. Listed in spec §6.2
     // verification deliverable for completeness; no renovation matrix case.
   })

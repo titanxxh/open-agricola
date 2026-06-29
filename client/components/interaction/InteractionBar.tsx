@@ -491,6 +491,7 @@ type Props = {
   playerNames: string[]
   pendingRoomTilesLength: number
   maxRoomSelections: number
+  pendingFenceEdgesLength?: number
   pendingStableTilesLength: number
   maxStableSelections: number
   pendingFarmHandSelected?: boolean
@@ -564,6 +565,7 @@ export const InteractionBar = ({
   playerNames,
   pendingRoomTilesLength,
   maxRoomSelections,
+  pendingFenceEdgesLength = 0,
   pendingStableTilesLength,
   maxStableSelections,
   pendingFarmHandSelected = false,
@@ -630,6 +632,9 @@ export const InteractionBar = ({
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
     pendingStableTilesLength === 0 &&
     !pendingFarmHandSelected
+  const isFenceConfirmDisabled =
+    pendingChoice?.promptKey === 'ui.interactionFenceSelect' &&
+    pendingFenceEdgesLength === 0
   const isSelectionConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionSelection' &&
     pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
@@ -947,7 +952,7 @@ export const InteractionBar = ({
                         isRoomConfirmDisabled) ||
                       (pendingChoice.promptKey === 'ui.interactionFenceSelect' &&
                         option.value === 'confirm' &&
-                        !!borrowedFenceSources?.hasMissingSources) ||
+                        (isFenceConfirmDisabled || !!borrowedFenceSources?.hasMissingSources)) ||
                       (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
                         option.value === 'confirm' &&
                         isStableConfirmDisabled) ||

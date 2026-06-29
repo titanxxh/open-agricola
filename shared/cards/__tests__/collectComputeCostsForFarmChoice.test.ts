@@ -18,7 +18,7 @@ const makeState = (player: PlayerState): GameState => ({
 
 describe('collectComputeCostsForFarmChoice', () => {
   it('aggregates wood delta from E16 BriarHedge listener (Pass #2 with 2 border edges)', () => {
-    const player = makePlayer({ minorPlayed: ['E16_BriarHedge'] })
+    const player = makePlayer({ minorPlayed: ['E016_BriarHedge'] })
     const state = makeState(player)
     const result = collectComputeCostsForFarmChoice(state, player, 'fence', {
       newFenceEdges: ['H-0-0', 'H-0-1'],
@@ -38,7 +38,7 @@ describe('collectComputeCostsForFarmChoice', () => {
   })
 
   it('aggregates trades and bonuses for farm-choice settlement', () => {
-    const player = makePlayer({ minorPlayed: ['D82_HuntingTrophy'] })
+    const player = makePlayer({ minorPlayed: ['D082_HuntingTrophy'] })
     const state = makeState(player)
     const result = collectFarmChoiceCostAdjustments(
       state,
@@ -54,7 +54,7 @@ describe('collectComputeCostsForFarmChoice', () => {
         to: { wood: 1 },
         max: 3,
         scope: 'action',
-        sourceId: 'D82_HuntingTrophy',
+        sourceId: 'D082_HuntingTrophy',
       },
     ])
     expect(result.bonuses).toEqual([])

@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { B87_Cottager_impl } from '../B/B87_Cottager'
+import { B087_Cottager_impl } from '../B/B087_Cottager'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 
-const CARD_ID = 'B87_Cottager'
+const CARD_ID = 'B087_Cottager'
 
-describe('B87_Cottager', () => {
+describe('B087_Cottager', () => {
   it('marks only the construct child as trueAction=false', () => {
     const player = { id: 'p1', occupationPlayed: [CARD_ID] } as unknown as PlayerState
     const state = { players: [player] } as unknown as GameState
 
-    const result = B87_Cottager_impl.listeners[0]!.handler({
+    const result = B087_Cottager_impl.listeners[0]!.handler({
       state,
       player,
       actionId: 'place-farmer',

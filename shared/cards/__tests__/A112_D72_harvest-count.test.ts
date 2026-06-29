@@ -8,9 +8,9 @@ import {
 import type { Field, GameState, PlayerState } from '../../contract/types'
 import * as cardListeners from '../card-listeners'
 import { A112_ScytheWorker_impl } from '../A/A112_ScytheWorker'
-import { D72_StableManure_impl } from '../D/D72_StableManure'
+import { D072_StableManure_impl } from '../D/D072_StableManure'
 import { E112_GrainThief_impl } from '../E/E112_GrainThief'
-import '../E/E73_Scythe'
+import '../E/E073_Scythe'
 
 const makePlayer = (fields: Field[]): PlayerState => ({
   id: 'p1',
@@ -77,8 +77,8 @@ describe('A112 and D72 harvest count integration', () => {
     const player = makePlayer([
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
     ])
-    player.minorPlayed.push('E73_Scythe')
-    player.cardStates.E73_Scythe = {
+    player.minorPlayed.push('E073_Scythe')
+    player.cardStates.E073_Scythe = {
       extraData: { fullReapPosition: '0-0' },
     }
 
@@ -90,7 +90,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'grain',
         count: 3,
-        sources: ['base', 'E73_Scythe'],
+        sources: ['base', 'E073_Scythe'],
         tags: ['full-field-reap'],
         scope: 'field',
       },
@@ -154,7 +154,7 @@ describe('A112 and D72 harvest count integration', () => {
             col: 1,
             crop: 'grain',
             count: 2,
-            sources: ['base', 'E112_GrainThief', 'E73_Scythe'],
+            sources: ['base', 'E112_GrainThief', 'E073_Scythe'],
             tags: ['supply-instead-of-field', 'full-field-reap'],
             scope: 'field',
           },
@@ -195,7 +195,7 @@ describe('A112 and D72 harvest count integration', () => {
     ])
 
     const result = computeHarvestSelectionThreshold(makeState(player), player, player.fields[0]!, {
-      sourceCard: 'D72_StableManure',
+      sourceCard: 'D072_StableManure',
       baseThreshold: 2,
     })
 
@@ -259,8 +259,8 @@ describe('A112 and D72 harvest count integration', () => {
     const player = makePlayer([
       { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 3 }] },
     ])
-    player.minorPlayed.push('D72_StableManure')
-    player.cardStates.D72_StableManure = {
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.D072_StableManure = {
       extraData: { selectedPositions: ['0-0'] },
     }
 
@@ -274,7 +274,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'vegetable',
         amount: 2,
-        sources: ['base', 'D72_StableManure'],
+        sources: ['base', 'D072_StableManure'],
       },
     ])
   })
@@ -284,8 +284,8 @@ describe('A112 and D72 harvest count integration', () => {
     const player = makePlayer([
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
     ])
-    player.minorPlayed.push('D72_StableManure')
-    player.cardStates.D72_StableManure = {
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.D072_StableManure = {
       extraData: { selectedPositions: ['0-0'] },
     }
 
@@ -299,7 +299,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'grain',
         amount: 2,
-        sources: ['base', 'D72_StableManure'],
+        sources: ['base', 'D072_StableManure'],
       },
     ])
   })
@@ -316,8 +316,8 @@ describe('A112 and D72 harvest count integration', () => {
         ],
       },
     ])
-    player.minorPlayed.push('D72_StableManure')
-    player.cardStates.D72_StableManure = {
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.D072_StableManure = {
       extraData: { selectedPositions: ['0-0'] },
     }
 
@@ -332,14 +332,14 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'grain',
         amount: 1,
-        sources: ['base', 'D72_StableManure'],
+        sources: ['base', 'D072_StableManure'],
       },
       {
         row: 0,
         col: 0,
         crop: 'vegetable',
         amount: 1,
-        sources: ['base', 'D72_StableManure'],
+        sources: ['base', 'D072_StableManure'],
       },
     ])
   })
@@ -351,15 +351,15 @@ describe('A112 and D72 harvest count integration', () => {
       { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
       { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
     ])
-    player.minorPlayed.push('D72_StableManure')
+    player.minorPlayed.push('D072_StableManure')
     player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }]
 
-    const flow = D72_StableManure_impl.effect.onStartHarvestFieldPhase!(makeState(player), player)
+    const flow = D072_StableManure_impl.effect.onStartHarvestFieldPhase!(makeState(player), player)
 
     expect(flow).toMatchObject({
       type: 'leaf',
       actionId: 'selection',
-      sourceCard: 'D72_StableManure',
+      sourceCard: 'D072_StableManure',
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
@@ -404,8 +404,8 @@ describe('A112 and D72 harvest count integration', () => {
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
     ])
     player.occupationPlayed.push('E112_GrainThief')
-    player.minorPlayed.push('D72_StableManure')
-    player.cardStates.D72_StableManure = {
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.D072_StableManure = {
       extraData: { selectedPositions: ['0-0'] },
     }
     player.cardStates.E112_GrainThief = {
@@ -424,7 +424,7 @@ describe('A112 and D72 harvest count integration', () => {
       amount: 1,
     })
     expect(entry.sources).toHaveLength(3)
-    expect(entry.sources).toEqual(expect.arrayContaining(['base', 'D72_StableManure', 'E112_GrainThief']))
+    expect(entry.sources).toEqual(expect.arrayContaining(['base', 'D072_StableManure', 'E112_GrainThief']))
   })
 
   it('D72 and E112 harvest the lower stack when E112 supplies the depleted top grain stack', () => {
@@ -440,8 +440,8 @@ describe('A112 and D72 harvest count integration', () => {
       },
     ])
     player.occupationPlayed.push('E112_GrainThief')
-    player.minorPlayed.push('D72_StableManure')
-    player.cardStates.D72_StableManure = {
+    player.minorPlayed.push('D072_StableManure')
+    player.cardStates.D072_StableManure = {
       extraData: { selectedPositions: ['0-0'] },
     }
     player.cardStates.E112_GrainThief = {
@@ -462,7 +462,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'vegetable',
         amount: 1,
-        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+        sources: ['base', 'D072_StableManure', 'E112_GrainThief'],
       },
     ])
     expect(result.reapSummary.harvestCountApplications).toEqual([
@@ -471,7 +471,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'grain',
         count: 0,
-        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+        sources: ['base', 'D072_StableManure', 'E112_GrainThief'],
         tags: ['supply-instead-of-field'],
         scope: 'top-stack',
       },
@@ -480,7 +480,7 @@ describe('A112 and D72 harvest count integration', () => {
         col: 0,
         crop: 'vegetable',
         count: 1,
-        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+        sources: ['base', 'D072_StableManure', 'E112_GrainThief'],
         tags: ['supply-instead-of-field'],
         scope: 'top-stack',
       },
@@ -513,7 +513,7 @@ describe('A112 and D72 harvest count integration', () => {
     player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }]
 
     const a112Flow = A112_ScytheWorker_impl.effect.onStartHarvestFieldPhase!(makeState(player), player)
-    const d72Flow = D72_StableManure_impl.effect.onStartHarvestFieldPhase!(makeState(player), player)
+    const d72Flow = D072_StableManure_impl.effect.onStartHarvestFieldPhase!(makeState(player), player)
 
     expect(a112Flow).toMatchObject({
       actionContext: {
@@ -539,10 +539,10 @@ describe('A112 and D72 harvest count integration', () => {
       sourceCard: 'A112_ScytheWorker',
       params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
     })
-    expect(D72_StableManure_impl.effect.onEndHarvest!(state, player)).toEqual({
+    expect(D072_StableManure_impl.effect.onEndHarvest!(state, player)).toEqual({
       type: 'leaf',
       actionId: 'special-effect',
-      sourceCard: 'D72_StableManure',
+      sourceCard: 'D072_StableManure',
       params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
     })
   })

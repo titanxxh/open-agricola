@@ -151,9 +151,9 @@ describe('Farmers of the Moor compatibility regressions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('major:Major_Joinery')
+    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('Major_Joinery')
 
-    resp = session.resolveChoice(0, 'major:Major_Joinery')
+    resp = session.resolveChoice(0, 'Major_Joinery')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
@@ -222,7 +222,8 @@ describe('Farmers of the Moor compatibility regressions', () => {
 
     expect(session.state.phase).toBe('parent-selection')
     expect(session.state.parentSelection).not.toBeNull()
-    expect(session.state.players[0]!.minorHand).toHaveLength(3)
+    expect(session.state.players[0]!.minorHand).toHaveLength(7)
+    expect(session.state.players[0]!.minorHand.filter((id) => id.startsWith('M'))).toHaveLength(4)
     expect(session.state.players[0]!.farmTerrain).toHaveLength(8)
 
     const p1Candidates = session.state.parentSelection!.candidates.p1

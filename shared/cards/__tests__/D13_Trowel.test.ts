@@ -4,9 +4,9 @@ import type { CardListenerContext } from '../card-listeners'
 import type { GameState, PlayerState } from '../../contract/types'
 import { GameSession } from '../../../server/game/authoritative-session'
 
-import '../D/D13_Trowel'
+import '../D/D013_Trowel'
 
-const CARD_ID = 'D13_Trowel'
+const CARD_ID = 'D013_Trowel'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
@@ -45,7 +45,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('D13_Trowel listener wiring', () => {
+describe('D013_Trowel listener wiring', () => {
   it('anytime listener emits a renovate-house leaf with params.selectedOption=stone', () => {
     const listener = findListener('D13-trowel-anytime')
     expect(listener).toBeDefined()
@@ -213,7 +213,7 @@ const enterActiveInteraction = (session: GameSession) => {
   return resp
 }
 
-describe('D13_Trowel session integration', () => {
+describe('D013_Trowel session integration', () => {
   it('anytime entry surfaces for a wood-house owner', () => {
     const session = setupSession({ houseType: 'wood' })
     const resp = enterActiveInteraction(session)

@@ -2,7 +2,7 @@
 /**
  * Build cards manifest for lazy loading.
  *
- * Scans shared/cards/{A,B,C,D,E,major,community}/*.ts plus dev/test stubs in
+ * Scans shared/cards/{A,B,C,D,E,M,major,community}/*.ts plus dev/test stubs in
  * shared/cards/__stubs__/*.ts and extracts meta fields from Card Source files.
  *
  * Output: public/cards-manifest.json
@@ -21,6 +21,7 @@ export type CardMeta = {
   number: number
   /** Construction type: which card class/literal produced this entry. */
   type: 'occupation' | 'minor' | 'major' | 'playerAction'
+  playerActionCardType?: 'minor' | 'occupation'
   category?: string
   desc?: string[]
   cost?: Record<string, number>
@@ -59,6 +60,7 @@ export type CardMeta = {
   requiresFarmersOfTheMoor?: boolean
   heatingRoomDiscount?: number
   heatingFuelCap?: number
+  heatingWoodToFuelDiscount?: number
   moorSpecialActionBonuses?: unknown
   mustBePlayedViaMajorImprovementAction?: boolean
   alsoCountsAs?: string[]
@@ -76,7 +78,7 @@ export type CardManifestEntry = {
 export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
-  'id', 'name', 'deck', 'number', 'category', 'desc',
+  'id', 'name', 'deck', 'number', 'playerActionCardType', 'category', 'desc',
   'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
   'maxRound', 'isCookery', 'isBaking', 'passing', 'returnCards',
   'occupationPrerequisites', 'improvementPrerequisites', 'implemented',
@@ -85,6 +87,7 @@ const META_FIELDS = new Set([
   'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
   'waresSalesmanGains', 'mustBePlayedViaMinorAction',
   'requiresFarmersOfTheMoor', 'heatingRoomDiscount', 'heatingFuelCap',
+  'heatingWoodToFuelDiscount',
   'moorSpecialActionBonuses',
   'mustBePlayedViaMajorImprovementAction', 'alsoCountsAs', 'cardField',
   'enablesPalisades', 'locales',
@@ -384,6 +387,13 @@ function cardSourceCallToMeta(
   if (typeof meta.id !== 'string') {
     throw new Error(`${filePath}: Card Source meta.id must be a static string`)
   }
+  if (
+    type === 'playerAction' &&
+    meta.playerActionCardType !== 'minor' &&
+    meta.playerActionCardType !== 'occupation'
+  ) {
+    throw new Error(`${filePath}: definePlayerActionCard meta.playerActionCardType must be 'minor' or 'occupation'`)
+  }
   meta.type = type
   return meta as unknown as CardMeta
 }
@@ -468,7 +478,7 @@ export function parseCardFile(filePath: string, options: ParseCardFileOptions = 
 
 export function buildCardsManifest(cardsRoot: string): CardsManifest {
   const manifest: CardsManifest = {}
-  const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community']
+  const decks = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community']
   const repoRoot = path.resolve(cardsRoot, '..', '..')
   const scanDir = (deckDir: string, parseOptions?: ParseCardFileOptions) => {
     if (!fs.existsSync(deckDir)) return

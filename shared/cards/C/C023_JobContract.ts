@@ -1,0 +1,128 @@
+import { defineMinorCard } from '../card-source'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { addSyntheticLinkedOccupancyRef, isSpaceOccupied } from '../../domain/space'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
+import type { CardImpl } from '../registry'
+
+const CARD_ID = 'C023_JobContract'
+const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
+
+/**
+ * C23 Job Contract (Minor, C, 23):
+ * - If both __Day Laborer__ and the adjacent __Lessons__ action space are
+ *   unoccupied, a player may use both spaces with a single person (Day
+ *   Laborer first, then Lessons). Afterward both spaces are considered
+ *   occupied.
+ *
+ * BGA (C023_JobContract.php): listens to place-farmer on DayLaborer and,
+ * immediately after, inserts a "place fake farmer on Lessons → use lessons"
+ * subtree. The fake farmer is removed at end of round.
+ *
+ * Implementation:
+ * - On place-farmer at `day-laborer`, if any lessons space is unoccupied,
+ *   return an optional seq whose body is a `occupation` leaf for the
+ *   lessons action cost, plus a selection-effect leaf that marks the lessons
+ *   space as taken (so other players cannot use it this round).
+ * - The fake-farmer return at end-of-round is implicit: our engine resets
+ *   `actionSpace.takenBy` between rounds via the standard cleanup (see
+ *   returning-home phase in game-session.ts), so the lessons space becomes
+ *   available again next round without additional bookkeeping.
+ */
+
+const getLessonsSpace = (state: GameState, player: PlayerState) => {
+  const playerCount = (state.players ?? []).length
+  // Prefer 'lessons' for <=3 players, 'lessons-4' for 4 players.
+  const preferred = playerCount >= 4 ? 'lessons-4' : 'lessons'
+  const chosen =
+    state.actionSpaces.find((s) => s.id === preferred && !isSpaceOccupied(s)) ??
+    state.actionSpaces.find(
+      (s) => LESSONS_SPACE_IDS.includes(s.id as typeof LESSONS_SPACE_IDS[number]) && !isSpaceOccupied(s),
+    )
+  if (!chosen) return null
+  void player
+  return chosen
+}
+
+const linkedWorkerIdForCurrentPlacement = (context: CardListenerContext): string | null => {
+  const spaceId = context.space?.id
+  if (!spaceId) return null
+  const placements = getRoundPlacementDetails(context.player)
+  const placement = [...placements].reverse().find((entry) => entry.spaceId === spaceId)
+  if (placement) return placement.workerId
+  return context.space?.takenBy.find((ref) => ref.playerId === context.player.id)?.workerId ?? null
+}
+
+const listener: CardListenerRegistration = {
+  id: 'C23-job-contract-after-day-laborer',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.space?.id !== 'day-laborer') return
+
+    const lessonsSpace = getLessonsSpace(context.state, context.player)
+    if (!lessonsSpace) return
+
+    // BGA C23 does NOT gate on occupationHand: even with empty hand the fake
+    // worker still occupies the lessons space (cascading lessons-listeners on
+    // other cards e.g. A113 / B155 still fire). The optional occupation
+    // leaf is still safe to offer — the player can simply skip the seq.
+
+    // Mark the lessons space as occupied by this player (fake-farmer).
+    const linkedWorkerId = linkedWorkerIdForCurrentPlacement(context)
+    if (!linkedWorkerId) return
+    addSyntheticLinkedOccupancyRef(lessonsSpace, context.player.id, linkedWorkerId, CARD_ID)
+
+    const lessonsCost =
+      lessonsSpace.id === 'lessons-4'
+        ? context.player.occupationPlayed.length <= 1
+          ? { food: 1 }
+          : { food: 2 }
+        : context.player.occupationPlayed.length === 0
+          ? {}
+          : { food: 1 }
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      optional: true,
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'occupation',
+          sourceCard: CARD_ID,
+          params: { exactCost: lessonsCost },
+        },
+      ],
+    }
+    return {
+      flow,
+      sourceCard: CARD_ID,
+    }
+  },
+}
+
+const cardImpl = {
+  listeners: [listener],
+  reaches: [] as readonly string[],
+} satisfies CardImpl
+
+export const C023_JobContract = defineMinorCard({
+  meta: {
+    id: CARD_ID,
+    name: 'Job Contract',
+    deck: 'C',
+    number: 23,
+    category: 'ACTIONS_BOOSTER',
+    desc: [
+        'If both are unoccupied, you can use the __Day Laborer__ and the adjacent __Lessons__ action space with a single person (in that order). Afterward, both spaces are considered occupied.',
+      ],
+    cost: {},
+    prerequisite: 'No Occupations',
+    occupationPrerequisites: { max: 0 },
+  },
+  impl: cardImpl,
+})
+
+export const C023_JobContract_impl = C023_JobContract.impl

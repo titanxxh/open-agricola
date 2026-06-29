@@ -1300,7 +1300,7 @@ describe('InteractionBar', () => {
       options: [
         {
           value: 'action-e53-exchange',
-          labelKey: 'cards.E53_BoarSpear.choice',
+          labelKey: 'cards.E053_BoarSpear.choice',
           descriptionPreview: {
             kind: 'action',
             labelKey: 'actions.exchange.description',
@@ -1310,7 +1310,7 @@ describe('InteractionBar', () => {
       ],
       playerIndex: 0,
       spaceId: 'pig-market',
-      sourceCard: 'E53_BoarSpear',
+      sourceCard: 'E053_BoarSpear',
     }
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -1355,7 +1355,7 @@ describe('InteractionBar', () => {
       />,
     )
 
-    expect(html).not.toContain('cards.E53_BoarSpear.choice')
+    expect(html).not.toContain('cards.E053_BoarSpear.choice')
     expect(html).toContain('Optional: Exchange resources')
     expect(html).toContain('Triggered by')
     expect(html).toContain('Boar Spear')
@@ -1721,6 +1721,60 @@ describe('InteractionBar', () => {
     expect(html).not.toContain('fence-mode-toggle')
   })
 
+  it('disables fence confirm before any fence edge is selected', () => {
+    const fencePendingChoice: PendingChoice = {
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+      playerIndex: 0,
+      spaceId: 'fence-space',
+    }
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingFenceEdgesLength={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={true}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
   it('shows the Carpenter Bench pasture limit during its fence selection', () => {
     const fencePendingChoice: PendingChoice = {
       promptKey: 'ui.interactionFenceSelect',
@@ -1728,7 +1782,7 @@ describe('InteractionBar', () => {
       options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
       playerIndex: 0,
       spaceId: 'forest',
-      sourceCard: 'B15_CarpentersBench',
+      sourceCard: 'B015_CarpentersBench',
     }
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -1781,7 +1835,7 @@ describe('InteractionBar', () => {
     const disabledChoice: PendingChoice = {
       promptKey: 'ui.interactionChooseOne',
       options: [
-        { value: 'play', labelKey: 'ui.interactionConfirmButton', disabled: true, disabledReasonKey: 'cards.B3_Moonshine.choicePlayDisabled' },
+        { value: 'play', labelKey: 'ui.interactionConfirmButton', disabled: true, disabledReasonKey: 'cards.B003_Moonshine.choicePlayDisabled' },
         { value: 'pass', labelKey: 'ui.interactionOptionalSkip' },
       ],
       playerIndex: 0,

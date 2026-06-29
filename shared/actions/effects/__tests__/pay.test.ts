@@ -29,11 +29,11 @@ import type {
   TradeModifier,
 } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
-import { A28_ForestSchool } from '../../../cards/A/A28_ForestSchool'
-import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+import { A028_ForestSchool } from '../../../cards/A/A028_ForestSchool'
+import { A088_HedgeKeeper } from '../../../cards/A/A088_HedgeKeeper'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 
-const hedgeKeeperModifier = A88_HedgeKeeper.impl.modifiers![0] as TradeModifier
+const hedgeKeeperModifier = A088_HedgeKeeper.impl.modifiers![0] as TradeModifier
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -445,7 +445,7 @@ describe('computeAllBuyableCombinations', () => {
     const best = solutions[0]!
     expect(best.resourcesPaid.wood).toBe(1)
     const hk = best.tradesUsed.find(
-      (u) => u.trade.sourceId === 'A88_HedgeKeeper' && u.times === 3,
+      (u) => u.trade.sourceId === 'A088_HedgeKeeper' && u.times === 3,
     )
     expect(hk).toBeDefined()
   })
@@ -846,9 +846,9 @@ describe('returnCardToBoard', () => {
 
   it('removes card from minorPlayed', () => {
     const player = createMockPlayer({})
-    player.minorPlayed = ['A3_PaperKnife', 'B75_WoodWorkshop']
-    returnCardToBoard(player, 'A3_PaperKnife')
-    expect(player.minorPlayed).toEqual(['B75_WoodWorkshop'])
+    player.minorPlayed = ['A003_PaperKnife', 'B075_WoodWorkshop']
+    returnCardToBoard(player, 'A003_PaperKnife')
+    expect(player.minorPlayed).toEqual(['B075_WoodWorkshop'])
   })
 
   it('handles non-existent card gracefully', () => {
@@ -1041,21 +1041,21 @@ describe('payAction', () => {
     const disabled = callPay(
       disabledPlayer,
       { cost: { food: 1 }, trackSourceCardPaymentStats: false },
-      { sourceCard: 'B82_ValueAssets' },
+      { sourceCard: 'B082_ValueAssets' },
     )
 
     expect(disabled.result.type).toBe('ok')
-    expect(readCardResourceStats(disabledPlayer, 'B82_ValueAssets')).toBeUndefined()
+    expect(readCardResourceStats(disabledPlayer, 'B082_ValueAssets')).toBeUndefined()
 
     const enabledPlayer = createMockPlayer({ food: 3 })
     const enabled = callPay(
       enabledPlayer,
       { cost: { food: 1 }, trackSourceCardPaymentStats: true },
-      { sourceCard: 'B82_ValueAssets' },
+      { sourceCard: 'B082_ValueAssets' },
     )
 
     expect(enabled.result.type).toBe('ok')
-    expect(readCardResourceStats(enabledPlayer, 'B82_ValueAssets')?.paid).toEqual({ food: 1 })
+    expect(readCardResourceStats(enabledPlayer, 'B082_ValueAssets')?.paid).toEqual({ food: 1 })
   })
 
   it('records selected card-purchase candidate attribution without source-card PAID stats', () => {
@@ -1086,7 +1086,7 @@ describe('payAction', () => {
           },
         },
       },
-      { sourceCard: 'D20_TurnwrestPlow' },
+      { sourceCard: 'D020_TurnwrestPlow' },
     )
 
     expect(result.type).toBe('ok')
@@ -1094,7 +1094,7 @@ describe('payAction', () => {
       saved: { wood: 2 },
       paid: { food: 1 },
     })
-    expect(readCardResourceStats(player, 'D20_TurnwrestPlow')).toBeUndefined()
+    expect(readCardResourceStats(player, 'D020_TurnwrestPlow')).toBeUndefined()
   })
 })
 
@@ -1141,9 +1141,9 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
       candidateMetadataByFeeIndex: {
         0: {
           originalFeeIndex: 0,
-          sources: ['A75_LumberMill'],
+          sources: ['A075_LumberMill'],
           costAttribution: {
-            A75_LumberMill: { saved: { wood: 1 } },
+            A075_LumberMill: { saved: { wood: 1 } },
           },
         },
       },
@@ -1155,10 +1155,10 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
         type: 'resource.paid',
         resources: { wood: 1 },
         paymentFor: 'minor-improvement',
-        bonusSources: ['A75_LumberMill'],
+        bonusSources: ['A075_LumberMill'],
       }),
     ])
-    expect(readCardResourceStats(player, 'A75_LumberMill')?.saved).toEqual({ wood: 1 })
+    expect(readCardResourceStats(player, 'A075_LumberMill')?.saved).toEqual({ wood: 1 })
   })
 
   it('typed-flat Partial<Resource>: event keeps bonusChoiceIndex provenance', () => {
@@ -1194,7 +1194,7 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
 
   it('typed-flat Partial<Resource> with reserve applies selected multi-solution payment', () => {
     const player = createMockPlayer({ food: 3, wood: 1 })
-    player.activeModifiers = [A28_ForestSchool.impl.modifiers![0] as TradeModifier]
+    player.activeModifiers = [A028_ForestSchool.impl.modifiers![0] as TradeModifier]
     const params = {
       cost: { food: 1 },
       costType: 'occupation',

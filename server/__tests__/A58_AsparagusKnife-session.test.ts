@@ -3,13 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import '../../shared/cards/A/A58_AsparagusKnife'
+import '../../shared/cards/A/A058_AsparagusKnife'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-const CARD_ID = 'A58_AsparagusKnife'
+const CARD_ID = 'A058_AsparagusKnife'
 
-describe('A58_AsparagusKnife session', () => {
+describe('A058_AsparagusKnife session', () => {
   const setupForReturnHome = (options: {
     round: number
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]

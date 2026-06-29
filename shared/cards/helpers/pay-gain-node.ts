@@ -1,4 +1,4 @@
-import type { ChoiceEffectPreview, PaymentResourceMap } from '../../contract/types'
+import type { ChoiceEffectPreview, ComplexCost, PaymentResourceMap } from '../../contract/types'
 import type { ActionFlow } from '../../contract/types'
 import type { PromptKey } from '../../contract/prompt-keys'
 import type { ActionHookResult } from '../../actions/hooks'
@@ -11,9 +11,11 @@ type SequenceFlow = {
   children: ActionFlow[]
 }
 
+type PayCost = PaymentResourceMap | ComplexCost
+
 type PayGainNodeOptions = {
   cardId: string
-  cost: PaymentResourceMap
+  cost: PayCost
   gain?: CardGain
   promptKey?: PromptKey
   choiceLabelKey?: string
@@ -50,13 +52,14 @@ const buildSequenceNode = (
 })
 
 const resolveChoiceLabelParams = (
-  cost: PaymentResourceMap,
+  cost: PayCost,
   gain: CardGain | undefined,
   choiceLabelKey?: string,
   choiceLabelParams?: Record<string, unknown>,
 ) => {
   if (choiceLabelParams) return choiceLabelParams
   if (choiceLabelKey !== 'ui.interactionResourceExchange') return undefined
+  if (isComplexPayCost(cost)) return undefined
   const { resources, score } = splitCardGain(gain)
   return {
     resourcesPaid: cost,
@@ -64,6 +67,15 @@ const resolveChoiceLabelParams = (
     bonusVp: score > 0 ? score : undefined,
   }
 }
+
+const isComplexPayCost = (cost: PayCost): cost is ComplexCost =>
+  'fee' in cost ||
+  'fees' in cost ||
+  'trades' in cost ||
+  'cards' in cost ||
+  'bonuses' in cost ||
+  'unitFee' in cost ||
+  'paymentResourceProviders' in cost
 
 const resolveChoiceLabelKey = (choiceLabelKey?: string) => choiceLabelKey
 
@@ -114,7 +126,7 @@ export const payLeaf = ({
 }): ActionFlow => ({
   type: 'leaf',
   actionId: 'pay',
-  params: cost,
+  params: isComplexPayCost(cost) ? { cost } : cost,
   sourceCard: cardId,
   choiceLabelKey,
   choiceLabelParams,

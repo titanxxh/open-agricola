@@ -5,9 +5,9 @@ import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-stat
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { GameState, PlayerState, ActionSpace, ActionChoiceOption } from '../../shared/contract/types'
 
-import '../../shared/cards/D/D27_Retraining'
+import '../../shared/cards/D/D027_Retraining'
 
-const CARD_ID = 'D27_Retraining'
+const CARD_ID = 'D027_Retraining'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -77,7 +77,7 @@ const setupSwapSession = () => {
   return session
 }
 
-describe('D27_Retraining listeners', () => {
+describe('D027_Retraining listeners', () => {
   it('registers both renovation-after and place-farmer-after listeners', () => {
     expect(findListener('D27-retraining-after-renovation')).toBeDefined()
     expect(findListener('D27-retraining-after-place-farmer')).toBeDefined()

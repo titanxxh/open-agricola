@@ -3,15 +3,15 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/C/C26_Flail'
+import '../../shared/cards/C/C026_Flail'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'C26_Flail'
+const CARD_ID = 'C026_Flail'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
-describe('C26_Flail session', () => {
+describe('C026_Flail session', () => {
   it('onBuy grants 2 food', () => {
     const session = new GameSession()
     const state = session.getState().state

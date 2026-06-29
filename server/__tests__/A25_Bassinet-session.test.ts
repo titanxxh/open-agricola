@@ -9,10 +9,10 @@ import {
 import { addWorkerRef } from '../../shared/domain/space'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/A/A25_Bassinet'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/A/A025_Bassinet'
+import '../../shared/cards/A/A092_AdoptiveParents'
 
-const CARD_ID = 'A25_Bassinet'
+const CARD_ID = 'A025_Bassinet'
 
 /**
  * Give P2 (index 1) the Bassinet minor improvement.
@@ -64,7 +64,7 @@ const baseSetup = () => {
   return session
 }
 
-describe('A25_Bassinet session', () => {
+describe('A025_Bassinet session', () => {
   it('case 1: happy path — P2 follows P1 into first non-accum space', () => {
     const session = baseSetup()
     const state = session.getState().state
@@ -167,7 +167,7 @@ describe('A25_Bassinet session', () => {
     setActiveWorkerCount(p1, 2)
     setWorkersAtHome(state, p1, 2)
     p1.resources.food = 5
-    p1.occupationPlayed.push('A92_AdoptiveParents')
+    p1.occupationPlayed.push('A092_AdoptiveParents')
     session.loadState(state)
 
     // P1 does FG → parent + newborn on wish-children. The action engine stays

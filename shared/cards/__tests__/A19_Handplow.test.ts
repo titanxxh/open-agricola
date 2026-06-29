@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import '../A/A19_Handplow'
+import '../A/A019_Handplow'
 
-const CARD_ID = 'A19_Handplow'
+const CARD_ID = 'A019_Handplow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -39,7 +39,7 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('A19_Handplow', () => {
+describe('A019_Handplow', () => {
   it('onBuy queues future meeple at round + 5', () => {
     const player = createPlayer()
     const state = createState(player)

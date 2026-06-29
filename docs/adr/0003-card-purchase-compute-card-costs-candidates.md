@@ -19,14 +19,14 @@ OA 当前卡牌购买成本通过 `computeCosts.improvement` listener 聚合 `{ 
 为卡牌购买引入一个小的 **ComputeCardCosts candidate pipeline**，只接入 major / minor improvement 购买成本：
 
 1. Pipeline 输入是 `Cost Candidate List`：由当前卡牌的基础 `fee` / `fees` 规范化而来。
-2. 官方卡牌购买成本 modifier 一次性迁移到专用 candidate mutation API；迁移范围是当前 17 张 `computeCosts.improvement` 官方卡和 `B65_GrainDepot` 的路径成本。
-3. `A20_DoubleTurnPlow` / `B36_Bottles` 不作为 cost modifier；它们对齐 BGA `getBaseCosts()`，在进入 pipeline 前产出动态基础候选。
+2. 官方卡牌购买成本 modifier 一次性迁移到专用 candidate mutation API；迁移范围是当前 17 张 `computeCosts.improvement` 官方卡和 `B065_GrainDepot` 的路径成本。
+3. `A020_DoubleTurnPlow` / `B036_Bottles` 不作为 cost modifier；它们对齐 BGA `getBaseCosts()`，在进入 pipeline 前产出动态基础候选。
 4. Pipeline 不引入 BGA topo。多个 mutation 默认按稳定 listener id 顺序执行；发现 fixed-price 必须先于普通折扣的真实冲突后，pipeline 局部读取 `CardListenerRegistration.order` 作为单点优先级（高值先执行，再按 id 稳定排序），不影响普通 trigger listener 结算。
 5. 直改 candidate 的资源减少 clamp 到 0；如果候选本来没有该资源，则不派生对应折扣候选；折到 0 的资源从 candidate 资源 map 中省略。同一张卡不对自己刚追加的候选重复应用。
 6. Append / fixed-price 类卡牌追加新候选并保留原候选；replacement 类卡牌只替换被实际改变的候选，未受影响的基础候选保留。
 7. 候选只做完全重复去重，不做 domination / Pareto 剪枝。去重 key 包含资源、原始 `feeIndex` 和 `sources`。（已被 ADR 0004 Amendments 两次修订：输出层每个 resources + originalFeeIndex 组只保留一条代表行；solver 层恢复 BGA 式支配剪枝——候选层仍不剪，剪枝发生在资源可行性过滤之后。）
 8. Candidate metadata 包含 `sources`、原始 `feeIndex`，以及可选的 Cost Attribution。`feeIndex` 表示基础支付路径身份，不随后续资源变形改变；B65 使用它决定 2/3/4 个 future grain。Cost Attribution 只用于卡牌统计展示，不表示真实资源移动或整笔支付归属。
-9. 本 pipeline 不重做 bonus 机制。`D82_HuntingTrophy`、`E130_Overachiever`、`E123_ResourceHoarder` 等 bonus / bonusChoiceIndex 语义继续走现有 solver。
+9. 本 pipeline 不重做 bonus 机制。`D082_HuntingTrophy`、`E130_Overachiever`、`E123_ResourceHoarder` 等 bonus / bonusChoiceIndex 语义继续走现有 solver。
 10. UI 展示复用现有 payment option `sourceCards` 链路：后端把 candidate `sources` 合并进 payment option / effect preview 的 `sourceCards`，前端继续由 `InteractionBar` 展示卡名。hover stats 读取 Card Resource Stats；选定候选后才把 Cost Attribution 写入对应 source cards。
 11. 非 card-purchase action cost 不进入本 candidate pipeline。A128 Riparian Builder 这类 action `computeCosts` 折扣若需要 hover stats，应在旧 action cost path 上显式声明 Cost Attribution。
 

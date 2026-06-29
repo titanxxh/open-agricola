@@ -8,6 +8,7 @@ import { setWorkersAtHome } from '../../domain/player'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal'
 import { runCardEffectHook } from '../card-effects'
 import { getCardDefinition } from '../catalog'
+import { implementedMinorImprovementCardsList, minorImprovementCardsList } from '../catalog.generated'
 import { confirmPlayerSwitch } from '../../../server/__tests__/_helpers/pending-confirms'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -38,10 +39,10 @@ describe('Card Source representative migrations', () => {
   })
 
   it('keeps Working Gloves modifiers under Card Source impl and effective in payment', () => {
-    const impl = ALL_CARD_IMPLS['E60_WorkingGloves']
-    const definition = getCardDefinition('E60_WorkingGloves')
+    const impl = ALL_CARD_IMPLS['E060_WorkingGloves']
+    const definition = getCardDefinition('E060_WorkingGloves')
 
-    expect(manifest()['E60_WorkingGloves']?.module).toBe('shared/cards/E/E60_WorkingGloves')
+    expect(manifest()['E060_WorkingGloves']?.module).toBe('shared/cards/E/E060_WorkingGloves')
     expect(definition?.modifier).toBeUndefined()
     expect(definition?.modifiers).toBeUndefined()
     expect(impl?.modifiers).toHaveLength(4)
@@ -51,7 +52,7 @@ describe('Card Source representative migrations', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
-    player.minorPlayed.push('E60_WorkingGloves')
+    player.minorPlayed.push('E060_WorkingGloves')
     player.resources = {
       ...player.resources,
       wood: 1,
@@ -63,7 +64,7 @@ describe('Card Source representative migrations', () => {
     session.loadState(state)
 
     const after = session.getState().state.players[0]!
-    expect(after.activeModifiers.filter((m) => m.cardId === 'E60_WorkingGloves')).toHaveLength(4)
+    expect(after.activeModifiers.filter((m) => m.cardId === 'E060_WorkingGloves')).toHaveLength(4)
 
     const solutions = computeAllBuyableCombinations(
       after,
@@ -79,8 +80,8 @@ describe('Card Source representative migrations', () => {
   })
 
   it('loads Barn Shed listener from Card Source impl through session runtime', () => {
-    expect(manifest()['E66_BarnShed']?.module).toBe('shared/cards/E/E66_BarnShed')
-    expect(ALL_CARD_IMPLS['E66_BarnShed']?.listeners?.map((listener) => listener.id)).toContain(
+    expect(manifest()['E066_BarnShed']?.module).toBe('shared/cards/E/E066_BarnShed')
+    expect(ALL_CARD_IMPLS['E066_BarnShed']?.listeners?.map((listener) => listener.id)).toContain(
       'E66-barn-shed-opponent-forest',
     )
 
@@ -89,7 +90,7 @@ describe('Card Source representative migrations', () => {
     state.currentPlayerIndex = 1
     state.round = 1
     const owner = state.players[0]!
-    owner.minorPlayed.push('E66_BarnShed')
+    owner.minorPlayed.push('E066_BarnShed')
     owner.resources.grain = 0
     setWorkersAtHome(state, owner, 2)
     const opponent = state.players[1]!
@@ -140,5 +141,195 @@ describe('Card Source representative migrations', () => {
         resources: { food: 1 },
       },
     ])
+  })
+
+  it('projects Farmers of the Moor major cards from split source files', () => {
+    const entries = manifest()
+
+    expect(Object.fromEntries([
+      'Major_Moor_HorseSlaughterhouse1',
+      'Major_Moor_HorseSlaughterhouse2',
+      'Major_Moor_Cookhouse1',
+      'Major_Moor_Cookhouse2',
+      'Major_Moor_PeatCharcoalKiln',
+      'Major_Moor_ForestersLodge',
+      'Major_Moor_RidingStables',
+      'Major_Moor_MuseumOfTheMoors',
+      'Major_Moor_HeatingOven',
+      'Major_Moor_TiledOven',
+      'Major_Moor_VillageChurch',
+      'Major_Moor_FurnitureStall',
+      'Major_Moor_CeramicsStall',
+      'Major_Moor_BasketStall',
+    ].map((id) => [id, entries[id]?.module]))).toEqual({
+      Major_Moor_HorseSlaughterhouse1: 'shared/cards/major/moor-horse-slaughterhouse',
+      Major_Moor_HorseSlaughterhouse2: 'shared/cards/major/moor-horse-slaughterhouse',
+      Major_Moor_Cookhouse1: 'shared/cards/major/moor-cookhouse',
+      Major_Moor_Cookhouse2: 'shared/cards/major/moor-cookhouse',
+      Major_Moor_PeatCharcoalKiln: 'shared/cards/major/moor-peat-charcoal-kiln',
+      Major_Moor_ForestersLodge: 'shared/cards/major/moor-foresters-lodge',
+      Major_Moor_RidingStables: 'shared/cards/major/moor-riding-stables',
+      Major_Moor_MuseumOfTheMoors: 'shared/cards/major/moor-museum-of-the-moors',
+      Major_Moor_HeatingOven: 'shared/cards/major/moor-heating-oven',
+      Major_Moor_TiledOven: 'shared/cards/major/moor-tiled-oven',
+      Major_Moor_VillageChurch: 'shared/cards/major/moor-village-church',
+      Major_Moor_FurnitureStall: 'shared/cards/major/moor-furniture-stall',
+      Major_Moor_CeramicsStall: 'shared/cards/major/moor-ceramics-stall',
+      Major_Moor_BasketStall: 'shared/cards/major/moor-basket-stall',
+    })
+  })
+
+  it('projects Farmers of the Moor minor cards and keeps remaining cards metadata-only', () => {
+    const entries = manifest()
+    const moorMinors = Object.values(entries)
+      .filter((entry) => entry.meta.type === 'minor' && entry.meta.deck === 'M')
+      .sort((a, b) => a.meta.number - b.meta.number)
+    const implementedMoorMinorIds = [
+      'M015_PeatBurnOff',
+      'M016_ClearFelling',
+      'M017_Reforestation',
+      'M018_RegisterOfCraftsmen',
+      'M019_LawnTurf',
+      'M020_PeatPellets',
+      'M021_PeatCuttingExpedition',
+      'M022_EcologicalNiche',
+      'M023_EdgeOfTheForest',
+      'M024_BasicSupplies',
+      'M025_HouseholdInventory',
+      'M026_ChimneyHood',
+      'M028_OutOnTheWallaby',
+      'M029_Tinker',
+      'M030_FarmAnimalMarket',
+      'M032_PeatHut',
+      'M036_PeatMoss',
+      'M037_BuildingPlan',
+      'M038_NatureReserve',
+      'M039_SpecialPasture',
+      'M040_MoorFire',
+      'M041_CattleCollar',
+      'M042_DeepPlow',
+      'M043_WildFields',
+      'M044_Swamp',
+      'M045_TreeNursery',
+      'M046_Thicket',
+      'M047_BogForest',
+      'M048_ForestSwamp',
+      'M049_SurveyorsMap',
+      'M050_FarmExtension',
+      'M051_MoorEnclosures',
+      'M054_AgriculturalImplement',
+      'M055_ToolShed',
+      'M058_PeatFertilizer',
+      'M059_NaturesFertilizer',
+      'M060_SowingMachine',
+      'M061_HayWagon',
+      'M062_HearthBrush',
+      'M063_PastoralLetter',
+      'M064_FamilyBurialPlot',
+      'M065_FireBrigade',
+      'M066_LandParcel',
+      'M067_ChamberOfCommerce',
+      'M068_Church',
+      'M069_LeatherSaddle',
+      'M070_MoorArchaeology',
+      'M071_BogBody',
+      'M072_OvenDamper',
+      'M073_StockBreedingPrize',
+      'M074_Administration',
+      'M075_FuelStorage',
+      'M076_Flatboat',
+      'M077_DryingField',
+      'M078_Barge',
+      'M079_PeatSled',
+      'M080_AdvancePayment',
+      'M081_PeatBoat',
+      'M082_Firewood',
+      'M083_CoalSeam',
+      'M085_OvenInstallation',
+      'M086_SpinningMill',
+      'M087_PeatBarge',
+      'M088_PeatIron',
+      'M089_BirthingHouse',
+      'M090_WinterStorehouse',
+      'M091_RoutineWork',
+      'M092_AridField',
+      'M094_PeatBath',
+      'M095_FallowFields',
+      'M096_FallowLand',
+      'M097_VillageHall',
+      'M098_FishSmokehouse',
+      'M099_HealingClay',
+      'M100_Pheromones',
+      'M103_ForestKindergarten',
+      'M104_WildHarvest',
+      'M105_OpenGrill',
+      'M106_HorseButchery',
+      'M107_PotRoastRecipe',
+      'M108_GrainDistillery',
+      'M109_Malthouse',
+      'M110_FarmCart',
+      'M111_NoTillFarming',
+      'M112_PeatAshFertilizer',
+      'M113_LivingHistoryMuseum',
+      'M114_RiversideWoods',
+      'M115_OakBark',
+      'M116_MoorBirchTrees',
+      'M117_DraughtHorses',
+      'M118_TimberMill',
+      'M119_AlderSwamp',
+      'M120_RiverClay',
+      'M121_Loam',
+      'M122_WillowBank',
+      'M123_StoneQuarry',
+      'M124_StoneWagon',
+      'M125_HardwareStore',
+      'M126_CooperativeStore',
+      'M127_Wheelbarrow',
+      'M128_Workbench',
+      'M129_PlowhorseMarket',
+      'M130_Nosebag',
+    ].sort()
+
+    expect(moorMinors.map((entry) => entry.meta.number)).toEqual(
+      Array.from({ length: 117 }, (_, index) => index + 15),
+    )
+    expect(moorMinors.every((entry) => entry.meta.requiresFarmersOfTheMoor === true)).toBe(true)
+    expect(moorMinors.filter((entry) => entry.meta.implemented).map((entry) => entry.meta.id).sort()).toEqual(
+      implementedMoorMinorIds,
+    )
+    expect(moorMinors
+      .filter((entry) => !implementedMoorMinorIds.includes(entry.meta.id))
+      .every((entry) => entry.meta.implemented === false)).toBe(true)
+    expect(moorMinors.every((entry) => entry.module.startsWith('shared/cards/M/'))).toBe(true)
+
+    expect(entries['M015_PeatBurnOff']?.meta).toMatchObject({
+      id: 'M015_PeatBurnOff',
+      name: 'Peat Burn-off',
+      category: 'FARM_PLANNER',
+      passing: true,
+      desc: [
+        'You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 moor for 1 field tile.',
+      ],
+    })
+    expect(entries['M032_PeatHut']?.meta).toMatchObject({
+      id: 'M032_PeatHut',
+      name: 'Peat Hut',
+      category: 'FARM_PLANNER',
+      cost: { fuel: 5, reed: 2 },
+      vp: 1,
+    })
+    expect(entries['M032_PeatHut']?.meta.passing).toBeUndefined()
+    expect(entries['M131_CattleStall']?.meta).toMatchObject({
+      id: 'M131_CattleStall',
+      name: 'Cattle Stall',
+      category: 'LIVESTOCK_PROVIDER',
+      cost: { wood: 2, clay: 2 },
+      vp: 1,
+    })
+    expect(minorImprovementCardsList.filter((card) => card.deck === 'M')).toHaveLength(117)
+    expect(implementedMinorImprovementCardsList
+      .filter((card) => card.deck === 'M')
+      .map((card) => card.id)
+      .sort()).toEqual(implementedMoorMinorIds)
   })
 })

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, MajorSupplyStack } from '../../contract/types'
 import {
   createMajorImprovementSupply,
+  moveMajorImprovementToSupplyTop,
   returnMajorImprovementToSupply,
   sixPlayerDuplicateMajorImprovementIds,
+  swapMajorImprovementWithSupply,
   takeMajorImprovementFromSupply,
 } from './supply'
 
@@ -36,6 +38,16 @@ const farmersOfTheMoorMajorStackIds = [
 
 const createSixPlayerSupplyState = (): Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'> => {
   const majorImprovementSupply = createMajorImprovementSupply(6)!
+  return {
+    majorImprovementSupply,
+    availableMajorImprovements: majorImprovementSupply
+      .map((stack) => stack.visibleId)
+      .filter((id): id is string => !!id),
+  }
+}
+
+const createFarmersOfTheMoorSupplyState = (): Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'> => {
+  const majorImprovementSupply = createMajorImprovementSupply(2, { enableFarmersOfTheMoor: true })!
   return {
     majorImprovementSupply,
     availableMajorImprovements: majorImprovementSupply
@@ -85,5 +97,38 @@ describe('major improvement supply helper', () => {
       cardIds: expectedCardIds,
     })
     expect(state.availableMajorImprovements).toContain(returnedCardId)
+  })
+
+  it('moves a hidden Farmers of the Moor major to the visible stack top', () => {
+    const state = createFarmersOfTheMoorSupplyState()
+
+    moveMajorImprovementToSupplyTop(state, 'Major_Moor_TiledOven')
+
+    expect(readStack(state, 'stone-oven')).toMatchObject({
+      visibleId: 'Major_Moor_TiledOven',
+      cardIds: ['Major_Moor_TiledOven', 'Major_StoneOven'],
+    })
+    expect(state.availableMajorImprovements).toContain('Major_Moor_TiledOven')
+    expect(state.availableMajorImprovements).not.toContain('Major_StoneOven')
+  })
+
+  it('keeps stack state correct after taking and swapping a moved-up major', () => {
+    const state = createFarmersOfTheMoorSupplyState()
+    moveMajorImprovementToSupplyTop(state, 'Major_Moor_TiledOven')
+
+    takeMajorImprovementFromSupply(state, 'Major_Moor_TiledOven')
+    expect(readStack(state, 'stone-oven')).toMatchObject({
+      visibleId: 'Major_StoneOven',
+      cardIds: ['Major_StoneOven'],
+    })
+
+    swapMajorImprovementWithSupply(state, 'Major_Moor_TiledOven', 'Major_StoneOven')
+
+    expect(readStack(state, 'stone-oven')).toMatchObject({
+      visibleId: 'Major_Moor_TiledOven',
+      cardIds: ['Major_Moor_TiledOven'],
+    })
+    expect(state.availableMajorImprovements).toContain('Major_Moor_TiledOven')
+    expect(state.availableMajorImprovements).not.toContain('Major_StoneOven')
   })
 })

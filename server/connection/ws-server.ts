@@ -12,6 +12,7 @@ import {
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   snapshotToRoom,
+  toRoomMeta,
   type Room,
 } from '../game/room.ts'
 import { createLobby, type Lobby } from '../game/lobby.ts'
@@ -23,6 +24,7 @@ import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
+import { serializeState } from '../../shared/session/serialization.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -53,7 +55,7 @@ const ensureFixedDevRooms = (
         undefined,
         buildFixedDevRoomInitialStateOptions(playerCount, startupOptions),
       )
-      registry.set({
+      const room: Room = {
         id,
         session,
         players: [],
@@ -63,7 +65,14 @@ const ensureFixedDevRooms = (
         enableParentCards: session.state.enableParentCards,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
         enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
-      })
+        allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+      }
+      registry.set(room)
+      persistence.save(
+        room.id,
+        serializeState(room.session.getState().state, { engineStack: room.session.getEngineStack() }),
+        toRoomMeta(room),
+      )
     }
   }
 }

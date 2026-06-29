@@ -6,9 +6,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import '../../shared/cards/A/A41_VegetableSlicer'
+import '../../shared/cards/A/A041_VegetableSlicer'
 
-const CARD_ID = 'A41_VegetableSlicer'
+const CARD_ID = 'A041_VegetableSlicer'
 const FIREPLACE_ID = 'Major_Fireplace1'
 const COOKING_HEARTH_ID = 'Major_CookingHearth1'
 const FIREPLACE3_ID = 'Major_Fireplace3'
@@ -122,7 +122,7 @@ const paidForImprovement = (
   ...(returnedCardId ? { returnedCardId } : {}),
 })
 
-describe('A41_VegetableSlicer improvement listener', () => {
+describe('A041_VegetableSlicer improvement listener', () => {
   it('triggers through the real major improvement action flow', () => {
     const session = new GameSession(1)
     const state = session.getState().state

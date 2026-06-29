@@ -6,9 +6,9 @@ import { specialEffectAction } from '../../shared/actions/effects/special-effect
 import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B18_GrasslandHarrow'
+import '../../shared/cards/B/B018_GrasslandHarrow'
 
-const CARD_ID = 'B18_GrasslandHarrow'
+const CARD_ID = 'B018_GrasslandHarrow'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -251,7 +251,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       } else {
         expect(resp.interaction.stateId).toBe('wait')
         if (resp.interaction.stateId !== 'wait') return
-        const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+        const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
         expect(cardOption).toBeDefined()
         resp = session.resolveChoice(0, cardOption!.value)
       }

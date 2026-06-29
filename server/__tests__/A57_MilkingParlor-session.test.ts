@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A57_MilkingParlor } from '../../shared/cards/A/A57_MilkingParlor'
+import { A057_MilkingParlor } from '../../shared/cards/A/A057_MilkingParlor'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
 
-describe('A57_MilkingParlor prerequisite', () => {
+describe('A057_MilkingParlor prerequisite', () => {
   it('blocks when fewer than 4 free farmyard spaces remain', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,13 +13,13 @@ describe('A57_MilkingParlor prerequisite', () => {
     player.fields = []
     player.stableTiles = []
     player.pastures = []
-    expect(meetsCardPrerequisites(player, A57_MilkingParlor, state.round, state)).toBe(false)
+    expect(meetsCardPrerequisites(player, A057_MilkingParlor, state.round, state)).toBe(false)
   })
 
   it('allows when at least 4 free spaces remain', () => {
     const session = new GameSession()
     const state = session.getState().state
     const player = state.players[0]!
-    expect(meetsCardPrerequisites(player, A57_MilkingParlor, state.round, state)).toBe(true)
+    expect(meetsCardPrerequisites(player, A057_MilkingParlor, state.round, state)).toBe(true)
   })
 })

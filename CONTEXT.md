@@ -128,6 +128,31 @@ _Avoid_: 任意给食物的行动、卡牌奖励、兑换收益
 因 linked action space 规则在本轮暂时不可进入的行动格。它不是 occupied，没有实际工人在该格上，也不应被卡牌或行动逻辑当作占用工人读取。
 _Avoid_: occupied Action Space、synthetic linked occupancy、phantom worker
 
+**Blocked Farmyard Space（被阻塞农场格）**:
+因卡牌或变体规则变成已使用且不可再放置房间、田、畜栏、围栏、地形或动物区的农场格。它是农场几何的一部分，但在规则上被永久或持续排除出后续放置候选。
+_Avoid_: 前端隐藏格、普通 unused space、Action Space block
+
+**Farmyard Space Goods Token（农场格货物标记）**:
+由卡牌放在具体农场格上的资源标记；该格仍按卡面语义保留 unused 或其他状态，直到后续规则条件满足时领取这些资源。
+_Avoid_: Field attachment、Action Space attachment、库存资源
+
+**Field Goods Token（田地货物标记）**:
+由卡牌放在已有田地上的资源标记；它不属于该田地的作物，不能在收获田地阶段收取，只能按卡牌指定条件领取。
+_Avoid_: Field attachment、作物、库存资源
+
+**Non-field Crop Space（非田作物格）**:
+由卡牌授权、可承载 grain 或 vegetable 的非田农场格。它可以参与卡牌指定的播种或作物增长语义，但不计为 Field。
+_Avoid_: Field、临时田、Field attachment
+
+**Farmyard Extension（农场版图扩展）**:
+由卡牌或变体规则添加到玩家农场版图边缘的新农场格。它扩展共享农场几何，新增格应被后续放置、占用、地形和计分规则当作正常农场格读取。
+新增格属于同一个 Farmyard，不是附属区域。
+_Avoid_: Farm board 扩展、UI 扩展格、临时格、外侧贴片
+
+**Covered Farm Terrain（被覆盖农场地形）**:
+被另一层森林或沼泽覆盖、暂时不作为 visible forest / visible moor 参与规则的农场地形。它仍属于该农场格，但只有移除覆盖层后才重新成为可见地形。
+_Avoid_: stacked terrain、hidden terrain、删除的地形
+
 **ActionDefinition**:
 一个行动的规则定义，包含可执行性、费用预览、执行函数、选择解析和可选 inner flow。
 _Avoid_: UI 按钮定义

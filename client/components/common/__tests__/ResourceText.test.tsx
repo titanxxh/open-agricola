@@ -19,6 +19,14 @@ describe('ResourceText', () => {
     expect(container.querySelector('.res-icon-barn')).toBeTruthy()
   })
 
+  it('renders Farmers of the Moor resource placeholders as sprites', () => {
+    const { container } = render(<ResourceText text="<HORSE> <FUEL>" />)
+    expect(container.querySelector('.res-icon-horse')).toBeTruthy()
+    expect(container.querySelector('.res-icon-fuel')).toBeTruthy()
+    expect(container.textContent).not.toContain('<HORSE>')
+    expect(container.textContent).not.toContain('<FUEL>')
+  })
+
   it('renders <BEGGING> as res-icon-begging', () => {
     const { container } = render(<ResourceText text="take 1 <BEGGING>" />)
     expect(container.querySelector('.res-icon-begging')).toBeTruthy()

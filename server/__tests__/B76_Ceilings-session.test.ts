@@ -4,9 +4,9 @@ import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
 import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 
-import '../../shared/cards/B/B76_Ceilings'
+import '../../shared/cards/B/B076_Ceilings'
 
-describe('B76_Ceilings session', () => {
+describe('B076_Ceilings session', () => {
   const setup = (round = 1) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -15,11 +15,11 @@ describe('B76_Ceilings session', () => {
     state.round = round
 
     const player = state.players[0]!
-    player.minorHand.push('B76_Ceilings')
+    player.minorHand.push('B076_Ceilings')
     // Need 1 occupation to meet prerequisite
     player.occupationPlayed.push('STUB_OCC')
     session.loadState(state)
-    session.devPlayCard(0, 'B76_Ceilings')
+    session.devPlayCard(0, 'B076_Ceilings')
     return session
   }
 
@@ -30,7 +30,7 @@ describe('B76_Ceilings session', () => {
     // devPlayCard triggers onBuy which queues pendingFutureMeeples
     expect(state.pendingFutureMeeples.length).toBe(1)
     expect(state.pendingFutureMeeples[0]).toMatchObject({
-      cardId: 'B76_Ceilings',
+      cardId: 'B076_Ceilings',
       playerId: state.players[0]!.id,
       startRound: 2,
       count: 5,
@@ -42,7 +42,7 @@ describe('B76_Ceilings session', () => {
     expect(state.futureMeeples).toHaveLength(5)
     expect(state.futureMeeples.map((e) => e.round)).toEqual([2, 3, 4, 5, 6])
     state.futureMeeples.forEach((entry) => {
-      expect(entry.cardId).toBe('B76_Ceilings')
+      expect(entry.cardId).toBe('B076_Ceilings')
       expect(entry.resources).toEqual({ wood: 1 })
     })
   })
@@ -94,9 +94,9 @@ describe('B76_Ceilings session', () => {
     expect(resp.ok).toBe(true)
 
     const updatedState = session.getState().state
-    // All B76_Ceilings future meeples should be removed
+    // All B076_Ceilings future meeples should be removed
     const b76Entries = updatedState.futureMeeples.filter(
-      (e) => e.cardId === 'B76_Ceilings',
+      (e) => e.cardId === 'B076_Ceilings',
     )
     expect(b76Entries).toHaveLength(0)
   })
@@ -123,6 +123,6 @@ describe('B76_Ceilings session', () => {
 
     const updatedState = session.getState().state
     const updatedPlayer = updatedState.players[0]!
-    expect(isCardFlagged(updatedPlayer, 'B76_Ceilings')).toBe(true)
+    expect(isCardFlagged(updatedPlayer, 'B076_Ceilings')).toBe(true)
   })
 })

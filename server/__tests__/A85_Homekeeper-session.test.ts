@@ -3,11 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
-import '../../shared/cards/A/A85_Homekeeper'
+import '../../shared/cards/A/A085_Homekeeper'
 
-const CARD_ID = 'A85_Homekeeper'
+const CARD_ID = 'A085_Homekeeper'
 
-describe('A85_Homekeeper session', () => {
+describe('A085_Homekeeper session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state

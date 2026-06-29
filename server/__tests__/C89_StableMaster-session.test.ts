@@ -4,10 +4,10 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/C/C89_StableMaster'
-import '../../shared/cards/C/C88_CarpentersApprentice'
+import '../../shared/cards/C/C089_StableMaster'
+import '../../shared/cards/C/C088_CarpentersApprentice'
 
-describe('C89_StableMaster session', () => {
+describe('C089_StableMaster session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -16,9 +16,9 @@ describe('C89_StableMaster session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.occupationHand.push('C89_StableMaster')
+    player.occupationHand.push('C089_StableMaster')
     session.loadState(state)
-    session.devPlayCard(0, 'C89_StableMaster')
+    session.devPlayCard(0, 'C089_StableMaster')
     return session
   }
 
@@ -91,11 +91,11 @@ describe('C89_StableMaster session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.occupationPlayed.push('C89_StableMaster')
+    player.occupationPlayed.push('C089_StableMaster')
     player.resources.wood = 1
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -116,14 +116,14 @@ describe('C89_StableMaster session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.occupationPlayed.push('C89_StableMaster')
+    player.occupationPlayed.push('C089_StableMaster')
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 },
     ]
     player.resources.wood = 5
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
     expect(flow).toBeNull()
   })
 
@@ -134,12 +134,12 @@ describe('C89_StableMaster session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.occupationPlayed.push('C89_StableMaster')
+    player.occupationPlayed.push('C089_StableMaster')
     player.resources.wood = 5
     player.supplyTokensConsumed = { stable: 4 }
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
     expect(flow).toBeNull()
   })
 
@@ -150,13 +150,13 @@ describe('C89_StableMaster session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
-    player.occupationPlayed.push('C89_StableMaster')
-    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.occupationPlayed.push('C089_StableMaster')
+    player.occupationPlayed.push('C088_CarpentersApprentice')
     player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]
     player.resources.wood = 0
     session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    const flow = runCardEffectHook(state, player, 'C089_StableMaster', 'onBuy')
     expect(flow).not.toBeNull()
   })
 
@@ -170,8 +170,8 @@ describe('C89_StableMaster session', () => {
       player.occupationHand = ['__test_placeholder__']
     }
     const player = state.players[0]!
-    player.occupationPlayed = ['C88_CarpentersApprentice']
-    player.occupationHand = ['C89_StableMaster']
+    player.occupationPlayed = ['C088_CarpentersApprentice']
+    player.occupationHand = ['C089_StableMaster']
     player.resources.food = 10
     player.resources.wood = 0
     player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]

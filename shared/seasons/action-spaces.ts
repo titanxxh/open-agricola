@@ -2,7 +2,7 @@ import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../con
 import { breedLeaf, canBreedAnimals } from '../actions/effects/breed'
 import { familyGrowthAction } from '../actions/effects/family-growth'
 import { plowAction } from '../actions/effects/plow'
-import { privateFieldPhaseAction } from '../actions/effects/private-field-phase'
+import { reapAction } from '../actions/effects/reap'
 import { sowAction } from '../actions/effects/sow'
 import { isActionDoableInFlowContext } from '../actions/flow'
 import { getActionDefinition } from '../actions/index'
@@ -208,8 +208,8 @@ const executeSummerFarmersMarket: ActionDefinition['execute'] = ({ state, player
 
 const autumnPrivateFieldLeaf = (): ActionFlow => ({
   type: 'leaf',
-  actionId: 'private-field-phase',
-  choiceLabelKey: 'actions.private-field-phase.name',
+  actionId: 'reap',
+  actionContext: { trigger: { phase: 'private-field-phase' } },
 })
 
 const autumnVegetableLeaf = (): ActionFlow => ({
@@ -224,7 +224,9 @@ const autumnThanksgivingFlow = (
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
 ): ActionFlow => {
   const children: ActionFlow[] = []
-  if (privateFieldPhaseAction.canBeExecutedByPlayer(state, player)) {
+  if (reapAction.canBeExecutedByPlayer(state, player, {
+    actionContext: { trigger: { phase: 'private-field-phase' } },
+  })) {
     children.push(autumnPrivateFieldLeaf())
   }
   children.push(autumnVegetableLeaf())

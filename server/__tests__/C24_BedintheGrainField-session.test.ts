@@ -4,7 +4,7 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
-const CARD_ID = 'C24_BedintheGrainField'
+const CARD_ID = 'C024_BedintheGrainField'
 
 const setupHarvest = (options: { rooms: number; ready?: boolean } = { rooms: 3, ready: true }) => {
   const session = new GameSession()
@@ -45,7 +45,7 @@ const expectC24Prompt = (resp: ReturnType<GameSession['performRoundEnd']>) => {
   return { skip: skip!, accept: accept! }
 }
 
-describe('C24_BedintheGrainField session', () => {
+describe('C024_BedintheGrainField session', () => {
   it('can skip the next-harvest family growth and clears the marker', () => {
     const session = setupHarvest({ rooms: 3 })
 

@@ -46,7 +46,10 @@ export const useFarmSelection = () => {
 
   const toggleFenceEdge = (
     edgeId: string,
-    sourceOptions: { donorCaps?: Record<string, number> } = {},
+    sourceOptions: {
+      donorCaps?: Record<string, number>
+      isBorderEdge?: (edgeId: string) => boolean
+    } = {},
   ) => {
     const inFence = pendingFenceEdges.includes(edgeId)
     const inPalisade = pendingPalisadeEdges.includes(edgeId)
@@ -95,7 +98,8 @@ export const useFarmSelection = () => {
         setPendingFenceSources((prev) => ({ ...prev, [edgeId]: selectedDonor }))
       }
     } else {
-      if (!isBorderEdge(edgeId)) return
+      const canUseAsBorder = sourceOptions.isBorderEdge ?? isBorderEdge
+      if (!canUseAsBorder(edgeId)) return
       if (inPalisade) setPendingPalisadeEdges((prev) => prev.filter((e) => e !== edgeId))
       else if (inFence) {
         setPendingFenceEdges((prev) => prev.filter((e) => e !== edgeId))

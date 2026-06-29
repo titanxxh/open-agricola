@@ -28,12 +28,12 @@ beforeAll(async () => {
     A105_BarrowPusher: manifestEntry('A105_BarrowPusher', 'Barrow Pusher', 'occupation'),
     A106_SlurrySpreader: manifestEntry('A106_SlurrySpreader', 'Slurry Spreader', 'occupation'),
     A108_MushroomCollector: manifestEntry('A108_MushroomCollector', 'Mushroom Collector', 'occupation'),
-    B34_SpecialFood: manifestEntry('B34_SpecialFood', 'Special Food', 'minor'),
-    C22_BasketChair: manifestEntry('C22_BasketChair', 'Basket Chair', 'minor'),
-    C11_WildlifeReserve: manifestEntry('C11_WildlifeReserve', 'Wildlife Reserve', 'minor'),
+    B034_SpecialFood: manifestEntry('B034_SpecialFood', 'Special Food', 'minor'),
+    C022_BasketChair: manifestEntry('C022_BasketChair', 'Basket Chair', 'minor'),
+    C011_WildlifeReserve: manifestEntry('C011_WildlifeReserve', 'Wildlife Reserve', 'minor'),
     C148_MudWallower: manifestEntry('C148_MudWallower', 'Mud Wallower', 'occupation'),
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
-    D75_WoodField: manifestEntry('D75_WoodField', 'Wood Field', 'minor'),
+    D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -166,6 +166,47 @@ const createFarmBoardProps = (
 })
 
 describe('FarmBoard', () => {
+  it('renders extension spaces inside the farm grid and submits real coordinates', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    player.farmyardExtensions = [{
+      id: 'ext-1',
+      sourceCardId: 'M050_FarmExtension',
+      tiles: [{ row: -1, col: 0 }, { row: -1, col: 1 }],
+    }]
+    const togglePositionSelection = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmGridColumns: 3,
+          farmCells: [
+            { key: '0-0', type: 'post' },
+            { key: '0-1', type: 'fence-h', fenceId: 'H--1-0' },
+            { key: '0-2', type: 'post' },
+            { key: '1-0', type: 'fence-v', fenceId: 'V--1-0' },
+            { key: '1-1', type: 'tile', tileRow: -1, tileCol: 0 },
+            { key: '1-2', type: 'fence-v', fenceId: 'V--1-1' },
+            { key: '2-0', type: 'post' },
+            { key: '2-1', type: 'fence-h', fenceId: 'H-0-0' },
+            { key: '2-2', type: 'post' },
+          ],
+          positionSelectableSet: new Set(['-1-0']),
+          togglePositionSelection,
+        })}
+      />,
+    )
+    const grid = container.querySelector('.farm-grid')
+    const tile = container.querySelector('[data-farm-tile-key="-1-0"]')
+
+    expect(grid).not.toBeNull()
+    expect(tile).not.toBeNull()
+    expect(grid!.contains(tile)).toBe(true)
+    expect(tile).toHaveAttribute('title', 'Empty')
+
+    fireEvent.click(tile!)
+    expect(togglePositionSelection).toHaveBeenCalledWith({ row: -1, col: 0 })
+  })
+
   it('renders supply capacities with icons in the compact resource panel', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -203,6 +244,8 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('farm-terrain-forest')
     expect(html).toContain('farm-terrain-moor')
+    expect(html).toContain('farm-terrain-sprite-forest')
+    expect(html).toContain('farm-terrain-sprite-moor')
     expect(html).toContain('Forest')
     expect(html).toContain('Moor')
     expect(html).toContain('res-icon-fuel')
@@ -235,17 +278,17 @@ describe('FarmBoard', () => {
 
   it('counts horses when disabling over-capacity card-zone controls', () => {
     const player = createPlayer('p1', 'Player A', 'red')
-    player.minorPlayed = ['C11_WildlifeReserve']
+    player.minorPlayed = ['C011_WildlifeReserve']
 
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          playedCards: ['C11_WildlifeReserve'],
+          playedCards: ['C011_WildlifeReserve'],
           isReorgActive: true,
           reorgRemaining: { sheep: 1, boar: 0, cattle: 0, horse: 0 },
           cardDisplayMap: new Map([
-            ['C11_WildlifeReserve', {
-              zoneId: 'card:C11_WildlifeReserve',
+            ['C011_WildlifeReserve', {
+              zoneId: 'card:C011_WildlifeReserve',
               capacity: 3,
               animalType: null,
               animalCount: 3,
@@ -357,7 +400,7 @@ describe('FarmBoard', () => {
   it('lets the active pending player choose a minor improvement from hand when the turn cursor has advanced', () => {
     const activePlayer = {
       ...createPlayer('p1', 'Player A', 'red'),
-      minorHand: ['B34_SpecialFood'],
+      minorHand: ['B034_SpecialFood'],
     }
     const turnPlayer = createPlayer('p2', 'Player B', 'blue')
     const resolveChoice = vi.fn()
@@ -370,16 +413,16 @@ describe('FarmBoard', () => {
           displayPlayer: activePlayer,
           isSelectingMinor: true,
           isSelectingImprovementAny: true,
-          selectableMinorIds: new Set(['B34_SpecialFood']),
+          selectableMinorIds: new Set(['B034_SpecialFood']),
           resolveChoice,
         })}
         activePlayerId={activePlayer.id}
       />,
     )
 
-    fireEvent.click(container.querySelector('[data-id="B34_SpecialFood"]')!)
+    fireEvent.click(container.querySelector('[data-id="B034_SpecialFood"]')!)
 
-    expect(resolveChoice).toHaveBeenCalledWith('minor:B34_SpecialFood')
+    expect(resolveChoice).toHaveBeenCalledWith('B034_SpecialFood')
   })
 
   it('renders reorg controls for card animal zones', () => {
@@ -763,7 +806,7 @@ describe('FarmBoard', () => {
               key: '-1-68',
               tile: { row: -1, col: 68 },
               allowedCrops: ['wood'],
-              sourceCard: 'E68_CherryOrchard',
+              sourceCard: 'E068_CherryOrchard',
             },
           ],
         } as any)}
@@ -775,12 +818,29 @@ describe('FarmBoard', () => {
     expect(html).toContain('-1-68-sow-choice')
   })
 
+  it('renders sow controls on on-board extra sow targets that are not fields', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          sowRemaining: { grain: 1, vegetable: 0, wood: 0, stone: 0 },
+          sowSelectableMap: new Map([['0-0', ['grain']]]),
+          updateSowSelection: () => {},
+        })}
+      />,
+    )
+
+    expect(html).toContain('0-0-sow-choice')
+    expect(html).not.toContain('extra-sow-tray')
+  })
+
   it('renders held-worker overlay when cardStates.heldWorkerId is set', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),
-      minorPlayed: ['C22_BasketChair'],
+      minorPlayed: ['C022_BasketChair'],
       cardStates: {
-        C22_BasketChair: { counters: {}, infobox: undefined, stack: [], extraData: { heldWorkerId: '1' } },
+        C022_BasketChair: { counters: {}, infobox: undefined, stack: [], extraData: { heldWorkerId: '1' } },
       },
     }
 
@@ -792,7 +852,7 @@ describe('FarmBoard', () => {
       devMode: false,
       currentStartPlayerId: '',
       nextStartPlayerId: '',
-      playedCards: ['minor:C22_BasketChair'],
+      playedCards: ['minor:C022_BasketChair'],
       farmCells: [],
       roomPositions: new Set<string>(),
       fieldPositions: new Set<string>(),
@@ -853,19 +913,19 @@ describe('FarmBoard', () => {
     const htmlWith = renderToStaticMarkup(
       <FarmBoard {...(commonProps as any)} {...(extraProps as any)} />,
     )
-    expect(htmlWith).toContain('data-testid="played-card-held-worker-C22_BasketChair"')
+    expect(htmlWith).toContain('data-testid="played-card-held-worker-C022_BasketChair"')
 
     // Without heldWorkerId — overlay must be absent
     const playerNoWorker: PlayerState = {
       ...player,
       cardStates: {
-        C22_BasketChair: { counters: {}, infobox: undefined, stack: [], extraData: {} },
+        C022_BasketChair: { counters: {}, infobox: undefined, stack: [], extraData: {} },
       },
     }
     const htmlWithout = renderToStaticMarkup(
       <FarmBoard {...({ ...commonProps, displayPlayer: playerNoWorker } as any)} {...(extraProps as any)} />,
     )
-    expect(htmlWithout).not.toContain('data-testid="played-card-held-worker-C22_BasketChair"')
+    expect(htmlWithout).not.toContain('data-testid="played-card-held-worker-C022_BasketChair"')
   })
 
   it('applies palisade class to fence cells whose edge is in the palisade pending set', () => {
@@ -1021,8 +1081,8 @@ describe('FarmBoard', () => {
               key: '-80-0',
               tile: { row: -80, col: 0 },
               allowedCrops: ['stone'],
-              sourceCard: 'E80_RockGarden',
-              groupKey: 'E80_RockGarden',
+              sourceCard: 'E080_RockGarden',
+              groupKey: 'E080_RockGarden',
             },
           ],
         } as any)}
@@ -1041,9 +1101,9 @@ describe('FarmBoard', () => {
   it('renders 2 wood stacks on D75 card when cardFieldStacks has 2 entries', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),
-      minorPlayed: ['D75_WoodField'],
+      minorPlayed: ['D075_WoodField'],
       cardStates: {
-        D75_WoodField: {
+        D075_WoodField: {
           counters: {},
           infobox: undefined,
           stack: [],
@@ -1066,7 +1126,7 @@ describe('FarmBoard', () => {
         devMode={false}
         currentStartPlayerId=""
         nextStartPlayerId=""
-        playedCards={['minor:D75_WoodField']}
+        playedCards={['minor:D075_WoodField']}
         farmCells={[]}
         roomPositions={new Set()}
         fieldPositions={new Set()}
@@ -1156,9 +1216,9 @@ describe('FarmBoard', () => {
 
   it('renders bonus VP counters directly on played cards', () => {
     const player = createPlayer('p1', 'Player A', 'red')
-    player.minorPlayed = ['B34_SpecialFood']
+    player.minorPlayed = ['B034_SpecialFood']
     player.cardStates = {
-      B34_SpecialFood: {
+      B034_SpecialFood: {
         counters: { bonusVp: 2 },
       },
     }
@@ -1166,7 +1226,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          playedCards: ['minor:B34_SpecialFood'],
+          playedCards: ['minor:B034_SpecialFood'],
         })}
       />,
     )

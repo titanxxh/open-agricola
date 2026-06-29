@@ -15,10 +15,11 @@ import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts
 import { workersAvailable } from '../../domain/player.ts'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
-  applyMoorSpecialAction,
+  createMoorSpecialActionSpace,
   validateMoorSpecialAction,
   type MoorSpecialActionPayload,
 } from '../../moor/special-actions.ts'
+import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import {
@@ -28,7 +29,7 @@ import {
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners.ts'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -66,6 +67,12 @@ export const nextSeatedPlayerIdx = (
  */
 const roundWorkComplete = (state: GameState): boolean =>
   state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
+
+const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
+  if (flows.length === 0) return undefined
+  if (flows.length === 1) return flows[0]
+  return { type: 'seq', children: flows }
+}
 
 /**
  * Resolve the starting-player seat index. Returns 0 when no player owns
@@ -218,13 +225,38 @@ export const takeSpecialAction = (
   core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
 
-  const result = applyMoorSpecialAction(state, playerIndex, cardId, actionId, payload)
-  if (!result.ok) return core.emitResponse(false, result.error)
-  if (core.hasPendingAnimalsCheck(player)) {
-    core.startReorgSubFlow(playerIndex, 'anytime', { originPlayerIndex: playerIndex })
-    return core.emitResponse()
+  const space = createMoorSpecialActionSpace(actionId)
+  const listenerExtraData = { specialActionCardId: cardId, payload }
+  const beforeFlows = runCardListeners({
+    state,
+    player,
+    space,
+    actionId,
+    phase: 'before',
+    extraData: listenerExtraData,
+  }, undefined, { stampFlowOwner: true })
+    .map((entry) => entry.flow)
+    .filter((flow): flow is ActionFlow => !!flow)
+  const applyFlow: ActionFlow = {
+    type: 'leaf',
+    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    params: payload ? { cardId, actionId, payload } : { cardId, actionId },
   }
-  return core.invokeEndTurnHooks(playerIndex)
+  const flow = combineFlows([
+    ...beforeFlows,
+    applyFlow,
+  ]) ?? applyFlow
+  const frame = core.buildAdhocEngineFrame(actionId, undefined, flow)
+  core.pushEngineFrame({
+    ...frame,
+    ownerPlayerIndex: playerIndex,
+    spaceId: actionId,
+    stageResume: null,
+    deferredPlayerSwitch: null,
+    reason: 'top-level',
+  })
+  core.driveEngineSteps()
+  return core.emitResponse()
 }
 
 /**
@@ -357,9 +389,10 @@ export const continueAfterReorganizeRoundEnd = (
   core: GameCore,
   playerIndex: number,
   originPlayerIndex: number | null,
+  triggerActionId?: string | null,
 ): void => {
   if (originPlayerIndex !== null) {
-    core.invokeEndTurnHooks(originPlayerIndex)
+    core.invokeEndTurnHooks(originPlayerIndex, triggerActionId)
     return
   }
   const player = core.state.players[playerIndex]!

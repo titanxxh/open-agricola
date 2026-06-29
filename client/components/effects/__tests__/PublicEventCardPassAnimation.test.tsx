@@ -25,7 +25,7 @@ const makeEvent = (overrides: Partial<CardPassedEvent> = {}): CardPassedEvent =>
   round: 1,
   phase: 'work',
   visibility: 'public',
-  cardId: 'A1_Shelter',
+  cardId: 'A001_Shelter',
   fromPlayerId: 'p1',
   toPlayerId: 'p2',
   ...overrides,
@@ -43,13 +43,13 @@ describe('PublicEventCardPassAnimation', () => {
   it('两个 anchor 都存在时渲染 overlay 并设置 CSS 变量', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const el = this as HTMLElement
-      if (el.dataset.cardAnchor === 'A1_Shelter') return rect(10, 20)
+      if (el.dataset.cardAnchor === 'A001_Shelter') return rect(10, 20)
       if (el.dataset.handAnchor === 'p2') return rect(200, 300)
       return rect(0, 0)
     })
 
     const fromCardEl = document.createElement('div')
-    fromCardEl.dataset.cardAnchor = 'A1_Shelter'
+    fromCardEl.dataset.cardAnchor = 'A001_Shelter'
     document.body.appendChild(fromCardEl)
 
     const toHandEl = document.createElement('div')

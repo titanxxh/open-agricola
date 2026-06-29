@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A71_ClearingSpade'
+import '../../shared/cards/A/A071_ClearingSpade'
 import type { AnytimeAction } from '../../shared/contract/types';
 
-describe('A71_ClearingSpade session', () => {
+describe('A071_ClearingSpade session', () => {
   const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -13,9 +13,9 @@ describe('A71_ClearingSpade session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorHand.push('A71_ClearingSpade')
+    player.minorHand.push('A071_ClearingSpade')
     session.loadState(state)
-    session.devPlayCard(0, 'A71_ClearingSpade')
+    session.devPlayCard(0, 'A071_ClearingSpade')
 
     // Set up fields
     const s2 = session.getState().state

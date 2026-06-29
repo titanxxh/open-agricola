@@ -4,6 +4,7 @@ export type FarmTerrainKind = 'forest' | 'moor'
 
 export type FarmTerrainTile = FarmTilePosition & {
   kind: FarmTerrainKind
+  covered?: FarmTerrainKind
 }
 
 export type MoorStartCardId =
@@ -35,6 +36,7 @@ export type MoorSpecialActionCardState = {
   id: string
   players: number[]
   actions: MoorSpecialActionId[]
+  image: string
   location: MoorSpecialActionCardLocation
 }
 

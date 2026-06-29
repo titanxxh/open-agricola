@@ -98,8 +98,8 @@ const listCardSourceFiles = () => {
 }
 
 const MAX_CONSTRUCT_ROOM_FILES = new Set([
-  'shared/cards/C/C87_Mason.ts',
-  'shared/cards/D/D87_MasterBuilder.ts',
+  'shared/cards/C/C087_Mason.ts',
+  'shared/cards/D/D087_MasterBuilder.ts',
   'shared/cards/E/E127_DiligentFarmer.ts',
 ])
 
@@ -137,7 +137,7 @@ const scanCardAuthoredCostHacks = () => {
   }
   return findings.filter(
     finding =>
-      !(finding.file === 'shared/cards/E/E27_PiggyBank.ts' &&
+      !(finding.file === 'shared/cards/E/E027_PiggyBank.ts' &&
         finding.type === 'negativeHugeDiscount'),
   )
 }

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { C95_BasketWeaver } from '../../shared/cards/C/C95_BasketWeaver'
+import { C095_BasketWeaver } from '../../shared/cards/C/C095_BasketWeaver'
 import { occupations } from '../../shared/cards/_lookup'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-const CARD_ID = 'C95_BasketWeaver'
+const CARD_ID = 'C095_BasketWeaver'
 
 const hasPaidResources = (
   option: { labelParams?: Record<string, unknown> },
@@ -19,10 +19,10 @@ const hasPaidResources = (
 // Catalog registration is handled by the parent agent; for local testing we
 // splice the card into the occupation registry if absent.
 if (!occupations.some((c) => c.id === CARD_ID)) {
-  occupations.push(C95_BasketWeaver)
+  occupations.push(C095_BasketWeaver)
 }
 
-describe('C95_BasketWeaver session', () => {
+describe('C095_BasketWeaver session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -32,7 +32,7 @@ describe('C95_BasketWeaver session', () => {
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2) // Add a second occupation to avoid auto-selection
-    player.occupationHand = [CARD_ID, 'A85_Homekeeper']
+    player.occupationHand = [CARD_ID, 'A085_Homekeeper']
     player.resources = { ...player.resources, food: 5, reed: 2, stone: 2 }
 
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
@@ -66,7 +66,7 @@ describe('C95_BasketWeaver session', () => {
       steps++
       const options = resp.interaction.options ?? []
       const basket = options.find(
-        (o) => o.value === 'major:Major_Basket' || o.value === 'Major_Basket',
+        (o) => o.value === 'Major_Basket',
       )
       if (basket && !bought) {
         resp = session.resolveChoice(0, basket.value)

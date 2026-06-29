@@ -10,10 +10,10 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import type { ActionChoiceOption, FenceSegment, PlayerState, SessionResponse } from '../../shared/contract/types'
 
 import '../../shared/cards/register-all'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/B/B030_WoodPalisades'
 
 const CARD_ID = 'E149_MidnightFencer'
-const B30_ID = 'B30_WoodPalisades'
+const B030_ID = 'B030_WoodPalisades'
 const TILE_00 = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
 const WIDE_PASTURE_EDGES = [
   'H-0-1',
@@ -70,7 +70,7 @@ const setupHarvest = (options: {
     owner.occupationPlayed.push(CARD_ID)
   }
   if (options.withB30) {
-    owner.minorPlayed.push(B30_ID)
+    owner.minorPlayed.push(B030_ID)
   }
   owner.fenceSegments = (options.ownerFenceEdges ?? []).map((edge) => ownFence(owner, edge))
   session.loadState(state)

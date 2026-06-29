@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/D/D82_HuntingTrophy'
+import '../../shared/cards/D/D082_HuntingTrophy'
 
-const CARD_ID = 'D82_HuntingTrophy'
+const CARD_ID = 'D082_HuntingTrophy'
 
-describe('D82_HuntingTrophy session', () => {
+describe('D082_HuntingTrophy session', () => {
   const setupFarmRedevelopment = () => {
     const session = new GameSession()
     const state = session.getState().state

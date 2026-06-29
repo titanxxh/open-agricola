@@ -63,7 +63,7 @@ describe('improvement: pay fail idempotent', () => {
     setWorkersAtHome(state, player, 2)
     setWorkersAtHome(state, state.players[1]!, 0)
     player.resources = { ...player.resources, wood: 2, clay: 2, stone: 2, food: 0 }
-    player.minorHand = ['B65_GrainDepot']
+    player.minorHand = ['B065_GrainDepot']
     player.occupationHand = ['__test_placeholder__']
     state.availableMajorImprovements = []
     session.loadState(state)
@@ -76,20 +76,20 @@ describe('improvement: pay fail idempotent', () => {
       stone: 2,
       food: 0,
     }
-    liveState.players[0]!.minorHand = ['B65_GrainDepot']
+    liveState.players[0]!.minorHand = ['B065_GrainDepot']
     liveState.players[0]!.occupationHand = ['__test_placeholder__']
     liveState.players[1]!.minorHand = ['__test_placeholder__']
     liveState.players[1]!.occupationHand = ['__test_placeholder__']
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const opt = resp.interaction.options?.find((o) => o.value === 'minor:B65_GrainDepot')
+      const opt = resp.interaction.options?.find((o) => o.value === 'B065_GrainDepot')
       expect(opt).toBeDefined()
       resp = session.resolveChoice(0, opt!.value)
     }
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
-    const payOption = resp.interaction.options?.find((o) => o.value === 'pay:improvement:minor:B65_GrainDepot:1')
+    const payOption = resp.interaction.options?.find((o) => o.value === 'pay:improvement:minor:B065_GrainDepot:1')
     expect(payOption).toBeDefined()
     liveState.players[0]!.resources = {
       ...liveState.players[0]!.resources,
@@ -102,9 +102,9 @@ describe('improvement: pay fail idempotent', () => {
     resp = session.resolveChoice(0, payOption!.value)
 
     expect(resp.ok).toBe(false)
-    expect(resp.state.players[0]!.minorHand).toContain('B65_GrainDepot')
-    expect(resp.state.players[0]!.minorPlayed).not.toContain('B65_GrainDepot')
+    expect(resp.state.players[0]!.minorHand).toContain('B065_GrainDepot')
+    expect(resp.state.players[0]!.minorPlayed).not.toContain('B065_GrainDepot')
     expect(resp.state.players[0]!.stats?.totalMinorBuilt ?? 0).toBe(0)
-    expect(resp.state.futureMeeples.some((entry) => entry.cardId === 'B65_GrainDepot')).toBe(false)
+    expect(resp.state.futureMeeples.some((entry) => entry.cardId === 'B065_GrainDepot')).toBe(false)
   })
 })

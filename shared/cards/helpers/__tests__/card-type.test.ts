@@ -3,13 +3,13 @@ import type { PlayerState } from '../../../contract/types'
 import { cardCountsAs, collectCardsAs, playerHasCardCapability } from '../card-type'
 
 import '../../major'
-import '../../D/D60_LargePottery'
-import '../../D/D59_EarthOven'
-import '../../D/D25_WitchesDanceFloor'
-import '../../A/A60_OrientalFireplace'
-import '../../C/C60_SmallPottersOven'
-import '../../B/B68_Beanfield'
-import '../../C/C35_LanternHouse'
+import '../../D/D060_LargePottery'
+import '../../D/D059_EarthOven'
+import '../../D/D025_WitchesDanceFloor'
+import '../../A/A060_OrientalFireplace'
+import '../../C/C060_SmallPottersOven'
+import '../../B/B068_Beanfield'
+import '../../C/C035_LanternHouse'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -38,33 +38,33 @@ describe('cardCountsAs', () => {
   })
 
   it('native minor without alsoCountsAs does not count as major', () => {
-    expect(cardCountsAs('B68_Beanfield', 'major')).toBe(false)
-    expect(cardCountsAs('B68_Beanfield', 'minor')).toBe(true)
+    expect(cardCountsAs('B068_Beanfield', 'major')).toBe(false)
+    expect(cardCountsAs('B068_Beanfield', 'minor')).toBe(true)
   })
 
   it('D60 LargePottery (minor with alsoCountsAs major) counts as both', () => {
-    expect(cardCountsAs('D60_LargePottery', 'minor')).toBe(true)
-    expect(cardCountsAs('D60_LargePottery', 'major')).toBe(true)
+    expect(cardCountsAs('D060_LargePottery', 'minor')).toBe(true)
+    expect(cardCountsAs('D060_LargePottery', 'major')).toBe(true)
   })
 
   it('D59 EarthOven counts as major via alsoCountsAs', () => {
-    expect(cardCountsAs('D59_EarthOven', 'major')).toBe(true)
-    expect(cardCountsAs('D59_EarthOven', 'minor')).toBe(true)
+    expect(cardCountsAs('D059_EarthOven', 'major')).toBe(true)
+    expect(cardCountsAs('D059_EarthOven', 'minor')).toBe(true)
   })
 
   it('A60 OrientalFireplace counts as major via alsoCountsAs', () => {
-    expect(cardCountsAs('A60_OrientalFireplace', 'major')).toBe(true)
-    expect(cardCountsAs('A60_OrientalFireplace', 'minor')).toBe(true)
+    expect(cardCountsAs('A060_OrientalFireplace', 'major')).toBe(true)
+    expect(cardCountsAs('A060_OrientalFireplace', 'minor')).toBe(true)
   })
 
   it('D25 WitchesDanceFloor counts as major via alsoCountsAs', () => {
-    expect(cardCountsAs('D25_WitchesDanceFloor', 'major')).toBe(true)
-    expect(cardCountsAs('D25_WitchesDanceFloor', 'minor')).toBe(true)
+    expect(cardCountsAs('D025_WitchesDanceFloor', 'major')).toBe(true)
+    expect(cardCountsAs('D025_WitchesDanceFloor', 'minor')).toBe(true)
   })
 
   it('C60 SmallPottersOven counts as major via alsoCountsAs', () => {
-    expect(cardCountsAs('C60_SmallPottersOven', 'major')).toBe(true)
-    expect(cardCountsAs('C60_SmallPottersOven', 'minor')).toBe(true)
+    expect(cardCountsAs('C060_SmallPottersOven', 'major')).toBe(true)
+    expect(cardCountsAs('C060_SmallPottersOven', 'minor')).toBe(true)
   })
 
   it('unknown id counts as nothing', () => {
@@ -77,10 +77,10 @@ describe('collectCardsAs', () => {
   it('returns native major + dual-type minors under "major"', () => {
     const p = makePlayer({
       improvements: ['Major_Pottery'],
-      minorPlayed: ['D60_LargePottery', 'B68_Beanfield'],
+      minorPlayed: ['D060_LargePottery', 'B068_Beanfield'],
     })
     const result = collectCardsAs(p, 'major')
-    expect(new Set(result)).toEqual(new Set(['Major_Pottery', 'D60_LargePottery']))
+    expect(new Set(result)).toEqual(new Set(['Major_Pottery', 'D060_LargePottery']))
   })
 
   it('dedupes if same id appears twice (defensive)', () => {
@@ -94,10 +94,10 @@ describe('collectCardsAs', () => {
   it('returns all minors under "minor" (dual-type stays in too)', () => {
     const p = makePlayer({
       improvements: ['Major_Pottery'],
-      minorPlayed: ['D60_LargePottery', 'B68_Beanfield'],
+      minorPlayed: ['D060_LargePottery', 'B068_Beanfield'],
     })
     expect(new Set(collectCardsAs(p, 'minor'))).toEqual(
-      new Set(['D60_LargePottery', 'B68_Beanfield']),
+      new Set(['D060_LargePottery', 'B068_Beanfield']),
     )
   })
 })
@@ -105,19 +105,19 @@ describe('collectCardsAs', () => {
 describe('playerHasCardCapability', () => {
   it('only reads played cards when checking hand-discard prevention', () => {
     const inHand = makePlayer({
-      minorHand: ['C35_LanternHouse'],
+      minorHand: ['C035_LanternHouse'],
     })
     expect(playerHasCardCapability(inHand, 'preventsHandDiscard')).toBe(false)
 
     const played = makePlayer({
-      minorPlayed: ['C35_LanternHouse'],
+      minorPlayed: ['C035_LanternHouse'],
     })
     expect(playerHasCardCapability(played, 'preventsHandDiscard')).toBe(true)
   })
 
   it('uses counts-as semantics when filtering by card type', () => {
     const player = makePlayer({
-      minorPlayed: ['D25_WitchesDanceFloor'],
+      minorPlayed: ['D025_WitchesDanceFloor'],
     })
 
     expect(playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'major' })).toBe(true)

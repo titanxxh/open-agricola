@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCardFile, type CardMeta } from './build-cards-manifest'
 
-const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'community'] as const
+const CATALOG_DECKS = ['A', 'B', 'C', 'D', 'E', 'M', 'community'] as const
 const RUNTIME_DECKS = [...CATALOG_DECKS, '__stubs__'] as const
 const MAJOR_DECK = 'major'
 
@@ -188,10 +188,12 @@ ${definitionArray(catalogSources, catalogMetas)}
 ]
 
 const isMinorLike = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'minor' || card.kind === 'playerAction'
+  card.kind === 'minor' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'minor')
 
 const isOccupation = (card: GeneratedCatalogCardDefinition) =>
-  card.kind === 'occupation'
+  card.kind === 'occupation' ||
+  (card.kind === 'playerAction' && card.playerActionCardType === 'occupation')
 
 const isImplemented = (card: GeneratedCatalogCardDefinition) => card.implemented !== false
 

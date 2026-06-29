@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { E80_RockGarden } from '../../shared/cards/E/E80_RockGarden'
+import { E080_RockGarden } from '../../shared/cards/E/E080_RockGarden'
 import {
   getMinorImprovementCard,
   isFieldCard,
   implementedMinorImprovementCards,
 } from '../../shared/cards/catalog'
-import '../../shared/cards/E/E80_RockGarden'
+import '../../shared/cards/E/E080_RockGarden'
 
-const CARD_ID = 'E80_RockGarden'
+const CARD_ID = 'E080_RockGarden'
 const ROW = -1
 const COL_BASE = 5080
 
@@ -44,9 +44,9 @@ const setup = (options?: {
   return session
 }
 
-describe('E80_RockGarden metadata', () => {
+describe('E080_RockGarden metadata', () => {
   it('is registered as a field card via isField metadata', () => {
-    expect(E80_RockGarden.isField).toBe(true)
+    expect(E080_RockGarden.isField).toBe(true)
     expect(isFieldCard(CARD_ID)).toBe(true)
   })
 
@@ -59,12 +59,12 @@ describe('E80_RockGarden metadata', () => {
   })
 
   it('carries BGA cost-free metadata (no printed cost)', () => {
-    expect(E80_RockGarden.cost).toBeUndefined()
-    expect(E80_RockGarden.vp).toBeUndefined()
+    expect(E080_RockGarden.cost).toBeUndefined()
+    expect(E080_RockGarden.vp).toBeUndefined()
   })
 })
 
-describe('E80_RockGarden session', () => {
+describe('E080_RockGarden session', () => {
   it('sows 1 stone through the real sow interaction and gains 1 stone on the next harvest', () => {
     const session = setup({ stone: 1 })
 

@@ -4,9 +4,9 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B11_Feedyard'
+import '../../shared/cards/B/B011_Feedyard'
 
-describe('B11_Feedyard session', () => {
+describe('B011_Feedyard session', () => {
   const setup = (options?: {
     pastures?: {
       id: string
@@ -24,7 +24,7 @@ describe('B11_Feedyard session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    player.minorPlayed.push('B11_Feedyard')
+    player.minorPlayed.push('B011_Feedyard')
     if (options?.pastures) {
       player.pastures = options.pastures
     }
@@ -44,7 +44,7 @@ describe('B11_Feedyard session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    const cardZone = zones.find(z => z.id === 'card:B011_Feedyard')
     expect(cardZone).toBeDefined()
     expect(cardZone!.zoneType).toBe('card')
     expect(cardZone!.capacity).toBe(3)
@@ -61,7 +61,7 @@ describe('B11_Feedyard session', () => {
     const player = state.players[0]!
 
     let zones = computeAnimalZones(player)
-    let cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    let cardZone = zones.find(z => z.id === 'card:B011_Feedyard')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(1)
 
@@ -70,7 +70,7 @@ describe('B11_Feedyard session', () => {
       id: 'p2', size: 1, tiles: [{ row: 3, col: 2 }], stables: 0, animalType: null, animalCount: 0,
     })
     zones = computeAnimalZones(player)
-    cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    cardZone = zones.find(z => z.id === 'card:B011_Feedyard')
     expect(cardZone).toBeDefined()
     expect(cardZone!.capacity).toBe(2)
   })
@@ -81,7 +81,7 @@ describe('B11_Feedyard session', () => {
     const player = state.players[0]!
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    const cardZone = zones.find(z => z.id === 'card:B011_Feedyard')
     expect(cardZone).toBeUndefined()
   })
 
@@ -97,7 +97,7 @@ describe('B11_Feedyard session', () => {
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'B11_Feedyard', 'onEndHarvest')
+    const flow = runCardEffectHook(state, player, 'B011_Feedyard', 'onEndHarvest')
     expect(flow).not.toBeNull()
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.type).toBe('leaf')
@@ -115,18 +115,18 @@ describe('B11_Feedyard session', () => {
     const player = state.players[0]!
     player.resources.sheep = 1
     player.cardStates = {
-      B11_Feedyard: { extraData: { animalCounts: { sheep: 1 } } },
+      B011_Feedyard: { extraData: { animalCounts: { sheep: 1 } } },
     }
     session.loadState(state)
 
     const zones = computeAnimalZones(player)
-    const cardZone = zones.find(z => z.id === 'card:B11_Feedyard')
+    const cardZone = zones.find(z => z.id === 'card:B011_Feedyard')
     expect(cardZone).toMatchObject({
       animalType: 'sheep',
       animalCount: 1,
       animalCounts: { sheep: 1 },
     })
-    const flow = runCardEffectHook(state, player, 'B11_Feedyard', 'onEndHarvest')
+    const flow = runCardEffectHook(state, player, 'B011_Feedyard', 'onEndHarvest')
     expect(flow).toBeNull()
   })
 
@@ -134,7 +134,7 @@ describe('B11_Feedyard session', () => {
     const session = setup({ pastures: [] })
     const state = session.getState().state
     const player = state.players[0]!
-    const flow = runCardEffectHook(state, player, 'B11_Feedyard', 'onEndHarvest')
+    const flow = runCardEffectHook(state, player, 'B011_Feedyard', 'onEndHarvest')
     expect(flow).toBeNull()
   })
 })

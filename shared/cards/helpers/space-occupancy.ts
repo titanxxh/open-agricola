@@ -7,7 +7,7 @@ import type { GameState } from '../../contract/types'
  * Family Growth 会把新生儿的 WorkerRef 也 push 到 FG 格；被送回家的工人
  * 会从 takenBy 中精确移除。因此 `takenBy.length` 直接对应"几个人"。
  *
- * 也解决 B4_WoodPile 的 TODO（"数累积格上有几个人"）。
+ * 也解决 B004_WoodPile 的 TODO（"数累积格上有几个人"）。
  */
 export const countPeopleOnSpace = (state: GameState, spaceId: string): number => {
   const space = state.actionSpaces.find(s => s.id === spaceId)

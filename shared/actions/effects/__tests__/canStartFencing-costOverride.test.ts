@@ -194,7 +194,7 @@ describe('canStartFencing with costOverride', () => {
         wood: 8, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
-      minorPlayed: ['B30_WoodPalisades'],
+      minorPlayed: ['B030_WoodPalisades'],
       supplyTokensConsumed: { fence: 12 },
     })
     expect(
@@ -214,7 +214,7 @@ describe('canStartFencing with costOverride', () => {
         wood: 20, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
-      minorPlayed: ['B30_WoodPalisades'],
+      minorPlayed: ['B030_WoodPalisades'],
       supplyTokensConsumed: { fence: 13 },
     })
     expect(

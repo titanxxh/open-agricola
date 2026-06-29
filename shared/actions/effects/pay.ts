@@ -34,6 +34,7 @@ import {
   resolveCostPaymentSelection,
   resolvePaymentSolutionSelection,
 } from '../payment/internal'
+import { isPaymentResourceKey } from '../../contract/resource-keys'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -68,7 +69,7 @@ export type PayParams = {
  *
  * Listeners on `actions: ['pay']` read these via `context.result.extraData`.
  * This is the canonical signal for "the card I own contributed to this
- * payment" — see E54_Contraband / E122_Cottar / E128_Saddler /
+ * payment" — see E054_Contraband / E122_Cottar / E128_Saddler /
  * E123_ResourceHoarder for examples.
  *
  * Current attribution note: `player._activeActionBonusSources` is still maintained by
@@ -77,22 +78,6 @@ export type PayParams = {
  * `playImprovement` HTTP entries that don't go through the `pay` leaf.
  * New listeners should not depend on it.
  */
-
-const RESOURCE_KEYS = new Set([
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-  'fence',
-  'stable',
-])
 
 const PAY_PARAM_KEYS = new Set([
   'cost',
@@ -114,7 +99,7 @@ const looksLikeFlatResource = (
   const keys = Object.keys(raw)
   if (keys.length === 0) return false
   if (keys.some((k) => PAY_PARAM_KEYS.has(k))) return false
-  return keys.every((k) => RESOURCE_KEYS.has(k))
+  return keys.every((k) => isPaymentResourceKey(k))
 }
 
 const normalizePayParams = (

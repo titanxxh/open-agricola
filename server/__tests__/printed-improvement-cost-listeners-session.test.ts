@@ -5,14 +5,14 @@ import { registerCustomCard } from '../../shared/cards/custom-registry'
 import { getMinorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
 import { isComplexCost } from '../../shared/actions/payment/internal'
 
-import '../../shared/cards/D/D80_BrickHammer'
+import '../../shared/cards/D/D080_BrickHammer'
 import '../../shared/cards/D/D117_WoodExpert'
 import '../../shared/cards/E/E156_ClaypitOwner'
 
 registerCustomCard({
   cardType: 'minor',
   cardJson: {
-    id: 'CUSTOM_D80_NoSummedClay',
+    id: 'CUSTOM_D080_NoSummedClay',
     name: 'D80 No Summed Clay',
     deck: 'community',
     number: 1,
@@ -104,10 +104,10 @@ const runAfterImprovement = (
 describe('printed improvement cost listeners', () => {
   it('D80 ignores its own non-clay altCosts when checking printed clay cost', () => {
     const player = makePlayer('p1')
-    player.minorPlayed = ['D80_BrickHammer']
+    player.minorPlayed = ['D080_BrickHammer']
     const result = runAfterImprovement(
       'D80-brick-hammer-after-improvement',
-      'D80_BrickHammer',
+      'D080_BrickHammer',
       player,
       makeState([player]),
     )
@@ -117,10 +117,10 @@ describe('printed improvement cost listeners', () => {
 
   it('D80 does not add clay from cost and altCosts together', () => {
     const player = makePlayer('p1')
-    player.minorPlayed = ['D80_BrickHammer']
+    player.minorPlayed = ['D080_BrickHammer']
     const result = runAfterImprovement(
       'D80-brick-hammer-after-improvement',
-      'CUSTOM_D80_NoSummedClay',
+      'CUSTOM_D080_NoSummedClay',
       player,
       makeState([player]),
     )
@@ -134,7 +134,7 @@ describe('printed improvement cost listeners', () => {
     owner.occupationPlayed = ['E156_ClaypitOwner']
     const result = runAfterImprovement(
       'E156-claypit-owner-opponent-improvement-clay',
-      'E30_ChildsToy',
+      'E030_ChildsToy',
       trigger,
       makeState([trigger, owner]),
     )
@@ -153,7 +153,7 @@ describe('printed improvement cost listeners', () => {
     const result = getMinorImprovementPreviewCostDetailed(
       makeState([player]),
       player,
-      'E30_ChildsToy',
+      'E030_ChildsToy',
     )
 
     expect(isComplexCost(result?.cost)).toBe(true)

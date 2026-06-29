@@ -16,6 +16,10 @@ type RoomRow = {
   status: string
   version: number
   custom_card_ids: string | null
+  enable_parent_cards: number
+  enable_through_the_seasons: number
+  enable_farmers_of_the_moor: number
+  allow_incomplete_farmers_of_the_moor_minor_deal: number
   updated_at: number
 }
 
@@ -42,7 +46,10 @@ export class SqliteRoomPersistence implements RoomPersistence {
   load(id: string): RoomSnapshot | null {
     try {
       const row = this.db.prepare(
-        'SELECT id, created_by, state_json, max_players, status, version, custom_card_ids, updated_at FROM rooms WHERE id = ?',
+        `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
+                enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+                allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
+         FROM rooms WHERE id = ?`,
       ).get(id) as RoomRow | undefined
       if (!row) return null
       const players = this.db.prepare(
@@ -55,6 +62,10 @@ export class SqliteRoomPersistence implements RoomPersistence {
           createdBy: row.created_by,
           maxPlayers: row.max_players,
           customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
+          enableParentCards: row.enable_parent_cards === 1,
+          enableThroughTheSeasons: row.enable_through_the_seasons === 1,
+          enableFarmersOfTheMoor: row.enable_farmers_of_the_moor === 1,
+          allowIncompleteFarmersOfTheMoorMinorDeal: row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
           status: toStatus(row.status),
           players,
         },
@@ -71,21 +82,70 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const now = Date.now()
       const stateJson = serialized === null ? null : JSON.stringify(serialized)
       const customCardIdsJson = JSON.stringify(meta.customCardDbIds)
+      const enableParentCards = meta.enableParentCards === true ? 1 : 0
+      const enableThroughTheSeasons = meta.enableThroughTheSeasons === true ? 1 : 0
+      const enableFarmersOfTheMoor = meta.enableFarmersOfTheMoor === true ? 1 : 0
+      const allowIncompleteFarmersOfTheMoorMinorDeal = meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0
       const existing = this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(id)
       if (existing) {
         if (serialized === null) {
           this.db.prepare(
-            'UPDATE rooms SET status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
-          ).run(meta.status, customCardIdsJson, now, id)
+            `UPDATE rooms
+             SET status = ?, custom_card_ids = ?, enable_parent_cards = ?, enable_through_the_seasons = ?,
+                 enable_farmers_of_the_moor = ?, allow_incomplete_farmers_of_the_moor_minor_deal = ?,
+                 version = version + 1, updated_at = ?
+             WHERE id = ?`,
+          ).run(
+            meta.status,
+            customCardIdsJson,
+            enableParentCards,
+            enableThroughTheSeasons,
+            enableFarmersOfTheMoor,
+            allowIncompleteFarmersOfTheMoorMinorDeal,
+            now,
+            id,
+          )
         } else {
           this.db.prepare(
-            'UPDATE rooms SET state_json = ?, status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
-          ).run(JSON.stringify(serialized), meta.status, customCardIdsJson, now, id)
+            `UPDATE rooms
+             SET state_json = ?, status = ?, custom_card_ids = ?, enable_parent_cards = ?,
+                 enable_through_the_seasons = ?, enable_farmers_of_the_moor = ?,
+                 allow_incomplete_farmers_of_the_moor_minor_deal = ?, version = version + 1,
+                 updated_at = ?
+             WHERE id = ?`,
+          ).run(
+            JSON.stringify(serialized),
+            meta.status,
+            customCardIdsJson,
+            enableParentCards,
+            enableThroughTheSeasons,
+            enableFarmersOfTheMoor,
+            allowIncompleteFarmersOfTheMoorMinorDeal,
+            now,
+            id,
+          )
         }
       } else {
         this.db.prepare(
-          'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
-        ).run(id, meta.createdBy, stateJson, meta.maxPlayers, meta.status, customCardIdsJson, now, now)
+          `INSERT INTO rooms (
+             id, created_by, state_json, max_players, status, version, custom_card_ids,
+             enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+             allow_incomplete_farmers_of_the_moor_minor_deal, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          id,
+          meta.createdBy,
+          stateJson,
+          meta.maxPlayers,
+          meta.status,
+          customCardIdsJson,
+          enableParentCards,
+          enableThroughTheSeasons,
+          enableFarmersOfTheMoor,
+          allowIncompleteFarmersOfTheMoorMinorDeal,
+          now,
+          now,
+        )
       }
       for (const p of meta.players) {
         const exists = this.db.prepare(
@@ -124,7 +184,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const excludeIds = opts.excludeIds ?? []
       const placeholders = excludeIds.length > 0 ? excludeIds.map(() => '?').join(', ') : "''"
       const rows = this.db.prepare(
-        `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids, updated_at
+        `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
+                enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+                allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
          FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
       ).all(...excludeIds) as RoomRow[]
       return rows

@@ -13,7 +13,7 @@ import type {
 } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B149_OpenAirFarmer'
-import '../../shared/cards/B/B30_WoodPalisades'
+import '../../shared/cards/B/B030_WoodPalisades'
 
 const CARD_ID = 'B149_OpenAirFarmer'
 
@@ -116,7 +116,7 @@ const setup = (options: SetupOptions = {}) => {
   player.occupationHand = [CARD_ID]
   player.occupationPlayed = []
   player.minorHand = ['__test_placeholder__']
-  player.minorPlayed = options.woodPalisades ? ['B30_WoodPalisades'] : []
+  player.minorPlayed = options.woodPalisades ? ['B030_WoodPalisades'] : []
   next.occupationHand = ['__test_placeholder__']
   next.minorHand = ['__test_placeholder__']
 

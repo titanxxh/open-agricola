@@ -13,25 +13,25 @@
 ### passing
 | Card | BGA | Ours |
 |---|---|---|
-| C1_Overhaul | true | (missing) |
-| C6_StoneClearing | true | (missing) |
-| C9_AutomaticWaterTrough | true | (missing) |
-| D1_ZigzagHarrow | true | (missing) |
-| E5_NightLoot | true | (missing) |
+| C001_Overhaul | true | (missing) |
+| C006_StoneClearing | true | (missing) |
+| C009_AutomaticWaterTrough | true | (missing) |
+| D001_ZigzagHarrow | true | (missing) |
+| E005_NightLoot | true | (missing) |
 
 ## ❌ Complex deviations (manual review)
 ### cost
 | Card | BGA | Ours |
 |---|---|---|
-| C54_MarketBooth | `{"stable":1}` | (missing) |
+| C054_MarketBooth | `{"stable":1}` | (missing) |
 
 ### prerequisite
 | Card | BGA | Ours |
 |---|---|---|
-| A3_PaperKnife | (missing) | 3 Occupations In Hand |
+| A003_PaperKnife | (missing) | 3 Occupations In Hand |
 | B154_SheepKeeper | (missing) | Less Than 7 Sheep |
-| B56_Brook | (missing) | Farmer on Fishing Space |
-| B74_ThickForest | (missing) | 5 Clay in Your Supply |
+| B056_Brook | (missing) | Farmer on Fishing Space |
+| B074_ThickForest | (missing) | 5 Clay in Your Supply |
 
 ## 🔍 Single-sided
 ### BGA-only (no matching TS file)
@@ -41,34 +41,34 @@
 ### Banned in BGA but present in TS (route to §2.5)
 - A131_CraftTeacher
 - A133_Braggart
-- A14_CarpentersHammer
-- A33_BigCountry
-- A39_Chapel
-- A48_ShavingHorse
-- A82_WorkCertificate
-- A97_Freshman
-- B10_Caravan
+- A014_CarpentersHammer
+- A033_BigCountry
+- A039_Chapel
+- A048_ShavingHorse
+- A082_WorkCertificate
+- A097_Freshman
+- B010_Caravan
 - B117_Informant
 - B132_EstateMaster
 - B151_LittlePeasant
-- B15_CarpentersBench
+- B015_CarpentersBench
 - B161_Weakling
-- B21_HayloftBarn
-- B22_WalkingBoots
+- B021_HayloftBarn
+- B022_WalkingBoots
 - C102_TreeGuard
 - C125_Nightworker
-- C28_TeachersDesk
-- C31_WritingChamber
-- C3_CarriageTrip
-- C60_SmallPottersOven
-- C63_CraftBrewery
-- C99_GardenDesigner
+- C028_TeachersDesk
+- C031_WritingChamber
+- C003_CarriageTrip
+- C060_SmallPottersOven
+- C063_CraftBrewery
+- C099_GardenDesigner
 - D137_TradeTeacher
-- D19_PulverizerPlow
-- D21_Recruitment
-- D33_SummerHouse
-- D4_CrossCutWood
-- D74_RoyalWood
-- D92_ChildOmbudsman
-- D97_BeggingStudent
-- E22_GuestRoom
+- D019_PulverizerPlow
+- D021_Recruitment
+- D033_SummerHouse
+- D004_CrossCutWood
+- D074_RoyalWood
+- D092_ChildOmbudsman
+- D097_BeggingStudent
+- E022_GuestRoom

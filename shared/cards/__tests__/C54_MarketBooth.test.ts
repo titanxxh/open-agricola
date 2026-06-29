@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
-import { C54_MarketBooth } from '../../cards/C/C54_MarketBooth'
+import { C054_MarketBooth } from '../../cards/C/C054_MarketBooth'
 
-import '../C/C54_MarketBooth'
+import '../C/C054_MarketBooth'
 
-const CARD_ID = 'C54_MarketBooth'
+const CARD_ID = 'C054_MarketBooth'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -33,9 +33,9 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
-describe('C54_MarketBooth', () => {
+describe('C054_MarketBooth', () => {
   it('prints a stable supply-token cost', () => {
-    expect(C54_MarketBooth.cost).toEqual({ stable: 1 })
+    expect(C054_MarketBooth.cost).toEqual({ stable: 1 })
   })
 
   it('declares harvest exchange as grain + fence for 5 food', () => {

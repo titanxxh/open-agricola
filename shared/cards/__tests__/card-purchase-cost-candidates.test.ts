@@ -4,19 +4,19 @@ import { isComplexCost, resolveCardCostWithModifiersDetailed } from '../../actio
 import { getMinorImprovementPreviewCostDetailed } from '../../actions/helpers/improvement-helpers'
 import { setActiveWorkerCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { A20_DoubleTurnPlow_impl } from '../A/A20_DoubleTurnPlow'
-import { A27_OvenSite_impl } from '../A/A27_OvenSite'
-import { A75_LumberMill_impl } from '../A/A75_LumberMill'
+import { A020_DoubleTurnPlow_impl } from '../A/A020_DoubleTurnPlow'
+import { A027_OvenSite_impl } from '../A/A027_OvenSite'
+import { A075_LumberMill_impl } from '../A/A075_LumberMill'
 import { A143_Stonecutter_impl } from '../A/A143_Stonecutter'
-import { B36_Bottles_impl } from '../B/B36_Bottles'
-import { B95_MasterBricklayer_impl } from '../B/B95_MasterBricklayer'
-import { C27_Blueprint_impl } from '../C/C27_Blueprint'
-import { C95_BasketWeaver_impl } from '../C/C95_BasketWeaver'
+import { B036_Bottles_impl } from '../B/B036_Bottles'
+import { B095_MasterBricklayer_impl } from '../B/B095_MasterBricklayer'
+import { C027_Blueprint_impl } from '../C/C027_Blueprint'
+import { C095_BasketWeaver_impl } from '../C/C095_BasketWeaver'
 import { C122_Bricklayer_impl } from '../C/C122_Bricklayer'
-import { D95_SiteManager_impl } from '../D/D95_SiteManager'
-import { D96_Furnisher_impl } from '../D/D96_Furnisher'
+import { D095_SiteManager_impl } from '../D/D095_SiteManager'
+import { D096_Furnisher_impl } from '../D/D096_Furnisher'
 import { D117_WoodExpert_impl } from '../D/D117_WoodExpert'
-import { E27_PiggyBank_impl } from '../E/E27_PiggyBank'
+import { E027_PiggyBank_impl } from '../E/E027_PiggyBank'
 import { E109_BraidMaker_impl } from '../E/E109_BraidMaker'
 
 const createPlayer = (): PlayerState =>
@@ -129,17 +129,17 @@ describe('card-purchase cost candidate cards', () => {
 
   it('keeps migrated card-purchase costs on candidate/base-cost APIs', () => {
     const migratedCandidateImpls = [
-      { id: 'A27_OvenSite', impl: A27_OvenSite_impl },
-      { id: 'A75_LumberMill', impl: A75_LumberMill_impl },
+      { id: 'A027_OvenSite', impl: A027_OvenSite_impl },
+      { id: 'A075_LumberMill', impl: A075_LumberMill_impl },
       { id: 'A143_Stonecutter', impl: A143_Stonecutter_impl },
-      { id: 'B95_MasterBricklayer', impl: B95_MasterBricklayer_impl },
-      { id: 'C27_Blueprint', impl: C27_Blueprint_impl },
-      { id: 'C95_BasketWeaver', impl: C95_BasketWeaver_impl },
+      { id: 'B095_MasterBricklayer', impl: B095_MasterBricklayer_impl },
+      { id: 'C027_Blueprint', impl: C027_Blueprint_impl },
+      { id: 'C095_BasketWeaver', impl: C095_BasketWeaver_impl },
       { id: 'C122_Bricklayer', impl: C122_Bricklayer_impl },
-      { id: 'D95_SiteManager', impl: D95_SiteManager_impl },
-      { id: 'D96_Furnisher', impl: D96_Furnisher_impl },
+      { id: 'D095_SiteManager', impl: D095_SiteManager_impl },
+      { id: 'D096_Furnisher', impl: D096_Furnisher_impl },
       { id: 'D117_WoodExpert', impl: D117_WoodExpert_impl },
-      { id: 'E27_PiggyBank', impl: E27_PiggyBank_impl },
+      { id: 'E027_PiggyBank', impl: E027_PiggyBank_impl },
       { id: 'E109_BraidMaker', impl: E109_BraidMaker_impl },
     ] satisfies Array<{ id: string, impl: CardImpl }>
 
@@ -153,8 +153,8 @@ describe('card-purchase cost candidate cards', () => {
     }
 
     for (const { id, impl } of [
-      { id: 'A20_DoubleTurnPlow', impl: A20_DoubleTurnPlow_impl },
-      { id: 'B36_Bottles', impl: B36_Bottles_impl },
+      { id: 'A020_DoubleTurnPlow', impl: A020_DoubleTurnPlow_impl },
+      { id: 'B036_Bottles', impl: B036_Bottles_impl },
     ] satisfies Array<{ id: string, impl: CardImpl }>) {
       expect(impl.getBaseCosts, id).toBeTypeOf('function')
       expect(computeCardPurchaseListeners(impl), id).toEqual([])
@@ -173,11 +173,11 @@ describe('card-purchase cost candidate cards', () => {
       },
       {
         playedZone: 'minorPlayed',
-        source: 'A75_LumberMill',
+        source: 'A075_LumberMill',
         target: 'Major_Test',
         base: { fees: [{ wood: 2 }, { stone: 1 }] },
         fees: [{ wood: 2 }, { stone: 1 }, { wood: 1 }],
-        attribution: { 2: { A75_LumberMill: { saved: { wood: 1 } } } },
+        attribution: { 2: { A075_LumberMill: { saved: { wood: 1 } } } },
       },
       {
         playedZone: 'occupationPlayed',
@@ -205,7 +205,7 @@ describe('card-purchase cost candidate cards', () => {
 
   it('B95 appends major stone discounts based on rooms beyond the initial house', () => {
     const player = createPlayer()
-    player.occupationPlayed = ['B95_MasterBricklayer']
+    player.occupationPlayed = ['B095_MasterBricklayer']
     player.rooms = 4
     const state = createState(player)
 
@@ -226,15 +226,15 @@ describe('card-purchase cost candidate cards', () => {
       .toEqual(sortedRows([
         { resources: { stone: 1 }, meta: [] },
         { resources: { stone: 3 }, meta: [] },
-        { resources: {}, meta: ['B95_MasterBricklayer'] },
-        { resources: { stone: 1 }, meta: ['B95_MasterBricklayer'] },
+        { resources: {}, meta: ['B095_MasterBricklayer'] },
+        { resources: { stone: 1 }, meta: ['B095_MasterBricklayer'] },
       ]))
 
     const minor = resolveCardCostWithModifiersDetailed(
       state,
       player,
       'improvement',
-      'C82_HardwareStore',
+      'C082_HardwareStore',
       { stone: 2 },
     )
     expect(minor.cost).toEqual({ stone: 2 })
@@ -243,7 +243,7 @@ describe('card-purchase cost candidate cards', () => {
 
   it('C27 appends sourced stone discounts only for Blueprint majors', () => {
     const player = createPlayer()
-    player.minorPlayed = ['C27_Blueprint']
+    player.minorPlayed = ['C027_Blueprint']
     const state = createState(player)
 
     const allowed = resolveCardCostWithModifiersDetailed(
@@ -258,7 +258,7 @@ describe('card-purchase cost candidate cards', () => {
       { wood: 2, stone: 2 },
       { wood: 2, stone: 1 },
     ])
-    expect(allowed.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['C27_Blueprint'])
+    expect(allowed.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['C027_Blueprint'])
 
     const other = resolveCardCostWithModifiersDetailed(
       state,
@@ -273,7 +273,7 @@ describe('card-purchase cost candidate cards', () => {
 
   it('D96 appends wood discount candidates only for Furnisher-triggered improvements', () => {
     const player = createPlayer()
-    player.occupationPlayed = ['D96_Furnisher']
+    player.occupationPlayed = ['D096_Furnisher']
     const state = createState(player)
 
     const triggered = resolveCardCostWithModifiersDetailed(
@@ -282,11 +282,11 @@ describe('card-purchase cost candidate cards', () => {
       'improvement',
       'Major_Test',
       { wood: 1 },
-      'D96_Furnisher',
+      'D096_Furnisher',
     )
     expect(isComplexCost(triggered.cost)).toBe(true)
     expect((triggered.cost as ComplexCost).fees).toEqual([{ wood: 1 }, {}])
-    expect(triggered.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['D96_Furnisher'])
+    expect(triggered.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['D096_Furnisher'])
 
     const ordinary = resolveCardCostWithModifiersDetailed(
       state,
@@ -302,21 +302,21 @@ describe('card-purchase cost candidate cards', () => {
 
   it('A20 and B36 produce dynamic base candidates before card-purchase modifiers', () => {
     const player = createPlayer()
-    player.minorHand = ['A20_DoubleTurnPlow', 'B36_Bottles']
+    player.minorHand = ['A020_DoubleTurnPlow', 'B036_Bottles']
     setActiveWorkerCount(player, 3)
     const state = createState(player)
 
     state.round = 3
-    const earlyPlow = getMinorImprovementPreviewCostDetailed(state, player, 'A20_DoubleTurnPlow')
+    const earlyPlow = getMinorImprovementPreviewCostDetailed(state, player, 'A020_DoubleTurnPlow')
     expect(isComplexCost(earlyPlow?.cost)).toBe(true)
     expect((earlyPlow?.cost as ComplexCost).fees).toEqual([{ grain: 1, food: 0 }])
 
     state.round = 4
-    const latePlow = getMinorImprovementPreviewCostDetailed(state, player, 'A20_DoubleTurnPlow')
+    const latePlow = getMinorImprovementPreviewCostDetailed(state, player, 'A020_DoubleTurnPlow')
     expect(isComplexCost(latePlow?.cost)).toBe(true)
     expect((latePlow?.cost as ComplexCost).fees).toEqual([{ grain: 1, food: 1 }])
 
-    const bottles = getMinorImprovementPreviewCostDetailed(state, player, 'B36_Bottles')
+    const bottles = getMinorImprovementPreviewCostDetailed(state, player, 'B036_Bottles')
     expect(isComplexCost(bottles?.cost)).toBe(true)
     expect((bottles?.cost as ComplexCost).fees).toEqual([{ clay: 3, food: 3 }])
   })

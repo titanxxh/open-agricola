@@ -4,8 +4,8 @@ import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameEvent } from '../../shared/contract/events'
 
-import '../../shared/cards/C/C88_CarpentersApprentice'
-import '../../shared/cards/B/B85_FarmHand'
+import '../../shared/cards/C/C088_CarpentersApprentice'
+import '../../shared/cards/B/B085_FarmHand'
 
 const PLACEHOLDER = ['__test_placeholder__']
 const FARM_HAND_TILE: FarmTilePosition = { row: 0, col: 2 }
@@ -29,7 +29,7 @@ const setup = (overrides: Partial<PlayerState> = {}) => {
     p.occupationHand = [...PLACEHOLDER]
   }
   const player = state.players[0]!
-  player.occupationPlayed.push('C88_CarpentersApprentice', 'B85_FarmHand')
+  player.occupationPlayed.push('C088_CarpentersApprentice', 'B085_FarmHand')
   player.resources = { ...player.resources, wood: 10, food: 10, reed: 2 }
   player.fields = make2x2Fields().map((t) => ({ ...t, stacks: [] }))
   Object.assign(player, overrides)
@@ -86,7 +86,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
       { row: 1, col: 4 },
       NORMAL_STABLE_TILE,
     ])
-    expect(after.cardStates?.B85_FarmHand?.extraData?.position).toEqual(FARM_HAND_TILE)
+    expect(after.cardStates?.B085_FarmHand?.extraData?.position).toEqual(FARM_HAND_TILE)
     // supply: 1 normal + 1 farmhand → -2.
     expect(getAvailableStableSupplyCount(commit.state, after)).toBe(supplyBefore - 2)
 
@@ -103,7 +103,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
         row: FARM_HAND_TILE.row,
         col: FARM_HAND_TILE.col,
         kind: 'special',
-        sourceCardId: 'B85_FarmHand',
+        sourceCardId: 'B085_FarmHand',
       },
     ])
   })
@@ -135,6 +135,6 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
       { row: 0, col: 4 },
       { row: 1, col: 4 },
     ])
-    expect(after.cardStates?.B85_FarmHand?.extraData?.position).toBeUndefined()
+    expect(after.cardStates?.B085_FarmHand?.extraData?.position).toBeUndefined()
   })
 })

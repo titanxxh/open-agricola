@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners } from '../card-listeners'
 
-import '../C/C15_Trellis'
+import '../C/C015_Trellis'
 
-describe('C15_Trellis listener phase', () => {
+describe('C015_Trellis listener phase', () => {
   it('listens on `before` phase (BGA onPlayerPlaceFarmer fires before action)', () => {
     const listener = getRegisteredCardListeners().find(
       (l) => l.id === 'C15-trellis-before-place-farmer',

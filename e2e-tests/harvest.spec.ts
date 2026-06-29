@@ -26,7 +26,7 @@ test.describe('Harvest Phase Order Tests', () => {
     await page.getByRole('button', { name: /jump|快进/i }).click();
     await page.waitForTimeout(300);
 
-    const logPanel = page.locator('.log');
+    const logPanel = page.locator('.action-log');
     await expect(logPanel).toContainText(/round 4|第 4 回合/i, { timeout: 5000 });
 
     const endRoundBtn = page.getByRole('button', { name: /end round|结束回合/i });
@@ -57,7 +57,7 @@ test.describe('Harvest Phase Order Tests', () => {
     await p1.getByRole('button', { name: /jump|快进/i }).click();
     await p1.waitForTimeout(500);
 
-    const logPanel = p1.locator('.log');
+    const logPanel = p1.locator('.action-log');
     await expect(logPanel).toContainText(/round 4|第 4 回合/i, { timeout: 5000 });
 
     await p1.getByRole('button', { name: /end round|结束回合/i }).click();
@@ -95,7 +95,7 @@ test.describe('Harvest Phase Order Tests', () => {
     await page.getByRole('button', { name: /jump|快进/i }).click();
     await page.waitForTimeout(300);
 
-    const logPanel = page.locator('.log');
+    const logPanel = page.locator('.action-log');
     await expect(logPanel).toContainText(/round 4|第 4 回合/i, { timeout: 5000 });
 
     const endRoundBtn = page.getByRole('button', { name: /end round|结束回合/i });
@@ -139,7 +139,7 @@ test.describe('Harvest Phase Order Tests', () => {
     await endRoundBtn.click();
     await page.waitForTimeout(500);
 
-    const logPanel = page.locator('.log');
+    const logPanel = page.locator('.action-log');
     await expect(logPanel).toContainText(/harvest|收获/i, { timeout: 5000 });
   });
 

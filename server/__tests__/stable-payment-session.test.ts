@@ -36,7 +36,7 @@ describe('stable payment session', () => {
       clay: 2,
       stone: 2,
     }
-    player.minorPlayed.push('A74_StableTree')
+    player.minorPlayed.push('A074_StableTree')
     player.activeModifiers = [...stableTradeModifiers]
 
     session.loadState(state)
@@ -84,7 +84,7 @@ describe('stable payment session', () => {
 
     const stableBuiltIndex = resp.state.events.findIndex((event) => event.type === 'farm.stableBuilt')
     const afterStablesIndex = resp.state.events.findIndex(
-      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === 'A74_StableTree',
+      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === 'A074_StableTree',
     )
     const paidIndex = resp.state.events.findIndex((event) => event.type === 'resource.paid' && event.paymentFor === 'stables')
     expect(stableBuiltIndex).toBeGreaterThanOrEqual(0)

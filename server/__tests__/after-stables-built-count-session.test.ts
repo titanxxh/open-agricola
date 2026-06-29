@@ -4,8 +4,8 @@ import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 
 import { getTotalAnimalCapacity } from '../../shared/domain/animal-zones'
 
-import '../../shared/cards/B/B85_FarmHand'
-import '../../shared/cards/A/A43_FarmyardManure'
+import '../../shared/cards/B/B085_FarmHand'
+import '../../shared/cards/A/A043_FarmyardManure'
 import '../../shared/cards/D/D166_StableMilker'
 import '../../shared/cards/D/D168_Stockman'
 
@@ -31,7 +31,7 @@ const setup = (overrides: Partial<PlayerState> = {}) => {
     p.occupationHand = [...PLACEHOLDER]
   }
   const player = state.players[0]!
-  player.occupationPlayed.push('B85_FarmHand')
+  player.occupationPlayed.push('B085_FarmHand')
   player.resources = { ...player.resources, wood: 10, food: 10, reed: 2 }
   player.fields = make2x2Fields().map((t) => ({ ...t, stacks: [] }))
   Object.assign(player, overrides)
@@ -55,7 +55,7 @@ const enterStableSelect = (session: GameSession) => {
 describe('after-stables built count — B85 counts as a built stable (#185)', () => {
   it('A43 (fires on ≥1 built stable) triggers for a B85 solo build', () => {
     const session = setup({
-      minorPlayed: ['A43_FarmyardManure'],
+      minorPlayed: ['A043_FarmyardManure'],
       houseAnimalCount: 1,
     } as Partial<PlayerState>)
     enterStableSelect(session)
@@ -64,14 +64,14 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
 
     const playerId = commit.state.players[0]!.id
     const entries = commit.state.futureMeeples.filter(
-      (e) => e.cardId === 'A43_FarmyardManure' && e.playerId === playerId,
+      (e) => e.cardId === 'A043_FarmyardManure' && e.playerId === playerId,
     )
     expect(entries).toHaveLength(3)
   })
 
   it('D166 (requires 2 built stables) triggers for a mixed ordinary + B85 build', () => {
     const session = setup({
-      occupationPlayed: ['B85_FarmHand', 'D166_StableMilker'],
+      occupationPlayed: ['B085_FarmHand', 'D166_StableMilker'],
     } as Partial<PlayerState>)
     enterStableSelect(session)
     const cattleBefore = session.getState().state.players[0]!.resources.cattle ?? 0
@@ -87,7 +87,7 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
 
   it('D166 does not trigger for a B85 solo build (only 1 stable built)', () => {
     const session = setup({
-      occupationPlayed: ['B85_FarmHand', 'D166_StableMilker'],
+      occupationPlayed: ['B085_FarmHand', 'D166_StableMilker'],
     } as Partial<PlayerState>)
     enterStableSelect(session)
     const cattleBefore = session.getState().state.players[0]!.resources.cattle ?? 0
@@ -102,7 +102,7 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
     // 1 ordinary stable already → card-facing count 1. Same action builds
     // 1 ordinary (2nd stable → cattle) + B85 (3rd stable → boar).
     const session = setup({
-      occupationPlayed: ['B85_FarmHand', 'D168_Stockman'],
+      occupationPlayed: ['B085_FarmHand', 'D168_Stockman'],
       stableTiles: [{ row: 0, col: 4 }],
     } as Partial<PlayerState>)
     enterStableSelect(session)
@@ -123,7 +123,7 @@ describe('after-stables built count — B85 counts as a built stable (#185)', ()
 
   it('does not count the B85 stable toward animal capacity', () => {
     const session = setup({
-      occupationPlayed: ['B85_FarmHand', 'D166_StableMilker'],
+      occupationPlayed: ['B085_FarmHand', 'D166_StableMilker'],
     } as Partial<PlayerState>)
     enterStableSelect(session)
     const capacityBefore = getTotalAnimalCapacity(

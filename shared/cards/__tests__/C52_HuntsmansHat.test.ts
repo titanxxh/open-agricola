@@ -3,7 +3,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
 
-const CARD_ID = 'C52_HuntsmansHat'
+const CARD_ID = 'C052_HuntsmansHat'
 
 const boarMoved = (
   boar: number,
@@ -96,7 +96,7 @@ const createState = (): GameState => ({
   workPhaseObtainedResources: {},
 })
 
-describe('C52_HuntsmansHat', () => {
+describe('C052_HuntsmansHat', () => {
   let cardApi: typeof import('../card-listeners')
 
   beforeEach(async () => {
@@ -111,10 +111,10 @@ describe('C52_HuntsmansHat', () => {
     // Post PR-2 _impl migration: card files no longer self-register at import
     // time. Pull the `_impl` export and push its listeners into the active
     // registry so `getRegisteredCardListeners()` returns them.
-    const mod = await import('../C/C52_HuntsmansHat')
-    const impl = mod.C52_HuntsmansHat_impl
+    const mod = await import('../C/C052_HuntsmansHat')
+    const impl = mod.C052_HuntsmansHat_impl
     for (const listener of impl?.listeners ?? []) {
-      activeMod.requireActiveCardRegistry('C52_HuntsmansHat').registerListener(listener)
+      activeMod.requireActiveCardRegistry('C052_HuntsmansHat').registerListener(listener)
     }
   })
 

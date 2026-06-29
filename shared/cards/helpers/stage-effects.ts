@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
-import { dispatchTradeAppliedListener } from '../../actions/effects/trade-applied-listener'
+import { dispatchTradeAppliedListener } from '../../actions/helpers/trade-applied-listener'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -27,6 +27,7 @@ export const createSingleHarvestExchange = (
   options?: { sourceId?: string },
 ) => (state: GameState, player: PlayerState) => {
   if ((player.resources[resource] ?? 0) <= 0) return
+  const preResources = { ...player.resources }
   player.resources[resource] -= 1
   applyCardGain(player, gain)
   // BGA semantics: harvest-time conversions emit Exchange events. We mirror
@@ -44,6 +45,9 @@ export const createSingleHarvestExchange = (
         sourceId: options.sourceId,
       },
       1,
+      undefined,
+      [],
+      preResources,
     )
   }
 }

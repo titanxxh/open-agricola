@@ -1,9 +1,16 @@
-import type { ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
-import type { ActionSpace } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
-import { fieldTopStack } from '../../domain/field'
-import { runCardListeners } from '../../cards/card-listeners'
+import { fieldIsEmpty, fieldTopStack } from '../../domain/field'
 import { computeHarvestCount } from '../helpers/harvest-count-registry'
+import { hasAnyCardFieldCrops, reapAllCardFields } from '../../cards/helpers/card-field'
+import {
+  defaultReapTrigger,
+  dispatchReapListener,
+  type ReapListenerOptions,
+  type ReapTrigger,
+} from '../helpers/reap-listener'
+
+export { dispatchReapListener, type ReapTrigger } from '../helpers/reap-listener'
 
 export type ReapHarvestCount = {
   count: number
@@ -12,19 +19,9 @@ export type ReapHarvestCount = {
   scope?: 'top-stack' | 'field'
 }
 
-export type ReapTrigger = {
-  phase: string
-  actionId?: string
-  cardId?: string
-}
-
-export type ReapOptions = {
-  trigger?: ReapTrigger
-  sourceCard?: string
+export type ReapOptions = ReapListenerOptions & {
   harvestCounts?: Record<string, ReapHarvestCount>
 }
-
-const defaultReapTrigger = (): ReapTrigger => ({ phase: 'harvest' })
 
 const fieldKey = (row: number, col: number) => `${row}-${col}`
 
@@ -77,41 +74,6 @@ const appendHarvestCountApplication = (
     return
   }
   reapSummary.harvestCountApplications!.push({ row, col, crop, count, sources, tags, scope })
-}
-
-/**
- * Dispatch a 'reap' synthetic action event to card listeners.
- * Called after base field reap and after each extra-reap card produces crops.
- */
-export const dispatchReapListener = (
-  state: GameState,
-  player: PlayerState,
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
-  amount: number,
-  _eventSink?: EventSink,
-  options: ReapOptions = {},
-): ActionFlow | undefined => {
-  if (amount <= 0) return
-  const trigger = options.trigger ?? defaultReapTrigger()
-  const space = {} as ActionSpace
-  const context = {
-    state,
-    player,
-    space,
-    actionId: 'reap',
-    phase: 'immediatelyAfter',
-    extraData: {
-      crop,
-      amount,
-      trigger,
-      ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}),
-    },
-  } as const
-  const children = (runCardListeners(context, undefined, { stampFlowOwner: true }) ?? [])
-    .map((result) => result.flow)
-    .filter((flow): flow is ActionFlow => Boolean(flow))
-  if (children.length === 0) return
-  return { type: 'parallel', children }
 }
 
 export const reap = (
@@ -226,4 +188,79 @@ export const reap = (
     reapSummary,
     ...(reactionChildren.length > 0 ? { reactionFlow: { type: 'parallel' as const, children: reactionChildren } } : {}),
   }
+}
+
+const appendFlowChildren = (children: ActionFlow[], flow: ActionFlow | undefined) => {
+  if (!flow) return
+  if (flow.type === 'parallel') {
+    children.push(...flow.children)
+    return
+  }
+  children.push(flow)
+}
+
+const readActionTrigger = (
+  actionContext: Record<string, unknown> | undefined,
+  sourceCard: string | undefined,
+): ReapTrigger => {
+  const raw = actionContext?.trigger
+  const trigger = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  const phase = typeof trigger.phase === 'string' ? trigger.phase : 'harvest'
+  return {
+    phase,
+    ...(typeof trigger.actionId === 'string' ? { actionId: trigger.actionId } : {}),
+    ...(typeof trigger.cardId === 'string'
+      ? { cardId: trigger.cardId }
+      : sourceCard
+        ? { cardId: sourceCard }
+        : {}),
+  }
+}
+
+const canReapOrdinaryFields = (player: PlayerState): boolean =>
+  player.fields.some((field) => !fieldIsEmpty(field))
+
+const isPrivateFieldTrigger = (trigger: ReapTrigger) =>
+  trigger.phase === 'private-field-phase'
+
+export const reapAction: ActionDefinition = {
+  id: 'reap',
+  nameKey: 'actions.reap.name',
+  descriptionKey: 'actions.reap.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player, context) => {
+    const trigger = readActionTrigger(context?.actionContext, context?.sourceCard)
+    return canReapOrdinaryFields(player) || (isPrivateFieldTrigger(trigger) && hasAnyCardFieldCrops(player))
+  },
+  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
+    const trigger = readActionTrigger(actionContext, sourceCard)
+    if (!reapAction.canBeExecutedByPlayer(state, player, { sourceCard, actionContext })) {
+      return { type: 'fail', errorKey: 'log.action' }
+    }
+
+    const result = reap(state, player, eventSink, { trigger, sourceCard })
+    const reactionChildren: ActionFlow[] = []
+    appendFlowChildren(reactionChildren, result.reactionFlow)
+    if (isPrivateFieldTrigger(trigger)) {
+      appendFlowChildren(
+        reactionChildren,
+        reapAllCardFields(state, player, {
+          trigger,
+          sourceCard,
+          eventSink,
+          updateHarvestSummary: false,
+        }),
+      )
+    }
+
+    if (reactionChildren.length > 0) {
+      return { type: 'flow', flow: { type: 'parallel', children: reactionChildren } }
+    }
+    return {
+      type: 'ok',
+      resourcesGained: result.reapSummary.resources,
+      extraData: { reapSummary: result.reapSummary },
+    }
+  },
 }

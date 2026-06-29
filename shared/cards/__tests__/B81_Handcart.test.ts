@@ -9,9 +9,9 @@ import { ActionNode } from '../../engine/nodes'
 import { ActionRegistry } from '../../engine/registry'
 import { EngineTree } from '../../engine/tree'
 
-import '../B/B81_Handcart'
+import '../B/B081_Handcart'
 
-const CARD_ID = 'B81_Handcart'
+const CARD_ID = 'B081_Handcart'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -94,7 +94,7 @@ const executeFlowLeaf = (state: GameState, player: PlayerState, flow: ActionFlow
   return result
 }
 
-describe('B81_Handcart', () => {
+describe('B081_Handcart', () => {
   it('offers xor with wood option when wood space has >= 6 wood', () => {
     const player = createPlayer()
     const state = createState(player)

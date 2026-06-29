@@ -98,7 +98,7 @@ describe('Collect action card listeners integration', () => {
     setActiveCardRegistry(new CardRegistry())
   })
 
-  it('E53_BoarSpear: registers during listener for collect action', () => {
+  it('E053_BoarSpear: registers during listener for collect action', () => {
     const boarSpearListener = {
       id: 'E53-boar-spear-during',
       phases: ['during' as const],
@@ -173,7 +173,7 @@ describe('Collect action card listeners integration', () => {
     expect(player.resources.wood).toBe(3)
   })
 
-  it('A17_ReclamationPlow: registers after listener for collect action', () => {
+  it('A017_ReclamationPlow: registers after listener for collect action', () => {
     const reclamationPlowListener = {
       id: 'A17-reclamation-plow-after',
       phases: ['after' as const],
@@ -248,7 +248,7 @@ describe('Collect action card listeners integration', () => {
     expect(player.resources.food).toBe(2)
   })
 
-  it('A53_Claypipe: tracks building resources gained during gain action', () => {
+  it('A053_Claypipe: tracks building resources gained during gain action', () => {
     const claypipeListener = {
       id: 'A53-claypipe-immediately-after',
       phases: ['immediatelyAfter' as const],
@@ -256,7 +256,7 @@ describe('Collect action card listeners integration', () => {
       handler: (context: CardListenerContext) => {
         const { player, result } = context
         
-        if (!player.minorPlayed?.includes('A53_Claypipe')) return
+        if (!player.minorPlayed?.includes('A053_Claypipe')) return
         if (result?.type !== 'ok') return
         
         const gainedResources = result.resourcesGained ?? {}
@@ -285,7 +285,7 @@ describe('Collect action card listeners integration', () => {
     const tree = new EngineTree(new ActionNode('action-gain', 'gain'))
     const engine = new Engine({ tree, registry, hooks, log })
     
-    const player = createPlayer({ minorPlayed: ['A53_Claypipe'], cardStates: {} })
+    const player = createPlayer({ minorPlayed: ['A053_Claypipe'], cardStates: {} })
     const space = createSpace('day-laborer')
     const state = createState(space, player)
 

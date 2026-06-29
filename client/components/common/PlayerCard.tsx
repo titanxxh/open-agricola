@@ -50,8 +50,39 @@ type PlayerCardProps = {
   enablePreview?: boolean
 }
 
+type MoorMajorDisplay = {
+  numbering: string
+  imageUrl?: string
+}
+
+const moorMajorDisplay = (numbering: string, hasArt = true): MoorMajorDisplay => ({
+  numbering,
+  imageUrl: hasArt ? `/assets/moor/major/${numbering}.png` : undefined,
+})
+
+const MOOR_MAJOR_DISPLAY: Record<string, MoorMajorDisplay> = {
+  Major_Moor_HorseSlaughterhouse1: moorMajorDisplay('M001'),
+  Major_Moor_HorseSlaughterhouse2: moorMajorDisplay('M002'),
+  Major_Moor_Cookhouse1: moorMajorDisplay('M003'),
+  Major_Moor_Cookhouse2: moorMajorDisplay('M004'),
+  Major_Moor_VillageChurch: moorMajorDisplay('M005'),
+  Major_Moor_HeatingOven: moorMajorDisplay('M006'),
+  Major_Moor_TiledOven: moorMajorDisplay('M007'),
+  Major_Moor_FurnitureStall: moorMajorDisplay('M008'),
+  Major_Moor_CeramicsStall: moorMajorDisplay('M009'),
+  Major_Moor_BasketStall: moorMajorDisplay('M010'),
+  Major_Moor_PeatCharcoalKiln: moorMajorDisplay('M011'),
+  Major_Moor_ForestersLodge: moorMajorDisplay('M012', false),
+  Major_Moor_MuseumOfTheMoors: moorMajorDisplay('M013'),
+  Major_Moor_RidingStables: moorMajorDisplay('M014'),
+}
+
+const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => MOOR_MAJOR_DISPLAY[cardId]
+
 const getCardNumbering = (cardId: string): string => {
-  const match = cardId.match(/^([A-E])(\d+)/)
+  const moorMajor = getMoorMajorDisplay(cardId)
+  if (moorMajor) return moorMajor.numbering
+  const match = cardId.match(/^([A-E]|M)(\d+)/)
   if (match) return `${match[1]}${match[2].padStart(3, '0')}`
   // Custom cards: O-series numbering (minor O001+, occupation O500+)
   if (cardId.startsWith('CUSTOM_')) return getCustomCardNumbering(cardId) ?? 'O000'
@@ -59,9 +90,18 @@ const getCardNumbering = (cardId: string): string => {
 }
 
 const getDeckFromId = (cardId: string): string | undefined => {
-  const match = cardId.match(/^([A-E])/)
+  if (getMoorMajorDisplay(cardId)) return 'M'
+  const match = cardId.match(/^([A-E]|M)/)
   return match ? match[1] : undefined
 }
+
+const getPlayer56PortraitUrl = (numbering: string): string => `/assets/player56/${numbering}.png`
+
+const PLAYER56_PORTRAITS = new Set(
+  ['A', 'B', 'C', 'D'].flatMap((deck) =>
+    Array.from({ length: 12 }, (_, index) => `${deck}${169 + index}`),
+  ),
+)
 
 const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   const positions: Record<string, { x: string; y: string }> = {
@@ -97,6 +137,17 @@ const extractMajorDisplayCost = (cost: PaymentResourceMap | ComplexCost): { base
   const baseCost = fees[0] ?? {}
   const upgradeCost = cost.cards?.cost
   return { baseCost, upgradeCost }
+}
+
+const getReturnCardFamilyName = (cardId: string, locale: Locale): string => {
+  if (cardId.startsWith('Major_Fireplace')) return t(locale, 'improvements.Major_Fireplace1.name')
+  if (cardId.startsWith('Major_CookingHearth')) return t(locale, 'improvements.Major_CookingHearth1.name')
+  return t(locale, `improvements.${cardId}.name`)
+}
+
+const formatReturnCards = (cardIds: string[], locale: Locale): string => {
+  const names = cardIds.map((id) => getReturnCardFamilyName(id, locale))
+  return names.filter((name, index) => names.indexOf(name) === index).join('/')
 }
 
 const renderCost = (cost: PaymentResourceMap, locale: Locale) => {
@@ -137,6 +188,7 @@ export const PlayerCard = ({
         name: t(locale, `improvements.${cardId}.name`),
         description: (meta.desc ?? []).join('\n'),
         cost: { ...emptyResources, ...baseCost },
+        category: meta.category,
         returnCards: meta.returnCards,
         vp: meta.vp,
         isCookery: meta.isCookery,
@@ -189,17 +241,27 @@ export const PlayerCard = ({
   }, [cardId, cardType, locale])
 
   const numbering = getCardNumbering(cardId)
+  const moorMajor = cardType === 'major' ? getMoorMajorDisplay(cardId) : undefined
   const deck = getDeckFromId(cardId)
+  const customArt = getCustomCardArtUrl(cardId)
+  const hasPlayer56Portrait = cardType !== 'major' && !customArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
     if (cardType === 'major') {
+      const moorDisplay = getMoorMajorDisplay(cardId)
+      if (moorDisplay?.imageUrl) {
+        return {
+          backgroundImage: `url(${moorDisplay.imageUrl})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+        }
+      }
       const pos = getMajorIconPosition(cardId)
       return {
         backgroundPosition: `${pos.x} ${pos.y}`,
       }
     }
     // Custom card art: use the uploaded image URL
-    const customArt = getCustomCardArtUrl(cardId)
     if (customArt) {
       // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
       const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
@@ -218,10 +280,20 @@ export const PlayerCard = ({
       E: 'deckE',
     }
     const deckName = deck ? deckMap[deck] : 'deckA'
+    if (hasPlayer56Portrait) {
+      return {
+        backgroundImage: `url(${getPlayer56PortraitUrl(numbering)})`,
+      }
+    }
+    if (cardType === 'minor' && deck === 'M') {
+      return {
+        backgroundImage: `url(/assets/moor/minor/${numbering}.png)`,
+      }
+    }
     return {
       backgroundImage: `url(/bga-img/${deckName}/${numbering}.png)`,
     }
-  }, [cardType, cardId, deck, numbering])
+  }, [cardType, cardId, customArt, deck, hasPlayer56Portrait, numbering])
 
   if (!cardData) return null
 
@@ -266,6 +338,7 @@ export const PlayerCard = ({
         className="player-card-inner" 
         data-id={cardId} 
         data-numbering={numbering}
+        data-moor-major={moorMajor ? 'true' : undefined}
         data-cook={cardData.isCookery ? 'true' : undefined}
         data-bread={cardData.isBaking ? 'true' : undefined}
         data-also-counts-as={
@@ -293,7 +366,7 @@ export const PlayerCard = ({
 
         <div className="card-title">{cardData.name}</div>
         
-        {'vp' in cardData && cardData.vp !== undefined && cardData.vp > 0 && (
+        {'vp' in cardData && cardData.vp !== undefined && cardData.vp !== 0 && (
           <div className="card-score">{cardData.vp}</div>
         )}
 
@@ -301,7 +374,7 @@ export const PlayerCard = ({
           <div className="card-players" data-n={cardData.players} />
         )}
 
-        {deck && cardType !== 'major' && (
+        {deck && (cardType !== 'major' || moorMajor) && (
           <div className="card-deck" data-deck={deck} />
         )}
         
@@ -315,7 +388,7 @@ export const PlayerCard = ({
               <div className="card-cost-return">
                 <div className="card-cost-return-text">
                   {locale === 'zh' ? '归还' : 'Return'}{' '}
-                  {t(locale, `improvements.${cardData.returnCards[0]}.name`)}{' '}
+                  {formatReturnCards(cardData.returnCards, locale)}{' '}
                   {locale === 'zh' ? '或' : 'or'}
                 </div>
                 {renderCost(cardData.cost, locale)}

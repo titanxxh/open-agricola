@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { workersAvailable } from '../../shared/domain/player'
-import { E3_TeaTime } from '../../shared/cards/E/E3_TeaTime'
+import { E003_TeaTime } from '../../shared/cards/E/E003_TeaTime'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
-const CARD_ID = 'E3_TeaTime'
+const CARD_ID = 'E003_TeaTime'
 
-describe('E3_TeaTime session', () => {
+describe('E003_TeaTime session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -74,7 +74,7 @@ describe('E3_TeaTime session', () => {
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
       if (space) space.takenBy = []
-      expect(meetsCardPrerequisites(player, E3_TeaTime, state.round, state)).toBe(false)
+      expect(meetsCardPrerequisites(player, E003_TeaTime, state.round, state)).toBe(false)
     })
 
     it('allows when own worker sits on Grain Utilization', () => {
@@ -83,7 +83,7 @@ describe('E3_TeaTime session', () => {
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
       space.takenBy = [{ playerId: player.id, workerId: player.workers[0]!.id }]
-      expect(meetsCardPrerequisites(player, E3_TeaTime, state.round, state)).toBe(true)
+      expect(meetsCardPrerequisites(player, E003_TeaTime, state.round, state)).toBe(true)
     })
   })
 })

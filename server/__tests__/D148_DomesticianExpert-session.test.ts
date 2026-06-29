@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import '../../shared/cards/D/D148_DomesticianExpert'
-import '../../shared/cards/D/D12_MilkingPlace'
+import '../../shared/cards/D/D012_MilkingPlace'
 
 describe('D148_DomesticianExpert session', () => {
   const setup = (roomTiles?: Array<{row: number, col: number}>) => {
@@ -133,7 +133,7 @@ describe('D148_DomesticianExpert session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     // Mark D12 as played (no need to run buy flow — zone hooks read minorPlayed)
-    player.minorPlayed.push('D12_MilkingPlace')
+    player.minorPlayed.push('D012_MilkingPlace')
     session.loadState(state)
 
     const zones = computeAnimalZones(state.players[0]!)

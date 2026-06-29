@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
-const CARD_ID = 'B96_TreeFarmJoiner'
-const MINOR_ID = 'B4_WoodPile'
+const CARD_ID = 'B096_TreeFarmJoiner'
+const MINOR_ID = 'B004_WoodPile'
 
 describe('B96 Tree Farm Joiner session', () => {
   const setup = () => {

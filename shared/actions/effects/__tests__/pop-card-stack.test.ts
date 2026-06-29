@@ -4,7 +4,7 @@ import { assertKnownGameEventShape } from '../../../events/guards'
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 
-const CARD_ID = 'B19_MoldboardPlow'
+const CARD_ID = 'B019_MoldboardPlow'
 
 const makePlayer = (): PlayerState =>
   ({

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B26_AgrarianFences'
+import '../../shared/cards/B/B026_AgrarianFences'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -35,14 +35,14 @@ const setup = (options?: {
   ]
 
   if (options?.withCard ?? true) {
-    player.minorPlayed.push('B26_AgrarianFences')
+    player.minorPlayed.push('B026_AgrarianFences')
   }
 
   session.loadState(state)
   return session
 }
 
-describe('B26_AgrarianFences session', () => {
+describe('B026_AgrarianFences session', () => {
   it('without the card, grain-utilization offers normal sow/bake choices', () => {
     const session = setup({ withCard: false })
     const resp = session.takeAction(0, 'grain-utilization')

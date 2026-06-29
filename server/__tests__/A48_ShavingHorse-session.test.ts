@@ -4,12 +4,12 @@ import { executeCardListener, type CardListenerContext } from '../../shared/card
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { A48_ShavingHorse_impl } from '../../shared/cards/A/A48_ShavingHorse'
-import '../../shared/cards/A/A48_ShavingHorse'
+import { A048_ShavingHorse_impl } from '../../shared/cards/A/A048_ShavingHorse'
+import '../../shared/cards/A/A048_ShavingHorse'
 
-const CARD_ID = 'A48_ShavingHorse'
-const AFTER_OBTAIN = A48_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-obtain')!
-const AFTER_EXCHANGE = A48_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-exchange')!
+const CARD_ID = 'A048_ShavingHorse'
+const AFTER_OBTAIN = A048_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-obtain')!
+const AFTER_EXCHANGE = A048_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-exchange')!
 
 type SetupOptions = {
   forestWood?: number
@@ -88,7 +88,7 @@ const directContext = (
   } as unknown as CardListenerContext
 }
 
-describe('A48_ShavingHorse session', () => {
+describe('A048_ShavingHorse session', () => {
   it('does not trigger when card not played', () => {
     const session = setup({ forestWood: 3, playerWood: 4, cardPlayed: false })
     const resp = session.takeAction(0, 'forest')
@@ -187,8 +187,8 @@ describe('A48_ShavingHorse session', () => {
   })
 
   it('has cost { wood: 1 } aligned with BGA', async () => {
-    const mod = await import('../../shared/cards/A/A48_ShavingHorse')
-    expect(mod.A48_ShavingHorse.cost).toEqual({ wood: 1 })
+    const mod = await import('../../shared/cards/A/A048_ShavingHorse')
+    expect(mod.A048_ShavingHorse.cost).toEqual({ wood: 1 })
   })
 
   it('triggers once after a batched future receive adds wood', () => {

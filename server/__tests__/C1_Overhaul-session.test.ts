@@ -8,14 +8,14 @@ import {
 import { getOwnOrdinaryFenceCount } from '../../shared/domain/fence-segments'
 import type { FenceSegment, GameState, PlayerState } from '../../shared/contract/types'
 
-import '../../shared/cards/B/B30_WoodPalisades'
-import '../../shared/cards/B/B94_StockProtector'
-import '../../shared/cards/C/C1_Overhaul'
+import '../../shared/cards/B/B030_WoodPalisades'
+import '../../shared/cards/B/B094_StockProtector'
+import '../../shared/cards/C/C001_Overhaul'
 import '../../shared/cards/E/E108_BlackberryFarmer'
 
-const CARD_ID = 'C1_Overhaul'
-const B30_ID = 'B30_WoodPalisades'
-const B94_ID = 'B94_StockProtector'
+const CARD_ID = 'C001_Overhaul'
+const B030_ID = 'B030_WoodPalisades'
+const B094_ID = 'B094_StockProtector'
 const E108_ID = 'E108_BlackberryFarmer'
 
 const TILE_00 = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
@@ -91,7 +91,7 @@ const setup = (opts: SetupOptions = {}) => {
   next.occupationHand = ['__test_placeholder__']
   player.occupationPlayed = ['__test_occ_a__', '__test_occ_b__', ...(opts.playedOccupations ?? [])]
   next.occupationPlayed = []
-  player.minorPlayed = opts.withB30 ? [B30_ID] : []
+  player.minorPlayed = opts.withB30 ? [B030_ID] : []
 
   const generatedOwnEdges = Array.from(
     { length: opts.ownFenceCount ?? 0 },
@@ -136,7 +136,7 @@ const buyC1 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
   if (!cardOption) return resp
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
@@ -256,7 +256,7 @@ describe('C1 Overhaul session', () => {
     const session = setup({
       wood: 1,
       ownFenceEdges: TILE_00,
-      playedOccupations: [B94_ID],
+      playedOccupations: [B094_ID],
     })
     const pending = buyC1(session)
     expectFarmSelect(pending)
@@ -274,7 +274,7 @@ describe('C1 Overhaul session', () => {
     expect(resp.state.events).not.toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.gained',
-        sourceCardId: B94_ID,
+        sourceCardId: B094_ID,
       }),
     ]))
   })

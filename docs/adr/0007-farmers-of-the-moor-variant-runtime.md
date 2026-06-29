@@ -13,11 +13,11 @@ Horses are added to the shared animal/resource type system, but are gated by `en
 
 Major improvement supply selection uses a variant registry. The base game, 5/6-player duplicate supply, and Farmers of the Moor supply are separate templates selected by the enabled variant combination. Purchase and return-to-supply logic must operate through the stack-aware supply helper rather than scattering `enableFarmersOfTheMoor` branches through improvement flows.
 
-Farmers of the Moor minor improvements are not implemented in the current slice. Their recurring rule terms still have reserved runtime contracts so future minor cards do not invent incompatible local meanings:
+Some Farmers of the Moor minor improvement rule terms still have reserved runtime contracts so future minor cards do not invent incompatible local meanings:
 
-- Visible Forests / Visible Moors are the public `player.farmTerrain` entries whose `kind` is `forest` / `moor`; serialization must preserve them for every viewer.
-- Blocked Farmyard Space means a farmyard position that future minor effects make unavailable to room, field, stable, or fence placement through shared farmyard validation inputs, not through frontend-only filtering.
-- Farmyard Extensions must extend the shared farmyard geometry and validation helpers before any card can place or use outside-board spaces.
+- Visible Forests / Visible Moors are the public top-layer `player.farmTerrain` entries whose visible `kind` is `forest` / `moor`; serialization must also preserve any Covered Farm Terrain for every viewer so later effects can reveal it without inventing local hidden state. The runtime supports at most one visible top terrain plus one Covered Farm Terrain per coordinate; removing the visible top and revealing covered terrain is not a cleared-space event.
+- Blocked Farmyard Space lives in `player.farmyardSpaceStates` and means a farmyard position that card effects make unavailable to room, field, stable, fence, or terrain placement through shared farmyard validation inputs, not through frontend-only filtering. Farmyard Space Goods Tokens and Field Goods Tokens use the same state list but do not make the space used unless `blocksPlacement` is set. Non-field Crop Spaces also use this list; they remain non-Field and unused for farmyard scoring/capacity, but block placement while holding a crop.
+- Farmyard Extensions live in `player.farmyardExtensions` and extend the shared farmyard geometry. Used/unused, room/stable/plow/fence, terrain placement, border-edge validation, scoring, and FarmBoard rendering must read the dynamic farmyard shape; extension spaces are normal farm coordinates, not frontend-only slots.
 - Moving Up Major Improvement and Upgrade use the stack-aware major supply return/purchase helpers and card identity metadata; they must not push raw ids into `availableMajorImprovements`.
 - Usage Counters live under the owning card's `player.cardStates[cardId]` counters or extraData and are consumed by card-local listeners or existing shared helpers.
 

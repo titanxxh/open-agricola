@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import './setup-register-all'
 import { CardRegistry } from '../registry'
-import { A28_ForestSchool } from '../A/A28_ForestSchool'
+import { A028_ForestSchool } from '../A/A028_ForestSchool'
 import { A123_FrameBuilder } from '../A/A123_FrameBuilder'
 
 describe('CardRegistry modifier loading', () => {
   it('loads a single modifier from Card Source impl', () => {
     const registry = new CardRegistry()
-    registry.loadImpl(A28_ForestSchool.id, A28_ForestSchool.impl)
-    const mods = registry.getModifiers('A28_ForestSchool')
+    registry.loadImpl(A028_ForestSchool.id, A028_ForestSchool.impl)
+    const mods = registry.getModifiers('A028_ForestSchool')
     expect(mods).toHaveLength(1)
     expect(mods[0]?.type).toBe('trade')
   })
@@ -23,6 +23,6 @@ describe('CardRegistry modifier loading', () => {
   it('syncModifiersFromCatalog is a compatibility no-op', () => {
     const registry = new CardRegistry()
     registry.syncModifiersFromCatalog([], [])
-    expect(registry.getModifiers('A28_ForestSchool')).toEqual([])
+    expect(registry.getModifiers('A028_ForestSchool')).toEqual([])
   })
 })

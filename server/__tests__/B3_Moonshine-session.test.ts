@@ -22,16 +22,16 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 
 // Force card modules to register their effects.
-import '../../shared/cards/B/B3_Moonshine'
+import '../../shared/cards/B/B003_Moonshine'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 
-const CARD_ID = 'B3_Moonshine'
+const CARD_ID = 'B003_Moonshine'
 const OCC_A = 'A116_WoodCutter'
 const OCC_B = 'A117_WoodCarrier'
 
 /** Build a standard 2-player session in round 1, p0 current player.
- *  p0 has B3_Moonshine in minorHand and [OCC_A, OCC_B] in occupationHand.
+ *  p0 has B003_Moonshine in minorHand and [OCC_A, OCC_B] in occupationHand.
  *  food is configurable (default 3).
  */
 const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
@@ -60,7 +60,7 @@ const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
 }
 
 /** Drive the meeting-place -> B3 onBuy path.
- *  Returns the resp AFTER resolving 'minor:B3_Moonshine', which should be
+ *  Returns the resp AFTER resolving 'minor:B003_Moonshine', which should be
  *  the pending choice {play, pass} in the target implementation.
  */
 const playB3 = (session: GameSession) => {
@@ -77,16 +77,16 @@ const playB3 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
   expect(cardOption).toBeDefined()
-  // Choose to play B3_Moonshine
+  // Choose to play B003_Moonshine
   return session.resolveChoice(0, cardOption!.value)
 }
 
 // ---------------------------------------------------------------------------
 // Case 1: onBuy emits a pending choice with {play, pass} options
 // ---------------------------------------------------------------------------
-describe('B3_Moonshine session', () => {
+describe('B003_Moonshine session', () => {
   it('case 1: onBuy emits a choice pending with play and pass options', () => {
     const session = makeSession({ food: 3 })
 
@@ -310,8 +310,8 @@ describe('B3_Moonshine session', () => {
     p0.resources.food = 3
     p0.resources.wood = 0
     // Pre-load one minor improvement into minorPlayed so A117 has something to count.
-    // Using 'A10_WoodShed' as a placeholder (any valid minor id — we only need the count).
-    p0.minorPlayed = ['A10_WoodenShed']
+    // Using 'A010_WoodShed' as a placeholder (any valid minor id — we only need the count).
+    p0.minorPlayed = ['A010_WoodenShed']
 
     session.loadState(state)
 
@@ -331,7 +331,7 @@ describe('B3_Moonshine session', () => {
     expect(playResp.ok).toBe(true)
 
     const p0After = playResp.state.players[0]!
-    // A117 grants 1 wood per improvement. p0 has 1 minor (A10_WoodenShed) + B3 itself
+    // A117 grants 1 wood per improvement. p0 has 1 minor (A010_WoodenShed) + B3 itself
     // may or may not be counted depending on timing — so assert at least 1 wood gained.
     // TODO: Task 4 can revisit with a more isolated setup to pin the exact gain count.
     expect(p0After.resources.wood).toBeGreaterThanOrEqual(woodBefore + 1)

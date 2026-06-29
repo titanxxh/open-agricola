@@ -3,12 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
-import '../../shared/cards/E/E28_Bookmark'
+import '../../shared/cards/E/E028_Bookmark'
 import type { ActionFlow } from '../../shared/contract/types'
 
-const CARD_ID = 'E28_Bookmark'
+const CARD_ID = 'E028_Bookmark'
 
-describe('E28_Bookmark session', () => {
+describe('E028_Bookmark session', () => {
   const setup = (playRound = 1) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -49,7 +49,7 @@ describe('E28_Bookmark session', () => {
 
     // Give occupation in hand
     const player = state.players[0]!
-    player.occupationHand.push('A97_Freshman')
+    player.occupationHand.push('A097_Freshman')
 
     session.loadState(state)
 
@@ -71,7 +71,7 @@ describe('E28_Bookmark session', () => {
     state.round = 3
 
     const player = state.players[0]!
-    player.occupationHand.push('A97_Freshman')
+    player.occupationHand.push('A097_Freshman')
 
     session.loadState(state)
 

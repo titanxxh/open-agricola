@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runBeforeEndGameHooks } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B133_VillagePeasant'
-import '../../shared/cards/D/D60_LargePottery'
+import '../../shared/cards/D/D060_LargePottery'
 
 const CARD_ID = 'B133_VillagePeasant'
 
@@ -14,8 +14,8 @@ describe('B133_VillagePeasant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.improvements = []
-    player.minorPlayed = ['B133_VillagePeasant', 'A2_PieceOfLand']
-    player.occupationPlayed = ['A1_Shelter', 'A10_WoodenShed']
+    player.minorPlayed = ['B133_VillagePeasant', 'A002_PieceOfLand']
+    player.occupationPlayed = ['A001_Shelter', 'A010_WoodenShed']
     player.resources.vegetable = 0
     session.loadState(state)
 
@@ -29,8 +29,8 @@ describe('B133_VillagePeasant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.improvements = ['Major_Joinery', 'Major_Pottery']
-    player.minorPlayed = [CARD_ID, 'A2_PieceOfLand']
-    player.occupationPlayed = ['A1_Shelter', 'A10_WoodenShed', 'A11_MudPatch']
+    player.minorPlayed = [CARD_ID, 'A002_PieceOfLand']
+    player.occupationPlayed = ['A001_Shelter', 'A010_WoodenShed', 'A011_MudPatch']
     player.resources.vegetable = 0
     session.loadState(state)
 
@@ -44,8 +44,8 @@ describe('B133_VillagePeasant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.improvements = []
-    player.minorPlayed = ['D60_LargePottery', 'A2_PieceOfLand']
-    player.occupationPlayed = [CARD_ID, 'A1_Shelter', 'A10_WoodenShed']
+    player.minorPlayed = ['D060_LargePottery', 'A002_PieceOfLand']
+    player.occupationPlayed = [CARD_ID, 'A001_Shelter', 'A010_WoodenShed']
     player.resources.vegetable = 0
     session.loadState(state)
 
@@ -60,8 +60,8 @@ describe('B133_VillagePeasant session', () => {
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.improvements = ['Major_Joinery', 'Major_Pottery']
-    player.minorPlayed = ['A2_PieceOfLand']
-    player.occupationPlayed = ['A1_Shelter', 'A10_WoodenShed']
+    player.minorPlayed = ['A002_PieceOfLand']
+    player.occupationPlayed = ['A001_Shelter', 'A010_WoodenShed']
     player.resources.vegetable = 0
     session.loadState(state)
 

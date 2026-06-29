@@ -4,9 +4,9 @@ import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, newbornCount 
 import { removeWorkerRef } from '../../shared/domain/space'
 import { nextSeatedPlayerIdx } from '../../shared/session/phases/round'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
-import '../../shared/cards/A/A92_AdoptiveParents'
+import '../../shared/cards/A/A092_AdoptiveParents'
 
-const A92 = 'A92_AdoptiveParents'
+const A92 = 'A092_AdoptiveParents'
 
 const placeholderHands = (state: { players: { minorHand: string[]; occupationHand: string[] }[] }) => {
   for (const p of state.players) {

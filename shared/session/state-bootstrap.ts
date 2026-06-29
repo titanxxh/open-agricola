@@ -6,9 +6,9 @@
 
 import {
   createDefaultRoomTiles,
-  FARM_COLS,
-  FARM_ROWS,
-  getAllTilePositions,
+  getFarmyardTileKeySet,
+  getFarmyardTilePositions,
+  normalizeFarmyardExtensions,
   positionKey,
 } from '../domain/farm'
 import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
@@ -30,6 +30,7 @@ import { initDraftState, initStagedDraftState } from '../draft/draft-manager'
 import type { DraftPool, DraftStageSpec } from '../draft/types'
 import type { ActionSpace, Field, GameState, OrdinaryCardDecks, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
+import { normalizeFarmyardSpaceStates } from '../domain/farmyard-space-states'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
 import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
@@ -104,13 +105,18 @@ const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
 
 const farmersOfTheMoorMinorHandSize = 4
 const farmersOfTheMoorPublishedMinorHandSize = 3
-const implementedFarmersOfTheMoorMinorIds: readonly string[] = []
+
+export const getImplementedFarmersOfTheMoorMinorIds = (playerCount: number): readonly string[] =>
+  implementedMinorImprovementCards
+    .filter((card) => card.requiresFarmersOfTheMoor)
+    .filter((card) => cardAllowedForPlayerCount(card.players, playerCount))
+    .map((card) => card.id)
 
 const resolveFarmersOfTheMoorMinorHandSize = (
   playerCount: number,
   allowIncomplete: boolean,
 ): number => {
-  const available = implementedFarmersOfTheMoorMinorIds.length
+  const available = getImplementedFarmersOfTheMoorMinorIds(playerCount).length
   const required = playerCount * farmersOfTheMoorMinorHandSize
   if (available >= required) return farmersOfTheMoorMinorHandSize
   if (!allowIncomplete) {
@@ -132,7 +138,7 @@ const dealFarmersOfTheMoorMinorHands = (
   if (handSize <= 0) {
     return Array.from({ length: playerCount }, () => [])
   }
-  const shuffled = shuffleWithRng([...implementedFarmersOfTheMoorMinorIds], createRng(seed))
+  const shuffled = shuffleWithRng([...getImplementedFarmersOfTheMoorMinorIds(playerCount)], createRng(seed))
   return Array.from({ length: playerCount }, (_, index) =>
     shuffled.slice(index * handSize, index * handSize + handSize),
   )
@@ -413,11 +419,13 @@ export const normalizeState = (raw: GameState): GameState => {
       majorEffects: player.majorEffects ?? { wellRounds: 0 },
       parentCards: player.parentCards ?? { mother: null, father: null },
       supplyTokensConsumed: player.supplyTokensConsumed ?? {},
+      farmyardExtensions: normalizeFarmyardExtensions(player.farmyardExtensions),
+      farmyardSpaceStates: normalizeFarmyardSpaceStates(player.farmyardSpaceStates),
     }
     if (enableFarmersOfTheMoor) {
       const startCardId = farmersOfTheMoor?.startCardByPlayerId[normalized.id]
       const hasRawTerrain = Array.isArray(player.farmTerrain)
-      const rawTerrain = normalizeFarmTerrain(player.farmTerrain)
+      const rawTerrain = normalizeFarmTerrain(player.farmTerrain, normalized)
       normalized.farmTerrain = hasRawTerrain
         ? rawTerrain
         : startCardId
@@ -427,6 +435,7 @@ export const normalizeState = (raw: GameState): GameState => {
         ? player.sickWorkerIds.filter((id): id is string => typeof id === 'string')
         : []
     } else {
+      delete normalized.farmyardExtensions
       delete normalized.farmTerrain
       delete normalized.sickWorkerIds
       delete normalized.resources.fuel
@@ -435,7 +444,7 @@ export const normalizeState = (raw: GameState): GameState => {
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
       const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
-      getAllTilePositions().forEach((pos) => {
+      getFarmyardTilePositions(normalized).forEach((pos) => {
         if (normalized.roomTiles.length >= desiredRooms) return
         const key = positionKey(pos)
         if (used.has(key)) return
@@ -448,12 +457,14 @@ export const normalizeState = (raw: GameState): GameState => {
     }
     const used = new Set(normalized.roomTiles.map((tile) => positionKey(tile)))
     normalized.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
-    const allPositions = getAllTilePositions()
+    const allPositions = getFarmyardTilePositions(normalized)
+    const allPositionKeys = getFarmyardTileKeySet(normalized)
     const nextEmpty = () =>
       allPositions.find((pos) => !used.has(positionKey(pos)))
     const normalizedStableTiles = (normalized.stableTiles ?? []).filter(
       (tile) => {
         const key = positionKey(tile)
+        if (!allPositionKeys.has(key)) return false
         if (used.has(key)) {
           return false
         }
@@ -467,10 +478,8 @@ export const normalizeState = (raw: GameState): GameState => {
       if (!Array.isArray(field.stacks)) field.stacks = []
       const row = Number.isFinite(field.row) ? field.row : -1
       const col = Number.isFinite(field.col) ? field.col : -1
-      const validRow = row >= 0 && row < FARM_ROWS
-      const validCol = col >= 0 && col < FARM_COLS
       const key = `${row}-${col}`
-      if (validRow && validCol && !used.has(key)) {
+      if (allPositionKeys.has(key) && !used.has(key)) {
         used.add(key)
         return [{ ...field, row, col }]
       }
