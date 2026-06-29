@@ -344,6 +344,22 @@ type AnimalAccommodationWorkZone = AnimalZone & {
   animalCount: number
 }
 
+const createAccommodationWorkZone = (
+  state: GameState,
+  zone: AnimalZone,
+): AnimalAccommodationWorkZone => {
+  const workZone: AnimalAccommodationWorkZone = {
+    ...zone,
+    animalCounts: createAnimalCounts(state.enableFarmersOfTheMoor === true),
+    animalCount: 0,
+    animalType: null,
+  }
+  if (!('allowedAnimalType' in workZone) && zone.zoneType === 'card' && isAnimalKeyForState(state, zone.animalType)) {
+    workZone.allowedAnimalType = zone.animalType
+  }
+  return workZone
+}
+
 const targetAnimalList = (
   state: GameState,
   targetCounts: Partial<Record<AnimalType, number>>,
@@ -396,12 +412,7 @@ export const canAccommodateAnimalTotals = (
 ): boolean => {
   const animals = targetAnimalList(state, targetCounts)
   if (!animals) return false
-  const zones: AnimalAccommodationWorkZone[] = computeAnimalZones(player, state).map((zone) => ({
-    ...zone,
-    animalCounts: createAnimalCounts(state.enableFarmersOfTheMoor === true),
-    animalCount: 0,
-    animalType: null,
-  }))
+  const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
   const placeFrom = (index: number, currentZones: AnimalAccommodationWorkZone[]): boolean => {
     const type = animals[index]
     if (!type) return true
