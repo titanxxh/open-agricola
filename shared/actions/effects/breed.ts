@@ -10,6 +10,7 @@ import type {
 import type { EventSink } from '../../contract/events'
 import { animalKeysForState } from '../../contract/animals'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
+import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
 import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
 
@@ -105,6 +106,7 @@ export const breedAction: ActionDefinition = {
         animalCount: zone.animalCount ?? 0,
         ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
         ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+        ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(state, player, zone) } : {}),
         ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
         ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
         ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),

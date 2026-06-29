@@ -10,9 +10,10 @@ import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard } from '../../domain'
 import {
   buildCardAnimalZoneId,
-  type AnimalZone,
+  getAllowedAnimalTypesForZone,
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
+  type AnimalZone,
 } from '../../domain/animal-zones'
 import {
   createAnimalCounts,
@@ -72,20 +73,6 @@ const writeCountsByZone = (
   delete extraData.animalCounts
   delete extraData.animalType
   delete extraData.held
-}
-
-const allowedAnimalTypesForZone = (
-  state: GameState,
-  player: PlayerState,
-  zone: AnimalZone,
-  animalKeys: readonly AnimalKey[],
-): AnimalKey[] => {
-  return animalKeys.filter((animal) => {
-    const candidate = createAnimalCounts(state.enableFarmersOfTheMoor === true)
-    candidate[animal] = 1
-    const normalized = normalizeAnimalCountsForZone(state, player, zone, { animalCounts: candidate })
-    return (normalized[animal] ?? 0) > 0
-  })
 }
 
 export const applyReorganizeMutate = (
@@ -160,7 +147,7 @@ export const applyReorganizeMutate = (
     )
     let occupiedExclusiveZones = 0
     for (const zone of cardZones) {
-      allowedTypesByZone.set(zone.id, allowedAnimalTypesForZone(state, player, zone, animalKeys))
+      allowedTypesByZone.set(zone.id, getAllowedAnimalTypesForZone(state, player, zone))
       const assigned = cardAssignmentForZone(zone.id)
       let counts = normalizeAnimalCountsForZone(state, player, zone, assigned)
       if (sumAnimalCounts(counts) > 0 && occupiedExclusiveZones >= exclusiveLimit) {
@@ -279,7 +266,7 @@ export const reorganizeAction: ActionDefinition = {
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
-      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: allowedAnimalTypesForZone(ctx.state, ctx.player, zone, animalKeysForState(ctx.state)) } : {}),
+      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(ctx.state, ctx.player, zone) } : {}),
       ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),

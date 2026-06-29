@@ -95,12 +95,14 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
         zoneType: 'card',
         cardId: HOME_WOOD,
         capacity: 1,
+        allowedAnimalTypes: ['boar', 'cattle', 'horse'],
         farmPosition: { row: 0, col: 0 },
       }),
       expect.objectContaining({
         zoneType: 'card',
         cardId: HOME_WOOD,
         capacity: 1,
+        allowedAnimalTypes: ['boar', 'cattle', 'horse'],
         farmPosition: { row: 0, col: 1 },
       }),
     ]))

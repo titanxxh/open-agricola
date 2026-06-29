@@ -126,7 +126,7 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
-import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
+import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -1600,6 +1600,7 @@ export class GameCore {
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
       ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+      ...(zone.zoneType === 'card' ? { allowedAnimalTypes: getAllowedAnimalTypesForZone(this.state, player, zone) } : {}),
       ...(zone.farmPosition ? { farmPosition: zone.farmPosition } : {}),
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
