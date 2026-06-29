@@ -3535,6 +3535,19 @@
   gap: 6px;
   align-content: start;
 }
+.played-card-readonly-animals {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px 6px;
+  border: 1px solid #d7c8a1;
+  border-radius: 8px;
+  background: #fffaf0;
+  font-size: 12px;
+  line-height: 1;
+}
 .played-card {
   background: #fff;
   border-radius: 10px;

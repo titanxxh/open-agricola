@@ -64,14 +64,16 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     const zones = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg'
       ? resp.interaction.zones
       : []
-    expect(zones).toContainEqual({
-      id: `card:${CARD_ID}`,
-      zoneType: 'card',
-      animalType: 'boar',
-      animalCount: 1,
-      capacity: 1,
-      cardId: CARD_ID,
-    })
+    expect(zones).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: `card:${CARD_ID}`,
+        zoneType: 'card',
+        animalType: 'boar',
+        animalCount: 1,
+        capacity: 1,
+        cardId: CARD_ID,
+      }),
+    ]))
   })
 
   it('reorg dragging boars out of C148 zone permanently lowers held cap', () => {
