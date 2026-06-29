@@ -917,6 +917,8 @@ import { M048_ForestSwamp } from './M/M048_ForestSwamp'
 import { M049_SurveyorsMap } from './M/M049_SurveyorsMap'
 import { M050_FarmExtension } from './M/M050_FarmExtension'
 import { M051_MoorEnclosures } from './M/M051_MoorEnclosures'
+import { M052_WeddingCoach } from './M/M052_WeddingCoach'
+import { M053_ForestHut } from './M/M053_ForestHut'
 import { M054_AgriculturalImplement } from './M/M054_AgriculturalImplement'
 import { M055_ToolShed } from './M/M055_ToolShed'
 import { M056_PeatCuttingRights } from './M/M056_PeatCuttingRights'
@@ -1923,6 +1925,8 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M049_SurveyorsMap': M049_SurveyorsMap.impl,
   'M050_FarmExtension': M050_FarmExtension.impl,
   'M051_MoorEnclosures': M051_MoorEnclosures.impl,
+  'M052_WeddingCoach': M052_WeddingCoach.impl,
+  'M053_ForestHut': M053_ForestHut.impl,
   'M054_AgriculturalImplement': M054_AgriculturalImplement.impl,
   'M055_ToolShed': M055_ToolShed.impl,
   'M056_PeatCuttingRights': M056_PeatCuttingRights.impl,

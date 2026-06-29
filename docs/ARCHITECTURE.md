@@ -685,7 +685,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `reap` 是可由 ActionFlow/internal 执行的内部 action；私人田地收获通过 `trigger: { phase: 'private-field-phase', cardId: sourceCard }` 进入同一 action，不启动完整 Harvest：先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
 
-`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
+`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。`place-farmer` 也支持 `actionContext.temporaryFromSupply + temporaryWorkerId` 放置由卡牌保留的 supply worker；该 worker 不标 active、不计 family/housing/feeding/scoring，生命周期由卡牌在 `onReturnHome` 清理。
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`futureMeepleActions` 是 round-start 内部 stage：普通资源到期时先按 player 合并成一个内部 `receive` action transaction，`resource.moved.reason='receive'` 且每个 entry 保留自己的 `sourceCardId`，因此 Receive listener 会触发一次，Gain listener 不会被隐式触发；`FutureMeepleResourceMap.field/stable` 到期后仍由 `applyFutureMeeples` 消费 token，再把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`。entry 可携带 `actionContext`，用于 D91 这类付费 plow。该 stage 完成后继续普通 `onRoundStart`，不重复 round-start 初始化。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先收集该玩家全部可触发 card flows，再作为 owner 属于该玩家的 stage-level `parallel` flow 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`、`beforeEndGameDispatchMode='serial'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，handHooks 固定 owner-scope；`beforeEndGameDispatchMode='select'` 的 activation 进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
 
@@ -856,7 +856,8 @@ export const A123_FrameBuilder = defineOccupationCard({
 - 只服务单卡或少数卡牌的历史记录优先落到 `cardStates[cardId].extraData`；如需覆盖卡牌打出前历史，使用显式 hand-zone listener，而不是新增全局 stat。
 - 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
 - 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
-- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。
+- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把 newborn 直接放到卡上，避免其在回家前占用行动格或被再次用作容量来源。
+- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；FarmBoard 只把 marker 渲染在对应 terrain tile 内，规则仍由后端卡牌状态裁定。
 
 ### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
 

@@ -3130,6 +3130,16 @@
 .stable-barn-icon[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .stable-barn-icon[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
 .stable-barn-icon[data-player-color="green"] .res-icon-barn { background-position-x: 100%; }
+.farm-terrain-marker-person {
+  left: 50%;
+  right: auto;
+  bottom: calc(var(--tile, 60px) * 0.14);
+  width: calc(var(--tile, 60px) * 0.34);
+  height: calc(var(--tile, 60px) * 0.44);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 2;
+}
 .farm-tile.locked {
   position: relative;
 }
