@@ -1203,6 +1203,7 @@ export const ActionBoard = ({
                     actionSpaceSelectionActive && canTake && 'choice-available',
                     actionSpaceSelectionActive && !canTake && 'choice-unavailable',
                   ].filter(Boolean).join(' ')}
+                  data-action-id={space.id}
                 >
                   <PlayerCard
                     locale={locale}

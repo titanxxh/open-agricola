@@ -99,20 +99,29 @@ export const parseArgs = (argv: string[]): Args => {
   if (argv.includes('--replay')) {
     throw new Error('--replay is not implemented; use trace.json plus snapshots/step-*.json for reproduction')
   }
+  const unsupportedBatchFlag = ['--games', '--agents'].find((flag) => argv.includes(flag))
+  if (unsupportedBatchFlag) {
+    throw new Error(`${unsupportedBatchFlag} is not implemented; run one game per invocation`)
+  }
   const get = (name: string, fallback: string): string => {
     const i = argv.indexOf(`--${name}`)
-    return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback
+    const value = argv[i + 1]
+    return i >= 0 && value && !value.startsWith('--') ? value : fallback
   }
   const seedRaw = get('seed', '')
   const moor = argv.includes('--moor')
   const maxStepsRaw = get('max-steps', '')
+  const url = get('url', process.env.FRONTEND_URL ?? '')
+  if (!url) {
+    throw new Error('--url is required; use the URL printed by ./restart-intranet.sh or set FRONTEND_URL')
+  }
   return {
     players: Number(get('players', '4')),
     room: get('room', 'dev4'),
-    url: get('url', process.env.FRONTEND_URL ?? 'http://localhost:5173'),
+    url,
     out: get('out', 'artifacts/agent-playtest/play'),
     seed: seedRaw === '' ? undefined : Number(seedRaw),
-    maxSteps: Number(maxStepsRaw === '' ? (moor ? '320' : '120') : maxStepsRaw),
+    maxSteps: Number(maxStepsRaw === '' ? (moor ? '500' : '120') : maxStepsRaw),
     observe: argv.includes('--observe'),
     moor,
   }
@@ -280,7 +289,10 @@ const resetNewGame = async (page: Page, seed?: number): Promise<void> => {
   await actionCard(page, 'Farmland').first().waitFor({ state: 'visible', timeout: 15000 })
 }
 
-export const AVAILABLE_ACTION_SELECTOR = '[data-action-id] button.action-card:not([disabled])'
+export const AVAILABLE_ACTION_SELECTOR = [
+  '[data-action-id] button.action-card:not([disabled])',
+  '[data-action-id] .player-card:not(.unselectable)',
+].join(', ')
 export const FARM_SELECT_PREPARE_SELECTORS = [
   '.sow-choice-button:not(.sow-choice-clear):not(.active):not([disabled])',
   '.farm-tile.selectable:not(.selected)',
