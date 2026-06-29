@@ -1,10 +1,13 @@
 import { resourceKeyList } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import { seasonActionIds } from '../../shared/seasons/action-spaces'
-import type { ActionChoiceOption, ActionSpace, FarmTilePosition, Resource } from '../../shared/contract/types'
+import type { ActionChoiceOption, ActionSpace, FarmTilePosition, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { PlayerScoreSummary } from '../../shared/domain/scoring'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import { hasHealthyWorkerAtHome } from '../../shared/moor/heating'
+import { isMoorSpecialActionCardUsableByPlayer } from '../../shared/moor/special-actions'
+import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import type { Locale } from '../../shared/i18n'
 import type { PlayerScoreRow } from '../components/board/ScorePanel'
 import type {
@@ -29,6 +32,27 @@ export type { WsStatus } from './ws-status'
 
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
+
+export const canTakeVisibleMoorSpecialAction = (
+  state: GameState,
+  currentPlayer: PlayerState,
+  card: MoorSpecialActionCardState,
+  actionId: MoorSpecialActionId,
+): boolean => {
+  if (state.players[state.currentPlayerIndex]?.id !== currentPlayer.id) return false
+  if (!isMoorSpecialActionCardUsableByPlayer(card, currentPlayer.id)) return false
+  if (!hasHealthyWorkerAtHome(state, currentPlayer)) return false
+  const borrowFood = card.location.kind === 'playerFaceUp' && card.location.playerId !== currentPlayer.id ? 2 : 0
+  const actionFood =
+    actionId === 'horse-market' && [2, 5, 6].includes(state.players.length) ? 1
+      : actionId === 'illicit-work' ? 1
+        : 0
+  const actionFuel = actionId === 'black-market' || actionId === 'illicit-work' ? 1 : 0
+  return (
+    currentPlayer.resources.food >= borrowFood + actionFood &&
+    (currentPlayer.resources.fuel ?? 0) >= actionFuel
+  )
+}
 
 type PublicEventCancellationSnapshotPayload = {
   publicEventCancellations?: GameSyncPayload['publicEventCancellations']
