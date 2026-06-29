@@ -958,6 +958,7 @@ import { M097_VillageHall } from './M/M097_VillageHall'
 import { M098_FishSmokehouse } from './M/M098_FishSmokehouse'
 import { M099_HealingClay } from './M/M099_HealingClay'
 import { M100_Pheromones } from './M/M100_Pheromones'
+import { M101_ButchersBlock } from './M/M101_ButchersBlock'
 import { M103_ForestKindergarten } from './M/M103_ForestKindergarten'
 import { M104_WildHarvest } from './M/M104_WildHarvest'
 import { M107_PotRoastRecipe } from './M/M107_PotRoastRecipe'
@@ -1961,6 +1962,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M098_FishSmokehouse': M098_FishSmokehouse.impl,
   'M099_HealingClay': M099_HealingClay.impl,
   'M100_Pheromones': M100_Pheromones.impl,
+  'M101_ButchersBlock': M101_ButchersBlock.impl,
   'M103_ForestKindergarten': M103_ForestKindergarten.impl,
   'M104_WildHarvest': M104_WildHarvest.impl,
   'M107_PotRoastRecipe': M107_PotRoastRecipe.impl,
