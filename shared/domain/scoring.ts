@@ -7,7 +7,7 @@ import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
 } from '../cards/registry-display'
-import { isMajorCardId } from '../cards/helpers/card-type.ts'
+import { getCardDefinitionById, isMajorCardId } from '../cards/helpers/card-type.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type {
   BonusScoreLevel,
@@ -23,6 +23,7 @@ import {
 } from './scoring-reserve.ts'
 import { getParentCardDefinition } from '../parents'
 import { readAllPublicCardMarkers } from '../cards/helpers/public-card-markers.ts'
+import { readAnimalHolderCounts } from './animal-holder-state.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -76,6 +77,15 @@ export type PlayerScoreSummary = {
   playerName: string
   categories: ScoreCategoryResult[]
   total: number
+}
+
+const countNonAnimalHolderCardAnimals = (player: PlayerState, animal: 'horse'): number => {
+  let count = 0
+  for (const [cardId, state] of Object.entries(player.cardStates ?? {})) {
+    if (getCardDefinitionById(cardId)?.animalHolder === true) continue
+    count += readAnimalHolderCounts(state?.extraData)[animal] ?? 0
+  }
+  return count
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +447,8 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     if (state.enableFarmersOfTheMoor === true) {
       const horseCount = player.resources.horse ?? 0
-      const horseScore = horseCount > 0 ? horseCount : -1
+      const halfValueHorses = Math.min(horseCount, countNonAnimalHolderCardAnimals(player, 'horse'))
+      const horseScore = horseCount > 0 ? horseCount - halfValueHorses * 0.5 : -1
       categories.push({
         key: 'horses',
         total: horseScore,
