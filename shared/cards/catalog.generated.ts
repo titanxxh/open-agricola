@@ -15159,7 +15159,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "vp": 1,
     "prerequisite": "see below",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },

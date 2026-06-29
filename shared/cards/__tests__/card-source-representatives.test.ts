@@ -263,6 +263,7 @@ describe('Card Source representative migrations', () => {
       'M098_FishSmokehouse',
       'M099_HealingClay',
       'M100_Pheromones',
+      'M101_ButchersBlock',
       'M103_ForestKindergarten',
       'M104_WildHarvest',
       'M105_OpenGrill',
