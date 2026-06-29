@@ -178,6 +178,15 @@ describe('M046/M047 covered farm terrain', () => {
     }).ok).toBe(false)
   })
 
+  it('M046 requires at least four visible forests', () => {
+    const session = setup('M046_Thicket', (player) => {
+      player.farmTerrain = [forestA, forestB, forestC, moorA, moorB]
+    })
+    const player = session.state.players[0]!
+
+    expect(meetsCardPrerequisites(player, M046_Thicket, session.state.round, session.state)).toBe(false)
+  })
+
   it('M047 covers selected moors with visible forests and hides the moors', () => {
     const session = setup('M047_BogForest', (player) => {
       player.resources.vegetable = 1

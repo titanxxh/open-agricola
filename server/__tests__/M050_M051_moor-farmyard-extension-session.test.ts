@@ -7,6 +7,8 @@ import { addFarmyardExtension } from '../../shared/domain/farmyard-extensions'
 import { getFarmyardTilePositions, isFarmyardBorderEdge, positionKey } from '../../shared/domain/farm'
 import { getUnusedTerrainTiles } from '../../shared/moor/terrain-flow'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { M051_MoorEnclosures } from '../../shared/cards/M/M051_MoorEnclosures'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { FarmTilePosition, Resource } from '../../shared/contract/types'
 
 const PLACEHOLDER = '__test_placeholder__'
@@ -188,5 +190,18 @@ describe('M050/M051 farmyard extension', () => {
       expect.arrayContaining(['-1-0', '-1-1']),
     )
     expect(countUnusedFarmyardSpaces(player)).toBe(13)
+  })
+
+  it('M051 requires a clay house', () => {
+    const session = setup('M051_MoorEnclosures')
+    const player = session.state.players[0]!
+    player.houseType = 'wood'
+    session.loadState(session.state)
+
+    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(false)
+    player.houseType = 'stone'
+    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(false)
+    player.houseType = 'clay'
+    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(true)
   })
 })

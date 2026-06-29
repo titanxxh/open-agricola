@@ -27,6 +27,8 @@ const cardImpl = {
       sourceCard: CARD_ID,
       actionContext: {
         fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          segmentBounds: { total: { min: 4, max: 4 } },
           connectionPolicy: 'allowDisconnected',
           allowedNewRegionTiles: nonAdjacentUnusedTiles(player),
           newPastureBounds: {

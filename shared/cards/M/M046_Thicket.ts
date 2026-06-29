@@ -9,6 +9,8 @@ const cardImpl = {
     id: CARD_ID,
     onBuy: (_state, player) => buildCoverTerrainFlow(CARD_ID, player, 'forest', 'forest', 2),
   },
+  prerequisiteCheck: (player) =>
+    (player.farmTerrain ?? []).filter((tile) => tile.kind === 'forest').length >= 4,
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

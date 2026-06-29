@@ -65,6 +65,9 @@ const playMinor = (session: GameSession, cardId: string) => {
   if (resp.interaction.stateId === 'wait' && resp.interaction.selection?.kind === 'farm-position') {
     return resp
   }
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionOptionalAction') {
+    return resp
+  }
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
   const card = resp.interaction.options?.find((option) => option.value === cardId)
@@ -85,6 +88,28 @@ const commitPosition = (
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, {
     positions: [{ row: tile.row, col: tile.col }],
   })
+}
+
+const acceptOptionalAction = (
+  session: GameSession,
+  resp: ReturnType<typeof playMinor>,
+) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  expect(option).toBeDefined()
+  return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
+}
+
+const skipOptionalAction = (
+  session: GameSession,
+  resp: ReturnType<typeof playMinor>,
+) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+  return session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
 }
 
 const cardBonusVp = (state: GameState) =>
@@ -165,7 +190,11 @@ describe('Moor farmyard space states', () => {
   it('M064 blocks one unused farmyard space and scores the tombstone bonus', () => {
     const target = { row: 1, col: 3 }
     const session = setup('M064_FamilyBurialPlot')
-    const resp = commitPosition(session, playMinor(session, 'M064_FamilyBurialPlot'), target)
+    const resp = commitPosition(
+      session,
+      acceptOptionalAction(session, playMinor(session, 'M064_FamilyBurialPlot')),
+      target,
+    )
     const player = resp.state.players[0]!
 
     expect(player.farmyardSpaceStates).toContainEqual({
@@ -177,6 +206,16 @@ describe('Moor farmyard space states', () => {
     })
     expect(getUsedFarmyardTileKeys(player)).toContain(positionKey(target))
     expect(cardBonusVp(resp.state)).toBe(1)
+  })
+
+  it('M064 can skip placing the optional tombstone', () => {
+    const session = setup('M064_FamilyBurialPlot')
+    const resp = skipOptionalAction(session, playMinor(session, 'M064_FamilyBurialPlot'))
+    const player = resp.state.players[0]!
+
+    expect(resp.ok).toBe(true)
+    expect(player.farmyardSpaceStates ?? []).toEqual([])
+    expect(cardBonusVp(resp.state)).toBe(0)
   })
 
   it('M070 can spend a fence after Cut Peat to block and score the emptied space', () => {

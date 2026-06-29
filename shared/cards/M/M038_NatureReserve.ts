@@ -70,6 +70,7 @@ const activateReserveTiles = (player: PlayerState) => {
   const reserves = reserveTiles(player)
   if (reserves.length === 0) return
   const terrainKeys = new Set((player.farmTerrain ?? []).map(positionKey))
+  const fieldKeys = new Set(player.fields.map(positionKey))
   const regions = fencedRegions(player)
   const pastureRegions = new Set(player.pastures.map((pasture) => regionKey(pasture.tiles ?? [])))
   const stableKeys = new Set(player.stableTiles.map(positionKey))
@@ -81,6 +82,7 @@ const activateReserveTiles = (player: PlayerState) => {
       remaining.push(reserve)
       continue
     }
+    if (fieldKeys.has(key)) continue
     const region = regions.find((candidate) =>
       candidate.tiles.some((tile) => positionKey(tile) === key),
     )
@@ -119,7 +121,7 @@ const activateListener: CardListenerRegistration = {
   id: 'M038-nature-reserve-activate-cleared-terrain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'cut-peat', 'slash-and-burn'],
+  actions: ['fell-trees', 'cut-peat'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     activateReserveTiles(context.ownerPlayer ?? context.player)
   },
