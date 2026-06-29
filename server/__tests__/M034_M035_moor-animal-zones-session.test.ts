@@ -228,6 +228,71 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
     }))
   })
 
+  it('M034 stale zone storage does not satisfy pending animal checks after the forest disappears', () => {
+    const { session } = setup([HOME_WOOD])
+    const card = findSpecialCardFor(session, 'horse-market')
+    let resp = session.takeSpecialAction(0, card.id, 'horse-market')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    if (resp.interaction.request.kind !== 'animal-reorg') throw new Error('expected animal reorg')
+    const forestZone = resp.interaction.request.zones.find((zone) =>
+      zone.cardId === HOME_WOOD && zone.farmPosition?.row === 0 && zone.farmPosition.col === 0
+    )
+    expect(forestZone).toBeDefined()
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        {
+          id: forestZone!.id,
+          zoneType: 'card',
+          cardId: HOME_WOOD,
+          animalType: 'horse',
+          animalCount: 1,
+        },
+      ],
+    })
+    const state = resp.state
+    const player = state.players[0]!
+    player.farmTerrain = player.farmTerrain?.filter((tile) =>
+      !(tile.row === 0 && tile.col === 0)
+    )
+    session.loadState(state)
+
+    expect(session.hasPendingAnimalsCheck(session.state.players[0]!)).toBe(true)
+  })
+
+  it('M034 visible zone storage is not double-counted when another animal is gained', () => {
+    const { session } = setup([HOME_WOOD])
+    const card = findSpecialCardFor(session, 'horse-market')
+    let resp = session.takeSpecialAction(0, card.id, 'horse-market')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    if (resp.interaction.request.kind !== 'animal-reorg') throw new Error('expected animal reorg')
+    const forestZone = resp.interaction.request.zones.find((zone) =>
+      zone.cardId === HOME_WOOD
+    )
+    expect(forestZone).toBeDefined()
+
+    resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        {
+          id: forestZone!.id,
+          zoneType: 'card',
+          cardId: HOME_WOOD,
+          animalType: 'horse',
+          animalCount: 1,
+        },
+      ],
+    })
+    const state = resp.state
+    state.players[0]!.resources.boar = 1
+    session.loadState(state)
+
+    expect(session.hasPendingAnimalsCheck(session.state.players[0]!)).toBe(true)
+  })
+
   it('M035 creates horse capacity only on unused spaces adjacent to the house and keeps the space unused', () => {
     const { session, player } = setup([HORSE_TROUGH])
     player.fields = [{ row: 1, col: 3, stacks: [] }]

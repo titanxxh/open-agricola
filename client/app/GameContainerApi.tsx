@@ -1522,8 +1522,8 @@ export const GameContainerApi = () => {
     return buildCardDisplayMap(animalReorg)
   }, [animalReorg])
   const farmCardDisplayMap = useMemo(() => {
-    return buildFarmCardDisplayMap(animalReorg)
-  }, [animalReorg])
+    return buildFarmCardDisplayMap(displayPlayer, animalReorg)
+  }, [displayPlayer, animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null

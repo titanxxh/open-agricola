@@ -3,7 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
 import { familySize, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
-import type { Resource, SessionResponse } from '../../shared/contract/types'
+import { runCardListeners } from '../../shared/cards/card-listeners'
+import type { ActionFlow, Resource, SessionResponse } from '../../shared/contract/types'
 
 const M052 = 'M052_WeddingCoach'
 const M053 = 'M053_ForestHut'
@@ -145,6 +146,12 @@ const findSpecialCard = (session: GameSession, actionId: string) =>
     card.actions.includes(actionId as never),
   )!
 
+const actionIds = (flow: ActionFlow | undefined): string[] => {
+  if (!flow) return []
+  if (flow.type === 'leaf') return [flow.actionId]
+  return flow.children.flatMap(actionIds)
+}
+
 describe('M052/M053 temporary people', () => {
   it('M052 grows without room, holds the newborn on the card, and releases it at returning home', () => {
     const session = setup(M052)
@@ -239,5 +246,62 @@ describe('M052/M053 temporary people', () => {
       removedFromSupply: false,
     })
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy ?? []).toEqual([])
+  })
+
+  it('M053 unlocks when Fell Trees removes the bound forest but reveals covered terrain', () => {
+    const session = setup(M053)
+    let resp = playMinor(session, M053)
+    resp = chooseForestBinding(session, resp)
+
+    const state = resp.state
+    const player = state.players[0]!
+    const workerId = player.cardStates[M053]?.extraData?.temporaryWorkerId
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'moor' }]
+
+    const result = runCardListeners({
+      state,
+      player,
+      actionId: 'fell-trees',
+      phase: 'after',
+      extraData: {
+        payload: { tile: { row: 0, col: 0 } },
+        terrainCleared: false,
+      },
+    })
+
+    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual(['place-farmer'])
+    expect(player.cardStates[M053]?.extraData?.boundForest).toBeUndefined()
+    expect(player.cardStates[M053]?.extraData?.farmTerrainMarkers).toEqual([])
+    expect(workerId).toBeDefined()
+  })
+
+  it('M053 unlocks when a terrain selection turns the bound forest into moor', () => {
+    const session = setup(M053)
+    let resp = playMinor(session, M053)
+    resp = chooseForestBinding(session, resp)
+
+    const state = resp.state
+    const player = state.players[0]!
+    player.farmTerrain = [{ row: 0, col: 0, kind: 'moor' }]
+
+    const result = runCardListeners({
+      state,
+      player,
+      actionId: 'selection',
+      phase: 'after',
+      actionContext: {
+        terrainMode: 'replace-kind',
+        terrainFromKind: 'forest',
+        terrainToKind: 'moor',
+      },
+      result: {
+        type: 'ok',
+        extraData: { selectedPositions: ['0-0'] },
+      },
+    })
+
+    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual(['place-farmer'])
+    expect(player.cardStates[M053]?.extraData?.boundForest).toBeUndefined()
+    expect(player.cardStates[M053]?.extraData?.farmTerrainMarkers).toEqual([])
   })
 })

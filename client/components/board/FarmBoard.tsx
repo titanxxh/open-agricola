@@ -38,6 +38,8 @@ type CardAnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalType, number>>
+  allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
   capacity: number
   zoneId: string
 }
@@ -352,6 +354,12 @@ const readFarmTerrainMarkers = (player: PlayerState): FarmTerrainMarker[] =>
       workerId: typeof marker.workerId === 'string' ? marker.workerId : undefined,
     }))
   })
+
+const canCardZoneAcceptAnimal = (display: CardAnimalDisplay, animalType: AnimalType) => {
+  if (display.allowedAnimalTypes && !display.allowedAnimalTypes.includes(animalType)) return false
+  if (display.allowedAnimalType && display.allowedAnimalType !== animalType) return false
+  return true
+}
 
 export type FarmBoardProps = {
   locale: Locale
@@ -1306,6 +1314,7 @@ export const FarmBoard = ({
                         const totalCount = sumAnimalCounts(cardAnimalCounts) || farmCardDisplay.animalCount
                         const canDecrease = count > 0
                         const canIncrease =
+                          canCardZoneAcceptAnimal(farmCardDisplay, animalType) &&
                           (reorgRemaining?.[animalType] ?? 0) > 0 &&
                           farmCardDisplay.capacity > 0 &&
                           totalCount < farmCardDisplay.capacity

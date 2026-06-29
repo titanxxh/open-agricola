@@ -2,7 +2,12 @@ import type { Pasture, PlayerState } from '../../../shared/contract/types'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
 import type { GameState } from '../../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
-import { positionKey } from '../../../shared/domain/farm'
+import { parsePositionKey, positionKey } from '../../../shared/domain/farm'
+import {
+  compactAnimalCounts,
+  readAnimalHolderCounts,
+  sumAnimalCounts,
+} from '../../../shared/domain/animal-holder-state'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
@@ -14,6 +19,8 @@ type AnimalDisplay = {
   animalType: AnimalType | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalType, number>>
+  allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
 }
 
 const interactionZoneAnimalTotal = (zone: AnimalReorgState['zones'][number]) => {
@@ -150,6 +157,8 @@ export const buildCardDisplayMap = (
         animalType: zone.animalType,
         animalCount: zone.animalCount,
         animalCounts: zone.animalCounts,
+        allowedAnimalType: zone.allowedAnimalType,
+        allowedAnimalTypes: zone.allowedAnimalTypes,
         capacity: zone.capacity,
         zoneId: zone.id,
       })
@@ -157,10 +166,59 @@ export const buildCardDisplayMap = (
   return map
 }
 
+const animalTypeFromCounts = (counts: Partial<Record<AnimalType, number>>): AnimalType | null => {
+  const used = ALL_ANIMAL_KEYS.filter((animal) => (counts[animal] ?? 0) > 0)
+  return used.length === 1 ? used[0]! : null
+}
+
+const readAllowedAnimalType = (value: unknown): AnimalType | null | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const type = (value as { allowedAnimalType?: unknown }).allowedAnimalType
+  if (type === null) return null
+  return ALL_ANIMAL_KEYS.includes(type as AnimalType) ? type as AnimalType : undefined
+}
+
+const readAllowedAnimalTypes = (value: unknown): AnimalType[] | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const types = (value as { allowedAnimalTypes?: unknown }).allowedAnimalTypes
+  if (!Array.isArray(types)) return undefined
+  return types.filter((type): type is AnimalType => ALL_ANIMAL_KEYS.includes(type as AnimalType))
+}
+
+const readCapacity = (value: unknown, fallback: number) => {
+  if (!value || typeof value !== 'object') return fallback
+  const capacity = (value as { capacity?: unknown }).capacity
+  return typeof capacity === 'number' && Number.isFinite(capacity)
+    ? Math.max(0, Math.floor(capacity))
+    : fallback
+}
+
 export const buildFarmCardDisplayMap = (
+  player: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
   const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  Object.values(player?.cardStates ?? {}).forEach((state) => {
+    const countsByZone = state?.extraData?.animalCountsByZone
+    if (!countsByZone || typeof countsByZone !== 'object') return
+    Object.entries(countsByZone as Record<string, unknown>).forEach(([zoneId, stored]) => {
+      const position = parsePositionKey(zoneId.split('@')[1] ?? '')
+      if (!position) return
+      const animalCounts = readAnimalHolderCounts(stored)
+      const animalCount = sumAnimalCounts(animalCounts)
+      if (animalCount <= 0) return
+      const compact = compactAnimalCounts(animalCounts)
+      map.set(positionKey(position), {
+        animalType: animalTypeFromCounts(compact),
+        animalCount,
+        animalCounts: compact,
+        allowedAnimalType: readAllowedAnimalType(stored),
+        allowedAnimalTypes: readAllowedAnimalTypes(stored),
+        capacity: readCapacity(stored, animalCount),
+        zoneId,
+      })
+    })
+  })
   animalReorg?.zones
     .filter((zone) => zone.zoneType === 'card' && zone.farmPosition)
     .forEach((zone) => {
@@ -168,6 +226,8 @@ export const buildFarmCardDisplayMap = (
         animalType: zone.animalType,
         animalCount: zone.animalCount,
         animalCounts: zone.animalCounts,
+        allowedAnimalType: zone.allowedAnimalType,
+        allowedAnimalTypes: zone.allowedAnimalTypes,
         capacity: zone.capacity,
         zoneId: zone.id,
       })
