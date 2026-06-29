@@ -897,6 +897,7 @@ import { M026_ChimneyHood } from './M/M026_ChimneyHood'
 import { M028_OutOnTheWallaby } from './M/M028_OutOnTheWallaby'
 import { M029_Tinker } from './M/M029_Tinker'
 import { M030_FarmAnimalMarket } from './M/M030_FarmAnimalMarket'
+import { M031_LivestockMarket } from './M/M031_LivestockMarket'
 import { M032_PeatHut } from './M/M032_PeatHut'
 import { M036_PeatMoss } from './M/M036_PeatMoss'
 import { M037_BuildingPlan } from './M/M037_BuildingPlan'
@@ -1897,6 +1898,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M028_OutOnTheWallaby': M028_OutOnTheWallaby.impl,
   'M029_Tinker': M029_Tinker.impl,
   'M030_FarmAnimalMarket': M030_FarmAnimalMarket.impl,
+  'M031_LivestockMarket': M031_LivestockMarket.impl,
   'M032_PeatHut': M032_PeatHut.impl,
   'M036_PeatMoss': M036_PeatMoss.impl,
   'M037_BuildingPlan': M037_BuildingPlan.impl,

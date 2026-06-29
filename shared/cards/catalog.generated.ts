@@ -13885,7 +13885,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "prerequisite": "5 Animals",
     "passing": true,
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
