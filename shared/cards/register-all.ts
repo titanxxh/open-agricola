@@ -919,6 +919,7 @@ import { M050_FarmExtension } from './M/M050_FarmExtension'
 import { M051_MoorEnclosures } from './M/M051_MoorEnclosures'
 import { M054_AgriculturalImplement } from './M/M054_AgriculturalImplement'
 import { M055_ToolShed } from './M/M055_ToolShed'
+import { M056_PeatCuttingRights } from './M/M056_PeatCuttingRights'
 import { M058_PeatFertilizer } from './M/M058_PeatFertilizer'
 import { M059_NaturesFertilizer } from './M/M059_NaturesFertilizer'
 import { M060_SowingMachine } from './M/M060_SowingMachine'
@@ -985,6 +986,7 @@ import { M127_Wheelbarrow } from './M/M127_Wheelbarrow'
 import { M128_Workbench } from './M/M128_Workbench'
 import { M129_PlowhorseMarket } from './M/M129_PlowhorseMarket'
 import { M130_Nosebag } from './M/M130_Nosebag'
+import { M131_CattleStall } from './M/M131_CattleStall'
 import { STUB_BeforeBakeGainClay } from './__stubs__/STUB_BeforeBakeGainClay'
 import { Major_ClayOven } from './major/clay-oven'
 import { Major_StoneOven } from './major/stone-oven'
@@ -1923,6 +1925,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M051_MoorEnclosures': M051_MoorEnclosures.impl,
   'M054_AgriculturalImplement': M054_AgriculturalImplement.impl,
   'M055_ToolShed': M055_ToolShed.impl,
+  'M056_PeatCuttingRights': M056_PeatCuttingRights.impl,
   'M058_PeatFertilizer': M058_PeatFertilizer.impl,
   'M059_NaturesFertilizer': M059_NaturesFertilizer.impl,
   'M060_SowingMachine': M060_SowingMachine.impl,
@@ -1989,6 +1992,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M128_Workbench': M128_Workbench.impl,
   'M129_PlowhorseMarket': M129_PlowhorseMarket.impl,
   'M130_Nosebag': M130_Nosebag.impl,
+  'M131_CattleStall': M131_CattleStall.impl,
   'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay.impl,
   'Major_ClayOven': Major_ClayOven.impl,
   'Major_StoneOven': Major_StoneOven.impl,
