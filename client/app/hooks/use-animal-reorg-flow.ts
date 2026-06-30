@@ -8,7 +8,6 @@ import {
   readAnimalHolderCounts,
   sumAnimalCounts,
 } from '../../../shared/domain/animal-holder-state'
-import { getPrivateAnimalsByType } from '../../../shared/domain/animals'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
@@ -54,10 +53,9 @@ export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined)
   Boolean(remaining && ALL_ANIMAL_KEYS.some((animal) => remaining[animal] > 0))
 
 export const computeReorgAvailableAnimals = (player: PlayerState): AnimalTotals => {
-  const privateCounts = getPrivateAnimalsByType(player)
   const totals = {} as AnimalTotals
   for (const animal of ALL_ANIMAL_KEYS) {
-    totals[animal] = Math.max(0, Math.floor((player.resources[animal] ?? 0) - (privateCounts[animal] ?? 0)))
+    totals[animal] = Math.max(0, Math.floor(player.resources[animal] ?? 0))
   }
   return totals
 }

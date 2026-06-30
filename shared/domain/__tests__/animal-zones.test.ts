@@ -52,21 +52,23 @@ describe('AnimalZones', () => {
     expect(canAccommodateAllAnimals(state, player, ['sheep', 'boar'])).toBe(false)
   })
 
-  it('ignores private card animals when checking visible accommodation totals', () => {
+  it('counts M084 lying horses against their visible animal space', () => {
     const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
     const player = playerWithPasture({
       pastures: [],
+      houseAnimalType: 'horse',
+      houseAnimalCount: 1,
       minorPlayed: ['M084_BogPony'],
       cardStates: {
         M084_BogPony: {
-          extraData: { privateAnimalCounts: { horse: 1 } },
+          extraData: { lyingHorseCount: 1 },
         },
       } as never,
     })
     player.resources.horse = 1
 
-    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(true)
-    expect(canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 })).toBe(true)
+    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(false)
+    expect(canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 })).toBe(false)
   })
 
   it('allows mixed animals only in explicitly mixed card zones', () => {
@@ -323,45 +325,47 @@ describe('AnimalZones', () => {
     expect(player.houseAnimalCount).toBe(1)
   })
 
-  it('enforceCapacity keeps private horses off visible zones', () => {
+  it('enforceCapacity keeps M084 lying horses in visible animal zones', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.enableFarmersOfTheMoor = true
     const player = state.players[0]
     player.resources.horse = 1
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
     player.pastures = []
     player.cardStates = {
-      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
     playerBoard(state, 0).animals.enforceCapacity()
 
     expect(player.resources.horse).toBe(1)
-    expect(player.houseAnimalType).toBeNull()
-    expect(player.houseAnimalCount).toBe(0)
-    expect(player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(player.houseAnimalType).toBe('horse')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
-  it('enforceCapacity preserves private horses when visible capacity is occupied', () => {
+  it('enforceCapacity discards excess visible animals before a M084 lying horse occupying the house', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.enableFarmersOfTheMoor = true
     const player = state.players[0]
     player.resources.sheep = 1
     player.resources.horse = 1
-    player.houseAnimalType = 'sheep'
+    player.houseAnimalType = 'horse'
     player.houseAnimalCount = 1
     player.pastures = []
     player.cardStates = {
-      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
 
     playerBoard(state, 0).animals.enforceCapacity()
 
-    expect(player.resources.sheep).toBe(1)
+    expect(player.resources.sheep).toBe(0)
     expect(player.resources.horse).toBe(1)
-    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalType).toBe('horse')
     expect(player.houseAnimalCount).toBe(1)
-    expect(player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 })

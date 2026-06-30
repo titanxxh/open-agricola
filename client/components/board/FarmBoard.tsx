@@ -30,6 +30,7 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
+import { readBogPonyLyingHorseCountFromExtraData } from '../../../shared/domain/bog-pony'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -1570,17 +1571,9 @@ export const FarmBoard = ({
           )
           const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
           const cardDisplay = cardDisplayMap.get(rawId)
-          const extraAnimalCounts = displayPlayer.cardStates?.[rawId]?.extraData as
-            | { privateAnimalCounts?: { horse?: number } }
-            | undefined
           const m084LyingHorses =
             rawId === M084_BOG_PONY_ID
-              ? Math.max(
-                0,
-                Math.floor(
-                  Number(extraAnimalCounts?.privateAnimalCounts?.horse ?? 0),
-                ),
-              )
+              ? readBogPonyLyingHorseCountFromExtraData(displayPlayer.cardStates?.[rawId]?.extraData)
               : 0
 
           return (

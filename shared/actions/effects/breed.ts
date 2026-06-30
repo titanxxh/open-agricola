@@ -13,7 +13,7 @@ import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
 import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
-import { getPrivateAnimalsByType } from '../../domain/animals'
+import { getBogPonyLyingHorseCount } from '../../domain/bog-pony'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
@@ -21,7 +21,8 @@ export type BreedOptions = {
 }
 
 const countBreedableAnimals = (player: PlayerState, type: BreedAnimalType): number => {
-  return Math.max(0, (player.resources[type] ?? 0) - (getPrivateAnimalsByType(player)[type] ?? 0))
+  const lyingHorses = type === 'horse' ? getBogPonyLyingHorseCount(player) : 0
+  return Math.max(0, (player.resources[type] ?? 0) - lyingHorses)
 }
 
 export const canBreedAnimals = (

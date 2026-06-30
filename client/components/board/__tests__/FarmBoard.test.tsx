@@ -609,7 +609,7 @@ describe('FarmBoard', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.minorPlayed = ['M084_BogPony']
     player.cardStates = {
-      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 2 } } },
+      M084_BogPony: { extraData: { lyingHorseCount: 2 } },
     }
 
     const html = renderToStaticMarkup(
