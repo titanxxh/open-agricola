@@ -368,4 +368,28 @@ describe('AnimalZones', () => {
     expect(player.houseAnimalCount).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
+
+  it('enforceCapacity consumes M084 lying markers first when horses are evicted', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.resources.horse = 1
+    player.minorPlayed = ['M084_BogPony']
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.sheep).toBe(1)
+    expect(player.resources.horse).toBe(0)
+    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
 })

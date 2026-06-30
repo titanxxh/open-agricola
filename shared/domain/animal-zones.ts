@@ -1,7 +1,12 @@
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { ALL_ANIMAL_KEYS, animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getCardEffect, type Meeple, type PastureCapacityModifier } from '../cards/card-effects.ts'
+import {
+  getCardEffect,
+  notifyAnimalsRemovedFromCardEffects,
+  type Meeple,
+  type PastureCapacityModifier,
+} from '../cards/card-effects.ts'
 import { playerHasCardCapability } from '../cards/helpers/card-type.ts'
 import {
   clampAnimalCountsToCapacity,
@@ -517,6 +522,7 @@ export const enforceAnimalCapacity = (
   const animalKeys = animalKeysForState(state)
   const totals: Partial<Record<AnimalType, number>> = {}
   for (const key of animalKeys) totals[key] = player.resources[key] ?? 0
+  const resourcesBefore = { ...totals }
   const looseStableKeys = getLooseStableKeys(player)
   const stableAnimals: Record<string, AnimalType | null> = {}
   looseStableKeys.forEach((key) => {
@@ -607,6 +613,12 @@ export const enforceAnimalCapacity = (
       if (type === animalType) player.resources[animalType] = (player.resources[animalType] ?? 0) + 1
     })
   }
+  const removed = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  for (const animalType of animalKeys) {
+    const amount = (resourcesBefore[animalType] ?? 0) - (player.resources[animalType] ?? 0)
+    if (amount > 0) removed[animalType] = amount
+  }
+  if (sumAnimalCounts(removed) > 0) notifyAnimalsRemovedFromCardEffects(state, player, removed)
 
   // Per-card zone validation hook: BGA `getInvalidAnimals($zone, ...)`. We
   // run this for each card-typed zone so card authors can mirror BGA's
