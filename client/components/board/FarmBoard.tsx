@@ -460,6 +460,7 @@ export type FarmBoardProps = {
     maxSelections: number
   }
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+  infirmaryWorkerCount?: number
   highlightedFarmTileKeys?: ReadonlySet<string>
   highlightedFenceEdgeIds?: ReadonlySet<string>
 }
@@ -786,6 +787,7 @@ export const FarmBoard = ({
   isInteractive,
   occupationHandSelection,
   onConfirmOccupationHandSelection,
+  infirmaryWorkerCount,
   highlightedFarmTileKeys = new Set<string>(),
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
@@ -813,6 +815,7 @@ export const FarmBoard = ({
         fields: '田地',
         fence: '栅栏容量',
         stable: '畜栏供给',
+        infirmary: '病房工人',
       }
     : {
         family: 'Family capacity',
@@ -821,6 +824,7 @@ export const FarmBoard = ({
         fields: 'Fields',
         fence: 'Fence capacity',
         stable: 'Stable supply',
+        infirmary: 'Infirmary workers',
       }
 
   // Multi-select state for occupation-hand selection interaction
@@ -901,6 +905,9 @@ export const FarmBoard = ({
           <span className="res-compact-divider" />
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
+            {typeof infirmaryWorkerCount === 'number' ? (
+              <CompactResourceItem iconClass="res-icon-infirmary-worker res-icon-child-free" value={infirmaryWorkerCount} label={`${compactLabels.infirmary}: ${infirmaryWorkerCount}`} />
+            ) : null}
             <CompactResourceItem iconClass={roomIconClass} value={summary.rooms.count} label={`${compactLabels.rooms}: ${summary.rooms.count}`} />
             <CompactResourceItem iconClass="res-icon-child-free" value={summary.housingCapacity.value} label={`${compactLabels.housing}: ${summary.housingCapacity.value}`} />
             <CompactResourceItem iconClass="res-icon-field" value={displayPlayer.fields.length} label={`${compactLabels.fields}: ${displayPlayer.fields.length}`} />
