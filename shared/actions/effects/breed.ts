@@ -11,18 +11,12 @@ import type { EventSink } from '../../contract/events'
 import { animalKeysForState } from '../../contract/animals'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
-import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
+import { getBreedableAnimalCount, getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
-import { getBogPonyLyingHorseCount } from '../../domain/bog-pony'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
   sourceCard: string
-}
-
-const countBreedableAnimals = (player: PlayerState, type: BreedAnimalType): number => {
-  const lyingHorses = type === 'horse' ? getBogPonyLyingHorseCount(player) : 0
-  return Math.max(0, (player.resources[type] ?? 0) - lyingHorses)
 }
 
 export const canBreedAnimals = (
@@ -34,7 +28,9 @@ export const canBreedAnimals = (
   const freeCapacity = getTotalAnimalCapacity(player, state)
   for (const type of types) {
     if (freeCapacity <= 0) return false
-    if (countBreedableAnimals(player, type) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    const ctx = { sourceCard: opts.sourceCard }
+    const breedableCount = getBreedableAnimalCount(state, player, type, player.resources[type] ?? 0, ctx)
+    if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
     return true
   }
   return false
@@ -62,7 +58,9 @@ export const breed = (
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   for (const type of types) {
     if (freeCapacity <= 0) break
-    if (countBreedableAnimals(player, type) < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
+    const ctx = { sourceCard: opts.sourceCard }
+    const breedableCount = getBreedableAnimalCount(state, player, type, player.resources[type] ?? 0, ctx)
+    if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
     player.resources[type] += 1
     summary.resources[type] = 1
     summary.animalTypes += 1
