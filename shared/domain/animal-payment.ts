@@ -1,10 +1,9 @@
 import type { GameState, PlayerState } from '../contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 import { computeAnimalZones, type AnimalZone } from './animal-zones'
+import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from './animals'
 import {
-  readAnimalHolderCounts,
   readPrivateAnimalCounts,
-  writeAnimalHolderCounts,
   writePrivateAnimalCounts,
 } from './animal-holder-state'
 
@@ -74,55 +73,14 @@ const takeFromPrivateAnimals = (
   return amount - remaining
 }
 
-const takeFromBoardAnimals = (
+const takeFromVisibleAnimals = (
   player: PlayerState,
   animal: AnimalKey,
   amount: number,
 ): number => {
-  let remaining = amount
-  for (const pasture of player.pastures ?? []) {
-    if (remaining <= 0) break
-    if (pasture.animalType !== animal) continue
-    const take = Math.min(pasture.animalCount, remaining)
-    pasture.animalCount -= take
-    remaining -= take
-    if (pasture.animalCount <= 0) pasture.animalType = null
-  }
-  if (remaining > 0 && player.houseAnimalType === animal && player.houseAnimalCount > 0) {
-    const take = Math.min(player.houseAnimalCount, remaining)
-    player.houseAnimalCount -= take
-    remaining -= take
-    if (player.houseAnimalCount <= 0) player.houseAnimalType = null
-  }
-  if (remaining > 0 && player.stableAnimals) {
-    for (const [key, value] of Object.entries(player.stableAnimals)) {
-      if (remaining <= 0) break
-      if (value !== animal) continue
-      player.stableAnimals[key] = null
-      remaining -= 1
-    }
-  }
-  return amount - remaining
-}
-
-const takeFromAnimalHolderCards = (
-  player: PlayerState,
-  animal: AnimalKey,
-  amount: number,
-): number => {
-  let remaining = amount
-  for (const state of Object.values(player.cardStates ?? {})) {
-    if (remaining <= 0) break
-    const extra = state?.extraData as Record<string, unknown> | undefined
-    if (!extra) continue
-    const counts = readAnimalHolderCounts(extra)
-    const take = Math.min(counts[animal] ?? 0, remaining)
-    if (take <= 0) continue
-    counts[animal] -= take
-    writeAnimalHolderCounts(extra, counts)
-    remaining -= take
-  }
-  return amount - remaining
+  const take = Math.min(getAssignedAnimalsByType(player)[animal] ?? 0, amount)
+  if (take > 0) subtractAnimalsFromBoard(player, { [animal]: take })
+  return take
 }
 
 const zoneAnimalCount = (zone: AnimalZone, animal: AnimalKey): number =>
@@ -166,14 +124,14 @@ export const applyAnimalPayment = (
   preference?: AnimalPaymentPreference,
 ): void => {
   const total = Math.max(0, Math.floor(amount))
+  const originalResource = player.resources[animal] ?? 0
   let remaining = total
   for (const source of preference?.prefer ?? []) {
     if (remaining <= 0) break
     remaining -= takeFromCardCounter(player, source, remaining)
   }
   if (remaining > 0) remaining -= takeFromPrivateAnimals(player, animal, remaining)
-  if (remaining > 0) remaining -= takeFromBoardAnimals(player, animal, remaining)
-  if (remaining > 0) remaining -= takeFromAnimalHolderCards(player, animal, remaining)
+  if (remaining > 0) remaining -= takeFromVisibleAnimals(player, animal, remaining)
   if (remaining > 0) {
     remaining -= takeFromCounterBackedAnimalZones(state, player, animal, remaining, preference?.avoid ?? [])
   }
@@ -181,5 +139,5 @@ export const applyAnimalPayment = (
     if (remaining <= 0) break
     remaining -= takeFromCardCounter(player, source, remaining)
   }
-  player.resources[animal] = Math.max(0, (player.resources[animal] ?? 0) - total)
+  player.resources[animal] = Math.max(0, originalResource - total)
 }
