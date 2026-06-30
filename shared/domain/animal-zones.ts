@@ -261,6 +261,9 @@ const ensureCardExtraData = (
   return cardState.extraData as Record<string, unknown>
 }
 
+const isCounterBackedAnimalZone = (zone: AnimalZone): boolean =>
+  zone.zoneType === 'card' && typeof zone.capacityCounterKey === 'string'
+
 const writeCardZoneStorage = (
   player: PlayerState,
   cardZones: AnimalZone[],
@@ -321,7 +324,7 @@ const reserveCardZoneAnimals = (
     }
     applyAnimalCountsToZone(zone, kept, fixedAnimalTypeForZone(state, zone))
   }
-  writeCardZoneStorage(player, cardZones)
+  writeCardZoneStorage(player, cardZones.filter((zone) => !isCounterBackedAnimalZone(zone)))
   return reserved
 }
 
