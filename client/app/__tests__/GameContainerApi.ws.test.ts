@@ -9,6 +9,7 @@ import {
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
+  devResourceKeysForState,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
@@ -24,6 +25,7 @@ import {
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
   splitBoardActionSpaces,
+  shouldShowPendingChoiceInInteractionBar,
 } from '../game-container-helpers'
 import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
 import type { ActionSpace } from '../../../shared/contract/types'
@@ -80,6 +82,13 @@ describe('GameContainerApi WS player identity', () => {
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?page=game')).toBe(false)
   })
 
+  it('includes FoM resources in the dev resource picker only for Farmers of the Moor games', () => {
+    expect(devResourceKeysForState({ enableFarmersOfTheMoor: false })).not.toContain('horse')
+    expect(devResourceKeysForState({ enableFarmersOfTheMoor: true })).toEqual(
+      expect.arrayContaining(['horse', 'fuel']),
+    )
+  })
+
   it('separates season action spaces from the normal action board', () => {
     const makeSpace = (id: string): ActionSpace => ({
       id,
@@ -117,6 +126,12 @@ describe('GameContainerApi WS player identity', () => {
     expect(farmCommitErrorMessageKey('stable', 'LIMIT_REACHED')).toBe('ui.stableErrorLimit')
     expect(farmCommitErrorMessageKey('plow', 'FENCED')).toBe('ui.plowErrorFenced')
     expect(farmCommitErrorMessageKey('sow', 'NO_SELECTION')).toBe('ui.sowErrorNoSelection')
+  })
+
+  it('routes anytime exchange choices to the exchange overlay instead of the bottom interaction bar', () => {
+    expect(shouldShowPendingChoiceInInteractionBar(null)).toBe(false)
+    expect(shouldShowPendingChoiceInInteractionBar({ promptKey: 'ui.interactionChooseOne' })).toBe(true)
+    expect(shouldShowPendingChoiceInInteractionBar({ promptKey: 'ui.interactionExchangeChoice' })).toBe(false)
   })
 
   it('disables Moor special actions when all workers at home are sick', () => {

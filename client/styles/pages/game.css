@@ -2044,6 +2044,7 @@
   filter: none;
 }
 .action-card-holder.choice-available .action-card,
+.player-action-card-wrapper.choice-available .action-card,
 .player-action-card-wrapper.choice-available .player-card {
   filter: none;
   box-shadow:
@@ -2051,6 +2052,7 @@
     0 0 18px rgba(234, 179, 8, 0.42);
 }
 .action-card-holder.choice-unavailable .action-card,
+.player-action-card-wrapper.choice-unavailable .action-card,
 .player-action-card-wrapper.choice-unavailable .player-card {
   filter: grayscale(70%) brightness(0.72);
   opacity: 0.66;
@@ -2161,6 +2163,20 @@
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0px 10px;
+}
+.player-action-space-card .action-desc {
+  gap: 2px;
+  font-size: 16px;
+}
+.player-action-space-card .action-desc .icon-line {
+  line-height: 1.05;
+  white-space: normal;
+}
+.player-action-space-card .action-desc .icon-line:first-child {
+  font-size: 1.2em;
+}
+.player-action-space-card .action-desc .icon-line .text {
+  font-size: 0.72em;
 }
 /* --- Accumulate gain display (number + resource icon inline) --- */
 .gain-display {
@@ -3535,6 +3551,19 @@
   gap: 6px;
   align-content: start;
 }
+.played-card-readonly-animals {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px 6px;
+  border: 1px solid #d7c8a1;
+  border-radius: 8px;
+  background: #fffaf0;
+  font-size: 12px;
+  line-height: 1;
+}
 .played-card {
   background: #fff;
   border-radius: 10px;
@@ -3915,6 +3944,22 @@
 .res-icon-first   { width:0.4em; height:0.9em;  background-position:93.9333% 0.523834%; background-size:2925.71%; }
 .res-icon-child   { width:1.1em; height:1.3em;  background-position:19.0819% 0.562114%; background-size:853.333%; }
 .res-icon-child-free { width:1.1em; height:1.5em; background-position:31.7333% 0.552486%; background-size:1183.82%; }
+.res-icon-infirmary-worker { position: relative; }
+.res-icon-infirmary-worker::after {
+  content: '+';
+  position: absolute;
+  right: -0.22em;
+  top: -0.34em;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 50%;
+  background: #d74332;
+  color: #fff;
+  font-size: 0.56em;
+  line-height: 0.72em;
+  text-align: center;
+  font-weight: 800;
+}
 .res-icon-room-wood  { width:1.5em; height:0.8em; background-position:74.5923% 8.62506%; background-size:1393.2%; }
 .res-icon-room-clay  { width:1.5em; height:0.8em; background-position:88.5324% 8.62069%; background-size:1393.2%; }
 .res-icon-room-stone { width:1.5em; height:0.8em; background-position:71.6544% 21.7766%; background-size:1365.33%; }

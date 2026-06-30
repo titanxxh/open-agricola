@@ -52,6 +52,14 @@ export const wouldExceedExclusiveCardZoneLimit = (
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
   Boolean(remaining && ALL_ANIMAL_KEYS.some((animal) => remaining[animal] > 0))
 
+export const computeReorgAvailableAnimals = (player: PlayerState): AnimalTotals => {
+  const totals = {} as AnimalTotals
+  for (const animal of ALL_ANIMAL_KEYS) {
+    totals[animal] = Math.max(0, Math.floor(player.resources[animal] ?? 0))
+  }
+  return totals
+}
+
 export const shouldShowAnimalDiscardPrompt = (
   animalReorg: AnimalReorgState | null,
   remaining: AnimalTotals | null | undefined,

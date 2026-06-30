@@ -1046,6 +1046,7 @@ export const zh = {
     harvestReapSkipped: '{player} 本轮跳过收割',
     harvestFeedConvert: '{player} 使用 {source}：{cost} → {food}',
     harvestFeedDetail: '{player} 喂养 {resources}',
+    harvestHeatingDetail: '{player} 供暖：支付 {fuelUsed}/{required} 燃料，转换 {woodToFuel} 木材，生病工人 {sickWorkers}',
     harvestBreedDetail: '{player} 繁殖 {resources}',
     startPlayer: '{player} 成为起始玩家',
     plow: '{player} 开垦 1 块田地',
@@ -1495,6 +1496,7 @@ export const zh = {
     A162_ForestTallyman: { name: '森林记录员', desc: '当森林+泥坑都被占用时：获得 2 黏土 + 3 木。' },
     STUB_BeforeBakeGainClay: { name: '测试：烤面包前得黏土', desc: '测试 stub：烤面包前获得 1 黏土。' },
     M040_MoorFire: { anytime: '沼泽火：把最后 1 个沼泽变为田地' },
+    M084_BogPony: { anytime: '沼泽矮马：横置 1 匹马获得 2 燃料' },
     M111_NoTillFarming: { anytime: '免耕农业：丢弃农场格上的作物' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
     D132_HideFarmer: {

@@ -14,7 +14,7 @@ import { FarmBoard, type FarmBoardProps } from './FarmBoard'
  * `displayPlayer` lookup behind a `viewedPlayerId` string.
  */
 export interface PlayerFarmPanelProps
-  extends Omit<FarmBoardProps, 'players' | 'currentPlayer' | 'displayPlayer'> {
+  extends Omit<FarmBoardProps, 'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount'> {
   state: GameState
   viewedPlayerId: string
 }
@@ -29,6 +29,11 @@ export function PlayerFarmPanel({
     state.players.find((p) => p.id === viewedPlayerId) ?? currentPlayer
 
   if (!currentPlayer || !displayPlayer) return null
+  const infirmaryWorkerCount = state.enableFarmersOfTheMoor
+    ? state.actionSpaces
+      .find((space) => space.id === 'moor-infirmary')
+      ?.takenBy.filter((worker) => worker.playerId === displayPlayer.id).length ?? 0
+    : undefined
 
   return (
     <div className="player-farm-panel">
@@ -37,6 +42,7 @@ export function PlayerFarmPanel({
         players={state.players}
         currentPlayer={currentPlayer}
         displayPlayer={displayPlayer}
+        infirmaryWorkerCount={infirmaryWorkerCount}
         playerPanelSummary={getPlayerPanelSupplySummary(state, displayPlayer)}
       />
       {/* occupations CardCarousel — added in Task 6 */}

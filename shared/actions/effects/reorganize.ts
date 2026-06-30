@@ -21,6 +21,11 @@ import {
   sumAnimalCounts,
   writeAnimalHolderCounts,
 } from '../../domain/animal-holder-state'
+import {
+  getAssignedAnimalsByType,
+  subtractAnimalsFromBoard,
+} from '../../domain/animals'
+import { notifyAnimalsRemovedFromCardEffects } from '../../cards/card-effects'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -75,6 +80,28 @@ const writeCountsByZone = (
   delete extraData.held
 }
 
+const trimVisibleAnimalsToAvailableTotals = (
+  state: GameState,
+  player: PlayerState,
+  resourceTotalsBefore: Partial<Record<AnimalKey, number>>,
+  visibleTotals: Partial<Record<AnimalKey, number>>,
+) => {
+  const animalKeys = animalKeysForState(state)
+  const assignedCounts = getAssignedAnimalsByType(player)
+  const clampedVisibleTotals = { ...visibleTotals }
+  const excessCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  for (const animal of animalKeys) {
+    const visibleLimit = Math.max(0, resourceTotalsBefore[animal] ?? 0)
+    const excess = (visibleTotals[animal] ?? 0) - visibleLimit
+    if (excess <= 0) continue
+    clampedVisibleTotals[animal] = visibleLimit
+    const assignedExcess = Math.min(assignedCounts[animal] ?? 0, excess)
+    if (assignedExcess > 0) excessCounts[animal] = assignedExcess
+  }
+  if (sumAnimalCounts(excessCounts) > 0) subtractAnimalsFromBoard(player, excessCounts)
+  return clampedVisibleTotals
+}
+
 export const applyReorganizeMutate = (
   state: GameState,
   player: PlayerState,
@@ -84,6 +111,8 @@ export const applyReorganizeMutate = (
   const computed = playerBoard(state, idx).animals.zones()
   const cap = (id: string) => computed.find((z) => z.id === id)?.capacity ?? 0
   const animalKeys = animalKeysForState(state)
+  const resourceTotalsBefore = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  for (const animal of animalKeys) resourceTotalsBefore[animal] = player.resources[animal] ?? 0
   const normalizeAnimalType = (type: AnimalKey | null | undefined): AnimalKey | null =>
     type && animalKeys.includes(type) ? type : null
   const cardAssignmentForZone = (zoneId: string): unknown => {
@@ -191,21 +220,29 @@ export const applyReorganizeMutate = (
     player.cardStates![cardId] = nextState
   }
 
-  const totals = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  const visibleTotals = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   zones
     .filter((zone) => zone.zoneType !== 'card' || !keyedCardZoneIds.has(zone.id))
     .forEach((zone) => {
       if (zone.zoneType === 'card') {
         const baseZone = computedZonesById.get(zone.id)
         if (baseZone) {
-          addAnimalCounts(totals, normalizeAnimalCountsForZone(state, player, baseZone, zone), animalKeys)
+          addAnimalCounts(visibleTotals, normalizeAnimalCountsForZone(state, player, baseZone, zone), animalKeys)
           return
         }
       }
-      addAnimalCounts(totals, readAnimalCountsForZoneAssignment(zone), animalKeys)
+      addAnimalCounts(visibleTotals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
-  for (const counts of cardCountsById.values()) addAnimalCounts(totals, counts, animalKeys)
-  for (const animal of animalKeys) player.resources[animal] = totals[animal] ?? 0
+  for (const counts of cardCountsById.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
+  const finalVisibleTotals = trimVisibleAnimalsToAvailableTotals(
+    state,
+    player,
+    resourceTotalsBefore,
+    visibleTotals,
+  )
+  for (const animal of animalKeys) player.resources[animal] = finalVisibleTotals[animal] ?? 0
+  const removed = discardedAnimals(state, resourceTotalsBefore, finalVisibleTotals)
+  if (Object.keys(removed).length > 0) notifyAnimalsRemovedFromCardEffects(state, player, removed)
 }
 
 const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {

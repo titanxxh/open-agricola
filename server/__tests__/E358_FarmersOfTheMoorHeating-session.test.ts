@@ -283,16 +283,40 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const p1Heat = heatingRequest(session, 0, 2)
     expect(p1Heat.maxFuelPayable).toBe(1)
     expect(p1Heat.maxWoodConvertibleToFuel).toBe(1)
-    confirmHeating(session, 0, { fuelUsed: 2, woodToFuel: 1 })
+    const p1HeatResp = confirmHeating(session, 0, { fuelUsed: 2, woodToFuel: 1 })
     expect(p1!.resources.wood).toBe(0)
     expect(p1!.resources.fuel).toBe(0)
     expect(p1!.sickWorkerIds).toEqual([])
+    expect(p1HeatResp.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.harvestHeatingDetail',
+        params: expect.objectContaining({
+          player: p1!.name,
+          required: 2,
+          fuelUsed: 2,
+          woodToFuel: 1,
+          sickWorkerIds: [],
+        }),
+      }),
+    ]))
 
     heatingRequest(session, 1, 2)
-    confirmHeating(session, 1, { fuelUsed: 0, woodToFuel: 0 })
+    const p2HeatResp = confirmHeating(session, 1, { fuelUsed: 0, woodToFuel: 0 })
     expect(p2!.resources.fuel).toBe(2)
     expect(p2!.resources.wood).toBe(2)
     expect(p2!.sickWorkerIds).toEqual(['2', '1'])
+    expect(p2HeatResp.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.harvestHeatingDetail',
+        params: expect.objectContaining({
+          player: p2!.name,
+          required: 2,
+          fuelUsed: 0,
+          woodToFuel: 0,
+          sickWorkerIds: ['2', '1'],
+        }),
+      }),
+    ]))
   })
 
   it('does not request heating during a Through the Seasons summer harvest', () => {

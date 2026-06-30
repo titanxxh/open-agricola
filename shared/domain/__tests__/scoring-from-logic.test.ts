@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { computeScores } from '../scoring'
+import { CardRegistry } from '../../cards/registry'
+import { setActiveCardRegistry } from '../../cards/active-registry'
+import { majorCardDefinitions } from '../../cards/major'
 
-// Register card effects used by scoring (e.g. C133_Soldier.computeBonusScore)
-import '../../cards/C/C133_Soldier'
+import { C133_Soldier_impl } from '../../cards/C/C133_Soldier'
+import { M084_BogPony_impl } from '../../cards/M/M084_BogPony'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -62,6 +65,14 @@ const createState = (player: PlayerState): GameState => ({
 })
 
 describe('computeScores', () => {
+  beforeEach(() => {
+    const registry = new CardRegistry()
+    registry.loadImpl('C133_Soldier', C133_Soldier_impl)
+    registry.loadImpl('M084_BogPony', M084_BogPony_impl)
+    registry.registerEffects(majorCardDefinitions)
+    setActiveCardRegistry(registry)
+  })
+
   it('scores begging cards and empty spaces consistently', () => {
     const player = createPlayer()
     player.resources.begging = 2
@@ -157,6 +168,22 @@ describe('computeScores', () => {
     const [horse] = computeScores(horseState)
     expect(horse.categories.find((category) => category.key === 'horses')).toMatchObject({
       total: 2,
+      quantity: 2,
+    })
+  })
+
+  it('scores M084 lying horses as half-value horses', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['M084_BogPony']
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+    player.resources.horse = 2
+    const state = { ...createState(player), enableFarmersOfTheMoor: true } as GameState
+    const [result] = computeScores(state)
+
+    expect(result.categories.find((category) => category.key === 'horses')).toMatchObject({
+      total: 1.5,
       quantity: 2,
     })
   })

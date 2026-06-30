@@ -8,6 +8,7 @@ import {
   buildPastureDisplayMap,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
+  computeReorgAvailableAnimals,
   buildReorgEngineProgressPlan,
   buildStableDisplayMap,
   hasUnassignedAnimals,
@@ -137,6 +138,16 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(target.resources.sheep).toBe(5)
     expect(target.resources.boar).toBe(2)
     expect(target.resources.cattle).toBe(4)
+  })
+
+  it('keeps M084 lying horses available to ordinary reorg zones', () => {
+    const target = player()
+    target.resources.horse = 2
+    target.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    expect(computeReorgAvailableAnimals(target)).toMatchObject({ horse: 2 })
   })
 
   it('builds pasture display from reorg draft zones while reorganizing', () => {

@@ -948,6 +948,7 @@ import { M079_PeatSled } from './M/M079_PeatSled'
 import { M080_AdvancePayment } from './M/M080_AdvancePayment'
 import { M082_Firewood } from './M/M082_Firewood'
 import { M083_CoalSeam } from './M/M083_CoalSeam'
+import { M084_BogPony } from './M/M084_BogPony'
 import { M086_SpinningMill } from './M/M086_SpinningMill'
 import { M087_PeatBarge } from './M/M087_PeatBarge'
 import { M088_PeatIron } from './M/M088_PeatIron'
@@ -1959,6 +1960,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M080_AdvancePayment': M080_AdvancePayment.impl,
   'M082_Firewood': M082_Firewood.impl,
   'M083_CoalSeam': M083_CoalSeam.impl,
+  'M084_BogPony': M084_BogPony.impl,
   'M086_SpinningMill': M086_SpinningMill.impl,
   'M087_PeatBarge': M087_PeatBarge.impl,
   'M088_PeatIron': M088_PeatIron.impl,

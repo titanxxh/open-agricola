@@ -41,6 +41,7 @@ const expectedPublicEventTypes = [
   'game.ended',
   'game.started',
   'harvest.feedConverted',
+  'harvest.heated',
   'harvest.phaseStarted',
   'harvest.reapNothing',
   'harvest.reapSkipped',

@@ -252,6 +252,7 @@ describe('Card Source representative migrations', () => {
       'M081_PeatBoat',
       'M082_Firewood',
       'M083_CoalSeam',
+      'M084_BogPony',
       'M085_OvenInstallation',
       'M086_SpinningMill',
       'M087_PeatBarge',

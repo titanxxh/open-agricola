@@ -11,6 +11,7 @@ import { convertResources, hasValidResources } from '../../helpers/trades'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import type { ActionMutationContext, ActionSpace, GameState, PlayerState, Resource, Trade } from '../../../contract/types'
 import { SessionCardContext, withSessionContext } from '../../../cards/session-card-context'
+import '../../../cards/C/C148_MudWallower'
 
 const makeEventSink = (capturedEvents: DraftGameEvent[]): EventSink => ({
   emit: (event) => {
@@ -44,6 +45,23 @@ const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   majorEffects: { wellRounds: 0 },
   startPlayer: false, activeModifiers: [], cardStates: {},
 })
+
+const createMockState = (player: PlayerState): GameState => ({
+  round: 1,
+  currentPlayerIndex: 0,
+  players: [player],
+  actionSpaces: [],
+  log: [],
+  roundStartSnapshot: null,
+  roundActionOrder: [],
+  gameSeed: 0,
+  availableMajorImprovements: [],
+  futureMeeples: [],
+  pendingFutureMeeples: [],
+  gameOver: false,
+  workPhaseObtainedResources: {},
+  roundPhase: 'work',
+}) as GameState
 
 describe('canAffordTrade', () => {
   it('returns true when player has exact resources for trade', () => {
@@ -148,6 +166,96 @@ describe('applyTrade', () => {
     applyTrade(player, trade, 0)
     expect(player.resources.wood).toBe(5)
     expect(player.resources.food).toBe(0)
+  })
+
+  it('deducts M084 lying horses before standing horses', () => {
+    const player = createMockPlayer({ horse: 2, food: 0 })
+    player.minorPlayed = ['M084_BogPony']
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+    player.pastures = [{
+      id: 'pasture-1',
+      size: 1,
+      tiles: [{ row: 0, col: 0 }],
+      stables: 0,
+      animalType: 'horse',
+      animalCount: 2,
+    }]
+    const trade: Trade = { from: { horse: 1 }, to: { food: 2 } }
+
+    applyTrade(player, trade)
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.resources.food).toBe(2)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+    expect(player.pastures[0]).toMatchObject({ animalType: 'horse', animalCount: 1 })
+  })
+
+  it('does not prioritize ordinary card-zone animals before board animals', () => {
+    const player = createMockPlayer({ horse: 2, food: 0 })
+    player.cardStates = {
+      M035_HorseTrough: { extraData: { animalCounts: { horse: 1 } } },
+    }
+    player.pastures = [{
+      id: 'pasture-1',
+      size: 1,
+      tiles: [{ row: 0, col: 0 }],
+      stables: 0,
+      animalType: 'horse',
+      animalCount: 1,
+    }]
+    const trade: Trade = { from: { horse: 1 }, to: { food: 2 } }
+
+    applyTrade(player, trade)
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.resources.food).toBe(2)
+    expect(player.cardStates.M035_HorseTrough?.extraData?.animalCounts?.horse ?? 0).toBe(1)
+    expect(player.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
+  })
+
+  it('deducts animals from farm-position-backed card zones', () => {
+    const player = createMockPlayer({ horse: 1, food: 0 })
+    player.cardStates = {
+      M034_HomeWood: {
+        extraData: {
+          animalCountsByZone: {
+            'card:M034_HomeWood@0,0': { animalCounts: { horse: 1 } },
+          },
+        },
+      },
+    }
+    const trade: Trade = { from: { horse: 1 }, to: { food: 2 } }
+
+    applyTrade(player, trade)
+
+    expect(player.resources.horse).toBe(0)
+    expect(player.resources.food).toBe(2)
+    const zone = player.cardStates.M034_HomeWood?.extraData?.animalCountsByZone?.['card:M034_HomeWood@0,0']
+    expect(zone?.animalCounts?.horse ?? 0).toBe(0)
+    expect(zone?.held ?? 0).toBe(0)
+  })
+
+  it('does not spend unrelated counter-backed zones when a preferred source has no counter', () => {
+    const player = createMockPlayer({ boar: 2, food: 0 })
+    player.occupationPlayed = ['C148_MudWallower']
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+    const trade: Trade = { from: { boar: 1 }, to: { food: 4 } }
+
+    applyTrade(
+      player,
+      trade,
+      1,
+      { animal: 'boar', prefer: [{ kind: 'cardCounter', cardId: 'B104_SheepWalker', counterKey: 'held' }] },
+      createMockState(player),
+    )
+
+    expect(player.resources.boar).toBe(1)
+    expect(player.resources.food).toBe(4)
+    expect(player.cardStates.C148_MudWallower?.counters?.held).toBe(1)
   })
 })
 

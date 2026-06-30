@@ -5,7 +5,7 @@ import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
 import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
-import type { AnimalKey } from '../contract/animals'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
@@ -42,6 +42,35 @@ export type BreedThresholdHandler = (
   animalType: BreedAnimalType,
   ctx: BreedThresholdContext,
 ) => number | undefined
+
+export type BreedableAnimalCountHandler = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  currentCount: number,
+  ctx: BreedThresholdContext,
+) => number | undefined
+
+export type AnimalScoreAdjustmentHandler = (
+  state: GameState,
+  player: PlayerState,
+  animalType: AnimalKey,
+  ctx: { quantity: number; baseScore: number; categoryKey: string },
+) => number | undefined
+
+export type AnimalPaymentHandler = (
+  state: GameState | undefined,
+  player: PlayerState,
+  animalType: AnimalKey,
+  amount: number,
+) => number | undefined
+
+export type AnimalRemovedHandler = (
+  state: GameState | undefined,
+  player: PlayerState,
+  animalType: AnimalKey,
+  amount: number,
+) => void
 
 export type PastureCapacityContext = {
   player: PlayerState
@@ -279,6 +308,10 @@ export type CardEffect = {
     state: GameState,
   ) => PastureCapacityModifier[]
   computeBreedThreshold?: BreedThresholdHandler
+  computeBreedableAnimalCount?: BreedableAnimalCountHandler
+  computeAnimalScoreAdjustment?: AnimalScoreAdjustmentHandler
+  consumeAnimalPayment?: AnimalPaymentHandler
+  onAnimalRemoved?: AnimalRemovedHandler
   onComputeAnimalZones?: (
     player: PlayerState,
     zones: AnimalZone[],
@@ -486,9 +519,9 @@ export const getBreedThreshold = (
   ctx: BreedThresholdContext,
 ): number => {
   const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
   ]
   let threshold = 2
   for (const cardId of allCards) {
@@ -508,6 +541,131 @@ export const getBreedThreshold = (
     }
   }
   return threshold
+}
+
+export const getBreedableAnimalCount = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  currentCount: number,
+  ctx: BreedThresholdContext,
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let count = Math.max(0, Math.floor(currentCount))
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeBreedableAnimalCount
+    if (!handler) continue
+    try {
+      const next = handler(state, player, animalType, count, ctx)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      count = Math.max(0, Math.floor(next))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeBreedableAnimalCount threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return count
+}
+
+export const getAnimalScoreAdjustment = (
+  state: GameState,
+  player: PlayerState,
+  animalType: AnimalKey,
+  ctx: { quantity: number; baseScore: number; categoryKey: string },
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let adjustment = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeAnimalScoreAdjustment
+    if (!handler) continue
+    try {
+      const next = handler(state, player, animalType, ctx)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      adjustment += next
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeAnimalScoreAdjustment threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return adjustment
+}
+
+export const consumeAnimalPaymentFromCardEffects = (
+  state: GameState | undefined,
+  player: PlayerState,
+  animalType: AnimalKey,
+  amount: number,
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let remaining = Math.max(0, Math.floor(amount))
+  for (const cardId of allCards) {
+    if (remaining <= 0) break
+    const effect = getCardEffect(cardId)
+    const handler = effect?.consumeAnimalPayment
+    if (!handler) continue
+    try {
+      const consumed = handler(state, player, animalType, remaining)
+      if (typeof consumed !== 'number' || Number.isNaN(consumed)) continue
+      remaining -= Math.max(0, Math.min(remaining, Math.floor(consumed)))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} consumeAnimalPayment threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return Math.max(0, Math.floor(amount)) - remaining
+}
+
+export const notifyAnimalsRemovedFromCardEffects = (
+  state: GameState | undefined,
+  player: PlayerState,
+  counts: Partial<Record<AnimalKey, number>>,
+): void => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  for (const animalType of ALL_ANIMAL_KEYS) {
+    const amount = Math.max(0, Math.floor(counts[animalType] ?? 0))
+    if (amount <= 0) continue
+    for (const cardId of allCards) {
+      const effect = getCardEffect(cardId)
+      const handler = effect?.onAnimalRemoved
+      if (!handler) continue
+      try {
+        handler(state, player, animalType, amount)
+      } catch (err) {
+        if (isCustomCard(cardId)) {
+          console.warn(`[card-effects] custom card ${cardId} onAnimalRemoved threw, skipping:`, err)
+          continue
+        }
+        throw err
+      }
+    }
+  }
 }
 
 /**

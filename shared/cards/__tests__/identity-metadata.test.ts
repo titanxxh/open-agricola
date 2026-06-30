@@ -16,6 +16,7 @@ import '../D/D060_LargePottery'
 import '../B/B068_Beanfield'
 import '../D/D025_WitchesDanceFloor'
 import '../D/D064_BakingCourse'
+import '../M/M085_OvenInstallation'
 
 registerAdHocMinorImprovement(new MinorImprovement({
   id: 'TEST_WaresSingle',
@@ -131,6 +132,10 @@ describe('identity metadata migrations', () => {
 
     it('does not trigger from a baking card without fireplace, cooking-hearth, or oven identity', () => {
       expect(runFirewood('minor:D064_BakingCourse')).toBeUndefined()
+    })
+
+    it('does not trigger from the Oven Installation upgrade', () => {
+      expect(runFirewood('minor:M085_OvenInstallation')).toBeUndefined()
     })
   })
 

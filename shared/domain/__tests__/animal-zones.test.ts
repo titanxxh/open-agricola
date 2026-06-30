@@ -3,11 +3,14 @@ import { GameSession } from '../../../server/game/authoritative-session.ts'
 import type { GameState, PlayerState } from '../../contract/types.ts'
 import { getActiveCardRegistry } from '../../cards/active-registry.ts'
 import {
+  buildCardAnimalZoneId,
   canAccommodateAllAnimals,
   canAccommodateAnimalTotals,
   computeAnimalZones,
   type AnimalZone,
 } from '../animal-zones.ts'
+import { applyAnimalPayment } from '../animal-payment.ts'
+import { getAssignedAnimalsByType } from '../animals.ts'
 import { playerBoard } from '../index.ts'
 
 const TEST_CARD = '__TEST_accommodation_zone__'
@@ -50,6 +53,25 @@ describe('AnimalZones', () => {
 
     expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(true)
     expect(canAccommodateAllAnimals(state, player, ['sheep', 'boar'])).toBe(false)
+  })
+
+  it('counts M084 lying horses against their visible animal space', () => {
+    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
+    const player = playerWithPasture({
+      pastures: [],
+      houseAnimalType: 'horse',
+      houseAnimalCount: 1,
+      minorPlayed: ['M084_BogPony'],
+      cardStates: {
+        M084_BogPony: {
+          extraData: { lyingHorseCount: 1 },
+        },
+      } as never,
+    })
+    player.resources.horse = 1
+
+    expect(canAccommodateAllAnimals(state, player, ['sheep'])).toBe(false)
+    expect(canAccommodateAnimalTotals(state, player, { horse: 1, sheep: 1 })).toBe(false)
   })
 
   it('allows mixed animals only in explicitly mixed card zones', () => {
@@ -304,5 +326,187 @@ describe('AnimalZones', () => {
     expect(pasture.animalCount).toBe(2)
     expect(player.houseAnimalType).toBe('sheep')
     expect(player.houseAnimalCount).toBe(1)
+  })
+
+  it('enforceCapacity keeps M084 lying horses in visible animal zones', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.horse = 1
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBe('horse')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
+  })
+
+  it('enforceCapacity discards excess visible animals before a M084 lying horse occupying the house', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.resources.horse = 1
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.sheep).toBe(0)
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBe('horse')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
+  })
+
+  it('enforceCapacity consumes M084 lying markers first when horses are evicted', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.resources.horse = 1
+    player.minorPlayed = ['M084_BogPony']
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.pastures = []
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.sheep).toBe(1)
+    expect(player.resources.horse).toBe(0)
+    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
+
+  it('enforceCapacity preserves active card-zone animals instead of copying them into the house', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    const zoneId = buildCardAnimalZoneId('M035_HorseTrough', { row: 2, col: 1 })
+    player.resources.horse = 1
+    player.minorPlayed = ['M035_HorseTrough', 'M084_BogPony']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      M035_HorseTrough: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: { animalCounts: { horse: 1 }, animalType: 'horse', held: 1 },
+          },
+        },
+      },
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBeNull()
+    expect(player.houseAnimalCount).toBe(0)
+    expect(player.cardStates.M035_HorseTrough?.extraData?.animalCountsByZone).toEqual({
+      [zoneId]: expect.objectContaining({ animalCounts: { horse: 1 } }),
+    })
+    expect(getAssignedAnimalsByType(player).horse).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(1)
+  })
+
+  it('enforceCapacity reserves counter-backed card zones without persisting ordinary holder storage', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.boar = 1
+    player.occupationPlayed = ['C148_MudWallower']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.boar).toBe(1)
+    expect(player.houseAnimalType).toBeNull()
+    expect(player.houseAnimalCount).toBe(0)
+    expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
+    expect(getAssignedAnimalsByType(player).boar).toBe(0)
+
+    applyAnimalPayment(player, state, 'boar', 1)
+
+    expect(player.resources.boar).toBe(0)
+    expect(player.cardStates.C148_MudWallower?.counters?.held).toBe(0)
+  })
+
+  it('enforceCapacity clears stale keyed card-zone storage when no active zones remain', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({ id: TEST_CARD, onComputeAnimalZones: () => [] })
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.minorPlayed = [TEST_CARD]
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      [TEST_CARD]: {
+        extraData: {
+          animalCountsByZone: {
+            [`card:${TEST_CARD}@0-0`]: { animalCounts: { sheep: 1 } },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates[TEST_CARD]?.extraData?.animalCountsByZone).toBeUndefined()
+    expect(getAssignedAnimalsByType(player).sheep).toBe(1)
+  })
+
+  it('enforceCapacity clamps counter-backed card reservations to zone capacity', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.boar = 2
+    player.occupationPlayed = ['C148_MudWallower']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.boar).toBe(2)
+    expect(player.houseAnimalType).toBe('boar')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
+    const c148Zone = computeAnimalZones(player, state).find((zone) => zone.cardId === 'C148_MudWallower')
+    expect(c148Zone?.animalCount).toBe(1)
   })
 })

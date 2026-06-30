@@ -72,6 +72,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'harvest.reapSkipped': ['playerId'],
   'harvest.reapNothing': ['playerId'],
   'harvest.feedConverted': ['playerId', 'source', 'cost', 'food'],
+  'harvest.heated': ['playerId', 'required', 'fuelUsed', 'woodToFuel', 'sickWorkerIds'],
   'game.started': [],
   'game.ended': [],
 }
@@ -625,6 +626,13 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.source, 'source')
       assertResourceMap(event.cost, 'cost')
       assertResourceMap(event.food, 'food')
+      return
+    case 'harvest.heated':
+      assertStringField(event.playerId, 'playerId')
+      assertFiniteNumberField(event.required, 'required')
+      assertFiniteNumberField(event.fuelUsed, 'fuelUsed')
+      assertFiniteNumberField(event.woodToFuel, 'woodToFuel')
+      assertStringArray(event.sickWorkerIds, 'sickWorkerIds')
       return
     default:
       assertNoPrivatePayload(event, '$')

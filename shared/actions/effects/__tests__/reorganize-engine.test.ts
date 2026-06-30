@@ -9,6 +9,7 @@ import type {
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
+import '../../../cards/M/M084_BogPony'
 
 const dummySpace: ActionSpace = {
   id: '__subflow:reorganize',
@@ -280,5 +281,154 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.boar).toBe(1)
     expect(ctx.player.resources.cattle).toBe(1)
     expect(ctx.player.resources.horse).toBe(0)
+  })
+
+  it('keeps M084 out of editable animal reorg zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 1 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 1,
+            tiles: [{ row: 0, col: 0 }],
+            stables: 0,
+            animalType: 'horse',
+            animalCount: 1,
+          },
+        ],
+      },
+    })
+    const request = reorganizeAction.execute(ctx)
+    expect(request.type).toBe('request')
+    if (request.type !== 'request' || request.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(request.request.zones.map((zone) => zone.id)).not.toContain('card:M084_BogPony')
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
+  })
+
+  it('lets reorg payload place M084 lying horses only in ordinary zones', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 1 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+        } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'house', zoneType: 'house', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.houseAnimalType).toBe('horse')
+    expect(ctx.player.houseAnimalCount).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
+  })
+
+  it('consumes M084 lying markers first when reorg discards horses', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 3 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { lyingHorseCount: 2 } },
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 2,
+            tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+            stables: 0,
+            animalType: 'horse',
+            animalCount: 3,
+          },
+        ],
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
+
+  it('removes a M084 lying marker before standing horses when reorg keeps other horses', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 3 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 2,
+            tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+            stables: 0,
+            animalType: 'horse',
+            animalCount: 3,
+          },
+        ],
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 2 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(2)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
+
+  it('clears stale ordinary card-zone animals when the zone disappears', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: { sheep: 0, boar: 1, cattle: 0 } as never,
+        cardStates: {
+          A011_MudPatch: { extraData: { animalCounts: { boar: 1 } } },
+        } as never,
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.boar).toBe(0)
+    expect(ctx.player.cardStates.A011_MudPatch?.extraData?.animalCounts).toBeUndefined()
   })
 })

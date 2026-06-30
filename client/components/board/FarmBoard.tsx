@@ -30,6 +30,10 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
+import {
+  M084_BOG_PONY_ID,
+  readBogPonyLyingHorseCountFromExtraData,
+} from '../../../shared/cards/M/M084_BogPony-state'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -456,6 +460,7 @@ export type FarmBoardProps = {
     maxSelections: number
   }
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+  infirmaryWorkerCount?: number
   highlightedFarmTileKeys?: ReadonlySet<string>
   highlightedFenceEdgeIds?: ReadonlySet<string>
 }
@@ -782,6 +787,7 @@ export const FarmBoard = ({
   isInteractive,
   occupationHandSelection,
   onConfirmOccupationHandSelection,
+  infirmaryWorkerCount,
   highlightedFarmTileKeys = new Set<string>(),
   highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
@@ -809,6 +815,7 @@ export const FarmBoard = ({
         fields: '田地',
         fence: '栅栏容量',
         stable: '畜栏供给',
+        infirmary: '病房工人',
       }
     : {
         family: 'Family capacity',
@@ -817,6 +824,7 @@ export const FarmBoard = ({
         fields: 'Fields',
         fence: 'Fence capacity',
         stable: 'Stable supply',
+        infirmary: 'Infirmary workers',
       }
 
   // Multi-select state for occupation-hand selection interaction
@@ -897,6 +905,9 @@ export const FarmBoard = ({
           <span className="res-compact-divider" />
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-child" value={`${summary.family.used}/${summary.family.limit}`} label={`${compactLabels.family}: ${summary.family.used}/${summary.family.limit}`} />
+            {typeof infirmaryWorkerCount === 'number' ? (
+              <CompactResourceItem iconClass="res-icon-infirmary-worker res-icon-child-free" value={infirmaryWorkerCount} label={`${compactLabels.infirmary}: ${infirmaryWorkerCount}`} />
+            ) : null}
             <CompactResourceItem iconClass={roomIconClass} value={summary.rooms.count} label={`${compactLabels.rooms}: ${summary.rooms.count}`} />
             <CompactResourceItem iconClass="res-icon-child-free" value={summary.housingCapacity.value} label={`${compactLabels.housing}: ${summary.housingCapacity.value}`} />
             <CompactResourceItem iconClass="res-icon-field" value={displayPlayer.fields.length} label={`${compactLabels.fields}: ${displayPlayer.fields.length}`} />
@@ -1569,6 +1580,10 @@ export const FarmBoard = ({
           )
           const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
           const cardDisplay = cardDisplayMap.get(rawId)
+          const m084LyingHorses =
+            rawId === M084_BOG_PONY_ID
+              ? readBogPonyLyingHorseCountFromExtraData(displayPlayer.cardStates?.[rawId]?.extraData)
+              : 0
 
           return (
             <div key={`played-${index}`} className="played-card-slot">
@@ -1586,6 +1601,15 @@ export const FarmBoard = ({
                 heldWorkerId={heldWorkerId}
                 playerColor={displayPlayer.color}
               />
+              {m084LyingHorses > 0 ? (
+                <div
+                  className="played-card-readonly-animals"
+                  aria-label={`Bog Pony lying horses: ${m084LyingHorses}`}
+                >
+                  <span className="res-icon res-icon-horse" aria-hidden="true" />
+                  <span>{m084LyingHorses}</span>
+                </div>
+              ) : null}
               {isReorgActive && cardDisplay ? (
                 <div className="played-card-reorg">
                   <AnimalCount

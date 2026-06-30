@@ -4388,7 +4388,16 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    applyHeatingPayment(this.state, player, payload)
+    const result = applyHeatingPayment(this.state, player, payload)
+    appendImmediateEvents(this.state, [{
+      type: 'harvest.heated',
+      actorPlayerId: player.id,
+      playerId: player.id,
+      required: result.required,
+      fuelUsed: result.fuelUsed,
+      woodToFuel: result.woodToFuel,
+      sickWorkerIds: result.sickWorkerIds,
+    }])
 
     const top = this.engineStack.current()
     if (top?.reason === 'heating') this.engineStack.pop()

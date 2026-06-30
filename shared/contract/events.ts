@@ -344,6 +344,14 @@ export type HarvestFeedConvertedEvent = GameEventBase<'harvest.feedConverted'> &
   food: Partial<Resource>
 }
 
+export type HarvestHeatedEvent = GameEventBase<'harvest.heated'> & {
+  playerId: string
+  required: number
+  fuelUsed: number
+  woodToFuel: number
+  sickWorkerIds: string[]
+}
+
 export type GameStartedEvent = GameEventBase<'game.started'>
 
 export type GameEndedEvent = GameEventBase<'game.ended'>
@@ -426,6 +434,7 @@ export type GameEvent =
   | HarvestReapSkippedEvent
   | HarvestReapNothingEvent
   | HarvestFeedConvertedEvent
+  | HarvestHeatedEvent
   | GameStartedEvent
   | GameEndedEvent
 

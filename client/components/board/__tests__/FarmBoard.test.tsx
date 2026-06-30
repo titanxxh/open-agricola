@@ -37,6 +37,7 @@ beforeAll(async () => {
     M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
     M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
     M035_HorseTrough: manifestEntry('M035_HorseTrough', 'Horse Trough', 'minor'),
+    M084_BogPony: manifestEntry('M084_BogPony', 'Bog Pony', 'minor'),
   }
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -604,6 +605,27 @@ describe('FarmBoard', () => {
     expect(html).toContain('>1<span')
   })
 
+  it('renders M084 lying horses as read-only played-card state', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['M084_BogPony']
+    player.cardStates = {
+      M084_BogPony: { extraData: { lyingHorseCount: 2 } },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['minor:M084_BogPony'],
+        })}
+      />,
+    )
+
+    expect(html).toContain('played-card-readonly-animals')
+    expect(html).toContain('res-icon-horse')
+    expect(html).toContain('>2</span>')
+    expect(html).not.toContain('played-card-reorg')
+  })
+
   it('keeps compact panel icon values grouped with accessible labels and the animation anchor', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
@@ -623,12 +645,24 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('data-player-resource-anchor="p1"')
     expect(html).toContain('aria-label="Family capacity: 2/5"')
+    expect(html).not.toContain('aria-label="Infirmary workers:')
     expect(html).toContain('aria-label="Rooms: 2"')
     expect(html).toContain('aria-label="Housing capacity: 2"')
     expect(html).toContain('aria-label="Fence capacity: 17/17"')
     expect(html).toContain('aria-label="Stable supply: 3/4"')
     expect(html).toMatch(/res-compact-item[\s\S]*res-icon-fence-icon[\s\S]*>17\/17</)
     expect(html).toMatch(/res-compact-item[\s\S]*res-icon-barn[\s\S]*>3\/4</)
+  })
+
+  it('shows workers currently placed in the Infirmary in the compact resource panel', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player, { infirmaryWorkerCount: 2 })} />,
+    )
+
+    expect(html).toContain('aria-label="Infirmary workers: 2"')
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-infirmary-worker[\s\S]*>2</)
   })
 
   it('marks highlighted farm tiles', () => {
