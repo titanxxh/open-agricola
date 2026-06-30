@@ -16,6 +16,7 @@ import {
   readAnimalHolderCounts,
   singleAnimalType,
   sumAnimalCounts,
+  writeAnimalHolderCounts,
   type AnimalCounts,
 } from './animal-holder-state.ts'
 
@@ -248,6 +249,80 @@ const rehydrateAnimalHolderZones = (
     const counts = normalizeAnimalCountsForZone(state, player, zone, stored)
     applyAnimalCountsToZone(zone, counts, fixedType)
   }
+}
+
+const ensureCardExtraData = (
+  player: PlayerState,
+  cardId: string,
+): Record<string, unknown> | null => {
+  const cardState = player.cardStates?.[cardId]
+  if (!cardState) return null
+  if (!cardState.extraData || typeof cardState.extraData !== 'object') cardState.extraData = {}
+  return cardState.extraData as Record<string, unknown>
+}
+
+const writeCardZoneStorage = (
+  player: PlayerState,
+  cardZones: AnimalZone[],
+) => {
+  const byCard = new Map<string, AnimalZone[]>()
+  for (const zone of cardZones) {
+    if (!zone.cardId) continue
+    const zones = byCard.get(zone.cardId) ?? []
+    zones.push(zone)
+    byCard.set(zone.cardId, zones)
+  }
+  for (const [cardId, zones] of byCard) {
+    const extraData = ensureCardExtraData(player, cardId)
+    if (!extraData) continue
+    const useZoneStorage = zones.length > 1 || zones.some((zone) =>
+      zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
+    )
+    if (!useZoneStorage) {
+      writeAnimalHolderCounts(extraData, readAnimalCountsForZoneAssignment(zones[0]))
+      continue
+    }
+    const next: Record<string, unknown> = {}
+    for (const zone of zones) {
+      const counts = readAnimalCountsForZoneAssignment(zone)
+      if (sumAnimalCounts(counts) <= 0) continue
+      const slot: Record<string, unknown> = {}
+      writeAnimalHolderCounts(slot, counts)
+      slot.capacity = zone.capacity
+      if (zone.allowedAnimalType !== undefined) slot.allowedAnimalType = zone.allowedAnimalType
+      if (zone.farmPosition) slot.farmPosition = zone.farmPosition
+      next[zone.id] = slot
+    }
+    if (Object.keys(next).length > 0) extraData.animalCountsByZone = next
+    else delete extraData.animalCountsByZone
+    delete extraData.animalCounts
+    delete extraData.animalType
+    delete extraData.held
+  }
+}
+
+const reserveCardZoneAnimals = (
+  state: GameState,
+  player: PlayerState,
+  zones: AnimalZone[],
+  totals: Partial<Record<AnimalType, number>>,
+): AnimalCounts => {
+  const reserved = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  const cardZones = zones.filter((zone) => zone.zoneType === 'card' && zone.cardId)
+  for (const zone of cardZones) {
+    const counts = readAnimalCountsForZoneAssignment(zone)
+    const kept = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+    for (const animalType of animalKeysForState(state)) {
+      const take = Math.min(counts[animalType] ?? 0, totals[animalType] ?? 0)
+      if (take <= 0) continue
+      kept[animalType] = take
+      reserved[animalType] = (reserved[animalType] ?? 0) + take
+      totals[animalType] = (totals[animalType] ?? 0) - take
+    }
+    applyAnimalCountsToZone(zone, kept, fixedAnimalTypeForZone(state, zone))
+  }
+  writeCardZoneStorage(player, cardZones)
+  return reserved
 }
 
 /** Loose-stable tile keys (stables not inside any pasture). */
@@ -510,7 +585,8 @@ export const canAccommodateAllAnimals = (
  * Imperative: rebalance animals across zones to fit current capacity.
  *
  * **MUTATES** `player.pastures`, `player.houseAnimal*`,
- * `player.stableAnimals`, and the per-type counters in `player.resources`.
+ * `player.stableAnimals`, card animal-holder storage, and the per-type
+ * counters in `player.resources`.
  */
 export const enforceAnimalCapacity = (
   player: PlayerState,
@@ -523,6 +599,7 @@ export const enforceAnimalCapacity = (
   const totals: Partial<Record<AnimalType, number>> = {}
   for (const key of animalKeys) totals[key] = player.resources[key] ?? 0
   const resourcesBefore = { ...totals }
+  const reservedCardTotals = reserveCardZoneAnimals(state, player, zones, totals)
   const looseStableKeys = getLooseStableKeys(player)
   const stableAnimals: Record<string, AnimalType | null> = {}
   looseStableKeys.forEach((key) => {
@@ -603,7 +680,8 @@ export const enforceAnimalCapacity = (
   })
   player.stableAnimals = stableAnimals
   for (const animalType of animalKeys) {
-    player.resources[animalType] = player.pastures
+    player.resources[animalType] = reservedCardTotals[animalType] ?? 0
+    player.resources[animalType] += player.pastures
       .filter((pasture) => pasture.animalType === animalType)
       .reduce((sum, pasture) => sum + pasture.animalCount, 0)
     if (player.houseAnimalType === animalType) {

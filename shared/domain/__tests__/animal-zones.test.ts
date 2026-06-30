@@ -3,11 +3,13 @@ import { GameSession } from '../../../server/game/authoritative-session.ts'
 import type { GameState, PlayerState } from '../../contract/types.ts'
 import { getActiveCardRegistry } from '../../cards/active-registry.ts'
 import {
+  buildCardAnimalZoneId,
   canAccommodateAllAnimals,
   canAccommodateAnimalTotals,
   computeAnimalZones,
   type AnimalZone,
 } from '../animal-zones.ts'
+import { getAssignedAnimalsByType } from '../animals.ts'
 import { playerBoard } from '../index.ts'
 
 const TEST_CARD = '__TEST_accommodation_zone__'
@@ -391,5 +393,39 @@ describe('AnimalZones', () => {
     expect(player.houseAnimalType).toBe('sheep')
     expect(player.houseAnimalCount).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
+
+  it('enforceCapacity preserves active card-zone animals instead of copying them into the house', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.enableFarmersOfTheMoor = true
+    const player = state.players[0]
+    const zoneId = buildCardAnimalZoneId('M035_HorseTrough', { row: 2, col: 1 })
+    player.resources.horse = 1
+    player.minorPlayed = ['M035_HorseTrough', 'M084_BogPony']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      M035_HorseTrough: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: { animalCounts: { horse: 1 }, animalType: 'horse', held: 1 },
+          },
+        },
+      },
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.horse).toBe(1)
+    expect(player.houseAnimalType).toBeNull()
+    expect(player.houseAnimalCount).toBe(0)
+    expect(player.cardStates.M035_HorseTrough?.extraData?.animalCountsByZone).toEqual({
+      [zoneId]: expect.objectContaining({ animalCounts: { horse: 1 } }),
+    })
+    expect(getAssignedAnimalsByType(player).horse).toBe(1)
+    expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(1)
   })
 })
