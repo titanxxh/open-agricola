@@ -195,6 +195,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onSowExtraField`
 - `computeLockedFarmTiles`
 - `getInvalidAnimals`
+- `computeBreedableAnimalCount`
+- `computeAnimalScoreAdjustment`
+- `consumeAnimalPayment`
 - `getSpecialStablePositions`
 - `applySpecialStable`
 - `getBuiltSpecialStables`
@@ -219,6 +222,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
 | `getSpecialStablePositions` / `applySpecialStable` | `(state, player[, position]) => FarmTilePosition[] / boolean`  | Build Stables 特殊 stable（如 B85 的 2×2 田地中心）            |
+| `computeBreedableAnimalCount`                | `(state, player, animalType, currentCount, ctx) => number`      | 调整参与繁殖的动物数量                                      |
+| `computeAnimalScoreAdjustment`               | `(state, player, animalType, ctx) => number`                   | 调整动物计分类别分值                                        |
+| `consumeAnimalPayment`                       | `(state, player, animalType, amount) => number`                | 动物支付前消费卡牌局部 marker / holder                       |
 | `getBuiltSpecialStables`                     | `(player) => FarmTilePosition[]`                                | 当前矗立的特殊 stable（驱动 snapshot `specialStables` 展示派生）    |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
 
