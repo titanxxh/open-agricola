@@ -3944,6 +3944,22 @@
 .res-icon-first   { width:0.4em; height:0.9em;  background-position:93.9333% 0.523834%; background-size:2925.71%; }
 .res-icon-child   { width:1.1em; height:1.3em;  background-position:19.0819% 0.562114%; background-size:853.333%; }
 .res-icon-child-free { width:1.1em; height:1.5em; background-position:31.7333% 0.552486%; background-size:1183.82%; }
+.res-icon-infirmary-worker { position: relative; }
+.res-icon-infirmary-worker::after {
+  content: '+';
+  position: absolute;
+  right: -0.22em;
+  top: -0.34em;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 50%;
+  background: #d74332;
+  color: #fff;
+  font-size: 0.56em;
+  line-height: 0.72em;
+  text-align: center;
+  font-weight: 800;
+}
 .res-icon-room-wood  { width:1.5em; height:0.8em; background-position:74.5923% 8.62506%; background-size:1393.2%; }
 .res-icon-room-clay  { width:1.5em; height:0.8em; background-position:88.5324% 8.62069%; background-size:1393.2%; }
 .res-icon-room-stone { width:1.5em; height:0.8em; background-position:71.6544% 21.7766%; background-size:1365.33%; }

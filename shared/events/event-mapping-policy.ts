@@ -267,6 +267,7 @@ export const publicEventMappingPolicy = {
   'harvest.reapSkipped': silentPublicCues(mapped()),
   'harvest.reapNothing': silentPublicCues(mapped()),
   'harvest.feedConverted': silentPublicCues(mapped()),
+  'harvest.heated': silentPublicCues(mapped()),
   'game.started': silentPublicCues(mapped()),
   'game.ended': silentPublicCues(mapped()),
 } satisfies Record<GameEvent['type'], PublicEventMappingPolicy>

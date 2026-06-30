@@ -21,6 +21,7 @@ import type {
   FarmRenovatedEvent,
   FarmStableBuiltEvent,
   GameEvent,
+  HarvestHeatedEvent,
   HarvestPhaseStartedEvent,
   ParentMotherScheduledEvent,
   ResourceAccumulatedEvent,
@@ -288,6 +289,18 @@ const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
   if (event.harvestPhase === 'feeding') return { key: 'log.harvestPhaseFeed' }
   return { key: 'log.harvestPhaseBreed' }
 }
+
+const mapHarvestHeated = (event: HarvestHeatedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.harvestHeatingDetail',
+  params: {
+    player: playerName(ctx, event.playerId),
+    required: event.required,
+    fuelUsed: event.fuelUsed,
+    woodToFuel: event.woodToFuel,
+    sickWorkers: event.sickWorkerIds.length,
+    sickWorkerIds: event.sickWorkerIds,
+  },
+})
 
 const mapFutureMeepleQueued = (
   event: FutureMeepleQueuedEvent,
@@ -740,6 +753,10 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             food: event.food,
           },
         }]
+      }
+
+      if (event.type === 'harvest.heated') {
+        return [mapHarvestHeated(event, ctx)]
       }
 
       if (event.type === 'futureMeeple.queued') {

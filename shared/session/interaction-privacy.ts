@@ -1,7 +1,7 @@
 import type { InteractionState } from '../contract/types'
 import type { ClientInteractionState, PrivateGameEvent } from '../contract/protocol/game'
 
-const PRIVATE_PROMPT_KINDS = new Set(['resource-batch-exchange-select'])
+const PRIVATE_EVENT_PROMPT_KINDS = new Set(['resource-batch-exchange-select'])
 
 const targetPlayerId = (
   interaction: InteractionState,
@@ -17,9 +17,9 @@ export const filterInteractionForViewer = (
   viewerPlayerId: string | null,
 ): ClientInteractionState => {
   if (interaction.stateId !== 'wait') return interaction
-  if (!PRIVATE_PROMPT_KINDS.has(interaction.request.kind)) return interaction
   const recipient = targetPlayerId(interaction, playerIds)
   if (recipient !== null && recipient === viewerPlayerId) return interaction
+  if (recipient === null) return interaction
   return {
     stateId: 'wait',
     playerIndex: interaction.playerIndex,
@@ -45,7 +45,7 @@ export const privateEventsForViewer = (
 ): PrivateGameEvent[] => {
   if (viewerPlayerId === null) return []
   const events: PrivateGameEvent[] = []
-  if (interaction.stateId === 'wait' && PRIVATE_PROMPT_KINDS.has(interaction.request.kind)) {
+  if (interaction.stateId === 'wait' && PRIVATE_EVENT_PROMPT_KINDS.has(interaction.request.kind)) {
     const recipient = targetPlayerId(interaction, playerIds)
     if (recipient !== null && recipient === viewerPlayerId) {
       events.push({

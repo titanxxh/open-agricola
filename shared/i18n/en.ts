@@ -1065,6 +1065,7 @@ export const en = {
     harvestReapSkipped: '{player} skips reap this round',
     harvestFeedConvert: '{player} uses {source}: {cost} → {food}',
     harvestFeedDetail: '{player} feeds {resources}',
+    harvestHeatingDetail: '{player} heats home: pays {fuelUsed}/{required} fuel, converts {woodToFuel} wood, sick workers {sickWorkers}',
     harvestBreedDetail: '{player} breeds {resources}',
     startPlayer: '{player} becomes start player',
     plow: '{player} plows 1 field',

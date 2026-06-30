@@ -124,6 +124,51 @@ describe('buildEnvelope', () => {
     expect(observer.payload.publicEventCancellations).toEqual(publicEventCancellations)
   })
 
+  it('redacts owner-only harvest and reorganization prompts from other viewers', () => {
+    const session = new GameSession()
+    const resp = session.withCtx(() => session.getState())
+    const p0 = resp.state.players[0]!
+    const p1 = resp.state.players[1]!
+    const waitResp = {
+      ...resp,
+      interaction: {
+        stateId: 'wait' as const,
+        playerIndex: 0,
+        promptKey: 'ui.reorganizeAnimals' as const,
+        request: {
+          kind: 'animal-reorg' as const,
+          zones: [],
+        },
+        allowedCommands: ['commitSelection', 'undoStep'] as const,
+        anytimeActions: [],
+      },
+    }
+
+    const target = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: waitResp,
+      viewerPlayerId: p0.id,
+      version: 1,
+      cause: 'choice',
+      emittedAt: 0,
+    })
+    const other = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: waitResp,
+      viewerPlayerId: p1.id,
+      version: 1,
+      cause: 'choice',
+      emittedAt: 0,
+    })
+
+    expect(target.payload.interaction.stateId === 'wait' && target.payload.interaction.request.kind)
+      .toBe('animal-reorg')
+    expect(other.payload.interaction.stateId === 'wait' && other.payload.interaction.request.kind)
+      .toBe('private-prompt')
+    expect(other.payload.interaction.stateId === 'wait' && other.payload.interaction.allowedCommands)
+      .toEqual([])
+  })
+
   it('filters response private events for each viewer', () => {
     const session = new GameSession()
     const resp = session.withCtx(() => session.getState())

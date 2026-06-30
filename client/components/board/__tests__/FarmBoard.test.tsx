@@ -645,12 +645,24 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('data-player-resource-anchor="p1"')
     expect(html).toContain('aria-label="Family capacity: 2/5"')
+    expect(html).not.toContain('aria-label="Infirmary workers:')
     expect(html).toContain('aria-label="Rooms: 2"')
     expect(html).toContain('aria-label="Housing capacity: 2"')
     expect(html).toContain('aria-label="Fence capacity: 17/17"')
     expect(html).toContain('aria-label="Stable supply: 3/4"')
     expect(html).toMatch(/res-compact-item[\s\S]*res-icon-fence-icon[\s\S]*>17\/17</)
     expect(html).toMatch(/res-compact-item[\s\S]*res-icon-barn[\s\S]*>3\/4</)
+  })
+
+  it('shows workers currently placed in the Infirmary in the compact resource panel', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard {...createFarmBoardProps(player, { infirmaryWorkerCount: 2 })} />,
+    )
+
+    expect(html).toContain('aria-label="Infirmary workers: 2"')
+    expect(html).toMatch(/res-compact-item[\s\S]*res-icon-infirmary-worker[\s\S]*>2</)
   })
 
   it('marks highlighted farm tiles', () => {
