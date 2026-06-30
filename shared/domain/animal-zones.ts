@@ -264,10 +264,31 @@ const ensureCardExtraData = (
 const isCounterBackedAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'card' && typeof zone.capacityCounterKey === 'string'
 
+const clearAnimalHolderStorage = (extraData: Record<string, unknown>) => {
+  delete extraData.animalCountsByZone
+  delete extraData.animalCounts
+  delete extraData.animalType
+  delete extraData.held
+}
+
+const clearInactiveCardZoneStorage = (
+  player: PlayerState,
+  activeCardZones: AnimalZone[],
+) => {
+  const activeCardIds = new Set(activeCardZones.map((zone) => zone.cardId).filter(Boolean))
+  for (const cardId of getPlayedCardIds(player)) {
+    if (activeCardIds.has(cardId)) continue
+    const extraData = player.cardStates?.[cardId]?.extraData
+    if (!extraData || typeof extraData !== 'object') continue
+    clearAnimalHolderStorage(extraData as Record<string, unknown>)
+  }
+}
+
 const writeCardZoneStorage = (
   player: PlayerState,
   cardZones: AnimalZone[],
 ) => {
+  clearInactiveCardZoneStorage(player, cardZones)
   const byCard = new Map<string, AnimalZone[]>()
   for (const zone of cardZones) {
     if (!zone.cardId) continue
@@ -283,6 +304,7 @@ const writeCardZoneStorage = (
     )
     if (!useZoneStorage) {
       writeAnimalHolderCounts(extraData, readAnimalCountsForZoneAssignment(zones[0]))
+      delete extraData.animalCountsByZone
       continue
     }
     const next: Record<string, unknown> = {}
@@ -313,7 +335,10 @@ const reserveCardZoneAnimals = (
   const reserved = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   const cardZones = zones.filter((zone) => zone.zoneType === 'card' && zone.cardId)
   for (const zone of cardZones) {
-    const counts = readAnimalCountsForZoneAssignment(zone)
+    const counts = clampAnimalCountsToCapacity(
+      readAnimalCountsForZoneAssignment(zone),
+      zone.capacity,
+    ).counts
     const kept = createAnimalCounts(state.enableFarmersOfTheMoor === true)
     for (const animalType of animalKeysForState(state)) {
       const take = Math.min(counts[animalType] ?? 0, totals[animalType] ?? 0)
