@@ -165,7 +165,7 @@ describe('computeScores', () => {
     const player = createPlayer()
     player.minorPlayed = ['M084_BogPony']
     player.cardStates = {
-      M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+      M084_BogPony: { extraData: { lyingHorseCount: 1 } },
     }
     player.resources.horse = 2
     const state = { ...createState(player), enableFarmersOfTheMoor: true } as GameState

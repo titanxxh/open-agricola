@@ -23,7 +23,7 @@ import {
 } from './scoring-reserve.ts'
 import { getParentCardDefinition } from '../parents'
 import { readAllPublicCardMarkers } from '../cards/helpers/public-card-markers.ts'
-import { getPrivateAnimalsByType } from './animals.ts'
+import { getBogPonyLyingHorseCount } from './bog-pony.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -438,7 +438,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     if (state.enableFarmersOfTheMoor === true) {
       const horseCount = player.resources.horse ?? 0
-      const halfValueHorses = Math.min(horseCount, getPrivateAnimalsByType(player).horse ?? 0)
+      const halfValueHorses = Math.min(horseCount, getBogPonyLyingHorseCount(player))
       const horseScore = horseCount > 0 ? horseCount - halfValueHorses * 0.5 : -1
       categories.push({
         key: 'horses',
