@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -214,5 +214,28 @@ describe('check-card-impl-boundaries', () => {
     ].join('\n'))
 
     expect(walkProductionCardFiles(root)).toContain(file)
+  })
+
+  it('does not scan deck-local helper files as card implementations', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const helper = writeFixture(root, 'shared/cards/M/M999_Test-state.ts', [
+      "export const CARD_ID = 'M999_Test'",
+    ].join('\n'))
+
+    expect(walkProductionCardFiles(root)).not.toContain(helper)
+  })
+
+  it('keeps single-card state out of generic animal runtime files', () => {
+    const repoRoot = path.resolve(__dirname, '..', '..')
+    const files = [
+      'shared/actions/effects/breed.ts',
+      'shared/domain/scoring.ts',
+      'shared/domain/animal-payment.ts',
+    ]
+
+    for (const file of files) {
+      const source = readFileSync(path.join(repoRoot, file), 'utf8')
+      expect(source, file).not.toMatch(/M084|BogPony|bog-pony|lyingHorse/)
+    }
   })
 })

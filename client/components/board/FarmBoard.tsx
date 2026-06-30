@@ -30,7 +30,10 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
-import { readBogPonyLyingHorseCountFromExtraData } from '../../../shared/domain/bog-pony'
+import {
+  M084_BOG_PONY_ID,
+  readBogPonyLyingHorseCountFromExtraData,
+} from '../../../shared/cards/M/M084_BogPony-state'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -53,7 +56,6 @@ type FarmTerrainMarker = {
 }
 
 const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
-const M084_BOG_PONY_ID = 'M084_BogPony'
 const PARENT_CARD_PREVIEW_WIDTH = 320
 const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 560) / 735)
 
