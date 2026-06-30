@@ -196,6 +196,28 @@ describe('applyTrade', () => {
     expect(player.cardStates.M035_HorseTrough?.extraData?.animalCounts?.horse ?? 0).toBe(1)
     expect(player.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
   })
+
+  it('deducts animals from farm-position-backed card zones', () => {
+    const player = createMockPlayer({ horse: 1, food: 0 })
+    player.cardStates = {
+      M034_HomeWood: {
+        extraData: {
+          animalCountsByZone: {
+            'card:M034_HomeWood@0,0': { animalCounts: { horse: 1 } },
+          },
+        },
+      },
+    }
+    const trade: Trade = { from: { horse: 1 }, to: { food: 2 } }
+
+    applyTrade(player, trade)
+
+    expect(player.resources.horse).toBe(0)
+    expect(player.resources.food).toBe(2)
+    const zone = player.cardStates.M034_HomeWood?.extraData?.animalCountsByZone?.['card:M034_HomeWood@0,0']
+    expect(zone?.animalCounts?.horse ?? 0).toBe(0)
+    expect(zone?.held ?? 0).toBe(0)
+  })
 })
 
 describe('convertResources', () => {
