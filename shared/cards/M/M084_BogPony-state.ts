@@ -1,10 +1,10 @@
-import type { PlayerState } from '../contract/types'
+import type { PlayerState } from '../../contract/types'
 
 export const M084_BOG_PONY_ID = 'M084_BogPony'
 
 const readPositiveInt = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
     : 0
 
 export const readBogPonyLyingHorseCountFromExtraData = (value: unknown): number => {
@@ -16,7 +16,7 @@ export const writeBogPonyLyingHorseCount = (
   extraData: Record<string, unknown>,
   count: number,
 ): void => {
-  const value = readPositiveInt(count)
+  const value = Math.max(0, Math.floor(count))
   if (value > 0) extraData.lyingHorseCount = value
   else delete extraData.lyingHorseCount
 }

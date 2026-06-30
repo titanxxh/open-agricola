@@ -2,11 +2,7 @@ import type { GameState, PlayerState } from '../contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 import { computeAnimalZones, type AnimalZone } from './animal-zones'
 import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from './animals'
-import {
-  M084_BOG_PONY_ID,
-  getBogPonyLyingHorseCount,
-  writeBogPonyLyingHorseCount,
-} from './bog-pony'
+import { consumeAnimalPaymentFromCardEffects } from '../cards/card-effects'
 
 export type AnimalPaymentCounterSource = {
   kind: 'cardCounter'
@@ -51,21 +47,6 @@ const takeFromCardCounter = (
   if (!counters || current <= 0 || amount <= 0) return 0
   const take = Math.min(current, amount)
   counters[source.counterKey] = current - take
-  return take
-}
-
-const takeFromBogPonyLyingHorses = (
-  player: PlayerState,
-  animal: AnimalKey,
-  amount: number,
-): number => {
-  if (animal !== 'horse') return 0
-  const current = getBogPonyLyingHorseCount(player)
-  const take = Math.min(current, amount)
-  if (take <= 0) return 0
-  const extraData = player.cardStates?.[M084_BOG_PONY_ID]?.extraData as Record<string, unknown> | undefined
-  if (!extraData) return 0
-  writeBogPonyLyingHorseCount(extraData, current - take)
   return take
 }
 
@@ -127,9 +108,7 @@ export const applyAnimalPayment = (
     remaining -= takeFromCardCounter(player, source, remaining)
   }
   if (remaining > 0) {
-    const lyingTaken = takeFromBogPonyLyingHorses(player, animal, remaining)
-    if (lyingTaken > 0) takeFromVisibleAnimals(player, animal, lyingTaken)
-    remaining -= lyingTaken
+    remaining -= consumeAnimalPaymentFromCardEffects(state, player, animal, remaining)
   }
   if (remaining > 0) remaining -= takeFromVisibleAnimals(player, animal, remaining)
   const hasSpecificPreferredSource = (preference?.prefer ?? []).some((source) => source.cardId)

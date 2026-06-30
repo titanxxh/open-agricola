@@ -8,7 +8,7 @@ import {
   getRegisteredOccupation,
 } from '../cards/registry-display'
 import { isMajorCardId } from '../cards/helpers/card-type.ts'
-import { getCardEffect } from '../cards/card-effects.ts'
+import { getAnimalScoreAdjustment, getCardEffect } from '../cards/card-effects.ts'
 import type {
   BonusScoreLevel,
   BonusScoringContext,
@@ -23,7 +23,6 @@ import {
 } from './scoring-reserve.ts'
 import { getParentCardDefinition } from '../parents'
 import { readAllPublicCardMarkers } from '../cards/helpers/public-card-markers.ts'
-import { getBogPonyLyingHorseCount } from './bog-pony.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -438,8 +437,12 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     if (state.enableFarmersOfTheMoor === true) {
       const horseCount = player.resources.horse ?? 0
-      const halfValueHorses = Math.min(horseCount, getBogPonyLyingHorseCount(player))
-      const horseScore = horseCount > 0 ? horseCount - halfValueHorses * 0.5 : -1
+      const baseHorseScore = horseCount > 0 ? horseCount : -1
+      const horseScore = baseHorseScore + getAnimalScoreAdjustment(state, player, 'horse', {
+        quantity: horseCount,
+        baseScore: baseHorseScore,
+        categoryKey: 'horses',
+      })
       categories.push({
         key: 'horses',
         total: horseScore,

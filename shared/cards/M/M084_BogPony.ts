@@ -11,11 +11,12 @@ import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registr
 import {
   getBogPonyLyingHorseCount,
   writeBogPonyLyingHorseCount,
-} from '../../domain/bog-pony'
-import { getAssignedAnimalsByType } from '../../domain/animals'
+} from './M084_BogPony-state'
+import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
 import { ensureCardState } from '../helpers/card-state'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
+import type { AnimalKey } from '../../contract/animals'
 
 const CARD_ID = 'M084_BogPony'
 const ACTION_ID = 'card_M084_BogPony_lie-horse'
@@ -37,6 +38,19 @@ const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
     params: { fuel: 2 },
     sourceCard: ctx.sourceCard ?? CARD_ID,
   })
+}
+
+const consumeLyingHorses = (player: PlayerState, animalType: AnimalKey, amount: number): number => {
+  if (animalType !== 'horse') return 0
+  const current = getBogPonyLyingHorseCount(player)
+  const assigned = getAssignedAnimalsByType(player).horse ?? 0
+  const take = Math.min(current, assigned, Math.max(0, Math.floor(amount)))
+  if (take <= 0) return 0
+  const extraData = player.cardStates?.[CARD_ID]?.extraData as Record<string, unknown> | undefined
+  if (!extraData) return 0
+  writeBogPonyLyingHorseCount(extraData, current - take)
+  subtractAnimalsFromBoard(player, { horse: take })
+  return take
 }
 
 export const bogPonyLieHorseAction: ActionDefinition = {
@@ -67,7 +81,19 @@ const anytimeListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [anytimeListener],
-  effect: { id: CARD_ID },
+  effect: {
+    id: CARD_ID,
+    computeBreedableAnimalCount: (_state, player, animalType, currentCount) => {
+      if (animalType !== 'horse') return undefined
+      return Math.max(0, currentCount - getBogPonyLyingHorseCount(player))
+    },
+    computeAnimalScoreAdjustment: (_state, player, animalType, ctx) => {
+      if (animalType !== 'horse') return undefined
+      return Math.min(ctx.quantity, getBogPonyLyingHorseCount(player)) * -0.5
+    },
+    consumeAnimalPayment: (_state, player, animalType, amount) =>
+      consumeLyingHorses(player, animalType, amount),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

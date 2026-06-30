@@ -241,7 +241,12 @@ export function walkProductionCardFiles(repoRoot: string): string[] {
     const dir = path.join(repoRoot, 'shared', 'cards', deck)
     if (!fs.existsSync(dir)) continue
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+      if (
+        entry.isFile()
+        && entry.name.endsWith('.ts')
+        && !entry.name.endsWith('.test.ts')
+        && NON_MAJOR_CARD_ID_RE.test(path.basename(entry.name, '.ts'))
+      ) {
         files.push(path.join(dir, entry.name))
       }
     }
