@@ -54,6 +54,10 @@ import {
   buildBakeBulkChoice,
   hasSelectedBakeGrain,
 } from './bake-exchange-ui'
+import {
+  buildAnytimeExchangeBulkChoice,
+  buildAnytimeExchangeOptions,
+} from './anytime-exchange-ui'
 import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
@@ -77,6 +81,7 @@ import {
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
+  shouldShowPendingChoiceInInteractionBar,
   splitBoardActionSpaces,
   type FarmCommitType,
   type WsStatus,
@@ -390,6 +395,7 @@ export const GameContainerApi = () => {
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
+  const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -882,6 +888,18 @@ export const GameContainerApi = () => {
     resolveChoice(choice)
   }
 
+  const confirmAnytimeExchange = () => {
+    if (!pendingChoice || !isAnytimeExchange) return
+    const choice = buildAnytimeExchangeBulkChoice(activeAnytimeExchangeCounts, anytimeExchangeOptions)
+    if (!choice) return
+    resolveChoice(choice)
+  }
+
+  const cancelAnytimeExchange = () => {
+    if (!pendingChoice || !isAnytimeExchange) return
+    resolveChoice('cancel')
+  }
+
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
     void transport.confirmNextPlayer().catch((e) => console.error(e))
@@ -1172,6 +1190,76 @@ export const GameContainerApi = () => {
   }
   const hasBakeSummary =
     summaryResources.food > 0 || summaryResources.grain > 0
+
+  const isAnytimeExchange =
+    pendingChoice?.promptKey === 'ui.interactionExchangeChoice'
+  const anytimeExchangePlayer =
+    isAnytimeExchange && pendingChoice && state
+      ? state.players[pendingChoice.playerIndex] ?? null
+      : null
+  const anytimeExchangeOptions =
+    isAnytimeExchange && pendingChoice && anytimeExchangePlayer
+      ? buildAnytimeExchangeOptions(
+          anytimeExchangePlayer,
+          pendingChoice.options,
+          cardLabel,
+          getCardMeta,
+        )
+      : []
+  const anytimeExchangeOptionIds = anytimeExchangeOptions.map((option) => option.id)
+  const activeAnytimeExchangeCounts = (() => {
+    const counts: Record<string, number> = {}
+    anytimeExchangeOptionIds.forEach((id) => {
+      counts[id] = anytimeExchangeCounts[id] ?? 0
+    })
+    return counts
+  })()
+  const updateAnytimeExchangeCount = (id: string, delta: number) => {
+    setAnytimeExchangeCounts((prev) => {
+      const currentCounts: Record<string, number> = {}
+      anytimeExchangeOptionIds.forEach((optionId) => {
+        currentCounts[optionId] = prev[optionId] ?? 0
+      })
+      const current = currentCounts[id] ?? 0
+      const option = anytimeExchangeOptions.find((entry) => entry.id === id)
+      if (!option || !anytimeExchangePlayer || option.tradeIndex === undefined) return prev
+      const max = Math.min(
+        option.maxTimes,
+        computeHarvestFeedCounterMax(
+          option,
+          anytimeExchangeOptions,
+          currentCounts,
+          anytimeExchangePlayer.resources,
+        ),
+      )
+      const nextValue = Math.max(0, Math.min(current + delta, max))
+      if (nextValue === current) return prev
+      return { ...prev, [id]: nextValue }
+    })
+  }
+  const anytimeExchangeSelections = anytimeExchangeOptions
+    .map((option) => ({
+      count: activeAnytimeExchangeCounts[option.id] ?? 0,
+      from: option.from,
+      to: option.to,
+    }))
+    .filter((entry) => entry.count > 0)
+  const anytimeExchangeSummary = (() => {
+    const resources = { ...emptyResources }
+    anytimeExchangeSelections.forEach((entry) => {
+      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
+        const key = k as keyof Resource
+        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
+      })
+      Object.entries(entry.to ?? {}).forEach(([k, v]) => {
+        const key = k as keyof Resource
+        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
+      })
+    })
+    return resources
+  })()
+  const hasAnytimeExchangeSelection = Object.values(activeAnytimeExchangeCounts).some((value) => value > 0)
+  const hasAnytimeExchangeSummary = Object.values(anytimeExchangeSummary).some((value) => value > 0)
 
   const isHarvestFeedExchange =
     interaction.stateId === 'wait' && interaction.request.kind === 'feed'
@@ -2234,6 +2322,118 @@ export const GameContainerApi = () => {
           </div>
         </div>
       ) : null}
+      {isAnytimeExchange && pendingChoice && isInteractive ? (
+        <div className="exchange-overlay">
+          <div className="exchange-modal">
+            <div className="exchange-header">
+              <div className="exchange-title">
+                {t(locale, 'ui.exchangeCenterTitle')}
+              </div>
+              <div className="exchange-subtitle">
+                {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+              </div>
+            </div>
+            <div className="exchange-content">
+              <div className="exchange-options">
+                {anytimeExchangeOptions.map((option) => {
+                  const current = activeAnytimeExchangeCounts[option.id] ?? 0
+                  const limit = option.tradeIndex === undefined || !anytimeExchangePlayer
+                    ? 0
+                    : Math.min(
+                        option.maxTimes,
+                        computeHarvestFeedCounterMax(
+                          option,
+                          anytimeExchangeOptions,
+                          activeAnytimeExchangeCounts,
+                          anytimeExchangePlayer.resources,
+                        ),
+                      )
+                  const canAdd = current < limit
+                  const canSubtract = current > 0
+                  const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
+                  const toResources: Partial<Resource> = { ...emptyResources, ...option.to }
+                  return (
+                    <div
+                      key={option.id}
+                      className="exchange-row"
+                      data-testid={`anytime-exchange-option-${option.sourceId}-ex${option.exchangeIndex}`}
+                    >
+                      <div className="exchange-name">{option.sourceName}</div>
+                      <div className="exchange-rate">
+                        <span className="interaction-resource-exchange">
+                          <ResourceLine
+                            locale={locale}
+                            mode="payment"
+                            resources={fromResources as Resource}
+                            hideZero
+                          />
+                          <span className="interaction-resource-exchange-arrow" aria-hidden="true">
+                            <span className="res-icon res-icon-arrow" />
+                          </span>
+                          <ResourceLine
+                            locale={locale}
+                            resources={toResources as Resource}
+                            hideZero
+                          />
+                        </span>
+                      </div>
+                      <div className="exchange-steps">
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateAnytimeExchangeCount(option.id, -1)}
+                          disabled={!canSubtract}
+                        >
+                          -
+                        </button>
+                        <div className="exchange-count">{current}</div>
+                        <button
+                          type="button"
+                          className="exchange-step"
+                          onClick={() => updateAnytimeExchangeCount(option.id, 1)}
+                          disabled={!canAdd}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="exchange-footer">
+                <div className="exchange-summary">
+                  {hasAnytimeExchangeSummary ? (
+                    <ResourceLine
+                      locale={locale}
+                      resources={anytimeExchangeSummary}
+                      emptyLabel={t(locale, 'ui.noResources')}
+                    />
+                  ) : (
+                    t(locale, 'ui.noResources')
+                  )}
+                </div>
+                <div className="exchange-actions">
+                  <button
+                    type="button"
+                    className="exchange-cancel"
+                    onClick={cancelAnytimeExchange}
+                  >
+                    {t(locale, 'ui.interactionCancel')}
+                  </button>
+                  <button
+                    type="button"
+                    className="exchange-confirm"
+                    onClick={confirmAnytimeExchange}
+                    disabled={!hasAnytimeExchangeSelection}
+                  >
+                    {t(locale, 'ui.interactionConfirmButton')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {isBakeExchange && pendingChoice ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -2505,7 +2705,8 @@ export const GameContainerApi = () => {
       </div>
 
       <InteractionBar
-        pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingAnimalReorg={pendingAnimalReorg}
+        pendingChoice={shouldShowPendingChoiceInInteractionBar(pendingChoice) ? pendingChoice : null}
         pendingEngineBlocked={pendingEngineBlocked}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
         pendingPlayerSwitch={pendingPlayerSwitch}
