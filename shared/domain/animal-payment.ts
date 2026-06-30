@@ -132,7 +132,8 @@ export const applyAnimalPayment = (
   }
   if (remaining > 0) remaining -= takeFromPrivateAnimals(player, animal, remaining)
   if (remaining > 0) remaining -= takeFromVisibleAnimals(player, animal, remaining)
-  if (remaining > 0) {
+  const hasSpecificPreferredSource = (preference?.prefer ?? []).some((source) => source.cardId)
+  if (remaining > 0 && !hasSpecificPreferredSource) {
     remaining -= takeFromCounterBackedAnimalZones(state, player, animal, remaining, preference?.avoid ?? [])
   }
   for (const source of preference?.avoid ?? []) {

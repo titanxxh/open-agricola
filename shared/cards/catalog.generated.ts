@@ -14891,6 +14891,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "requiresFarmersOfTheMoor": true,
     "heatingFuelCap": 0,
     "ovenIdentity": true,
+    "firewoodBuildTrigger": false,
     "kind": "minor"
   },
   {
