@@ -103,8 +103,37 @@ describe('ActionBoard', () => {
     const holder = container.querySelector('[data-action-id="moor-infirmary"]')
     expect(holder).not.toBeNull()
     expect(holder?.className).not.toContain('action-card-holder')
+    expect(holder?.querySelector('.player-action-space-card')).not.toBeNull()
+    expect(holder?.querySelector('.res-icon-food')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Infirmary/ }))
     expect(takeAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'moor-infirmary' }))
+  })
+
+  it('renders non-card dynamic resource market with resource icons', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('moor-resource-market-12', 'actions.moor-resource-market-12.name')]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={vi.fn()}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    const holder = container.querySelector('[data-action-id="moor-resource-market-12"]')
+    expect(holder?.querySelector('.res-icon-food')).not.toBeNull()
+    expect(holder?.querySelector('.res-icon-stone')).not.toBeNull()
   })
 
   it('renders card dynamic action spaces with action ids for the playtest harness', () => {

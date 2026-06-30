@@ -2044,6 +2044,7 @@
   filter: none;
 }
 .action-card-holder.choice-available .action-card,
+.player-action-card-wrapper.choice-available .action-card,
 .player-action-card-wrapper.choice-available .player-card {
   filter: none;
   box-shadow:
@@ -2051,6 +2052,7 @@
     0 0 18px rgba(234, 179, 8, 0.42);
 }
 .action-card-holder.choice-unavailable .action-card,
+.player-action-card-wrapper.choice-unavailable .action-card,
 .player-action-card-wrapper.choice-unavailable .player-card {
   filter: grayscale(70%) brightness(0.72);
   opacity: 0.66;
@@ -2161,6 +2163,20 @@
   background-image: url('/bga-img/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0px 10px;
+}
+.player-action-space-card .action-desc {
+  gap: 2px;
+  font-size: 16px;
+}
+.player-action-space-card .action-desc .icon-line {
+  line-height: 1.05;
+  white-space: normal;
+}
+.player-action-space-card .action-desc .icon-line:first-child {
+  font-size: 1.2em;
+}
+.player-action-space-card .action-desc .icon-line .text {
+  font-size: 0.72em;
 }
 /* --- Accumulate gain display (number + resource icon inline) --- */
 .gain-display {
