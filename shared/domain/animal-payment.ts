@@ -3,9 +3,10 @@ import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 import { computeAnimalZones, type AnimalZone } from './animal-zones'
 import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from './animals'
 import {
-  readPrivateAnimalCounts,
-  writePrivateAnimalCounts,
-} from './animal-holder-state'
+  M084_BOG_PONY_ID,
+  getBogPonyLyingHorseCount,
+  writeBogPonyLyingHorseCount,
+} from './bog-pony'
 
 export type AnimalPaymentCounterSource = {
   kind: 'cardCounter'
@@ -53,24 +54,19 @@ const takeFromCardCounter = (
   return take
 }
 
-const takeFromPrivateAnimals = (
+const takeFromBogPonyLyingHorses = (
   player: PlayerState,
   animal: AnimalKey,
   amount: number,
 ): number => {
-  let remaining = amount
-  for (const state of Object.values(player.cardStates ?? {})) {
-    if (remaining <= 0) break
-    const extra = state?.extraData as Record<string, unknown> | undefined
-    if (!extra) continue
-    const counts = readPrivateAnimalCounts(extra)
-    const take = Math.min(counts[animal] ?? 0, remaining)
-    if (take <= 0) continue
-    counts[animal] -= take
-    writePrivateAnimalCounts(extra, counts)
-    remaining -= take
-  }
-  return amount - remaining
+  if (animal !== 'horse') return 0
+  const current = getBogPonyLyingHorseCount(player)
+  const take = Math.min(current, amount)
+  if (take <= 0) return 0
+  const extraData = player.cardStates?.[M084_BOG_PONY_ID]?.extraData as Record<string, unknown> | undefined
+  if (!extraData) return 0
+  writeBogPonyLyingHorseCount(extraData, current - take)
+  return take
 }
 
 const takeFromVisibleAnimals = (
@@ -130,7 +126,11 @@ export const applyAnimalPayment = (
     if (remaining <= 0) break
     remaining -= takeFromCardCounter(player, source, remaining)
   }
-  if (remaining > 0) remaining -= takeFromPrivateAnimals(player, animal, remaining)
+  if (remaining > 0) {
+    const lyingTaken = takeFromBogPonyLyingHorses(player, animal, remaining)
+    if (lyingTaken > 0) takeFromVisibleAnimals(player, animal, lyingTaken)
+    remaining -= lyingTaken
+  }
   if (remaining > 0) remaining -= takeFromVisibleAnimals(player, animal, remaining)
   const hasSpecificPreferredSource = (preference?.prefer ?? []).some((source) => source.cardId)
   if (remaining > 0 && !hasSpecificPreferredSource) {

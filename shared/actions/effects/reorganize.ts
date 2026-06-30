@@ -23,7 +23,6 @@ import {
 } from '../../domain/animal-holder-state'
 import {
   getAssignedAnimalsByType,
-  getPrivateAnimalsByType,
   subtractAnimalsFromBoard,
 } from '../../domain/animals'
 
@@ -85,14 +84,13 @@ const trimVisibleAnimalsToAvailableTotals = (
   player: PlayerState,
   resourceTotalsBefore: Partial<Record<AnimalKey, number>>,
   visibleTotals: Partial<Record<AnimalKey, number>>,
-  privateCounts: Partial<Record<AnimalKey, number>>,
 ) => {
   const animalKeys = animalKeysForState(state)
   const assignedCounts = getAssignedAnimalsByType(player)
   const clampedVisibleTotals = { ...visibleTotals }
   const excessCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   for (const animal of animalKeys) {
-    const visibleLimit = Math.max(0, (resourceTotalsBefore[animal] ?? 0) - (privateCounts[animal] ?? 0))
+    const visibleLimit = Math.max(0, resourceTotalsBefore[animal] ?? 0)
     const excess = (visibleTotals[animal] ?? 0) - visibleLimit
     if (excess <= 0) continue
     clampedVisibleTotals[animal] = visibleLimit
@@ -235,15 +233,13 @@ export const applyReorganizeMutate = (
       addAnimalCounts(visibleTotals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
   for (const counts of cardCountsById.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
-  const privateCounts = getPrivateAnimalsByType(player)
   const finalVisibleTotals = trimVisibleAnimalsToAvailableTotals(
     state,
     player,
     resourceTotalsBefore,
     visibleTotals,
-    privateCounts,
   )
-  for (const animal of animalKeys) player.resources[animal] = (finalVisibleTotals[animal] ?? 0) + (privateCounts[animal] ?? 0)
+  for (const animal of animalKeys) player.resources[animal] = finalVisibleTotals[animal] ?? 0
 }
 
 const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {

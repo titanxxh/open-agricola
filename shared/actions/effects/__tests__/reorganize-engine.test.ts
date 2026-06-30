@@ -283,14 +283,14 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.horse).toBe(0)
   })
 
-  it('preserves M084 lying horses outside editable animal reorg zones', () => {
+  it('keeps M084 out of editable animal reorg zones', () => {
     const ctx = makeCtx({
       state: { enableFarmersOfTheMoor: true },
       player: {
         minorPlayed: ['M084_BogPony'],
-        resources: { sheep: 0, boar: 0, cattle: 0, horse: 2 } as never,
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 1 } as never,
         cardStates: {
-          M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+          M084_BogPony: { extraData: { lyingHorseCount: 1 } },
         } as never,
         pastures: [
           {
@@ -316,18 +316,18 @@ describe('reorganizeAction.resolveChoice', () => {
     )
 
     expect(result.type).toBe('ok')
-    expect(ctx.player.resources.horse).toBe(2)
-    expect(ctx.player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
-  it('does not let reorg payload assign M084 private horses to visible zones', () => {
+  it('lets reorg payload place M084 lying horses only in ordinary zones', () => {
     const ctx = makeCtx({
       state: { enableFarmersOfTheMoor: true },
       player: {
         minorPlayed: ['M084_BogPony'],
         resources: { sheep: 0, boar: 0, cattle: 0, horse: 1 } as never,
         cardStates: {
-          M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+          M084_BogPony: { extraData: { lyingHorseCount: 1 } },
         } as never,
       },
     })
@@ -340,9 +340,9 @@ describe('reorganizeAction.resolveChoice', () => {
 
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.horse).toBe(1)
-    expect(ctx.player.houseAnimalType).toBeNull()
-    expect(ctx.player.houseAnimalCount).toBe(0)
-    expect(ctx.player.cardStates.M084_BogPony?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(ctx.player.houseAnimalType).toBe('horse')
+    expect(ctx.player.houseAnimalCount).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
   it('clears stale ordinary card-zone animals when the zone disappears', () => {

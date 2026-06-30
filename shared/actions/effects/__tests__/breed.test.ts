@@ -183,7 +183,7 @@ describe('breed core helper', () => {
     const player = makePlayer({
       minorPlayed: ['M084_BogPony'],
       cardStates: {
-        M084_BogPony: { extraData: { privateAnimalCounts: { horse: 1 } } },
+        M084_BogPony: { extraData: { lyingHorseCount: 1 } },
       },
       resources: {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,

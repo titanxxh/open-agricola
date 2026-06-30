@@ -9,10 +9,10 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainAction } from '../../actions/effects/gain'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import {
-  readPrivateAnimalCounts,
-  writePrivateAnimalCounts,
-} from '../../domain/animal-holder-state'
-import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
+  getBogPonyLyingHorseCount,
+  writeBogPonyLyingHorseCount,
+} from '../../domain/bog-pony'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import { ensureCardState } from '../helpers/card-state'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
@@ -21,25 +21,16 @@ const CARD_ID = 'M084_BogPony'
 const ACTION_ID = 'card_M084_BogPony_lie-horse'
 
 const countStandingHorses = (player: PlayerState): number => {
-  return getAssignedAnimalsByType(player).horse ?? 0
-}
-
-const moveStandingHorseToCard = (player: PlayerState): boolean => {
-  if (countStandingHorses(player) <= 0) return false
-  const totalHorses = player.resources.horse ?? 0
-  subtractAnimalsFromBoard(player, { horse: 1 })
-  player.resources.horse = totalHorses
-  return true
+  const lyingHorses = getBogPonyLyingHorseCount(player)
+  return Math.max(0, (getAssignedAnimalsByType(player).horse ?? 0) - lyingHorses)
 }
 
 const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
   const { player } = ctx
-  if (!moveStandingHorseToCard(player)) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+  if (countStandingHorses(player) <= 0) return { type: 'fail', errorKey: 'log.specialEffectFail' }
   const cardState = ensureCardState(player, CARD_ID)
   const extraData = { ...((cardState.extraData as Record<string, unknown> | undefined) ?? {}) }
-  const counts = readPrivateAnimalCounts(extraData)
-  counts.horse = (counts.horse ?? 0) + 1
-  writePrivateAnimalCounts(extraData, counts)
+  writeBogPonyLyingHorseCount(extraData, getBogPonyLyingHorseCount(player) + 1)
   cardState.extraData = extraData
   return gainAction.execute({
     ...ctx,

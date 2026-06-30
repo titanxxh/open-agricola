@@ -58,7 +58,7 @@ const setup = () => {
   }
   const player = state.players[0]!
   player.minorPlayed = [CARD_ID]
-  player.cardStates = { [CARD_ID]: { extraData: { privateAnimalCounts: { horse: 0 } } } }
+  player.cardStates = { [CARD_ID]: { extraData: { lyingHorseCount: 0 } } }
   session.loadState(state)
   return session
 }
@@ -74,19 +74,13 @@ describe('M084 Bog Pony session', () => {
     expect(session.takeAnytimeAction(0, ANYTIME_ID).ok).toBe(false)
   })
 
-  it('lies a placed standing horse on the card for 2 fuel without reducing total horses', () => {
+  it('lies a placed standing horse for 2 fuel without freeing its animal space', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
     player.resources = fullResources({ horse: 1, fuel: 0 })
-    player.pastures = [{
-      id: 'horse-pasture',
-      size: 1,
-      tiles: [{ row: 1, col: 0 }],
-      stables: 0,
-      animalType: 'horse',
-      animalCount: 1,
-    }]
+    player.houseAnimalType = 'horse'
+    player.houseAnimalCount = 1
     session.loadState(state)
 
     expect(enterActiveInteraction(session)).toContain(ANYTIME_ID)
@@ -96,8 +90,9 @@ describe('M084 Bog Pony session', () => {
     const updated = resp.state.players[0]!
     expect(updated.resources.fuel).toBe(2)
     expect(updated.resources.horse).toBe(1)
-    expect(updated.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
-    expect(updated.cardStates[CARD_ID]?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
+    expect(updated.houseAnimalType).toBe('horse')
+    expect(updated.houseAnimalCount).toBe(1)
+    expect(updated.cardStates[CARD_ID]?.extraData?.lyingHorseCount).toBe(1)
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.moved',
@@ -118,7 +113,7 @@ describe('M084 Bog Pony session', () => {
     player.resources = fullResources({ horse: 1, fuel: 0 })
     player.minorPlayed = [CARD_ID, 'M035_HorseTrough']
     player.cardStates = {
-      [CARD_ID]: { extraData: { privateAnimalCounts: { horse: 0 } } },
+      [CARD_ID]: { extraData: { lyingHorseCount: 0 } },
       M035_HorseTrough: {
         extraData: {
           animalCountsByZone: {
@@ -136,8 +131,8 @@ describe('M084 Bog Pony session', () => {
     const updated = resp.state.players[0]!
     const troughZone = updated.cardStates.M035_HorseTrough?.extraData?.animalCountsByZone?.['card:M035_HorseTrough@0,0']
     expect(updated.resources).toMatchObject({ horse: 1, fuel: 2 })
-    expect(updated.cardStates[CARD_ID]?.extraData?.privateAnimalCounts).toMatchObject({ horse: 1 })
-    expect(troughZone?.animalCounts?.horse ?? 0).toBe(0)
+    expect(updated.cardStates[CARD_ID]?.extraData?.lyingHorseCount).toBe(1)
+    expect(troughZone?.animalCounts?.horse ?? 0).toBe(1)
   })
 
   it('does not open animal reorg after lying a horse during a normal action', () => {

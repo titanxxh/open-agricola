@@ -13,7 +13,6 @@ import {
   sumAnimalCounts,
   type AnimalCounts,
 } from './animal-holder-state.ts'
-import { getPrivateAnimalsByType } from './animals.ts'
 
 // ---------------------------------------------------------------------------
 // AnimalZone type and computation helpers (formerly in
@@ -409,19 +408,6 @@ const targetAnimalList = (
   )
 }
 
-const visibleTargetAnimalCounts = (
-  player: PlayerState,
-  targetCounts: Partial<Record<AnimalType, number>>,
-): Partial<Record<AnimalType, number>> => {
-  const privateCounts = getPrivateAnimalsByType(player)
-  if (sumAnimalCounts(privateCounts) <= 0) return targetCounts
-  const visibleCounts = { ...targetCounts }
-  for (const key of ALL_ANIMAL_KEYS) {
-    visibleCounts[key] = Math.max(0, (visibleCounts[key] ?? 0) - (privateCounts[key] ?? 0))
-  }
-  return visibleCounts
-}
-
 const candidateZoneWithAnimal = (
   zone: AnimalAccommodationWorkZone,
   type: AnimalType,
@@ -471,7 +457,7 @@ export const canAccommodateAnimalTotals = (
   player: PlayerState,
   targetCounts: Partial<Record<AnimalType, number>>,
 ): boolean => {
-  const animals = targetAnimalList(state, visibleTargetAnimalCounts(player, targetCounts))
+  const animals = targetAnimalList(state, targetCounts)
   if (!animals) return false
   const zones = computeAnimalZones(player, state).map((zone) => createAccommodationWorkZone(state, zone))
   const animalKeys = animalKeysForState(state)
@@ -529,9 +515,8 @@ export const enforceAnimalCapacity = (
   const zoneCapacity = (id: string) => zones.find((z) => z.id === id)?.capacity ?? 0
 
   const animalKeys = animalKeysForState(state)
-  const privateCounts = getPrivateAnimalsByType(player)
   const totals: Partial<Record<AnimalType, number>> = {}
-  for (const key of animalKeys) totals[key] = Math.max(0, (player.resources[key] ?? 0) - (privateCounts[key] ?? 0))
+  for (const key of animalKeys) totals[key] = player.resources[key] ?? 0
   const looseStableKeys = getLooseStableKeys(player)
   const stableAnimals: Record<string, AnimalType | null> = {}
   looseStableKeys.forEach((key) => {
@@ -621,7 +606,6 @@ export const enforceAnimalCapacity = (
     Object.values(stableAnimals).forEach((type) => {
       if (type === animalType) player.resources[animalType] = (player.resources[animalType] ?? 0) + 1
     })
-    player.resources[animalType] = (player.resources[animalType] ?? 0) + (privateCounts[animalType] ?? 0)
   }
 
   // Per-card zone validation hook: BGA `getInvalidAnimals($zone, ...)`. We
