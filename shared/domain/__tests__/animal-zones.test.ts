@@ -9,6 +9,7 @@ import {
   computeAnimalZones,
   type AnimalZone,
 } from '../animal-zones.ts'
+import { applyAnimalPayment } from '../animal-payment.ts'
 import { getAssignedAnimalsByType } from '../animals.ts'
 import { playerBoard } from '../index.ts'
 
@@ -427,5 +428,32 @@ describe('AnimalZones', () => {
     })
     expect(getAssignedAnimalsByType(player).horse).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(1)
+  })
+
+  it('enforceCapacity reserves counter-backed card zones without persisting ordinary holder storage', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.boar = 1
+    player.occupationPlayed = ['C148_MudWallower']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.boar).toBe(1)
+    expect(player.houseAnimalType).toBeNull()
+    expect(player.houseAnimalCount).toBe(0)
+    expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
+    expect(getAssignedAnimalsByType(player).boar).toBe(0)
+
+    applyAnimalPayment(player, state, 'boar', 1)
+
+    expect(player.resources.boar).toBe(0)
+    expect(player.cardStates.C148_MudWallower?.counters?.held).toBe(0)
   })
 })
