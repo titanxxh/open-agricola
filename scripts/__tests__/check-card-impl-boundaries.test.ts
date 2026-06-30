@@ -2,7 +2,11 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { cardImplBoundaryExitCode, checkCardImplBoundaries } from '../check-card-impl-boundaries'
+import {
+  cardImplBoundaryExitCode,
+  checkCardImplBoundaries,
+  walkProductionCardFiles,
+} from '../check-card-impl-boundaries'
 
 const writeFixture = (root: string, rel: string, content: string): string => {
   const full = path.join(root, rel)
@@ -65,6 +69,43 @@ describe('check-card-impl-boundaries', () => {
     ].join('\n'))
 
     expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
+  it('allows declared named printed targets for public played-card membership checks', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/M/M063_PastoralLetter.ts', [
+      "const CHURCH = 'M068_Church'",
+      'export const M063_PastoralLetter_impl = {',
+      '  effect: {',
+      '    computeBonusScore: (_state: any, player: any) =>',
+      '      player.minorPlayed.includes(CHURCH) ? 1 : 0,',
+      '  },',
+      '  reaches: [CHURCH],',
+      '}',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
+  it('reports private state reads even when the target is declared in reaches', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/M/M063_PastoralLetter.ts', [
+      "const CHURCH = 'M068_Church'",
+      'export const M063_PastoralLetter_impl = {',
+      '  effect: {',
+      '    computeBonusScore: (_state: any, player: any) =>',
+      '      player.cardStates?.[CHURCH]?.counters?.held ?? 0,',
+      '  },',
+      '  reaches: [CHURCH],',
+      '}',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({
+        cardId: 'M063_PastoralLetter',
+        referencedCardId: 'M068_Church',
+      }),
+    ])
   })
 
   it('reports runtime uses of same-file const string and array aliases', () => {
@@ -133,5 +174,16 @@ describe('check-card-impl-boundaries', () => {
         { warnOnly: true },
       ),
     ).toBe(0)
+  })
+
+  it('scans Farmers of the Moor production cards', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/M/M999_Test.ts', [
+      "export const M999_Test_impl = {",
+      '  effect: { onBuy: () => undefined },',
+      '}',
+    ].join('\n'))
+
+    expect(walkProductionCardFiles(root)).toContain(file)
   })
 })

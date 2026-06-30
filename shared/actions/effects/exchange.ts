@@ -9,7 +9,6 @@ import type {
   Trade,
   ResourceKey,
 } from '../../contract/types'
-import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../contract/animals'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
@@ -30,38 +29,12 @@ import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
-import { subtractAnimalsFromBoard } from '../../domain/animals'
 import {
-  readAnimalHolderCounts,
-  readPrivateAnimalCounts,
-  writeAnimalHolderCounts,
-  writePrivateAnimalCounts,
-} from '../../domain/animal-holder-state'
-
-type AnimalResourceKey = AnimalKey
-type CardCounterAnimalSource = {
-  kind: 'cardCounter'
-  cardId?: string
-  counterKey: string
-}
-type AnimalPaymentPreference = {
-  animal: AnimalResourceKey
-  prefer?: CardCounterAnimalSource[]
-  avoid?: CardCounterAnimalSource[]
-}
-
-const isAnimalResourceKey = (key: ResourceKey): key is AnimalResourceKey =>
-  (ALL_ANIMAL_KEYS as readonly string[]).includes(key)
-
-const readAnimalPaymentPreference = (
-  actionContext: Record<string, unknown> | undefined,
-): AnimalPaymentPreference | undefined => {
-  const raw = actionContext?.animalPaymentPreference
-  if (!raw || typeof raw !== 'object') return undefined
-  const pref = raw as Partial<AnimalPaymentPreference>
-  if (!ALL_ANIMAL_KEYS.includes(pref.animal as AnimalKey)) return undefined
-  return pref as AnimalPaymentPreference
-}
+  applyAnimalPayment,
+  isAnimalResourceKey,
+  readAnimalPaymentPreference,
+  type AnimalPaymentPreference,
+} from '../../domain/animal-payment'
 
 const readMaxTradeTimesBySourceId = (
   actionContext: Record<string, unknown> | undefined,
@@ -74,122 +47,6 @@ const readMaxTradeTimesBySourceId = (
     out[key] = Math.max(0, Math.floor(value))
   }
   return out
-}
-
-const takeFromCardCounter = (
-  player: PlayerState,
-  source: CardCounterAnimalSource,
-  amount: number,
-): number => {
-  if (!source.cardId) {
-    let remaining = amount
-    for (const cardId of Object.keys(player.cardStates ?? {})) {
-      if (remaining <= 0) break
-      remaining -= takeFromCardCounter(player, { ...source, cardId }, remaining)
-    }
-    return amount - remaining
-  }
-  const counters = player.cardStates?.[source.cardId]?.counters
-  const current = counters?.[source.counterKey] ?? 0
-  if (!counters || current <= 0 || amount <= 0) return 0
-  const take = Math.min(current, amount)
-  counters[source.counterKey] = current - take
-  return take
-}
-
-const takeFromPrivateAnimals = (
-  player: PlayerState,
-  animal: AnimalResourceKey,
-  amount: number,
-): number => {
-  let remaining = amount
-  for (const state of Object.values(player.cardStates ?? {})) {
-    if (remaining <= 0) break
-    const extra = state?.extraData as Record<string, unknown> | undefined
-    if (!extra) continue
-    const counts = readPrivateAnimalCounts(extra)
-    const take = Math.min(counts[animal] ?? 0, remaining)
-    if (take <= 0) continue
-    counts[animal] -= take
-    writePrivateAnimalCounts(extra, counts)
-    remaining -= take
-  }
-  return amount - remaining
-}
-
-const takeFromBoardAnimals = (
-  player: PlayerState,
-  animal: AnimalResourceKey,
-  amount: number,
-): number => {
-  let remaining = amount
-  for (const pasture of player.pastures ?? []) {
-    if (remaining <= 0) break
-    if (pasture.animalType !== animal) continue
-    const take = Math.min(pasture.animalCount, remaining)
-    pasture.animalCount -= take
-    remaining -= take
-    if (pasture.animalCount <= 0) pasture.animalType = null
-  }
-  if (remaining > 0 && player.houseAnimalType === animal && player.houseAnimalCount > 0) {
-    const take = Math.min(player.houseAnimalCount, remaining)
-    player.houseAnimalCount -= take
-    remaining -= take
-    if (player.houseAnimalCount <= 0) player.houseAnimalType = null
-  }
-  if (remaining > 0 && player.stableAnimals) {
-    for (const [key, value] of Object.entries(player.stableAnimals)) {
-      if (remaining <= 0) break
-      if (value !== animal) continue
-      player.stableAnimals[key] = null
-      remaining -= 1
-    }
-  }
-  return amount - remaining
-}
-
-const takeFromAnimalHolderCards = (
-  player: PlayerState,
-  animal: AnimalResourceKey,
-  amount: number,
-): number => {
-  let remaining = amount
-  for (const state of Object.values(player.cardStates ?? {})) {
-    if (remaining <= 0) break
-    const extra = state?.extraData as Record<string, unknown> | undefined
-    if (!extra) continue
-    const counts = readAnimalHolderCounts(extra)
-    const take = Math.min(counts[animal] ?? 0, remaining)
-    if (take <= 0) continue
-    counts[animal] -= take
-    writeAnimalHolderCounts(extra, counts)
-    remaining -= take
-  }
-  return amount - remaining
-}
-
-const deductAnimalWithPreference = (
-  player: PlayerState,
-  animal: AnimalResourceKey,
-  amount: number,
-  preference: AnimalPaymentPreference,
-): void => {
-  let remaining = amount
-  for (const source of preference.prefer ?? []) {
-    if (remaining <= 0) break
-    remaining -= takeFromCardCounter(player, source, remaining)
-  }
-  if (remaining > 0) {
-    remaining -= takeFromBoardAnimals(player, animal, remaining)
-  }
-  if (remaining > 0) {
-    remaining -= takeFromAnimalHolderCards(player, animal, remaining)
-  }
-  for (const source of preference.avoid ?? []) {
-    if (remaining <= 0) break
-    remaining -= takeFromCardCounter(player, source, remaining)
-  }
-  player.resources[animal] = Math.max(0, (player.resources[animal] ?? 0) - amount)
 }
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
@@ -406,25 +263,20 @@ export const applyTrade = (
   trade: Trade,
   times: number = 1,
   animalPaymentPreference?: AnimalPaymentPreference,
+  state?: GameState,
 ): void => {
   // Deduct 'from' resources
   const fromKeys = Object.keys(trade.from) as ResourceKey[]
   for (const key of fromKeys) {
     const amount = (trade.from[key] ?? 0) * times
-    if (
-      amount > 0 &&
-      animalPaymentPreference &&
-      isAnimalResourceKey(key) &&
-      animalPaymentPreference.animal === key
-    ) {
-      deductAnimalWithPreference(player, key, amount, animalPaymentPreference)
-    } else if (amount > 0 && isAnimalResourceKey(key)) {
-      const privateTaken = takeFromPrivateAnimals(player, key, amount)
-      if (privateTaken > 0) {
-        player.resources[key] = Math.max(0, (player.resources[key] ?? 0) - privateTaken)
-      }
-      const remaining = amount - privateTaken
-      if (remaining > 0) subtractAnimalsFromBoard(player, { [key]: remaining })
+    if (amount > 0 && isAnimalResourceKey(key)) {
+      applyAnimalPayment(
+        player,
+        state,
+        key,
+        amount,
+        animalPaymentPreference?.animal === key ? animalPaymentPreference : undefined,
+      )
     } else {
       player.resources[key] -= amount
     }
@@ -673,7 +525,7 @@ const resolveExchangeChoice = (
       const times = Math.min(count, max)
       if (times > 0) {
         const preResources = { ...player.resources }
-        applyTrade(player, trade, times, animalPaymentPreference)
+        applyTrade(player, trade, times, animalPaymentPreference, state)
         recordCookeryConversion(player, trade, times)
         if (trade.sideEffect) {
           applyTradeSideEffect(
@@ -714,7 +566,7 @@ const resolveExchangeChoice = (
     const times = Math.min(count, boundedMax)
     if (times > 0) {
       const preResources = { ...player.resources }
-      applyTrade(player, trade, times, animalPaymentPreference)
+      applyTrade(player, trade, times, animalPaymentPreference, state)
       recordCookeryConversion(player, trade, times)
       if (trade.sideEffect) {
         applyTradeSideEffect(
@@ -794,7 +646,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       }
       const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
       const preResources = { ...player.resources }
-      applyTrade(player, directTrade, 1, animalPaymentPreference)
+      applyTrade(player, directTrade, 1, animalPaymentPreference, state)
       recordCookeryConversion(player, directTrade, 1)
       if (directTrade.sideEffect) {
         applyTradeSideEffect(
