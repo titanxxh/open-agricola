@@ -456,4 +456,57 @@ describe('AnimalZones', () => {
     expect(player.resources.boar).toBe(0)
     expect(player.cardStates.C148_MudWallower?.counters?.held).toBe(0)
   })
+
+  it('enforceCapacity clears stale keyed card-zone storage when no active zones remain', () => {
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({ id: TEST_CARD, onComputeAnimalZones: () => [] })
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.sheep = 1
+    player.minorPlayed = [TEST_CARD]
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      [TEST_CARD]: {
+        extraData: {
+          animalCountsByZone: {
+            [`card:${TEST_CARD}@0-0`]: { animalCounts: { sheep: 1 } },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.houseAnimalType).toBe('sheep')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates[TEST_CARD]?.extraData?.animalCountsByZone).toBeUndefined()
+    expect(getAssignedAnimalsByType(player).sheep).toBe(1)
+  })
+
+  it('enforceCapacity clamps counter-backed card reservations to zone capacity', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]
+    player.resources.boar = 2
+    player.occupationPlayed = ['C148_MudWallower']
+    player.pastures = []
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.cardStates = {
+      C148_MudWallower: { counters: { counter: 0, held: 1 } },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(player.resources.boar).toBe(2)
+    expect(player.houseAnimalType).toBe('boar')
+    expect(player.houseAnimalCount).toBe(1)
+    expect(player.cardStates.C148_MudWallower?.extraData).toBeUndefined()
+    const c148Zone = computeAnimalZones(player, state).find((zone) => zone.cardId === 'C148_MudWallower')
+    expect(c148Zone?.animalCount).toBe(1)
+  })
 })
