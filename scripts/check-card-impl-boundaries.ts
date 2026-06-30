@@ -6,7 +6,7 @@ import ts from 'typescript'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const NON_MAJOR_CARD_ID_RE = /^[A-E]\d+_[A-Z]\w*$/
+const NON_MAJOR_CARD_ID_RE = /^(?:[A-E]|M)\d+_[A-Z]\w*$/
 
 export type CardImplBoundaryViolation = {
   file: string
@@ -117,6 +117,73 @@ function collectConstCardAliases(sourceFile: ts.SourceFile, cardId: string): Map
   return aliases
 }
 
+function cardIdsFromExpression(expr: ts.Expression, aliases: Map<string, string[]>): string[] {
+  const value = unwrapExpression(expr)
+  if (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) return [value.text]
+  if (ts.isIdentifier(value)) return aliases.get(value.text) ?? []
+  if (ts.isArrayLiteralExpression(value)) {
+    return value.elements.flatMap((element) => cardIdsFromExpression(element as ts.Expression, aliases))
+  }
+  return []
+}
+
+function collectReachCardIds(sourceFile: ts.SourceFile, aliases: Map<string, string[]>): Set<string> {
+  const reaches = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (ts.isPropertyAssignment(node) && propertyNameText(node.name) === 'reaches') {
+      for (const cardId of cardIdsFromExpression(node.initializer, aliases)) reaches.add(cardId)
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return reaches
+}
+
+function propertyAccessName(node: ts.Expression): string | null {
+  const value = unwrapExpression(node)
+  if (ts.isPropertyAccessExpression(value)) return value.name.text
+  if (ts.isElementAccessExpression(value)) {
+    const arg = value.argumentExpression && unwrapExpression(value.argumentExpression)
+    if (arg && (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg))) return arg.text
+  }
+  return null
+}
+
+function isPublicPlayedCardListExpression(node: ts.Expression): boolean {
+  const name = propertyAccessName(node)
+  return name === 'improvements' || name === 'minorPlayed' || name === 'occupationPlayed'
+}
+
+function isInsidePublicPlayedMembershipCheck(node: ts.Node): boolean {
+  let cur: ts.Node | undefined = node.parent
+  while (cur) {
+    if (
+      ts.isCallExpression(cur) &&
+      cur.arguments.some((arg) => arg === node || arg.getStart() <= node.getStart() && node.getEnd() <= arg.getEnd())
+    ) {
+      const expr = unwrapExpression(cur.expression)
+      if (
+        ts.isPropertyAccessExpression(expr) &&
+        expr.name.text === 'includes' &&
+        isPublicPlayedCardListExpression(expr.expression)
+      ) {
+        return true
+      }
+    }
+    cur = cur.parent
+  }
+  return false
+}
+
+function isAllowedNamedPrintedTargetReference(
+  node: ts.Node,
+  referencedCardId: string,
+  reaches: Set<string>,
+): boolean {
+  return reaches.has(referencedCardId) && isInsidePublicPlayedMembershipCheck(node)
+}
+
 export function checkCardImplBoundaries(files: string[]): CardImplBoundaryResult {
   const violations: CardImplBoundaryViolation[] = []
   for (const file of files) {
@@ -124,13 +191,15 @@ export function checkCardImplBoundaries(files: string[]): CardImplBoundaryResult
     const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
     const cardId = cardIdFromFile(file)
     const aliases = collectConstCardAliases(sourceFile, cardId)
+    const reaches = collectReachCardIds(sourceFile, aliases)
 
     const visit = (node: ts.Node): void => {
       if (
         (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
         isForbiddenReference(cardId, node.text) &&
         !isInsideAllowedProperty(node) &&
-        !isInsideConstAliasDeclaration(node, aliases)
+        !isInsideConstAliasDeclaration(node, aliases) &&
+        !isAllowedNamedPrintedTargetReference(node, node.text, reaches)
       ) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
         violations.push({
@@ -148,6 +217,7 @@ export function checkCardImplBoundaries(files: string[]): CardImplBoundaryResult
       ) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
         for (const referencedCardId of aliases.get(node.text)!) {
+          if (isAllowedNamedPrintedTargetReference(node, referencedCardId, reaches)) continue
           violations.push({
             file,
             line: line + 1,
@@ -164,9 +234,9 @@ export function checkCardImplBoundaries(files: string[]): CardImplBoundaryResult
   return { violations, filesChecked: files.length }
 }
 
-function walkProductionCardFiles(repoRoot: string): string[] {
+export function walkProductionCardFiles(repoRoot: string): string[] {
   const files: string[] = []
-  for (const deck of ['A', 'B', 'C', 'D', 'E']) {
+  for (const deck of ['A', 'B', 'C', 'D', 'E', 'M']) {
     const dir = path.join(repoRoot, 'shared', 'cards', deck)
     if (!fs.existsSync(dir)) continue
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

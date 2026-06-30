@@ -37,6 +37,8 @@ export type AnimalZone = {
   countsFarmyardSpaceAsUnused?: boolean
   displaySource?: 'played-card' | 'farm-position'
   exclusiveCardZoneLimit?: number
+  capacityCounterKey?: string
+  capacityLossOnPayment?: boolean
 }
 
 type AnimalType = AnimalKey

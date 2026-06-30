@@ -1,26 +1,18 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getPlayedCardDefinitions } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M072_OvenDamper'
-const TARGETS = [
-  'Major_ClayOven',
-  'Major_ClayOven2',
-  'Major_StoneOven',
-  'Major_StoneOven2',
-  'Major_Moor_HeatingOven',
-  'Major_Moor_TiledOven',
-  'M085_OvenInstallation',
-] as const
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { fuel: 3 }),
     computeBonusScore: (_state, player) =>
-      TARGETS.filter((id) => player.improvements.includes(id) || player.minorPlayed.includes(id)).length,
+      getPlayedCardDefinitions(player).filter((def) => def.ovenIdentity === true).length,
   },
-  reaches: TARGETS,
+  reaches: [] as readonly string[],
 } satisfies CardImpl
 
 export const M072_OvenDamper = defineMinorCard({

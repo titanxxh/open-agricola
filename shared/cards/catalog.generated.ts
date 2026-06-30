@@ -14890,6 +14890,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "heatingFuelCap": 0,
+    "ovenIdentity": true,
     "kind": "minor"
   },
   {
