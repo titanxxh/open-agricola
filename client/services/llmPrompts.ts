@@ -159,9 +159,6 @@ const CARD_IMPL = {
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
 | getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
-| computeBreedableAnimalCount | \`(state, player, animalType, currentCount, ctx) => number\` | 调整参与繁殖的动物数量 |
-| computeAnimalScoreAdjustment | \`(state, player, animalType, ctx) => number\` | 调整动物计分类别分值 |
-| consumeAnimalPayment | \`(state, player, animalType, amount) => number\` | 动物支付前消费卡牌局部 marker / holder |
 | getSpecialStablePositions / applySpecialStable | \`(state, player[, position]) => FarmTilePosition[] / boolean\` | Build Stables 特殊 stable（如 B85 的 2×2 中心） |
 | getBuiltSpecialStables | \`(player) => FarmTilePosition[]\` | 当前矗立的特殊 stable（驱动 snapshot specialStables 展示派生） |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |

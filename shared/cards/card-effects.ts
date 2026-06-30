@@ -5,7 +5,7 @@ import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../domain/farm'
 import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
-import type { AnimalKey } from '../contract/animals'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).
@@ -64,6 +64,13 @@ export type AnimalPaymentHandler = (
   animalType: AnimalKey,
   amount: number,
 ) => number | undefined
+
+export type AnimalRemovedHandler = (
+  state: GameState | undefined,
+  player: PlayerState,
+  animalType: AnimalKey,
+  amount: number,
+) => void
 
 export type PastureCapacityContext = {
   player: PlayerState
@@ -144,7 +151,6 @@ export type CardEffectField = CardEffectHook
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
-  | 'computeBreedableAnimalCount' | 'computeAnimalScoreAdjustment' | 'consumeAnimalPayment'
   | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
 
 export const cardEffectHooks: CardEffectField[] = [
@@ -183,9 +189,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'onSowExtraField',
   'computeLockedFarmTiles',
   'getInvalidAnimals',
-  'computeBreedableAnimalCount',
-  'computeAnimalScoreAdjustment',
-  'consumeAnimalPayment',
   'getSpecialStablePositions',
   'applySpecialStable',
   'getBuiltSpecialStables',
@@ -308,6 +311,7 @@ export type CardEffect = {
   computeBreedableAnimalCount?: BreedableAnimalCountHandler
   computeAnimalScoreAdjustment?: AnimalScoreAdjustmentHandler
   consumeAnimalPayment?: AnimalPaymentHandler
+  onAnimalRemoved?: AnimalRemovedHandler
   onComputeAnimalZones?: (
     player: PlayerState,
     zones: AnimalZone[],
@@ -632,6 +636,36 @@ export const consumeAnimalPaymentFromCardEffects = (
     }
   }
   return Math.max(0, Math.floor(amount)) - remaining
+}
+
+export const notifyAnimalsRemovedFromCardEffects = (
+  state: GameState | undefined,
+  player: PlayerState,
+  counts: Partial<Record<AnimalKey, number>>,
+): void => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  for (const animalType of ALL_ANIMAL_KEYS) {
+    const amount = Math.max(0, Math.floor(counts[animalType] ?? 0))
+    if (amount <= 0) continue
+    for (const cardId of allCards) {
+      const effect = getCardEffect(cardId)
+      const handler = effect?.onAnimalRemoved
+      if (!handler) continue
+      try {
+        handler(state, player, animalType, amount)
+      } catch (err) {
+        if (isCustomCard(cardId)) {
+          console.warn(`[card-effects] custom card ${cardId} onAnimalRemoved threw, skipping:`, err)
+          continue
+        }
+        throw err
+      }
+    }
+  }
 }
 
 /**
