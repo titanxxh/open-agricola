@@ -230,6 +230,8 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'corral-6':           ['+1<sheep>/<pig>/<cattle>'],
   'side-job-6':         ['[Pay] 1<wood><arrow><barn>', '[and/or]', '<bread>'],
   'improvement-6':      ['R1-4: 1<minor>', 'R5+: 1<major>/<minor>'],
+  'moor-infirmary':     ['+1<food>', '[Sick workers only]'],
+  'moor-resource-market-12': ['+1<food>+1<stone>'],
   // Round actions
   'fencing':            ['1<wood><arrow><fence-icon>'],
   'grain-utilization':  ['<sow> + <bread>'],
@@ -1172,12 +1174,16 @@ export const ActionBoard = ({
                     onMouseLeave={hideTooltip}
                   >
                     <button
-                      className="action-card action-s"
+                      className="action-card player-action-space-card"
                       onClick={() => takeAction(space)}
                       disabled={!canTake}
                     >
                       <h4 className="action-header">{t(locale, space.nameKey)}</h4>
-                      <div className="action-desc">{t(locale, space.descriptionKey)}</div>
+                      <div className="action-desc">
+                        {ACTION_ICON_DESC[space.id]?.length
+                          ? renderIconDesc(ACTION_ICON_DESC[space.id], space.id)
+                          : t(locale, space.descriptionKey)}
+                      </div>
                       <div className="action-footer" />
                     </button>
                     {renderFarmerHolder(space)}
