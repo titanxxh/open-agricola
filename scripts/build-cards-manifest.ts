@@ -51,6 +51,7 @@ export type CardMeta = {
   fireplaceIdentity?: boolean
   cookingHearthIdentity?: boolean
   ovenIdentity?: boolean
+  firewoodBuildTrigger?: boolean
   potteryIdentity?: boolean
   preventsHandDiscard?: boolean
   animalHolder?: boolean
@@ -83,7 +84,7 @@ const META_FIELDS = new Set([
   'maxRound', 'isCookery', 'isBaking', 'passing', 'returnCards',
   'occupationPrerequisites', 'improvementPrerequisites', 'implemented',
   'evenMoreSet', 'extraVp', 'providesField', 'providesOccupation', 'isField',
-  'fireplaceIdentity', 'cookingHearthIdentity', 'ovenIdentity', 'potteryIdentity',
+  'fireplaceIdentity', 'cookingHearthIdentity', 'ovenIdentity', 'firewoodBuildTrigger', 'potteryIdentity',
   'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
   'waresSalesmanGains', 'mustBePlayedViaMinorAction',
   'requiresFarmersOfTheMoor', 'heatingRoomDiscount', 'heatingFuelCap',

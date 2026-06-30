@@ -20,7 +20,8 @@ export const M085_OvenInstallation = defineMinorCard({
     implemented: true,
     requiresFarmersOfTheMoor: true,
     heatingFuelCap: 0,
-    // OA treats this upgrade as oven-family identity for cards such as Oven Damper.
+    // Counts for Oven Damper scoring, but this upgrade is not a Firewood build trigger.
     ovenIdentity: true,
+    firewoodBuildTrigger: false,
   },
 })
