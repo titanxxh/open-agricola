@@ -1,4 +1,4 @@
-import { resourceKeyList } from '../../shared/contract/state-constants'
+import { extendedResourceKeyList, resourceKeyList } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import { seasonActionIds } from '../../shared/seasons/action-spaces'
 import type { ActionChoiceOption, ActionSpace, FarmTilePosition, GameState, PlayerState, Resource } from '../../shared/contract/types'
@@ -37,6 +37,11 @@ export const shouldShowPendingChoiceInInteractionBar = (
   pendingChoice: { promptKey?: string } | null,
 ): boolean =>
   !!pendingChoice && pendingChoice.promptKey !== 'ui.interactionExchangeChoice'
+
+export const devResourceKeysForState = (
+  state?: { enableFarmersOfTheMoor?: boolean } | null,
+): (keyof Resource)[] =>
+  state?.enableFarmersOfTheMoor === true ? extendedResourceKeyList : resourceKeyList
 
 export const canTakeVisibleMoorSpecialAction = (
   state: GameState,
