@@ -9,6 +9,7 @@ import {
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
+  devResourceKeysForState,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
@@ -79,6 +80,13 @@ describe('GameContainerApi WS player identity', () => {
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=true')).toBe(true)
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=1')).toBe(false)
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?page=game')).toBe(false)
+  })
+
+  it('includes FoM resources in the dev resource picker only for Farmers of the Moor games', () => {
+    expect(devResourceKeysForState({ enableFarmersOfTheMoor: false })).not.toContain('horse')
+    expect(devResourceKeysForState({ enableFarmersOfTheMoor: true })).toEqual(
+      expect.arrayContaining(['horse', 'fuel']),
+    )
   })
 
   it('separates season action spaces from the normal action board', () => {

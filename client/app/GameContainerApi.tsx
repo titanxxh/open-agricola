@@ -16,7 +16,7 @@ import {
   parsePositionKey,
   positionKey,
 } from '../../shared/domain/farm'
-import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
+import { emptyResources } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -72,6 +72,7 @@ import {
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
+  devResourceKeysForState,
   getCurrentlySelectableRoomKeys,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
@@ -1924,7 +1925,7 @@ export const GameContainerApi = () => {
     [state, scores, selfPlayer?.id],
   )
 
-  const resourceKeys = resourceKeyList
+  const resourceKeys = devResourceKeysForState(state)
 
   const applyDevResource = useCallback(async () => {
     if (!devPlayerId || !state) return
