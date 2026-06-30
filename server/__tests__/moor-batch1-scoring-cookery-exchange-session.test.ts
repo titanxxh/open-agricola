@@ -292,6 +292,15 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const noOvens = setup()
     noOvens.state.players[0]!.minorPlayed = ['M072_OvenDamper']
     expect(bonusVp(noOvens.state)).toBe(0)
+
+    const identityOvens = setup()
+    identityOvens.state.players[0]!.minorPlayed = [
+      'M072_OvenDamper',
+      'M085_OvenInstallation',
+      'E063_IronOven',
+      'E064_SimpleOven',
+    ]
+    expect(bonusVp(identityOvens.state)).toBe(3)
   })
 
   it('M073 scores the minimum complete animal set times other players', () => {
