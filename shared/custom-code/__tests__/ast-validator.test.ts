@@ -33,6 +33,20 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'onMagicThing'"))).toBe(true)
   })
 
+  it('rejects animal effect hooks that require unsupported sandbox arguments', () => {
+    const code = `
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          computeBreedableAnimalCount: (state, player, animalType, currentCount) => currentCount,
+        },
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes("unknown effect hook 'computeBreedableAnimalCount'"))).toBe(true)
+  })
+
   it('accepts valid listener phases', () => {
     const code = `
       const CARD_IMPL = {

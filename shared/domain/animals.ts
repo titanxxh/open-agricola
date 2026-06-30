@@ -107,9 +107,9 @@ export const getAssignedAnimalCount = (player: PlayerState): number => {
  * the B157 reserve=0 scenario semantics. If a future card requires closest-empty
  * pasture order, revisit.
  *
- * Does NOT trigger any animal-holder card hooks (e.g. C148 onAnimalRemoved if
- * such a hook exists in the future) — direct mutation only.
- */
+   * Does NOT trigger `CardEffect.onAnimalRemoved` — direct mutation only.
+   * Callers that model system discards must notify card effects themselves.
+   */
 export const subtractAnimalsFromBoard = (
   player: PlayerState,
   counts: Partial<Record<AnimalKey, number>>,

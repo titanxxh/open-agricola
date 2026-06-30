@@ -25,6 +25,7 @@ import {
   getAssignedAnimalsByType,
   subtractAnimalsFromBoard,
 } from '../../domain/animals'
+import { notifyAnimalsRemovedFromCardEffects } from '../../cards/card-effects'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -240,6 +241,8 @@ export const applyReorganizeMutate = (
     visibleTotals,
   )
   for (const animal of animalKeys) player.resources[animal] = finalVisibleTotals[animal] ?? 0
+  const removed = discardedAnimals(state, resourceTotalsBefore, finalVisibleTotals)
+  if (Object.keys(removed).length > 0) notifyAnimalsRemovedFromCardEffects(state, player, removed)
 }
 
 const animalTotals = (state: GameState, player: PlayerState): Partial<Pick<Resource, AnimalKey>> => {

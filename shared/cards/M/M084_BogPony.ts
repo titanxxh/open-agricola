@@ -53,6 +53,16 @@ const consumeLyingHorses = (player: PlayerState, animalType: AnimalKey, amount: 
   return take
 }
 
+const consumeRemovedLyingHorseMarkers = (player: PlayerState, animalType: AnimalKey, amount: number): void => {
+  if (animalType !== 'horse') return
+  const current = getBogPonyLyingHorseCount(player)
+  const take = Math.min(current, Math.max(0, Math.floor(amount)))
+  if (take <= 0) return
+  const extraData = player.cardStates?.[CARD_ID]?.extraData as Record<string, unknown> | undefined
+  if (!extraData) return
+  writeBogPonyLyingHorseCount(extraData, current - take)
+}
+
 export const bogPonyLieHorseAction: ActionDefinition = {
   id: ACTION_ID,
   nameKey: 'cards.M084_BogPony.anytime',
@@ -93,6 +103,8 @@ const cardImpl = {
     },
     consumeAnimalPayment: (_state, player, animalType, amount) =>
       consumeLyingHorses(player, animalType, amount),
+    onAnimalRemoved: (_state, player, animalType, amount) =>
+      consumeRemovedLyingHorseMarkers(player, animalType, amount),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

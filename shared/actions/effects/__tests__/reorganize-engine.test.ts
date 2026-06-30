@@ -345,6 +345,39 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
   })
 
+  it('consumes M084 lying markers first when reorg discards horses', () => {
+    const ctx = makeCtx({
+      state: { enableFarmersOfTheMoor: true },
+      player: {
+        minorPlayed: ['M084_BogPony'],
+        resources: { sheep: 0, boar: 0, cattle: 0, horse: 3 } as never,
+        cardStates: {
+          M084_BogPony: { extraData: { lyingHorseCount: 2 } },
+        } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 2,
+            tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+            stables: 0,
+            animalType: 'horse',
+            animalCount: 3,
+          },
+        ],
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{ id: 'pasture-1', zoneType: 'pasture', animalType: 'horse', animalCount: 1 }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.horse).toBe(1)
+    expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(0)
+  })
+
   it('clears stale ordinary card-zone animals when the zone disappears', () => {
     const ctx = makeCtx({
       player: {
