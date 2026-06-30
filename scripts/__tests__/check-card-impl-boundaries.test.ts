@@ -108,6 +108,35 @@ describe('check-card-impl-boundaries', () => {
     ])
   })
 
+  it('reports private state reads nested inside public membership arguments', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/M/M063_PastoralLetter.ts', [
+      "const CHURCH = 'M068_Church'",
+      'export const M063_PastoralLetter_impl = {',
+      '  effect: {',
+      '    computeBonusScore: (_state: any, player: any) =>',
+      '      player.minorPlayed.includes(player.cardStates?.[CHURCH]?.counters?.held ? CHURCH : CHURCH) ? 1 : 0,',
+      '  },',
+      '  reaches: [CHURCH],',
+      '}',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({
+        cardId: 'M063_PastoralLetter',
+        referencedCardId: 'M068_Church',
+      }),
+      expect.objectContaining({
+        cardId: 'M063_PastoralLetter',
+        referencedCardId: 'M068_Church',
+      }),
+      expect.objectContaining({
+        cardId: 'M063_PastoralLetter',
+        referencedCardId: 'M068_Church',
+      }),
+    ])
+  })
+
   it('reports runtime uses of same-file const string and array aliases', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
     const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [

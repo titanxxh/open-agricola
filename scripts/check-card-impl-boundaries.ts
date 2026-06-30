@@ -160,7 +160,8 @@ function isInsidePublicPlayedMembershipCheck(node: ts.Node): boolean {
   while (cur) {
     if (
       ts.isCallExpression(cur) &&
-      cur.arguments.some((arg) => arg === node || arg.getStart() <= node.getStart() && node.getEnd() <= arg.getEnd())
+      cur.arguments.length > 0 &&
+      unwrapExpression(cur.arguments[0] as ts.Expression) === node
     ) {
       const expr = unwrapExpression(cur.expression)
       if (

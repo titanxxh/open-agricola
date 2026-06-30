@@ -13,6 +13,7 @@ const getBuiltImprovementId = (choice: string | undefined) =>
 
 const isFirewoodTrigger = (cardId: string): boolean => {
   const def = getCardDefinitionById(cardId)
+  if (def?.firewoodBuildTrigger === false) return false
   return def?.fireplaceIdentity === true
     || def?.cookingHearthIdentity === true
     || def?.ovenIdentity === true
