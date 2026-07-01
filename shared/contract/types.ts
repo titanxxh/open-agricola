@@ -1028,6 +1028,9 @@ export type InteractionAnimalReorgZone = {
   id: string
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   cardId?: string
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+  displayOwnerName?: string
   animalType: AnimalKey | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalKey, number>>
@@ -1036,7 +1039,7 @@ export type InteractionAnimalReorgZone = {
   capacity: number
   farmPosition?: FarmTilePosition
   countsFarmyardSpaceAsUnused?: boolean
-  displaySource?: 'played-card' | 'farm-position'
+  displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
   exclusiveCardZoneLimit?: number
 }
 

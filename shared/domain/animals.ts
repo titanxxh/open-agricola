@@ -1,4 +1,4 @@
-import type { PlayerState } from '../contract/types'
+import type { GameState, PlayerState } from '../contract/types'
 import type { AnimalKey } from '../contract/animals'
 import { ALL_ANIMAL_KEYS } from '../contract/animals'
 import {
@@ -23,12 +23,37 @@ const addCounts = (
   }
 }
 
-const readAnimalHolderCountsWithZones = (extraData: unknown): AnimalCounts => {
+const entryAnimalOwnerId = (entry: unknown): string | undefined =>
+  entry && typeof entry === 'object' && typeof (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId === 'string'
+    ? (entry as { animalOwnerPlayerId: string }).animalOwnerPlayerId
+    : undefined
+
+const readAnimalHolderCountsWithZones = (
+  extraData: unknown,
+  animalOwnerPlayerId?: string,
+): AnimalCounts => {
   const total = readAnimalHolderCounts(extraData)
   if (!extraData || typeof extraData !== 'object') return total
   const zoneCounts = (extraData as { animalCountsByZone?: unknown }).animalCountsByZone
   if (!zoneCounts || typeof zoneCounts !== 'object') return total
   for (const entry of Object.values(zoneCounts)) {
+    const ownerId = entryAnimalOwnerId(entry)
+    if (animalOwnerPlayerId && ownerId && ownerId !== animalOwnerPlayerId) continue
+    addCounts(total, readAnimalHolderCounts(entry))
+  }
+  return total
+}
+
+const readHostedAnimalHolderCounts = (
+  extraData: unknown,
+  animalOwnerPlayerId: string,
+): AnimalCounts => {
+  const total = createAnimalCounts()
+  if (!extraData || typeof extraData !== 'object') return total
+  const zoneCounts = (extraData as { animalCountsByZone?: unknown }).animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return total
+  for (const entry of Object.values(zoneCounts)) {
+    if (entryAnimalOwnerId(entry) !== animalOwnerPlayerId) continue
     addCounts(total, readAnimalHolderCounts(entry))
   }
   return total
@@ -38,6 +63,7 @@ const subtractFromCountsByZone = (
   extraData: Record<string, unknown>,
   type: AnimalKey,
   amount: number,
+  animalOwnerPlayerId?: string,
 ) => {
   let remaining = amount
   const zoneCounts = extraData.animalCountsByZone
@@ -45,6 +71,8 @@ const subtractFromCountsByZone = (
   for (const entry of Object.values(zoneCounts)) {
     if (remaining <= 0) break
     if (!entry || typeof entry !== 'object') continue
+    const ownerId = entryAnimalOwnerId(entry)
+    if (animalOwnerPlayerId && ownerId && ownerId !== animalOwnerPlayerId) continue
     const zoneExtra = entry as Record<string, unknown>
     const counts = readAnimalHolderCounts(zoneExtra)
     const take = Math.min(counts[type] ?? 0, remaining)
@@ -74,7 +102,7 @@ const subtractFromCountsByZone = (
  * `docs/superpowers/specs/2026-05-17-B157_Salter-design.md` §7 for the known
  * B157 deviation this causes.
  */
-export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
+export const getAssignedAnimalsByType = (player: PlayerState, state?: GameState): AnimalCounts => {
   const result: AnimalCounts = { ...ZERO }
   for (const pasture of player.pastures ?? []) {
     if (pasture.animalType && pasture.animalCount > 0 && isAnimalKey(pasture.animalType)) {
@@ -87,14 +115,22 @@ export const getAssignedAnimalsByType = (player: PlayerState): AnimalCounts => {
   for (const animal of Object.values(player.stableAnimals ?? {})) {
     if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
   }
-  for (const state of Object.values(player.cardStates ?? {})) {
-    addCounts(result, readAnimalHolderCountsWithZones(state?.extraData))
+  for (const cardState of Object.values(player.cardStates ?? {})) {
+    addCounts(result, readAnimalHolderCountsWithZones(cardState?.extraData, state ? player.id : undefined))
+  }
+  if (state) {
+    for (const storagePlayer of state.players ?? []) {
+      if (storagePlayer.id === player.id) continue
+      for (const cardState of Object.values(storagePlayer.cardStates ?? {})) {
+        addCounts(result, readHostedAnimalHolderCounts(cardState?.extraData, player.id))
+      }
+    }
   }
   return result
 }
 
-export const getAssignedAnimalCount = (player: PlayerState): number => {
-  const byType = getAssignedAnimalsByType(player)
+export const getAssignedAnimalCount = (player: PlayerState, state?: GameState): number => {
+  const byType = getAssignedAnimalsByType(player, state)
   return sumAnimalCounts(byType)
 }
 
@@ -113,6 +149,7 @@ export const getAssignedAnimalCount = (player: PlayerState): number => {
 export const subtractAnimalsFromBoard = (
   player: PlayerState,
   counts: Partial<Record<AnimalKey, number>>,
+  state?: GameState,
 ): void => {
   for (const type of ALL_ANIMAL_KEYS) {
     let remaining = counts[type] ?? 0
@@ -156,7 +193,19 @@ export const subtractAnimalsFromBoard = (
           remaining -= take
         }
         if (remaining > 0) {
-          remaining = subtractFromCountsByZone(extra, type, remaining)
+          remaining = subtractFromCountsByZone(extra, type, remaining, state ? player.id : undefined)
+        }
+      }
+    }
+    if (remaining > 0 && state) {
+      for (const storagePlayer of state.players ?? []) {
+        if (remaining <= 0) break
+        if (storagePlayer.id === player.id) continue
+        for (const cardState of Object.values(storagePlayer.cardStates ?? {})) {
+          if (remaining <= 0) break
+          const extra = cardState?.extraData as Record<string, unknown> | undefined
+          if (!extra) continue
+          remaining = subtractFromCountsByZone(extra, type, remaining, player.id)
         }
       }
     }
