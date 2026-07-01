@@ -228,6 +228,29 @@ const borrowedPlayedCardDisplayFromZone = (
   }
 }
 
+const hostedZoneIdsFromZoneId = (zoneId: string): {
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+} => {
+  const match = zoneId.match(/^card:[^:]+:owner:([^:]+):animalOwner:([^:]+)$/)
+  if (!match) return {}
+  return { ownerPlayerId: match[1], animalOwnerPlayerId: match[2] }
+}
+
+const normalizeBorrowedDraftZone = (
+  zone: AnimalReorgState['zones'][number],
+): AnimalReorgState['zones'][number] => {
+  if (zone.ownerPlayerId && zone.animalOwnerPlayerId) return zone
+  const parsed = hostedZoneIdsFromZoneId(zone.id)
+  if (!parsed.ownerPlayerId && !parsed.animalOwnerPlayerId) return zone
+  const normalized = { ...zone }
+  if (!normalized.ownerPlayerId && parsed.ownerPlayerId) normalized.ownerPlayerId = parsed.ownerPlayerId
+  if (!normalized.animalOwnerPlayerId && parsed.animalOwnerPlayerId) {
+    normalized.animalOwnerPlayerId = parsed.animalOwnerPlayerId
+  }
+  return normalized
+}
+
 export const buildBorrowedPlayedCardDisplays = (
   state: GameState | null | undefined,
   displayPlayer: PlayerState | null | undefined,
@@ -240,8 +263,9 @@ export const buildBorrowedPlayedCardDisplays = (
     if (display) map.set(display.zoneId, display)
   })
   animalReorg?.zones.forEach((zone) => {
-    if (zone.animalOwnerPlayerId && zone.animalOwnerPlayerId !== displayPlayer.id) return
-    const display = borrowedPlayedCardDisplayFromZone(state, zone, true)
+    const normalizedZone = normalizeBorrowedDraftZone(zone)
+    if (normalizedZone.animalOwnerPlayerId && normalizedZone.animalOwnerPlayerId !== displayPlayer.id) return
+    const display = borrowedPlayedCardDisplayFromZone(state, normalizedZone, true)
     if (display) map.set(display.zoneId, display)
   })
   return [...map.values()].sort((a, b) =>

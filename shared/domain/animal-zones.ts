@@ -277,6 +277,30 @@ const ensureCardExtraData = (
 const isCounterBackedAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'card' && typeof zone.capacityCounterKey === 'string'
 
+const animalOwnerIdFromZoneId = (zoneId: string): string | undefined =>
+  zoneId.match(/:animalOwner:([^:]+)$/)?.[1]
+
+const preservedCardZoneEntries = (
+  extraData: Record<string, unknown>,
+  currentAnimalOwnerPlayerId: string,
+  activeZoneIds: Set<string>,
+): Record<string, unknown> => {
+  const zoneCounts = extraData.animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return {}
+  const preserved: Record<string, unknown> = {}
+  for (const [zoneId, entry] of Object.entries(zoneCounts)) {
+    if (activeZoneIds.has(zoneId)) continue
+    if (!entry || typeof entry !== 'object') continue
+    const animalOwnerPlayerId = typeof (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId === 'string'
+      ? (entry as { animalOwnerPlayerId: string }).animalOwnerPlayerId
+      : animalOwnerIdFromZoneId(zoneId)
+    if (!animalOwnerPlayerId) continue
+    if (animalOwnerPlayerId === currentAnimalOwnerPlayerId) continue
+    preserved[zoneId] = entry
+  }
+  return preserved
+}
+
 const clearAnimalHolderStorage = (extraData: Record<string, unknown>) => {
   delete extraData.animalCountsByZone
   delete extraData.animalCounts
@@ -320,14 +344,21 @@ const writeCardZoneStorage = (
       delete extraData.animalCountsByZone
       continue
     }
-    const next: Record<string, unknown> = {}
+    const activeZoneIds = new Set(zones.map((zone) => zone.id))
+    const next: Record<string, unknown> = {
+      ...preservedCardZoneEntries(extraData, player.id, activeZoneIds),
+    }
     for (const zone of zones) {
       const counts = readAnimalCountsForZoneAssignment(zone)
       if (sumAnimalCounts(counts) <= 0) continue
       const slot: Record<string, unknown> = {}
       writeAnimalHolderCounts(slot, counts)
       slot.capacity = zone.capacity
+      if (zone.cardId) slot.cardId = zone.cardId
+      if (zone.ownerPlayerId) slot.ownerPlayerId = zone.ownerPlayerId
+      if (zone.animalOwnerPlayerId) slot.animalOwnerPlayerId = zone.animalOwnerPlayerId
       if (zone.allowedAnimalType !== undefined) slot.allowedAnimalType = zone.allowedAnimalType
+      if (zone.allowedAnimalTypes) slot.allowedAnimalTypes = zone.allowedAnimalTypes
       if (zone.farmPosition) slot.farmPosition = zone.farmPosition
       next[zone.id] = slot
     }

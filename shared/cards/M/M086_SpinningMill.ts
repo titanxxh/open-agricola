@@ -8,8 +8,9 @@ const CARD_ID = 'M086_SpinningMill'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onHarvestFieldPhase: (_state, player) => {
-      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscount', Math.floor(getAssignedAnimalsByType(player).sheep / 2))
+    onHarvestFieldPhase: (state, player) => {
+      const sheep = getAssignedAnimalsByType(player, state).sheep
+      writeCardExtraData(player, CARD_ID, 'heatingRoomDiscount', Math.floor(sheep / 2))
     },
   },
   reaches: [] as readonly string[],

@@ -12,14 +12,14 @@ const sheepFoodIncome = (sheep: number): number => {
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onHarvestFieldPhase: (_state, player) => {
-    const sheep = getAssignedAnimalsByType(player).sheep
+  onHarvestFieldPhase: (state, player) => {
+    const sheep = getAssignedAnimalsByType(player, state).sheep
     const gain = sheepFoodIncome(sheep)
     if (gain <= 0) return
     return gainLeaf(CARD_ID, { food: gain })
   },
-  computeBonusScore: (_state, player) => {
-    const sheep = getAssignedAnimalsByType(player).sheep
+  computeBonusScore: (state, player) => {
+    const sheep = getAssignedAnimalsByType(player, state).sheep
     return Math.floor(sheep / 3)
   },
 },
