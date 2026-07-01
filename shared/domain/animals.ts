@@ -116,7 +116,7 @@ export const getAssignedAnimalsByType = (player: PlayerState, state?: GameState)
     if (animal && isAnimalKey(animal)) result[animal] = (result[animal] ?? 0) + 1
   }
   for (const cardState of Object.values(player.cardStates ?? {})) {
-    addCounts(result, readAnimalHolderCountsWithZones(cardState?.extraData, state ? player.id : undefined))
+    addCounts(result, readAnimalHolderCountsWithZones(cardState?.extraData, player.id))
   }
   if (state) {
     for (const storagePlayer of state.players ?? []) {

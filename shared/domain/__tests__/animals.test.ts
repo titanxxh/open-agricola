@@ -127,6 +127,40 @@ describe('getAssignedAnimalsByType', () => {
     expect(getAssignedAnimalsByType(owner, state).sheep).toBe(0)
   })
 
+  it('filters hosted card-zone animals by player id without GameState', () => {
+    const owner = mkPlayer({ id: 'owner', name: 'Owner' })
+    const guest = mkPlayer({ id: 'guest', name: 'Guest' })
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { cattle: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    } as unknown as PlayerState['cardStates']
+
+    expect(getAssignedAnimalsByType(owner)).toEqual({ sheep: 0, boar: 0, cattle: 1 })
+  })
+
   it('ignores cardStates.counters.held (C148-style permanent capacity counter)', () => {
     // C148_MudWallower uses counters.held as permanent capacity, not current
     // count, so we intentionally do NOT sum it here. See animals.ts JSDoc.
