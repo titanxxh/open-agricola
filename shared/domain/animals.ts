@@ -64,6 +64,7 @@ const subtractFromCountsByZone = (
   type: AnimalKey,
   amount: number,
   animalOwnerPlayerId?: string,
+  requireExplicitAnimalOwner = false,
 ) => {
   let remaining = amount
   const zoneCounts = extraData.animalCountsByZone
@@ -72,7 +73,9 @@ const subtractFromCountsByZone = (
     if (remaining <= 0) break
     if (!entry || typeof entry !== 'object') continue
     const ownerId = entryAnimalOwnerId(entry)
-    if (animalOwnerPlayerId && ownerId && ownerId !== animalOwnerPlayerId) continue
+    if (animalOwnerPlayerId && ownerId !== animalOwnerPlayerId) {
+      if (ownerId || requireExplicitAnimalOwner) continue
+    }
     const zoneExtra = entry as Record<string, unknown>
     const counts = readAnimalHolderCounts(zoneExtra)
     const take = Math.min(counts[type] ?? 0, remaining)
@@ -205,7 +208,7 @@ export const subtractAnimalsFromBoard = (
           if (remaining <= 0) break
           const extra = cardState?.extraData as Record<string, unknown> | undefined
           if (!extra) continue
-          remaining = subtractFromCountsByZone(extra, type, remaining, player.id)
+          remaining = subtractFromCountsByZone(extra, type, remaining, player.id, true)
         }
       }
     }

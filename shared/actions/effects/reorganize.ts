@@ -116,6 +116,9 @@ const storagePlayerForZone = (
   ? state.players.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
   : player
 
+const animalOwnerIdFromZoneId = (zoneId: string): string | undefined =>
+  zoneId.match(/:animalOwner:([^:]+)$/)?.[1]
+
 const preservedHostedZoneEntries = (
   existing: unknown,
   currentAnimalOwnerPlayerId: string,
@@ -129,8 +132,10 @@ const preservedHostedZoneEntries = (
   for (const [zoneId, entry] of Object.entries(zoneCounts)) {
     if (activeZoneIds.has(zoneId)) continue
     if (!entry || typeof entry !== 'object') continue
-    const animalOwnerPlayerId = (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId
-    if (typeof animalOwnerPlayerId !== 'string') continue
+    const animalOwnerPlayerId = typeof (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId === 'string'
+      ? (entry as { animalOwnerPlayerId: string }).animalOwnerPlayerId
+      : animalOwnerIdFromZoneId(zoneId)
+    if (!animalOwnerPlayerId) continue
     if (animalOwnerPlayerId === currentAnimalOwnerPlayerId) continue
     preserved[zoneId] = entry
   }
@@ -198,7 +203,7 @@ export const applyReorganizeMutate = (
       group.zones.push(zone)
       cardZonesByStorageKey.set(key, group)
     })
-  const cardCountsById = new Map<string, ReturnType<typeof createAnimalCounts>>()
+  const cardCountsByStorageKey = new Map<string, ReturnType<typeof createAnimalCounts>>()
   for (const { cardId, storagePlayer, zones: cardZones } of cardZonesByStorageKey.values()) {
     const existing = storagePlayer.cardStates?.[cardId]
     const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
@@ -225,7 +230,7 @@ export const applyReorganizeMutate = (
       countsByZone.set(zone.id, counts)
       addAnimalCounts(assignedCounts, counts, animalKeys)
     }
-    cardCountsById.set(cardId, assignedCounts)
+    cardCountsByStorageKey.set(`${storagePlayer.id}:${cardId}`, assignedCounts)
     if (typeof existing?.counters?.held === 'number') continue
     if (sumAnimalCounts(assignedCounts) <= 0 && !existing?.extraData) continue
     storagePlayer.cardStates ??= {}
@@ -272,7 +277,7 @@ export const applyReorganizeMutate = (
       }
       addAnimalCounts(visibleTotals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
-  for (const counts of cardCountsById.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
+  for (const counts of cardCountsByStorageKey.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
   const finalVisibleTotals = trimVisibleAnimalsToAvailableTotals(
     state,
     player,
