@@ -310,6 +310,13 @@ export const PlayerCard = ({
     .join(' ')
 
   const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => typeof v === 'number' && (v as number) > 0)
+  const returnCardsText = 'returnCards' in cardData && cardData.returnCards && cardData.returnCards.length > 0
+    ? `${locale === 'zh' ? '归还' : 'Return'} ${formatReturnCards(cardData.returnCards, locale)}`
+    : undefined
+  const prerequisiteText = [
+    'prerequisite' in cardData && typeof cardData.prerequisite === 'string' ? cardData.prerequisite : undefined,
+    !hasCost ? returnCardsText : undefined,
+  ].filter(Boolean).join('\n')
 
   const previewCard = enablePreview ? (
     <PlayerCard
@@ -356,9 +363,9 @@ export const PlayerCard = ({
         )}
         <div className="card-icon" style={iconStyle} />
         
-        {'prerequisite' in cardData && typeof cardData.prerequisite === 'string' && cardData.prerequisite && (
+        {prerequisiteText && (
           <div className="card-prerequisite">
-            <div className="prerequisite-text">{cardData.prerequisite}</div>
+            <div className="prerequisite-text">{prerequisiteText}</div>
           </div>
         )}
 
@@ -387,8 +394,7 @@ export const PlayerCard = ({
             {'returnCards' in cardData && cardData.returnCards && cardData.returnCards.length > 0 ? (
               <div className="card-cost-return">
                 <div className="card-cost-return-text">
-                  {locale === 'zh' ? '归还' : 'Return'}{' '}
-                  {formatReturnCards(cardData.returnCards, locale)}{' '}
+                  {returnCardsText}{' '}
                   {locale === 'zh' ? '或' : 'or'}
                 </div>
                 {renderCost(cardData.cost, locale)}

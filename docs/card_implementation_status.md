@@ -1370,7 +1370,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `M064_FamilyBurialPlot` | 已对齐 | stone house 前置；onBuy 可选在 unused farmyard space 放置 blocked farmyard space state，计为占用且终局 +1 bonus VP；session 测试覆盖接受/跳过、阻塞占用和计分。 |
 | `M065_FireBrigade` | 已对齐 | 需要 4+ food 和 4+ fuel，onBuy 给 2 food，并按 2-5 visible forests 给 1-4 bonus VP；session 测试覆盖 bonus VP。 |
 | `M067_ChamberOfCommerce` | 已对齐 | onBuy 给 1 wood 和 1 reed，终局按 Joinery / Pottery / Basketmaker 家族建筑数量给分；session 测试覆盖即时资源与 craft 计分。 |
-| `M068_Church` | 已对齐 | 通过 `returnCards` 升级 Village Church，打出得 2 food；returning home 每轮可选支付 1 fuel 得 1 bonus VP；session 测试覆盖升级、即时 food 和返回家阶段 flow。 |
+| `M068_Church` | 已对齐 | 以拥有 Village Church 作为 prerequisite；打出时将 Village Church 从游戏中移除而非返还 supply，并得 2 food；returning home 每轮可选支付 1 fuel 得 1 bonus VP；session 测试覆盖 prerequisite、remove-from-play、即时 food 和返回家阶段 flow。 |
 | `M069_LeatherSaddle` | 已对齐 | 需要 2+ horse；通过 per-trade `immediatelyAfter.trade-applied` 的 `preResources` 判断每笔 cattle 转 food 发生前是否有 3+ horse，并用 immediate `special-effect` counter 等量给 bonus VP；session 测试覆盖真实 exchange 入账、horse 门槛与非 cattle 不触发。 |
 | `M070_MoorArchaeology` | 已对齐 | clay house 前置；Cut Peat 后可选消费 1 个 fence supply token，在被清空格写入 blocked farmyard space state，计为占用且终局 +1 bonus VP；session 测试覆盖 optional 接受、fence supply 消费、阻塞占用和计分。 |
 | `M071_BogBody` | 已对齐 | `computeSharedPostScore` 给 Museum of the Moors / Living History Museum 拥有者各 +1；同一玩家同时拥有两张目标牌时得 2 分，session 测试覆盖跨玩家共享计分和双目标叠加。 |

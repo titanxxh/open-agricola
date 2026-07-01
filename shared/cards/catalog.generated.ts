@@ -14512,9 +14512,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "cost": {},
     "vp": 5,
     "extraVp": true,
-    "returnCards": [
-      "Major_Moor_VillageChurch"
-    ],
+    "prerequisite": "Remove Your Village Church from Play",
     "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
