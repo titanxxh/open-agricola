@@ -1,5 +1,12 @@
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
-import type { ActionSpace, CardStates, GameState, LogEntry, PlayerState } from '../contract/types'
+import type {
+  ActionSpace,
+  CardStates,
+  GameState,
+  InteractionAnimalReorgZone,
+  LogEntry,
+  PlayerState,
+} from '../contract/types'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { PublicEventCancellation } from '../contract/protocol/game'
 import type { EngineStack, EngineStackCursor } from '../engine'
@@ -10,6 +17,7 @@ import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
 import { createSeasonActionSpaces } from '../seasons/action-spaces'
+import { computeAnimalZones, type AnimalZone } from '../domain/animal-zones'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,
@@ -24,6 +32,7 @@ export type SerializedActionSpace = Omit<
  */
 export type SerializedPlayerState = PlayerState & {
   specialStables: BuiltSpecialStable[]
+  borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
 }
 
 export type SerializedParentSelectionCandidates = {
@@ -56,6 +65,42 @@ export type SerializeStateContext = {
   engineStack: EngineStack
 }
 
+const serializeAnimalZone = (zone: AnimalZone): InteractionAnimalReorgZone => {
+  const out: InteractionAnimalReorgZone = {
+    id: zone.id,
+    zoneType: zone.zoneType,
+    animalType: zone.animalType ?? null,
+    animalCount: Math.max(0, zone.animalCount ?? 0),
+    capacity: zone.capacity,
+  }
+  if (zone.cardId) out.cardId = zone.cardId
+  if (zone.ownerPlayerId) out.ownerPlayerId = zone.ownerPlayerId
+  if (zone.animalOwnerPlayerId) out.animalOwnerPlayerId = zone.animalOwnerPlayerId
+  if (zone.displayOwnerName) out.displayOwnerName = zone.displayOwnerName
+  if (zone.animalCounts) out.animalCounts = zone.animalCounts
+  if (zone.allowedAnimalType !== undefined) out.allowedAnimalType = zone.allowedAnimalType
+  if (zone.allowedAnimalTypes) out.allowedAnimalTypes = zone.allowedAnimalTypes
+  if (zone.farmPosition) out.farmPosition = zone.farmPosition
+  if (zone.countsFarmyardSpaceAsUnused !== undefined) {
+    out.countsFarmyardSpaceAsUnused = zone.countsFarmyardSpaceAsUnused
+  }
+  if (zone.displaySource) out.displaySource = zone.displaySource
+  if (zone.exclusiveCardZoneLimit !== undefined) out.exclusiveCardZoneLimit = zone.exclusiveCardZoneLimit
+  return out
+}
+
+const collectBorrowedPlayedCardAnimalZones = (
+  state: GameState,
+  player: PlayerState,
+): InteractionAnimalReorgZone[] =>
+  computeAnimalZones(player, state)
+    .filter((zone) =>
+      zone.zoneType === 'card' &&
+      !zone.farmPosition &&
+      zone.displaySource === 'borrowed-played-card'
+    )
+    .map(serializeAnimalZone)
+
 export const serializeState = (
   state: GameState,
   ctx: SerializeStateContext,
@@ -67,6 +112,7 @@ export const serializeState = (
     players: players.map((player) => ({
       ...player,
       specialStables: collectBuiltSpecialStables(player),
+      borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(state, player),
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -671,11 +717,15 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
     ...(raw.enableThroughTheSeasons ? createSeasonActionSpaces(raw.players?.length) : []),
   ]
   const { engineStack, players, ...rest } = raw
-  // Strip the snapshot-only `specialStables` display projection so it never
+  // Strip snapshot-only display projections so they never
   // leaks into the authoritative `PlayerState` domain shape.
   const rawWithoutCursor = {
     ...rest,
-    players: players.map(({ specialStables: _specialStables, ...player }) => player),
+    players: players.map(({
+      specialStables: _specialStables,
+      borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
+      ...player
+    }) => player),
   }
   const restored = rebuildActiveModifiers(normalizeState(rawWithoutCursor as unknown as GameState))
   restored.actionSpaces = templates.map((template) => {

@@ -3,6 +3,7 @@ import type { GameState, PlayerState, Resource } from '../../../shared/contract/
 import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
+  buildBorrowedPlayedCardDisplays,
   buildCardDisplayMap,
   buildFarmCardDisplayMap,
   buildPastureDisplayMap,
@@ -177,6 +178,96 @@ describe('use-animal-reorg-flow helpers', () => {
       capacity: 1,
       zoneId: 'card:C148_MudWallower',
     })
+  })
+
+  it('builds borrowed played-card animal zones from other players cards outside reorg', () => {
+    const state = gameState()
+    const owner = state.players[0]!
+    const viewer = state.players[1]!
+    owner.name = 'Owner'
+    owner.minorPlayed = ['M033_NightPasture']
+    ;(viewer as PlayerState & { borrowedPlayedCardAnimalZones: AnimalReorgState['zones'] })
+      .borrowedPlayedCardAnimalZones = [
+        {
+          id: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+          zoneType: 'card',
+          cardId: 'M033_NightPasture',
+          ownerPlayerId: 'p1',
+          animalOwnerPlayerId: 'p2',
+          displayOwnerName: 'Owner',
+          displaySource: 'borrowed-played-card',
+          animalType: null,
+          animalCount: 0,
+          capacity: 1,
+        },
+      ]
+
+    const display = buildBorrowedPlayedCardDisplays(state, viewer, null)
+
+    expect(display).toEqual([
+      {
+        animalType: null,
+        animalCount: 0,
+        capacity: 1,
+        zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+        cardId: 'M033_NightPasture',
+        cardType: 'minor',
+        ownerPlayerId: 'p1',
+        animalOwnerPlayerId: 'p2',
+        displayOwnerName: 'Owner',
+        displaySource: 'borrowed-played-card',
+        isReorgDraft: false,
+      },
+    ])
+  })
+
+  it('overlays borrowed played-card animal zones with active reorg draft state', () => {
+    const state = gameState()
+    const owner = state.players[0]!
+    const viewer = state.players[1]!
+    owner.name = 'Owner'
+    owner.minorPlayed = ['M033_NightPasture']
+    ;(viewer as PlayerState & { borrowedPlayedCardAnimalZones: AnimalReorgState['zones'] })
+      .borrowedPlayedCardAnimalZones = [
+        {
+          id: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+          zoneType: 'card',
+          cardId: 'M033_NightPasture',
+          ownerPlayerId: 'p1',
+          animalOwnerPlayerId: 'p2',
+          displayOwnerName: 'Owner',
+          displaySource: 'borrowed-played-card',
+          animalType: null,
+          animalCount: 0,
+          capacity: 1,
+        },
+      ]
+    const reorg = animalReorgState()
+    reorg.zones.push({
+      id: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+      zoneType: 'card',
+      cardId: 'M033_NightPasture',
+      ownerPlayerId: 'p1',
+      animalOwnerPlayerId: 'p2',
+      displayOwnerName: 'Owner',
+      displaySource: 'borrowed-played-card',
+      animalType: 'horse',
+      animalCount: 1,
+      capacity: 1,
+    })
+
+    const display = buildBorrowedPlayedCardDisplays(state, viewer, reorg)
+
+    expect(display).toEqual([
+      expect.objectContaining({
+        animalType: 'horse',
+        animalCount: 1,
+        zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+        cardId: 'M033_NightPasture',
+        displaySource: 'borrowed-played-card',
+        isReorgDraft: true,
+      }),
+    ])
   })
 
   it('builds farm-card display from persisted per-zone storage after reorg', () => {

@@ -36,6 +36,7 @@ export type AnimalZone = {
   animalCount?: number
   animalCounts?: Partial<Record<AnimalType, number>>
   allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
   cardId?: string
   ownerPlayerId?: string
   animalOwnerPlayerId?: string
