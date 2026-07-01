@@ -138,6 +138,54 @@ describe('subtractAnimalsFromBoard', () => {
     expect(zone.animalCounts?.sheep ?? 0).toBe(0)
   })
 
+  it('无 state 时只扣当前玩家的 hosted animal-holder card animalCountsByZone', () => {
+    const owner = createPlayer({
+      id: 'owner',
+      name: 'Owner',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const guest = createPlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+            [ownerZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      } as any,
+    }
+
+    subtractAnimalsFromBoard(owner, { sheep: 1 })
+
+    const zoneStorage = (owner.cardStates!.M033_NightPasture.extraData as any).animalCountsByZone as any
+    expect(owner.resources.sheep).toBe(0)
+    expect(zoneStorage[ownerZoneId].animalCounts?.sheep ?? 0).toBe(0)
+    expect(zoneStorage[guestZoneId].animalCounts?.sheep ?? 0).toBe(1)
+    expect(guest.resources.sheep).toBe(1)
+  })
+
   it('多 type 同时', () => {
     const p = createPlayer({
       resources: { ...emptyResources(), sheep: 1, boar: 1 },
