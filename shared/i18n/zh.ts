@@ -104,6 +104,7 @@ export const zh = {
     fieldLabel: '田地 {index}',
     fieldEmpty: '空地',
     playedCards: '已打出卡牌',
+    playedCardsByOthers: '来自他人的卡牌',
     handCards: '手牌',
     playerActionCards: '玩家行动卡',
     minorCards: '小改进',
