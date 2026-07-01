@@ -543,6 +543,10 @@ export const zh = {
       'hiring-fair': '雇工集市',
       'black-market': '黑市',
       'illicit-work': '非法工作',
+      cardChoiceMarket: '{card} · 公共卡',
+      cardChoiceMarketTile: '{card} · 格子（{row},{col}）· 公共卡',
+      cardChoiceBorrowed: '{card} · 向 {player} 借用，支付 2 食物',
+      cardChoiceBorrowedTile: '{card} · 格子（{row},{col}）· 向 {player} 借用，支付 2 食物',
     },
   },
   prompt: {

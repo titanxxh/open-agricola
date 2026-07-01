@@ -93,7 +93,7 @@ const trimVisibleAnimalsToAvailableTotals = (
   visibleTotals: Partial<Record<AnimalKey, number>>,
 ) => {
   const animalKeys = animalKeysForState(state)
-  const assignedCounts = getAssignedAnimalsByType(player)
+  const assignedCounts = getAssignedAnimalsByType(player, state)
   const clampedVisibleTotals = { ...visibleTotals }
   const excessCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   for (const animal of animalKeys) {
@@ -104,7 +104,7 @@ const trimVisibleAnimalsToAvailableTotals = (
     const assignedExcess = Math.min(assignedCounts[animal] ?? 0, excess)
     if (assignedExcess > 0) excessCounts[animal] = assignedExcess
   }
-  if (sumAnimalCounts(excessCounts) > 0) subtractAnimalsFromBoard(player, excessCounts)
+  if (sumAnimalCounts(excessCounts) > 0) subtractAnimalsFromBoard(player, excessCounts, state)
   return clampedVisibleTotals
 }
 

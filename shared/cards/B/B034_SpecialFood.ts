@@ -66,7 +66,7 @@ const beforeListener: CardListenerRegistration = {
         params: {
           kind: 'set-extra-data',
           key: ANIMALS_BEFORE_KEY,
-          value: getAssignedAnimalsByType(context.player),
+          value: getAssignedAnimalsByType(context.player, context.state),
         },
       },
       sourceCard: CARD_ID,
@@ -100,7 +100,7 @@ const afterListener: CardListenerRegistration = {
       obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return
 
-    const animalsAfterCollecting = getAssignedAnimalsByType(context.player)
+    const animalsAfterCollecting = getAssignedAnimalsByType(context.player, context.state)
     let ambiguous = false
     for (const animalType of ANIMAL_TYPES) {
       const after = animalsAfterCollecting[animalType]

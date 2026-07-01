@@ -1,4 +1,11 @@
-import type { ActionChoiceOption, ActionDefinition, ActionFlow, GameState, PlayerState } from '../contract/types'
+import type {
+  ActionChoiceOption,
+  ActionDefinition,
+  ActionFlow,
+  ChoiceDescriptionPreview,
+  GameState,
+  PlayerState,
+} from '../contract/types'
 import {
   executeCardListener,
   getListenerById,
@@ -104,6 +111,8 @@ type ActionChoice = {
 
 type CardActionChoice = ActionChoice & {
   cardId: string
+  cardLocationKind: 'market' | 'playerFaceUp'
+  cardLocationPlayerId?: string
 }
 
 const actionChoiceValue = (
@@ -164,6 +173,8 @@ const cardActionChoices = (
         return [{
           value: cardActionChoiceValue(card.id, actionId, payload),
           cardId: card.id,
+          cardLocationKind: card.location.kind === 'playerFaceUp' ? 'playerFaceUp' : 'market',
+          ...(card.location.kind === 'playerFaceUp' ? { cardLocationPlayerId: card.location.playerId } : {}),
           actionId,
           payload,
         }]
@@ -171,6 +182,53 @@ const cardActionChoices = (
     })
   })
 }
+
+const cardActionChoiceTileParams = (choice: CardActionChoice): Record<string, unknown> => {
+  const tile = choice.payload.tile
+  return tile ? { row: tile.row, col: tile.col } : {}
+}
+
+const cardActionChoiceLabelParams = (
+  state: GameState,
+  choice: CardActionChoice,
+): Record<string, unknown> => {
+  const owner = choice.cardLocationPlayerId
+    ? state.players.find((candidate) => candidate.id === choice.cardLocationPlayerId)
+    : undefined
+  return {
+    card: choice.cardId,
+    location: choice.cardLocationKind,
+    ...(owner ? { player: owner.name } : {}),
+    ...cardActionChoiceTileParams(choice),
+  }
+}
+
+const cardActionChoiceMetaPreview = (
+  state: GameState,
+  choice: CardActionChoice,
+): ChoiceDescriptionPreview => {
+  const hasTile = !!choice.payload.tile
+  const borrowed = choice.cardLocationKind === 'playerFaceUp'
+  return {
+    kind: 'action',
+    labelKey: borrowed
+      ? hasTile ? 'moor.specialActions.cardChoiceBorrowedTile' : 'moor.specialActions.cardChoiceBorrowed'
+      : hasTile ? 'moor.specialActions.cardChoiceMarketTile' : 'moor.specialActions.cardChoiceMarket',
+    labelParams: cardActionChoiceLabelParams(state, choice),
+  }
+}
+
+const cardActionChoiceDescriptionPreview = (
+  state: GameState,
+  choice: CardActionChoice,
+): ChoiceDescriptionPreview => ({
+  kind: 'group',
+  separator: ' · ',
+  parts: [
+    { kind: 'action', labelKey: optionLabel(choice.actionId) },
+    cardActionChoiceMetaPreview(state, choice),
+  ],
+})
 
 const takeCardActionOptions = (
   state: GameState,
@@ -180,6 +238,8 @@ const takeCardActionOptions = (
   cardActionChoices(state, player, actionContext).map((choice) => ({
     value: choice.value,
     labelKey: optionLabel(choice.actionId),
+    labelParams: cardActionChoiceLabelParams(state, choice),
+    descriptionPreview: cardActionChoiceDescriptionPreview(state, choice),
   }))
 
 const choiceMode = (actionContext?: Record<string, unknown>) => {
@@ -224,6 +284,7 @@ const parseCardActionChoice = (value: string): CardActionChoice | null => {
   return {
     value,
     cardId,
+    cardLocationKind: 'market',
     actionId: parsed.actionId,
     payload: parsed.payload,
   }

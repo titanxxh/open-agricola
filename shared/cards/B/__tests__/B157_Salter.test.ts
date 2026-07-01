@@ -85,6 +85,39 @@ describe('B157_Salter listener', () => {
     expect(r.flow.params).toEqual({ presetCounts: { cattle: 1 } })
     expect(r.labelKey).toBe('cards.B157_Salter.single.cattle')
   })
+
+  it('hosted Night Pasture animal fast path', () => {
+    const owner = createPlayer({ id: 'owner', name: 'Owner' })
+    const guest = createPlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const zoneId = `card:M033_NightPasture:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = ['M033_NightPasture']
+    owner.cardStates = {
+      M033_NightPasture: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: 'M033_NightPasture',
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      } as any,
+    }
+    const state = createState(guest, 5)
+    state.players = [owner, guest]
+
+    const r = callListener(guest, state) as any
+
+    expect(r.flow.params).toEqual({ presetCounts: { sheep: 1 } })
+  })
 })
 
 // ============================================================
@@ -204,6 +237,42 @@ describe('salterPickAction (ad-hoc)', () => {
     const r = callResolve(s, p, { resourceCounts: { sheep: 1, boar: 0, cattle: 0 } })
     expect(r.type).toBe('flow')
     expect(s.pendingFutureMeeples.length).toBe(1)
+  })
+
+  it('resolveChoice: hosted Night Pasture animal can be selected and removed', () => {
+    const owner = createPlayer({ id: 'owner', name: 'Owner' })
+    const guest = createPlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const zoneId = `card:M033_NightPasture:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = ['M033_NightPasture']
+    owner.cardStates = {
+      M033_NightPasture: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: 'M033_NightPasture',
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      } as any,
+    }
+    const state = createState(guest, 3)
+    state.players = [owner, guest]
+
+    const r = callResolve(state, guest, { sheep: 1 })
+
+    expect(r.type).toBe('flow')
+    expect(guest.resources.sheep).toBe(0)
+    const zone = ((owner.cardStates!.M033_NightPasture.extraData as any).animalCountsByZone as any)[zoneId]
+    expect(zone.animalCounts?.sheep ?? 0).toBe(0)
   })
 
   it('resolveChoice: NaN count → fail (rejected by integer validator)', () => {

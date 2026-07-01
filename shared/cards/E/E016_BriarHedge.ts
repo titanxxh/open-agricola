@@ -36,8 +36,8 @@ const E16FenceListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  prerequisiteCheck: (player) => {
-    const totals = getAssignedAnimalsByType(player)
+  prerequisiteCheck: (player, state) => {
+    const totals = getAssignedAnimalsByType(player, state)
     return totals.sheep >= 1 && totals.boar >= 1 && totals.cattle >= 1
   },
   listeners: [E16FenceListener],

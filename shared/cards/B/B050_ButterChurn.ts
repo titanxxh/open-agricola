@@ -7,14 +7,14 @@ const CARD_ID = 'B050_ButterChurn'
 
 const cardImpl = {
   effect: {
-  id: CARD_ID,
-  onHarvestFieldPhase: (_state, player) => {
-    const animals = getAssignedAnimalsByType(player)
-    const gain = Math.floor(animals.sheep / 3) + Math.floor(animals.cattle / 2)
-    if (gain <= 0) return
-    return gainLeaf(CARD_ID, { food: gain })
+    id: CARD_ID,
+    onHarvestFieldPhase: (state, player) => {
+      const animals = getAssignedAnimalsByType(player, state)
+      const gain = Math.floor(animals.sheep / 3) + Math.floor(animals.cattle / 2)
+      if (gain <= 0) return
+      return gainLeaf(CARD_ID, { food: gain })
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

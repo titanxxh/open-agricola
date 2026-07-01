@@ -192,7 +192,6 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeExtraRoomCapacity`
 - `computeHarvestBreedOrderPriority`
 - `onComputeAnimalZones`
-- `onComputeSharedAnimalZones`
 - `onComputeSowableFields`
 - `onSowExtraField`
 - `computeLockedFarmTiles`
@@ -219,7 +218,6 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `computeExtraRoomCapacity`                   | 返回 `number`                                                      | 额外容纳空间                                              |
 | `computeHarvestBreedOrderPriority`           | 返回 `number`                                                      | Harvest breeding phase 顺序调整，数字越大越晚                         |
 | `onComputeAnimalZones`                       | 接收 `(zones, state, player)` 或 `(state, player, zones)`           | 动物分区扩展（双接口）                                         |
-| `onComputeSharedAnimalZones`                 | 接收 `(owner, animalOwner, zones, state)`                         | 卡主为其他玩家贡献 borrowed 动物区                                  |
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
 | `getSpecialStablePositions` / `applySpecialStable` | `(state, player[, position]) => FarmTilePosition[] / boolean`  | Build Stables 特殊 stable（如 B85 的 2×2 田地中心）            |
