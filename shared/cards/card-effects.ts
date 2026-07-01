@@ -72,6 +72,13 @@ export type AnimalRemovedHandler = (
   amount: number,
 ) => void
 
+export type SharedAnimalZoneHandler = (
+  owner: PlayerState,
+  animalOwner: PlayerState,
+  zones: AnimalZone[],
+  state: GameState,
+) => void | AnimalZone[]
+
 export type PastureCapacityContext = {
   player: PlayerState
   state: GameState
@@ -148,7 +155,8 @@ export type CardEffectField = CardEffectHook
   | 'contributeExtraTurn'
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
-  | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
+  | 'computeHarvestBreedOrderPriority'
+  | 'onComputeAnimalZones' | 'onComputeSharedAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
   | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
@@ -184,6 +192,7 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeSharedPostScore',
   'computeCostedBonus',
   'computeExtraRoomCapacity',
+  'computeHarvestBreedOrderPriority',
   'onComputeAnimalZones',
   'onComputeSowableFields',
   'onSowExtraField',
@@ -303,6 +312,7 @@ export type CardEffect = {
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
+  computeHarvestBreedOrderPriority?: (state: GameState, player: PlayerState) => number | void
   computePastureCapacityModifiers?: (
     player: PlayerState,
     state: GameState,
@@ -317,6 +327,7 @@ export type CardEffect = {
     zones: AnimalZone[],
     state: GameState,
   ) => void | AnimalZone[]
+  onComputeSharedAnimalZones?: SharedAnimalZoneHandler
   /**
    * Per-card zone validation. Mirrors BGA `getInvalidAnimals($zone, $raise)`.
    * Given the meeples currently in a card-owned zone, return the subset that
@@ -604,6 +615,35 @@ export const getAnimalScoreAdjustment = (
     }
   }
   return adjustment
+}
+
+export const getHarvestBreedOrderPriority = (
+  state: GameState,
+  player: PlayerState,
+): number => {
+  const allCards = [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+  ]
+  let priority = 0
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeHarvestBreedOrderPriority
+    if (!handler) continue
+    try {
+      const next = handler(state, player)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      priority = Math.max(priority, Math.floor(next))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeHarvestBreedOrderPriority threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return priority
 }
 
 export const consumeAnimalPaymentFromCardEffects = (

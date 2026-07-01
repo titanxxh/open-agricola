@@ -262,6 +262,14 @@ _Avoid_: 动物容量、牧场容量、可安置动物的 stable
 动物支付或动物兑换在多个可扣减动物区之间选择来源的局部约束，用于表达“优先扣这张卡上的动物”或“尽量保留这张卡上的动物”。它不引入全局动物身份，只在一次支付解析中约束 aggregate 动物资源从哪些区域扣减。
 _Avoid_: 全局 animal id、普通资源支付顺序、动物容量规则
 
+**Hosted Card Animal Zone（寄宿卡牌动物区）**:
+一张玩家拥有的卡牌为另一名玩家提供的动物区。承载卡归 Card Owner；动物归 Animal Owner；动物数量、支付、繁殖和整理按 Animal Owner 计算，但该动物区作为 Card Owner 的卡牌能力存在。
+_Avoid_: 把动物复制到 Animal Owner 的卡牌状态、把寄宿动物计给 Card Owner、前端自推断别人卡上的可用动物区
+
+**Card Owner / Animal Owner**:
+Card Owner 是拥有或打出承载卡的玩家；Animal Owner 是某个动物区中动物实际归属的玩家。普通动物区两者通常相同；Hosted Card Animal Zone 中两者可以不同。
+_Avoid_: 当前行动玩家、浏览器 viewer、RoomPlayer
+
 **Internal Action**:
 不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
 _Avoid_: 玩家可直接选择的公开行动

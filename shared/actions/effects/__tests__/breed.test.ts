@@ -5,6 +5,9 @@ import { getBreedThreshold, type CardEffect } from '../../../cards/card-effects'
 import { withActiveRegistry } from '../../../cards/active-registry'
 import { CardRegistry } from '../../../cards/registry'
 import { E084_DollysMother_impl } from '../../../cards/E/E084_DollysMother'
+import { M033_NightPasture_impl } from '../../../cards/M/M033_NightPasture'
+
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -216,6 +219,57 @@ describe('breed core helper', () => {
 
     expect(breedSummary.resources.boar).toBe(1)
     expect(player.resources.boar).toBe(3)
+  })
+
+  it('counts borrowed Night Pasture animals for the card owner, not the guest, when breeding', () => {
+    const owner = makePlayer({
+      id: 'owner',
+      name: 'Owner',
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 1, boar: 0, cattle: 0, begging: 0,
+      },
+      minorPlayed: [NIGHT_PASTURE],
+      pastures: [makePasture(1)],
+    } as Partial<PlayerState>)
+    const guest = makePlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 1, boar: 0, cattle: 0, begging: 0,
+      },
+    } as Partial<PlayerState>)
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+    const state = { players: [owner, guest], actionSpaces: [], enableFarmersOfTheMoor: true } as unknown as GameState
+
+    const ownerBreed = withEffects([M033_NightPasture_impl.effect], () =>
+      breed(state, owner, { sourceCard: 'harvest' }),
+    )
+    const guestBreed = withEffects([M033_NightPasture_impl.effect], () =>
+      breed(state, guest, { sourceCard: 'harvest' }),
+    )
+
+    expect(ownerBreed.breedSummary.resources.sheep).toBe(1)
+    expect(owner.resources.sheep).toBe(2)
+    expect(guestBreed.breedSummary.resources.sheep).toBeUndefined()
+    expect(guest.resources.sheep).toBe(1)
   })
 
   it('keeps horses out of default harvest breeding when Farmers of the Moor is disabled', () => {

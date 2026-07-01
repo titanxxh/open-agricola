@@ -89,6 +89,7 @@ import {
 } from './game-container-helpers'
 import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
+  buildBorrowedPlayedCardDisplays,
   buildCardDisplayMap,
   buildFarmCardDisplayMap,
   buildPastureDisplayMap,
@@ -1611,6 +1612,9 @@ export const GameContainerApi = () => {
   const cardDisplayMap = useMemo(() => {
     return buildCardDisplayMap(animalReorg)
   }, [animalReorg])
+  const borrowedPlayedCardDisplays = useMemo(() => {
+    return buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
+  }, [state, displayPlayer, animalReorg])
   const farmCardDisplayMap = useMemo(() => {
     return buildFarmCardDisplayMap(displayPlayer, animalReorg)
   }, [displayPlayer, animalReorg])
@@ -2633,7 +2637,7 @@ export const GameContainerApi = () => {
               positionSelectableSet={combinedPositionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
+              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} borrowedPlayedCardDisplays={borrowedPlayedCardDisplays} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
               hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
               existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
               fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}

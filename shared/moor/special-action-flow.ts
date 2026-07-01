@@ -1,4 +1,11 @@
-import type { ActionChoiceOption, ActionDefinition, ActionFlow, GameState, PlayerState } from '../contract/types'
+import type {
+  ActionChoiceOption,
+  ActionDefinition,
+  ActionFlow,
+  ChoiceDescriptionPreview,
+  GameState,
+  PlayerState,
+} from '../contract/types'
 import {
   executeCardListener,
   getListenerById,
@@ -14,6 +21,7 @@ import {
   createMoorSpecialActionSpace,
   isMoorSpecialActionId,
   isMoorSpecialActionCardUsableByPlayer,
+  validateMoorSpecialAction,
   validateMoorSpecialActionEffect,
   type MoorSpecialActionPayload,
 } from './special-actions'
@@ -101,6 +109,12 @@ type ActionChoice = {
   payload: MoorSpecialActionPayload
 }
 
+type CardActionChoice = ActionChoice & {
+  cardId: string
+  cardLocationKind: 'market' | 'playerFaceUp'
+  cardLocationPlayerId?: string
+}
+
 const actionChoiceValue = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
@@ -135,8 +149,104 @@ const takeActionOptions = (
     labelKey: optionLabel(choice.actionId),
   }))
 
-const choiceMode = (actionContext?: Record<string, unknown>) =>
-  actionContext?.mode === 'take-card' ? 'take-card' : 'take-action'
+const cardActionChoiceValue = (
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+) => `card-action:${cardId}:${actionChoiceValue(actionId, payload)}`
+
+const cardActionChoices = (
+  state: GameState,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): CardActionChoice[] => {
+  const playerIndex = state.players.indexOf(player)
+  if (playerIndex < 0) return []
+  const allowed = new Set(readActionIds(actionContext))
+  return (state.farmersOfTheMoor?.specialActionCards ?? []).flatMap((card) => {
+    if (!isMoorSpecialActionCardUsableByPlayer(card, player.id)) return []
+    return card.actions.flatMap((actionId) => {
+      if (!allowed.has(actionId)) return []
+      return tilePayloads(player, actionId).flatMap((payload) => {
+        const validation = validateMoorSpecialAction(state, playerIndex, card.id, actionId, payload)
+        if (!validation.ok) return []
+        return [{
+          value: cardActionChoiceValue(card.id, actionId, payload),
+          cardId: card.id,
+          cardLocationKind: card.location.kind === 'playerFaceUp' ? 'playerFaceUp' : 'market',
+          ...(card.location.kind === 'playerFaceUp' ? { cardLocationPlayerId: card.location.playerId } : {}),
+          actionId,
+          payload,
+        }]
+      })
+    })
+  })
+}
+
+const cardActionChoiceTileParams = (choice: CardActionChoice): Record<string, unknown> => {
+  const tile = choice.payload.tile
+  return tile ? { row: tile.row, col: tile.col } : {}
+}
+
+const cardActionChoiceLabelParams = (
+  state: GameState,
+  choice: CardActionChoice,
+): Record<string, unknown> => {
+  const owner = choice.cardLocationPlayerId
+    ? state.players.find((candidate) => candidate.id === choice.cardLocationPlayerId)
+    : undefined
+  return {
+    card: choice.cardId,
+    location: choice.cardLocationKind,
+    ...(owner ? { player: owner.name } : {}),
+    ...cardActionChoiceTileParams(choice),
+  }
+}
+
+const cardActionChoiceMetaPreview = (
+  state: GameState,
+  choice: CardActionChoice,
+): ChoiceDescriptionPreview => {
+  const hasTile = !!choice.payload.tile
+  const borrowed = choice.cardLocationKind === 'playerFaceUp'
+  return {
+    kind: 'action',
+    labelKey: borrowed
+      ? hasTile ? 'moor.specialActions.cardChoiceBorrowedTile' : 'moor.specialActions.cardChoiceBorrowed'
+      : hasTile ? 'moor.specialActions.cardChoiceMarketTile' : 'moor.specialActions.cardChoiceMarket',
+    labelParams: cardActionChoiceLabelParams(state, choice),
+  }
+}
+
+const cardActionChoiceDescriptionPreview = (
+  state: GameState,
+  choice: CardActionChoice,
+): ChoiceDescriptionPreview => ({
+  kind: 'group',
+  separator: ' · ',
+  parts: [
+    { kind: 'action', labelKey: optionLabel(choice.actionId) },
+    cardActionChoiceMetaPreview(state, choice),
+  ],
+})
+
+const takeCardActionOptions = (
+  state: GameState,
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): ActionChoiceOption[] =>
+  cardActionChoices(state, player, actionContext).map((choice) => ({
+    value: choice.value,
+    labelKey: optionLabel(choice.actionId),
+    labelParams: cardActionChoiceLabelParams(state, choice),
+    descriptionPreview: cardActionChoiceDescriptionPreview(state, choice),
+  }))
+
+const choiceMode = (actionContext?: Record<string, unknown>) => {
+  if (actionContext?.mode === 'take-card') return 'take-card'
+  if (actionContext?.mode === 'take-card-action') return 'take-card-action'
+  return 'take-action'
+}
 
 export const hasMoorSpecialActionChoice = (
   state: GameState,
@@ -145,7 +255,9 @@ export const hasMoorSpecialActionChoice = (
 ): boolean =>
   choiceMode(actionContext) === 'take-card'
     ? takeCardOptions(state, player).length > 0
-    : actionChoices(state, player, actionContext).length > 0
+    : choiceMode(actionContext) === 'take-card-action'
+      ? cardActionChoices(state, player, actionContext).length > 0
+      : actionChoices(state, player, actionContext).length > 0
 
 const parseActionChoice = (value: string): { actionId: MoorSpecialActionId; payload: MoorSpecialActionPayload } | null => {
   const parts = value.split(':')
@@ -159,6 +271,23 @@ const parseActionChoice = (value: string): { actionId: MoorSpecialActionId; payl
     return { actionId, payload: { tile: { row, col } } }
   }
   return { actionId, payload: {} }
+}
+
+const parseCardActionChoice = (value: string): CardActionChoice | null => {
+  const prefix = 'card-action:'
+  if (!value.startsWith(prefix)) return null
+  const parts = value.slice(prefix.length).split(':')
+  const cardId = parts.shift()
+  if (!cardId) return null
+  const parsed = parseActionChoice(parts.join(':'))
+  if (!parsed) return null
+  return {
+    value,
+    cardId,
+    cardLocationKind: 'market',
+    actionId: parsed.actionId,
+    payload: parsed.payload,
+  }
 }
 
 const takeSpecialActionCard = (
@@ -270,6 +399,31 @@ const runAfterSpecialActionListeners = (
   return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared)
 }
 
+const buildSpecialActionCardActionFlow = (
+  state: GameState,
+  player: PlayerState,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+): ActionFlow => {
+  const beforeFlows = runCardListeners({
+    state,
+    player,
+    space: createMoorSpecialActionSpace(actionId),
+    actionId,
+    phase: 'before',
+    extraData: { specialActionCardId: cardId, payload },
+  }, undefined, { stampFlowOwner: true })
+    .map((entry) => entry.flow)
+    .filter((flow): flow is ActionFlow => !!flow)
+  const applyFlow: ActionFlow = {
+    type: 'leaf',
+    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    params: { cardId, actionId, payload },
+  }
+  return combineFlows([...beforeFlows, applyFlow]) ?? applyFlow
+}
+
 export const moorSpecialActionAfterListenersAction: ActionDefinition = {
   id: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
   nameKey: 'actions.special-effect.name',
@@ -308,9 +462,12 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, context) =>
     hasMoorSpecialActionChoice(state, player, context?.actionContext),
   execute: ({ state, player, actionContext }) => {
-    const options = choiceMode(actionContext) === 'take-card'
+    const mode = choiceMode(actionContext)
+    const options = mode === 'take-card'
       ? takeCardOptions(state, player)
-      : takeActionOptions(state, player, actionContext)
+      : mode === 'take-card-action'
+        ? takeCardActionOptions(state, player, actionContext)
+        : takeActionOptions(state, player, actionContext)
     if (options.length === 0) return { type: 'fail', errorKey: 'special action unavailable' }
     return {
       type: 'request',
@@ -319,8 +476,25 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ state, player, actionContext, eventSink }, choice) => {
-    if (choiceMode(actionContext) === 'take-card') {
+    const mode = choiceMode(actionContext)
+    if (mode === 'take-card') {
       return takeSpecialActionCard(state, player, choice)
+    }
+    if (mode === 'take-card-action') {
+      const parsed = parseCardActionChoice(choice)
+      if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }
+      const allowed = readActionIds(actionContext)
+      if (!allowed.includes(parsed.actionId)) {
+        return { type: 'fail', errorKey: 'special action unavailable' }
+      }
+      const playerIndex = state.players.indexOf(player)
+      if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
+      const validation = validateMoorSpecialAction(state, playerIndex, parsed.cardId, parsed.actionId, parsed.payload)
+      if (!validation.ok) return { type: 'fail', errorKey: validation.error }
+      return {
+        type: 'flow',
+        flow: buildSpecialActionCardActionFlow(state, player, parsed.cardId, parsed.actionId, parsed.payload),
+      }
     }
     const parsed = parseActionChoice(choice)
     if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }

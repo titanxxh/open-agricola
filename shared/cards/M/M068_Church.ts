@@ -3,11 +3,17 @@ import type { CardImpl } from '../registry'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'M068_Church'
+const TARGET = 'Major_Moor_VillageChurch'
 
 const cardImpl = {
+  prerequisiteCheck: (player) => player.improvements.includes(TARGET),
   effect: {
     id: CARD_ID,
-    onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
+    onBuy: (_state, player) => {
+      if (!player.improvements.includes(TARGET)) return
+      player.improvements = player.improvements.filter((id) => id !== TARGET)
+      return gainLeaf(CARD_ID, { food: 2 })
+    },
     onStartReturnHome: (_state, player) => {
       if ((player.resources.fuel ?? 0) < 1) return
       return {
@@ -20,7 +26,7 @@ const cardImpl = {
       }
     },
   },
-  reaches: ['Major_Moor_VillageChurch'] as readonly string[],
+  reaches: [TARGET] as readonly string[],
 } satisfies CardImpl
 
 export const M068_Church = defineMinorCard({
@@ -36,9 +42,7 @@ export const M068_Church = defineMinorCard({
     cost: {},
     vp: 5,
     extraVp: true,
-    returnCards: [
-        "Major_Moor_VillageChurch"
-    ],
+    prerequisite: "Remove Your Village Church from Play",
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },

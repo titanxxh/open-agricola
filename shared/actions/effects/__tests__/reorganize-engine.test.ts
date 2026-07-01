@@ -9,7 +9,10 @@ import type {
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
+import '../../../cards/M/M033_NightPasture'
 import '../../../cards/M/M084_BogPony'
+
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 const dummySpace: ActionSpace = {
   id: '__subflow:reorganize',
@@ -87,6 +90,31 @@ describe('reorganizeAction.execute', () => {
     expect(result.request.kind).toBe('animal-reorg')
     if (result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
     expect(result.request.zones).toBeInstanceOf(Array)
+  })
+
+  it('emits hosted card-zone metadata for a borrowed Night Pasture zone', () => {
+    const owner = makeCtx({ player: { id: 'owner', name: 'Owner', minorPlayed: [NIGHT_PASTURE] } }).player
+    owner.cardStates = { [NIGHT_PASTURE]: { extraData: {} } }
+    const guest = makeCtx({ player: { id: 'guest', name: 'Guest' } }).player
+    const ctx = makeCtx({ state: { enableFarmersOfTheMoor: true } })
+    ctx.player = guest
+    ctx.state.players = [owner, guest]
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+
+    const result = reorganizeAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(result.request.zones.find((zone) => zone.id === guestZoneId)).toMatchObject({
+      id: guestZoneId,
+      zoneType: 'card',
+      cardId: NIGHT_PASTURE,
+      ownerPlayerId: owner.id,
+      animalOwnerPlayerId: guest.id,
+      displayOwnerName: owner.name,
+      displaySource: 'borrowed-played-card',
+      capacity: 1,
+    })
   })
 })
 
@@ -343,6 +371,191 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.houseAnimalType).toBe('horse')
     expect(ctx.player.houseAnimalCount).toBe(1)
     expect(ctx.player.cardStates.M084_BogPony?.extraData?.lyingHorseCount).toBe(1)
+  })
+
+  it('writes borrowed Night Pasture reorg storage to the card owner and preserves other hosted slots', () => {
+    const owner = makeCtx({ player: { id: 'owner', name: 'Owner', minorPlayed: [NIGHT_PASTURE] } }).player
+    const guest = makeCtx({
+      player: {
+        id: 'guest',
+        name: 'Guest',
+        resources: { sheep: 1 } as never,
+      },
+    }).player
+    const other = makeCtx({
+      player: {
+        id: 'other',
+        name: 'Other',
+        resources: { boar: 1 } as never,
+      },
+    }).player
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    const otherZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${other.id}`
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [otherZoneId]: {
+              animalCounts: { boar: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: other.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+    const ctx = makeCtx({ state: { enableFarmersOfTheMoor: true } })
+    ctx.player = guest
+    ctx.state.players = [owner, guest, other]
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: guestZoneId,
+        zoneType: 'card',
+        cardId: NIGHT_PASTURE,
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+        animalType: 'sheep',
+        animalCount: 1,
+        animalCounts: { sheep: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(guest.cardStates?.[NIGHT_PASTURE]).toBeUndefined()
+    expect(owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [guestZoneId]: {
+        animalCounts: { sheep: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+      },
+      [otherZoneId]: {
+        animalCounts: { boar: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: other.id,
+      },
+    })
+  })
+
+  it('preserves untagged non-active Night Pasture slots when a guest reorganizes', () => {
+    const owner = makeCtx({
+      player: {
+        id: 'owner',
+        name: 'Owner',
+        minorPlayed: [NIGHT_PASTURE],
+        resources: { boar: 1 } as never,
+      },
+    }).player
+    const guest = makeCtx({
+      player: {
+        id: 'guest',
+        name: 'Guest',
+        resources: { sheep: 1 } as never,
+      },
+    }).player
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { boar: 1 },
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+    const ctx = makeCtx({ state: { enableFarmersOfTheMoor: true } })
+    ctx.player = guest
+    ctx.state.players = [owner, guest]
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [{
+        id: guestZoneId,
+        zoneType: 'card',
+        cardId: NIGHT_PASTURE,
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+        animalType: 'sheep',
+        animalCount: 1,
+        animalCounts: { sheep: 1 },
+      }] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [ownerZoneId]: {
+        animalCounts: { boar: 1 },
+      },
+      [guestZoneId]: {
+        animalCounts: { sheep: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+      },
+    })
+  })
+
+  it('counts card animals from multiple Night Pasture owners into the animal owner totals', () => {
+    const firstOwner = makeCtx({ player: { id: 'owner-a', name: 'Owner A', minorPlayed: [NIGHT_PASTURE] } }).player
+    const secondOwner = makeCtx({ player: { id: 'owner-b', name: 'Owner B', minorPlayed: [NIGHT_PASTURE] } }).player
+    const guest = makeCtx({
+      player: {
+        id: 'guest',
+        name: 'Guest',
+        resources: { sheep: 2 } as never,
+      },
+    }).player
+    const firstZoneId = `card:${NIGHT_PASTURE}:owner:${firstOwner.id}:animalOwner:${guest.id}`
+    const secondZoneId = `card:${NIGHT_PASTURE}:owner:${secondOwner.id}:animalOwner:${guest.id}`
+    const ctx = makeCtx({ state: { enableFarmersOfTheMoor: true } })
+    ctx.player = guest
+    ctx.state.players = [firstOwner, secondOwner, guest]
+
+    const result = reorganizeAction.resolveChoice!(
+      ctx,
+      'confirm',
+      [
+        {
+          id: firstZoneId,
+          zoneType: 'card',
+          cardId: NIGHT_PASTURE,
+          ownerPlayerId: firstOwner.id,
+          animalOwnerPlayerId: guest.id,
+          animalType: 'sheep',
+          animalCount: 1,
+          animalCounts: { sheep: 1 },
+        },
+        {
+          id: secondZoneId,
+          zoneType: 'card',
+          cardId: NIGHT_PASTURE,
+          ownerPlayerId: secondOwner.id,
+          animalOwnerPlayerId: guest.id,
+          animalType: 'sheep',
+          animalCount: 1,
+          animalCounts: { sheep: 1 },
+        },
+      ] as unknown as Record<string, unknown>,
+    )
+
+    expect(result.type).toBe('ok')
+    expect(guest.resources.sheep).toBe(2)
+    expect(firstOwner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [firstZoneId]: { animalCounts: { sheep: 1 } },
+    })
+    expect(secondOwner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [secondZoneId]: { animalCounts: { sheep: 1 } },
+    })
   })
 
   it('consumes M084 lying markers first when reorg discards horses', () => {

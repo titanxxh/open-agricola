@@ -54,6 +54,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('card-res-icon clay')
   })
 
+  it('renders zero-cost returnCards as a prerequisite badge', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="A060_OrientalFireplace" cardType="minor" />,
+    )
+    expect(html).toContain('card-prerequisite')
+    expect(html).toContain('Return Fireplace/Cooking Hearth')
+    expect(html).not.toContain('card-cost-return')
+  })
+
   it('does not emit data-also-counts-as on plain (non-dual) minors', () => {
     const html = renderToStaticMarkup(
       // D34 is a plain minor with no alsoCountsAs; picking it keeps this

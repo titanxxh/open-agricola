@@ -155,6 +155,7 @@ const CARD_IMPL = {
 | computeCostedBonus | \`(state, player, ctx) => BonusScoreLevel[]\` | 终局花资源换 VP（声明 levels；solver 枚举最优组合） |
 | computeSharedPostScore | \`(state, owner, summaries) => Array<{playerId, score}>\` | 跨玩家加分 |
 | computeExtraRoomCapacity | \`number\` | 额外容纳空间 |
+| computeHarvestBreedOrderPriority | \`number\` | Harvest breeding phase 顺序调整，数字越大越晚 |
 | onComputeAnimalZones | 修改 zones 数组 | 动物分区扩展 |
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |

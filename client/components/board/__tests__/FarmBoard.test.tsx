@@ -35,6 +35,7 @@ beforeAll(async () => {
     C146_WorkshopAssistant: manifestEntry('C146_WorkshopAssistant', 'Workshop Assistant', 'occupation'),
     D075_WoodField: manifestEntry('D075_WoodField', 'Wood Field', 'minor'),
     M027_GardenPath: manifestEntry('M027_GardenPath', 'Garden Path', 'minor'),
+    M033_NightPasture: manifestEntry('M033_NightPasture', 'Night Pasture', 'minor'),
     M034_HomeWood: manifestEntry('M034_HomeWood', 'Home Wood', 'minor'),
     M035_HorseTrough: manifestEntry('M035_HorseTrough', 'Horse Trough', 'minor'),
     M084_BogPony: manifestEntry('M084_BogPony', 'Bog Pony', 'minor'),
@@ -603,6 +604,82 @@ describe('FarmBoard', () => {
     expect(html).toContain('played-card-reorg')
     expect(html).toContain('res-icon-boar')
     expect(html).toContain('>1<span')
+  })
+
+  it('renders borrowed played-card animal zones from other players outside reorg', () => {
+    const owner = createPlayer('p1', 'Owner', 'red')
+    const viewer = createPlayer('p2', 'Viewer', 'blue')
+    owner.minorPlayed = ['M033_NightPasture']
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(viewer, {
+          players: [owner, viewer],
+          currentPlayer: viewer,
+          displayPlayer: viewer,
+          borrowedPlayedCardDisplays: [
+            {
+              animalType: null,
+              animalCount: 0,
+              capacity: 1,
+              zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+              cardId: 'M033_NightPasture',
+              cardType: 'minor',
+              ownerPlayerId: 'p1',
+              animalOwnerPlayerId: 'p2',
+              displayOwnerName: 'Owner',
+              displaySource: 'borrowed-played-card',
+              isReorgDraft: false,
+            },
+          ],
+        } as Partial<FarmBoardProps>)}
+      />,
+    )
+
+    expect(html).toContain('played-cards-by-others')
+    expect(html).toContain('data-id="M033_NightPasture"')
+    expect(html).toContain('0/1')
+    expect(html).not.toContain('played-card-reorg')
+  })
+
+  it('renders reorg controls for borrowed played-card animal draft zones', () => {
+    const owner = createPlayer('p1', 'Owner', 'red')
+    const viewer = createPlayer('p2', 'Viewer', 'blue')
+    owner.minorPlayed = ['M033_NightPasture']
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(viewer, {
+          players: [owner, viewer],
+          currentPlayer: viewer,
+          displayPlayer: viewer,
+          isReorgActive: true,
+          reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 0 },
+          borrowedPlayedCardDisplays: [
+            {
+              animalType: 'horse',
+              animalCount: 1,
+              capacity: 1,
+              zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+              cardId: 'M033_NightPasture',
+              cardType: 'minor',
+              ownerPlayerId: 'p1',
+              animalOwnerPlayerId: 'p2',
+              displayOwnerName: 'Owner',
+              displaySource: 'borrowed-played-card',
+              isReorgDraft: true,
+            },
+          ],
+        } as Partial<FarmBoardProps>)}
+      />,
+    )
+
+    expect(html).toContain('played-cards-by-others')
+    expect(html).toContain('played-card-reorg')
+    expect(html).toContain('res-icon-horse')
+    expect(html).toContain(
+      '<span class="pasture-control-label">Horse</span><button>-</button><span class="pasture-control-value">1</span>',
+    )
   })
 
   it('renders M084 lying horses as read-only played-card state', () => {

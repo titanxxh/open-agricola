@@ -36,11 +36,16 @@ export type AnimalZone = {
   animalCount?: number
   animalCounts?: Partial<Record<AnimalType, number>>
   allowedAnimalType?: AnimalType | null
+  allowedAnimalTypes?: AnimalType[]
   cardId?: string
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+  breedingOwnerPlayerId?: string
+  displayOwnerName?: string
   pastureIndex?: number
   farmPosition?: { row: number; col: number }
   countsFarmyardSpaceAsUnused?: boolean
-  displaySource?: 'played-card' | 'farm-position'
+  displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
   exclusiveCardZoneLimit?: number
   capacityCounterKey?: string
   capacityLossOnPayment?: boolean
@@ -54,6 +59,12 @@ export const buildCardAnimalZoneId = (
 ): string => position
   ? `card:${cardId}@${positionKey(position)}`
   : `card:${cardId}`
+
+export const buildHostedCardAnimalZoneId = (
+  cardId: string,
+  ownerPlayerId: string,
+  animalOwnerPlayerId: string,
+): string => `card:${cardId}:owner:${ownerPlayerId}:animalOwner:${animalOwnerPlayerId}`
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
@@ -234,9 +245,12 @@ const rehydrateAnimalHolderZones = (
 ) => {
   for (const zone of zones) {
     if (zone.zoneType !== 'card' || !zone.cardId) continue
-    if (typeof player.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
+    const storagePlayer = zone.ownerPlayerId
+      ? state.players?.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+      : player
+    if (typeof storagePlayer.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
     const fixedType = fixedAnimalTypeForZone(state, zone)
-    const extraData = player.cardStates?.[zone.cardId]?.extraData
+    const extraData = storagePlayer.cardStates?.[zone.cardId]?.extraData
     const countsByZone = extraData?.animalCountsByZone
     const keyedCounts = countsByZone && typeof countsByZone === 'object'
       ? (countsByZone as Record<string, unknown>)[zone.id]
@@ -261,8 +275,40 @@ const ensureCardExtraData = (
   return cardState.extraData as Record<string, unknown>
 }
 
+const storagePlayerForCardZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): PlayerState => zone.ownerPlayerId
+  ? state.players?.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+  : player
+
 const isCounterBackedAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'card' && typeof zone.capacityCounterKey === 'string'
+
+const animalOwnerIdFromZoneId = (zoneId: string): string | undefined =>
+  zoneId.match(/:animalOwner:([^:]+)$/)?.[1]
+
+const preservedCardZoneEntries = (
+  extraData: Record<string, unknown>,
+  currentAnimalOwnerPlayerId: string,
+  activeZoneIds: Set<string>,
+): Record<string, unknown> => {
+  const zoneCounts = extraData.animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return {}
+  const preserved: Record<string, unknown> = {}
+  for (const [zoneId, entry] of Object.entries(zoneCounts)) {
+    if (activeZoneIds.has(zoneId)) continue
+    if (!entry || typeof entry !== 'object') continue
+    const animalOwnerPlayerId = typeof (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId === 'string'
+      ? (entry as { animalOwnerPlayerId: string }).animalOwnerPlayerId
+      : animalOwnerIdFromZoneId(zoneId)
+    if (!animalOwnerPlayerId) continue
+    if (animalOwnerPlayerId === currentAnimalOwnerPlayerId) continue
+    preserved[zoneId] = entry
+  }
+  return preserved
+}
 
 const clearAnimalHolderStorage = (extraData: Record<string, unknown>) => {
   delete extraData.animalCountsByZone
@@ -285,19 +331,29 @@ const clearInactiveCardZoneStorage = (
 }
 
 const writeCardZoneStorage = (
+  state: GameState,
   player: PlayerState,
   cardZones: AnimalZone[],
 ) => {
-  clearInactiveCardZoneStorage(player, cardZones)
-  const byCard = new Map<string, AnimalZone[]>()
+  const byStorageAndCard = new Map<string, { storagePlayer: PlayerState; zones: AnimalZone[] }>()
   for (const zone of cardZones) {
     if (!zone.cardId) continue
-    const zones = byCard.get(zone.cardId) ?? []
-    zones.push(zone)
-    byCard.set(zone.cardId, zones)
+    const storagePlayer = storagePlayerForCardZone(state, player, zone)
+    const key = `${storagePlayer.id}:${zone.cardId}`
+    const entry = byStorageAndCard.get(key) ?? { storagePlayer, zones: [] }
+    entry.zones.push(zone)
+    byStorageAndCard.set(key, entry)
   }
-  for (const [cardId, zones] of byCard) {
-    const extraData = ensureCardExtraData(player, cardId)
+  clearInactiveCardZoneStorage(
+    player,
+    [...byStorageAndCard.values()]
+      .filter((entry) => entry.storagePlayer.id === player.id)
+      .flatMap((entry) => entry.zones),
+  )
+  for (const { storagePlayer, zones } of byStorageAndCard.values()) {
+    const cardId = zones[0]?.cardId
+    if (!cardId) continue
+    const extraData = ensureCardExtraData(storagePlayer, cardId)
     if (!extraData) continue
     const useZoneStorage = zones.length > 1 || zones.some((zone) =>
       zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
@@ -307,14 +363,21 @@ const writeCardZoneStorage = (
       delete extraData.animalCountsByZone
       continue
     }
-    const next: Record<string, unknown> = {}
+    const activeZoneIds = new Set(zones.map((zone) => zone.id))
+    const next: Record<string, unknown> = {
+      ...preservedCardZoneEntries(extraData, player.id, activeZoneIds),
+    }
     for (const zone of zones) {
       const counts = readAnimalCountsForZoneAssignment(zone)
       if (sumAnimalCounts(counts) <= 0) continue
       const slot: Record<string, unknown> = {}
       writeAnimalHolderCounts(slot, counts)
       slot.capacity = zone.capacity
+      if (zone.cardId) slot.cardId = zone.cardId
+      if (zone.ownerPlayerId) slot.ownerPlayerId = zone.ownerPlayerId
+      if (zone.animalOwnerPlayerId) slot.animalOwnerPlayerId = zone.animalOwnerPlayerId
       if (zone.allowedAnimalType !== undefined) slot.allowedAnimalType = zone.allowedAnimalType
+      if (zone.allowedAnimalTypes) slot.allowedAnimalTypes = zone.allowedAnimalTypes
       if (zone.farmPosition) slot.farmPosition = zone.farmPosition
       next[zone.id] = slot
     }
@@ -349,7 +412,7 @@ const reserveCardZoneAnimals = (
     }
     applyAnimalCountsToZone(zone, kept, fixedAnimalTypeForZone(state, zone))
   }
-  writeCardZoneStorage(player, cardZones.filter((zone) => !isCounterBackedAnimalZone(zone)))
+  writeCardZoneStorage(state, player, cardZones.filter((zone) => !isCounterBackedAnimalZone(zone)))
   return reserved
 }
 
@@ -414,7 +477,32 @@ export const computeAnimalZones = (
       }
       for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
         const zone = zones[i]!
-        if (zone.zoneType === 'card' && !zone.cardId) zone.cardId = cardId
+        if (zone.zoneType !== 'card') continue
+        if (!zone.cardId) zone.cardId = cardId
+        zone.ownerPlayerId ??= player.id
+        zone.animalOwnerPlayerId ??= player.id
+        zone.displaySource ??= 'played-card'
+      }
+    }
+  }
+  for (const owner of state.players ?? []) {
+    if (owner.id === player.id) continue
+    for (const cardId of getPlayedCardIds(owner)) {
+      const effect = getCardEffect(cardId)
+      if (!effect?.onComputeSharedAnimalZones) continue
+      const firstNewZoneIndex = zones.length
+      const result = effect.onComputeSharedAnimalZones(owner, player, zones, state)
+      if (Array.isArray(result)) {
+        zones.push(...result)
+      }
+      for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
+        const zone = zones[i]!
+        if (zone.zoneType !== 'card') continue
+        if (!zone.cardId) zone.cardId = cardId
+        zone.ownerPlayerId ??= owner.id
+        zone.animalOwnerPlayerId ??= player.id
+        zone.displayOwnerName ??= owner.name
+        zone.displaySource = 'borrowed-played-card'
       }
     }
   }

@@ -6,7 +6,9 @@ import { Scoring } from '../../shared/domain'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { getMajorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { M113_LivingHistoryMuseum } from '../../shared/cards/M/M113_LivingHistoryMuseum'
+import { M068_Church } from '../../shared/cards/M/M068_Church'
 import type { ActionFlow, GameState, Resource } from '../../shared/contract/types'
 
 const PLACEHOLDER = '__test_placeholder__'
@@ -211,6 +213,7 @@ describe('Moor major-supply and upgrade minors', () => {
   it('M068 upgrades Village Church, gains 2 food, and offers returning-home fuel for VP', () => {
     const session = setup()
     const player = session.state.players[0]!
+    takeMajorImprovementFromSupply(session.state, 'Major_Moor_VillageChurch')
     player.improvements = ['Major_Moor_VillageChurch']
     player.resources = fullResources({ fuel: 1 })
 
@@ -218,10 +221,29 @@ describe('Moor major-supply and upgrade minors', () => {
     resp = choosePaymentIfNeeded(session)
 
     expect(resp.state.players[0]!.improvements).not.toContain('Major_Moor_VillageChurch')
+    expect(resp.state.availableMajorImprovements).not.toContain('Major_Moor_VillageChurch')
+    expect(stackFor(resp.state, 'well').cardIds).not.toContain('Major_Moor_VillageChurch')
     expect(resp.state.players[0]!.minorPlayed).toContain('M068_Church')
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(actionIds(runCardEffectHook(resp.state, resp.state.players[0]!, 'M068_Church', 'onStartReturnHome')))
       .toEqual(['pay', 'bonus-vp'])
+  })
+
+  it('M068 cannot be played without Village Church in play', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.resources = fullResources({ fuel: 1 })
+
+    expect(meetsCardPrerequisites(player, M068_Church, session.state.round, session.state)).toBe(false)
+    player.minorHand = ['M068_Church']
+    session.loadState(session.state)
+    const resp = session.takeAction(0, 'meeting-place')
+
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('M068_Church')
+    }
+    expect(resp.state.players[0]!.minorPlayed).not.toContain('M068_Church')
+    expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
   it('M106 exposes horse and 2-horse cookery exchanges and keeps Horse Slaughterhouses under Fireplaces', () => {

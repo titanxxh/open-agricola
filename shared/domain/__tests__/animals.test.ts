@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getAssignedAnimalsByType, getAssignedAnimalCount } from '../animals'
-import type { PlayerState } from '../../contract/types'
+import type { GameState, PlayerState } from '../../contract/types'
+
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 const mkPlayer = (overrides: Partial<PlayerState>): PlayerState =>
   ({
@@ -96,6 +98,67 @@ describe('getAssignedAnimalsByType', () => {
       } as unknown as PlayerState['cardStates'],
     })
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 2, boar: 0, cattle: 1 })
+  })
+
+  it('counts hosted card-zone animals for the animal owner only', () => {
+    const owner = mkPlayer({ id: 'owner', name: 'Owner' })
+    const guest = mkPlayer({ id: 'guest', name: 'Guest' })
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    } as unknown as PlayerState['cardStates']
+    const state = { players: [owner, guest], enableFarmersOfTheMoor: true } as GameState
+
+    expect(getAssignedAnimalsByType(guest, state).sheep).toBe(1)
+    expect(getAssignedAnimalsByType(owner, state).sheep).toBe(0)
+  })
+
+  it('filters hosted card-zone animals by player id without GameState', () => {
+    const owner = mkPlayer({ id: 'owner', name: 'Owner' })
+    const guest = mkPlayer({ id: 'guest', name: 'Guest' })
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { cattle: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    } as unknown as PlayerState['cardStates']
+
+    expect(getAssignedAnimalsByType(owner)).toEqual({ sheep: 0, boar: 0, cattle: 1 })
   })
 
   it('ignores cardStates.counters.held (C148-style permanent capacity counter)', () => {

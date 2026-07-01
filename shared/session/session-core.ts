@@ -109,7 +109,7 @@ import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { getCardEffect } from '../cards/card-effects.ts'
+import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
 import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
@@ -1596,6 +1596,9 @@ export class GameCore {
       id: zone.id,
       zoneType: zone.zoneType,
       cardId: zone.cardId,
+      ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
+      ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
+      ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
       animalType: zone.animalType ?? null,
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
@@ -4499,7 +4502,15 @@ export class GameCore {
     const breedOrder = harvestOrder.filter((index) => {
       const p = this.state.players[index]
       return p ? !this.hasPassFieldAndBreed(p) : false
-    })
+    }).map((index, order) => ({ index, order }))
+      .sort((left, right) => {
+        const leftPlayer = this.state.players[left.index]
+        const rightPlayer = this.state.players[right.index]
+        const leftPriority = leftPlayer ? getHarvestBreedOrderPriority(this.state, leftPlayer) : 0
+        const rightPriority = rightPlayer ? getHarvestBreedOrderPriority(this.state, rightPlayer) : 0
+        return leftPriority - rightPriority || left.order - right.order
+      })
+      .map((entry) => entry.index)
     const flow = this.buildHarvestBreedFlow(breedOrder)
     if (flow) {
       this.startStageFlow(flow, 'onBreedPhase', 0, 0)

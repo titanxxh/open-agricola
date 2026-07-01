@@ -37,6 +37,8 @@ export type ZoneAssignment = {
   id: string
   zoneType: InteractionAnimalReorgZone['zoneType']
   cardId?: string
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
   animalType: AnimalKey | null
   animalCount: number
   animalCounts?: Partial<Record<AnimalKey, number>>
@@ -55,8 +57,9 @@ const writeCountsByZone = (
   entries: Map<string, Partial<Record<AnimalKey, number>>>,
   zonesById: Map<string, AnimalZone>,
   allowedTypesByZone: Map<string, AnimalKey[]>,
+  preservedEntries: Record<string, unknown> = {},
 ) => {
-  const next: Record<string, unknown> = {}
+  const next: Record<string, unknown> = { ...preservedEntries }
   for (const [zoneId, counts] of entries) {
     if (sumAnimalCounts(counts) <= 0) continue
     const slot: Record<string, unknown> = {}
@@ -64,6 +67,9 @@ const writeCountsByZone = (
     const zone = zonesById.get(zoneId)
     if (zone) {
       slot.capacity = zone.capacity
+      if (zone.cardId) slot.cardId = zone.cardId
+      if (zone.ownerPlayerId) slot.ownerPlayerId = zone.ownerPlayerId
+      if (zone.animalOwnerPlayerId) slot.animalOwnerPlayerId = zone.animalOwnerPlayerId
       if (zone.allowedAnimalType !== undefined) slot.allowedAnimalType = zone.allowedAnimalType
       if (zone.farmPosition) slot.farmPosition = zone.farmPosition
     }
@@ -87,7 +93,7 @@ const trimVisibleAnimalsToAvailableTotals = (
   visibleTotals: Partial<Record<AnimalKey, number>>,
 ) => {
   const animalKeys = animalKeysForState(state)
-  const assignedCounts = getAssignedAnimalsByType(player)
+  const assignedCounts = getAssignedAnimalsByType(player, state)
   const clampedVisibleTotals = { ...visibleTotals }
   const excessCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
   for (const animal of animalKeys) {
@@ -98,8 +104,42 @@ const trimVisibleAnimalsToAvailableTotals = (
     const assignedExcess = Math.min(assignedCounts[animal] ?? 0, excess)
     if (assignedExcess > 0) excessCounts[animal] = assignedExcess
   }
-  if (sumAnimalCounts(excessCounts) > 0) subtractAnimalsFromBoard(player, excessCounts)
+  if (sumAnimalCounts(excessCounts) > 0) subtractAnimalsFromBoard(player, excessCounts, state)
   return clampedVisibleTotals
+}
+
+const storagePlayerForZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): PlayerState => zone.ownerPlayerId
+  ? state.players.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+  : player
+
+const animalOwnerIdFromZoneId = (zoneId: string): string | undefined =>
+  zoneId.match(/:animalOwner:([^:]+)$/)?.[1]
+
+const preservedHostedZoneEntries = (
+  existing: unknown,
+  currentAnimalOwnerPlayerId: string,
+  activeZoneIds: Set<string>,
+): Record<string, unknown> => {
+  const extraData = (existing as { extraData?: unknown } | undefined)?.extraData
+  if (!extraData || typeof extraData !== 'object') return {}
+  const zoneCounts = (extraData as { animalCountsByZone?: unknown }).animalCountsByZone
+  if (!zoneCounts || typeof zoneCounts !== 'object') return {}
+  const preserved: Record<string, unknown> = {}
+  for (const [zoneId, entry] of Object.entries(zoneCounts)) {
+    if (activeZoneIds.has(zoneId)) continue
+    if (!entry || typeof entry !== 'object') continue
+    const animalOwnerPlayerId = typeof (entry as { animalOwnerPlayerId?: unknown }).animalOwnerPlayerId === 'string'
+      ? (entry as { animalOwnerPlayerId: string }).animalOwnerPlayerId
+      : animalOwnerIdFromZoneId(zoneId)
+    if (!animalOwnerPlayerId) continue
+    if (animalOwnerPlayerId === currentAnimalOwnerPlayerId) continue
+    preserved[zoneId] = entry
+  }
+  return preserved
 }
 
 export const applyReorganizeMutate = (
@@ -148,7 +188,7 @@ export const applyReorganizeMutate = (
   player.stableAnimals = stable
 
   const computedZonesById = new Map(computed.map((zone) => [zone.id, zone]))
-  const cardZonesById = new Map<string, typeof computed>()
+  const cardZonesByStorageKey = new Map<string, { cardId: string; storagePlayer: PlayerState; zones: AnimalZone[] }>()
   const keyedCardZoneIds = new Set(
     computed
       .filter((z) => z.zoneType === 'card' && z.cardId)
@@ -157,13 +197,15 @@ export const applyReorganizeMutate = (
   computed
     .filter((z) => z.zoneType === 'card' && z.cardId)
     .forEach((zone) => {
-      const group = cardZonesById.get(zone.cardId!) ?? []
-      group.push(zone)
-      cardZonesById.set(zone.cardId!, group)
+      const storagePlayer = storagePlayerForZone(state, player, zone)
+      const key = `${storagePlayer.id}:${zone.cardId!}`
+      const group = cardZonesByStorageKey.get(key) ?? { cardId: zone.cardId!, storagePlayer, zones: [] }
+      group.zones.push(zone)
+      cardZonesByStorageKey.set(key, group)
     })
-  const cardCountsById = new Map<string, ReturnType<typeof createAnimalCounts>>()
-  for (const [cardId, cardZones] of cardZonesById) {
-    const existing = player.cardStates?.[cardId]
+  const cardCountsByStorageKey = new Map<string, ReturnType<typeof createAnimalCounts>>()
+  for (const { cardId, storagePlayer, zones: cardZones } of cardZonesByStorageKey.values()) {
+    const existing = storagePlayer.cardStates?.[cardId]
     const assignedCounts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
     const countsByZone = new Map<string, ReturnType<typeof createAnimalCounts>>()
     const allowedTypesByZone = new Map<string, AnimalKey[]>()
@@ -188,25 +230,27 @@ export const applyReorganizeMutate = (
       countsByZone.set(zone.id, counts)
       addAnimalCounts(assignedCounts, counts, animalKeys)
     }
-    cardCountsById.set(cardId, assignedCounts)
+    cardCountsByStorageKey.set(`${storagePlayer.id}:${cardId}`, assignedCounts)
     if (typeof existing?.counters?.held === 'number') continue
     if (sumAnimalCounts(assignedCounts) <= 0 && !existing?.extraData) continue
-    player.cardStates ??= {}
-    const nextState = { ...(player.cardStates[cardId] ?? {}) }
+    storagePlayer.cardStates ??= {}
+    const nextState = { ...(storagePlayer.cardStates[cardId] ?? {}) }
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
     if (useZoneStorage) {
+      const activeZoneIds = new Set(cardZones.map((zone) => zone.id))
       writeCountsByZone(
         extraData,
         countsByZone,
         new Map(cardZones.map((zone) => [zone.id, zone])),
         allowedTypesByZone,
+        preservedHostedZoneEntries(existing, player.id, activeZoneIds),
       )
     } else writeAnimalHolderCounts(extraData, assignedCounts)
     nextState.extraData = extraData
-    player.cardStates[cardId] = nextState
+    storagePlayer.cardStates[cardId] = nextState
   }
   for (const [cardId, existing] of Object.entries(player.cardStates ?? {})) {
-    if (cardZonesById.has(cardId)) continue
+    if ([...cardZonesByStorageKey.values()].some((entry) => entry.storagePlayer.id === player.id && entry.cardId === cardId)) continue
     if (typeof existing?.counters?.held === 'number') continue
     const existingExtraData = existing?.extraData as Record<string, unknown> | undefined
     const zoneCounts = existingExtraData?.animalCountsByZone
@@ -233,7 +277,7 @@ export const applyReorganizeMutate = (
       }
       addAnimalCounts(visibleTotals, readAnimalCountsForZoneAssignment(zone), animalKeys)
     })
-  for (const counts of cardCountsById.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
+  for (const counts of cardCountsByStorageKey.values()) addAnimalCounts(visibleTotals, counts, animalKeys)
   const finalVisibleTotals = trimVisibleAnimalsToAvailableTotals(
     state,
     player,
@@ -299,6 +343,9 @@ export const reorganizeAction: ActionDefinition = {
       id: zone.id,
       zoneType: zone.zoneType,
       cardId: zone.cardId,
+      ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
+      ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
+      ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
       animalType: zone.animalType ?? null,
       animalCount: zone.animalCount ?? 0,
       ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),

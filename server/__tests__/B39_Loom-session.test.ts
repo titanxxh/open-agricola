@@ -82,13 +82,42 @@ describe('B039_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', 
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({ food: 1 })
   })
+
+  it('counts sheep hosted on another player Night Pasture', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    const owner = state.players[1]!
+    const zoneId = `card:M033_NightPasture:owner:${owner.id}:animalOwner:${player.id}`
+    owner.cardStates = {
+      M033_NightPasture: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: {
+              animalCounts: { sheep: 4 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: player.id,
+              cardId: 'M033_NightPasture',
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    const flow = runCardEffectHook(state, player, 'B039_Loom', 'onHarvestFieldPhase')
+
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.params).toEqual({ food: 2 })
+  })
 })
 
 describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
-  const score = (player: ReturnType<GameSession['getState']>['state']['players'][number]) => {
+  const score = (state: ReturnType<GameSession['getState']>['state'], player: ReturnType<GameSession['getState']>['state']['players'][number]) => {
     const effect = getCardEffect('B039_Loom')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return effect!.computeBonusScore!(undefined as any, player, undefined as any)
+    return effect!.computeBonusScore!(state, player, undefined as any)
   }
 
   it('reserve only 6 sheep: 0 VP', () => {
@@ -96,7 +125,7 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.sheep = 6
-    expect(score(player)).toBe(0)
+    expect(score(state, player)).toBe(0)
   })
 
   it('6 sheep on board: 2 VP', () => {
@@ -106,6 +135,33 @@ describe('B039_Loom — computeBonusScore uses on-board sheep', () => {
     player.pastures = [
       { id: 'pa-1', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 6 },
     ]
-    expect(score(player)).toBe(2)
+    expect(score(state, player)).toBe(2)
+  })
+
+  it('counts sheep hosted on another player Night Pasture', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    const owner = state.players[1]!
+    const zoneId = `card:M033_NightPasture:owner:${owner.id}:animalOwner:${player.id}`
+    owner.cardStates = {
+      M033_NightPasture: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: {
+              animalCounts: { sheep: 3 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: player.id,
+              cardId: 'M033_NightPasture',
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    expect(score(state, player)).toBe(1)
   })
 })

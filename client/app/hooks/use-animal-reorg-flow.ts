@@ -23,6 +23,22 @@ type AnimalDisplay = {
   allowedAnimalTypes?: AnimalType[]
 }
 
+export type BorrowedPlayedCardDisplay = AnimalDisplay & {
+  capacity: number
+  zoneId: string
+  cardId: string
+  cardType: 'minor' | 'occupation' | 'major'
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+  displayOwnerName?: string
+  displaySource: 'borrowed-played-card'
+  isReorgDraft: boolean
+}
+
+type PlayerWithBorrowedPlayedCardZones = PlayerState & {
+  borrowedPlayedCardAnimalZones?: AnimalReorgState['zones']
+}
+
 const interactionZoneAnimalTotal = (zone: AnimalReorgState['zones'][number]) => {
   const animalCounts = zone.animalCounts
   if (animalCounts) {
@@ -158,7 +174,11 @@ export const buildCardDisplayMap = (
 ) => {
   const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
   animalReorg?.zones
-    .filter((zone) => zone.zoneType === 'card' && !zone.farmPosition)
+    .filter((zone) =>
+      zone.zoneType === 'card' &&
+      !zone.farmPosition &&
+      zone.displaySource !== 'borrowed-played-card'
+    )
     .forEach((zone) => {
       const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
       map.set(cardId, {
@@ -172,6 +192,90 @@ export const buildCardDisplayMap = (
       })
     })
   return map
+}
+
+const playedCardType = (
+  state: GameState,
+  ownerPlayerId: string | undefined,
+  cardId: string,
+): BorrowedPlayedCardDisplay['cardType'] => {
+  const owner = state.players.find((candidate) => candidate.id === ownerPlayerId)
+  if (owner?.occupationPlayed.includes(cardId)) return 'occupation'
+  if (owner?.improvements.includes(cardId)) return 'major'
+  return 'minor'
+}
+
+const borrowedPlayedCardDisplayFromZone = (
+  state: GameState,
+  zone: AnimalReorgState['zones'][number],
+  isReorgDraft: boolean,
+): BorrowedPlayedCardDisplay | null => {
+  if (zone.zoneType !== 'card') return null
+  if (zone.farmPosition) return null
+  if (zone.displaySource !== 'borrowed-played-card') return null
+  const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
+  return {
+    animalType: zone.animalType ?? null,
+    animalCount: Math.max(0, zone.animalCount ?? 0),
+    animalCounts: zone.animalCounts,
+    allowedAnimalType: zone.allowedAnimalType,
+    allowedAnimalTypes: zone.allowedAnimalTypes,
+    capacity: zone.capacity,
+    zoneId: zone.id,
+    cardId,
+    cardType: playedCardType(state, zone.ownerPlayerId, cardId),
+    ownerPlayerId: zone.ownerPlayerId,
+    animalOwnerPlayerId: zone.animalOwnerPlayerId,
+    displayOwnerName: zone.displayOwnerName,
+    displaySource: 'borrowed-played-card',
+    isReorgDraft,
+  }
+}
+
+const hostedZoneIdsFromZoneId = (zoneId: string): {
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+} => {
+  const match = zoneId.match(/^card:[^:]+:owner:([^:]+):animalOwner:([^:]+)$/)
+  if (!match) return {}
+  return { ownerPlayerId: match[1], animalOwnerPlayerId: match[2] }
+}
+
+const normalizeBorrowedDraftZone = (
+  zone: AnimalReorgState['zones'][number],
+): AnimalReorgState['zones'][number] => {
+  if (zone.ownerPlayerId && zone.animalOwnerPlayerId) return zone
+  const parsed = hostedZoneIdsFromZoneId(zone.id)
+  if (!parsed.ownerPlayerId && !parsed.animalOwnerPlayerId) return zone
+  const normalized = { ...zone }
+  if (!normalized.ownerPlayerId && parsed.ownerPlayerId) normalized.ownerPlayerId = parsed.ownerPlayerId
+  if (!normalized.animalOwnerPlayerId && parsed.animalOwnerPlayerId) {
+    normalized.animalOwnerPlayerId = parsed.animalOwnerPlayerId
+  }
+  return normalized
+}
+
+export const buildBorrowedPlayedCardDisplays = (
+  state: GameState | null | undefined,
+  displayPlayer: PlayerState | null | undefined,
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, BorrowedPlayedCardDisplay>()
+  if (!state || !displayPlayer) return []
+  ;((displayPlayer as PlayerWithBorrowedPlayedCardZones).borrowedPlayedCardAnimalZones ?? []).forEach((zone) => {
+    const display = borrowedPlayedCardDisplayFromZone(state, zone, false)
+    if (display) map.set(display.zoneId, display)
+  })
+  animalReorg?.zones.forEach((zone) => {
+    const normalizedZone = normalizeBorrowedDraftZone(zone)
+    if (normalizedZone.animalOwnerPlayerId && normalizedZone.animalOwnerPlayerId !== displayPlayer.id) return
+    const display = borrowedPlayedCardDisplayFromZone(state, normalizedZone, true)
+    if (display) map.set(display.zoneId, display)
+  })
+  return [...map.values()].sort((a, b) =>
+    (a.displayOwnerName ?? '').localeCompare(b.displayOwnerName ?? '') ||
+    a.cardId.localeCompare(b.cardId)
+  )
 }
 
 const animalTypeFromCounts = (counts: Partial<Record<AnimalType, number>>): AnimalType | null => {

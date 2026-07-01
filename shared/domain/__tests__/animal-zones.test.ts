@@ -14,6 +14,7 @@ import { getAssignedAnimalsByType } from '../animals.ts'
 import { playerBoard } from '../index.ts'
 
 const TEST_CARD = '__TEST_accommodation_zone__'
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 const playerWithPasture = (overrides: Partial<PlayerState> = {}): PlayerState => {
   const session = new GameSession()
@@ -38,6 +39,151 @@ afterEach(() => {
 })
 
 describe('AnimalZones', () => {
+  it('computes Night Pasture hosted zones for card owner and animal owners', () => {
+    const session = new GameSession(17033, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = { [NIGHT_PASTURE]: { extraData: {} } }
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+
+    const ownerZone = computeAnimalZones(owner, state).find((zone) => zone.id === ownerZoneId)
+    const guestZone = computeAnimalZones(guest, state).find((zone) => zone.id === guestZoneId)
+
+    expect(ownerZone).toMatchObject({
+      id: ownerZoneId,
+      zoneType: 'card',
+      cardId: NIGHT_PASTURE,
+      capacity: 3,
+      allowedAnimalType: null,
+      displaySource: 'played-card',
+      ownerPlayerId: owner.id,
+      animalOwnerPlayerId: owner.id,
+    })
+    expect(guestZone).toMatchObject({
+      id: guestZoneId,
+      zoneType: 'card',
+      cardId: NIGHT_PASTURE,
+      capacity: 1,
+      allowedAnimalType: null,
+      displaySource: 'borrowed-played-card',
+      ownerPlayerId: owner.id,
+      animalOwnerPlayerId: guest.id,
+      displayOwnerName: owner.name,
+    })
+  })
+
+  it('rehydrates borrowed Night Pasture storage from the card owner state', () => {
+    const session = new GameSession(17034, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { boar: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    const guestZone = computeAnimalZones(guest, state).find((zone) => zone.id === guestZoneId)
+
+    expect(guestZone).toMatchObject({
+      animalType: 'boar',
+      animalCount: 1,
+      animalCounts: { boar: 1 },
+    })
+  })
+
+  it('lets the animal owner pay from borrowed Night Pasture storage', () => {
+    const session = new GameSession(17036, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.resources.boar = 1
+    guest.resources.sheep = 1
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { boar: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    applyAnimalPayment(guest, state, 'sheep', 1)
+
+    const storage = owner.cardStates[NIGHT_PASTURE]!.extraData!.animalCountsByZone as Record<string, {
+      animalCounts?: unknown
+    }>
+    expect(guest.resources.sheep).toBe(0)
+    expect(storage[guestZoneId].animalCounts).toBeUndefined()
+    expect(storage[ownerZoneId].animalCounts).toEqual({ boar: 1 })
+  })
+
+  it('uses borrowed Night Pasture capacity for the animal owner accommodation search', () => {
+    const session = new GameSession(17035, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = { [NIGHT_PASTURE]: { extraData: {} } }
+    guest.pastures = []
+    guest.stableTiles = []
+    guest.houseAnimalType = 'sheep'
+    guest.houseAnimalCount = 1
+
+    expect(canAccommodateAnimalTotals(state, guest, { sheep: 1, boar: 1 })).toBe(true)
+  })
+
   it('checks final totals against ordinary single-type pasture rules', () => {
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace'] })
@@ -428,6 +574,120 @@ describe('AnimalZones', () => {
     })
     expect(getAssignedAnimalsByType(player).horse).toBe(1)
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(1)
+  })
+
+  it('enforceCapacity preserves borrowed Night Pasture entries stored on the card owner', () => {
+    const session = new GameSession(17037, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.resources.boar = 1
+    guest.resources.sheep = 1
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { boar: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [ownerZoneId]: {
+        animalCounts: { boar: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: owner.id,
+      },
+      [guestZoneId]: {
+        animalCounts: { sheep: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+      },
+    })
+  })
+
+  it('enforceCapacity writes borrowed Night Pasture entries to the card owner when ids collide', () => {
+    const session = new GameSession(17033, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    owner.minorPlayed = [NIGHT_PASTURE]
+    guest.minorPlayed = [NIGHT_PASTURE]
+    guest.resources.sheep = 4
+    guest.pastures = []
+    guest.houseAnimalType = null
+    guest.houseAnimalCount = 0
+    const guestOwnZoneId = `card:${NIGHT_PASTURE}:owner:${guest.id}:animalOwner:${guest.id}`
+    const borrowedZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [borrowedZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+    guest.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestOwnZoneId]: {
+              animalCounts: { sheep: 3 },
+              ownerPlayerId: guest.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 1).animals.enforceCapacity()
+
+    const guestZones = guest.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
+    const ownerZones = owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
+    expect(guestZones[guestOwnZoneId]).toMatchObject({ animalCounts: { sheep: 3 } })
+    expect(guestZones[borrowedZoneId]).toBeUndefined()
+    expect(ownerZones[borrowedZoneId]).toMatchObject({ animalCounts: { sheep: 1 } })
   })
 
   it('enforceCapacity reserves counter-backed card zones without persisting ordinary holder storage', () => {

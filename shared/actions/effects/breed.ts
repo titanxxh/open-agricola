@@ -10,13 +10,36 @@ import type {
 import type { EventSink } from '../../contract/events'
 import { animalKeysForState } from '../../contract/animals'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
-import { getAllowedAnimalTypesForZone } from '../../domain/animal-zones'
+import {
+  computeAnimalZones,
+  getAllowedAnimalTypesForZone,
+  readAnimalCountsForZoneAssignment,
+} from '../../domain/animal-zones'
 import { getBreedableAnimalCount, getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 import type { BreedAnimalType } from '../../cards/card-effects'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
   sourceCard: string
+}
+
+const breedingAnimalCount = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+): number => {
+  let count = player.resources[animalType] ?? 0
+  for (const animalOwner of state.players ?? []) {
+    for (const zone of computeAnimalZones(animalOwner, state)) {
+      if (!zone.breedingOwnerPlayerId) continue
+      if (zone.breedingOwnerPlayerId === zone.animalOwnerPlayerId) continue
+      const amount = readAnimalCountsForZoneAssignment(zone)[animalType] ?? 0
+      if (amount <= 0) continue
+      if (zone.breedingOwnerPlayerId === player.id) count += amount
+      if (zone.animalOwnerPlayerId === player.id) count -= amount
+    }
+  }
+  return Math.max(0, count)
 }
 
 export const canBreedAnimals = (
@@ -29,7 +52,7 @@ export const canBreedAnimals = (
   for (const type of types) {
     if (freeCapacity <= 0) return false
     const ctx = { sourceCard: opts.sourceCard }
-    const breedableCount = getBreedableAnimalCount(state, player, type, player.resources[type] ?? 0, ctx)
+    const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
     return true
   }
@@ -59,7 +82,7 @@ export const breed = (
   for (const type of types) {
     if (freeCapacity <= 0) break
     const ctx = { sourceCard: opts.sourceCard }
-    const breedableCount = getBreedableAnimalCount(state, player, type, player.resources[type] ?? 0, ctx)
+    const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
     if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
     player.resources[type] += 1
     summary.resources[type] = 1
@@ -106,6 +129,9 @@ export const breedAction: ActionDefinition = {
         id: zone.id,
         zoneType: zone.zoneType,
         cardId: zone.cardId,
+        ...(zone.ownerPlayerId ? { ownerPlayerId: zone.ownerPlayerId } : {}),
+        ...(zone.animalOwnerPlayerId ? { animalOwnerPlayerId: zone.animalOwnerPlayerId } : {}),
+        ...(zone.displayOwnerName ? { displayOwnerName: zone.displayOwnerName } : {}),
         animalType: zone.animalType ?? null,
         animalCount: zone.animalCount ?? 0,
         ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
