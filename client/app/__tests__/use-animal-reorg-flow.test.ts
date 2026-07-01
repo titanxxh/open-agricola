@@ -180,6 +180,40 @@ describe('use-animal-reorg-flow helpers', () => {
     })
   })
 
+  it('keeps borrowed played-card draft zones out of the owned card display map', () => {
+    const reorg = animalReorgState()
+    reorg.zones.push(
+      {
+        id: 'card:M033_NightPasture',
+        zoneType: 'card',
+        cardId: 'M033_NightPasture',
+        animalType: 'sheep',
+        animalCount: 3,
+        capacity: 3,
+      },
+      {
+        id: 'card:M033_NightPasture:owner:p3:animalOwner:p1',
+        zoneType: 'card',
+        cardId: 'M033_NightPasture',
+        ownerPlayerId: 'p3',
+        animalOwnerPlayerId: 'p1',
+        displaySource: 'borrowed-played-card',
+        animalType: 'sheep',
+        animalCount: 1,
+        capacity: 1,
+      },
+    )
+
+    const display = buildCardDisplayMap(reorg)
+
+    expect(display.get('M033_NightPasture')).toEqual({
+      animalType: 'sheep',
+      animalCount: 3,
+      capacity: 3,
+      zoneId: 'card:M033_NightPasture',
+    })
+  })
+
   it('builds borrowed played-card animal zones from other players cards outside reorg', () => {
     const state = gameState()
     const owner = state.players[0]!
