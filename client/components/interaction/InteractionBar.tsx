@@ -47,9 +47,33 @@ type HeatingPending = {
 }
 
 const emptyAnimalCounts: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0, horse: 0 }
+const animalCountOrder: AnimalKey[] = ['sheep', 'boar', 'cattle', 'horse']
 
 const clampWhole = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)))
+
+const AnimalCountLine = ({
+  locale,
+  counts,
+}: {
+  locale: Locale
+  counts: Partial<Record<AnimalKey, number>>
+}) => (
+  <span className="interaction-animal-counts">
+    {animalCountOrder
+      .filter((animal) => animal !== 'horse' || counts.horse !== undefined)
+      .map((animal) => {
+        const count = counts[animal] ?? 0
+        const label = `${t(locale, `resources.${animal}`)}: ${count}`
+        return (
+          <span key={animal} className="interaction-animal-count" title={label} aria-label={label}>
+            <span className={`res-icon res-icon-${animal}`} aria-hidden="true" />
+            <span className="interaction-animal-count-value">{count}</span>
+          </span>
+        )
+      })}
+  </span>
+)
 
 const HeatingPanel = ({
   locale,
@@ -714,12 +738,7 @@ export const InteractionBar = ({
                 </div>
                 <div className="interaction-reorg-row">
                   <span>{t(locale, 'ui.reorgPending')}</span>
-                  <span>
-                    {formatAnimalCounts(
-                      locale,
-                      reorgRemaining ?? emptyAnimalCounts,
-                    )}
-                  </span>
+                  <AnimalCountLine locale={locale} counts={reorgRemaining ?? emptyAnimalCounts} />
                 </div>
                 {hasReorgOverflow ? (
                   <div className="interaction-error">{t(locale, 'ui.reorgOverAssign')}</div>

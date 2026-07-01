@@ -125,6 +125,26 @@
   gap: 16px;
   color: #fdf6e3;
 }
+.interaction-animal-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.interaction-animal-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.interaction-animal-count .res-icon {
+  font-size: 18px;
+}
+.interaction-animal-count-value {
+  min-width: 10px;
+  text-align: left;
+}
 .interaction-reorg-warning {
   display: grid;
   gap: 10px;
