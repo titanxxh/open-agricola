@@ -72,13 +72,13 @@ const resolveSalterCounts = (
   if (counts.sheep + counts.boar + counts.cattle < 1) {
     return { type: 'fail', errorKey: 'salter-pick.error.must-pick-at-least-one' }
   }
-  const onBoard = getAssignedAnimalsByType(player)
+  const onBoard = getAssignedAnimalsByType(player, state)
   for (const t of ['sheep', 'boar', 'cattle'] as const) {
     if (counts[t] > onBoard[t]) {
       return { type: 'fail', errorKey: `salter-pick.error.invalid-count-${t}` }
     }
   }
-  subtractAnimalsFromBoard(player, counts)
+  subtractAnimalsFromBoard(player, counts, state)
   const sourceSummary = {
     key: 'log.salterFutureFood',
     params: buildSalterLogParams(state, counts),
@@ -119,7 +119,7 @@ export const salterPickAction: ActionDefinition = {
     if (preset) {
       return resolveSalterCounts(state, player, preset)
     }
-    const onBoard = getAssignedAnimalsByType(player)
+    const onBoard = getAssignedAnimalsByType(player, state)
     if (onBoard.sheep + onBoard.boar + onBoard.cattle < 1) {
       return { type: 'fail', errorKey: 'salter-pick.error.no-animals-on-board' }
     }
@@ -152,7 +152,7 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { state, player } = context
-    const onBoard = getAssignedAnimalsByType(player)
+    const onBoard = getAssignedAnimalsByType(player, state)
     const totalOnBoard = onBoard.sheep + onBoard.boar + onBoard.cattle
     if (totalOnBoard < 1) return
     const reserveSum =

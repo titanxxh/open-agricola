@@ -274,6 +274,14 @@ const ensureCardExtraData = (
   return cardState.extraData as Record<string, unknown>
 }
 
+const storagePlayerForCardZone = (
+  state: GameState,
+  player: PlayerState,
+  zone: AnimalZone,
+): PlayerState => zone.ownerPlayerId
+  ? state.players?.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+  : player
+
 const isCounterBackedAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'card' && typeof zone.capacityCounterKey === 'string'
 
@@ -322,19 +330,29 @@ const clearInactiveCardZoneStorage = (
 }
 
 const writeCardZoneStorage = (
+  state: GameState,
   player: PlayerState,
   cardZones: AnimalZone[],
 ) => {
-  clearInactiveCardZoneStorage(player, cardZones)
-  const byCard = new Map<string, AnimalZone[]>()
+  const byStorageAndCard = new Map<string, { storagePlayer: PlayerState; zones: AnimalZone[] }>()
   for (const zone of cardZones) {
     if (!zone.cardId) continue
-    const zones = byCard.get(zone.cardId) ?? []
-    zones.push(zone)
-    byCard.set(zone.cardId, zones)
+    const storagePlayer = storagePlayerForCardZone(state, player, zone)
+    const key = `${storagePlayer.id}:${zone.cardId}`
+    const entry = byStorageAndCard.get(key) ?? { storagePlayer, zones: [] }
+    entry.zones.push(zone)
+    byStorageAndCard.set(key, entry)
   }
-  for (const [cardId, zones] of byCard) {
-    const extraData = ensureCardExtraData(player, cardId)
+  clearInactiveCardZoneStorage(
+    player,
+    [...byStorageAndCard.values()]
+      .filter((entry) => entry.storagePlayer.id === player.id)
+      .flatMap((entry) => entry.zones),
+  )
+  for (const { storagePlayer, zones } of byStorageAndCard.values()) {
+    const cardId = zones[0]?.cardId
+    if (!cardId) continue
+    const extraData = ensureCardExtraData(storagePlayer, cardId)
     if (!extraData) continue
     const useZoneStorage = zones.length > 1 || zones.some((zone) =>
       zone.id !== buildCardAnimalZoneId(cardId) || zone.farmPosition
@@ -393,7 +411,7 @@ const reserveCardZoneAnimals = (
     }
     applyAnimalCountsToZone(zone, kept, fixedAnimalTypeForZone(state, zone))
   }
-  writeCardZoneStorage(player, cardZones.filter((zone) => !isCounterBackedAnimalZone(zone)))
+  writeCardZoneStorage(state, player, cardZones.filter((zone) => !isCounterBackedAnimalZone(zone)))
   return reserved
 }
 

@@ -232,6 +232,24 @@ describe('M057 Taps', () => {
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
   })
 
+  it('disambiguates Taps card-action options by card and terrain tile', () => {
+    const session = setupM057Rotation()
+    const player = session.state.players[0]!
+    player.farmTerrain = [{ ...MOOR_A }, { ...MOOR_B }]
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    expect(offer.interaction.stateId).toBe('wait')
+    if (offer.interaction.stateId !== 'wait') throw new Error('expected wait')
+    const cutPeatOptions = (offer.interaction.options ?? []).filter((option) =>
+      option.labelKey === 'moor.specialActions.cut-peat')
+
+    expect(cutPeatOptions.length).toBeGreaterThan(1)
+    expect(cutPeatOptions.every((option) => option.descriptionPreview?.kind === 'group')).toBe(true)
+    const labels = cutPeatOptions.map((option) => JSON.stringify(option.descriptionPreview))
+    expect(new Set(labels).size).toBe(cutPeatOptions.length)
+  })
+
   it('pays 2 food when the Taps extra turn borrows another player face-up special action card', () => {
     const session = setupM057Rotation()
     const player = session.state.players[0]!

@@ -89,6 +89,23 @@ const CARD_IMPL = {
     })
   })
 
+  it('does not expose shared animal zone hooks without executor argument plumbing', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onComputeSharedAnimalZones: () => [],
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+
+    expect(result.valid).toBe(false)
+    if (result.valid) return
+    expect(result.errors.join('\n')).toContain("unknown effect hook 'onComputeSharedAnimalZones'")
+  })
+
   it('rejects forbidden globals during validation', () => {
     const result = validateAndCompileCustomCode('process.exit(1)', 'CUSTOM_BadCard')
     expect(result.valid).toBe(false)

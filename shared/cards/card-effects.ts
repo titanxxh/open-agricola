@@ -194,7 +194,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeExtraRoomCapacity',
   'computeHarvestBreedOrderPriority',
   'onComputeAnimalZones',
-  'onComputeSharedAnimalZones',
   'onComputeSowableFields',
   'onSowExtraField',
   'computeLockedFarmTiles',
