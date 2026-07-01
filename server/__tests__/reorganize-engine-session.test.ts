@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/M/M033_NightPasture'
+
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 describe('reorganizeAction engine sub-flow integration', () => {
   const setupWorkPhase = (opts: { boar?: number } = {}) => {
@@ -41,6 +44,32 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
     const values = (resp.interaction.options ?? []).map((o) => o.value).sort()
     expect(values).toEqual(['confirm'])
+  })
+
+  it('active animal-reorg interaction zones include hosted Night Pasture metadata', () => {
+    const session = setupWorkPhase()
+    const state = session.getState().state
+    const guest = state.players[0]!
+    const owner = state.players[1]!
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = { [NIGHT_PASTURE]: { extraData: {} } }
+    const sheepMarket = state.actionSpaces.find((s) => s.id === 'sheep-market')
+    if (!sheepMarket) throw new Error('missing sheep market')
+    sheepMarket.resources.sheep = 1
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'sheep-market')
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    const zoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    expect(resp.interaction.zones.find((zone) => zone.id === zoneId)).toMatchObject({
+      id: zoneId,
+      cardId: NIGHT_PASTURE,
+      ownerPlayerId: owner.id,
+      animalOwnerPlayerId: guest.id,
+      displaySource: 'borrowed-played-card',
+    })
   })
 
   it('confirm + zones payload places boar on pasture and clears the pending', () => {

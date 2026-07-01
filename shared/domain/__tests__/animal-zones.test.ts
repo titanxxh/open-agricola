@@ -576,6 +576,61 @@ describe('AnimalZones', () => {
     expect(player.cardStates.M084_BogPony?.extraData?.lyingHorseCount ?? 0).toBe(1)
   })
 
+  it('enforceCapacity preserves borrowed Night Pasture entries stored on the card owner', () => {
+    const session = new GameSession(17037, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    const ownerZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${owner.id}`
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.resources.boar = 1
+    guest.resources.sheep = 1
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [ownerZoneId]: {
+              animalCounts: { boar: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: owner.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 0).animals.enforceCapacity()
+
+    expect(owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone).toMatchObject({
+      [ownerZoneId]: {
+        animalCounts: { boar: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: owner.id,
+      },
+      [guestZoneId]: {
+        animalCounts: { sheep: 1 },
+        ownerPlayerId: owner.id,
+        animalOwnerPlayerId: guest.id,
+      },
+    })
+  })
+
   it('enforceCapacity reserves counter-backed card zones without persisting ordinary holder storage', () => {
     const session = new GameSession()
     const state = session.getState().state

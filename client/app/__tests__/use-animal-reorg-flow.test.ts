@@ -270,6 +270,51 @@ describe('use-animal-reorg-flow helpers', () => {
     ])
   })
 
+  it('does not overlay another animal owner borrowed draft zone when metadata is missing', () => {
+    const state = gameState()
+    const owner = state.players[0]!
+    const viewer = state.players[1]!
+    owner.name = 'Owner'
+    owner.minorPlayed = ['M033_NightPasture']
+    ;(viewer as PlayerState & { borrowedPlayedCardAnimalZones: AnimalReorgState['zones'] })
+      .borrowedPlayedCardAnimalZones = [
+        {
+          id: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+          zoneType: 'card',
+          cardId: 'M033_NightPasture',
+          ownerPlayerId: 'p1',
+          animalOwnerPlayerId: 'p2',
+          displayOwnerName: 'Owner',
+          displaySource: 'borrowed-played-card',
+          animalType: null,
+          animalCount: 0,
+          capacity: 1,
+        },
+      ]
+    const reorg = animalReorgState()
+    reorg.zones.push({
+      id: 'card:M033_NightPasture:owner:p1:animalOwner:p3',
+      zoneType: 'card',
+      cardId: 'M033_NightPasture',
+      displayOwnerName: 'Owner',
+      displaySource: 'borrowed-played-card',
+      animalType: 'horse',
+      animalCount: 1,
+      capacity: 1,
+    })
+
+    const display = buildBorrowedPlayedCardDisplays(state, viewer, reorg)
+
+    expect(display).toEqual([
+      expect.objectContaining({
+        animalType: null,
+        animalCount: 0,
+        zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p2',
+        isReorgDraft: false,
+      }),
+    ])
+  })
+
   it('builds farm-card display from persisted per-zone storage after reorg', () => {
     const target = player()
     target.cardStates = {

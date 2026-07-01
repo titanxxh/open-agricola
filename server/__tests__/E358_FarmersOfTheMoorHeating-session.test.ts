@@ -480,6 +480,34 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(computeHeatingRequirement(session.state, player)).toBe(5)
   })
 
+  it('counts sheep hosted on another player Night Pasture for Spinning Mill heating discount', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+    const owner = session.state.players[1]!
+    const zoneId = `card:M033_NightPasture:owner:${owner.id}:animalOwner:${player.id}`
+    player.minorPlayed = ['M086_SpinningMill']
+    owner.cardStates = {
+      M033_NightPasture: {
+        extraData: {
+          animalCountsByZone: {
+            [zoneId]: {
+              animalCounts: { sheep: 4 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: player.id,
+              cardId: 'M033_NightPasture',
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    runCardEffectHook(session.state, player, 'M086_SpinningMill', 'onHarvestFieldPhase')
+
+    expect(player.cardStates.M086_SpinningMill?.extraData?.heatingRoomDiscount).toBe(2)
+  })
+
   it('applies Firewood fuel gain and wood-conversion heating discount only when wood is converted', () => {
     const session = prepareMoorHeatingSession()
     const player = session.state.players[0]!

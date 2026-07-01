@@ -138,6 +138,53 @@ describe('subtractAnimalsFromBoard', () => {
     expect(zone.animalCounts?.sheep ?? 0).toBe(0)
   })
 
+  it('cross-player subtraction ignores untagged card zones owned by other players', () => {
+    const unrelated = createPlayer({ id: 'unrelated', name: 'Unrelated' })
+    const owner = createPlayer({ id: 'owner', name: 'Owner' })
+    const guest = createPlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const unrelatedZoneId = 'card:M034_HomeWood@0,0'
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    unrelated.cardStates = {
+      M034_HomeWood: {
+        extraData: {
+          animalCountsByZone: {
+            [unrelatedZoneId]: { animalCounts: { sheep: 1 } },
+          },
+        },
+      } as any,
+    }
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      } as any,
+    }
+    const state = { players: [unrelated, owner, guest], enableFarmersOfTheMoor: true } as GameState
+
+    subtractAnimalsFromBoard(guest, { sheep: 1 }, state)
+
+    const unrelatedZone = ((unrelated.cardStates!.M034_HomeWood.extraData as any).animalCountsByZone as any)[unrelatedZoneId]
+    const hostedZone = ((owner.cardStates!.M033_NightPasture.extraData as any).animalCountsByZone as any)[guestZoneId]
+    expect(unrelatedZone.animalCounts?.sheep ?? 0).toBe(1)
+    expect(hostedZone.animalCounts?.sheep ?? 0).toBe(0)
+    expect(guest.resources.sheep).toBe(0)
+  })
+
   it('无 state 时只扣当前玩家的 hosted animal-holder card animalCountsByZone', () => {
     const owner = createPlayer({
       id: 'owner',
