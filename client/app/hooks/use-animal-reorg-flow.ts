@@ -174,7 +174,11 @@ export const buildCardDisplayMap = (
 ) => {
   const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
   animalReorg?.zones
-    .filter((zone) => zone.zoneType === 'card' && !zone.farmPosition)
+    .filter((zone) =>
+      zone.zoneType === 'card' &&
+      !zone.farmPosition &&
+      zone.displaySource !== 'borrowed-played-card'
+    )
     .forEach((zone) => {
       const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
       map.set(cardId, {
