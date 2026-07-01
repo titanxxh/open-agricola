@@ -16,6 +16,7 @@ const nightPastureZone = (
   cardId: CARD_ID,
   ownerPlayerId,
   animalOwnerPlayerId,
+  breedingOwnerPlayerId: ownerPlayerId,
   ...(displayOwnerName ? { displayOwnerName } : {}),
   displaySource,
   capacity,

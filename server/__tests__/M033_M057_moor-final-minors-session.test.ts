@@ -232,6 +232,33 @@ describe('M057 Taps', () => {
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
   })
 
+  it('revalidates stale borrowed Taps card actions before before-special-action listeners', () => {
+    const session = setupM057Rotation([M057, M112])
+    const player = session.state.players[0]!
+    const other = session.state.players[1]!
+    const card = session.state.farmersOfTheMoor!.specialActionCards.find((entry) =>
+      entry.actions.includes('cut-peat'))!
+    card.location = { kind: 'playerFaceUp', playerId: other.id }
+    player.resources.food = 2
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
+    player.farmTerrain = [{ ...MOOR_A }]
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    expect(offer.interaction.stateId).toBe('wait')
+    if (offer.interaction.stateId !== 'wait') throw new Error('expected wait')
+    const option = offer.interaction.options?.find((entry) =>
+      entry.value.startsWith(`card-action:${card.id}:action:cut-peat`))
+    expect(option).toBeDefined()
+
+    session.state.players[0]!.resources.food = 0
+    const resp = session.resolveChoice(0, option!.value)
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(resp.state.players[0]!.resources.fuel).toBe(0)
+  })
+
   it('disambiguates Taps card-action options by card and terrain tile', () => {
     const session = setupM057Rotation()
     const player = session.state.players[0]!

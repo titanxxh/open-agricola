@@ -221,7 +221,7 @@ describe('breed core helper', () => {
     expect(player.resources.boar).toBe(3)
   })
 
-  it('does not count borrowed Night Pasture animals toward the card owner breeding threshold', () => {
+  it('counts borrowed Night Pasture animals for the card owner, not the guest, when breeding', () => {
     const owner = makePlayer({
       id: 'owner',
       name: 'Owner',
@@ -259,12 +259,17 @@ describe('breed core helper', () => {
     }
     const state = { players: [owner, guest], actionSpaces: [], enableFarmersOfTheMoor: true } as unknown as GameState
 
-    const { breedSummary } = withEffects([M033_NightPasture_impl.effect], () =>
+    const ownerBreed = withEffects([M033_NightPasture_impl.effect], () =>
       breed(state, owner, { sourceCard: 'harvest' }),
     )
+    const guestBreed = withEffects([M033_NightPasture_impl.effect], () =>
+      breed(state, guest, { sourceCard: 'harvest' }),
+    )
 
-    expect(breedSummary.resources.sheep).toBeUndefined()
-    expect(owner.resources.sheep).toBe(1)
+    expect(ownerBreed.breedSummary.resources.sheep).toBe(1)
+    expect(owner.resources.sheep).toBe(2)
+    expect(guestBreed.breedSummary.resources.sheep).toBeUndefined()
+    expect(guest.resources.sheep).toBe(1)
   })
 
   it('keeps horses out of default harvest breeding when Farmers of the Moor is disabled', () => {
