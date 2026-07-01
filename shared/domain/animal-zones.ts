@@ -40,6 +40,7 @@ export type AnimalZone = {
   cardId?: string
   ownerPlayerId?: string
   animalOwnerPlayerId?: string
+  breedingOwnerPlayerId?: string
   displayOwnerName?: string
   pastureIndex?: number
   farmPosition?: { row: number; col: number }

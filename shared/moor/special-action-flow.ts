@@ -489,6 +489,8 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       }
       const playerIndex = state.players.indexOf(player)
       if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
+      const validation = validateMoorSpecialAction(state, playerIndex, parsed.cardId, parsed.actionId, parsed.payload)
+      if (!validation.ok) return { type: 'fail', errorKey: validation.error }
       return {
         type: 'flow',
         flow: buildSpecialActionCardActionFlow(state, player, parsed.cardId, parsed.actionId, parsed.payload),
