@@ -1,6 +1,40 @@
 import { defineMinorCard } from '../card-source'
+import { buildHostedCardAnimalZoneId, type AnimalZone } from '../../domain/animal-zones'
+import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M033_NightPasture'
+
+const nightPastureZone = (
+  ownerPlayerId: string,
+  animalOwnerPlayerId: string,
+  capacity: number,
+  displaySource: AnimalZone['displaySource'],
+  displayOwnerName?: string,
+): AnimalZone => ({
+  id: buildHostedCardAnimalZoneId(CARD_ID, ownerPlayerId, animalOwnerPlayerId),
+  zoneType: 'card',
+  cardId: CARD_ID,
+  ownerPlayerId,
+  animalOwnerPlayerId,
+  ...(displayOwnerName ? { displayOwnerName } : {}),
+  displaySource,
+  capacity,
+  allowedAnimalType: null,
+})
+
+const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onComputeAnimalZones: (owner) => [
+      nightPastureZone(owner.id, owner.id, 3, 'played-card'),
+    ],
+    onComputeSharedAnimalZones: (owner, animalOwner) => {
+      if (owner.id === animalOwner.id) return
+      return [nightPastureZone(owner.id, animalOwner.id, 1, 'borrowed-played-card', owner.name)]
+    },
+    computeHarvestBreedOrderPriority: () => 1,
+  },
+} satisfies CardImpl
 
 export const M033_NightPasture = defineMinorCard({
   meta: {
@@ -15,7 +49,10 @@ export const M033_NightPasture = defineMinorCard({
     cost: {
         "clay": 2
     },
-    implemented: false,
+    implemented: true,
     requiresFarmersOfTheMoor: true,
   },
+  impl: cardImpl,
 })
+
+export const M033_NightPasture_impl = M033_NightPasture.impl

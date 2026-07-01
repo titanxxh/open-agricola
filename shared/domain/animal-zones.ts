@@ -37,10 +37,13 @@ export type AnimalZone = {
   animalCounts?: Partial<Record<AnimalType, number>>
   allowedAnimalType?: AnimalType | null
   cardId?: string
+  ownerPlayerId?: string
+  animalOwnerPlayerId?: string
+  displayOwnerName?: string
   pastureIndex?: number
   farmPosition?: { row: number; col: number }
   countsFarmyardSpaceAsUnused?: boolean
-  displaySource?: 'played-card' | 'farm-position'
+  displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
   exclusiveCardZoneLimit?: number
   capacityCounterKey?: string
   capacityLossOnPayment?: boolean
@@ -54,6 +57,12 @@ export const buildCardAnimalZoneId = (
 ): string => position
   ? `card:${cardId}@${positionKey(position)}`
   : `card:${cardId}`
+
+export const buildHostedCardAnimalZoneId = (
+  cardId: string,
+  ownerPlayerId: string,
+  animalOwnerPlayerId: string,
+): string => `card:${cardId}:owner:${ownerPlayerId}:animalOwner:${animalOwnerPlayerId}`
 
 export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
   zone.zoneType === 'house' || zone.houseAnimalZone === true
@@ -234,9 +243,12 @@ const rehydrateAnimalHolderZones = (
 ) => {
   for (const zone of zones) {
     if (zone.zoneType !== 'card' || !zone.cardId) continue
-    if (typeof player.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
+    const storagePlayer = zone.ownerPlayerId
+      ? state.players?.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+      : player
+    if (typeof storagePlayer.cardStates?.[zone.cardId]?.counters?.held === 'number') continue
     const fixedType = fixedAnimalTypeForZone(state, zone)
-    const extraData = player.cardStates?.[zone.cardId]?.extraData
+    const extraData = storagePlayer.cardStates?.[zone.cardId]?.extraData
     const countsByZone = extraData?.animalCountsByZone
     const keyedCounts = countsByZone && typeof countsByZone === 'object'
       ? (countsByZone as Record<string, unknown>)[zone.id]
@@ -414,7 +426,32 @@ export const computeAnimalZones = (
       }
       for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
         const zone = zones[i]!
-        if (zone.zoneType === 'card' && !zone.cardId) zone.cardId = cardId
+        if (zone.zoneType !== 'card') continue
+        if (!zone.cardId) zone.cardId = cardId
+        zone.ownerPlayerId ??= player.id
+        zone.animalOwnerPlayerId ??= player.id
+        zone.displaySource ??= 'played-card'
+      }
+    }
+  }
+  for (const owner of state.players ?? []) {
+    if (owner.id === player.id) continue
+    for (const cardId of getPlayedCardIds(owner)) {
+      const effect = getCardEffect(cardId)
+      if (!effect?.onComputeSharedAnimalZones) continue
+      const firstNewZoneIndex = zones.length
+      const result = effect.onComputeSharedAnimalZones(owner, player, zones, state)
+      if (Array.isArray(result)) {
+        zones.push(...result)
+      }
+      for (let i = firstNewZoneIndex; i < zones.length; i += 1) {
+        const zone = zones[i]!
+        if (zone.zoneType !== 'card') continue
+        if (!zone.cardId) zone.cardId = cardId
+        zone.ownerPlayerId ??= owner.id
+        zone.animalOwnerPlayerId ??= player.id
+        zone.displayOwnerName ??= owner.name
+        zone.displaySource = 'borrowed-played-card'
       }
     }
   }
