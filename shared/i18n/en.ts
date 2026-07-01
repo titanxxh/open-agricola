@@ -104,6 +104,7 @@ export const en = {
     fieldLabel: 'Field {index}',
     fieldEmpty: 'Empty field',
     playedCards: 'Played Cards',
+    playedCardsByOthers: 'By others',
     handCards: 'Hand Cards',
     playerActionCards: 'Player Action Cards',
     minorCards: 'Minor Improvements',

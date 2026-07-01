@@ -47,6 +47,12 @@ type CardAnimalDisplay = {
   capacity: number
   zoneId: string
 }
+type BorrowedPlayedCardDisplay = CardAnimalDisplay & {
+  cardId: string
+  cardType: CardType
+  displayOwnerName?: string
+  isReorgDraft: boolean
+}
 type FarmTerrainMarker = {
   row: number
   col: number
@@ -412,6 +418,7 @@ export type FarmBoardProps = {
   >
   cardDisplayMap?: Map<string, CardAnimalDisplay>
   farmCardDisplayMap?: Map<string, CardAnimalDisplay>
+  borrowedPlayedCardDisplays?: BorrowedPlayedCardDisplay[]
   isReorgActive: boolean
   reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
@@ -759,6 +766,7 @@ export const FarmBoard = ({
   stableDisplayMap,
   cardDisplayMap = new Map(),
   farmCardDisplayMap = new Map(),
+  borrowedPlayedCardDisplays = [],
   isReorgActive,
   reorgRemaining,
   pendingFenceSet,
@@ -869,6 +877,54 @@ export const FarmBoard = ({
     })
     return `${target.row}-${target.col}`
   })()
+
+  const renderPlayedCardReorg = (cardDisplay: CardAnimalDisplay) => (
+    <div className="played-card-reorg">
+      <AnimalCount
+        count={cardDisplay.animalCount}
+        animalType={cardDisplay.animalType}
+        capacity={cardDisplay.capacity}
+      />
+      <div className="pasture-controls">
+        {ANIMAL_CONTROL_TYPES.map((animalType) => {
+          const cardAnimalCounts = cardDisplay.animalCounts ?? {}
+          const count =
+            cardAnimalCounts[animalType] ??
+            (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)
+          const totalCount = sumAnimalCounts(cardAnimalCounts) || cardDisplay.animalCount
+          const canDecrease = count > 0
+          const canIncrease =
+            (reorgRemaining?.[animalType] ?? 0) > 0 &&
+            cardDisplay.capacity > 0 &&
+            totalCount < cardDisplay.capacity
+          return (
+            <div key={animalType} className="pasture-control-row">
+              <span className="pasture-control-label">
+                {t(locale, `resources.${animalType}`)}
+              </span>
+              <button
+                onClick={() =>
+                  adjustReorgAnimal(cardDisplay.zoneId, animalType, -1)
+                }
+                disabled={!isInteractive || !canDecrease}
+              >
+                -
+              </button>
+              <span className="pasture-control-value">{count}</span>
+              <button
+                onClick={() =>
+                  adjustReorgAnimal(cardDisplay.zoneId, animalType, 1)
+                }
+                disabled={!isInteractive || !canIncrease}
+              >
+                +
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 
   return (
     <section className="center">
@@ -1610,58 +1666,47 @@ export const FarmBoard = ({
                   <span>{m084LyingHorses}</span>
                 </div>
               ) : null}
-              {isReorgActive && cardDisplay ? (
-                <div className="played-card-reorg">
-                  <AnimalCount
-                    count={cardDisplay.animalCount}
-                    animalType={cardDisplay.animalType}
-                    capacity={cardDisplay.capacity}
-                  />
-                  <div className="pasture-controls">
-                    {ANIMAL_CONTROL_TYPES.map((animalType) => {
-                      const cardAnimalCounts = cardDisplay.animalCounts ?? {}
-                      const count =
-                        cardAnimalCounts[animalType] ??
-                        (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)
-                      const totalCount = sumAnimalCounts(cardAnimalCounts) || cardDisplay.animalCount
-                      const canDecrease =
-                        count > 0
-                      const canIncrease =
-                        (reorgRemaining?.[animalType] ?? 0) > 0 &&
-                        cardDisplay.capacity > 0 &&
-                        totalCount < cardDisplay.capacity
-                      return (
-                        <div key={animalType} className="pasture-control-row">
-                          <span className="pasture-control-label">
-                            {t(locale, `resources.${animalType}`)}
-                          </span>
-                          <button
-                            onClick={() =>
-                              adjustReorgAnimal(cardDisplay.zoneId, animalType, -1)
-                            }
-                            disabled={!isInteractive || !canDecrease}
-                          >
-                            -
-                          </button>
-                          <span className="pasture-control-value">{count}</span>
-                          <button
-                            onClick={() =>
-                              adjustReorgAnimal(cardDisplay.zoneId, animalType, 1)
-                            }
-                            disabled={!isInteractive || !canIncrease}
-                          >
-                            +
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : null}
+              {isReorgActive && cardDisplay ? renderPlayedCardReorg(cardDisplay) : null}
             </div>
           )
         })}
       </div>
+      {borrowedPlayedCardDisplays.length > 0 ? (
+        <div className="played-cards-by-others">
+          <div className="played-cards-by-others-title">{t(locale, 'ui.playedCardsByOthers')}</div>
+          <div className="played-row played-row-by-others">
+            {borrowedPlayedCardDisplays.map((display) => (
+              <div
+                key={display.zoneId}
+                className="played-card-slot borrowed-played-card-slot"
+                data-testid={`borrowed-played-card-${display.zoneId}`}
+              >
+                <PlayerCard
+                  locale={locale}
+                  cardId={display.cardId}
+                  cardType={display.cardType}
+                  devMode={devMode}
+                  disabled
+                />
+                {display.displayOwnerName ? (
+                  <div className="borrowed-played-card-owner">{display.displayOwnerName}</div>
+                ) : null}
+                {display.isReorgDraft
+                  ? renderPlayedCardReorg(display)
+                  : (
+                      <div className="played-card-readonly-animals">
+                        <AnimalCount
+                          count={display.animalCount}
+                          animalType={display.animalType}
+                          capacity={display.capacity}
+                        />
+                      </div>
+                    )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>

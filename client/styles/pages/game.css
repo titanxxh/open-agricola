@@ -3571,6 +3571,19 @@
   gap: 6px;
   align-content: start;
 }
+.played-cards-by-others {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.played-cards-by-others-title,
+.borrowed-played-card-owner {
+  font-size: 12px;
+  color: #6f5b37;
+}
+.played-cards-by-others-title {
+  font-weight: 700;
+}
 .played-card-readonly-animals {
   display: inline-flex;
   align-items: center;

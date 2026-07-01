@@ -42,12 +42,17 @@ describe('shared/session/serialization', () => {
       const serialized = serializeState(state, emptyCtx())
       expect(serialized.round).toBe(state.round)
       expect(serialized.currentPlayerIndex).toBe(state.currentPlayerIndex)
-      // Serialized players match the domain players plus the snapshot-only
-      // `specialStables` display projection.
+      // Serialized players match the domain players plus snapshot-only display
+      // projections.
       serialized.players.forEach((serializedPlayer, index) => {
-        const { specialStables, ...domainPlayer } = serializedPlayer
+        const {
+          specialStables,
+          borrowedPlayedCardAnimalZones,
+          ...domainPlayer
+        } = serializedPlayer
         expect(domainPlayer).toEqual(state.players[index])
         expect(specialStables).toEqual([])
+        expect(borrowedPlayedCardAnimalZones).toEqual([])
       })
       expect(serialized.gameSeed).toBe(state.gameSeed)
       expect(serialized.gameOver).toBe(state.gameOver)
