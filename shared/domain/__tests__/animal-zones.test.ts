@@ -631,6 +631,65 @@ describe('AnimalZones', () => {
     })
   })
 
+  it('enforceCapacity writes borrowed Night Pasture entries to the card owner when ids collide', () => {
+    const session = new GameSession(17033, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const guest = state.players[1]!
+    owner.minorPlayed = [NIGHT_PASTURE]
+    guest.minorPlayed = [NIGHT_PASTURE]
+    guest.resources.sheep = 4
+    guest.pastures = []
+    guest.houseAnimalType = null
+    guest.houseAnimalCount = 0
+    const guestOwnZoneId = `card:${NIGHT_PASTURE}:owner:${guest.id}:animalOwner:${guest.id}`
+    const borrowedZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [borrowedZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+    guest.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestOwnZoneId]: {
+              animalCounts: { sheep: 3 },
+              ownerPlayerId: guest.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 3,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      },
+    }
+
+    playerBoard(state, 1).animals.enforceCapacity()
+
+    const guestZones = guest.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
+    const ownerZones = owner.cardStates[NIGHT_PASTURE]?.extraData?.animalCountsByZone as Record<string, unknown>
+    expect(guestZones[guestOwnZoneId]).toMatchObject({ animalCounts: { sheep: 3 } })
+    expect(guestZones[borrowedZoneId]).toBeUndefined()
+    expect(ownerZones[borrowedZoneId]).toMatchObject({ animalCounts: { sheep: 1 } })
+  })
+
   it('enforceCapacity reserves counter-backed card zones without persisting ordinary holder storage', () => {
     const session = new GameSession()
     const state = session.getState().state

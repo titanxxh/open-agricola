@@ -556,6 +556,10 @@ export const en = {
       'hiring-fair': 'Hiring Fair',
       'black-market': 'Black Market',
       'illicit-work': 'Illicit Work',
+      cardChoiceMarket: '{card} · public card',
+      cardChoiceMarketTile: '{card} · tile ({row},{col}) · public card',
+      cardChoiceBorrowed: '{card} · borrow from {player} for 2 food',
+      cardChoiceBorrowedTile: '{card} · tile ({row},{col}) · borrow from {player} for 2 food',
     },
   },
   prompt: {

@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type {
   ActionDefinition,
   ActionExecutionResult,
+  GameState,
   ActionMutationContext,
   PlayerState,
 } from '../../contract/types'
@@ -21,14 +22,14 @@ import type { AnimalKey } from '../../contract/animals'
 const CARD_ID = 'M084_BogPony'
 const ACTION_ID = 'card_M084_BogPony_lie-horse'
 
-const countStandingHorses = (player: PlayerState): number => {
+const countStandingHorses = (state: GameState | undefined, player: PlayerState): number => {
   const lyingHorses = getBogPonyLyingHorseCount(player)
-  return Math.max(0, (getAssignedAnimalsByType(player).horse ?? 0) - lyingHorses)
+  return Math.max(0, (getAssignedAnimalsByType(player, state).horse ?? 0) - lyingHorses)
 }
 
 const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
-  const { player } = ctx
-  if (countStandingHorses(player) <= 0) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+  const { state, player } = ctx
+  if (countStandingHorses(state, player) <= 0) return { type: 'fail', errorKey: 'log.specialEffectFail' }
   const cardState = ensureCardState(player, CARD_ID)
   const extraData = { ...((cardState.extraData as Record<string, unknown> | undefined) ?? {}) }
   writeBogPonyLyingHorseCount(extraData, getBogPonyLyingHorseCount(player) + 1)
@@ -40,16 +41,21 @@ const lieHorse = (ctx: ActionMutationContext): ActionExecutionResult => {
   })
 }
 
-const consumeLyingHorses = (player: PlayerState, animalType: AnimalKey, amount: number): number => {
+const consumeLyingHorses = (
+  state: GameState | undefined,
+  player: PlayerState,
+  animalType: AnimalKey,
+  amount: number,
+): number => {
   if (animalType !== 'horse') return 0
   const current = getBogPonyLyingHorseCount(player)
-  const assigned = getAssignedAnimalsByType(player).horse ?? 0
+  const assigned = getAssignedAnimalsByType(player, state).horse ?? 0
   const take = Math.min(current, assigned, Math.max(0, Math.floor(amount)))
   if (take <= 0) return 0
   const extraData = player.cardStates?.[CARD_ID]?.extraData as Record<string, unknown> | undefined
   if (!extraData) return 0
   writeBogPonyLyingHorseCount(extraData, current - take)
-  subtractAnimalsFromBoard(player, { horse: take })
+  subtractAnimalsFromBoard(player, { horse: take }, state)
   return take
 }
 
@@ -80,7 +86,7 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (countStandingHorses(context.player) <= 0) return
+    if (countStandingHorses(context.state, context.player) <= 0) return
     return {
       flow: { type: 'leaf', actionId: ACTION_ID, sourceCard: CARD_ID },
       sourceCard: CARD_ID,
@@ -101,8 +107,8 @@ const cardImpl = {
       if (animalType !== 'horse') return undefined
       return Math.min(ctx.quantity, getBogPonyLyingHorseCount(player)) * -0.5
     },
-    consumeAnimalPayment: (_state, player, animalType, amount) =>
-      consumeLyingHorses(player, animalType, amount),
+    consumeAnimalPayment: (state, player, animalType, amount) =>
+      consumeLyingHorses(state, player, animalType, amount),
     onAnimalRemoved: (_state, player, animalType, amount) =>
       consumeRemovedLyingHorseMarkers(player, animalType, amount),
   },
