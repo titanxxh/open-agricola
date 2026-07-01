@@ -428,7 +428,10 @@ describe('InteractionBar', () => {
 
     expect(html).toContain('interaction-reorg-panel')
     expect(html).toContain('Pending Animals')
-    expect(html).toContain('Sheep 0 · Boar 2 · Cattle 0')
+    expect(html).toContain('interaction-animal-counts')
+    expect(html).toContain('res-icon-boar')
+    expect(html).toContain('>2</span>')
+    expect(html).not.toContain('Sheep 0 · Boar 2 · Cattle 0')
     expect(html).toContain('Confirm')
   })
 
