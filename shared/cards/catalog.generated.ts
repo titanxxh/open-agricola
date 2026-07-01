@@ -14322,7 +14322,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "prerequisite": "2 Improvements",
-    "implemented": false,
+    "implemented": true,
     "requiresFarmersOfTheMoor": true,
     "kind": "minor"
   },
