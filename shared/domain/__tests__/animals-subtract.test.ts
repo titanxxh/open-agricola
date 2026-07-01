@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState } from '../../contract/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import { subtractAnimalsFromBoard } from '../animals'
+
+const NIGHT_PASTURE = 'M033_NightPasture'
 
 const emptyResources = () => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -100,6 +102,40 @@ describe('subtractAnimalsFromBoard', () => {
     const zone = ((p.cardStates!.M034_HomeWood.extraData as any).animalCountsByZone as any)['card:M034_HomeWood@0,0']
     expect(zone.animalCounts.sheep).toBe(1)
     expect(zone.held).toBe(1)
+  })
+
+  it('hosted animal-holder card animalCountsByZone', () => {
+    const owner = createPlayer({ id: 'owner', name: 'Owner' })
+    const guest = createPlayer({
+      id: 'guest',
+      name: 'Guest',
+      resources: { ...emptyResources(), sheep: 1 },
+    })
+    const guestZoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
+    owner.minorPlayed = [NIGHT_PASTURE]
+    owner.cardStates = {
+      [NIGHT_PASTURE]: {
+        extraData: {
+          animalCountsByZone: {
+            [guestZoneId]: {
+              animalCounts: { sheep: 1 },
+              ownerPlayerId: owner.id,
+              animalOwnerPlayerId: guest.id,
+              cardId: NIGHT_PASTURE,
+              capacity: 1,
+              allowedAnimalType: null,
+            },
+          },
+        },
+      } as any,
+    }
+    const state = { players: [owner, guest], enableFarmersOfTheMoor: true } as GameState
+
+    subtractAnimalsFromBoard(guest, { sheep: 1 }, state)
+
+    expect(guest.resources.sheep).toBe(0)
+    const zone = ((owner.cardStates!.M033_NightPasture.extraData as any).animalCountsByZone as any)[guestZoneId]
+    expect(zone.animalCounts?.sheep ?? 0).toBe(0)
   })
 
   it('多 type 同时', () => {

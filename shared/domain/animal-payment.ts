@@ -52,11 +52,12 @@ const takeFromCardCounter = (
 
 const takeFromVisibleAnimals = (
   player: PlayerState,
+  state: GameState | undefined,
   animal: AnimalKey,
   amount: number,
 ): number => {
-  const take = Math.min(getAssignedAnimalsByType(player)[animal] ?? 0, amount)
-  if (take > 0) subtractAnimalsFromBoard(player, { [animal]: take })
+  const take = Math.min(getAssignedAnimalsByType(player, state)[animal] ?? 0, amount)
+  if (take > 0) subtractAnimalsFromBoard(player, { [animal]: take }, state)
   return take
 }
 
@@ -110,7 +111,7 @@ export const applyAnimalPayment = (
   if (remaining > 0) {
     remaining -= consumeAnimalPaymentFromCardEffects(state, player, animal, remaining)
   }
-  if (remaining > 0) remaining -= takeFromVisibleAnimals(player, animal, remaining)
+  if (remaining > 0) remaining -= takeFromVisibleAnimals(player, state, animal, remaining)
   const hasSpecificPreferredSource = (preference?.prefer ?? []).some((source) => source.cardId)
   if (remaining > 0 && !hasSpecificPreferredSource) {
     remaining -= takeFromCounterBackedAnimalZones(state, player, animal, remaining, preference?.avoid ?? [])
