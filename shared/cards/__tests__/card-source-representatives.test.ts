@@ -227,6 +227,7 @@ describe('Card Source representative migrations', () => {
       'M054_AgriculturalImplement',
       'M055_ToolShed',
       'M056_PeatCuttingRights',
+      'M057_Taps',
       'M058_PeatFertilizer',
       'M059_NaturesFertilizer',
       'M060_SowingMachine',

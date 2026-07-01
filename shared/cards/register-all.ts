@@ -924,6 +924,7 @@ import { M053_ForestHut } from './M/M053_ForestHut'
 import { M054_AgriculturalImplement } from './M/M054_AgriculturalImplement'
 import { M055_ToolShed } from './M/M055_ToolShed'
 import { M056_PeatCuttingRights } from './M/M056_PeatCuttingRights'
+import { M057_Taps } from './M/M057_Taps'
 import { M058_PeatFertilizer } from './M/M058_PeatFertilizer'
 import { M059_NaturesFertilizer } from './M/M059_NaturesFertilizer'
 import { M060_SowingMachine } from './M/M060_SowingMachine'
@@ -1937,6 +1938,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'M054_AgriculturalImplement': M054_AgriculturalImplement.impl,
   'M055_ToolShed': M055_ToolShed.impl,
   'M056_PeatCuttingRights': M056_PeatCuttingRights.impl,
+  'M057_Taps': M057_Taps.impl,
   'M058_PeatFertilizer': M058_PeatFertilizer.impl,
   'M059_NaturesFertilizer': M059_NaturesFertilizer.impl,
   'M060_SowingMachine': M060_SowingMachine.impl,
