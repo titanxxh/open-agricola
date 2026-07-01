@@ -11,6 +11,7 @@ const M057 = 'M057_Taps'
 const M083 = 'M083_CoalSeam'
 const M060 = 'M060_SowingMachine'
 const M015 = 'M015_PeatBurnOff'
+const M112 = 'M112_PeatAshFertilizer'
 const FILLER = '__test_placeholder__'
 const MOOR_A = { row: 2, col: 0, kind: 'moor' as const }
 const MOOR_B = { row: 2, col: 1, kind: 'moor' as const }
@@ -213,6 +214,22 @@ describe('M057 Taps', () => {
     expect(chosen.ok).toBe(true)
     expect(chosen.state.players[0]!.resources.food).toBe(1)
     expect(chosen.state.players[0]!.resources.fuel).toBe(1)
+  })
+
+  it('fires before-special-action listeners before a Taps borrowed card action', () => {
+    const session = setupM057Rotation([M057, M112])
+    const player = session.state.players[0]!
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
+    player.farmTerrain = [{ ...MOOR_A }]
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    let resp = session.resolveChoice(0, optionFor(offer, 'cut-peat').value)
+
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe(M112)
+    resp = acceptOptional(session, resp)
+    expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+    expect(resp.state.players[0]!.resources.fuel).toBe(3)
   })
 
   it('pays 2 food when the Taps extra turn borrows another player face-up special action card', () => {

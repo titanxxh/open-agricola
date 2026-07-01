@@ -338,6 +338,31 @@ const runAfterSpecialActionListeners = (
   return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared)
 }
 
+const buildSpecialActionCardActionFlow = (
+  state: GameState,
+  player: PlayerState,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload,
+): ActionFlow => {
+  const beforeFlows = runCardListeners({
+    state,
+    player,
+    space: createMoorSpecialActionSpace(actionId),
+    actionId,
+    phase: 'before',
+    extraData: { specialActionCardId: cardId, payload },
+  }, undefined, { stampFlowOwner: true })
+    .map((entry) => entry.flow)
+    .filter((flow): flow is ActionFlow => !!flow)
+  const applyFlow: ActionFlow = {
+    type: 'leaf',
+    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    params: { cardId, actionId, payload },
+  }
+  return combineFlows([...beforeFlows, applyFlow]) ?? applyFlow
+}
+
 export const moorSpecialActionAfterListenersAction: ActionDefinition = {
   id: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
   nameKey: 'actions.special-effect.name',
@@ -403,17 +428,10 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       }
       const playerIndex = state.players.indexOf(player)
       if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
-      const result = applyMoorSpecialAction(
-        state,
-        playerIndex,
-        parsed.cardId,
-        parsed.actionId,
-        parsed.payload,
-        eventSink,
-      )
-      if (!result.ok) return { type: 'fail', errorKey: result.error }
-      const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result)
-      return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+      return {
+        type: 'flow',
+        flow: buildSpecialActionCardActionFlow(state, player, parsed.cardId, parsed.actionId, parsed.payload),
+      }
     }
     const parsed = parseActionChoice(choice)
     if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }
