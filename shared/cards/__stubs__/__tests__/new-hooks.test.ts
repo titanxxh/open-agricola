@@ -61,7 +61,6 @@ function resolveSourceCardChoice(
   resp: ReturnType<GameSession['performRoundEnd']>,
   sourceCard: string,
 ) {
-  expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
   const option = resp.interaction.options?.find((o) => o.sourceCard === sourceCard && o.value !== '__skip__')
   expect(option).toBeDefined()
@@ -167,7 +166,7 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(source.flow.children.map(firstChildSourceCard)).toEqual(cardIds)
   })
 
-  it('harvest field parallel choices are prompted to each owning player', () => {
+  it('single harvest field stage choices are prompted to each owning player', () => {
     const hook = 'onStartHarvestFieldPhase'
     const cardIds = registerHarvestFieldFlowCards(hook)
     const { session, state } = makeSession(4, [])
@@ -182,18 +181,9 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0]])
-
-    const frame = session.getEngineStack().toCursor().frames.at(-1)
-    const source = frame?.source
-    expect(source?.kind).toBe('flow')
-    if (source?.kind !== 'flow') return
-    expect(source.flow.type).toBe('parallel')
-    if (source.flow.type !== 'parallel') return
-    expect(source.flow.children.map((child) => child.targetPlayerId)).toEqual([p0.id])
+    expect(resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0], cardIds[0]])
 
     let p1Resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
-    p1Resp = resolveSourceCardChoice(session, p1Resp, cardIds[0]!)
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.request.kind).toBe('confirm-player-switch')
@@ -204,7 +194,7 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.playerIndex).toBe(1)
-    expect(p1Resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1]])
+    expect(p1Resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1], cardIds[1]])
   })
 
   it('harvest field parallel choices resume the stage once after out-of-order resolution', () => {

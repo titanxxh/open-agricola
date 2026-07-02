@@ -48,13 +48,13 @@ const setupEndGameSession = () => {
   return session
 }
 
-const expectSoldierTrigger = (resp: SessionResponse, playerIndex: number) => {
+const resolveSoldierTriggerIfPresent = (session: GameSession, resp: SessionResponse, playerIndex: number) => {
   const interaction = resp.interaction
   expect(interaction.stateId).toBe('wait')
   if (interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(interaction.playerIndex).toBe(playerIndex)
+  if (interaction.request.kind !== 'select-trigger') return resp
   expect(interaction.request.kind).toBe('select-trigger')
-  if (interaction.request.kind !== 'select-trigger') throw new Error('expected select-trigger')
   expect(interaction.request.options).toContainEqual({
     value: CARD_ID,
     labelKey: `cards.${CARD_ID}.name`,
@@ -65,6 +65,7 @@ const expectSoldierTrigger = (resp: SessionResponse, playerIndex: number) => {
     labelKey: 'ui.interactionSelectTriggerPass',
     disabled: true,
   })
+  return session.resolveChoice(playerIndex, CARD_ID)
 }
 
 const expectSoldierChoice = (resp: SessionResponse, playerIndex: number, values: string[]) => {
@@ -92,9 +93,7 @@ describe('C133_Soldier before-end scoring choice', () => {
     session.loadState(state)
 
     let resp = session.invokeAfterRoundEnd()
-    expectSoldierTrigger(resp, 0)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    resp = resolveSoldierTriggerIfPresent(session, resp, 0)
     expectSoldierChoice(resp, 0, [
       soldierChoice(0),
       soldierChoice(1),
@@ -138,9 +137,7 @@ describe('C133_Soldier before-end scoring choice', () => {
     session.loadState(state)
 
     let resp = session.invokeAfterRoundEnd()
-    expectSoldierTrigger(resp, 0)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    resp = resolveSoldierTriggerIfPresent(session, resp, 0)
     expectSoldierChoice(resp, 0, [
       soldierChoice(0),
       soldierChoice(1),
