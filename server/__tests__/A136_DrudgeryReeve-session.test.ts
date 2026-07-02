@@ -201,7 +201,6 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
         }
       },
       beforeEndGameScope: 'allPlayers',
-      beforeEndGameDispatchMode: 'select',
       beforeEndGameMandatory: true,
     }
     requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)

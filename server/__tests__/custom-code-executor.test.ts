@@ -53,7 +53,7 @@ const CARD_IMPL = {
     expect(result.manifest.listeners[0]?.actions).toEqual(['meeting-place'])
   })
 
-  it('extracts before-end dispatch metadata for executor-backed custom cards', () => {
+  it('extracts before-end metadata for executor-backed custom cards', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
@@ -61,7 +61,6 @@ const CARD_IMPL = {
   effect: {
     id: CARD_ID,
     beforeEndGameScope: 'allPlayers',
-    beforeEndGameDispatchMode: 'select',
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state: any, _player: any) => {
       return { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID }
@@ -74,7 +73,6 @@ const CARD_IMPL = {
     if (!result.valid) return
     expect((result.manifest as any).effectMetadata).toEqual({
       beforeEndGameScope: 'allPlayers',
-      beforeEndGameDispatchMode: 'select',
       beforeEndGameMandatory: true,
     })
 
@@ -84,7 +82,6 @@ const CARD_IMPL = {
 
     expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({
       beforeEndGameScope: 'allPlayers',
-      beforeEndGameDispatchMode: 'select',
       beforeEndGameMandatory: true,
     })
   })

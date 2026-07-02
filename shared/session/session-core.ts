@@ -110,7 +110,7 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
-import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
+import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
@@ -303,7 +303,7 @@ type SowSelectionPayload = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
-const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
+const stageReactionHooks = new Set<StageResumeState['hook']>([
   'onStartHarvestFieldPhase',
   'onHarvestFieldPhase',
   'onEndHarvestFieldPhase',
@@ -2609,8 +2609,8 @@ export class GameCore {
     cardIndex = 0,
     extra?: StageResumeState['extra'],
   ) {
-    if (cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
-      return this.continueParallelStageHook(hook, playerIndex)
+    if (cardIndex === 0 && stageReactionHooks.has(hook)) {
+      return this.continueStageReactionHook(hook, playerIndex)
     }
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
@@ -2647,55 +2647,64 @@ export class GameCore {
     return Math.max(0, cardIndex - 1)
   }
 
-  private stageFlowNeedsPlayerInteraction(flow: ActionFlow): boolean {
-    if (flow.optional) return true
-    if (flow.type === 'leaf') {
-      const definition = this.registry.get(flow.actionId)
-      return Boolean(definition?.resolveChoice && !definition.skipChoiceWrap)
+  private buildStageEffectActivationFlow(
+    cardId: string,
+    hook: StageCardEffectHook,
+    ownerPlayerId: string,
+    targetPlayerId: string,
+    mandatory = true,
+    actionContext: Record<string, unknown> = {},
+  ): ActionFlow {
+    const context = {
+      ownerPlayerId,
+      targetPlayerId,
+      stageHook: hook,
+      mandatory,
+      ...actionContext,
     }
-    if (flow.type === 'or' || flow.type === 'xor') return true
-    if (flow.type === 'parallel' && flow.mode === 'trigger-select') return true
-    return flow.children.some((child) => this.stageFlowNeedsPlayerInteraction(child))
+    return {
+      type: 'leaf',
+      actionId: 'activate-card-effect',
+      params: {
+        cardId,
+        hook,
+        ...context,
+      },
+      actionContext: context,
+      sourceCard: cardId,
+      targetPlayerId,
+      optional: mandatory ? undefined : true,
+    }
   }
 
-  private continueParallelStageHook(
+  private collectOwnStageReactionActivationFlows(
+    hook: StageCardEffectHook,
+    player: PlayerState,
+  ): ActionFlow[] {
+    const children: ActionFlow[] = []
+    const cards = [
+      ...this.getPlayerEffectCardIds(player),
+      ...this.getPlayerHandEffectCardIds(player, hook),
+    ]
+    for (const cardId of cards) {
+      const effect = getCardEffect(cardId)
+      if (!effect?.[hook]) continue
+      children.push(this.buildStageEffectActivationFlow(cardId, hook, player.id, player.id))
+    }
+    return children
+  }
+
+  private continueStageReactionHook(
     hook: StageCardEffectHook,
     playerIndex = 0,
   ) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
-      const autoChildren: ActionFlow[] = []
-      const promptedChildren: ActionFlow[] = []
-      const cards = [
-        ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook),
-      ]
-      for (const cardId of cards) {
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
-        if (flow) {
-          const ownedFlow: ActionFlow = {
-            ...flow,
-            sourceCard: flow.sourceCard ?? cardId,
-            targetPlayerId: flow.targetPlayerId ?? player.id,
-          }
-          if (this.stageFlowNeedsPlayerInteraction(ownedFlow)) {
-            promptedChildren.push(ownedFlow)
-          } else {
-            autoChildren.push(ownedFlow)
-          }
-        }
-      }
-      if (autoChildren.length === 0 && promptedChildren.length === 0) continue
-      const children: ActionFlow[] = []
-      if (autoChildren.length > 0) {
-        children.push({ type: 'parallel', children: autoChildren })
-      }
-      if (promptedChildren.length > 0) {
-        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
-      }
+      const children = this.collectOwnStageReactionActivationFlows(hook, player)
+      if (children.length === 0) continue
       this.startStageFlow(
-        children.length === 1 ? children[0]! : { type: 'seq', children },
+        { type: 'parallel', mode: 'trigger-select', children },
         hook,
         currentPlayerIndex,
         0,
@@ -2711,36 +2720,20 @@ export class GameCore {
     ownerPlayerId: string,
     targetPlayerId: string,
     scope: BeforeEndGameScope,
-    dispatchMode: BeforeEndGameDispatchMode,
     mandatory: boolean,
   ): ActionFlow {
-    const actionContext = {
+    return this.buildStageEffectActivationFlow(cardId, 'onBeforeEndGame', ownerPlayerId, targetPlayerId, mandatory, {
       ownerPlayerId,
       targetPlayerId,
       beforeEndGameScope: scope,
-      beforeEndGameDispatchMode: dispatchMode,
       beforeEndGameMandatory: mandatory,
-    }
-    return {
-      type: 'leaf',
-      actionId: 'activate-card-effect',
-      params: {
-        cardId,
-        hook: 'onBeforeEndGame',
-        ...actionContext,
-      },
-      actionContext,
-      sourceCard: cardId,
-      targetPlayerId,
-      optional: dispatchMode === 'select' && !mandatory ? true : undefined,
-    }
+    })
   }
 
   private collectBeforeEndGameActivationFlows(targetPlayerIndex: number) {
     const targetPlayer = this.state.players[targetPlayerIndex]
-    const serialChildren: ActionFlow[] = []
-    const promptedChildren: ActionFlow[] = []
-    if (!targetPlayer) return { serialChildren, promptedChildren }
+    const children: ActionFlow[] = []
+    if (!targetPlayer) return children
 
     for (const ownerPlayer of this.state.players) {
       const playedCards = this.getPlayerEffectCardIds(ownerPlayer)
@@ -2749,17 +2742,14 @@ export class GameCore {
         if (!effect?.onBeforeEndGame) continue
         const scope = effect.beforeEndGameScope ?? 'owner'
         if (scope === 'owner' && ownerPlayer.id !== targetPlayer.id) continue
-        const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
         const flow = this.buildBeforeEndGameActivationFlow(
           cardId,
           ownerPlayer.id,
           targetPlayer.id,
           scope,
-          dispatchMode,
-          effect.beforeEndGameMandatory === true,
+          effect.beforeEndGameMandatory !== false,
         )
-        if (dispatchMode === 'select') promptedChildren.push(flow)
-        else serialChildren.push(flow)
+        children.push(flow)
       }
     }
 
@@ -2767,36 +2757,25 @@ export class GameCore {
     for (const cardId of handCards) {
       const effect = getCardEffect(cardId)
       if (!effect?.onBeforeEndGame) continue
-      const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
       const flow = this.buildBeforeEndGameActivationFlow(
         cardId,
         targetPlayer.id,
         targetPlayer.id,
         'owner',
-        dispatchMode,
-        effect.beforeEndGameMandatory === true,
+        effect.beforeEndGameMandatory !== false,
       )
-      if (dispatchMode === 'select') promptedChildren.push(flow)
-      else serialChildren.push(flow)
+      children.push(flow)
     }
 
-    return { serialChildren, promptedChildren }
+    return children
   }
 
   private continueBeforeEndGamePlayerDispatch(playerIndex = 0) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const { serialChildren, promptedChildren } =
-        this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
-      if (serialChildren.length === 0 && promptedChildren.length === 0) continue
-      const children: ActionFlow[] = []
-      if (serialChildren.length > 0) {
-        children.push({ type: 'parallel', children: serialChildren })
-      }
-      if (promptedChildren.length > 0) {
-        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
-      }
+      const children = this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
+      if (children.length === 0) continue
       this.startStageFlow(
-        children.length === 1 ? children[0]! : { type: 'seq', children },
+        { type: 'parallel', mode: 'trigger-select', children },
         'onBeforeEndGame',
         currentPlayerIndex,
         0,

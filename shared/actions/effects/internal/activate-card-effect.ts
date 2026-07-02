@@ -14,9 +14,14 @@ const effectPlayerForHook = (
   hook: FlowCardEffectHook,
   params?: Record<string, unknown>,
 ) => {
+  const targetPlayer = playerById(state, params?.targetPlayerId)
+  if (targetPlayer) return targetPlayer
   if (hook !== 'onBeforeEndGame') return player
   return playerById(state, params?.targetPlayerId) ?? player
 }
+
+const jsonSnapshot = (state: GameState, player: PlayerState): string =>
+  JSON.stringify({ state, player })
 
 export const activateCardEffect = (
   state: GameState,
@@ -40,19 +45,19 @@ export const previewActivateCardEffect = (
   const hook = params?.hook
   if (typeof cardId !== 'string' || typeof hook !== 'string') return undefined
   if (!flowCardEffectHooks.includes(hook as FlowCardEffectHook)) return undefined
-  if (hook !== 'onBeforeEndGame') return undefined
   const effectPlayer = effectPlayerForHook(state, player, hook as FlowCardEffectHook, params)
+  const before = jsonSnapshot(state, effectPlayer)
   const flow = runCardEffectHook(state, effectPlayer, cardId, hook as FlowCardEffectHook)
-  if (!flow) return undefined
+  const mutated = !flow && jsonSnapshot(state, effectPlayer) !== before
+  if (!flow && !mutated) return undefined
   return {
-    flow,
+    flow: flow ?? undefined,
     doable: true,
     sourceCard: cardId,
     extraData: {
       ownerPlayerId: params?.ownerPlayerId,
       targetPlayerId: effectPlayer.id,
       beforeEndGameScope: params?.beforeEndGameScope,
-      beforeEndGameDispatchMode: params?.beforeEndGameDispatchMode,
       beforeEndGameMandatory: params?.beforeEndGameMandatory,
       actionContext,
     },

@@ -214,7 +214,6 @@ type FlowEffectHandlerWithContext = (
 ) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 export type BeforeEndGameScope = 'owner' | 'allPlayers'
-export type BeforeEndGameDispatchMode = 'serial' | 'select'
 
 export type ResolveChoiceHandler = (
   state: GameState,
@@ -390,7 +389,6 @@ export type CardEffect = {
    */
   handHooks?: CardEffectHook[]
   beforeEndGameScope?: BeforeEndGameScope
-  beforeEndGameDispatchMode?: BeforeEndGameDispatchMode
   beforeEndGameMandatory?: boolean
 }
 
