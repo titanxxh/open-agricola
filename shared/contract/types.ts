@@ -348,8 +348,8 @@ export type PlayerState = {
    * OysterEater) consume this many turn-rotation extra-action opportunities
    * before the remaining contributed extra turns are offered.
    */
-  _extraTurnSkipCount?: number
-  _extraTurnConsumedCount?: number
+  _extraTurnSkipCountsByCard?: Record<string, number>
+  _extraTurnConsumedCountsByCard?: Record<string, number>
 }
 
 export type FarmTilePosition = {
@@ -778,6 +778,7 @@ export type ActionFlow =
       optionId?: string
       optional?: boolean
       mode?: 'all' | 'trigger-select'
+      triggerSelectOnce?: boolean
       sourceCard?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>

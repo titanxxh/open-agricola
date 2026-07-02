@@ -30,7 +30,7 @@ import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners, listenerOwnerOptions, runCardListeners } from '../../cards/card-listeners.ts'
-import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow } from '../../cards/card-effects.ts'
+import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
@@ -640,7 +640,7 @@ export const handleConfirmNextPlayerResolved = (
       collectExtraTurnFlow(state, current) !== null
     if (!shouldSkipPlayerTurn(state, current)) break
     if (skippedExtraTurn) {
-      current._extraTurnSkipCount = (current._extraTurnSkipCount ?? 0) + 1
+      skipPendingExtraTurn(state, current)
     }
     appendImmediateEvents(state, [{
       type: 'turn.skipped',

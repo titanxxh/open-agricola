@@ -967,6 +967,7 @@ export class GameCore {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
       if (flow.mode === 'trigger-select') {
         parallel.mode = 'trigger-select'
+        parallel.resolveAfterSelection = flow.triggerSelectOnce === true
         parallel.triggerOwnerPlayerId = ownerPlayerId
         parallel.triggerChildren = children.map((child, index) => ({
           nodeId: child.id,
@@ -3119,8 +3120,8 @@ export class GameCore {
     }
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
-      delete player._extraTurnSkipCount
-      delete player._extraTurnConsumedCount
+      delete player._extraTurnSkipCountsByCard
+      delete player._extraTurnConsumedCountsByCard
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
