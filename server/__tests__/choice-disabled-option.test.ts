@@ -47,10 +47,6 @@ beforeEach(() => {
     registerAdHocOccupation(testCard)
     occupationRegistered = true
   }
-  requireActiveCardRegistry('choice-disabled-option').setEffect({
-    id: TEST_CARD_ID,
-    onBuy: () => buildTestOnBuyFlow(),
-  })
 })
 
 /**
@@ -58,6 +54,10 @@ beforeEach(() => {
  */
 const makeSession = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  requireActiveCardRegistry('choice-disabled-option').setEffect({
+    id: TEST_CARD_ID,
+    onBuy: () => buildTestOnBuyFlow(),
+  })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

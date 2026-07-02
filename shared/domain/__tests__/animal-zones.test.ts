@@ -221,6 +221,8 @@ describe('AnimalZones', () => {
   })
 
   it('allows mixed animals only in explicitly mixed card zones', () => {
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
@@ -235,13 +237,13 @@ describe('AnimalZones', () => {
         } as AnimalZone,
       ],
     })
-    const state = { players: [] } as unknown as GameState
-    const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(true)
   })
 
   it('preserves fixed animal type on card zones when checking final totals', () => {
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ occupationPlayed: [TEST_CARD], minorPlayed: ['D012_MilkingPlace'], pastures: [] })
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
@@ -257,28 +259,12 @@ describe('AnimalZones', () => {
         } as AnimalZone,
       ],
     })
-    const state = { players: [] } as unknown as GameState
-    const player = playerWithPasture({ occupationPlayed: [TEST_CARD], minorPlayed: ['D012_MilkingPlace'], pastures: [] })
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
     expect(canAccommodateAnimalTotals(state, player, { boar: 1 })).toBe(false)
   })
 
   it('does not freeze flexible card zones to their current animal type', () => {
-    const reg = getActiveCardRegistry()
-    if (!reg) throw new Error('no active registry')
-    reg.setEffect({
-      id: TEST_CARD,
-      onComputeAnimalZones: () => [
-        {
-          id: `card:${TEST_CARD}`,
-          zoneType: 'card',
-          capacity: 3,
-          animalType: null,
-          animalCount: 0,
-        } as AnimalZone,
-      ],
-    })
     const state = { players: [] } as unknown as GameState
     const player = playerWithPasture({
       occupationPlayed: [TEST_CARD],
@@ -293,11 +279,27 @@ describe('AnimalZones', () => {
       },
     })
     player.resources.sheep = 3
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: () => [
+        {
+          id: `card:${TEST_CARD}`,
+          zoneType: 'card',
+          capacity: 3,
+          animalType: null,
+          animalCount: 0,
+        } as AnimalZone,
+      ],
+    })
 
     expect(canAccommodateAnimalTotals(state, player, { boar: 3 })).toBe(true)
   })
 
   it('attaches the source card id to card zones added by a card effect', () => {
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ occupationPlayed: [TEST_CARD] })
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
@@ -312,8 +314,6 @@ describe('AnimalZones', () => {
         } as AnimalZone)
       },
     })
-    const state = { players: [] } as unknown as GameState
-    const player = playerWithPasture({ occupationPlayed: [TEST_CARD] })
     const cardZone = computeAnimalZones(player, state).find((zone) => zone.id === `card:${TEST_CARD}`)
 
     expect(cardZone?.cardId).toBe(TEST_CARD)
@@ -341,6 +341,8 @@ describe('AnimalZones', () => {
   })
 
   it('rejects assignments blocked by card-zone validation', () => {
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
@@ -357,13 +359,13 @@ describe('AnimalZones', () => {
       getInvalidAnimals: (_player, _zone, meeples) =>
         meeples.filter((meeple) => meeple.type === 'boar'),
     })
-    const state = { players: [] } as unknown as GameState
-    const player = playerWithPasture({ minorPlayed: ['D012_MilkingPlace', TEST_CARD], pastures: [] })
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(false)
   })
 
   it('enforces exclusive card-zone limits when checking final totals', () => {
+    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
+    const player = playerWithPasture({ minorPlayed: [TEST_CARD], pastures: [] })
     const reg = getActiveCardRegistry()
     if (!reg) throw new Error('no active registry')
     reg.setEffect({
@@ -387,8 +389,6 @@ describe('AnimalZones', () => {
         } as AnimalZone,
       ],
     })
-    const state = { players: [], enableFarmersOfTheMoor: true } as unknown as GameState
-    const player = playerWithPasture({ minorPlayed: [TEST_CARD], pastures: [] })
 
     expect(canAccommodateAnimalTotals(state, player, { horse: 3 })).toBe(true)
     expect(canAccommodateAnimalTotals(state, player, { horse: 4 })).toBe(false)

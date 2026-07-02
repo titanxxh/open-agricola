@@ -103,6 +103,24 @@ describe('C053_GypsysCrock session', () => {
     }
   })
 
+  it('loads official card listeners even when the active registry is empty before session construction', () => {
+    const previousRegistry = getActiveCardRegistry()
+    setActiveCardRegistry(new CardRegistry())
+
+    try {
+      const session = setup()
+      enterActiveInteraction(session)
+      let resp = session.takeAnytimeAction(0, 'exchange')
+      expect(resp.ok).toBe(true)
+      resp = session.resolveChoice(0, 'bulk:0=2')
+      expect(resp.ok).toBe(true)
+
+      expect(resp.state.players[0]!.resources.food).toBe(5)
+    } finally {
+      setActiveCardRegistry(previousRegistry)
+    }
+  })
+
   it('grants bonus food proportional to goods lost (4 sheep = 2 bonus)', () => {
     const session = setup()
     enterActiveInteraction(session)

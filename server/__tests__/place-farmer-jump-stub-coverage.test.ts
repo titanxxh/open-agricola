@@ -101,7 +101,7 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
   const STUB_ID = '__test_jump_back_card__'
   const LISTENER_ID = 'stub-jump-back-listener'
 
-  beforeEach(() => {
+  const registerJumpBackListener = () => {
     const registry = requireActiveCardRegistry('stub-jump-test')
     registry.registerListener({
       id: LISTENER_ID,
@@ -124,7 +124,7 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
         }
       },
     })
-  })
+  }
 
   afterEach(() => {
     requireActiveCardRegistry('stub-jump-test').removeListenersWhere(
@@ -134,6 +134,7 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
 
   it('A129 -> stub -> A129 chain bounces back to farm-expansion and terminates by jumpChain self-check', () => {
     const { session, state } = setup2P('A129_Swagman')
+    registerJumpBackListener()
     state.players[0]!.occupationPlayed.push(STUB_ID)
     session.loadState(state)
 
@@ -164,7 +165,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
   const LISTENER_ID = 'stub-grain-seeds-observer-listener'
   const TRACE_KEY = 'observed'
 
-  beforeEach(() => {
+  const registerObserverListener = () => {
     const registry = requireActiveCardRegistry('stub-cascade-test')
     registry.registerListener({
       id: LISTENER_ID,
@@ -177,7 +178,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
         writeCardExtraData(ctx.player, STUB_OBS_ID, TRACE_KEY, prev + 1)
       },
     })
-  })
+  }
 
   afterEach(() => {
     requireActiveCardRegistry('stub-cascade-test').removeListenersWhere(
@@ -187,6 +188,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
 
   it('observer fires when player directly places on grain-seeds (sanity)', () => {
     const { session, state } = setup2P()
+    registerObserverListener()
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
 
@@ -202,6 +204,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
 
   it('observer fires on jump-second-placement via cascade dispatch keyed on jump destination', () => {
     const { session, state } = setup2P('A129_Swagman')
+    registerObserverListener()
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
 
