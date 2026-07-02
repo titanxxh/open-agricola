@@ -247,6 +247,9 @@ const triggerResultMandatory = (
   result: ActionHookResult | undefined,
 ): boolean => {
   if (metadataMandatory) return true
+  if (typeof result?.extraData?.beforeEndGameMandatory === 'boolean') {
+    return result.extraData.beforeEndGameMandatory
+  }
   if (phase === 'before') return false
   if (!resultHasApplicabilitySignal(result)) return false
   return result?.flow?.optional !== true
