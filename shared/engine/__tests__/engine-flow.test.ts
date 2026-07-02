@@ -329,7 +329,7 @@ describe('Engine flow nodes', () => {
     expect(parallel.children.every((child) => child instanceof ActionNode)).toBe(true)
   })
 
-  it('same trigger-player reaction group spans active and opponent owners', () => {
+  it('splits same-timing reaction groups by card owner', () => {
     const p1 = createPlayer()
     p1.minorPlayed = ['OWN_CARD']
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const, minorPlayed: ['P2_CARD'] }
@@ -389,19 +389,78 @@ describe('Engine flow nodes', () => {
       p1.id,
     )
 
-    expect(nodes).toHaveLength(1)
-    const node = nodes[0]
-    expect(node).toBeInstanceOf(ParallelNode)
-    const parallel = node as ParallelNode
-    expect(parallel.mode).toBe('trigger-select')
-    expect(parallel.triggerOwnerPlayerId).toBe(p1.id)
-    expect(parallel.ownerPlayerId).toBe(p1.id)
-    expect(parallel.triggerChildren.map((child) => child.cardId)).toEqual([
-      'OWN_CARD',
-      'P2_CARD',
-      'P3_CARD',
-    ])
-    expect(parallel.children.map((child) => child.ownerPlayerId)).toEqual([p1.id, p2.id, p3.id])
+    expect(nodes).toHaveLength(3)
+    expect(nodes.map((node) => node.ownerPlayerId)).toEqual([p1.id, p2.id, p3.id])
+    expect(nodes.every((node) => node instanceof ActionNode)).toBe(true)
+  })
+
+  it('previews trigger-select affordability against the child owner', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    p1.resources.food = 0
+    p2.resources.food = 1
+    p2.minorPlayed = ['OWNER_PAY_CARD', 'OWNER_OTHER_CARD']
+    const state = createState()
+    state.players = [p1, p2]
+
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'owner-pay-listener',
+      cardIds: ['OWNER_PAY_CARD'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: 'OWNER_PAY_CARD' },
+      }),
+    })
+    cardRegistry.registerListener({
+      id: 'owner-other-listener',
+      cardIds: ['OWNER_OTHER_CARD'],
+      handler: () => ({ extraData: { applicable: true } }),
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const children = [
+      new ActionNode('activate-owner-pay', 'activate-card', 'OWNER_PAY_CARD', {
+        listenerId: 'owner-pay-listener',
+        cardId: 'OWNER_PAY_CARD',
+        phase: 'after',
+        actionId: 'gain',
+        event: {},
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+      }),
+      new ActionNode('activate-owner-other', 'activate-card', 'OWNER_OTHER_CARD', {
+        listenerId: 'owner-other-listener',
+        cardId: 'OWNER_OTHER_CARD',
+        phase: 'after',
+        actionId: 'gain',
+        event: {},
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+      }),
+    ]
+    children.forEach((child) => { child.ownerPlayerId = p2.id })
+    const triggerSelect = new ParallelNode('owner-preview-select', children)
+    triggerSelect.mode = 'trigger-select'
+    triggerSelect.triggerOwnerPlayerId = p1.id
+    triggerSelect.ownerPlayerId = p1.id
+    triggerSelect.triggerChildren = children.map((child) => ({
+      nodeId: child.id,
+      cardId: child.sourceCard!,
+      listenerId: String(child.params.listenerId),
+      mandatory: false,
+    }))
+    const engine = new Engine({
+      tree: new EngineTree(triggerSelect),
+      registry: new ActionRegistry(),
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    const prompt = engine.proceed({ state, player: p1, space: createSpace(gainAction) })
+
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.sourceCard === 'OWNER_PAY_CARD')?.disabled).not.toBe(true)
   })
 
   it('disabled trigger-select choice is rejected without resolving the child', () => {
@@ -459,9 +518,10 @@ describe('Engine flow nodes', () => {
     const prompt = engine.proceed(context)
     expect(prompt.type).toBe('choice')
     if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
-    expect(prompt.choice.options.find((option) => option.value === 'C1')?.disabled).toBe(true)
+    const disabledOption = prompt.choice.options.find((option) => option.sourceCard === 'C1')
+    expect(disabledOption?.disabled).toBe(true)
 
-    const rejected = engine.resolveChoice('C1', context)
+    const rejected = engine.resolveChoice(disabledOption!.value, context)
 
     expect(rejected.type).toBe('fail')
     expect(child.getState()).toBe('ready')
@@ -603,12 +663,12 @@ describe('Engine flow nodes', () => {
     const prompt = engine.proceed(context())
     expect(prompt.type).toBe('choice')
     if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
-    expect(prompt.choice.options.find((option) => option.value === 'HAND_SELECT_CARD')).toMatchObject({
-      value: 'HAND_SELECT_CARD',
+    const option = prompt.choice.options.find((candidate) => candidate.sourceCard === 'HAND_SELECT_CARD')
+    expect(option).toMatchObject({
       sourceCard: 'HAND_SELECT_CARD',
     })
 
-    const accepted = engine.resolveChoice('HAND_SELECT_CARD', context())
+    const accepted = engine.resolveChoice(option!.value, context())
     expect(accepted.type).toBe('ok')
     expect(engine.proceed(context()).type).toBe('ok')
 

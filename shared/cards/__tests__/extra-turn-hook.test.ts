@@ -8,6 +8,7 @@ import {
   consumePendingExtraTurns,
 } from '../card-effects'
 import { requireActiveCardRegistry } from '../active-registry'
+import { activateExtraTurnAction } from '../../actions/effects/internal/activate-extra-turn'
 import { A092_AdoptiveParents } from '../../cards/A/A092_AdoptiveParents'
 import '../A/A092_AdoptiveParents'
 
@@ -133,6 +134,33 @@ describe('extra-turn extension point (isolation)', () => {
     expect(collected.flow.mode).toBe('trigger-select')
     expect(collected.flow.triggerSelectOnce).toBe(true)
     expect(collected.flow.children.map((child) => child.sourceCard)).toEqual([TEST_EXTRA, A92])
+  })
+
+  it('fails stale provider activation instead of silently consuming the provider prompt', () => {
+    const { state, player } = setupA92Player()
+    requireActiveCardRegistry('extra turn stale-provider test').setEffect({
+      id: TEST_EXTRA,
+      contributeExtraTurn: (_state, currentPlayer) => currentPlayer.resources.wood === 0
+        ? {
+            type: 'leaf',
+            actionId: 'gain',
+            params: { clay: 1 },
+            sourceCard: TEST_EXTRA,
+          }
+        : undefined,
+      countExtraTurns: () => 1,
+    })
+    player.minorPlayed.push(TEST_EXTRA)
+    expect(collectExtraTurnFlow(state, player)?.flow.type).toBe('parallel')
+
+    player.resources.wood = 1
+    const result = activateExtraTurnAction.execute({
+      state,
+      player,
+      params: { cardId: TEST_EXTRA },
+    } as Parameters<typeof activateExtraTurnAction.execute>[0])
+
+    expect(result.type).toBe('fail')
   })
 
   it('counts remaining opportunities after skipped and forced consumed counters', () => {

@@ -49,7 +49,7 @@ import {
   pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
-import type { PendingEnvelope } from './types'
+import type { InteractionContextSnapshot, PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
@@ -76,6 +76,15 @@ const resolveExecutionSpace = (
   if (typeof targetSpaceId !== 'string') return fallback
   return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
+
+const triggerSelectContextSnapshot = (context: EngineContext): InteractionContextSnapshot => ({
+  params: undefined,
+  costs: undefined,
+  sourceCard: undefined,
+  actionContext: typeof context.space?.id === 'string'
+    ? { targetSpaceId: context.space.id }
+    : undefined,
+})
 
 const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
@@ -1005,13 +1014,14 @@ export function engineProceed(
       )
       const options = evaluation.options
       if (options.length === 0) {
-        node.resolve()
+        node.resolveRemainingTriggerChildrenForPass()
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
       const request: InteractionRequest = stepResult.request.kind === 'select-trigger'
         ? { ...stepResult.request, options }
         : stepResult.request
+      const contextSnapshot = triggerSelectContextSnapshot(context)
       node.setPending({
         hostNodeId: node.id,
         request,
@@ -1019,6 +1029,7 @@ export function engineProceed(
         promptKey,
         promptParams: undefined,
         ownerNodeId: null,
+        contextSnapshot,
         effectiveOwnerPlayerId: request.kind === 'select-trigger'
           ? request.ownerPlayerId || node.ownerPlayerId
           : node.ownerPlayerId,

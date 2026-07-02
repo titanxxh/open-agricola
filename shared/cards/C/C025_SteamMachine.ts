@@ -13,6 +13,7 @@ const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean =>
 
 const steamMachineListener: CardListenerRegistration = {
   id: 'C25-steam-machine-immediately-after',
+  cardIds: [CARD_ID],
   phases: ['immediatelyAfter' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, space, state } = context

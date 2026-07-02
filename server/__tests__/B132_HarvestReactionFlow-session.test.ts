@@ -61,7 +61,7 @@ describe('harvest reaction flow', () => {
   ) => {
     if (resp.interaction.stateId !== 'wait') return resp
     if (resp.interaction.request.kind !== 'select-trigger') return resp
-    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.value === cardId)
+    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.sourceCard === cardId)
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
@@ -130,16 +130,50 @@ describe('harvest reaction flow', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
     expect(resp.interaction.options).toContainEqual({
-      value: 'B050_ButterChurn',
+      value: expect.any(String),
       labelKey: 'cards.B050_ButterChurn.name',
       sourceCard: 'B050_ButterChurn',
     })
     expect(resp.interaction.options).toContainEqual({
-      value: 'C098_CubeCutter',
+      value: expect.any(String),
       labelKey: 'cards.C098_CubeCutter.name',
       sourceCard: 'C098_CubeCutter',
     })
     expect(resp.state.players[0]!.resources.food).toBe(20)
+  })
+
+  it('re-evaluates remaining harvest field triggers after a selected trigger changes resources', () => {
+    const { session, state } = setupHarvestSession()
+    const player = state.players[0]!
+    player.minorPlayed.push('B050_ButterChurn')
+    player.occupationPlayed.push('C098_CubeCutter')
+    player.resources.food = 0
+    player.resources.wood = 1
+    player.pastures = [
+      { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
+    ]
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'B050_ButterChurn')).toBe(true)
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(false)
+
+    resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
+
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected second trigger-select')
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(true)
+
+    resp = resolveCardTrigger(session, resp, 'C098_CubeCutter')
+    resp = acceptOptional(session, resp)
+
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.C098_CubeCutter?.counters?.bonusVp).toBe(1)
   })
 
   it('keeps Stable Manure harvest field selection interactive', () => {

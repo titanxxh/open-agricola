@@ -96,6 +96,8 @@ const previewContextForChild = (
   context: TriggerSelectContext,
 ): {
   listenerContext: CardListenerContextInput
+  previewState: ActionExecutionContext['state']
+  effectPlayer: PlayerState
   ownerPlayerId?: string
   ownerCardZone?: ActivateCardActionNode['params']['ownerCardZone']
 } => {
@@ -133,6 +135,8 @@ const previewContextForChild = (
   return {
     ownerPlayerId,
     ownerCardZone: params.ownerCardZone,
+    previewState,
+    effectPlayer,
     listenerContext: {
       state: previewState,
       player: triggerPlayer,
@@ -154,7 +158,7 @@ const previewContextForChild = (
 const previewActivateCardEffectChild = (
   child: ActionNode,
   context: TriggerSelectContext,
-): ActionHookResult | undefined => {
+): { result: ActionHookResult | undefined; previewState: ActionExecutionContext['state']; previewPlayer: PlayerState } => {
   const targetPlayerId = child.params?.targetPlayerId
   const playerClones = new Map(
     (context.state.players ?? []).map((player) => [player.id, clonePlayerForPreview(player)]),
@@ -164,12 +168,16 @@ const previewActivateCardEffectChild = (
     (typeof targetPlayerId === 'string' ? playerClones.get(targetPlayerId) : undefined)
     ?? playerClones.get(context.player.id)
     ?? clonePlayerForPreview(context.player)
-  return previewActivateCardEffect(
+  return {
     previewState,
     previewPlayer,
-    child.params,
-    child.actionContext,
-  )
+    result: previewActivateCardEffect(
+      previewState,
+      previewPlayer,
+      child.params,
+      child.actionContext,
+    ),
+  }
 }
 
 const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boolean => {
@@ -189,22 +197,26 @@ const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boo
 
 export { isPureResourceFlowCurrentlyPayable } from '../actions/resource-flow-preview'
 
-const previewAvailability = (context: ActionExecutionContext): { supplyTokens: SupplyTokenCounts } => ({
+const previewAvailability = (
+  state: ActionExecutionContext['state'],
+  player: PlayerState,
+): { supplyTokens: SupplyTokenCounts } => ({
   supplyTokens: {
-    fence: getOwnOrdinaryFenceReserveCount(context.player),
-    stable: getAvailableStableSupplyCount(context.state, context.player),
+    fence: getOwnOrdinaryFenceReserveCount(player),
+    stable: getAvailableStableSupplyCount(state, player),
   },
 })
 
 const evaluateChildDoable = (
   result: ActionHookResult | undefined,
-  context: ActionExecutionContext,
+  state: ActionExecutionContext['state'],
+  player: PlayerState,
 ): boolean => {
   if (!resultHasApplicabilitySignal(result)) return false
   if (typeof result?.doable === 'boolean') return result.doable
   if (result?.flow) {
     return canPreviewPureResourceFlow(result.flow)
-      ? isPureResourceFlowCurrentlyPayable(result.flow, context.player.resources, previewAvailability(context))
+      ? isPureResourceFlowCurrentlyPayable(result.flow, player.resources, previewAvailability(state, player))
       : true
   }
   return true
@@ -212,10 +224,11 @@ const evaluateChildDoable = (
 
 const previewResourcesAfterChild = (
   result: ActionHookResult | undefined,
-  context: ActionExecutionContext,
+  state: ActionExecutionContext['state'],
+  player: PlayerState,
 ): Resource | undefined => {
   if (!result?.flow) return undefined
-  return applyPureResourceFlowPreview(result.flow, context.player.resources, previewAvailability(context)) ?? undefined
+  return applyPureResourceFlowPreview(result.flow, player.resources, previewAvailability(state, player)) ?? undefined
 }
 
 type TriggerSelectableChild = {
@@ -302,19 +315,35 @@ export const evaluateTriggerSelect = (
 ): TriggerSelectEvaluation => {
   const optionStates: TriggerOptionState[] = []
   const options: ActionChoiceOption[] = []
+  const entries = unresolvedTriggerChildren(node)
+  const cardIdCounts = new Map<string, number>()
+  for (const entry of entries) {
+    cardIdCounts.set(entry.cardId, (cardIdCounts.get(entry.cardId) ?? 0) + 1)
+  }
 
-  for (const entry of unresolvedTriggerChildren(node)) {
+  for (const entry of entries) {
     const { child } = entry
     const listener = isActivateCardActionNode(child) ? getListenerById(entry.listenerId) : undefined
     const preview = listener && isActivateCardActionNode(child) ? previewContextForChild(child, context) : null
+    let previewState = context.state
+    let previewPlayer = context.player
     const result = listener && preview
-      ? executeCardListener(listener, preview.listenerContext, {
-        ownerPlayerId: preview.ownerPlayerId,
-        ownerCardId: entry.cardId,
-        ownerCardZone: preview.ownerCardZone,
-      })
+      ? (() => {
+        previewState = preview.previewState
+        previewPlayer = preview.effectPlayer
+        return executeCardListener(listener, preview.listenerContext, {
+          ownerPlayerId: preview.ownerPlayerId,
+          ownerCardId: entry.cardId,
+          ownerCardZone: preview.ownerCardZone,
+        })
+      })()
       : isActivateCardEffectNode(child)
-        ? previewActivateCardEffectChild(child, context)
+        ? (() => {
+          const stagePreview = previewActivateCardEffectChild(child, context)
+          previewState = stagePreview.previewState
+          previewPlayer = stagePreview.previewPlayer
+          return stagePreview.result
+        })()
       : undefined
     const previewable = isActivateCardActionNode(child) || isActivateCardEffectNode(child)
     const applicable = previewable
@@ -322,9 +351,11 @@ export const evaluateTriggerSelect = (
         resultHasApplicabilitySignal(result)
       : true
     const doable = previewable
-      ? (applicable ? evaluateChildDoable(result, context) : false)
+      ? (applicable ? evaluateChildDoable(result, previewState, previewPlayer) : false)
       : true
-    const resourcesAfter = doable ? previewResourcesAfterChild(result, context) : undefined
+    const resourcesAfter = doable && previewPlayer.id === context.player.id
+      ? previewResourcesAfterChild(result, previewState, previewPlayer)
+      : undefined
     const state: TriggerOptionState = {
       child,
       cardId: entry.cardId,
@@ -341,12 +372,9 @@ export const evaluateTriggerSelect = (
       resourcesAfter,
     }
     optionStates.push(state)
-    if (!applicable) {
-      child.resolve()
-      continue
-    }
+    if (!applicable) continue
     options.push({
-      value: state.cardId,
+      value: (cardIdCounts.get(state.cardId) ?? 0) > 1 ? state.child.id : state.cardId,
       labelKey: `cards.${state.cardId}.name`,
       sourceCard: state.cardId,
       ...(doable ? {} : { disabled: true, disabledReasonKey: TRIGGER_DISABLED_REASON }),
