@@ -198,9 +198,8 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
       beforeEndGameScope: 'allPlayers',
       beforeEndGameMandatory: true,
     }
-    requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)
-
     const session = setupEndGameSession()
+    requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)
     const state = session.getState().state
     state.players[0]!.occupationPlayed = [RESERVE_FIRST_CARD, CARD_ID]
     setBuildingResources(state.players[0]!, 3)

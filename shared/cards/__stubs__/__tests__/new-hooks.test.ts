@@ -18,6 +18,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 function makeSession(round: number, stubCardIds: string[]) {
   const session = new GameSession()
+  registerStubCards()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -71,7 +72,6 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onBeforeReturnHome fires before workers return', () => {
@@ -104,7 +104,6 @@ describe('New hook stubs - AfterRoundEnd', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onAfterRoundEnd fires after round end', () => {
@@ -120,7 +119,6 @@ describe('New hook stubs - Harvest sub-phases', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onStartHarvest fires at harvest start', () => {
@@ -150,8 +148,10 @@ describe('New hook stubs - Harvest sub-phases', () => {
     'onHarvestFieldPhase',
     'onEndHarvestFieldPhase',
   ] as const)('%s card flows are collected into one stage parallel flow', (hook) => {
+    const { session, state } = makeSession(4, [])
     const cardIds = registerHarvestFieldFlowCards(hook)
-    const { session } = makeSession(4, cardIds)
+    state.players[0]!.minorPlayed.push(...cardIds)
+    session.loadState(state)
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -168,8 +168,8 @@ describe('New hook stubs - Harvest sub-phases', () => {
 
   it('single harvest field stage choices are prompted to each owning player', () => {
     const hook = 'onStartHarvestFieldPhase'
-    const cardIds = registerHarvestFieldFlowCards(hook)
     const { session, state } = makeSession(4, [])
+    const cardIds = registerHarvestFieldFlowCards(hook)
     const p0 = state.players[0]!
     const p1 = state.players[1]!
     p0.minorPlayed.push(cardIds[0]!)
@@ -199,8 +199,9 @@ describe('New hook stubs - Harvest sub-phases', () => {
 
   it('harvest field parallel choices resume the stage once after out-of-order resolution', () => {
     const hook = 'onStartHarvestFieldPhase'
+    const { session, state } = makeSession(4, [])
     const cardIds = registerHarvestFieldFlowCards(hook)
-    const { session, state } = makeSession(4, cardIds)
+    state.players[0]!.minorPlayed.push(...cardIds)
     state.players.forEach((player) => {
       player.resources.food = 20
     })

@@ -92,7 +92,6 @@ import {
 import { getMinorImprovement } from '../cards/registry-display.ts'
 import {
   registerCustomCard,
-  clearCustomCardRuntimeFromRegistry,
   getCustomMinorImprovementIds,
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
@@ -764,26 +763,14 @@ export class GameCore {
     this.engineLog = new LogStore()
 
     // Build or accept a per-session card registry, then publish it as the
-    // "active" registry so any subsequent `registerCardListener` /
-    // `registerCardEffect` calls (e.g. from custom-code cards) forward into it.
-    //
-    // If an active registry already exists (e.g. test harness with
-    // pre-registered stub listeners / effects), clone it so those entries
-    // survive into the session without leaking mutations back to the outer
-    // registry. Fall back to a fresh registry loaded with ALL_CARD_IMPLS
-    // when no outer registry is active (production startup path).
+    // active registry for legacy helper/test injection. Official entries are
+    // protected from broad remove* cleanup; test/custom entries remain mutable.
     if (options.cardRegistry) {
       this.cardRegistry = options.cardRegistry
     } else {
-      const existing = getActiveCardRegistry()
-      if (existing) {
-        this.cardRegistry = existing.clone()
-        clearCustomCardRuntimeFromRegistry(this.cardRegistry)
-      } else {
-        this.cardRegistry = new CardRegistry()
-        for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
-          this.cardRegistry.loadImpl(cardId, impl as CardImpl)
-        }
+      this.cardRegistry = new CardRegistry()
+      for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+        this.cardRegistry.loadImpl(cardId, impl as CardImpl, { protected: true })
       }
     }
     this.cardRegistry.syncModifiersFromCatalog(
@@ -793,8 +780,13 @@ export class GameCore {
     registerThroughTheSeasonsCardListeners(this.cardRegistry)
     // Register majors as effect bundles so getCardEffect resolves them after
     // the older getMajorCardEffect path is removed.
-    this.cardRegistry.registerEffects(majorCardDefinitions)
+    this.cardRegistry.registerEffects(majorCardDefinitions, { protected: true })
     setActiveCardRegistry(this.cardRegistry)
+    queueMicrotask(() => {
+      if (getActiveCardRegistry() === this.cardRegistry) {
+        setActiveCardRegistry(this.cardRegistry.clone())
+      }
+    })
 
     // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
@@ -5138,6 +5130,10 @@ export class GameCore {
   }
 
   devPlayCard(playerIndex: number, cardIdInput: string): SessionResponse {
+    return this.withCtx(() => this.devPlayCardInContext(playerIndex, cardIdInput))
+  }
+
+  private devPlayCardInContext(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const cardId = resolveDevCardIdInput(cardIdInput)

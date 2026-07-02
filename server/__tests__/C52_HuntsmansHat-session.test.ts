@@ -5,6 +5,7 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
+import { getActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
 
 import '../../shared/cards/C/C052_HuntsmansHat'
 import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
@@ -65,6 +66,38 @@ describe('C052_HuntsmansHat server session', () => {
         e.params?.cardId === CARD_ID,
     )
     expect(hasLog).toBe(true)
+  })
+
+  it('keeps session listeners when the global active registry is mutated', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources.food = 0
+    player.resources.boar = 0
+    player.minorPlayed.push(CARD_ID)
+
+    const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
+    if (!pigMarket) throw new Error('pig-market space missing')
+    pigMarket.resources.boar = 2
+
+    session.loadState(state)
+    const activeBackup = getActiveCardRegistry()?.clone() ?? null
+    try {
+      getActiveCardRegistry()?.removeListenersWhere((listener) => listener.id === LISTENER_ID)
+      let resp = session.takeAction(0, 'pig-market')
+      expect(resp.ok).toBe(true)
+      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(0, 'confirm', [
+          { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        ] as unknown as Record<string, unknown>)
+      }
+      expect(resp.state.players[0]!.resources.food).toBe(2)
+    } finally {
+      setActiveCardRegistry(activeBackup)
+    }
   })
 })
 

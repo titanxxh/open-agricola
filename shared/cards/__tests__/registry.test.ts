@@ -30,6 +30,36 @@ describe('CardRegistry', () => {
     expect(registry.getEffect('X1_Test')).toBe(effect)
   })
 
+  it('protects official listeners and effects from broad cleanup', () => {
+    const registry = new CardRegistry()
+    const officialListener: CardListenerRegistration = {
+      id: 'official-listener',
+      cardIds: ['X1_Test'],
+      handler: () => undefined,
+    }
+    const testListener: CardListenerRegistration = {
+      id: 'test-listener',
+      cardIds: ['X2_Test'],
+      handler: () => undefined,
+    }
+    registry.loadImpl('X1_Test', {
+      listeners: [officialListener],
+      effect: { id: 'X1_Test' },
+    }, { protected: true })
+    registry.loadImpl('X2_Test', {
+      listeners: [testListener],
+      effect: { id: 'X2_Test' },
+    })
+
+    registry.removeListenersWhere(() => true)
+    registry.removeEffectsWhere(() => true)
+
+    expect(registry.getListenersFor('X1_Test')).toEqual([officialListener])
+    expect(registry.getEffect('X1_Test')).toBeDefined()
+    expect(registry.getListenersFor('X2_Test')).toEqual([])
+    expect(registry.getEffect('X2_Test')).toBeUndefined()
+  })
+
   it('unload removes card entries', () => {
     const registry = new CardRegistry()
     const listener: CardListenerRegistration = {
