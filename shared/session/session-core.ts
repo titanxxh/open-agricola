@@ -2704,8 +2704,11 @@ export class GameCore {
       if (!player) continue
       const children = this.collectOwnStageReactionActivationFlows(hook, player)
       if (children.length === 0) continue
+      const flow = children.length === 1
+        ? children[0]!
+        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
       this.startStageFlow(
-        { type: 'parallel', mode: 'trigger-select', children },
+        flow,
         hook,
         currentPlayerIndex,
         0,
@@ -2775,8 +2778,11 @@ export class GameCore {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const children = this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
       if (children.length === 0) continue
+      const flow = children.length === 1
+        ? children[0]!
+        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
       this.startStageFlow(
-        { type: 'parallel', mode: 'trigger-select', children },
+        flow,
         'onBeforeEndGame',
         currentPlayerIndex,
         0,
