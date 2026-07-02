@@ -34,7 +34,6 @@ export type CardListenerContextInput =
   Partial<Pick<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
-export type CardListenerDispatchMode = 'serial' | 'select'
 export type CardListenerZone = 'played' | 'hand'
 
 export type CardListenerRegistration = {
@@ -45,14 +44,6 @@ export type CardListenerRegistration = {
   scope?: CardListenerScope
   zones?: CardListenerZone[]
   mandatory?: boolean
-  /**
-   * Static dispatch grouping for trailing listener nodes.
-   *
-   * Default `serial` listeners are activated in play order without probing the
-   * handler. `select` listeners for the same owner/phase/action are wrapped in
-   * a trigger-select ParallelNode when two or more match.
-   */
-  dispatchMode?: CardListenerDispatchMode
   /**
    * Card-purchase cost candidate transform (Candidate Closure, ADR 0004).
    * Receives one Cost Candidate and returns the derived candidate(s), or

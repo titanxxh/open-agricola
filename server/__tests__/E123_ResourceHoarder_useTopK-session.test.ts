@@ -12,6 +12,7 @@ import { ActionNode } from '../../shared/engine/nodes'
 import { ActionRegistry } from '../../shared/engine/registry'
 import { EngineTree } from '../../shared/engine/tree'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
 
@@ -219,8 +220,15 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
       }],
     } as CardListenerContext
 
-    executeCardListener(listener, context)
-    expect(player.cardStates[CARD_ID]!.stack).toEqual([])
+    const result = executeCardListener(listener, context)
+    expect(result?.flow?.type).toBe('seq')
+    const children = result?.flow?.type === 'seq' ? result.flow.children : []
+    expect(children.filter((child) =>
+      child.type === 'leaf' &&
+      child.actionId === 'special-effect' &&
+      child.params?.kind === 'pop-card-stack-top',
+    )).toHaveLength(2)
+    expect(player.cardStates[CARD_ID]!.stack).toEqual(['stone', 'clay'])
   })
 
   it('pay event records k=2 bonusChoiceIndex and payment source details', () => {
@@ -397,6 +405,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
 
     resp = session.resolveChoice(0, e123Option!.value)
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.state.players[0]!.cardStates[CARD_ID]!.stack).toEqual(['stone'])
   })
 

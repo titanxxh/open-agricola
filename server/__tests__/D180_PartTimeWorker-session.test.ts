@@ -41,9 +41,15 @@ const optionFrom = (resp: ReturnType<GameSession['getState']>, sourceCard: strin
 }
 
 const chooseFrom = (session: GameSession, resp: ReturnType<GameSession['getState']>, sourceCard: string) => {
+  const wasTriggerSelect = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger'
   const option = optionFrom(resp, sourceCard)
   expect(option).toBeDefined()
-  return session.resolveChoice(0, option!.value)
+  let next = session.resolveChoice(0, option!.value)
+  if (!wasTriggerSelect) return next
+  const nested = optionFrom(next, sourceCard)
+  if (!nested) return next
+  next = session.resolveChoice(0, nested.value)
+  return next
 }
 
 describe('D180 Part-Time Worker session', () => {

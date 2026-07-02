@@ -205,7 +205,6 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C1'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
       }),
@@ -233,7 +232,6 @@ describe('ParallelNode trigger-select mode', () => {
       id: 'listener-a',
       cardIds: ['C1'],
       mandatory: true,
-      dispatchMode: 'select',
       handler: () => undefined,
     })
     setActiveCardRegistry(cardRegistry)
@@ -253,7 +251,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['TestClayBeforeBake'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { clay: 1 } },
       }),
@@ -295,7 +292,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['TestWoodBeforeBake'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
       }),
@@ -333,7 +329,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['D066_PotterCeramics'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { cost: { clay: 1 } } },
       }),
@@ -365,13 +360,36 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
+  it('keeps non-resource continuation flows selectable', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['NonResourceFlowCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'custom-follow-up' },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'NonResourceFlowCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'NonResourceFlowCard',
+        labelKey: 'cards.NonResourceFlowCard.name',
+        sourceCard: 'NonResourceFlowCard',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
   it('applicable mandatory trigger with optional child remains enabled', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C126_Excavator'],
       mandatory: true,
-      dispatchMode: 'select',
       handler: () => ({
         flow: {
           type: 'seq',
@@ -445,5 +463,39 @@ describe('isPureResourceFlowCurrentlyPayable', () => {
       { type: 'leaf', actionId: 'unknown-action' },
       baseResources(),
     )).toBe(false)
+  })
+
+  it('checks optional pay flows instead of treating optional as free', () => {
+    expect(isPureResourceFlowCurrentlyPayable(
+      {
+        type: 'seq',
+        optional: true,
+        children: [
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { grain: 1 } },
+        ],
+      },
+      baseResources({ clay: 0 }),
+    )).toBe(false)
+  })
+
+  it('checks supply-token costs when availability is provided', () => {
+    const flow = {
+      type: 'seq' as const,
+      children: [
+        { type: 'leaf' as const, actionId: 'pay', params: { wood: 1, fence: 1 } },
+        { type: 'leaf' as const, actionId: 'gain', params: { food: 2 } },
+      ],
+    }
+    expect(isPureResourceFlowCurrentlyPayable(
+      flow,
+      baseResources({ wood: 1 }),
+      { supplyTokens: { fence: 0 } },
+    )).toBe(false)
+    expect(isPureResourceFlowCurrentlyPayable(
+      flow,
+      baseResources({ wood: 1 }),
+      { supplyTokens: { fence: 1 } },
+    )).toBe(true)
   })
 })

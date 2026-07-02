@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
 
@@ -48,6 +49,27 @@ const createSpace = (id: string): ActionSpace => ({
   execute: () => ({ type: 'ok' }),
   resolveChoice: () => ({ type: 'ok' }),
 })
+
+const executeSpecialEffectLeaves = (
+  flow: ActionFlow | undefined,
+  state: GameState,
+  player: PlayerState,
+) => {
+  if (!flow) return
+  if (flow.type === 'seq') {
+    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+    return
+  }
+  if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
+  specialEffectAction.execute({
+    state,
+    player,
+    space: createSpace('test'),
+    params: flow.params,
+    sourceCard: flow.sourceCard,
+    actionContext: flow.actionContext,
+  })
+}
 
 describe('E123_ResourceHoarder session', () => {
   it('onBuy initializes the stack with 6 resources bottom to top', () => {
@@ -167,7 +189,7 @@ describe('E123_ResourceHoarder session', () => {
       }],
     } as CardListenerContext
 
-    executeCardListener(afterPayListener!, context)
+    executeSpecialEffectLeaves(executeCardListener(afterPayListener!, context)?.flow, state, player)
     expect(player.cardStates[CARD_ID]!.stack).toEqual(
       ['stone', 'clay', 'stone', 'reed', 'wood'],
     )
@@ -303,14 +325,22 @@ describe('E123_ResourceHoarder session', () => {
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ clay: 1 })
 
     // Pop clay
-    executeCardListener(afterPayListener, mkContext('pay', 'after', 1))
+    executeSpecialEffectLeaves(
+      executeCardListener(afterPayListener, mkContext('pay', 'after', 1))?.flow,
+      state,
+      player,
+    )
 
     // Now top is wood
     result = executeCardListener(costListener, mkContext('construct', 'computeCosts'))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ wood: 1 })
 
     // Pop wood
-    executeCardListener(afterPayListener, mkContext('pay', 'after', 1))
+    executeSpecialEffectLeaves(
+      executeCardListener(afterPayListener, mkContext('pay', 'after', 1))?.flow,
+      state,
+      player,
+    )
 
     // Now top is reed
     result = executeCardListener(costListener, mkContext('improvement', 'computeCosts'))

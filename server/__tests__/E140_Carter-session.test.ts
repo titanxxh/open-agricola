@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import {
   executeCardListener,
   getRegisteredCardListeners,
@@ -100,7 +101,8 @@ describe('E140_Carter session', () => {
     state.players[0]!.resources.food = 0
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     // Player should get 3 wood + 3 food (1 food per building resource taken)

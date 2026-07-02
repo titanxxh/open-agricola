@@ -10,7 +10,6 @@ const beforeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['improvement'],
-  dispatchMode: 'select',
   mandatory: true,
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }

@@ -20,7 +20,6 @@ const masterWorkmanBeforeListener: CardListenerRegistration = {
   id: 'A126-master-workman-before',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  dispatchMode: 'select',
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) return

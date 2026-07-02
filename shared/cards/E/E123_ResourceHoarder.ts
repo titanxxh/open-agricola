@@ -93,8 +93,29 @@ const afterPayListener: CardListenerRegistration = {
     if (k <= 0) return
 
     const popCount = Math.min(k, stack.length)
-    stack.length = stack.length - popCount
-    updateInfobox(context.player)
+    const remaining = stack.slice(0, stack.length - popCount)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          ...Array.from({ length: popCount }, () => ({
+            type: 'leaf' as const,
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'pop-card-stack-top' },
+          })),
+          ...(remaining.length > 0
+            ? [{
+                type: 'leaf' as const,
+                actionId: 'special-effect',
+                sourceCard: CARD_ID,
+                params: { kind: 'set-infobox', text: `Stack: ${remaining.join(', ')} (top→)` },
+              }]
+            : []),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

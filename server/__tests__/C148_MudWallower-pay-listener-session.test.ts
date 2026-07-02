@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C148_MudWallower'
 
@@ -141,8 +142,9 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     player.resources = { ...player.resources, boar: 2 }
     session.loadState(state)
 
-    const resp = session.takeAction(0, '__test-pay-boar')
+    let resp = session.takeAction(0, '__test-pay-boar')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',

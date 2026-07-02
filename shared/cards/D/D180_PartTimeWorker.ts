@@ -23,17 +23,28 @@ const isResourceMovedEvent = (
 ): event is QueryableResourceMovedEvent =>
   event.type === 'resource.moved'
 
-const isAccumulationSpace = (context: CardListenerContext): boolean =>
-  Object.values(context.space?.gainPerRound ?? {}).some((amount) => (amount ?? 0) > 0)
+const isAccumulationSpace = (context: CardListenerContext, spaceId: string): boolean => {
+  const space = context.state.actionSpaces.find((candidate) => candidate.id === spaceId)
+  return Object.values(space?.gainPerRound ?? {}).some((amount) => (amount ?? 0) > 0)
+}
 
 const addResource = (resources: Partial<Resource>, resource: keyof Resource, amount: number) => {
   if (amount <= 0) return
   resources[resource] = (resources[resource] ?? 0) + amount
 }
 
-const collectedFromCurrentSpace = (context: CardListenerContext): Partial<Resource> => {
-  const spaceId = context.space?.id
-  if (!spaceId) return {}
+const collectSourceSpaceId = (context: CardListenerContext): string | undefined => {
+  const playerId = (context.triggerPlayer ?? context.player).id
+  for (const event of context.actionEvents ?? context.transactionEvents) {
+    if (!isResourceMovedEvent(event)) continue
+    if (event.reason !== 'collect') continue
+    if (event.from.kind !== 'actionSpace') continue
+    if (event.to.kind !== 'player' || event.to.playerId !== playerId) continue
+    return event.from.spaceId
+  }
+}
+
+const collectedFromSpace = (context: CardListenerContext, spaceId: string): Partial<Resource> => {
   const playerId = (context.triggerPlayer ?? context.player).id
   const out: Partial<Resource> = {}
   for (const event of context.actionEvents ?? context.transactionEvents) {
@@ -102,10 +113,10 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isAccumulationSpace(context)) return
-    const targetSpaceId = context.space?.id
+    const targetSpaceId = collectSourceSpaceId(context)
     if (!targetSpaceId) return
-    const collected = collectedFromCurrentSpace(context)
+    if (!isAccumulationSpace(context, targetSpaceId)) return
+    const collected = collectedFromSpace(context, targetSpaceId)
     const reward = REWARD_BY_COLLECTED_TOTAL[totalResources(collected)]
     if (!reward) return
     const returnMaps = enumerateReturnMaps(collected, reward.leave)

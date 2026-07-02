@@ -292,8 +292,8 @@ describe('Through the Seasons Spring rules', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger prompt')
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected fence prompt')
+    expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
   })
 
   it('does not apply Spring free fences to palisades', () => {

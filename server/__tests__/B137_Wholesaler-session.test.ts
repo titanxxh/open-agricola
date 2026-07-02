@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B137_Wholesaler'
 
@@ -87,8 +88,9 @@ describe('B137_Wholesaler session', () => {
     const initialVeg = state.players[0]!.resources.vegetable
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'vegetable-seeds')
+    let resp = session.takeAction(0, 'vegetable-seeds')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
 
     const p = resp.state.players[0]!
     // vegetable-seeds gives 1 vegetable, card gives 1 more
@@ -135,10 +137,11 @@ describe('B137_Wholesaler session', () => {
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
     ])
+    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
 
     // After reorg, card after-hook fires and gives +1 boar
     // This may trigger another animalReorg
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
       ])
@@ -160,8 +163,9 @@ describe('B137_Wholesaler session', () => {
     const initialStone = state.players[0]!.resources.stone
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'eastern-quarry')
+    let resp = session.takeAction(0, 'eastern-quarry')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
 
     const p = resp.state.players[0]!
     // eastern-quarry accumulated 2 stone + 1 from card
@@ -188,9 +192,10 @@ describe('B137_Wholesaler session', () => {
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 2 },
     ])
+    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
 
     // After reorg, card after-hook fires and gives +1 cattle
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 3 },
       ])

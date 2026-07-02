@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A001_Shelter'
 import '../../shared/cards/A/A037_Bucksaw'
@@ -84,6 +85,11 @@ const finishOptionalPrompts = (
   let guard = 10
   while (resp.interaction.stateId === 'wait' && guard > 0) {
     guard -= 1
+    if (resp.interaction.request.kind === 'select-trigger') {
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+      expect(resp.ok).toBe(true)
+      continue
+    }
     const skip = resp.interaction.options?.find(
       (option) => option.value === '__skip__' || option.value === 'skip',
     )
@@ -155,8 +161,9 @@ describe('B049_Scales session', () => {
       food: 0,
     })
 
-    const resp = session.takeAction(0, 'major-improvement')
+    let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const player = resp.state.players[0]!
     expect(player.improvements).toContain('Major_Basket')
@@ -178,8 +185,9 @@ describe('B049_Scales session', () => {
       food: 0,
     })
 
-    const resp = session.takeAction(0, 'lessons')
+    let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const player = resp.state.players[0]!
     expect(player.occupationPlayed).toContain('A123_FrameBuilder')

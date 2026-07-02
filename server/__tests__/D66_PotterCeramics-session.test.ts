@@ -40,7 +40,7 @@ const setup = (overrides: {
 }
 
 describe('D066_PotterCeramics session', () => {
-  it('offers enabled D66 before bake and blocks pass when bake is empty without it', () => {
+  it('offers optional D66 before bake and uses it to make bake non-empty', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'grain-utilization')
@@ -48,24 +48,12 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
-    const d66 = resp.interaction.options?.find((option) => option.value === CARD_ID)
-    const pass = resp.interaction.options?.find((option) => option.value === '__pass__')
+    const d66 = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(d66).toBeDefined()
-    expect(d66?.disabled).not.toBe(true)
-    expect(pass).toMatchObject({ value: '__pass__', disabled: true })
-
-    resp = session.resolveChoice(0, '__pass__')
-    expect(resp.ok).toBe(false)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-      expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-    }
-    expect(resp.state.players[0]!.resources.grain).toBe(0)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    resp = session.resolveChoice(0, d66!.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
@@ -89,7 +77,7 @@ describe('D066_PotterCeramics session', () => {
     }
   })
 
-  it('keeps pass enabled after B26 replacement chooses bake plus fences when fencing can continue without D66', () => {
+  it('can skip D66 after B26 replacement chooses bake plus fences when fencing can continue without it', () => {
     const session = setup({
       clay: 1,
       grain: 0,
@@ -126,11 +114,10 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === CARD_ID)?.disabled).not.toBe(true)
-    expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).not.toBe(true)
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
-    resp = session.resolveChoice(0, '__pass__')
+    resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(1)

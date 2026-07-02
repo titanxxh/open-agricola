@@ -11,7 +11,6 @@ const beforeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
-  dispatchMode: 'select',
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { GameEvent } from '../../shared/contract/events'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/register-all'
 import '../../shared/cards/B/B155_ArtTeacher'
 
@@ -44,6 +45,10 @@ describe('B155 ArtTeacher onBuy listener', () => {
     expect(resp.ok).toBe(true)
     let safety = 8
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.request.kind === 'select-trigger') {
+        resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+        continue
+      }
       if (resp.interaction.request.kind !== 'choice') break
       const matched = resp.interaction.options?.find((o) => o.value === CARD_ID)
       const next = matched?.value

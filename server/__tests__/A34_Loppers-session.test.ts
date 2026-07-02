@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A034_Loppers'
 import '../../shared/cards/E/E074_AshTrees'
@@ -19,6 +20,14 @@ const edgesForTile = (row: number, col: number) => [
   `V-${row}-${col}`,
   `V-${row}-${col + 1}`,
 ]
+
+const passTriggerSelectIfPresent = (
+  session: GameSession,
+  resp: SessionResponse,
+): SessionResponse => {
+  if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'select-trigger') return resp
+  return session.resolveChoice(resp.interaction.playerIndex, '__pass__')
+}
 
 const widePastureEdges = [
   'H-0-1',
@@ -220,6 +229,7 @@ describe('A34 Loppers — supply fence payment', () => {
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
@@ -261,6 +271,7 @@ describe('A34 Loppers — supply fence payment', () => {
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
+    resp = passTriggerSelectIfPresent(session, resp)
     expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
@@ -280,6 +291,7 @@ describe('A34 Loppers — supply fence payment', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const useAll = resp.interaction.options?.find(
@@ -298,6 +310,12 @@ describe('A34 Loppers — supply fence payment', () => {
     })
 
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
+      const a34 = resp.interaction.options?.find((option) => option.value === CARD_ID)
+      expect(a34?.disabled ?? true).toBe(true)
+      resp = passTriggerSelectIfPresent(session, resp)
+    }
     expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(15)
     expect(resp.state.players[0]!.resources.wood).toBe(1)
@@ -318,6 +336,7 @@ describe('A34 Loppers — supply fence payment', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const useAll = resp.interaction.options?.find(
@@ -334,12 +353,11 @@ describe('A34 Loppers — supply fence payment', () => {
       palisadeEdges: [],
       extraWood: 0,
     })
-
-    if (resp.interaction.stateId === 'wait') {
-      const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
-      if (accept) {
-        resp = session.resolveChoice(0, accept.value)
-      }
+    resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
+      const a34 = resp.interaction.options?.find((option) => option.value === CARD_ID)
+      expect(a34?.disabled ?? true).toBe(true)
+      resp = passTriggerSelectIfPresent(session, resp)
     }
 
     expect(resp.ok).toBe(true)

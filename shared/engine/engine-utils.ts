@@ -269,106 +269,74 @@ export function buildPhaseTrailingNodes(
 
   type Prepared = {
     ml: MatchedCardListener
+    ownerOrderIndex: number
     playOrderIndex: number
     matchedIndex: number
   }
 
-  const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
-    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
-    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
-    return { ml, playOrderIndex, matchedIndex }
-  })
-
-  const byOwner = new Map<string, Prepared[]>()
-  for (const p of prepared) {
-    const arr = byOwner.get(p.ml.ownerPlayerId) ?? []
-    arr.push(p)
-    byOwner.set(p.ml.ownerPlayerId, arr)
-  }
-
   const activeId = state.players[state.currentPlayerIndex]?.id
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
-  const orderedOwners: string[] = []
-  // Global listeners (no cardIds → ownerPlayerId='') run first in the active
-  // player's context.
-  if (byOwner.has('')) orderedOwners.push('')
-  if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
-  for (const p of state.players) {
-    if (p.id !== activeId && byOwner.has(p.id)) orderedOwners.push(p.id)
-  }
+  const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
+    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
+    const ownerSeatIndex = owner ? state.players.findIndex((p) => p.id === owner.id) : Number.MAX_SAFE_INTEGER
+    const ownerOrderIndex = ml.ownerPlayerId === ''
+      ? -1
+      : ml.ownerPlayerId === effectiveTriggerPlayerId ? 0 : ownerSeatIndex + 1
+    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
+    return { ml, ownerOrderIndex, playOrderIndex, matchedIndex }
+  }).sort((a, b) => {
+    const ownerDelta = a.ownerOrderIndex - b.ownerOrderIndex
+    if (ownerDelta !== 0) return ownerDelta
+    const playOrderDelta = a.playOrderIndex - b.playOrderIndex
+    if (playOrderDelta !== 0) return playOrderDelta
+    return a.matchedIndex - b.matchedIndex
+  })
 
-  const out: EngineNode[] = []
-  for (const ownerId of orderedOwners) {
-    const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => {
-      const playOrderDelta = a.playOrderIndex - b.playOrderIndex
-      if (playOrderDelta !== 0) return playOrderDelta
-      return a.matchedIndex - b.matchedIndex
-    })
-
-    const buildNode = (p: Prepared): ActivateCardActionNode => {
-      const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
-      const params: ActivateCardActionParams = {
-        listenerId: p.ml.registration.id,
-        cardId: p.ml.cardId,
-        phase,
-        actionId,
-        event: baseEvent,
-        triggerPlayerId: effectiveTriggerPlayerId,
-        ownerPlayerId: p.ml.ownerPlayerId,
-        ownerCardZone: p.ml.ownerCardZone,
-        mandatory: p.ml.registration.mandatory === true,
-        countCardUse:
-          typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
-        transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
-        actionEvents: actionEvents ? [...actionEvents] : undefined,
-        actionEventStartIndex,
-        triggerSnapshot,
-      }
-      const node = new ActionNode(
-        nodeId,
-        ACTIVATE_CARD_ACTION_ID,
-        p.ml.cardId,
-        params,
-      )
-      if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
-      return node as ActivateCardActionNode
+  const children = prepared.map((p): ActivateCardActionNode => {
+    const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
+    const params: ActivateCardActionParams = {
+      listenerId: p.ml.registration.id,
+      cardId: p.ml.cardId,
+      phase,
+      actionId,
+      event: baseEvent,
+      triggerPlayerId: effectiveTriggerPlayerId,
+      ownerPlayerId: p.ml.ownerPlayerId,
+      ownerCardZone: p.ml.ownerCardZone,
+      mandatory: p.ml.registration.mandatory === true,
+      countCardUse:
+        typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
+      actionEvents: actionEvents ? [...actionEvents] : undefined,
+      actionEventStartIndex,
+      triggerSnapshot,
     }
+    const node = new ActionNode(
+      nodeId,
+      ACTIVATE_CARD_ACTION_ID,
+      p.ml.cardId,
+      params,
+    )
+    if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
+    return node as ActivateCardActionNode
+  })
 
-    const ownerGroupNodes: EngineNode[] = []
+  if (children.length === 1) return [children[0]!]
 
-    const serialOnes = group.filter((p) => (p.ml.registration.dispatchMode ?? 'serial') === 'serial')
-    for (const p of serialOnes) ownerGroupNodes.push(buildNode(p))
-
-    const selectOnes = group.filter((p) => p.ml.registration.dispatchMode === 'select')
-    if (selectOnes.length > 0) {
-      const children = selectOnes.map(buildNode)
-      const ptn = new ParallelNode(
-        `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
-        children,
-      )
-      ptn.mode = 'trigger-select'
-      ptn.triggerOwnerPlayerId = ownerId
-      ptn.ownerPlayerId = ownerId
-      ptn.triggerChildren = children.map((child) => ({
-        nodeId: child.id,
-        cardId: child.params.cardId,
-        listenerId: child.params.listenerId,
-        mandatory: child.params.mandatory === true,
-      }))
-      ownerGroupNodes.push(ptn)
-    }
-
-    if (ownerGroupNodes.length === 0) continue
-    // Empty ownerId == global listener (no cardIds) runs in the active
-    // player's frame. Card-owned listener groups carry owner metadata.
-    if (ownerId !== activeId && ownerId !== '') {
-      ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
-    } else {
-      if (ownerId) ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
-    }
-    out.push(...ownerGroupNodes)
-  }
-  return out
+  const ptn = new ParallelNode(
+    `parallel-trigger-${phase}-${actionId}-${effectiveTriggerPlayerId ?? 'global'}-${int.counterRef.value++}`,
+    children,
+  )
+  ptn.mode = 'trigger-select'
+  ptn.triggerOwnerPlayerId = effectiveTriggerPlayerId
+  ptn.ownerPlayerId = effectiveTriggerPlayerId
+  ptn.triggerChildren = children.map((child) => ({
+    nodeId: child.id,
+    cardId: child.params.cardId,
+    listenerId: child.params.listenerId,
+    mandatory: child.params.mandatory === true,
+  }))
+  return [ptn]
 }
 
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {

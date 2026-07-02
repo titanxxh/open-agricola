@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/D/D118_Bonehead'
 import type { ActionChoiceOption } from '../../shared/contract/types'
@@ -61,6 +62,7 @@ describe('D118_Bonehead session', () => {
     expect(grocerOption).toBeDefined()
     resp = session.resolveChoice(0, 'A102_Grocer')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, 'D118_Bonehead')
 
     // After playing occupation, D118 should have given 1 wood
     const p = resp.state.players[0]!
