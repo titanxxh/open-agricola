@@ -104,7 +104,6 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
           id: 'test',
           handHooks: ['onRoundStart'],
           beforeEndGameScope: 'allPlayers',
-          beforeEndGameDispatchMode: 'select',
           beforeEndGameMandatory: true,
           onRoundStart: (state, player) => {},
         },
@@ -112,6 +111,21 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     `
     const result = validateCardCode(code)
     expect(result.valid).toBe(true)
+  })
+
+  it('rejects deprecated before-end dispatch meta field', () => {
+    const deprecatedKey = 'beforeEndGame' + 'Dispatch' + 'Mode'
+    const code = `
+      const CARD_IMPL = {
+        effect: {
+          id: 'test',
+          ${deprecatedKey}: 'select',
+          onRoundStart: (state, player) => {},
+        },
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
   })
 
   it('rejects scoringPriority as a deprecated meta field', () => {

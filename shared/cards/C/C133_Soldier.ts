@@ -38,7 +38,6 @@ const reserveForPairs = (pairs: number): Partial<Resource> => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    beforeEndGameDispatchMode: 'select',
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state, player) => {
       const maxPairs = maxSoldierPairs(player)

@@ -48,7 +48,6 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     beforeEndGameScope: 'allPlayers',
-    beforeEndGameDispatchMode: 'select',
     beforeEndGameMandatory: true,
     onBuy: (state, _player) => {
       const remainingTurns = 14 - state.round
