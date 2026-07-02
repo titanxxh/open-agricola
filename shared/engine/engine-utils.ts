@@ -276,6 +276,10 @@ export function buildPhaseTrailingNodes(
 
   const activeId = state.players[state.currentPlayerIndex]?.id
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
+  const eventSourceCard =
+    typeof baseEvent.sourceCard === 'string' && baseEvent.sourceCard.length > 0
+      ? baseEvent.sourceCard
+      : undefined
   const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
     const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
     const ownerSeatIndex = owner ? state.players.findIndex((p) => p.id === owner.id) : Number.MAX_SAFE_INTEGER
@@ -294,9 +298,10 @@ export function buildPhaseTrailingNodes(
 
   const children = prepared.map((p): ActivateCardActionNode => {
     const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
+    const cardId = p.ml.cardId || eventSourceCard || ''
     const params: ActivateCardActionParams = {
       listenerId: p.ml.registration.id,
-      cardId: p.ml.cardId,
+      cardId,
       phase,
       actionId,
       event: baseEvent,
@@ -314,7 +319,7 @@ export function buildPhaseTrailingNodes(
     const node = new ActionNode(
       nodeId,
       ACTIVATE_CARD_ACTION_ID,
-      p.ml.cardId,
+      cardId,
       params,
     )
     if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
