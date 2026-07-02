@@ -81,8 +81,8 @@ const cloneStateForPreview = (
   state: ActionExecutionContext['state'],
   playerClones: Map<string, PlayerState>,
 ) => ({
-  ...state,
-  players: (state.players ?? []).map((player) => playerClones.get(player.id) ?? player),
+  ...cloneJson(state),
+  players: (state.players ?? []).map((player) => playerClones.get(player.id) ?? clonePlayerForPreview(player)),
   actionSpaces: (state.actionSpaces ?? []).map((space) => ({
     ...space,
     resources: { ...space.resources },

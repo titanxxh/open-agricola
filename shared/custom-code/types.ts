@@ -2,7 +2,6 @@ import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { CardListenerContext, CardListenerScope } from '../cards/card-listeners'
 import type {
-  BeforeEndGameDispatchMode,
   BeforeEndGameScope,
   CardEffectField,
   PaymentInfo,
@@ -10,7 +9,6 @@ import type {
 
 export type CustomCodeEffectMetadata = {
   beforeEndGameScope?: BeforeEndGameScope
-  beforeEndGameDispatchMode?: BeforeEndGameDispatchMode
   beforeEndGameMandatory?: boolean
 }
 

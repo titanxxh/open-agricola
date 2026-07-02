@@ -5,6 +5,7 @@ import type { ActionChoiceOption, PlayerState } from '../../shared/contract/type
 
 import '../../shared/cards/B/B132_EstateMaster'
 import '../../shared/cards/B/B050_ButterChurn'
+import '../../shared/cards/C/C098_CubeCutter'
 import '../../shared/cards/D/D038_MilkingStool'
 import '../../shared/cards/D/D072_StableManure'
 import '../../shared/cards/E/E112_GrainThief'
@@ -76,7 +77,7 @@ describe('harvest reaction flow', () => {
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
 
-  it('auto-runs mandatory non-interactive harvest field hooks without trigger-select pending', () => {
+  it('dispatches mandatory non-interactive harvest field hooks through trigger-select', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.minorPlayed.push('B050_ButterChurn')
@@ -86,7 +87,8 @@ describe('harvest reaction flow', () => {
     ]
 
     session.loadState(state)
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
@@ -94,7 +96,7 @@ describe('harvest reaction flow', () => {
     expect(resp.state.players[0]!.resources.food).toBe(20)
   })
 
-  it('auto-runs Milking Stool without trigger-select pending', () => {
+  it('dispatches Milking Stool through trigger-select', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.occupationPlayed.push('D038_MilkingStool')
@@ -103,12 +105,41 @@ describe('harvest reaction flow', () => {
     player.houseAnimalCount = 1
 
     session.loadState(state)
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveCardTrigger(session, resp, 'D038_MilkingStool')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(19)
+  })
+
+  it('keeps deterministic and interactive harvest field hooks in the same trigger selection', () => {
+    const { session, state } = setupHarvestSession()
+    const player = state.players[0]!
+    player.minorPlayed.push('B050_ButterChurn')
+    player.occupationPlayed.push('C098_CubeCutter')
+    player.resources.wood = 1
+    player.pastures = [
+      { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
+    ]
+
+    session.loadState(state)
+    const resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
+    expect(resp.interaction.options).toContainEqual({
+      value: 'B050_ButterChurn',
+      labelKey: 'cards.B050_ButterChurn.name',
+      sourceCard: 'B050_ButterChurn',
+    })
+    expect(resp.interaction.options).toContainEqual({
+      value: 'C098_CubeCutter',
+      labelKey: 'cards.C098_CubeCutter.name',
+      sourceCard: 'C098_CubeCutter',
+    })
+    expect(resp.state.players[0]!.resources.food).toBe(20)
   })
 
   it('keeps Stable Manure harvest field selection interactive', () => {

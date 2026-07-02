@@ -134,7 +134,10 @@ describe('New hook stubs - Harvest sub-phases', () => {
 
   it('HarvestFieldPhase hooks all fire during field phase', () => {
     const { session } = makeSession(4, [HARVEST_FIELD_ID])
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
     const counters = p0.cardStates?.[HARVEST_FIELD_ID]?.counters
