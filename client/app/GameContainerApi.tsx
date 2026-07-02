@@ -86,6 +86,7 @@ import {
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
   shouldShowPendingChoiceInInteractionBar,
+  shouldShowDevPanel,
   shouldSuppressPendingChoiceOptionsInInteractionBar,
   splitBoardActionSpaces,
   type FarmCommitType,
@@ -2582,7 +2583,7 @@ export const GameContainerApi = () => {
         </div>
       ) : null}
       {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
-      {devMode && isInteractive ? (
+      {shouldShowDevPanel({ devMode, hasGameView }) ? (
         <DevPanel
           locale={locale} players={state.players}
           devPlayerId={devPlayerId} devResource={devResource} devAmount={devAmount} devRound={devRound}

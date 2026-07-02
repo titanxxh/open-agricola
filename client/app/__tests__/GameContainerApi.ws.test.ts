@@ -28,6 +28,7 @@ import {
   removePublicEventResourceAnimations,
   splitBoardActionSpaces,
   shouldShowPendingChoiceInInteractionBar,
+  shouldShowDevPanel,
   shouldSuppressPendingChoiceOptionsInInteractionBar,
 } from '../game-container-helpers'
 import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
@@ -90,6 +91,12 @@ describe('GameContainerApi WS player identity', () => {
     expect(devResourceKeysForState({ enableFarmersOfTheMoor: true })).toEqual(
       expect.arrayContaining(['horse', 'fuel']),
     )
+  })
+
+  it('shows the dev panel for every player view when dev mode is enabled', () => {
+    expect(shouldShowDevPanel({ devMode: true, hasGameView: true })).toBe(true)
+    expect(shouldShowDevPanel({ devMode: true, hasGameView: false })).toBe(false)
+    expect(shouldShowDevPanel({ devMode: false, hasGameView: true })).toBe(false)
   })
 
   it('separates season action spaces from the normal action board', () => {
