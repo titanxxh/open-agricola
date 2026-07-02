@@ -17,6 +17,7 @@ export class ParallelNode extends BaseNode {
   public children: EngineNode[]
   public mode: ParallelNodeMode = 'all'
   public selectedChildId: string | null = null
+  public resolveAfterSelection = false
   public triggerOwnerPlayerId?: string
   public triggerChildren: ParallelTriggerChild[] = []
   public emittedChoices: ActionChoiceOption[] = []
@@ -121,6 +122,9 @@ export class ParallelNode extends BaseNode {
     if (!this.selectedChildId) return
     const sel = this.cardChildren().find((c) => c.id === this.selectedChildId)
     if (!sel || sel.getState() === 'resolved') {
+      if (this.resolveAfterSelection) {
+        this.resolveRemainingTriggerChildrenForPass()
+      }
       this.selectedChildId = null
     }
   }
@@ -169,6 +173,7 @@ export class ParallelNode extends BaseNode {
     if (this.mode === 'trigger-select') {
       data.mode = this.mode
       data.selectedChildId = this.selectedChildId
+      if (this.resolveAfterSelection) data.resolveAfterSelection = true
       data.triggerOwnerPlayerId = this.triggerOwnerPlayerId
       data.triggerChildren = this.triggerChildren
       data.emittedChoices = this.emittedChoices

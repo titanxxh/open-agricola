@@ -148,7 +148,7 @@ describe('C025_SteamMachine session', () => {
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!._extraTurnConsumedCount).toBe(1)
+    expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
     expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
@@ -169,7 +169,7 @@ describe('C025_SteamMachine session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(3)
-    expect(resp.state.players[0]!._extraTurnConsumedCount).toBe(1)
+    expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
     expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
@@ -182,7 +182,7 @@ describe('C025_SteamMachine session', () => {
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!._extraTurnConsumedCount).toBe(2)
+    expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toEqual({ [A92]: 2 })
     expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(false)
     expect(c25ConsumeEvents(resp)).toHaveLength(1)
   })
@@ -197,7 +197,7 @@ describe('C025_SteamMachine session', () => {
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!._extraTurnConsumedCount).toBeUndefined()
+    expect(resp.state.players[0]!._extraTurnConsumedCountsByCard).toBeUndefined()
     expect(c25ConsumeEvents(resp)).toEqual([])
   })
 

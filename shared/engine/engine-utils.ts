@@ -372,6 +372,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.mode = node.mode
     clone.selectedChildId = node.selectedChildId
+    clone.resolveAfterSelection = node.resolveAfterSelection
     clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
     clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
     clone.emittedChoices = [...node.emittedChoices]
@@ -673,6 +674,7 @@ export function buildFlowNode(
     const parallel = new ParallelNode(nextId(), children)
     if (flow.mode === 'trigger-select') {
       parallel.mode = 'trigger-select'
+      parallel.resolveAfterSelection = flow.triggerSelectOnce === true
       parallel.triggerChildren = children.map((child, index) => ({
         nodeId: child.id,
         cardId: flow.children[index]?.sourceCard ?? `child-${index}`,

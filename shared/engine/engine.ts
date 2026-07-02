@@ -187,6 +187,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
       case 'parallel': {
         const parallel = new ParallelNode(cursor.id, buildChildren())
         if (data.mode === 'trigger-select') parallel.mode = 'trigger-select'
+        parallel.resolveAfterSelection = data.resolveAfterSelection === true
         parallel.selectedChildId = typeof data.selectedChildId === 'string'
           ? data.selectedChildId
           : null
