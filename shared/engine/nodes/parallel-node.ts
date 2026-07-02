@@ -58,7 +58,8 @@ export class ParallelNode extends BaseNode {
 
   chooseCard(cardId: string): EngineNode | null {
     if (this.mode !== 'trigger-select') return null
-    const entry = this.remainingTriggerChildren().find(({ metadata }) => metadata.cardId === cardId)
+    const entry = this.remainingTriggerChildren().find(({ metadata }) =>
+      metadata.nodeId === cardId || metadata.cardId === cardId)
     if (!entry) return null
     this.selectedChildId = entry.child.id
     return entry.child

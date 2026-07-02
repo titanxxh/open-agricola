@@ -65,6 +65,21 @@ const resolveExecutionSpace = (
   return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
 
+const contextForPendingEnvelope = (
+  context: EngineContext,
+  envelope?: { contextSnapshot?: unknown } | null,
+): EngineContext => {
+  const executionContext = buildChoiceExecutionContext(
+    context,
+    envelope?.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1],
+  )
+  return {
+    ...context,
+    player: executionContext.player,
+    space: resolveExecutionSpace(context.state, executionContext.space, executionContext.actionContext),
+  }
+}
+
 const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
   return false
@@ -376,17 +391,18 @@ export function engineResolveChoice(
       }
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.clearPending()
+        const triggerContext = contextForPendingEnvelope(context, envelope)
         const offered = evaluateTriggerSelect(
           node,
-          { ...context, ...currentEventReadContext(int) },
-          triggerSelectEvaluationOptions(int, context),
+          { ...triggerContext, ...currentEventReadContext(int) },
+          triggerSelectEvaluationOptions(int, triggerContext),
         ).options
         if (offered.length === 0) {
-          node.resolve()
+          node.resolveRemainingTriggerChildrenForPass()
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
-        const selected = offered.find((opt) => opt.value === choice)
+        const selected = offered.find((opt) => opt.value === choice || opt.sourceCard === choice)
         if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -413,17 +429,19 @@ export function engineResolveChoice(
       }
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
+      const envelope = pendingEnvelopeFromHostNode(node)
+      const triggerContext = contextForPendingEnvelope(context, envelope)
       const offered = evaluateTriggerSelect(
         node,
-        { ...context, ...currentEventReadContext(int) },
-        triggerSelectEvaluationOptions(int, context),
+        { ...triggerContext, ...currentEventReadContext(int) },
+        triggerSelectEvaluationOptions(int, triggerContext),
       ).options
       if (offered.length === 0) {
-        node.resolve()
+        node.resolveRemainingTriggerChildrenForPass()
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
-      const selected = offered.find((opt) => opt.value === choice)
+      const selected = offered.find((opt) => opt.value === choice || opt.sourceCard === choice)
       if (!selected || selected.disabled) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }

@@ -27,5 +27,7 @@ export const isPendingChoiceValueAllowed = (
   const choices = pendingEnvelopeChoices(envelope)
   if (choices.length === 0) return true
   return choices.some((option) => option.value === value && option.disabled !== true)
+    || (envelope.request.kind === 'select-trigger' &&
+      choices.some((option) => option.sourceCard === value && option.disabled !== true))
     || isStructuredChoiceValue(envelope, value)
 }
