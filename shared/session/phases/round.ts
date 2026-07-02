@@ -74,6 +74,33 @@ const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
   return { type: 'seq', children: flows }
 }
 
+export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
+  if (core.engineStackDepth() > 0) return false
+  const state = core.state
+  const current = state.players[state.currentPlayerIndex]
+  if (!current || workersAvailable(state, current) > 0) return false
+  const extra = collectExtraTurnFlow(state, current)
+  if (!extra) return false
+
+  core.appendHistory(true)
+  core.setTurnOwner(state.currentPlayerIndex)
+  current._activeActionBonusSources = []
+  core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(current))
+  core.resetActionResultDetails()
+  recordActionSnapshot(current, core.allocActionToken())
+  const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
+  core.pushEngineFrame({
+    ...frame,
+    ownerPlayerIndex: state.currentPlayerIndex,
+    spaceId: '__subflow:top-level',
+    stageResume: null,
+    deferredPlayerSwitch: null,
+    reason: 'top-level',
+  })
+  core.driveEngineSteps()
+  return true
+}
+
 /**
  * Resolve the starting-player seat index. Returns 0 when no player owns
  * the start-player marker (matches the legacy GameCore.getStartPlayerIdx
@@ -632,44 +659,11 @@ export const handleConfirmNextPlayerResolved = (
   }
 
   // Extra-turn injection: the rotation stopped on a player who has no ordinary
-  // workers left but is owed a turn-rotation extra action (A92 AdoptiveParents).
-  // Push the contributed flow (XOR[use, forfeit]) as a top-level frame for that
-  // player and drive it — mirrors `takeAnytimeAction`'s no-active-engine branch.
+  // workers left but is owed a turn-rotation extra action from a card hook.
+  // Push the contributed flow as a top-level frame for that player and drive it.
   // place-farmer inside the flow runs in the player's own turn, so alternation
   // is preserved. Ordered before the round-end check so the round stays open.
-  const currentForExtra = state.players[state.currentPlayerIndex]
-  if (currentForExtra && workersAvailable(state, currentForExtra) <= 0) {
-    const extra = collectExtraTurnFlow(state, currentForExtra)
-    if (extra) {
-      // Mirror takeAction's per-action setup so the promoted worker's placement
-      // sees a fresh action snapshot/token: cards that read
-      // getRoomsBuiltThisAction / getStableTilesBuiltThisAction /
-      // getFencesBuiltThisAction during build/fence (e.g. A23 Toolbox) would
-      // otherwise compare against a stale/missing snapshot and over-trigger.
-      core.appendHistory(true)
-      core.setTurnOwner(state.currentPlayerIndex)
-      currentForExtra._activeActionBonusSources = []
-      core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(currentForExtra))
-      core.resetActionResultDetails()
-      recordActionSnapshot(currentForExtra, core.allocActionToken())
-      const frame = core.buildAdhocEngineFrame('extra-turn', extra.cardId, extra.flow)
-      // `__subflow:top-level` spaceId mirrors `takeAnytimeAction`'s
-      // no-active-engine branch so `buildInteraction` surfaces the XOR as a real
-      // pending interaction. `reason: 'top-level'` (not the spaceId) is what makes
-      // the completion trampoline run `finishCompletedActionTurn`, advancing the
-      // rotation or ending the round once the extra-turn flow finishes.
-      core.pushEngineFrame({
-        ...frame,
-        ownerPlayerIndex: state.currentPlayerIndex,
-        spaceId: '__subflow:top-level',
-        stageResume: null,
-        deferredPlayerSwitch: null,
-        reason: 'top-level',
-      })
-      core.driveEngineSteps()
-      return core.emitResponse()
-    }
-  }
+  if (startPendingExtraTurnIfAny(core)) return core.emitResponse()
 
   // Check if the round's work phase is done (round end condition). A player
   // whose extra turn was consumed by a mandatory skip above no longer reports

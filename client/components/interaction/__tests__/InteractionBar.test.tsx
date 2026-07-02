@@ -2090,4 +2090,65 @@ describe('InteractionBar', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
     expect(screen.getByText('Choose a source for every selected fence.')).toBeInTheDocument()
   })
+
+  it('suppresses generic buttons for Moor card-action pending choices', () => {
+    const resolveChoice = vi.fn()
+    const { container } = render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={{
+          promptKey: 'ui.interactionFlowSelect',
+          options: [
+            {
+              value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
+              labelKey: 'moor.specialActions.hiring-fair',
+            },
+          ],
+          playerIndex: 0,
+          spaceId: '__subflow:top-level',
+        }}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={resolveChoice}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        suppressChoiceOptions={true}
+      />,
+    )
+
+    expect(container.querySelector('.interaction-actions')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Hiring Fair/i })).toBeNull()
+    expect(resolveChoice).not.toHaveBeenCalled()
+  })
 })

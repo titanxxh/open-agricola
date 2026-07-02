@@ -2129,6 +2129,11 @@ export class GameCore {
     }
   }
 
+  private restorePendingExtraTurnAfterUndo(): void {
+    if (this.engineStack.depth() > 0) return
+    roundPhase.startPendingExtraTurnIfAny(this)
+  }
+
   private recomputeActionStartIndex() {
     for (let i = this.history.length - 1; i >= 0; i -= 1) {
       if (this.history[i]?.actionStart) {
@@ -5198,6 +5203,7 @@ export class GameCore {
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
+        this.restorePendingExtraTurnAfterUndo()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
       if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
@@ -5212,6 +5218,7 @@ export class GameCore {
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
+        this.restorePendingExtraTurnAfterUndo()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
     }
@@ -5239,6 +5246,7 @@ export class GameCore {
     this.history.pop()
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
+    this.restorePendingExtraTurnAfterUndo()
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 
@@ -5268,6 +5276,7 @@ export class GameCore {
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
     this.actionStartIndex = null
+    this.restorePendingExtraTurnAfterUndo()
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 }

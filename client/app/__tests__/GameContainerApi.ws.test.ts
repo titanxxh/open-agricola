@@ -6,6 +6,7 @@ import {
   applyPublicEventCancellationSnapshot,
   buildCompactScoreRows,
   canTakeVisibleMoorSpecialAction,
+  buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
   buildReplayFeedback,
   clearReplayFeedback,
@@ -21,11 +22,13 @@ import {
   maxPlayersFromQuery,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
+  parsePendingMoorSpecialActionChoice,
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
   splitBoardActionSpaces,
   shouldShowPendingChoiceInInteractionBar,
+  shouldSuppressPendingChoiceOptionsInInteractionBar,
 } from '../game-container-helpers'
 import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
 import type { ActionSpace } from '../../../shared/contract/types'
@@ -279,6 +282,76 @@ describe('GameContainerApi WS player identity', () => {
     expect(buildPlaceFarmerChoiceMap('ui.interactionChooseOne', [
       { value: 'forest', labelKey: 'actions.forest.name' },
     ])).toEqual(new Map())
+  })
+
+  it('parses pending Moor special action card choices', () => {
+    expect(parsePendingMoorSpecialActionChoice({
+      value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
+      labelKey: 'moor.specialActions.hiring-fair',
+    })).toEqual({
+      value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
+      cardId: 'moor-special-hiring-fair',
+      actionId: 'hiring-fair',
+      tile: undefined,
+      tileKey: undefined,
+      disabled: false,
+    })
+
+    expect(parsePendingMoorSpecialActionChoice({
+      value: 'card-action:moor-special-fell-trees:action:fell-trees:2:0',
+      labelKey: 'moor.specialActions.fell-trees',
+      disabled: true,
+    })).toEqual({
+      value: 'card-action:moor-special-fell-trees:action:fell-trees:2:0',
+      cardId: 'moor-special-fell-trees',
+      actionId: 'fell-trees',
+      tile: { row: 2, col: 0 },
+      tileKey: '2-0',
+      disabled: true,
+    })
+
+    expect(parsePendingMoorSpecialActionChoice({
+      value: 'card-action:bad',
+      labelKey: 'moor.specialActions.hiring-fair',
+    })).toBeNull()
+  })
+
+  it('builds pending Moor special action lookup maps from choice options', () => {
+    const maps = buildPendingMoorSpecialActionChoiceMaps([
+      {
+        value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
+        labelKey: 'moor.specialActions.hiring-fair',
+      },
+      {
+        value: 'card-action:moor-special-fell-trees:action:fell-trees:2:0',
+        labelKey: 'moor.specialActions.fell-trees',
+      },
+      {
+        value: 'card-action:moor-special-fell-trees:action:fell-trees:3:0',
+        labelKey: 'moor.specialActions.fell-trees',
+        disabled: true,
+      },
+    ])
+
+    expect(maps.isActive).toBe(true)
+    expect(maps.byCardAction.get('moor-special-hiring-fair:hiring-fair')?.value)
+      .toBe('card-action:moor-special-hiring-fair:action:hiring-fair')
+    expect(maps.byCardActionTile.get('moor-special-fell-trees:fell-trees:2-0')?.value)
+      .toBe('card-action:moor-special-fell-trees:action:fell-trees:2:0')
+    expect(maps.selectableTileKeysByCardAction.get('moor-special-fell-trees:fell-trees'))
+      .toEqual(new Set(['2-0']))
+  })
+
+  it('suppresses generic InteractionBar buttons for pending Moor card-action choices', () => {
+    expect(shouldSuppressPendingChoiceOptionsInInteractionBar({
+      options: [{
+        value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
+        labelKey: 'moor.specialActions.hiring-fair',
+      }],
+    })).toBe(true)
+    expect(shouldSuppressPendingChoiceOptionsInInteractionBar({
+      options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+    })).toBe(false)
   })
 
   it('removes only one counted resource animation batch occurrence', () => {
