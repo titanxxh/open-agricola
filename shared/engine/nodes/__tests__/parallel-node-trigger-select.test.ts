@@ -105,6 +105,16 @@ const makeTriggerSelect = (
   return node
 }
 
+const makeActivateCardEffect = (
+  id: string,
+  cardId: string,
+  mandatory = true,
+): ActionNode => new ActionNode(id, 'activate-card-effect', cardId, {
+  cardId,
+  hook: 'onBeforeEndGame',
+  beforeEndGameMandatory: mandatory,
+})
+
 describe('ParallelNode trigger-select mode', () => {
   beforeEach(() => {
     setActiveCardRegistry(new CardRegistry())
@@ -300,6 +310,43 @@ describe('ParallelNode trigger-select mode', () => {
         labelKey: 'ui.interactionSelectTriggerPass',
         disabled: true,
       },
+    ])
+  })
+
+  it('keeps pass enabled for optional mutation-only stage activations', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.setEffect({
+      id: 'OptionalMutationStageCard',
+      onBeforeEndGame: (_state, player) => {
+        player.cardStates.OptionalMutationStageCard = { ready: true }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      minorPlayed: ['OptionalMutationStageCard'],
+    })
+    const child = makeActivateCardEffect('stage-a', 'OptionalMutationStageCard', false)
+    const node = new ParallelNode('stage-select', [child])
+    node.mode = 'trigger-select'
+    node.triggerOwnerPlayerId = 'p1'
+    node.ownerPlayerId = 'p1'
+    node.triggerChildren = [{
+      nodeId: child.id,
+      cardId: 'OptionalMutationStageCard',
+      listenerId: '',
+      mandatory: false,
+    }]
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player))
+
+    expect(player.cardStates).toEqual({})
+    expect(evaluation.options).toEqual([
+      {
+        value: 'OptionalMutationStageCard',
+        labelKey: 'cards.OptionalMutationStageCard.name',
+        sourceCard: 'OptionalMutationStageCard',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
     ])
   })
 
