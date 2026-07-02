@@ -550,6 +550,7 @@ type Props = {
   hasActionStartSnapshot: boolean
   anytimeActions: AnytimeAction[]
   takeAnytimeAction: (actionId: string) => void
+  suppressChoiceOptions?: boolean
   canBuildPalisades?: boolean
   fencePlacementMode?: 'fence' | 'palisade'
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
@@ -624,6 +625,7 @@ export const InteractionBar = ({
   hasActionStartSnapshot,
   anytimeActions,
   takeAnytimeAction,
+  suppressChoiceOptions = false,
   canBuildPalisades = false,
   fencePlacementMode = 'fence',
   setFencePlacementMode,
@@ -952,7 +954,7 @@ export const InteractionBar = ({
               {isSelectingSow && sowErrorText ? (
                 <div className="interaction-error">{sowErrorText}</div>
               ) : null}
-              {((pendingChoice.promptParams?.needed as number) ?? 0) > 1 ? (
+              {suppressChoiceOptions ? null : ((pendingChoice.promptParams?.needed as number) ?? 0) > 1 ? (
                 <CollectorMultiSelect
                   locale={locale}
                   options={visibleOptions}

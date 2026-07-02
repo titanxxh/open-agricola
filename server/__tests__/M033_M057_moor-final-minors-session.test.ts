@@ -216,6 +216,35 @@ describe('M057 Taps', () => {
     expect(chosen.state.players[0]!.resources.fuel).toBe(1)
   })
 
+  it('undoAction restores the pending Taps extra-turn offer after resolving a borrowed card action', () => {
+    const session = setupM057Rotation()
+    const player = session.state.players[0]!
+    const other = session.state.players[1]!
+    const card = session.state.farmersOfTheMoor!.specialActionCards.find((entry) =>
+      entry.actions.includes('fell-trees'))!
+    card.location = { kind: 'playerFaceUp', playerId: other.id }
+    player.resources.food = 2
+    player.farmTerrain = [{ row: 2, col: 0, kind: 'forest' }]
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    const chosen = session.resolveChoice(0, optionFor(offer, 'fell-trees').value)
+
+    expect(chosen.ok).toBe(true)
+    expect(chosen.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBe(true)
+
+    const undone = session.undoAction()
+
+    expect(undone.ok).toBe(true)
+    expect(undone.state.currentPlayerIndex).toBe(0)
+    expect(hasPendingExtraTurn(undone.state, undone.state.players[0]!)).toBe(true)
+    expect(undone.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBeUndefined()
+    expect(undone.interaction.stateId).toBe('wait')
+    expect(undone.interaction.stateId === 'wait' ? undone.interaction.sourceCard : undefined).toBe(M057)
+    expect(reqKind(undone)).toBe('choice')
+    expect(optionFor(undone, 'fell-trees')).toBeDefined()
+  })
+
   it('fires before-special-action listeners before a Taps borrowed card action', () => {
     const session = setupM057Rotation([M057, M112])
     const player = session.state.players[0]!
