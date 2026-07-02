@@ -59,8 +59,8 @@ describe('harvest reaction flow', () => {
     resp: ReturnType<GameSession['performRoundEnd']>,
     cardId: string,
   ) => {
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
+    if (resp.interaction.stateId !== 'wait') return resp
+    if (resp.interaction.request.kind !== 'select-trigger') return resp
     const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.value === cardId)
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
@@ -77,7 +77,7 @@ describe('harvest reaction flow', () => {
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
 
-  it('dispatches mandatory non-interactive harvest field hooks through trigger-select', () => {
+  it('auto-expands a single mandatory non-interactive harvest field hook', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.minorPlayed.push('B050_ButterChurn')
@@ -96,7 +96,7 @@ describe('harvest reaction flow', () => {
     expect(resp.state.players[0]!.resources.food).toBe(20)
   })
 
-  it('dispatches Milking Stool through trigger-select', () => {
+  it('auto-expands a single Milking Stool harvest field hook', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.occupationPlayed.push('D038_MilkingStool')

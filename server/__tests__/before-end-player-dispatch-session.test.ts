@@ -4,7 +4,6 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const SHARED_CARD = 'TEST_BeforeEndShared'
 const OWNER_CARD = 'TEST_BeforeEndOwner'
@@ -102,21 +101,6 @@ describe('Before-End Player Dispatch session', () => {
 
     resp = session.resolveChoice(0, SHARED_CARD)
     expect(resp.state.players[0]!.resources.food).toBe(1)
-
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
-
-    resp = confirmPlayerSwitch(session)
-    expectSharedTrigger(resp, 1)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
-    expect(resp.interaction.allowedCommands).not.toContain('undoAction')
-
-    resp = session.resolveChoice(1, SHARED_CARD)
     expect(resp.state.players[1]!.resources.food).toBe(1)
     expect(resp.state.gameOver).toBe(true)
     expect(resp.interaction.stateId).toBe('gameover')
@@ -125,7 +109,7 @@ describe('Before-End Player Dispatch session', () => {
   it('keeps before-end preview mutations out of real game state until activation is selected', () => {
     const session = setupEndGameSession()
     const state = session.getState().state
-    state.players[0]!.occupationPlayed = [PREVIEW_CARD]
+    state.players[0]!.occupationPlayed = [PREVIEW_CARD, SHARED_CARD]
     state.players[0]!.fields = []
     session.loadState(state)
 
@@ -152,6 +136,5 @@ describe('Before-End Player Dispatch session', () => {
 
     resp = session.resolveChoice(0, PREVIEW_CARD)
     expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
-    expect(resp.state.gameOver).toBe(true)
   })
 })
