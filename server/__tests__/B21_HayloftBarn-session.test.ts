@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import { createEventQuery } from '../../shared/events/query'
@@ -60,7 +61,8 @@ describe('B021_HayloftBarn session', () => {
     session.loadState(state)
 
     // grain-seeds gives 1 grain
-    const resp = session.takeAction(0, 'grain-seeds')
+    let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -216,7 +218,8 @@ describe('B021_HayloftBarn session', () => {
     const foodBefore = state.players[0]!.resources.food
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'grain-seeds')
+    let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -251,6 +254,7 @@ describe('B021_HayloftBarn session', () => {
 
     // First grain action
     let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(3)
 
@@ -264,6 +268,7 @@ describe('B021_HayloftBarn session', () => {
 
     // Second grain action
     resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(2)
   })
@@ -280,7 +285,8 @@ describe('B021_HayloftBarn session', () => {
     expect(familyBefore).toBe(2)
     expect(player.rooms).toBe(2)
 
-    const resp = session.takeAction(0, 'grain-seeds')
+    let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const updated = resp.state.players[0]!
@@ -308,7 +314,8 @@ describe('B021_HayloftBarn session', () => {
     const familyBefore = player.workers.filter((w) => w.isActive).length
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'grain-seeds')
+    let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const updated = resp.state.players[0]!
@@ -322,7 +329,8 @@ describe('B021_HayloftBarn session', () => {
     const state = session.getState().state
     const familyBefore = state.players[0]!.workers.filter((w) => w.isActive).length
 
-    const resp = session.takeAction(0, 'grain-seeds')
+    let resp = session.takeAction(0, 'grain-seeds')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const updated = resp.state.players[0]!

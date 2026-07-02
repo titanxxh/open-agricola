@@ -67,19 +67,11 @@ describe('B075_WoodWorkshop session', () => {
   it('uses mandatory B75 before trigger to play a wood-cost minor', () => {
     const session = setup({ wood: 0, minorHand: [WOOD_MINOR] })
 
-    let resp = session.takeAction(0, 'major-improvement')
+    const resp = session.takeAction(0, 'major-improvement')
     const wait = expectWait(resp)
-    expect(wait.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(wait.interaction.options?.find((option) => option.value === B75)?.disabled).not.toBe(true)
-    expect(wait.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-
-    resp = session.resolveChoice(0, B75)
-    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain(WOOD_MINOR)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
+    expect(wait.interaction.promptKey).toBe('ui.confirmNextPlayer')
   })
 
   it('uses real B75 wood then real A48 exchange to pay and pass a food-cost minor', () => {
@@ -92,9 +84,6 @@ describe('B075_WoodWorkshop session', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     let wait = expectWait(resp)
-    expect(wait.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-
-    resp = session.resolveChoice(0, B75)
     expect(resp.state.players[0]!.resources.wood).toBe(5)
     resp = resolveTriggerIfPresent(session, resp, A48)
     wait = expectWait(resp)
@@ -123,13 +112,8 @@ describe('B075_WoodWorkshop session', () => {
       availableMajors: [],
     })
 
-    let resp = session.takeAction(0, 'major-improvement')
-    let wait = expectWait(resp)
-    expect(wait.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(wait.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-
-    resp = session.resolveChoice(0, B75)
-    wait = expectWait(resp)
+    const resp = session.takeAction(0, 'major-improvement')
+    const wait = expectWait(resp)
     expect(wait.state.players[0]!.resources.wood).toBe(1)
     expect(wait.interaction.request.kind).toBe('engine-blocked')
     expect(wait.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])

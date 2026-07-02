@@ -10,8 +10,8 @@
 > 2026-04-19 第二轮同步：
 > - 拆分"官方卡可用"与"自定义卡沙盒可用"两套清单——之前的"helper 也作为全局函数注入"陈述对沙盒并不成立。
 > - 自定义卡沙盒**不注入** `familySize` / `workersAvailable` / `initCardState` 等任何项目内 helper；`state` / `player` 是 JSON 深拷贝的只读快照。
-> - 自定义卡沙盒**不识别** `computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `computeLockedFarmTiles` / `handHooks` 等扩展 hook（`extractManifestFromCompiledCode` 用 `cardEffectHooks` 白名单过滤）。围栏折扣已迁到 `computeCosts` listener phase（参见 ARCHITECTURE.md §15.7），通过 `registerCardListener` 即可生效。
-> - 自定义卡沙盒**不识别** `computeChoiceCandidates` / `anytime` 这两个 listener phase（`isActionHookPhase` 限制）。
+> - 自定义卡沙盒 effect hook / listener phase 白名单以 `CUSTOM_CARD_SANDBOX.md §3` 为准；本文件只保留设计导读。
+> - 同一时机多个 reaction listener / stage hook / extra-turn provider 可用时，系统会用 `trigger-select` 让玩家选择来源卡，设计时不要依赖打出区扫描顺序。
 > - `bonus-vp` actionId 固定 +1，不接受 `amount` 参数；要 N 分就把 N 个 leaf 串入 seq。
 > - `PlayerState` 字段名是 `fenceSegments`（不是 `fences`）；`store-on-card` 写入 `cardStates[id].counters[resource]`，不是 `cardStates[id][resource]`。
 >
@@ -22,6 +22,7 @@
 1. **不使用 import/export** — 自定义卡沙盒禁止 import；`registerCardEffect`、`registerCardListener`、`MinorImprovement`、`Occupation` 作为全局注入。**注意**：项目内 helper（`familySize` 等）**不**注入沙盒，只在官方卡 / 测试 / 直接 import 时可用。
 2. **两套扩展机制** — `registerCardEffect`（阶段触发）和 `registerCardListener`（行动触发），覆盖大多数卡牌效果。
 3. **动态计算支持** — hook 函数内可读 GameState / PlayerState 字段（沙盒里是 JSON 深拷贝快照，只读字段、无方法）。
+4. **反应顺序由玩家选择** — 多张卡同一时机触发时，返回可重放 ActionFlow，让 `trigger-select` 执行来源卡选择；不要把规则写成依赖卡牌扫描顺序。
 
 ## Prompt 结构
 
@@ -56,6 +57,7 @@ const card = new MinorImprovement({ ... })
 | 启用行动 | listener + `isDoable` + `doable: true` | 让不可用的行动变可用 |
 | 资源转换 | `modifiers: [{ type: 'trade', ... }]` | 静态资源替换 |
 | 多选一 | ActionFlow `type: 'xor'` | 玩家选择分支 |
+| 额外行动 provider | `registerCardEffect` + `contributeExtraTurn` | 普通工人耗尽后贡献一次额外行动机会；多个 provider 先让玩家选择来源卡 |
 
 ### 3. registerCardEffect 可用 hook
 
@@ -73,10 +75,14 @@ const card = new MinorImprovement({ ... })
 | `onBeforeHarvest` / `onStartHarvest` / `onHarvest` / `onEndHarvest` / `onAfterHarvest` | 收获前/中/后 | 每 4-5 轮 |
 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` | 收割田地子阶段 | 每收获 |
 | `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` | 喂食子阶段 | 每收获 |
+| `onBeforeEndGame` | 终局计分前，按 target player step 触发 | 每局一次 |
+| `contributeExtraTurn` | 普通工人耗尽后贡献 extra-turn provider | 每次轮转检查 |
 
 `onBeforePlayerTurn` 是 non-flow skip-control exception，只能同步返回 `{ skipTurn?: true } | void`，用于 labor turn 入口跳过本次放工人机会；不能返回 `ActionFlow` 或产生 pending。
 
-**以下 hook 仅对官方卡（直接 import 注册）有效；自定义卡沙盒会过滤掉，写了不会触发**（详见 §7.3）：
+harvest field 三个 stage hook、`onBeforeEndGame` 和 action reaction listener 同一时机有多个来源时默认进入 `trigger-select`；`contributeExtraTurn` 多 provider 时先选择来源卡，再展开该 provider 的 flow。
+
+**进阶 hook**（官方卡可直接 import 使用；自定义卡是否可用以 `CUSTOM_CARD_SANDBOX.md §3.1` 白名单为准）：
 
 | hook | 触发时机 |
 |------|----------|
@@ -109,8 +115,8 @@ registerCardListener({
 
 **可用 phases**（`shared/actions/hooks.ts` 中 `ActionHookPhase`，权威）：
 
-- 官方卡：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`
-- 自定义卡沙盒：仅 `before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`（`computeChoiceCandidates` / `anytime` 会被沙盒过滤，详见 §7.4）
+- 官方卡：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime` / `computeExchanges`
+- 自定义卡沙盒：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`（不含官方内部 `computeExchanges`，详见 §7.4）
 
 **可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（可由 ActionFlow 执行；也作为 `dispatchReapListener` 派发给 B132 EstateMaster 等 listener 的 actionId）
 
@@ -177,15 +183,11 @@ registerCardListener({
 
 #### 7.3 沙盒识别的 effect hook（`cardEffectHooks` 白名单交集）
 
-`onBuy` / `onBeforeStartOfTurn` / `onBeforePlayerTurn`（non-flow skip-control，只返回 `{ skipTurn?: true } | void`） / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
-
-**沙盒不识别**（写了也不会触发）：`computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `handHooks`。终局加分请改成在 `onAfterHarvest`（最后一轮）等阶段串多个 `bonus-vp` leaf 近似实现。围栏折扣改用 listener `computeCosts` phase（actions: `['fence']`）。
+完整列表见 `CUSTOM_CARD_SANDBOX.md §3.1`，并由 `pnpm run check:prompt-sync` 和代码白名单同步。`onBeforePlayerTurn` 是 non-flow skip-control，只返回 `{ skipTurn?: true } | void`。`contributeExtraTurn` 返回本卡 provider flow；多个 provider 同时可用时先进入 provider 来源卡选择。围栏折扣使用 listener `computeCosts` phase（actions: `['fence']`）。
 
 #### 7.4 沙盒识别的 listener phase（`isActionHookPhase` 白名单）
 
-`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`。
-
-**沙盒不识别**：`computeChoiceCandidates` / `anytime`。
+`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`。
 
 #### 7.5 actionId 注意
 

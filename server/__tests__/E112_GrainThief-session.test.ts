@@ -84,6 +84,7 @@ const setupSession = () => {
 const selectE112Trigger = (session: GameSession, resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger choice')
+  if (resp.interaction.request.kind !== 'select-trigger') return resp
   const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)

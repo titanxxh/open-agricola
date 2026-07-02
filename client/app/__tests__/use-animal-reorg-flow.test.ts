@@ -171,12 +171,41 @@ describe('use-animal-reorg-flow helpers', () => {
   })
 
   it('builds card display from reorg draft zones while reorganizing', () => {
-    const display = buildCardDisplayMap(animalReorgState())
+    const display = buildCardDisplayMap(null, animalReorgState())
     expect(display.get('C148_MudWallower')).toEqual({
       animalType: 'boar',
       animalCount: 1,
       capacity: 1,
       zoneId: 'card:C148_MudWallower',
+      isReorgDraft: true,
+    })
+  })
+
+  it('builds owned played-card animal zones outside reorg', () => {
+    const owner = player()
+    ;(owner as PlayerState & { playedCardAnimalZones: AnimalReorgState['zones'] })
+      .playedCardAnimalZones = [
+        {
+          id: 'card:M033_NightPasture:owner:p1:animalOwner:p1',
+          zoneType: 'card',
+          cardId: 'M033_NightPasture',
+          ownerPlayerId: 'p1',
+          animalOwnerPlayerId: 'p1',
+          displaySource: 'played-card',
+          animalType: null,
+          animalCount: 0,
+          capacity: 3,
+        },
+      ]
+
+    const display = buildCardDisplayMap(owner, null)
+
+    expect(display.get('M033_NightPasture')).toEqual({
+      animalType: null,
+      animalCount: 0,
+      capacity: 3,
+      zoneId: 'card:M033_NightPasture:owner:p1:animalOwner:p1',
+      isReorgDraft: false,
     })
   })
 
@@ -204,13 +233,14 @@ describe('use-animal-reorg-flow helpers', () => {
       },
     )
 
-    const display = buildCardDisplayMap(reorg)
+    const display = buildCardDisplayMap(null, reorg)
 
     expect(display.get('M033_NightPasture')).toEqual({
       animalType: 'sheep',
       animalCount: 3,
       capacity: 3,
       zoneId: 'card:M033_NightPasture',
+      isReorgDraft: true,
     })
   })
 
@@ -372,6 +402,38 @@ describe('use-animal-reorg-flow helpers', () => {
       capacity: 1,
       zoneId: 'card:M034_HomeWood@0-0',
       allowedAnimalTypes: ['boar', 'cattle', 'horse'],
+      isReorgDraft: false,
+    })
+  })
+
+  it('builds empty farm-position card animal zones outside reorg', () => {
+    const target = player()
+    ;(target as PlayerState & { farmCardAnimalZones: AnimalReorgState['zones'] })
+      .farmCardAnimalZones = [
+        {
+          id: 'card:M035_HorseTrough@1-2',
+          zoneType: 'card',
+          cardId: 'M035_HorseTrough',
+          displaySource: 'farm-position',
+          farmPosition: { row: 1, col: 2 },
+          animalType: 'horse',
+          animalCount: 0,
+          capacity: 2,
+          allowedAnimalType: 'horse',
+        },
+      ]
+
+    const display = buildFarmCardDisplayMap(target, null)
+
+    expect(display.get('1-2')).toEqual({
+      animalType: 'horse',
+      animalCount: 0,
+      animalCounts: undefined,
+      allowedAnimalType: 'horse',
+      allowedAnimalTypes: undefined,
+      capacity: 2,
+      zoneId: 'card:M035_HorseTrough@1-2',
+      isReorgDraft: false,
     })
   })
 

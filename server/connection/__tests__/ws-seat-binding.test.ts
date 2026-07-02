@@ -1,14 +1,14 @@
 /**
  * PR-6 Task 4 — WS seat binding tests.
  *
- * Verifies that every WS command carrying a client-supplied playerIndex or
- * playerId is cross-checked against the connection's own seat. A client
- * connected as seat 0 must not be able to submit actions, commit choices,
- * run dev mutations, or submit draft picks on seat 1 (or any other seat).
+ * Verifies that WS commands carrying a client-supplied playerIndex or playerId
+ * are cross-checked against the connection's own seat unless the command is an
+ * explicitly global fixed-dev-room helper.
  *
  * Covers:
  *   • `commitSelection` — explicit playerIndex in payload
- *   • `devSetResources` / `devDrawCard` / `devPlayCard` — dev channel
+ *   • `devSetResources` / `devDrawCard` — seat-bound dev channel
+ *   • `devPlayCard` — fixed-dev-room cross-seat exception
  *   • `draftSubmit` — playerId-based identity
  *   • Happy path: own-seat commands are accepted
  *
@@ -115,6 +115,49 @@ const setupTwoPlayerRoom = async (
       event.type === 'stateUpdate' && event.cause === 'reconnect',
   )
   return { p1, p2, initialP1, initialP2, roomId: roomCreated.roomId }
+}
+
+const setupFixedDevRoom = async (
+  baseUrl: string,
+  sockets: TestSocket[],
+) => {
+  const p1 = await openWs(baseUrl, sockets)
+  p1.send(JSON.stringify({
+    type: 'joinRoom',
+    roomId: 'dev2',
+    requestedPlayerIndex: 0,
+    name: 'P1',
+  }))
+  await waitForEvent(
+    p1,
+    (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
+      event.type === 'roomJoined',
+  )
+
+  const p2 = await openWs(baseUrl, sockets)
+  p2.send(JSON.stringify({
+    type: 'joinRoom',
+    roomId: 'dev2',
+    requestedPlayerIndex: 1,
+    name: 'P2',
+  }))
+  await waitForEvent(
+    p2,
+    (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
+      event.type === 'roomJoined',
+  )
+  const initialP1 = await waitForEvent(
+    p1,
+    (event): event is StateUpdateEnvelope =>
+      event.type === 'stateUpdate' && event.cause === 'reconnect',
+  )
+  const initialP2 = await waitForEvent(
+    p2,
+    (event): event is StateUpdateEnvelope =>
+      event.type === 'stateUpdate' && event.cause === 'reconnect',
+  )
+
+  return { p1, p2, initialP1, initialP2 }
 }
 
 describe('WS seat binding', () => {
@@ -243,7 +286,7 @@ describe('WS seat binding', () => {
     expect(err.error).toMatch(/seat mismatch/i)
   })
 
-  it('rejects devDrawCard / devPlayCard when seat does not match', async () => {
+  it('rejects devDrawCard when seat does not match', async () => {
     const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
 
     p1.send(
@@ -260,21 +303,26 @@ describe('WS seat binding', () => {
         event.type === 'error' && event.requestId === 'spoof-draw-1',
     )
     expect(err1.error).toMatch(/seat mismatch/i)
+  })
 
-    p1.send(
+  it('accepts devPlayCard for a different seat in fixed dev rooms', async () => {
+    const { p2 } = await setupFixedDevRoom(baseUrl, sockets)
+
+    p2.send(
       JSON.stringify({
         type: 'devPlayCard',
-        playerIndex: 1,
-        cardId: 'A3',
+        playerIndex: 0,
+        cardId: 'D025_WitchesDanceFloor',
         requestId: 'spoof-play-1',
       }),
     )
-    const err2 = await waitForEvent(
-      p1,
-      (event): event is Extract<ServerEvent, { type: 'error' }> =>
-        event.type === 'error' && event.requestId === 'spoof-play-1',
+    const afterPlay = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.requestId === 'spoof-play-1',
     )
-    expect(err2.error).toMatch(/seat mismatch/i)
+    expect(afterPlay.payload.state.players[0]!.minorPlayed).toContain('D025_WitchesDanceFloor')
+    expect(afterPlay.payload.state.players[1]!.minorPlayed).not.toContain('D025_WitchesDanceFloor')
   })
 
   it('rejects draftSubmit when the playerId does not belong to the sender', async () => {

@@ -301,7 +301,6 @@ describe('engine hook event context', () => {
       cardIds: ['Test_Trigger_Preview_Card'],
       actions: [blocked.id],
       phases: ['before' as const],
-      dispatchMode: 'select' as const,
       handler: (context) => {
         previewListenerObserved = context.eventQuery.has('resource.exchanged')
         expect(context.transactionEvents).toHaveLength(1)
@@ -311,7 +310,15 @@ describe('engine hook event context', () => {
         }
       },
     }
+    const secondPreviewListener = {
+      id: 'test-trigger-preview-listener-2',
+      cardIds: ['Test_Trigger_Preview_Card_2'],
+      actions: [blocked.id],
+      phases: ['before' as const],
+      handler: () => ({ extraData: { applicable: true } }),
+    }
     registry.registerListener(listener)
+    registry.registerListener(secondPreviewListener)
     registry.registerListener({
       id: 'test-trigger-replace-event-query',
       cardIds: ['Test_Replace_Preview_Card'],
@@ -328,7 +335,10 @@ describe('engine hook event context', () => {
     const setup = makeEventTestEngine([exchange, fallback, blocked])
     const [triggerSelect] = buildPhaseTrailingNodes(
       setup.engine._internals(),
-      [{ registration: listener, cardId: 'Test_Trigger_Preview_Card', ownerPlayerId: player.id }],
+      [
+        { registration: listener, cardId: 'Test_Trigger_Preview_Card', ownerPlayerId: player.id },
+        { registration: secondPreviewListener, cardId: 'Test_Trigger_Preview_Card_2', ownerPlayerId: player.id },
+      ],
       'before',
       blocked.id,
       state,

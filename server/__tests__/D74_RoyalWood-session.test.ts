@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/D/D074_RoyalWood'
 import '../../shared/cards/B/B081_Handcart'
 import '../../shared/cards/E/E014_WoodSaw'
@@ -75,6 +76,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
     expect(minorOption).toBeDefined()
     resp = session.resolveChoice(0, minorOption!.value)
   }
+  resp = resolveTriggerIfPresent(session, resp, CARD_ID)
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   return resp
@@ -160,6 +162,7 @@ describe('D074_RoyalWood session', () => {
     expect(joineryOption).toBeDefined()
     resp = session.resolveChoice(0, joineryOption!.value)
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -199,6 +202,7 @@ describe('D074_RoyalWood session', () => {
     const room = resp.interaction.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(5)
 
     resp = session.resolveChoice(0, '__done__')
@@ -245,6 +249,7 @@ describe('D074_RoyalWood session', () => {
     const stable = resp.interaction.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.paid',

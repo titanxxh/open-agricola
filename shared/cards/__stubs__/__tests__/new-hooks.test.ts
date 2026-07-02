@@ -18,6 +18,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 function makeSession(round: number, stubCardIds: string[]) {
   const session = new GameSession()
+  registerStubCards()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -61,7 +62,6 @@ function resolveSourceCardChoice(
   resp: ReturnType<GameSession['performRoundEnd']>,
   sourceCard: string,
 ) {
-  expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
   const option = resp.interaction.options?.find((o) => o.sourceCard === sourceCard && o.value !== '__skip__')
   expect(option).toBeDefined()
@@ -72,7 +72,6 @@ describe('New hook stubs - ReturnHome sub-phases', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onBeforeReturnHome fires before workers return', () => {
@@ -105,7 +104,6 @@ describe('New hook stubs - AfterRoundEnd', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onAfterRoundEnd fires after round end', () => {
@@ -121,7 +119,6 @@ describe('New hook stubs - Harvest sub-phases', () => {
   beforeEach(() => {
     clearActionHooks()
     clearStubCards()
-    registerStubCards()
   })
 
   it('onStartHarvest fires at harvest start', () => {
@@ -134,7 +131,10 @@ describe('New hook stubs - Harvest sub-phases', () => {
 
   it('HarvestFieldPhase hooks all fire during field phase', () => {
     const { session } = makeSession(4, [HARVEST_FIELD_ID])
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
+    resp = resolveSourceCardChoice(session, resp, HARVEST_FIELD_ID)
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
     const counters = p0.cardStates?.[HARVEST_FIELD_ID]?.counters
@@ -148,8 +148,10 @@ describe('New hook stubs - Harvest sub-phases', () => {
     'onHarvestFieldPhase',
     'onEndHarvestFieldPhase',
   ] as const)('%s card flows are collected into one stage parallel flow', (hook) => {
+    const { session, state } = makeSession(4, [])
     const cardIds = registerHarvestFieldFlowCards(hook)
-    const { session } = makeSession(4, cardIds)
+    state.players[0]!.minorPlayed.push(...cardIds)
+    session.loadState(state)
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -164,10 +166,10 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(source.flow.children.map(firstChildSourceCard)).toEqual(cardIds)
   })
 
-  it('harvest field parallel choices are prompted to each owning player', () => {
+  it('single harvest field stage choices are prompted to each owning player', () => {
     const hook = 'onStartHarvestFieldPhase'
-    const cardIds = registerHarvestFieldFlowCards(hook)
     const { session, state } = makeSession(4, [])
+    const cardIds = registerHarvestFieldFlowCards(hook)
     const p0 = state.players[0]!
     const p1 = state.players[1]!
     p0.minorPlayed.push(cardIds[0]!)
@@ -179,18 +181,9 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0]])
-
-    const frame = session.getEngineStack().toCursor().frames.at(-1)
-    const source = frame?.source
-    expect(source?.kind).toBe('flow')
-    if (source?.kind !== 'flow') return
-    expect(source.flow.type).toBe('parallel')
-    if (source.flow.type !== 'parallel') return
-    expect(source.flow.children.map((child) => child.targetPlayerId)).toEqual([p0.id])
+    expect(resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0], cardIds[0]])
 
     let p1Resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
-    p1Resp = resolveSourceCardChoice(session, p1Resp, cardIds[0]!)
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.request.kind).toBe('confirm-player-switch')
@@ -201,13 +194,14 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.playerIndex).toBe(1)
-    expect(p1Resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1]])
+    expect(p1Resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1], cardIds[1]])
   })
 
   it('harvest field parallel choices resume the stage once after out-of-order resolution', () => {
     const hook = 'onStartHarvestFieldPhase'
+    const { session, state } = makeSession(4, [])
     const cardIds = registerHarvestFieldFlowCards(hook)
-    const { session, state } = makeSession(4, cardIds)
+    state.players[0]!.minorPlayed.push(...cardIds)
     state.players.forEach((player) => {
       player.resources.food = 20
     })

@@ -45,7 +45,6 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
   'id',
   'handHooks',
   'beforeEndGameScope',
-  'beforeEndGameDispatchMode',
   'beforeEndGameMandatory',
 ])
 

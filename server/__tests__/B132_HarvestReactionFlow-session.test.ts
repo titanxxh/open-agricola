@@ -5,6 +5,7 @@ import type { ActionChoiceOption, PlayerState } from '../../shared/contract/type
 
 import '../../shared/cards/B/B132_EstateMaster'
 import '../../shared/cards/B/B050_ButterChurn'
+import '../../shared/cards/C/C098_CubeCutter'
 import '../../shared/cards/D/D038_MilkingStool'
 import '../../shared/cards/D/D072_StableManure'
 import '../../shared/cards/E/E112_GrainThief'
@@ -58,9 +59,9 @@ describe('harvest reaction flow', () => {
     resp: ReturnType<GameSession['performRoundEnd']>,
     cardId: string,
   ) => {
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
-    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.value === cardId)
+    if (resp.interaction.stateId !== 'wait') return resp
+    if (resp.interaction.request.kind !== 'select-trigger') return resp
+    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.sourceCard === cardId)
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
@@ -76,7 +77,7 @@ describe('harvest reaction flow', () => {
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
 
-  it('auto-runs mandatory non-interactive harvest field hooks without trigger-select pending', () => {
+  it('auto-expands a single mandatory non-interactive harvest field hook', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.minorPlayed.push('B050_ButterChurn')
@@ -86,7 +87,8 @@ describe('harvest reaction flow', () => {
     ]
 
     session.loadState(state)
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
@@ -94,7 +96,7 @@ describe('harvest reaction flow', () => {
     expect(resp.state.players[0]!.resources.food).toBe(20)
   })
 
-  it('auto-runs Milking Stool without trigger-select pending', () => {
+  it('auto-expands a single Milking Stool harvest field hook', () => {
     const { session, state } = setupHarvestSession()
     const player = state.players[0]!
     player.occupationPlayed.push('D038_MilkingStool')
@@ -103,12 +105,75 @@ describe('harvest reaction flow', () => {
     player.houseAnimalCount = 1
 
     session.loadState(state)
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveCardTrigger(session, resp, 'D038_MilkingStool')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(19)
+  })
+
+  it('keeps deterministic and interactive harvest field hooks in the same trigger selection', () => {
+    const { session, state } = setupHarvestSession()
+    const player = state.players[0]!
+    player.minorPlayed.push('B050_ButterChurn')
+    player.occupationPlayed.push('C098_CubeCutter')
+    player.resources.wood = 1
+    player.pastures = [
+      { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
+    ]
+
+    session.loadState(state)
+    const resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
+    expect(resp.interaction.options).toContainEqual({
+      value: expect.any(String),
+      labelKey: 'cards.B050_ButterChurn.name',
+      sourceCard: 'B050_ButterChurn',
+    })
+    expect(resp.interaction.options).toContainEqual({
+      value: expect.any(String),
+      labelKey: 'cards.C098_CubeCutter.name',
+      sourceCard: 'C098_CubeCutter',
+    })
+    expect(resp.state.players[0]!.resources.food).toBe(20)
+  })
+
+  it('re-evaluates remaining harvest field triggers after a selected trigger changes resources', () => {
+    const { session, state } = setupHarvestSession()
+    const player = state.players[0]!
+    player.minorPlayed.push('B050_ButterChurn')
+    player.occupationPlayed.push('C098_CubeCutter')
+    player.resources.food = 0
+    player.resources.wood = 1
+    player.pastures = [
+      { id: 'sheep-pasture', size: 3, tiles: [], stables: 0, animalType: 'sheep', animalCount: 3 },
+    ]
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'B050_ButterChurn')).toBe(true)
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(false)
+
+    resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
+
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected second trigger-select')
+    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(true)
+
+    resp = resolveCardTrigger(session, resp, 'C098_CubeCutter')
+    resp = acceptOptional(session, resp)
+
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.C098_CubeCutter?.counters?.bonusVp).toBe(1)
   })
 
   it('keeps Stable Manure harvest field selection interactive', () => {

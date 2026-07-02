@@ -8,6 +8,7 @@ import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confi
 import type { SessionResponse } from '../game/authoritative-session'
 
 const M057 = 'M057_Taps'
+const A092 = 'A092_AdoptiveParents'
 const M083 = 'M083_CoalSeam'
 const M060 = 'M060_SowingMachine'
 const M015 = 'M015_PeatBurnOff'
@@ -27,7 +28,7 @@ const placeableSpaces = (session: GameSession) =>
 const reqKind = (resp: SessionResponse): string | undefined =>
   resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : undefined
 
-const setupM057Rotation = (minorPlayed: string[] = [M057]) => {
+const setupM057Rotation = (minorPlayed: string[] = [M057], occupationPlayed: string[] = []) => {
   const session = new GameSession(57057, undefined, {
     playerCount: 2,
     enableFarmersOfTheMoor: true,
@@ -53,6 +54,7 @@ const setupM057Rotation = (minorPlayed: string[] = [M057]) => {
     }
   })
   state.players[0]!.minorPlayed = [...minorPlayed]
+  state.players[0]!.occupationPlayed = [...occupationPlayed]
   session.loadState(state)
   return session
 }
@@ -68,6 +70,15 @@ const optionFor = (resp: SessionResponse, actionId: string): ActionChoiceOption 
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
   const option = resp.interaction.options?.find((candidate) =>
     candidate.labelKey === `moor.specialActions.${actionId}`)
+  expect(option).toBeDefined()
+  return option!
+}
+
+const triggerOptionFor = (resp: SessionResponse, sourceCard: string): ActionChoiceOption => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+  expect(resp.interaction.request.kind).toBe('select-trigger')
+  const option = resp.interaction.options?.find((candidate) => candidate.sourceCard === sourceCard)
   expect(option).toBeDefined()
   return option!
 }
@@ -214,6 +225,63 @@ describe('M057 Taps', () => {
     expect(chosen.ok).toBe(true)
     expect(chosen.state.players[0]!.resources.food).toBe(1)
     expect(chosen.state.players[0]!.resources.fuel).toBe(1)
+  })
+
+  it('offers Taps and Adoptive Parents as provider activations before nested action choices', () => {
+    const session = setupM057Rotation([M057], [A092])
+    const player = session.state.players[0]!
+    player.resources.food = 2
+    player.workers.find((worker) => worker.isActive)!.isNewborn = true
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+
+    expect(reqKind(offer)).toBe('select-trigger')
+    expect(triggerOptionFor(offer, M057)).toBeDefined()
+    expect(triggerOptionFor(offer, A092)).toBeDefined()
+    expect(offer.interaction.stateId === 'wait'
+      ? offer.interaction.options?.some((option) => option.labelKey === 'moor.specialActions.hiring-fair')
+      : false).toBe(false)
+
+    const selectedTaps = session.resolveChoice(0, M057)
+
+    expect(reqKind(selectedTaps)).toBe('choice')
+    expect(optionFor(selectedTaps, 'hiring-fair')).toBeDefined()
+
+    const undone = session.undoAction()
+    expect(undone.ok).toBe(true)
+    expect(reqKind(undone)).toBe('select-trigger')
+    expect(triggerOptionFor(undone, M057)).toBeDefined()
+    expect(triggerOptionFor(undone, A092)).toBeDefined()
+  })
+
+  it('undoAction restores the pending Taps extra-turn offer after resolving a borrowed card action', () => {
+    const session = setupM057Rotation()
+    const player = session.state.players[0]!
+    const other = session.state.players[1]!
+    const card = session.state.farmersOfTheMoor!.specialActionCards.find((entry) =>
+      entry.actions.includes('fell-trees'))!
+    card.location = { kind: 'playerFaceUp', playerId: other.id }
+    player.resources.food = 2
+    player.farmTerrain = [{ row: 2, col: 0, kind: 'forest' }]
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    const chosen = session.resolveChoice(0, optionFor(offer, 'fell-trees').value)
+
+    expect(chosen.ok).toBe(true)
+    expect(chosen.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBe(true)
+
+    const undone = session.undoAction()
+
+    expect(undone.ok).toBe(true)
+    expect(undone.state.currentPlayerIndex).toBe(0)
+    expect(hasPendingExtraTurn(undone.state, undone.state.players[0]!)).toBe(true)
+    expect(undone.state.players[0]!.cardStates?.[M057]?.extraData?.usedThisRound).toBeUndefined()
+    expect(undone.interaction.stateId).toBe('wait')
+    expect(undone.interaction.stateId === 'wait' ? undone.interaction.sourceCard : undefined).toBe(M057)
+    expect(reqKind(undone)).toBe('choice')
+    expect(optionFor(undone, 'fell-trees')).toBeDefined()
   })
 
   it('fires before-special-action listeners before a Taps borrowed card action', () => {

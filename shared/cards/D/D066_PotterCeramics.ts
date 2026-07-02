@@ -16,12 +16,12 @@ const beforeBakeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['bake-bread'],
-  dispatchMode: 'select',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getPlayerBakeRates(context.player).length === 0) return
     return {
       flow: {
         type: 'seq' as const,
+        optional: true,
         children: [
           payLeaf({ cardId: CARD_ID, cost: { clay: 1 } }),
           gainLeaf(CARD_ID, { grain: 1 }),

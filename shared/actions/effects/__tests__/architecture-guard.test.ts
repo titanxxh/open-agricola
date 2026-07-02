@@ -21,6 +21,7 @@ describe('effects architecture guard', () => {
 
     expect(ids).toEqual([
       'activate-card-effect',
+      'activate-extra-turn',
       'bake-bread',
       'bonus-food',
       'bonus-grain',

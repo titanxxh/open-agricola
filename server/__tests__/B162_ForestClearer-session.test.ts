@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { B162_ForestClearer_impl } from '../../shared/cards/B/B162_ForestClearer'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -68,7 +69,8 @@ describe('B162_ForestClearer session', () => {
   it('gains +1 wood +1 food when collecting exactly 2 wood', () => {
     const session = setup(2)
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -81,7 +83,8 @@ describe('B162_ForestClearer session', () => {
   it('gains +1 wood (no food) when collecting exactly 3 wood', () => {
     const session = setup(3)
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -94,7 +97,8 @@ describe('B162_ForestClearer session', () => {
   it('gains +1 wood +1 food when collecting exactly 4 wood', () => {
     const session = setup(4)
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!

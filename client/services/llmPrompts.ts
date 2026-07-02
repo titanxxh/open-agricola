@@ -108,7 +108,6 @@ const CARD_IMPL = {
 	    computeBonusScore: (state, player, ctx) => number,  // 返回 VP 数（不是对象）
 	    handHooks: ['onRoundStart'],  // meta：声明手牌时也触发的 hook
 	    beforeEndGameScope: 'owner',  // meta：'owner' | 'allPlayers'
-	    beforeEndGameDispatchMode: 'serial',  // meta：'serial' | 'select'
 	    beforeEndGameMandatory: false,  // meta：select trigger 是否禁用 pass
 	  },
   listeners: [           // 行动触发（可选）
@@ -165,7 +164,6 @@ const CARD_IMPL = {
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
 | beforeEndGameScope (meta) | \`'owner' \| 'allPlayers'\` | 终局前按 target player 分发 onBeforeEndGame |
-| beforeEndGameDispatchMode (meta) | \`'serial' \| 'select'\` | 终局前自动执行或进入 trigger-select |
 | beforeEndGameMandatory (meta) | \`boolean\` | select trigger 可用时是否禁用 pass |
 
 ## listener 机制

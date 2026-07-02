@@ -6,7 +6,7 @@ import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { PlayerScoreSummary } from '../../shared/domain/scoring'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import { hasHealthyWorkerAtHome } from '../../shared/moor/heating'
-import { isMoorSpecialActionCardUsableByPlayer } from '../../shared/moor/special-actions'
+import { isMoorSpecialActionCardUsableByPlayer, isMoorSpecialActionId } from '../../shared/moor/special-actions'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import type { Locale } from '../../shared/i18n'
 import type { PlayerScoreRow } from '../components/board/ScorePanel'
@@ -42,6 +42,14 @@ export const devResourceKeysForState = (
   state?: { enableFarmersOfTheMoor?: boolean } | null,
 ): (keyof Resource)[] =>
   state?.enableFarmersOfTheMoor === true ? extendedResourceKeyList : resourceKeyList
+
+export const shouldShowDevPanel = ({
+  devMode,
+  hasGameView,
+}: {
+  devMode: boolean
+  hasGameView: boolean
+}): boolean => devMode && hasGameView
 
 export const canTakeVisibleMoorSpecialAction = (
   state: GameState,
@@ -239,6 +247,105 @@ export const buildPlaceFarmerChoiceMap = (
   })
   return new Map(entries)
 }
+
+export type PendingMoorSpecialActionChoice = {
+  value: string
+  cardId: string
+  actionId: MoorSpecialActionId
+  tile?: FarmTilePosition
+  tileKey?: string
+  disabled: boolean
+}
+
+export type PendingMoorSpecialActionChoiceMaps = {
+  isActive: boolean
+  byCardAction: Map<string, PendingMoorSpecialActionChoice>
+  byCardActionTile: Map<string, PendingMoorSpecialActionChoice>
+  selectableTileKeysByCardAction: Map<string, Set<string>>
+}
+
+export const pendingMoorSpecialActionKey = (
+  cardId: string,
+  actionId: MoorSpecialActionId,
+): string => `${cardId}:${actionId}`
+
+export const pendingMoorSpecialActionTileKey = (
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  tileKey: string,
+): string => `${cardId}:${actionId}:${tileKey}`
+
+export const parsePendingMoorSpecialActionChoice = (
+  option: ActionChoiceOption,
+): PendingMoorSpecialActionChoice | null => {
+  const prefix = 'card-action:'
+  if (!option.value.startsWith(prefix)) return null
+  const parts = option.value.slice(prefix.length).split(':')
+  const cardId = parts[0]
+  const actionMarker = parts[1]
+  const actionId = parts[2]
+  if (!cardId || actionMarker !== 'action' || !actionId) return null
+  if (!isMoorSpecialActionId(actionId)) return null
+  if (parts.length !== 3 && parts.length !== 5) return null
+  if (parts.length === 5) {
+    const row = Number(parts[3])
+    const col = Number(parts[4])
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return null
+    const tile = { row, col }
+    return {
+      value: option.value,
+      cardId,
+      actionId,
+      tile,
+      tileKey: positionKey(tile),
+      disabled: option.disabled === true,
+    }
+  }
+  return {
+    value: option.value,
+    cardId,
+    actionId,
+    disabled: option.disabled === true,
+  }
+}
+
+export const buildPendingMoorSpecialActionChoiceMaps = (
+  options?: readonly ActionChoiceOption[],
+): PendingMoorSpecialActionChoiceMaps => {
+  const byCardAction = new Map<string, PendingMoorSpecialActionChoice>()
+  const byCardActionTile = new Map<string, PendingMoorSpecialActionChoice>()
+  const selectableTileKeysByCardAction = new Map<string, Set<string>>()
+  for (const option of options ?? []) {
+    const parsed = parsePendingMoorSpecialActionChoice(option)
+    if (!parsed) continue
+    const actionKey = pendingMoorSpecialActionKey(parsed.cardId, parsed.actionId)
+    if (!parsed.tileKey) {
+      if (!parsed.disabled) byCardAction.set(actionKey, parsed)
+      continue
+    }
+    if (parsed.disabled) continue
+    byCardActionTile.set(
+      pendingMoorSpecialActionTileKey(parsed.cardId, parsed.actionId, parsed.tileKey),
+      parsed,
+    )
+    const tileKeys = selectableTileKeysByCardAction.get(actionKey) ?? new Set<string>()
+    tileKeys.add(parsed.tileKey)
+    selectableTileKeysByCardAction.set(actionKey, tileKeys)
+  }
+  return {
+    isActive: byCardAction.size > 0 || byCardActionTile.size > 0,
+    byCardAction,
+    byCardActionTile,
+    selectableTileKeysByCardAction,
+  }
+}
+
+export const shouldSuppressPendingChoiceOptionsInInteractionBar = (
+  pendingChoice: { options?: readonly ActionChoiceOption[] } | null,
+): boolean =>
+  (pendingChoice?.options ?? []).some((option) =>
+    parsePendingMoorSpecialActionChoice(option) !== null,
+  )
 
 export const hasPublicEventHighlights = (targets: PublicEventHighlightTargets): boolean =>
   targets.actionIds.length > 0 || targets.farmTiles.length > 0 || targets.fenceEdges.length > 0

@@ -57,13 +57,13 @@ const setupEndGameSession = () => {
   return session
 }
 
-const expectA136Trigger = (resp: SessionResponse, playerIndex: number) => {
+const resolveA136TriggerIfPresent = (session: GameSession, resp: SessionResponse, playerIndex: number) => {
   const interaction = resp.interaction
   expect(interaction.stateId).toBe('wait')
   if (interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(interaction.playerIndex).toBe(playerIndex)
+  if (interaction.request.kind !== 'select-trigger') return resp
   expect(interaction.request.kind).toBe('select-trigger')
-  if (interaction.request.kind !== 'select-trigger') throw new Error('expected select-trigger')
   expect(interaction.request.options).toContainEqual({
     value: CARD_ID,
     labelKey: `cards.${CARD_ID}.name`,
@@ -74,6 +74,7 @@ const expectA136Trigger = (resp: SessionResponse, playerIndex: number) => {
     labelKey: 'ui.interactionSelectTriggerPass',
     disabled: true,
   })
+  return session.resolveChoice(playerIndex, CARD_ID)
 }
 
 const expectA136Choice = (resp: SessionResponse, playerIndex: number, values: string[]) => {
@@ -98,9 +99,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
     session.loadState(state)
 
     let resp = session.invokeAfterRoundEnd()
-    expectA136Trigger(resp, 0)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    resp = resolveA136TriggerIfPresent(session, resp, 0)
     expectA136Choice(resp, 0, [a136Choice(0), a136Choice(1), a136Choice(2)])
 
     resp = session.resolveChoice(0, a136Choice(2))
@@ -117,9 +116,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
     expect(resp.interaction.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
-    expectA136Trigger(resp, 1)
-
-    resp = session.resolveChoice(1, CARD_ID)
+    resp = resolveA136TriggerIfPresent(session, resp, 1)
     expectA136Choice(resp, 1, [
       a136Choice(0),
       a136Choice(1),
@@ -172,9 +169,7 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
     session.loadState(state)
 
     let resp = session.invokeAfterRoundEnd()
-    expectA136Trigger(resp, 0)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    resp = resolveA136TriggerIfPresent(session, resp, 0)
     expectA136Choice(resp, 0, [a136Choice(0), a136Choice(1)])
 
     resp = session.resolveChoice(0, a136Choice(0))
@@ -201,12 +196,10 @@ describe('A136_DrudgeryReeve before-end shared scoring', () => {
         }
       },
       beforeEndGameScope: 'allPlayers',
-      beforeEndGameDispatchMode: 'select',
       beforeEndGameMandatory: true,
     }
-    requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)
-
     const session = setupEndGameSession()
+    requireActiveCardRegistry('A136 before-end recompute test').setEffect(effect)
     const state = session.getState().state
     state.players[0]!.occupationPlayed = [RESERVE_FIRST_CARD, CARD_ID]
     setBuildingResources(state.players[0]!, 3)

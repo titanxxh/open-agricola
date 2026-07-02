@@ -230,7 +230,7 @@ describe('Engine flow nodes', () => {
     })
   })
 
-  it('single select listener is wrapped in trigger-select', () => {
+  it('single reaction listener stays a direct activation leaf', () => {
     const p1 = createPlayer()
     const state = createState()
     state.players = [p1]
@@ -247,7 +247,6 @@ describe('Engine flow nodes', () => {
         registration: {
           id: 'listener-1',
           cardIds: ['C1'],
-          dispatchMode: 'select',
           handler: () => undefined,
         },
         cardId: 'C1',
@@ -268,19 +267,257 @@ describe('Engine flow nodes', () => {
 
     expect(nodes).toHaveLength(1)
     const node = nodes[0]
-    expect(node).toBeInstanceOf(ParallelNode)
-    const parallel = node as ParallelNode
-    expect(parallel.mode).toBe('trigger-select')
-    expect(parallel.children).toHaveLength(1)
-    expect(parallel.children[0]).toBeInstanceOf(ActionNode)
-    const child = parallel.children[0] as ActionNode
+    expect(node).toBeInstanceOf(ActionNode)
+    const child = node as ActionNode
     expect(child.actionId).toBe('activate-card')
     expect(child.sourceCard).toBe('C1')
   })
 
+  it('same-timing reaction listeners are selectable without dispatch opt-in', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C1', 'C2']
+    const state = createState()
+    state.players = [p1]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'listener-1',
+          cardIds: ['C1'],
+          handler: () => undefined,
+        },
+        cardId: 'C1',
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
+      },
+      {
+        registration: {
+          id: 'listener-2',
+          cardIds: ['C2'],
+          handler: () => undefined,
+        },
+        cardId: 'C2',
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const node = nodes[0]
+    expect(node).toBeInstanceOf(ParallelNode)
+    const parallel = node as ParallelNode
+    expect(parallel.mode).toBe('trigger-select')
+    expect(parallel.triggerChildren.map((child) => child.cardId)).toEqual(['C1', 'C2'])
+    expect(parallel.children).toHaveLength(2)
+    expect(parallel.children.every((child) => child instanceof ActionNode)).toBe(true)
+  })
+
+  it('uses the event source card for grouped global reaction listeners', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C2']
+    const state = createState()
+    state.players = [p1]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'global-source-card-listener',
+          handler: () => undefined,
+        },
+        cardId: '',
+        ownerPlayerId: '',
+      },
+      {
+        registration: {
+          id: 'listener-2',
+          cardIds: ['C2'],
+          handler: () => undefined,
+        },
+        cardId: 'C2',
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      { sourceCard: 'B018_GrasslandHarrow' },
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const parallel = nodes[0] as ParallelNode
+    expect(parallel.mode).toBe('trigger-select')
+    expect(parallel.triggerChildren.map((child) => child.cardId)).toEqual(['B018_GrasslandHarrow', 'C2'])
+    expect((parallel.children[0] as ActionNode).sourceCard).toBe('B018_GrasslandHarrow')
+    expect((parallel.children[0] as ActionNode).params.cardId).toBe('B018_GrasslandHarrow')
+  })
+
+  it('splits same-timing reaction groups by card owner', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['OWN_CARD']
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const, minorPlayed: ['P2_CARD'] }
+    const p3 = { ...createPlayer(), id: 'p3', name: 'P3', color: 'green' as const, minorPlayed: ['P3_CARD'] }
+    const state = createState()
+    state.players = [p1, p2, p3]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'own-listener',
+          cardIds: ['OWN_CARD'],
+          handler: () => undefined,
+        },
+        cardId: 'OWN_CARD',
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
+      },
+      {
+        registration: {
+          id: 'p2-listener',
+          cardIds: ['P2_CARD'],
+          scope: 'opponent',
+          handler: () => undefined,
+        },
+        cardId: 'P2_CARD',
+        ownerPlayerId: p2.id,
+        ownerCardZone: 'played',
+      },
+      {
+        registration: {
+          id: 'p3-listener',
+          cardIds: ['P3_CARD'],
+          scope: 'opponent',
+          handler: () => undefined,
+        },
+        cardId: 'P3_CARD',
+        ownerPlayerId: p3.id,
+        ownerCardZone: 'played',
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(3)
+    expect(nodes.map((node) => node.ownerPlayerId)).toEqual([p1.id, p2.id, p3.id])
+    expect(nodes.every((node) => node instanceof ActionNode)).toBe(true)
+  })
+
+  it('previews trigger-select affordability against the child owner', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    p1.resources.food = 0
+    p2.resources.food = 1
+    p2.minorPlayed = ['OWNER_PAY_CARD', 'OWNER_OTHER_CARD']
+    const state = createState()
+    state.players = [p1, p2]
+
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'owner-pay-listener',
+      cardIds: ['OWNER_PAY_CARD'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: 'OWNER_PAY_CARD' },
+      }),
+    })
+    cardRegistry.registerListener({
+      id: 'owner-other-listener',
+      cardIds: ['OWNER_OTHER_CARD'],
+      handler: () => ({ extraData: { applicable: true } }),
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const children = [
+      new ActionNode('activate-owner-pay', 'activate-card', 'OWNER_PAY_CARD', {
+        listenerId: 'owner-pay-listener',
+        cardId: 'OWNER_PAY_CARD',
+        phase: 'after',
+        actionId: 'gain',
+        event: {},
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+      }),
+      new ActionNode('activate-owner-other', 'activate-card', 'OWNER_OTHER_CARD', {
+        listenerId: 'owner-other-listener',
+        cardId: 'OWNER_OTHER_CARD',
+        phase: 'after',
+        actionId: 'gain',
+        event: {},
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+      }),
+    ]
+    children.forEach((child) => { child.ownerPlayerId = p2.id })
+    const triggerSelect = new ParallelNode('owner-preview-select', children)
+    triggerSelect.mode = 'trigger-select'
+    triggerSelect.triggerOwnerPlayerId = p1.id
+    triggerSelect.ownerPlayerId = p1.id
+    triggerSelect.triggerChildren = children.map((child) => ({
+      nodeId: child.id,
+      cardId: child.sourceCard!,
+      listenerId: String(child.params.listenerId),
+      mandatory: false,
+    }))
+    const engine = new Engine({
+      tree: new EngineTree(triggerSelect),
+      registry: new ActionRegistry(),
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    const prompt = engine.proceed({ state, player: p1, space: createSpace(gainAction) })
+
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.sourceCard === 'OWNER_PAY_CARD')?.disabled).not.toBe(true)
+  })
+
   it('disabled trigger-select choice is rejected without resolving the child', () => {
     const p1 = createPlayer()
-    p1.minorPlayed = ['C1']
+    p1.minorPlayed = ['C1', 'C2']
     const state = createState()
     state.players = [p1]
 
@@ -288,12 +525,17 @@ describe('Engine flow nodes', () => {
     const listener = {
       id: 'listener-1',
       cardIds: ['C1'],
-      dispatchMode: 'select' as const,
       handler: () => ({
         flow: { type: 'leaf' as const, actionId: 'pay', params: { cost: { wood: 1 } } },
       }),
     }
+    const listener2 = {
+      id: 'listener-2',
+      cardIds: ['C2'],
+      handler: () => ({ extraData: { applicable: true } }),
+    }
     cardRegistry.registerListener(listener)
+    cardRegistry.registerListener(listener2)
     setActiveCardRegistry(cardRegistry)
 
     const registry = new ActionRegistry()
@@ -305,7 +547,10 @@ describe('Engine flow nodes', () => {
     })
     const nodes = buildPhaseTrailingNodes(
       engineForNodes._internals(),
-      [{ registration: listener, cardId: 'C1', ownerPlayerId: p1.id }],
+      [
+        { registration: listener, cardId: 'C1', ownerPlayerId: p1.id },
+        { registration: listener2, cardId: 'C2', ownerPlayerId: p1.id },
+      ],
       'after',
       'gain',
       state,
@@ -325,9 +570,10 @@ describe('Engine flow nodes', () => {
     const prompt = engine.proceed(context)
     expect(prompt.type).toBe('choice')
     if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
-    expect(prompt.choice.options.find((option) => option.value === 'C1')?.disabled).toBe(true)
+    const disabledOption = prompt.choice.options.find((option) => option.sourceCard === 'C1')
+    expect(disabledOption?.disabled).toBe(true)
 
-    const rejected = engine.resolveChoice('C1', context)
+    const rejected = engine.resolveChoice(disabledOption!.value, context)
 
     expect(rejected.type).toBe('fail')
     expect(child.getState()).toBe('ready')
@@ -408,7 +654,7 @@ describe('Engine flow nodes', () => {
 
   it('preserves hand owner zone through trigger-select activation', () => {
     const p1 = createPlayer()
-    p1.minorHand = ['HAND_SELECT_CARD']
+    p1.minorHand = ['HAND_SELECT_CARD', 'HAND_SELECT_CARD_2']
     const state = createState()
     state.players = [p1]
 
@@ -425,7 +671,6 @@ describe('Engine flow nodes', () => {
       zones: ['hand'],
       actions: ['trigger-hand-select'],
       phases: ['after'],
-      dispatchMode: 'select',
       handler: (context: CardListenerContext) => {
         seen.push({
           ownerCardId: context.ownerCardId,
@@ -435,6 +680,14 @@ describe('Engine flow nodes', () => {
         })
         return { extraData: { applicable: true } }
       },
+    })
+    cardRegistry.registerListener({
+      id: 'hand-select-after-2',
+      cardIds: ['HAND_SELECT_CARD_2'],
+      zones: ['hand'],
+      actions: ['trigger-hand-select'],
+      phases: ['after'],
+      handler: () => ({ extraData: { applicable: true } }),
     })
     setActiveCardRegistry(cardRegistry)
 
@@ -462,12 +715,12 @@ describe('Engine flow nodes', () => {
     const prompt = engine.proceed(context())
     expect(prompt.type).toBe('choice')
     if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
-    expect(prompt.choice.options.find((option) => option.value === 'HAND_SELECT_CARD')).toMatchObject({
-      value: 'HAND_SELECT_CARD',
+    const option = prompt.choice.options.find((candidate) => candidate.sourceCard === 'HAND_SELECT_CARD')
+    expect(option).toMatchObject({
       sourceCard: 'HAND_SELECT_CARD',
     })
 
-    const accepted = engine.resolveChoice('HAND_SELECT_CARD', context())
+    const accepted = engine.resolveChoice(option!.value, context())
     expect(accepted.type).toBe('ok')
     expect(engine.proceed(context()).type).toBe('ok')
 

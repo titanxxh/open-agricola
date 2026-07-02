@@ -214,7 +214,6 @@ type FlowEffectHandlerWithContext = (
 ) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 export type BeforeEndGameScope = 'owner' | 'allPlayers'
-export type BeforeEndGameDispatchMode = 'serial' | 'select'
 
 export type ResolveChoiceHandler = (
   state: GameState,
@@ -262,15 +261,11 @@ export type CardEffect = {
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
   resolveChoice?: ResolveChoiceHandler
   /**
-   * Turn-rotation extra-action hook. Returns an `ActionFlow` (typically an
-   * XOR `[use, forfeit]`) when this card can still grant `player` an extra
-   * placement this round, or `void` when it cannot. Consumed actively by the
-   * round-rotation gating in `shared/session/phases/round.ts` (NOT auto-run
-   * via `runCardEffectHook`): it both decides whether the rotation may stop on
-   * an out-of-workers player (`hasPendingExtraTurn`) and produces the flow
-   * pushed to that player. Single source of truth so gating and flow cannot
-   * drift. First introduced for A92 AdoptiveParents; reusable by any card that
-   * wants to earn a turn-rotation extra action.
+   * Turn-rotation extra-action provider. Returns an `ActionFlow` when this
+   * card can still grant `player` an extra placement this round, or `void`
+   * when it cannot. Round gating collects all providers; one provider is
+   * expanded directly, multiple providers are offered as one-shot
+   * trigger-select activations.
    */
   contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
   countExtraTurns?: (state: GameState, player: PlayerState) => number
@@ -390,7 +385,6 @@ export type CardEffect = {
    */
   handHooks?: CardEffectHook[]
   beforeEndGameScope?: BeforeEndGameScope
-  beforeEndGameDispatchMode?: BeforeEndGameDispatchMode
   beforeEndGameMandatory?: boolean
 }
 
@@ -739,91 +733,55 @@ export const shouldSkipPlayerTurn = (state: GameState, player: PlayerState): boo
   return skip
 }
 
-/**
- * Collect the first turn-rotation extra-action flow a player's played cards
- * can contribute this turn (e.g. A92 AdoptiveParents' `XOR[use, forfeit]`).
- * Returns the flow plus the owning card id, or `null` when no card contributes.
- * This is the single source of truth consumed by the round-rotation gating in
- * `round.ts`: both the "may the rotation stop on this 0-worker player" decision
- * and the flow pushed to them come from the same `contributeExtraTurn` hook, so
- * they cannot drift. Errors from custom cards are swallowed (consistent with
- * the other hook aggregators here).
- */
-export const collectExtraTurnFlow = (
-  state: GameState,
-  player: PlayerState,
-): { flow: ActionFlow; cardId: string } | null => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    if (!effect?.contributeExtraTurn) continue
-    try {
-      if (effect.countExtraTurns) {
-        const rawCount = effect.countExtraTurns(state, player)
-        const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
-        if (count === 0) continue
-        if (skipped >= count) {
-          skipped -= count
-          continue
-        }
-      }
-      const flow = effect.contributeExtraTurn(state, player)
-      if (!effect.countExtraTurns && flow && skipped > 0) {
-        skipped -= 1
-        continue
-      }
-      if (flow) return { flow, cardId }
-    } catch (err) {
-      if (isCustomCard(cardId)) {
-        console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
-        continue
-      }
-      throw err
-    }
-  }
-  return null
+export type ExtraTurnContribution = {
+  cardId: string
+  ownerPlayerId: string
+  count: number
+  flow: ActionFlow
 }
 
-const countExtraTurnOpportunities = (
+const extraTurnCardIds = (player: PlayerState): string[] => [
+  ...player.improvements,
+  ...player.minorPlayed,
+  ...player.occupationPlayed,
+]
+
+const extraTurnCountForCard = (
   state: GameState,
   player: PlayerState,
   effect: CardEffect,
-  skipped: number,
 ): number => {
   if (effect.countExtraTurns) {
     const rawCount = effect.countExtraTurns(state, player)
-    const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
-    if (count === 0 || skipped >= count) return count
-    return effect.contributeExtraTurn?.(state, player) ? count : 0
+    return Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0
   }
   return effect.contributeExtraTurn?.(state, player) ? 1 : 0
 }
 
-export const countPendingExtraTurns = (state: GameState, player: PlayerState): number => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  let skipped = Math.max(0, player._extraTurnSkipCount ?? 0) + Math.max(0, player._extraTurnConsumedCount ?? 0)
-  let pending = 0
-  for (const cardId of allCards) {
+const extraTurnCounter = (
+  map: Record<string, number> | undefined,
+  cardId: string,
+): number => Math.max(0, Math.floor(map?.[cardId] ?? 0))
+
+export const collectExtraTurnContributions = (
+  state: GameState,
+  player: PlayerState,
+): ExtraTurnContribution[] => {
+  const contributions: ExtraTurnContribution[] = []
+  for (const cardId of extraTurnCardIds(player)) {
     const effect = getCardEffect(cardId)
     if (!effect?.contributeExtraTurn) continue
     try {
-      const count = countExtraTurnOpportunities(state, player, effect, skipped)
-      if (count === 0) continue
-      if (skipped >= count) {
-        skipped -= count
-        continue
+      const count = extraTurnCountForCard(state, player, effect)
+      const skipped =
+        extraTurnCounter(player._extraTurnSkipCountsByCard, cardId) +
+        extraTurnCounter(player._extraTurnConsumedCountsByCard, cardId)
+      const remaining = Math.max(0, count - skipped)
+      if (remaining <= 0) continue
+      const flow = effect.contributeExtraTurn(state, player)
+      if (flow) {
+        contributions.push({ cardId, ownerPlayerId: player.id, count: remaining, flow })
       }
-      pending += count - skipped
-      skipped = 0
     } catch (err) {
       if (isCustomCard(cardId)) {
         console.warn(`[card-effects] custom card ${cardId} contributeExtraTurn threw, skipping:`, err)
@@ -832,14 +790,67 @@ export const countPendingExtraTurns = (state: GameState, player: PlayerState): n
       throw err
     }
   }
-  return pending
+  return contributions
+}
+
+const extraTurnActivationFlow = (cardId: string): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'activate-extra-turn',
+  params: { cardId },
+  sourceCard: cardId,
+})
+
+/**
+ * Collect turn-rotation extra-action providers. A single provider is expanded
+ * directly; multiple providers become a one-shot trigger-select so the player
+ * chooses which card's extra turn to use now.
+ */
+export const collectExtraTurnFlow = (
+  state: GameState,
+  player: PlayerState,
+): { flow: ActionFlow; cardId?: string } | null => {
+  const contributions = collectExtraTurnContributions(state, player)
+  if (contributions.length === 0) return null
+  if (contributions.length === 1) {
+    const contribution = contributions[0]!
+    return { flow: contribution.flow, cardId: contribution.cardId }
+  }
+  return {
+    flow: {
+      type: 'parallel',
+      mode: 'trigger-select',
+      triggerSelectOnce: true,
+      children: contributions.map((contribution) => extraTurnActivationFlow(contribution.cardId)),
+    },
+  }
+}
+
+export const countPendingExtraTurns = (state: GameState, player: PlayerState): number => {
+  return collectExtraTurnContributions(state, player)
+    .reduce((sum, contribution) => sum + contribution.count, 0)
 }
 
 export const consumePendingExtraTurns = (state: GameState, player: PlayerState): number => {
-  const pending = countPendingExtraTurns(state, player)
-  if (pending <= 0) return 0
-  player._extraTurnConsumedCount = Math.max(0, player._extraTurnConsumedCount ?? 0) + pending
-  return pending
+  const contributions = collectExtraTurnContributions(state, player)
+  const consumed = contributions.reduce((sum, contribution) => sum + contribution.count, 0)
+  if (consumed <= 0) return 0
+  const next = { ...(player._extraTurnConsumedCountsByCard ?? {}) }
+  for (const contribution of contributions) {
+    next[contribution.cardId] = extraTurnCounter(next, contribution.cardId) + contribution.count
+  }
+  player._extraTurnConsumedCountsByCard = next
+  return consumed
+}
+
+export const skipPendingExtraTurn = (state: GameState, player: PlayerState): boolean => {
+  const contribution = collectExtraTurnContributions(state, player)[0]
+  if (!contribution) return false
+  player._extraTurnSkipCountsByCard = {
+    ...(player._extraTurnSkipCountsByCard ?? {}),
+    [contribution.cardId]:
+      extraTurnCounter(player._extraTurnSkipCountsByCard, contribution.cardId) + 1,
+  }
+  return true
 }
 
 /**
@@ -849,7 +860,7 @@ export const consumePendingExtraTurns = (state: GameState, player: PlayerState):
  * extra turn is still pending.
  */
 export const hasPendingExtraTurn = (state: GameState, player: PlayerState): boolean =>
-  collectExtraTurnFlow(state, player) !== null
+  collectExtraTurnContributions(state, player).length > 0
 
 export const getExtraRoomCapacity = (player: PlayerState): number => {
   const allCards = [

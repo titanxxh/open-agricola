@@ -134,9 +134,6 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
         if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
           __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
         }
-        if (eff.beforeEndGameDispatchMode === 'serial' || eff.beforeEndGameDispatchMode === 'select') {
-          __effectMetadata.beforeEndGameDispatchMode = eff.beforeEndGameDispatchMode;
-        }
         if (typeof eff.beforeEndGameMandatory === 'boolean') {
           __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
         }

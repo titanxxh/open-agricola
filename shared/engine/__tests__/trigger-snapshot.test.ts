@@ -38,6 +38,30 @@ const action = (
   execute,
 })
 
+const proceedUntilChoice = (
+  engine: Engine,
+  context: Parameters<Engine['proceed']>[0],
+) => {
+  for (let i = 0; i < 10; i += 1) {
+    const step = engine.proceed(context)
+    if (step.type === 'choice') return step
+    expect(step.type).not.toBe('blocked')
+  }
+  throw new Error('expected choice')
+}
+
+const proceedUntil = (
+  engine: Engine,
+  context: Parameters<Engine['proceed']>[0],
+  done: () => boolean,
+) => {
+  for (let i = 0; i < 10 && !done(); i += 1) {
+    const step = engine.proceed(context)
+    expect(step.type).not.toBe('blocked')
+    expect(step.type).not.toBe('choice')
+  }
+}
+
 describe('trailing trigger snapshots', () => {
   afterEach(() => {
     withActiveRegistry(new CardRegistry(), () => undefined)
@@ -112,6 +136,7 @@ describe('trailing trigger snapshots', () => {
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
+        if (context.state !== state) return { extraData: { applicable: true } }
         observed.push({
           snapshot: collectTriggerCardsAs(context, context.player, 'occupation').length,
           live: context.player.occupationPlayed.length,
@@ -119,12 +144,17 @@ describe('trailing trigger snapshots', () => {
       },
     })
     const { engine } = makeEventTestEngine([trigger, appendOccupation])
+    const context = { state, player, space: asActionSpace(trigger) }
 
     withActiveRegistry(registry, () => {
-      for (let i = 0; i < 10 && observed.length === 0; i += 1) {
-        const step = engine.proceed({ state, player, space: asActionSpace(trigger) })
-        expect(step.type).not.toBe('blocked')
-      }
+      expect(engine.proceed(context).type).toBe('ok')
+      const mutatorChoice = proceedUntilChoice(engine, context)
+      expect(mutatorChoice.choice.options.map((option) => option.value)).toContain('A085_Homekeeper')
+      expect(engine.resolveChoice('A085_Homekeeper', context).type).toBe('ok')
+      const observerChoice = proceedUntilChoice(engine, context)
+      expect(observerChoice.choice.options.map((option) => option.value)).toContain('E089_Stallwright')
+      expect(engine.resolveChoice('E089_Stallwright', context).type).toBe('ok')
+      proceedUntil(engine, context, () => observed.length > 0)
     })
 
     expect(observed).toEqual([{ snapshot: 3, live: 4 }])
@@ -200,16 +230,22 @@ describe('trailing trigger snapshots', () => {
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
+        if (context.state !== state) return { extraData: { applicable: true } }
         seenZones.push(context.ownerCardZone)
       },
     })
     const { engine } = makeEventTestEngine([trigger, moveObserver])
+    const context = { state, player, space: asActionSpace(trigger) }
 
     withActiveRegistry(registry, () => {
-      for (let i = 0; i < 10 && seenZones.length === 0; i += 1) {
-        const step = engine.proceed({ state, player, space: asActionSpace(trigger) })
-        expect(step.type).not.toBe('blocked')
-      }
+      expect(engine.proceed(context).type).toBe('ok')
+      const mutatorChoice = proceedUntilChoice(engine, context)
+      expect(mutatorChoice.choice.options.map((option) => option.value)).toContain('B049_Scales')
+      expect(engine.resolveChoice('B049_Scales', context).type).toBe('ok')
+      const observerChoice = proceedUntilChoice(engine, context)
+      expect(observerChoice.choice.options.map((option) => option.value)).toContain('B082_ValueAssets')
+      expect(engine.resolveChoice('B082_ValueAssets', context).type).toBe('ok')
+      proceedUntil(engine, context, () => seenZones.length > 0)
     })
 
     expect(seenZones).toEqual(['played'])

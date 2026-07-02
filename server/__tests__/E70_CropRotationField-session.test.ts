@@ -202,7 +202,8 @@ describe('E070_CropRotationField session', () => {
         .toBe('ui.interactionOptionalAction')
 
       const sowOption = resp.interaction.stateId === 'wait'
-        ? resp.interaction.options?.find((option) => option.value.startsWith('action-sow-'))
+        ? resp.interaction.options?.find((option) =>
+            option.value !== '__skip__' && option.sourceCard === CARD_ID)
         : undefined
       expect(sowOption).toBeDefined()
       resp = session.resolveChoice(0, sowOption!.value)

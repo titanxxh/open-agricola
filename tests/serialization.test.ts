@@ -47,11 +47,15 @@ describe('shared/session/serialization', () => {
       serialized.players.forEach((serializedPlayer, index) => {
         const {
           specialStables,
+          playedCardAnimalZones,
+          farmCardAnimalZones,
           borrowedPlayedCardAnimalZones,
           ...domainPlayer
         } = serializedPlayer
         expect(domainPlayer).toEqual(state.players[index])
         expect(specialStables).toEqual([])
+        expect(playedCardAnimalZones).toEqual([])
+        expect(farmCardAnimalZones).toEqual([])
         expect(borrowedPlayedCardAnimalZones).toEqual([])
       })
       expect(serialized.gameSeed).toBe(state.gameSeed)

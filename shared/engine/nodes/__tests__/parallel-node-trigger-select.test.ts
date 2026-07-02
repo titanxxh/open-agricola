@@ -105,6 +105,16 @@ const makeTriggerSelect = (
   return node
 }
 
+const makeActivateCardEffect = (
+  id: string,
+  cardId: string,
+  mandatory = true,
+): ActionNode => new ActionNode(id, 'activate-card-effect', cardId, {
+  cardId,
+  hook: 'onBeforeEndGame',
+  beforeEndGameMandatory: mandatory,
+})
+
 describe('ParallelNode trigger-select mode', () => {
   beforeEach(() => {
     setActiveCardRegistry(new CardRegistry())
@@ -138,6 +148,32 @@ describe('ParallelNode trigger-select mode', () => {
 
     expect(node.chooseCard('C1')).toBe(a)
     expect(node.selectedChildId).toBe('a')
+  })
+
+  it('keeps a selected non-card trigger child active for one-shot prompts', () => {
+    const child = new ActionNode(
+      'extra-a',
+      'activate-extra-turn',
+      'A092_AdoptiveParents',
+      { cardId: 'A092_AdoptiveParents' },
+    )
+    const node = new ParallelNode('ptn-extra', [child])
+    node.mode = 'trigger-select'
+    node.resolveAfterSelection = true
+    node.triggerOwnerPlayerId = 'p1'
+    node.ownerPlayerId = 'p1'
+    node.triggerChildren = [{
+      nodeId: child.id,
+      cardId: 'A092_AdoptiveParents',
+      listenerId: '',
+      mandatory: true,
+    }]
+
+    expect(node.chooseCard('A092_AdoptiveParents')).toBe(child)
+
+    expect(node.step(stubCtx)).toEqual({ kind: 'continue' })
+    expect(child.getState()).not.toBe('resolved')
+    expect(node.getState()).not.toBe('resolved')
   })
 
   it('follow-up inserted after selected child runs before next trigger prompt', () => {
@@ -205,7 +241,6 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C1'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
       }),
@@ -227,13 +262,12 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
-  it('no-op mandatory trigger resolves without a pass-only option list', () => {
+  it('no-op mandatory trigger evaluates without a pass-only option list', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C1'],
       mandatory: true,
-      dispatchMode: 'select',
       handler: () => undefined,
     })
     setActiveCardRegistry(cardRegistry)
@@ -242,8 +276,78 @@ describe('ParallelNode trigger-select mode', () => {
 
     const evaluation = evaluateTriggerSelect(node, makeContext())
 
-    expect(child.getState()).toBe('resolved')
+    expect(child.getState()).not.toBe('resolved')
     expect(evaluation.options).toEqual([])
+  })
+
+  it('keeps mutation-only listener triggers selectable', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['MutationOnlyCard'],
+      handler: (context) => {
+        const effectPlayer = context.effectPlayer ?? context.player
+        effectPlayer.cardStates.MutationOnlyCard = { ready: true }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      minorPlayed: ['MutationOnlyCard'],
+    })
+    const node = makeTriggerSelect([makeActivate('a', 'MutationOnlyCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player))
+
+    expect(player.cardStates).toEqual({})
+    expect(evaluation.options).toEqual([
+      {
+        value: 'MutationOnlyCard',
+        labelKey: 'cards.MutationOnlyCard.name',
+        sourceCard: 'MutationOnlyCard',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
+  it('keeps pass enabled for optional mutation-only stage activations', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.setEffect({
+      id: 'OptionalMutationStageCard',
+      onBeforeEndGame: (_state, player) => {
+        player.cardStates.OptionalMutationStageCard = { ready: true }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      minorPlayed: ['OptionalMutationStageCard'],
+    })
+    const child = makeActivateCardEffect('stage-a', 'OptionalMutationStageCard', false)
+    const node = new ParallelNode('stage-select', [child])
+    node.mode = 'trigger-select'
+    node.triggerOwnerPlayerId = 'p1'
+    node.ownerPlayerId = 'p1'
+    node.triggerChildren = [{
+      nodeId: child.id,
+      cardId: 'OptionalMutationStageCard',
+      listenerId: '',
+      mandatory: false,
+    }]
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player))
+
+    expect(player.cardStates).toEqual({})
+    expect(evaluation.options).toEqual([
+      {
+        value: 'OptionalMutationStageCard',
+        labelKey: 'cards.OptionalMutationStageCard.name',
+        sourceCard: 'OptionalMutationStageCard',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
   })
 
   it('before-action pass is disabled while an enabled trigger can unlock continuation', () => {
@@ -253,7 +357,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['TestClayBeforeBake'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { clay: 1 } },
       }),
@@ -295,7 +398,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['TestWoodBeforeBake'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
       }),
@@ -333,7 +435,6 @@ describe('ParallelNode trigger-select mode', () => {
       cardIds: ['D066_PotterCeramics'],
       actions: ['bake-bread'],
       phases: ['before'],
-      dispatchMode: 'select',
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { cost: { clay: 1 } } },
       }),
@@ -365,13 +466,92 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
+  it('disables pass for an enabled non-optional trigger flow even without explicit mandatory metadata', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['CleanupCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'CleanupCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'CleanupCard',
+        labelKey: 'cards.CleanupCard.name',
+        sourceCard: 'CleanupCard',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
+  it('keeps pass enabled for an enabled optional trigger flow', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['OptionalCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'OptionalCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'OptionalCard',
+        labelKey: 'cards.OptionalCard.name',
+        sourceCard: 'OptionalCard',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
+  it('keeps non-resource continuation flows selectable', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['NonResourceFlowCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'custom-follow-up' },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'NonResourceFlowCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'NonResourceFlowCard',
+        labelKey: 'cards.NonResourceFlowCard.name',
+        sourceCard: 'NonResourceFlowCard',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
   it('applicable mandatory trigger with optional child remains enabled', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C126_Excavator'],
       mandatory: true,
-      dispatchMode: 'select',
       handler: () => ({
         flow: {
           type: 'seq',
@@ -445,5 +625,39 @@ describe('isPureResourceFlowCurrentlyPayable', () => {
       { type: 'leaf', actionId: 'unknown-action' },
       baseResources(),
     )).toBe(false)
+  })
+
+  it('checks optional pay flows instead of treating optional as free', () => {
+    expect(isPureResourceFlowCurrentlyPayable(
+      {
+        type: 'seq',
+        optional: true,
+        children: [
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { grain: 1 } },
+        ],
+      },
+      baseResources({ clay: 0 }),
+    )).toBe(false)
+  })
+
+  it('checks supply-token costs when availability is provided', () => {
+    const flow = {
+      type: 'seq' as const,
+      children: [
+        { type: 'leaf' as const, actionId: 'pay', params: { wood: 1, fence: 1 } },
+        { type: 'leaf' as const, actionId: 'gain', params: { food: 2 } },
+      ],
+    }
+    expect(isPureResourceFlowCurrentlyPayable(
+      flow,
+      baseResources({ wood: 1 }),
+      { supplyTokens: { fence: 0 } },
+    )).toBe(false)
+    expect(isPureResourceFlowCurrentlyPayable(
+      flow,
+      baseResources({ wood: 1 }),
+      { supplyTokens: { fence: 1 } },
+    )).toBe(true)
   })
 })

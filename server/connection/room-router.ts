@@ -412,7 +412,6 @@ function handleDevDrawCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
 
 function handleDevPlayCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devPlayCard' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
-  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.devPlayCard(msg.playerIndex, msg.cardId))
   ctx.broadcaster.broadcastState(room, resp, 'dev', msg.requestId)

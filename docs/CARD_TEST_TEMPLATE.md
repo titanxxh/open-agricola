@@ -128,6 +128,15 @@
 - 农场版图状态
 - 是否需要预先设置 `cardStates`
 
+### 4.4 同时机多卡反应
+
+如果卡牌属于 action reaction listener、harvest field stage card-effect、before-end card-effect 或 extra-turn provider，且同一时机可能与另一张卡同时触发，测试必须覆盖 `trigger-select`：
+
+- 构造至少两张同一时机可触发的卡
+- 断言 pending / interaction 展示的是可选择的来源卡，而不是直接按打出区顺序执行
+- 分别选择不同来源卡，断言后续 flow、状态、日志和剩余 trigger 的重算符合预期
+- 覆盖 `undoStep` 或 `undoAction` 后重新派生同一 trigger-select 的场景
+
 ## 5. 推荐的后端入口清单
 
 卡牌测试优先使用后端边界驱动。当前架构下没有任何可用的 HTTP API（除 `/api/auth/*` 与极少量只读端点外）；所有规则相关的命令都走 WebSocket 或者直接调 `GameSession` / `RoomManager` 方法。

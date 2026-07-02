@@ -6,6 +6,7 @@ import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../.
 import '../../shared/cards/B/B025_BreadPaddle'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const CARD_ID = 'B025_BreadPaddle'
 
@@ -102,6 +103,7 @@ describe('B025_BreadPaddle session', () => {
 
     resp = session.resolveChoice(0, 'A114_SeasonalWorker')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 6) {

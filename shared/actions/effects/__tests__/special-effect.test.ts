@@ -381,7 +381,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     expect(result.type).toBe('ok')
-    expect(player._extraTurnConsumedCount).toBeUndefined()
+    expect(player._extraTurnConsumedCountsByCard).toBeUndefined()
     expect(events).toEqual([])
   })
 
@@ -395,7 +395,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     expect(result.type).toBe('ok')
-    expect(player._extraTurnConsumedCount).toBe(2)
+    expect(player._extraTurnConsumedCountsByCard).toEqual({ [A092_AdoptiveParents.id]: 2 })
     expect(hasPendingExtraTurn(state, player)).toBe(false)
     expect(events).toEqual([
       expect.objectContaining({
@@ -409,7 +409,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
   it('consume-pending-extra-turns: consumes only opportunities not already skipped', () => {
     const { state, player } = setupExtraTurnPlayer({ newborns: 2, food: 2 })
     const events: DraftGameEvent[] = []
-    player._extraTurnSkipCount = 1
+    player._extraTurnSkipCountsByCard = { [A092_AdoptiveParents.id]: 1 }
 
     const result = specialEffectAction.execute({
       ...makeCtx(player, { kind: 'consume-pending-extra-turns' }, CARD_ID, state),
@@ -417,7 +417,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     })
 
     expect(result.type).toBe('ok')
-    expect(player._extraTurnConsumedCount).toBe(1)
+    expect(player._extraTurnConsumedCountsByCard).toEqual({ [A092_AdoptiveParents.id]: 1 })
     expect(hasPendingExtraTurn(state, player)).toBe(false)
     expect(events).toHaveLength(1)
   })

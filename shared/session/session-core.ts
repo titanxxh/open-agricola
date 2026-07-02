@@ -92,7 +92,6 @@ import {
 import { getMinorImprovement } from '../cards/registry-display.ts'
 import {
   registerCustomCard,
-  clearCustomCardRuntimeFromRegistry,
   getCustomMinorImprovementIds,
   getCustomOccupationIds,
 } from '../cards/custom-registry.ts'
@@ -110,7 +109,7 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
-import type { BeforeEndGameDispatchMode, BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
+import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
@@ -303,7 +302,7 @@ type SowSelectionPayload = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
-const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
+const stageReactionHooks = new Set<StageResumeState['hook']>([
   'onStartHarvestFieldPhase',
   'onHarvestFieldPhase',
   'onEndHarvestFieldPhase',
@@ -622,7 +621,7 @@ export class GameCore {
   }
 
   /** @internal phase access — drive the engine's step loop until it blocks. */
-  driveEngineSteps(): void { this.runEngineSteps() }
+  driveEngineSteps(): void { this.withCtx(() => this.runEngineSteps()) }
 
   /** @internal phase access — flush queued log entries into the canonical log. */
   flushEngineLogPublic(): void { this.flushEngineLog() }
@@ -651,11 +650,11 @@ export class GameCore {
     return this.listenersVetoIsDoable(player, space)
   }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
-  invokeHarvestFromBeforeHarvest(): SessionResponse { return this.continueHarvestFromBeforeHarvest() }
+  invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }
   /** @internal Harvest phase trampoline — kicks off the breed-phase continuation chain. */
-  invokeAfterFeedingPhase(): SessionResponse { return this.continueAfterFeedingPhase() }
+  invokeAfterFeedingPhase(): SessionResponse { return this.withCtx(() => this.continueAfterFeedingPhase()) }
   /** @internal Round phase trampoline — onAllWorkersPlaced + performRoundEnd cascade. */
-  invokeAllWorkersPlacedHooks(): SessionResponse { return this.continueAllWorkersPlacedHooks() }
+  invokeAllWorkersPlacedHooks(): SessionResponse { return this.withCtx(() => this.continueAllWorkersPlacedHooks()) }
   /** @internal Round phase — set state.currentPlayerIndex (only by handleConfirmNextPlayerResolved). */
   setCurrentPlayerIndex(idx: number): void { this.state.currentPlayerIndex = idx }
   /** @internal Round phase — read activePlayerIndex view (engineStack-derived). */
@@ -701,14 +700,14 @@ export class GameCore {
   invokeFinalizeRound(): void { this.finalizeRound() }
   /** @internal Round phase — onEndTurn stage hook trampoline. */
   invokeEndTurnHooks(playerIndex: number, triggerActionId?: string | null): SessionResponse {
-    return this.continueEndTurnHooks(playerIndex, 0, triggerActionId)
+    return this.withCtx(() => this.continueEndTurnHooks(playerIndex, 0, triggerActionId))
   }
   /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
   isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
   /** @internal Harvest phase — find next player still owing a harvest-breed reorg. */
   findNextHarvestReorgPlayerIndex(playerIndex: number): number { return this.findNextHarvestReorgPlayer(playerIndex) }
   /** @internal Harvest phase — onEndHarvest stage hook chain trampoline. */
-  invokeEndHarvestEffects(): SessionResponse { return this.continueEndHarvestEffects() }
+  invokeEndHarvestEffects(): SessionResponse { return this.withCtx(() => this.continueEndHarvestEffects()) }
   /** @internal Draft phase — assign processed draft state back. */
   setDraftState(draft: GameState['draft']): void { this.state.draft = draft }
   /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
@@ -724,11 +723,11 @@ export class GameCore {
   /** @internal Round phase — emit `log.actionDetail`. */
   invokeLogActionDetail(before: PlayerState, after: PlayerState): void { this.logActionDetail(before, after) }
   /** @internal Round phase — onBeforeReturnHome stage hook chain trampoline. */
-  invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
+  invokeBeforeReturnHomeHooks(): SessionResponse { return this.withCtx(() => this.continueBeforeReturnHomeHooks()) }
   /** @internal Round phase — onAfterRoundEnd stage hook chain trampoline. */
-  invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
+  invokeAfterRoundEnd(): SessionResponse { return this.withCtx(() => this.continueAfterRoundEnd()) }
   /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
-  invokeRoundEndHooks(): SessionResponse { return this.continueRoundEndHooks() }
+  invokeRoundEndHooks(): SessionResponse { return this.withCtx(() => this.continueRoundEndHooks()) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic pending-only frame. */
@@ -764,26 +763,14 @@ export class GameCore {
     this.engineLog = new LogStore()
 
     // Build or accept a per-session card registry, then publish it as the
-    // "active" registry so any subsequent `registerCardListener` /
-    // `registerCardEffect` calls (e.g. from custom-code cards) forward into it.
-    //
-    // If an active registry already exists (e.g. test harness with
-    // pre-registered stub listeners / effects), clone it so those entries
-    // survive into the session without leaking mutations back to the outer
-    // registry. Fall back to a fresh registry loaded with ALL_CARD_IMPLS
-    // when no outer registry is active (production startup path).
+    // active registry for legacy helper/test injection. Official entries are
+    // protected from broad remove* cleanup; test/custom entries remain mutable.
     if (options.cardRegistry) {
       this.cardRegistry = options.cardRegistry
     } else {
-      const existing = getActiveCardRegistry()
-      if (existing) {
-        this.cardRegistry = existing.clone()
-        clearCustomCardRuntimeFromRegistry(this.cardRegistry)
-      } else {
-        this.cardRegistry = new CardRegistry()
-        for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
-          this.cardRegistry.loadImpl(cardId, impl as CardImpl)
-        }
+      this.cardRegistry = new CardRegistry()
+      for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
+        this.cardRegistry.loadImpl(cardId, impl as CardImpl, { protected: true })
       }
     }
     this.cardRegistry.syncModifiersFromCatalog(
@@ -793,8 +780,13 @@ export class GameCore {
     registerThroughTheSeasonsCardListeners(this.cardRegistry)
     // Register majors as effect bundles so getCardEffect resolves them after
     // the older getMajorCardEffect path is removed.
-    this.cardRegistry.registerEffects(majorCardDefinitions)
+    this.cardRegistry.registerEffects(majorCardDefinitions, { protected: true })
     setActiveCardRegistry(this.cardRegistry)
+    queueMicrotask(() => {
+      if (getActiveCardRegistry() === this.cardRegistry) {
+        setActiveCardRegistry(this.cardRegistry.clone())
+      }
+    })
 
     // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
@@ -967,6 +959,7 @@ export class GameCore {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
       if (flow.mode === 'trigger-select') {
         parallel.mode = 'trigger-select'
+        parallel.resolveAfterSelection = flow.triggerSelectOnce === true
         parallel.triggerOwnerPlayerId = ownerPlayerId
         parallel.triggerChildren = children.map((child, index) => ({
           nodeId: child.id,
@@ -2129,6 +2122,11 @@ export class GameCore {
     }
   }
 
+  private restorePendingExtraTurnAfterUndo(): void {
+    if (this.engineStack.depth() > 0) return
+    roundPhase.startPendingExtraTurnIfAny(this)
+  }
+
   private recomputeActionStartIndex() {
     for (let i = this.history.length - 1; i >= 0; i -= 1) {
       if (this.history[i]?.actionStart) {
@@ -2604,8 +2602,8 @@ export class GameCore {
     cardIndex = 0,
     extra?: StageResumeState['extra'],
   ) {
-    if (cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
-      return this.continueParallelStageHook(hook, playerIndex)
+    if (cardIndex === 0 && stageReactionHooks.has(hook)) {
+      return this.continueStageReactionHook(hook, playerIndex)
     }
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
@@ -2642,55 +2640,67 @@ export class GameCore {
     return Math.max(0, cardIndex - 1)
   }
 
-  private stageFlowNeedsPlayerInteraction(flow: ActionFlow): boolean {
-    if (flow.optional) return true
-    if (flow.type === 'leaf') {
-      const definition = this.registry.get(flow.actionId)
-      return Boolean(definition?.resolveChoice && !definition.skipChoiceWrap)
+  private buildStageEffectActivationFlow(
+    cardId: string,
+    hook: StageCardEffectHook,
+    ownerPlayerId: string,
+    targetPlayerId: string,
+    mandatory = true,
+    actionContext: Record<string, unknown> = {},
+  ): ActionFlow {
+    const context = {
+      ownerPlayerId,
+      targetPlayerId,
+      stageHook: hook,
+      mandatory,
+      ...actionContext,
     }
-    if (flow.type === 'or' || flow.type === 'xor') return true
-    if (flow.type === 'parallel' && flow.mode === 'trigger-select') return true
-    return flow.children.some((child) => this.stageFlowNeedsPlayerInteraction(child))
+    return {
+      type: 'leaf',
+      actionId: 'activate-card-effect',
+      params: {
+        cardId,
+        hook,
+        ...context,
+      },
+      actionContext: context,
+      sourceCard: cardId,
+      targetPlayerId,
+      optional: mandatory ? undefined : true,
+    }
   }
 
-  private continueParallelStageHook(
+  private collectOwnStageReactionActivationFlows(
+    hook: StageCardEffectHook,
+    player: PlayerState,
+  ): ActionFlow[] {
+    const children: ActionFlow[] = []
+    const cards = [
+      ...this.getPlayerEffectCardIds(player),
+      ...this.getPlayerHandEffectCardIds(player, hook),
+    ]
+    for (const cardId of cards) {
+      const effect = getCardEffect(cardId)
+      if (!effect?.[hook]) continue
+      children.push(this.buildStageEffectActivationFlow(cardId, hook, player.id, player.id))
+    }
+    return children
+  }
+
+  private continueStageReactionHook(
     hook: StageCardEffectHook,
     playerIndex = 0,
   ) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
-      const autoChildren: ActionFlow[] = []
-      const promptedChildren: ActionFlow[] = []
-      const cards = [
-        ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook),
-      ]
-      for (const cardId of cards) {
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
-        if (flow) {
-          const ownedFlow: ActionFlow = {
-            ...flow,
-            sourceCard: flow.sourceCard ?? cardId,
-            targetPlayerId: flow.targetPlayerId ?? player.id,
-          }
-          if (this.stageFlowNeedsPlayerInteraction(ownedFlow)) {
-            promptedChildren.push(ownedFlow)
-          } else {
-            autoChildren.push(ownedFlow)
-          }
-        }
-      }
-      if (autoChildren.length === 0 && promptedChildren.length === 0) continue
-      const children: ActionFlow[] = []
-      if (autoChildren.length > 0) {
-        children.push({ type: 'parallel', children: autoChildren })
-      }
-      if (promptedChildren.length > 0) {
-        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
-      }
+      const children = this.collectOwnStageReactionActivationFlows(hook, player)
+      if (children.length === 0) continue
+      const flow = children.length === 1
+        ? children[0]!
+        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
       this.startStageFlow(
-        children.length === 1 ? children[0]! : { type: 'seq', children },
+        flow,
         hook,
         currentPlayerIndex,
         0,
@@ -2706,36 +2716,20 @@ export class GameCore {
     ownerPlayerId: string,
     targetPlayerId: string,
     scope: BeforeEndGameScope,
-    dispatchMode: BeforeEndGameDispatchMode,
     mandatory: boolean,
   ): ActionFlow {
-    const actionContext = {
+    return this.buildStageEffectActivationFlow(cardId, 'onBeforeEndGame', ownerPlayerId, targetPlayerId, mandatory, {
       ownerPlayerId,
       targetPlayerId,
       beforeEndGameScope: scope,
-      beforeEndGameDispatchMode: dispatchMode,
       beforeEndGameMandatory: mandatory,
-    }
-    return {
-      type: 'leaf',
-      actionId: 'activate-card-effect',
-      params: {
-        cardId,
-        hook: 'onBeforeEndGame',
-        ...actionContext,
-      },
-      actionContext,
-      sourceCard: cardId,
-      targetPlayerId,
-      optional: dispatchMode === 'select' && !mandatory ? true : undefined,
-    }
+    })
   }
 
   private collectBeforeEndGameActivationFlows(targetPlayerIndex: number) {
     const targetPlayer = this.state.players[targetPlayerIndex]
-    const serialChildren: ActionFlow[] = []
-    const promptedChildren: ActionFlow[] = []
-    if (!targetPlayer) return { serialChildren, promptedChildren }
+    const children: ActionFlow[] = []
+    if (!targetPlayer) return children
 
     for (const ownerPlayer of this.state.players) {
       const playedCards = this.getPlayerEffectCardIds(ownerPlayer)
@@ -2744,17 +2738,14 @@ export class GameCore {
         if (!effect?.onBeforeEndGame) continue
         const scope = effect.beforeEndGameScope ?? 'owner'
         if (scope === 'owner' && ownerPlayer.id !== targetPlayer.id) continue
-        const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
         const flow = this.buildBeforeEndGameActivationFlow(
           cardId,
           ownerPlayer.id,
           targetPlayer.id,
           scope,
-          dispatchMode,
-          effect.beforeEndGameMandatory === true,
+          effect.beforeEndGameMandatory !== false,
         )
-        if (dispatchMode === 'select') promptedChildren.push(flow)
-        else serialChildren.push(flow)
+        children.push(flow)
       }
     }
 
@@ -2762,36 +2753,28 @@ export class GameCore {
     for (const cardId of handCards) {
       const effect = getCardEffect(cardId)
       if (!effect?.onBeforeEndGame) continue
-      const dispatchMode = effect.beforeEndGameDispatchMode ?? 'serial'
       const flow = this.buildBeforeEndGameActivationFlow(
         cardId,
         targetPlayer.id,
         targetPlayer.id,
         'owner',
-        dispatchMode,
-        effect.beforeEndGameMandatory === true,
+        effect.beforeEndGameMandatory !== false,
       )
-      if (dispatchMode === 'select') promptedChildren.push(flow)
-      else serialChildren.push(flow)
+      children.push(flow)
     }
 
-    return { serialChildren, promptedChildren }
+    return children
   }
 
   private continueBeforeEndGamePlayerDispatch(playerIndex = 0) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const { serialChildren, promptedChildren } =
-        this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
-      if (serialChildren.length === 0 && promptedChildren.length === 0) continue
-      const children: ActionFlow[] = []
-      if (serialChildren.length > 0) {
-        children.push({ type: 'parallel', children: serialChildren })
-      }
-      if (promptedChildren.length > 0) {
-        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
-      }
+      const children = this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
+      if (children.length === 0) continue
+      const flow = children.length === 1
+        ? children[0]!
+        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
       this.startStageFlow(
-        children.length === 1 ? children[0]! : { type: 'seq', children },
+        flow,
         'onBeforeEndGame',
         currentPlayerIndex,
         0,
@@ -3135,8 +3118,8 @@ export class GameCore {
     }
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
-      delete player._extraTurnSkipCount
-      delete player._extraTurnConsumedCount
+      delete player._extraTurnSkipCountsByCard
+      delete player._extraTurnConsumedCountsByCard
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
@@ -3468,6 +3451,10 @@ export class GameCore {
   }
 
   private runEngineSteps(): void {
+    return this.withCtx(() => this.runEngineStepsInContext())
+  }
+
+  private runEngineStepsInContext(): void {
     let frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
     const space = this.getSpaceById(frame.spaceId)
@@ -3772,7 +3759,7 @@ export class GameCore {
   }
 
   getState(): SessionResponse {
-    return this.respond()
+    return this.withCtx(() => this.respond())
   }
 
   /**
@@ -3821,6 +3808,10 @@ export class GameCore {
   }
 
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
+    return this.withCtx(() => this.getAvailableActionsInContext(playerIndex))
+  }
+
+  private getAvailableActionsInContext(playerIndex: number): { spaceId: string; nameKey: string }[] {
     const player = this.state.players[playerIndex]
     if (!player) return []
     return this.state.actionSpaces
@@ -3833,6 +3824,10 @@ export class GameCore {
    * Returns a map of spaceId -> isExecutable for all action spaces.
    */
   getActionAvailability(playerIndex: number): Record<string, boolean> {
+    return this.withCtx(() => this.getActionAvailabilityInContext(playerIndex))
+  }
+
+  private getActionAvailabilityInContext(playerIndex: number): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
 
@@ -3872,6 +3867,13 @@ export class GameCore {
   getCardAvailability(
     playerIndex: number,
     actionAvailability = this.getActionAvailability(playerIndex),
+  ): Record<string, boolean> {
+    return this.withCtx(() => this.getCardAvailabilityInContext(playerIndex, actionAvailability))
+  }
+
+  private getCardAvailabilityInContext(
+    playerIndex: number,
+    actionAvailability = this.getActionAvailabilityInContext(playerIndex),
   ): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
@@ -3943,7 +3945,7 @@ export class GameCore {
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
-    return roundPhase.takeAction(this, playerIndex, spaceId)
+    return this.withCtx(() => roundPhase.takeAction(this, playerIndex, spaceId))
   }
 
   takeSpecialAction(
@@ -3952,12 +3954,12 @@ export class GameCore {
     actionId: MoorSpecialActionId,
     payload?: MoorSpecialActionPayload,
   ): SessionResponse {
-    return roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload)
+    return this.withCtx(() => roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload))
   }
 
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
-    return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
+    return this.withCtx(() => roundPhase.takeAnytimeAction(this, playerIndex, actionId))
   }
 
   resolveOrdinaryCardDrawChoice(
@@ -4098,6 +4100,14 @@ export class GameCore {
    * `resolveEngineChoice` after finite option validation.
    */
   resolveChoice(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse {
+    return this.withCtx(() => this.resolveChoiceInContext(playerIndex, value, payload))
+  }
+
+  private resolveChoiceInContext(
     playerIndex: number,
     value: string,
     payload?: Record<string, unknown>,
@@ -4601,6 +4611,10 @@ export class GameCore {
   }
 
   loadState(raw: unknown): SessionResponse {
+    return this.withCtx(() => this.loadStateInContext(raw))
+  }
+
+  private loadStateInContext(raw: unknown): SessionResponse {
     let nextState: GameState
     let cursor: EngineStackCursor | null = null
     if (isStateWithCursor(raw)) {
@@ -4758,6 +4772,13 @@ export class GameCore {
   }
 
   commitSelectionChoice(
+    playerIndex: number,
+    payload: SelectionCommitPayload,
+  ): SessionResponse {
+    return this.withCtx(() => this.commitSelectionChoiceInContext(playerIndex, payload))
+  }
+
+  private commitSelectionChoiceInContext(
     playerIndex: number,
     payload: SelectionCommitPayload,
   ): SessionResponse {
@@ -5109,6 +5130,10 @@ export class GameCore {
   }
 
   devPlayCard(playerIndex: number, cardIdInput: string): SessionResponse {
+    return this.withCtx(() => this.devPlayCardInContext(playerIndex, cardIdInput))
+  }
+
+  private devPlayCardInContext(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const cardId = resolveDevCardIdInput(cardIdInput)
@@ -5168,6 +5193,10 @@ export class GameCore {
   }
 
   undoStep(): SessionResponse {
+    return this.withCtx(() => this.undoStepInContext())
+  }
+
+  private undoStepInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
     const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
@@ -5198,6 +5227,7 @@ export class GameCore {
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
+        this.restorePendingExtraTurnAfterUndo()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
       if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
@@ -5212,6 +5242,7 @@ export class GameCore {
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
+        this.restorePendingExtraTurnAfterUndo()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
     }
@@ -5239,10 +5270,15 @@ export class GameCore {
     this.history.pop()
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
+    this.restorePendingExtraTurnAfterUndo()
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 
   undoAction(): SessionResponse {
+    return this.withCtx(() => this.undoActionInContext())
+  }
+
+  private undoActionInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
     if (!this.canUndoActionNow()) {
       if (
@@ -5268,6 +5304,7 @@ export class GameCore {
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
     this.actionStartIndex = null
+    this.restorePendingExtraTurnAfterUndo()
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 }

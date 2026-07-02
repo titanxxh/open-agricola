@@ -50,3 +50,14 @@ A92 据此实现 BGA 双入口：
 - **新增全局 `GameState.skippedPlayers` 字段（真·对齐 BGA）**：拒。动 GameState 主结构、影响 snapshot/patch 协议，超出单卡范围；卡内 `cardStates` forfeit 标记已足够。
 - **双 hook（boolean 判定 + flow 产出分离）**：拒。两处判定逻辑需人工保持一致，易漂移。单 hook 返回 flow 是单一真相源。
 - **扩展 `onBeforePlayerTurn` 返回 `{skipTurn?, flow?}`**：拒。skip 与 extra-turn 语义混合，且 gating 仍需单独聚合判定。
+
+## 2026-07-02 amendment: provider selection
+
+后续实现 `M057_Taps` 后，extra-turn 不再只有 A92 一个 provider。`contributeExtraTurn` 的职责保持不变：每张卡声明“我现在能贡献什么额外行动 flow”。聚合层从 first-match 升级为 provider selection：
+
+1. `collectExtraTurnContributions()` 收集所有 provider。
+2. `hasPendingExtraTurn()` 只看是否存在 provider。
+3. `collectExtraTurnFlow()` 在单 provider 时直接展开；多 provider 时生成 one-shot `ParallelNode(mode='trigger-select')`，让玩家先选择来源卡。
+4. skip / forced consume 改为按 cardId 记录机会消耗，避免 A92 与 M057 并存时一个全局计数错误吞掉另一张卡的机会。
+
+这个 amendment 不改变本 ADR 的核心决策：extra-turn 仍是轮转层主动消费的通用 hook，而不是 `onBeforePlayerTurn` 或单卡 after-listener push flow。

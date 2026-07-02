@@ -269,106 +269,93 @@ export function buildPhaseTrailingNodes(
 
   type Prepared = {
     ml: MatchedCardListener
+    ownerOrderIndex: number
     playOrderIndex: number
     matchedIndex: number
   }
 
-  const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
-    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
-    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
-    return { ml, playOrderIndex, matchedIndex }
-  })
-
-  const byOwner = new Map<string, Prepared[]>()
-  for (const p of prepared) {
-    const arr = byOwner.get(p.ml.ownerPlayerId) ?? []
-    arr.push(p)
-    byOwner.set(p.ml.ownerPlayerId, arr)
-  }
-
   const activeId = state.players[state.currentPlayerIndex]?.id
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
-  const orderedOwners: string[] = []
-  // Global listeners (no cardIds → ownerPlayerId='') run first in the active
-  // player's context.
-  if (byOwner.has('')) orderedOwners.push('')
-  if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
-  for (const p of state.players) {
-    if (p.id !== activeId && byOwner.has(p.id)) orderedOwners.push(p.id)
-  }
+  const eventSourceCard =
+    typeof baseEvent.sourceCard === 'string' && baseEvent.sourceCard.length > 0
+      ? baseEvent.sourceCard
+      : undefined
+  const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
+    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
+    const ownerSeatIndex = owner ? state.players.findIndex((p) => p.id === owner.id) : Number.MAX_SAFE_INTEGER
+    const ownerOrderIndex = ml.ownerPlayerId === ''
+      ? -1
+      : ml.ownerPlayerId === effectiveTriggerPlayerId ? 0 : ownerSeatIndex + 1
+    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
+    return { ml, ownerOrderIndex, playOrderIndex, matchedIndex }
+  }).sort((a, b) => {
+    const ownerDelta = a.ownerOrderIndex - b.ownerOrderIndex
+    if (ownerDelta !== 0) return ownerDelta
+    const playOrderDelta = a.playOrderIndex - b.playOrderIndex
+    if (playOrderDelta !== 0) return playOrderDelta
+    return a.matchedIndex - b.matchedIndex
+  })
 
-  const out: EngineNode[] = []
-  for (const ownerId of orderedOwners) {
-    const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => {
-      const playOrderDelta = a.playOrderIndex - b.playOrderIndex
-      if (playOrderDelta !== 0) return playOrderDelta
-      return a.matchedIndex - b.matchedIndex
-    })
-
-    const buildNode = (p: Prepared): ActivateCardActionNode => {
-      const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
-      const params: ActivateCardActionParams = {
-        listenerId: p.ml.registration.id,
-        cardId: p.ml.cardId,
-        phase,
-        actionId,
-        event: baseEvent,
-        triggerPlayerId: effectiveTriggerPlayerId,
-        ownerPlayerId: p.ml.ownerPlayerId,
-        ownerCardZone: p.ml.ownerCardZone,
-        mandatory: p.ml.registration.mandatory === true,
-        countCardUse:
-          typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
-        transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
-        actionEvents: actionEvents ? [...actionEvents] : undefined,
-        actionEventStartIndex,
-        triggerSnapshot,
-      }
-      const node = new ActionNode(
-        nodeId,
-        ACTIVATE_CARD_ACTION_ID,
-        p.ml.cardId,
-        params,
-      )
-      if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
-      return node as ActivateCardActionNode
+  const children = prepared.map((p): ActivateCardActionNode => {
+    const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
+    const cardId = p.ml.cardId || eventSourceCard || ''
+    const params: ActivateCardActionParams = {
+      listenerId: p.ml.registration.id,
+      cardId,
+      phase,
+      actionId,
+      event: baseEvent,
+      triggerPlayerId: effectiveTriggerPlayerId,
+      ownerPlayerId: p.ml.ownerPlayerId,
+      ownerCardZone: p.ml.ownerCardZone,
+      mandatory: p.ml.registration.mandatory === true,
+      countCardUse:
+        typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
+      actionEvents: actionEvents ? [...actionEvents] : undefined,
+      actionEventStartIndex,
+      triggerSnapshot,
     }
+    const node = new ActionNode(
+      nodeId,
+      ACTIVATE_CARD_ACTION_ID,
+      cardId,
+      params,
+    )
+    if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
+    return node as ActivateCardActionNode
+  })
 
-    const ownerGroupNodes: EngineNode[] = []
-
-    const serialOnes = group.filter((p) => (p.ml.registration.dispatchMode ?? 'serial') === 'serial')
-    for (const p of serialOnes) ownerGroupNodes.push(buildNode(p))
-
-    const selectOnes = group.filter((p) => p.ml.registration.dispatchMode === 'select')
-    if (selectOnes.length > 0) {
-      const children = selectOnes.map(buildNode)
-      const ptn = new ParallelNode(
-        `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
-        children,
-      )
-      ptn.mode = 'trigger-select'
-      ptn.triggerOwnerPlayerId = ownerId
-      ptn.ownerPlayerId = ownerId
-      ptn.triggerChildren = children.map((child) => ({
-        nodeId: child.id,
-        cardId: child.params.cardId,
-        listenerId: child.params.listenerId,
-        mandatory: child.params.mandatory === true,
-      }))
-      ownerGroupNodes.push(ptn)
-    }
-
-    if (ownerGroupNodes.length === 0) continue
-    // Empty ownerId == global listener (no cardIds) runs in the active
-    // player's frame. Card-owned listener groups carry owner metadata.
-    if (ownerId !== activeId && ownerId !== '') {
-      ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
+  const groups: ActivateCardActionNode[][] = []
+  for (const child of children) {
+    const ownerKey = child.params.ownerPlayerId || effectiveTriggerPlayerId || ''
+    const last = groups.at(-1)
+    const lastOwnerKey = last?.[0]?.params.ownerPlayerId || effectiveTriggerPlayerId || ''
+    if (last && lastOwnerKey === ownerKey) {
+      last.push(child)
     } else {
-      if (ownerId) ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
+      groups.push([child])
     }
-    out.push(...ownerGroupNodes)
   }
-  return out
+
+  return groups.map((group) => {
+    if (group.length === 1) return group[0]!
+    const ownerPlayerId = group[0]?.params.ownerPlayerId || effectiveTriggerPlayerId
+    const ptn = new ParallelNode(
+      `parallel-trigger-${phase}-${actionId}-${ownerPlayerId ?? 'global'}-${int.counterRef.value++}`,
+      group,
+    )
+    ptn.mode = 'trigger-select'
+    ptn.triggerOwnerPlayerId = ownerPlayerId
+    ptn.ownerPlayerId = ownerPlayerId
+    ptn.triggerChildren = group.map((child) => ({
+      nodeId: child.id,
+      cardId: child.params.cardId || child.sourceCard || child.params.listenerId,
+      listenerId: child.params.listenerId,
+      mandatory: child.params.mandatory === true,
+    }))
+    return ptn
+  })
 }
 
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {
@@ -404,6 +391,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.mode = node.mode
     clone.selectedChildId = node.selectedChildId
+    clone.resolveAfterSelection = node.resolveAfterSelection
     clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
     clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
     clone.emittedChoices = [...node.emittedChoices]
@@ -705,6 +693,7 @@ export function buildFlowNode(
     const parallel = new ParallelNode(nextId(), children)
     if (flow.mode === 'trigger-select') {
       parallel.mode = 'trigger-select'
+      parallel.resolveAfterSelection = flow.triggerSelectOnce === true
       parallel.triggerChildren = children.map((child, index) => ({
         nodeId: child.id,
         cardId: flow.children[index]?.sourceCard ?? `child-${index}`,

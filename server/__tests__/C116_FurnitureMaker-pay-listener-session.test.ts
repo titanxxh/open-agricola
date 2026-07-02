@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/register-all'
 import '../../shared/cards/C/C116_FurnitureMaker'
@@ -43,6 +44,10 @@ const playLessons = (
   // and may follow up with a payment-choice prompt. Walk both.
   let guard = 6
   while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+    if (resp.interaction.request.kind === 'select-trigger') {
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+      continue
+    }
     if (resp.interaction.request.kind !== 'choice') break
     const opt =
       resp.interaction.options?.find((o) => o.value === occupationId)

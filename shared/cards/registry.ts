@@ -37,6 +37,10 @@ export type CardImpl = {
   reaches?: readonly string[]
 }
 
+type CardRegistryLoadOptions = {
+  protected?: boolean
+}
+
 export type RegistrySnapshot = {
   cardIds: string[]
   listenerCount: number
@@ -51,13 +55,19 @@ export class CardRegistry {
   private readonly modifiersByCard = new Map<string, CostModifier[]>()
   private readonly prereqChecksByCard = new Map<string, PrerequisiteHandler>()
   private readonly baseCostHandlersByCard = new Map<string, CardPurchaseBaseCostHandler>()
+  private readonly protectedListenerIds = new Set<string>()
+  private readonly protectedEffectIds = new Set<string>()
 
-  loadImpl(cardId: string, impl: CardImpl): void {
+  loadImpl(cardId: string, impl: CardImpl, options: CardRegistryLoadOptions = {}): void {
     if (impl.listeners && impl.listeners.length > 0) {
       this.listenersByCard.set(cardId, impl.listeners)
+      if (options.protected) {
+        for (const listener of impl.listeners) this.protectedListenerIds.add(listener.id)
+      }
     }
     if (impl.effect) {
       this.effectsByCard.set(cardId, impl.effect)
+      if (options.protected) this.protectedEffectIds.add(cardId)
     }
     if (impl.modifiers && impl.modifiers.length > 0) {
       this.modifiersByCard.set(cardId, impl.modifiers)
@@ -98,7 +108,7 @@ export class CardRegistry {
   /** Remove listeners matching a predicate across all cards. */
   removeListenersWhere(predicate: (reg: CardListenerRegistration) => boolean): void {
     for (const [cardId, listeners] of this.listenersByCard) {
-      const kept = listeners.filter((l) => !predicate(l))
+      const kept = listeners.filter((l) => this.protectedListenerIds.has(l.id) || !predicate(l))
       if (kept.length === 0) {
         this.listenersByCard.delete(cardId)
       } else if (kept.length !== listeners.length) {
@@ -110,7 +120,7 @@ export class CardRegistry {
   /** Remove effects matching a predicate. */
   removeEffectsWhere(predicate: (id: string) => boolean): void {
     for (const id of [...this.effectsByCard.keys()]) {
-      if (predicate(id)) this.effectsByCard.delete(id)
+      if (!this.protectedEffectIds.has(id) && predicate(id)) this.effectsByCard.delete(id)
     }
   }
 
@@ -136,32 +146,39 @@ export class CardRegistry {
    * removed. Each entry that has at least one CardEffect hook (anything
    * besides id) is set as the effect for `entry.id`.
    */
-  registerEffects(effects: readonly CardEffect[]): void {
+  registerEffects(effects: readonly CardEffect[], options: CardRegistryLoadOptions = {}): void {
     for (const effect of effects) {
       if (this.effectsByCard.has(effect.id)) continue
       this.effectsByCard.set(effect.id, effect)
+      if (options.protected) this.protectedEffectIds.add(effect.id)
     }
   }
 
   /** Shallow clone: new CardRegistry with the same listener / effect / modifier entries. */
   clone(): CardRegistry {
     const copy = new CardRegistry()
-    for (const [cardId, listeners] of this.listenersByCard) {
-      copy.listenersByCard.set(cardId, [...listeners])
-    }
-    for (const [cardId, effect] of this.effectsByCard) {
-      copy.effectsByCard.set(cardId, effect)
-    }
-    for (const [cardId, modifiers] of this.modifiersByCard) {
-      copy.modifiersByCard.set(cardId, [...modifiers])
-    }
-    for (const [cardId, fn] of this.prereqChecksByCard) {
-      copy.prereqChecksByCard.set(cardId, fn)
-    }
-    for (const [cardId, fn] of this.baseCostHandlersByCard) {
-      copy.baseCostHandlersByCard.set(cardId, fn)
-    }
+    copy.mergeFrom(this)
     return copy
+  }
+
+  mergeFrom(other: CardRegistry): void {
+    for (const [cardId, listeners] of other.listenersByCard) {
+      this.listenersByCard.set(cardId, [...listeners])
+    }
+    for (const [cardId, effect] of other.effectsByCard) {
+      this.effectsByCard.set(cardId, effect)
+    }
+    for (const [cardId, modifiers] of other.modifiersByCard) {
+      this.modifiersByCard.set(cardId, [...modifiers])
+    }
+    for (const [cardId, fn] of other.prereqChecksByCard) {
+      this.prereqChecksByCard.set(cardId, fn)
+    }
+    for (const [cardId, fn] of other.baseCostHandlersByCard) {
+      this.baseCostHandlersByCard.set(cardId, fn)
+    }
+    for (const id of other.protectedListenerIds) this.protectedListenerIds.add(id)
+    for (const id of other.protectedEffectIds) this.protectedEffectIds.add(id)
   }
 
   /**
@@ -181,8 +198,11 @@ export class CardRegistry {
   }
 
   unload(cardId: string): void {
+    const listeners = this.listenersByCard.get(cardId) ?? []
+    for (const listener of listeners) this.protectedListenerIds.delete(listener.id)
     this.listenersByCard.delete(cardId)
     this.effectsByCard.delete(cardId)
+    this.protectedEffectIds.delete(cardId)
     this.modifiersByCard.delete(cardId)
     this.prereqChecksByCard.delete(cardId)
     this.baseCostHandlersByCard.delete(cardId)

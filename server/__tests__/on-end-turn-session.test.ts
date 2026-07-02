@@ -22,11 +22,11 @@ const registerCounterEffect = () => {
 describe('onEndTurn session', () => {
   beforeEach(() => {
     clearActionHooks()
-    registerCounterEffect()
   })
 
   it('fires before confirmNextPlayer on a normal worker placement turn', () => {
     const session = new GameSession()
+    registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -45,6 +45,7 @@ describe('onEndTurn session', () => {
 
   it('does not fire during an intermediate confirmPlayerSwitch', () => {
     const session = new GameSession()
+    registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 1
@@ -87,6 +88,7 @@ describe('onEndTurn session', () => {
 
   it('waits until action-scoped animal reorg resolves', () => {
     const session = new GameSession()
+    registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
