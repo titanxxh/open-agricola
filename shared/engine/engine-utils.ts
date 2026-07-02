@@ -321,22 +321,36 @@ export function buildPhaseTrailingNodes(
     return node as ActivateCardActionNode
   })
 
-  if (children.length === 1) return [children[0]!]
+  const groups: ActivateCardActionNode[][] = []
+  for (const child of children) {
+    const ownerKey = child.params.ownerPlayerId || effectiveTriggerPlayerId || ''
+    const last = groups.at(-1)
+    const lastOwnerKey = last?.[0]?.params.ownerPlayerId || effectiveTriggerPlayerId || ''
+    if (last && lastOwnerKey === ownerKey) {
+      last.push(child)
+    } else {
+      groups.push([child])
+    }
+  }
 
-  const ptn = new ParallelNode(
-    `parallel-trigger-${phase}-${actionId}-${effectiveTriggerPlayerId ?? 'global'}-${int.counterRef.value++}`,
-    children,
-  )
-  ptn.mode = 'trigger-select'
-  ptn.triggerOwnerPlayerId = effectiveTriggerPlayerId
-  ptn.ownerPlayerId = effectiveTriggerPlayerId
-  ptn.triggerChildren = children.map((child) => ({
-    nodeId: child.id,
-    cardId: child.params.cardId,
-    listenerId: child.params.listenerId,
-    mandatory: child.params.mandatory === true,
-  }))
-  return [ptn]
+  return groups.map((group) => {
+    if (group.length === 1) return group[0]!
+    const ownerPlayerId = group[0]?.params.ownerPlayerId || effectiveTriggerPlayerId
+    const ptn = new ParallelNode(
+      `parallel-trigger-${phase}-${actionId}-${ownerPlayerId ?? 'global'}-${int.counterRef.value++}`,
+      group,
+    )
+    ptn.mode = 'trigger-select'
+    ptn.triggerOwnerPlayerId = ownerPlayerId
+    ptn.ownerPlayerId = ownerPlayerId
+    ptn.triggerChildren = group.map((child) => ({
+      nodeId: child.id,
+      cardId: child.params.cardId || child.sourceCard || child.params.listenerId,
+      listenerId: child.params.listenerId,
+      mandatory: child.params.mandatory === true,
+    }))
+    return ptn
+  })
 }
 
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {

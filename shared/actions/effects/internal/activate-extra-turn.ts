@@ -15,6 +15,6 @@ export const activateExtraTurnAction: ActionDefinition = {
     }
     const flow = getCardEffect(cardId)?.contributeExtraTurn?.(state, player)
     if (flow) return { type: 'flow', flow }
-    return { type: 'ok' }
+    return { type: 'fail', errorKey: 'log.cardEffectFail' }
   },
 }
