@@ -4,6 +4,7 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B048_ForestStone'
 
 const CARD_ID = 'B048_ForestStone'
@@ -62,8 +63,9 @@ describe('B048_ForestStone session', () => {
     const stateBefore = session.getState().state
     const foodBefore = stateBefore.players[0]!.resources.food
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const player = resp.state.players[0]!
     // foodCount should decrease from 2 to 1
@@ -78,8 +80,9 @@ describe('B048_ForestStone session', () => {
   it('using a stone accumulation space adds 2 food to card', () => {
     const session = setup()
 
-    const resp = session.takeAction(0, 'eastern-quarry')
+    let resp = session.takeAction(0, 'eastern-quarry')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const player = resp.state.players[0]!
     // foodCount should increase from 2 to 4
@@ -97,8 +100,9 @@ describe('B048_ForestStone session', () => {
     session.loadState(state)
 
     const foodBefore = state.players[0]!.resources.food
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const updated = resp.state.players[0]!
     // No extra food from card
@@ -113,6 +117,7 @@ describe('B048_ForestStone session', () => {
     // Use forest (wood) - releases 1 food, foodCount 2 -> 1
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(1)
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       resp = confirmNextPlayer(session)
@@ -132,6 +137,7 @@ describe('B048_ForestStone session', () => {
     // Use eastern-quarry (stone) - adds 2 food, foodCount 1 -> 3
     resp = session.takeAction(0, 'eastern-quarry')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(3)
   })
 })

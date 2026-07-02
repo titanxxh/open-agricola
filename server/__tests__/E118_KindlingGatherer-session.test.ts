@@ -8,6 +8,7 @@ import {
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow, ActionSpace, Resource } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E118_KindlingGatherer'
 
@@ -100,7 +101,8 @@ describe('E118_KindlingGatherer action-space provenance', () => {
     player.resources.wood = 0
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'day-laborer')
+    let resp = session.takeAction(0, 'day-laborer')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)

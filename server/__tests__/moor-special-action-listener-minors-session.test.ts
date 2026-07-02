@@ -13,6 +13,7 @@ import { M116_MoorBirchTrees } from '../../shared/cards/M/M116_MoorBirchTrees'
 import { M121_Loam } from '../../shared/cards/M/M121_Loam'
 import { M122_WillowBank } from '../../shared/cards/M/M122_WillowBank'
 import { M127_Wheelbarrow } from '../../shared/cards/M/M127_Wheelbarrow'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const FILLER = '__test_placeholder__'
 const TEST_PLACE_FARMER_CARD = 'TEST_PlaceFarmerProbe'
@@ -242,7 +243,9 @@ describe('FoM special action listener minors', () => {
     player.sickWorkerIds = ['3']
     setWorkersAtHome(session.state, player, 1)
 
-    const resp = session.takeAction(0, 'moor-infirmary')
+    let resp = session.takeAction(0, 'moor-infirmary')
+    resp = resolveTriggerIfPresent(session, resp, 'M094_PeatBath')
+    resp = resolveTriggerIfPresent(session, resp, 'M099_HealingClay')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(2)
@@ -339,7 +342,9 @@ describe('FoM special action listener minors', () => {
     setWorkersAtHome(state, player, 1)
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'forest')
+    let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, 'M118_TimberMill')
+    resp = resolveTriggerIfPresent(session, resp, 'M127_Wheelbarrow')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(5)

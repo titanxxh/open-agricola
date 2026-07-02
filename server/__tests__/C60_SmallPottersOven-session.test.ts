@@ -5,6 +5,7 @@ import '../../shared/cards/D/D106_WhiskyDistiller'
 import '../../shared/cards/C/C060_SmallPottersOven'
 import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/__stubs__/STUB_BeforeBakeGainClay'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const setupBakeViaC60 = (
   grain: number,
@@ -145,6 +146,7 @@ describe('C060_SmallPottersOven server session', () => {
     const session = setupBakeViaC60(0)
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -184,6 +186,7 @@ describe('C060_SmallPottersOven server session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -224,6 +227,7 @@ describe('C060_SmallPottersOven server session', () => {
     session.getState().state.players[0]!.resources.grain = 5
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -249,6 +253,7 @@ describe('C060_SmallPottersOven server session', () => {
     const session = setupBakeViaC60(0)
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -278,6 +283,7 @@ describe('C060_SmallPottersOven server session', () => {
     const session = setupBakeViaC60(1)
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -345,6 +351,7 @@ describe('C060_SmallPottersOven server session', () => {
     })
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -375,6 +382,11 @@ describe('C060_SmallPottersOven server session', () => {
 
     resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === 'D066_PotterCeramics') {
+      const d66Option = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      expect(d66Option).toBeDefined()
+      resp = session.resolveChoice(0, d66Option!.value)
+    }
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       resp = session.resolveChoice(0, 'Major_ClayOven')
     }
@@ -390,6 +402,7 @@ describe('C060_SmallPottersOven server session', () => {
     })
 
     let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -425,6 +438,11 @@ describe('C060_SmallPottersOven server session', () => {
 
     resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === 'D066_PotterCeramics') {
+      const d66Option = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      expect(d66Option).toBeDefined()
+      resp = session.resolveChoice(0, d66Option!.value)
+    }
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       resp = session.resolveChoice(0, 'Major_ClayOven')
     }

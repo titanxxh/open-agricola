@@ -124,6 +124,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Card-provided payment resources | `ComplexCost.paymentResourceProviders`、`PaymentSolution.paymentResourceCovers`、`B155_ArtTeacher`、ADR 0004 | 卡牌可在 `computeCosts` 内声明 payment-only 虚拟资源；provider 在卡牌内部定义可用量、覆盖比例和消费来源。虚拟资源不进入成本候选行或 `PlayerState.resources`，但会出现在 payment option / `resourcesPaid`；使用 provider 的 payment option 必须把 provider `sourceCard` 合入 `sourceCards` 以区分卡牌效果路径，并由 executor 消耗来源状态。 |
 | Payment budgets | `ComplexCost.paymentBudget`、`fencePolicy.paymentBudget`、`B015_CarpentersBench` | 对最终 `PaymentSolution.resourcesPaid` 做资源上限过滤；不提供资源、不改变 cost row、不作为 `segmentBounds`。fencing 中用于 B15 这类“只能使用本次资源”的规则，必须在 free fence / computeCosts / payment solver 之后检查，禁止用 collected+1 段数上限替代。 |
 | Candidate Closure（候选闭包，ADR 0004） | `candidate-closure.ts` `closeCandidates()`、`buildUnitCostOptions()` 闭包接入、`cost-modifier-permutation-probe.test.ts` | unit trade（D15/B145/A123 等）不再声明 `order`，`Trade.order` / `TradeModifier.order` 已删除；可达 cost row 集合由闭包求不动点产出，与修改器注册顺序无关；mandatory 饱和过滤保证强制折扣链任意序收敛；新增 cost 转换只声明局部语义（替换什么、mandatory 与否、maxUses），禁止重新引入任何顺序字段。 |
+| Action reaction listener dispatch | `CardListenerRegistration`、`buildPhaseTrailingNodes()`、`resolveTriggerSelectChild()`、`canPreviewPureResourceFlow()` | `before` / `during` / `immediatelyAfter` / `after` reaction listener 在同一 trigger player / phase 下默认按 BGA reaction 语义进入 `trigger-select`，不再用 `dispatchMode:'select'` opt-in，也不保留 per-card serial escape hatch；单 child 可直接展开以减少 UI 噪音。compute/query listener 继续串行聚合，不产生玩家选择。trigger-select 的纯资源 preview 会检查普通资源与 fence/stable supply token，optional 根支付可因资源不足而禁用，嵌套 optional 仍可作为可跳过子流程保留。 |
 | 跨玩家 / 阶段 hook 调度 | `stageResume`、`confirm-player-switch`、`TriggerSnapshot`、`onBeforeEndGame`、`beforeEndGameScope` / `beforeEndGameDispatchMode` | owner prompt、trigger-select、before-end choice 必须保留 undo boundary 和触发时快照语义；trailing listener 读 snapshot helper，不读执行时 live count。 |
 | 阶段 hook 恢复与可变 played-card 列表 | `stageResume.extra.resumeAfterCardId`、`resolveStageStartCardIndex()` | 如果阶段 hook 子流程会移除当前卡牌，resume 不能只依赖旧 numeric index；必须按上一个 card id 恢复，card 已移除时从旧 index 前一位继续，避免跳过同阶段后续卡牌。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardBonusVp` category、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源。 |
@@ -216,6 +217,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 下表从当前 `ALL_CARD_IMPLS` 机械抽取。`*` 表示 action id 通配；动态 listener 已按运行时 `actions` 展开。本轮新增 FoM special action listener runtime：`M041` / `M054` / `M055` / `M058` / `M059` / `M060` / `M109` 复用 special action before/after dispatch、后端 Moor special choice action、普通 `plow` / `sow` / `pay` / `gain` flow；`M070` / `M077` / `M092` / `M096` / `M127` 使用 `after.cut-peat`，`M096` / `M118` / `M119` 使用 `after.fell-trees`，`M083` / `M121` / `M123` 使用 `after.hiring-fair`，`M116` / `M122` 走 `moorSpecialActionBonuses` metadata，并继续复用 `after.place-farmer` / `after.collect` / `onBuy` / `onStartReturnHome` 等既有 hook；FoM heating 小改良 runtime：`M032` 使用 `computeExtraRoomCapacity` + `computeReplace/isDoable.renovate-house`，`M082` 使用 `onBuy`，`M086` 使用 `onHarvestFieldPhase`；room/build/harvest-building runtime：`M036` 使用 construct `scope:'unit'` modifier，`M037` 使用 `after.construct`，`M061` 使用 `after.collect`，`M091` 使用 harvest effect + `after.exchange` / `immediatelyAfter.trade-applied`。
 
 Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前被拒绝，不触发 `before` / `during` / `immediatelyAfter` / `after` listener；本表只描述真实成功路径和 guard 之后的 recoverable failure。
+
+Action reaction listener 的同一 trigger player / phase 默认进入 `trigger-select`；compute / query hook 保持串行聚合，不用玩家选择，也不再新增 `dispatchMode` 字段。
 
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
@@ -1068,7 +1071,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D063_Lynchet` | 已对齐 |  |
 | `D064_BakingCourse` | 已对齐 |  |
 | `D065_GrainSieve` | 已对齐 |  |
-| `D066_PotterCeramics` | 已对齐 |  |
+| `D066_PotterCeramics` | 已对齐 | bake-bread 前可选支付 1 clay 获得 3 food 的 before listener；reaction dispatch 不再依赖 `dispatchMode:'select'`，根 optional 支付 flow 会被 trigger-select preview 按 clay 库存判定是否可执行。 |
 | `D067_ReapHook` | 已对齐 |  |
 | `D068_SmallBasket` | 已对齐 |  |
 | `D069_SmallGreenhouse` | 已对齐 |  |
@@ -1182,7 +1185,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D177_Graduate` | 已对齐 | 5+ 产品扩展实现：onBuy 有 1 food 时强制支付 1 food；支付成功后获得 2 stone + 2 reed，不能支付则不触发奖励。 |
 | `D178_SubstituteTeacher` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，三个可见 Lessons 格都实际 occupied 后可用，奖励为 1 building resource 或 grain+vegetable。 |
 | `D179_Bullcatcher` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，round slot 3 与 round slot 6 对应行动格都 occupied 且 owner 仍有可用工人时可用，使用后获得 1 cattle + 2 food。 |
-| `D180_PartTimeWorker` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。after collect 读取本次从该 accumulation space 移到玩家的 `resource.moved` goods map，exact 2/4/6 分别可选返还 1/2/3 goods 到该格并获得 sheep/boar/cattle；`return-to-space` leaf 显式携带被收取格的 `targetSpaceId`，card-granted placement 收取非外层行动格时也返还到正确格；混合资源枚举所有合法返还组合，且与其他 `return-to-space` optional flow 串行共存，不把后续返还资源计入触发。 |
+| `D180_PartTimeWorker` | 已接受差异 | BGA implemented=false；OA 作为 5+ 扩展产品实现。after collect 读取本次从该 accumulation space 移到玩家的 `resource.moved` goods map，exact 2/4/6 分别可选返还 1/2/3 goods 到该格并获得 sheep/boar/cattle；`return-to-space` leaf 从 `resource.moved.from.spaceId` 派生并显式携带被收取格的 `targetSpaceId`，card-granted placement 收取非外层行动格时也返还到正确格；混合资源枚举所有合法返还组合，且与其他 `return-to-space` optional flow 串行共存，不把后续返还资源计入触发。 |
 | `E001_PoleBarns` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达最多 3 个免费 stable。 |
 | `E002_RenovationMaterials` | 已对齐 | BGA `formatCost([])` 通过 `renovate-house` `actionContext.exactCost` 表达免费翻修到 clay。 |
 | `E003_TeaTime` | 已对齐 |  |
@@ -1305,7 +1308,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 已对齐 | after-pay 仅监听 `pay` leaf，并读取 `resource.paid` 的 bonusSources / bonusChoiceIndex 决定弹出 top k；本牌的 `Bonus.choices` 设置 `choiceAffectsState:true`，因此使用不同 top-k 的支付路径不会被 dominance pruning 互剪。动态支付会把实际 reduction 写入 `PaymentSolution.bonusReductions`，hover stats 可显示本牌 saved 资源；payment solver 不再把无实际 cost 变化的 `k=0` skip 记录为本牌生效路径，避免和 C14 等 reed discount 叠出重复选项；C14 与 E123 top reed 都可作为玩家可选支付路径 |
+| `E123_ResourceHoarder` | 已对齐 | after-pay 仅监听 `pay` leaf，并读取 `resource.paid` 的 bonusSources / bonusChoiceIndex 决定弹出 top k；本牌的 `Bonus.choices` 设置 `choiceAffectsState:true`，因此使用不同 top-k 的支付路径不会被 dominance pruning 互剪。动态支付会把实际 reduction 写入 `PaymentSolution.bonusReductions`，hover stats 可显示本牌 saved 资源；payment solver 不再把无实际 cost 变化的 `k=0` skip 记录为本牌生效路径，避免和 C14 等 reed discount 叠出重复选项；C14 与 E123 top reed 都可作为玩家可选支付路径。after-pay pop stack / infobox 更新通过显式 `special-effect` flow 执行，保持 reaction preview 与 live 执行一致。 |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 | delayed from-supply 的 `isDoable` / `onAllWorkersPlaced` 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露放人 flow |
 | `E126_TaxCollector` | 已对齐 |  |

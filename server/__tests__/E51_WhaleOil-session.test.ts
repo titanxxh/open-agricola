@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -52,7 +53,8 @@ describe('E051_WhaleOil session', () => {
   it('using Fishing adds 1 food to card', () => {
     const session = setup()
 
-    const resp = session.takeAction(0, 'fishing')
+    let resp = session.takeAction(0, 'fishing')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!

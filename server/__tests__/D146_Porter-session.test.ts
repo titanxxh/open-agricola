@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D146_Porter_impl } from '../../shared/cards/D/D146_Porter'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -74,6 +75,7 @@ describe('D146_Porter session', () => {
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const after = session.getState().state
     // +4 clay from space, +1 clay + 1 food from Porter
@@ -98,6 +100,7 @@ describe('D146_Porter session', () => {
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
 
     const after = session.getState().state
     // +4 wood from space, +1 wood + 1 food from Porter

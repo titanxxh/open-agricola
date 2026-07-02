@@ -1,7 +1,8 @@
-import type { ActionChoiceOption, ActionExecutionContext, PlayerState, Resource } from '../contract/types'
+import type { ActionChoiceOption, ActionExecutionContext, PlayerState, Resource, SupplyTokenCounts } from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
   applyPureResourceFlowPreview,
+  canPreviewPureResourceFlow,
   isPureResourceFlowCurrentlyPayable,
 } from '../actions/resource-flow-preview'
 import {
@@ -11,6 +12,10 @@ import {
   type CardListenerContextInput,
 } from '../cards/card-listeners'
 import { previewActivateCardEffect } from '../actions/effects/internal/activate-card-effect'
+import {
+  getAvailableStableSupplyCount,
+  getOwnOrdinaryFenceReserveCount,
+} from '../domain/supply-tokens'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { ActionNode } from './nodes/action-node'
 import type { ParallelNode } from './nodes'
@@ -118,6 +123,12 @@ const previewContextForChild = (
     ownerCardZone: params.ownerCardZone,
     mandatory: params.mandatory,
   }
+  const transactionEvents = context.transactionEvents ?? params.transactionEvents
+  const actionEvents = context.actionEvents
+    ?? params.actionEvents
+    ?? (typeof params.actionEventStartIndex === 'number' && transactionEvents
+      ? transactionEvents.slice(params.actionEventStartIndex)
+      : undefined)
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
   return {
     ownerPlayerId,
@@ -131,8 +142,8 @@ const previewContextForChild = (
       space: context.space,
       actionId: params.actionId,
       phase: params.phase,
-      transactionEvents: context.transactionEvents ?? params.transactionEvents,
-      actionEvents: context.actionEvents ?? params.actionEvents,
+      transactionEvents,
+      actionEvents,
       eventQuery: context.eventQuery,
       triggerSnapshot: params.triggerSnapshot,
       ...event,
@@ -178,13 +189,24 @@ const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boo
 
 export { isPureResourceFlowCurrentlyPayable } from '../actions/resource-flow-preview'
 
+const previewAvailability = (context: ActionExecutionContext): { supplyTokens: SupplyTokenCounts } => ({
+  supplyTokens: {
+    fence: getOwnOrdinaryFenceReserveCount(context.player),
+    stable: getAvailableStableSupplyCount(context.state, context.player),
+  },
+})
+
 const evaluateChildDoable = (
   result: ActionHookResult | undefined,
   context: ActionExecutionContext,
 ): boolean => {
   if (!resultHasApplicabilitySignal(result)) return false
   if (typeof result?.doable === 'boolean') return result.doable
-  if (result?.flow) return isPureResourceFlowCurrentlyPayable(result.flow, context.player.resources)
+  if (result?.flow) {
+    return canPreviewPureResourceFlow(result.flow)
+      ? isPureResourceFlowCurrentlyPayable(result.flow, context.player.resources, previewAvailability(context))
+      : true
+  }
   return true
 }
 
@@ -193,7 +215,7 @@ const previewResourcesAfterChild = (
   context: ActionExecutionContext,
 ): Resource | undefined => {
   if (!result?.flow) return undefined
-  return applyPureResourceFlowPreview(result.flow, context.player.resources) ?? undefined
+  return applyPureResourceFlowPreview(result.flow, context.player.resources, previewAvailability(context)) ?? undefined
 }
 
 type TriggerSelectableChild = {

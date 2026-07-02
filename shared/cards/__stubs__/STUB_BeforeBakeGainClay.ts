@@ -11,7 +11,6 @@ const beforeBakeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before'],
   actions: ['bake-bread'],
-  dispatchMode: 'select',
   handler: () => ({
     flow: gainLeaf(CARD_ID, { clay: 1 }),
     sourceCard: CARD_ID,

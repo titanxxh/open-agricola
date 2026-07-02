@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B094_StockProtector'
 
@@ -30,20 +31,17 @@ describe('B094_StockProtector session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-
-    resp = session.resolveChoice(0, CARD_ID)
-    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(8)
     expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionStockProtectorPlace')
@@ -64,14 +62,7 @@ describe('B094_StockProtector session', () => {
 
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'fencing')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-
-    resp = session.resolveChoice(0, CARD_ID)
+    const resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(2)
     expect(resp.interaction.stateId).toBe('wait')

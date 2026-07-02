@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
@@ -30,6 +31,7 @@ describe('card flow regressions', () => {
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
+    resp = resolveTriggerIfPresent(session, resp, 'A017_ReclamationPlow')
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionReclamationPlow')
@@ -67,6 +69,7 @@ describe('card flow regressions', () => {
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
+    resp = resolveTriggerIfPresent(session, resp, 'A017_ReclamationPlow')
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionReclamationPlow')

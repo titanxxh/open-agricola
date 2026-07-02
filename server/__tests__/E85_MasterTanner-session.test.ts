@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E085_MasterTanner'
 
@@ -48,6 +49,7 @@ describe('E085_MasterTanner session', () => {
 
     // Cook 2 boar (Fireplace trade index 1 = boar->2food)
     resp = session.resolveChoice(0, 'bulk:1=2')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -69,6 +71,7 @@ describe('E085_MasterTanner session', () => {
 
     // Cook 1 boar
     resp = session.resolveChoice(0, 'bulk:1=1')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -85,6 +88,7 @@ describe('E085_MasterTanner session', () => {
 
     // Cook 2 cattle (Fireplace trade index 2 = cattle->3food)
     resp = session.resolveChoice(0, 'bulk:2=2')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -125,6 +129,7 @@ describe('E085_MasterTanner session', () => {
 
     // Cook 1 sheep (index 0) + 1 boar (index 1) + 1 cattle (index 2)
     resp = session.resolveChoice(0, 'bulk:0=1,1=1,2=1')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -147,6 +152,7 @@ describe('E085_MasterTanner session', () => {
     let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'bulk:1=1')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     let stack = getCardStack(resp.state.players[0]!, CARD_ID)
@@ -156,6 +162,7 @@ describe('E085_MasterTanner session', () => {
     resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'bulk:2=1')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
 
     stack = getCardStack(resp.state.players[0]!, CARD_ID)
