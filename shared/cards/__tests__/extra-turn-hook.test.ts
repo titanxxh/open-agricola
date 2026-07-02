@@ -7,10 +7,12 @@ import {
   countPendingExtraTurns,
   consumePendingExtraTurns,
 } from '../card-effects'
+import { requireActiveCardRegistry } from '../active-registry'
 import { A092_AdoptiveParents } from '../../cards/A/A092_AdoptiveParents'
 import '../A/A092_AdoptiveParents'
 
 const A92 = A092_AdoptiveParents.id
+const TEST_EXTRA = 'TEST_ExtraTurnProvider'
 
 const placeholderHands = (state: {
   players: { minorHand: string[]; occupationHand: string[] }[]
@@ -109,13 +111,37 @@ describe('extra-turn extension point (isolation)', () => {
     expect(branches[1]?.choiceLabelKey).toBe('ui.interactionDecline')
   })
 
+  it('collects multiple providers as a one-shot trigger selection', () => {
+    const { state, player } = setupA92Player()
+    requireActiveCardRegistry('extra turn multi-provider test').setEffect({
+      id: TEST_EXTRA,
+      contributeExtraTurn: () => ({
+        type: 'leaf',
+        actionId: 'gain',
+        params: { wood: 1 },
+        sourceCard: TEST_EXTRA,
+      }),
+      countExtraTurns: () => 1,
+    })
+    player.minorPlayed.push(TEST_EXTRA)
+
+    const collected = collectExtraTurnFlow(state, player)
+
+    expect(collected?.cardId).toBeUndefined()
+    expect(collected?.flow.type).toBe('parallel')
+    if (collected?.flow.type !== 'parallel') throw new Error('expected trigger-select')
+    expect(collected.flow.mode).toBe('trigger-select')
+    expect(collected.flow.triggerSelectOnce).toBe(true)
+    expect(collected.flow.children.map((child) => child.sourceCard)).toEqual([TEST_EXTRA, A92])
+  })
+
   it('counts remaining opportunities after skipped and forced consumed counters', () => {
     const { state, player } = setupA92Player({ newborns: 2, food: 2 })
 
     expect(countPendingExtraTurns(state, player)).toBe(2)
-    player._extraTurnSkipCount = 1
+    player._extraTurnSkipCountsByCard = { [A92]: 1 }
     expect(countPendingExtraTurns(state, player)).toBe(1)
-    player._extraTurnConsumedCount = 1
+    player._extraTurnConsumedCountsByCard = { [A92]: 1 }
     expect(countPendingExtraTurns(state, player)).toBe(0)
     expect(hasPendingExtraTurn(state, player)).toBe(false)
   })
@@ -126,19 +152,19 @@ describe('extra-turn extension point (isolation)', () => {
     const consumed = consumePendingExtraTurns(state, player)
 
     expect(consumed).toBe(2)
-    expect(player._extraTurnConsumedCount).toBe(2)
+    expect(player._extraTurnConsumedCountsByCard).toEqual({ [A92]: 2 })
     expect(countPendingExtraTurns(state, player)).toBe(0)
     expect(collectExtraTurnFlow(state, player)).toBeNull()
   })
 
   it('consumePendingExtraTurns respects already skipped opportunities', () => {
     const { state, player } = setupA92Player({ newborns: 2, food: 2 })
-    player._extraTurnSkipCount = 1
+    player._extraTurnSkipCountsByCard = { [A92]: 1 }
 
     const consumed = consumePendingExtraTurns(state, player)
 
     expect(consumed).toBe(1)
-    expect(player._extraTurnConsumedCount).toBe(1)
+    expect(player._extraTurnConsumedCountsByCard).toEqual({ [A92]: 1 })
     expect(countPendingExtraTurns(state, player)).toBe(0)
     expect(collectExtraTurnFlow(state, player)).toBeNull()
   })
@@ -147,6 +173,6 @@ describe('extra-turn extension point (isolation)', () => {
     const { state, player } = setupA92Player({ food: 0 })
 
     expect(consumePendingExtraTurns(state, player)).toBe(0)
-    expect(player._extraTurnConsumedCount).toBeUndefined()
+    expect(player._extraTurnConsumedCountsByCard).toBeUndefined()
   })
 })

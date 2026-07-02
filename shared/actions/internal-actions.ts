@@ -34,6 +34,7 @@ import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
+import { activateExtraTurnAction } from './effects/internal/activate-extra-turn'
 import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
 import { scheduledOfferAction } from './effects/internal/scheduled-offers'
@@ -84,6 +85,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   buildFarmhandRoomAction,
   selectionAction,
   activateCardEffectAction,
+  activateExtraTurnAction,
   drawOrdinaryCardsAction,
   placeFarmerOnSpaceAction,
   scheduledOfferAction,
