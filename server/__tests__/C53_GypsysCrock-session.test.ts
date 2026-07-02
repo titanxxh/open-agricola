@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardListeners } from '../../shared/cards/card-listeners'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
+import { getActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards/active-registry'
+import { CardRegistry } from '../../shared/cards/registry'
 
 import '../../shared/cards/C/C053_GypsysCrock'
 
@@ -81,6 +83,24 @@ describe('C053_GypsysCrock session', () => {
     // 2 goods lost → floor(2/2) = 1 bonus food
     // Total = 4 + 1 = 5
     expect(player.resources.food).toBe(5)
+  })
+
+  it('uses the session card registry even when another test swaps the active registry', () => {
+    const session = setup()
+    enterActiveInteraction(session)
+    const previousRegistry = getActiveCardRegistry()
+    setActiveCardRegistry(new CardRegistry())
+
+    try {
+      let resp = session.takeAnytimeAction(0, 'exchange')
+      expect(resp.ok).toBe(true)
+      resp = session.resolveChoice(0, 'bulk:0=2')
+      expect(resp.ok).toBe(true)
+
+      expect(resp.state.players[0]!.resources.food).toBe(5)
+    } finally {
+      setActiveCardRegistry(previousRegistry)
+    }
   })
 
   it('grants bonus food proportional to goods lost (4 sheep = 2 bonus)', () => {
