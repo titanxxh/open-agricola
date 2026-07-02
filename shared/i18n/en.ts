@@ -749,6 +749,7 @@ export const en = {
       'plant-additional-good': { name: 'Add crop to field' },
     },
     'activate-card-effect': { name: 'Activate Card Effect', description: 'Run an internal card effect hook' },
+    'activate-extra-turn': { name: 'Activate Extra Turn', description: 'Run an internal extra-turn provider hook' },
     'recall-placed-worker': { name: 'Recall Placed Worker', description: 'Return one of your placed workers back home' },
     'discard-from-hand': { name: 'Discard From Hand', description: 'Discard 1 card from your hand' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },
