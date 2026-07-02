@@ -43,6 +43,14 @@ export const devResourceKeysForState = (
 ): (keyof Resource)[] =>
   state?.enableFarmersOfTheMoor === true ? extendedResourceKeyList : resourceKeyList
 
+export const shouldShowDevPanel = ({
+  devMode,
+  hasGameView,
+}: {
+  devMode: boolean
+  hasGameView: boolean
+}): boolean => devMode && hasGameView
+
 export const canTakeVisibleMoorSpecialAction = (
   state: GameState,
   currentPlayer: PlayerState,
