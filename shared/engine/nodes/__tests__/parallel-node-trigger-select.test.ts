@@ -270,6 +270,39 @@ describe('ParallelNode trigger-select mode', () => {
     expect(evaluation.options).toEqual([])
   })
 
+  it('keeps mutation-only listener triggers selectable', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['MutationOnlyCard'],
+      handler: (context) => {
+        const effectPlayer = context.effectPlayer ?? context.player
+        effectPlayer.cardStates.MutationOnlyCard = { ready: true }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      minorPlayed: ['MutationOnlyCard'],
+    })
+    const node = makeTriggerSelect([makeActivate('a', 'MutationOnlyCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player))
+
+    expect(player.cardStates).toEqual({})
+    expect(evaluation.options).toEqual([
+      {
+        value: 'MutationOnlyCard',
+        labelKey: 'cards.MutationOnlyCard.name',
+        sourceCard: 'MutationOnlyCard',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
   it('before-action pass is disabled while an enabled trigger can unlock continuation', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
