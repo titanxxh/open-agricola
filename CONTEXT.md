@@ -294,6 +294,14 @@ _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。
 _Avoid_: dispatch 阶段直接 mutate state
 
+**Reaction Hook**:
+同一时机可能有多张卡可触发、且玩家应能决定触发顺序的卡牌反应。OA 用 `ParallelNode(mode='trigger-select')` 对齐 BGA `NODE_PARALLEL`：先显示可触发卡牌，玩家选择一张后执行该卡 activation，剩余同组 reaction 继续由引擎重算。
+_Avoid_: 固定卡牌扫描顺序、per-card 触发顺序开关
+
+**Compute / Query Hook**:
+只汇总数值、候选、费用、可达性或计分的 hook，例如 `computeCosts`、`isDoable`、`computeBonusScore`。这类 hook 不代表玩家可选择的反应顺序，仍按确定性顺序聚合。
+_Avoid_: trigger-select、玩家排序选择、状态修改
+
 **Cards**:
 卡牌运行时领域，覆盖 `CardRegistry`、`SessionCardContext`、card effects、card listeners、display lookup 和自定义卡注册。
 _Avoid_: 把单卡规则扩散到主路径
@@ -419,7 +427,7 @@ _Avoid_: 每轮一次的标记
 _Avoid_: 单纯增加工人计数
 
 **Extra Turn（额外行动）**:
-玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。对应 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
+玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。多张卡同时贡献时先进入 provider 级 `trigger-select`，选中某张卡后才展开该卡自己的额外行动 flow。skip / forced consume 按来源卡记录机会消耗，不用玩家级全局计数。对应 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
 _Avoid_: 连续放工（破坏交替）
 
 **Forfeit（放弃额外行动）**:
@@ -439,6 +447,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **Effects** 定义公开和内部行动；**Internal Action** 支撑支付、selection、future meeple、worker recall 等非玩家直选叶子。
 - **Action Hook** 修改行动生命周期的可达性、成本、替代、候选或后续 flow；**Card Effect Hook** 处理阶段/计分；**Card Listener** 响应 action/event phase。
 - **Card Listener** 可以构造 flow，但状态修改必须落到 action leaf 执行阶段。
+- **Reaction Hook** 用 trigger-select 显式化同一时机的玩家顺序选择；**Compute / Query Hook** 只做确定性聚合。
 - **Card Definition** 和 **Card Display** 可以被前端读取；**Card Impl** 只给 server / sandbox 执行规则。
 - 持续计数、单次标记和单卡历史优先写入 **Card State**；只有跨卡通用事实才进入 `GameState` 或 `PlayerState` 顶层。
 - **Domain** 提供农场、动物、牧场、计分等派生视图和不变量；规则路径可以复用，前端只能把它当安全派生 helper。
