@@ -730,6 +730,7 @@ export const zh = {
       'plant-additional-good': { name: '给田地添加作物' },
     },
     'activate-card-effect': { name: '触发卡牌效果', description: '执行内部卡牌效果 hook' },
+    'activate-extra-turn': { name: '触发额外回合', description: '执行内部额外回合 provider hook' },
     'recall-placed-worker': { name: '召回工人', description: '将一个已放置的工人收回家中' },
     'discard-from-hand': { name: '弃手牌', description: '从手牌中弃掉 1 张' },
     'reserve-fence-bonus': { name: '预留围栏优惠', description: '为当前围栏行动预留来源卡牌上的免费围栏' },
