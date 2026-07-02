@@ -622,7 +622,7 @@ export class GameCore {
   }
 
   /** @internal phase access — drive the engine's step loop until it blocks. */
-  driveEngineSteps(): void { this.runEngineSteps() }
+  driveEngineSteps(): void { this.withCtx(() => this.runEngineSteps()) }
 
   /** @internal phase access — flush queued log entries into the canonical log. */
   flushEngineLogPublic(): void { this.flushEngineLog() }
@@ -651,11 +651,11 @@ export class GameCore {
     return this.listenersVetoIsDoable(player, space)
   }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
-  invokeHarvestFromBeforeHarvest(): SessionResponse { return this.continueHarvestFromBeforeHarvest() }
+  invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }
   /** @internal Harvest phase trampoline — kicks off the breed-phase continuation chain. */
-  invokeAfterFeedingPhase(): SessionResponse { return this.continueAfterFeedingPhase() }
+  invokeAfterFeedingPhase(): SessionResponse { return this.withCtx(() => this.continueAfterFeedingPhase()) }
   /** @internal Round phase trampoline — onAllWorkersPlaced + performRoundEnd cascade. */
-  invokeAllWorkersPlacedHooks(): SessionResponse { return this.continueAllWorkersPlacedHooks() }
+  invokeAllWorkersPlacedHooks(): SessionResponse { return this.withCtx(() => this.continueAllWorkersPlacedHooks()) }
   /** @internal Round phase — set state.currentPlayerIndex (only by handleConfirmNextPlayerResolved). */
   setCurrentPlayerIndex(idx: number): void { this.state.currentPlayerIndex = idx }
   /** @internal Round phase — read activePlayerIndex view (engineStack-derived). */
@@ -701,14 +701,14 @@ export class GameCore {
   invokeFinalizeRound(): void { this.finalizeRound() }
   /** @internal Round phase — onEndTurn stage hook trampoline. */
   invokeEndTurnHooks(playerIndex: number, triggerActionId?: string | null): SessionResponse {
-    return this.continueEndTurnHooks(playerIndex, 0, triggerActionId)
+    return this.withCtx(() => this.continueEndTurnHooks(playerIndex, 0, triggerActionId))
   }
   /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
   isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
   /** @internal Harvest phase — find next player still owing a harvest-breed reorg. */
   findNextHarvestReorgPlayerIndex(playerIndex: number): number { return this.findNextHarvestReorgPlayer(playerIndex) }
   /** @internal Harvest phase — onEndHarvest stage hook chain trampoline. */
-  invokeEndHarvestEffects(): SessionResponse { return this.continueEndHarvestEffects() }
+  invokeEndHarvestEffects(): SessionResponse { return this.withCtx(() => this.continueEndHarvestEffects()) }
   /** @internal Draft phase — assign processed draft state back. */
   setDraftState(draft: GameState['draft']): void { this.state.draft = draft }
   /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
@@ -724,11 +724,11 @@ export class GameCore {
   /** @internal Round phase — emit `log.actionDetail`. */
   invokeLogActionDetail(before: PlayerState, after: PlayerState): void { this.logActionDetail(before, after) }
   /** @internal Round phase — onBeforeReturnHome stage hook chain trampoline. */
-  invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
+  invokeBeforeReturnHomeHooks(): SessionResponse { return this.withCtx(() => this.continueBeforeReturnHomeHooks()) }
   /** @internal Round phase — onAfterRoundEnd stage hook chain trampoline. */
-  invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
+  invokeAfterRoundEnd(): SessionResponse { return this.withCtx(() => this.continueAfterRoundEnd()) }
   /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
-  invokeRoundEndHooks(): SessionResponse { return this.continueRoundEndHooks() }
+  invokeRoundEndHooks(): SessionResponse { return this.withCtx(() => this.continueRoundEndHooks()) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic pending-only frame. */
@@ -3459,6 +3459,10 @@ export class GameCore {
   }
 
   private runEngineSteps(): void {
+    return this.withCtx(() => this.runEngineStepsInContext())
+  }
+
+  private runEngineStepsInContext(): void {
     let frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
     const space = this.getSpaceById(frame.spaceId)
@@ -3763,7 +3767,7 @@ export class GameCore {
   }
 
   getState(): SessionResponse {
-    return this.respond()
+    return this.withCtx(() => this.respond())
   }
 
   /**
@@ -3812,6 +3816,10 @@ export class GameCore {
   }
 
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
+    return this.withCtx(() => this.getAvailableActionsInContext(playerIndex))
+  }
+
+  private getAvailableActionsInContext(playerIndex: number): { spaceId: string; nameKey: string }[] {
     const player = this.state.players[playerIndex]
     if (!player) return []
     return this.state.actionSpaces
@@ -3824,6 +3832,10 @@ export class GameCore {
    * Returns a map of spaceId -> isExecutable for all action spaces.
    */
   getActionAvailability(playerIndex: number): Record<string, boolean> {
+    return this.withCtx(() => this.getActionAvailabilityInContext(playerIndex))
+  }
+
+  private getActionAvailabilityInContext(playerIndex: number): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
 
@@ -3863,6 +3875,13 @@ export class GameCore {
   getCardAvailability(
     playerIndex: number,
     actionAvailability = this.getActionAvailability(playerIndex),
+  ): Record<string, boolean> {
+    return this.withCtx(() => this.getCardAvailabilityInContext(playerIndex, actionAvailability))
+  }
+
+  private getCardAvailabilityInContext(
+    playerIndex: number,
+    actionAvailability = this.getActionAvailabilityInContext(playerIndex),
   ): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
@@ -3934,7 +3953,7 @@ export class GameCore {
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
-    return roundPhase.takeAction(this, playerIndex, spaceId)
+    return this.withCtx(() => roundPhase.takeAction(this, playerIndex, spaceId))
   }
 
   takeSpecialAction(
@@ -3943,12 +3962,12 @@ export class GameCore {
     actionId: MoorSpecialActionId,
     payload?: MoorSpecialActionPayload,
   ): SessionResponse {
-    return roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload)
+    return this.withCtx(() => roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload))
   }
 
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
-    return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
+    return this.withCtx(() => roundPhase.takeAnytimeAction(this, playerIndex, actionId))
   }
 
   resolveOrdinaryCardDrawChoice(
@@ -4089,6 +4108,14 @@ export class GameCore {
    * `resolveEngineChoice` after finite option validation.
    */
   resolveChoice(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse {
+    return this.withCtx(() => this.resolveChoiceInContext(playerIndex, value, payload))
+  }
+
+  private resolveChoiceInContext(
     playerIndex: number,
     value: string,
     payload?: Record<string, unknown>,
@@ -4592,6 +4619,10 @@ export class GameCore {
   }
 
   loadState(raw: unknown): SessionResponse {
+    return this.withCtx(() => this.loadStateInContext(raw))
+  }
+
+  private loadStateInContext(raw: unknown): SessionResponse {
     let nextState: GameState
     let cursor: EngineStackCursor | null = null
     if (isStateWithCursor(raw)) {
@@ -4749,6 +4780,13 @@ export class GameCore {
   }
 
   commitSelectionChoice(
+    playerIndex: number,
+    payload: SelectionCommitPayload,
+  ): SessionResponse {
+    return this.withCtx(() => this.commitSelectionChoiceInContext(playerIndex, payload))
+  }
+
+  private commitSelectionChoiceInContext(
     playerIndex: number,
     payload: SelectionCommitPayload,
   ): SessionResponse {
@@ -5159,6 +5197,10 @@ export class GameCore {
   }
 
   undoStep(): SessionResponse {
+    return this.withCtx(() => this.undoStepInContext())
+  }
+
+  private undoStepInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
     const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
@@ -5237,6 +5279,10 @@ export class GameCore {
   }
 
   undoAction(): SessionResponse {
+    return this.withCtx(() => this.undoActionInContext())
+  }
+
+  private undoActionInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
     if (!this.canUndoActionNow()) {
       if (
