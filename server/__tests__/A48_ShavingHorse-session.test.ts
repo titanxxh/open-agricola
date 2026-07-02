@@ -88,6 +88,17 @@ const directContext = (
   } as unknown as CardListenerContext
 }
 
+const resolveShavingHorseTriggerIfPresent = (
+  session: GameSession,
+  resp: ReturnType<GameSession['takeAction']>,
+) => {
+  if (resp.interaction.stateId !== 'wait') return resp
+  if (resp.interaction.request.kind !== 'select-trigger') return resp
+  const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+  expect(option).toBeDefined()
+  return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
+}
+
 describe('A048_ShavingHorse session', () => {
   it('does not trigger when card not played', () => {
     const session = setup({ forestWood: 3, playerWood: 4, cardPlayed: false })
@@ -118,7 +129,7 @@ describe('A048_ShavingHorse session', () => {
 
   it('offers optional exchange when wood reaches 5', () => {
     const session = setup({ forestWood: 3, playerWood: 2 }) // after collect: 5
-    const resp = session.takeAction(0, 'forest')
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -137,7 +148,7 @@ describe('A048_ShavingHorse session', () => {
 
   it('decline option keeps wood and grants no food', () => {
     const session = setup({ forestWood: 3, playerWood: 2 })
-    const resp = session.takeAction(0, 'forest')
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -150,7 +161,7 @@ describe('A048_ShavingHorse session', () => {
 
   it('forces mandatory exchange when wood reaches 7', () => {
     const session = setup({ forestWood: 3, playerWood: 4 }) // after collect: 7
-    const resp = session.takeAction(0, 'forest')
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
     expect(resp.ok).toBe(true)
     // No choice prompt — mandatory flow runs through automatically
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')

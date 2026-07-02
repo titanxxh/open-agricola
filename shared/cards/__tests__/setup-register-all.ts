@@ -16,11 +16,11 @@ const [
 
 const defaultRegistry = new CardRegistry()
 for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
-  defaultRegistry.loadImpl(cardId, impl)
+  defaultRegistry.loadImpl(cardId, impl, { protected: true })
 }
 defaultRegistry.syncModifiersFromCatalog(
   allOccupationCards,
   allMinorImprovementCards,
 )
-defaultRegistry.registerEffects(majorCardDefinitions)
+defaultRegistry.registerEffects(majorCardDefinitions, { protected: true })
 setActiveCardRegistry(defaultRegistry)

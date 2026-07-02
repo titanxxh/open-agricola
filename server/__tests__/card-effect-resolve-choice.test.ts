@@ -73,7 +73,12 @@ afterEach(() => {
  * to play it for free (first occupation on lessons = 0 food).
  */
 const makeSession = () => {
+  const effect = getCardEffect(TEST_CARD_ID) ?? {
+    id: TEST_CARD_ID,
+    onBuy: () => buildTestOnBuyFlow(),
+  }
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  requireActiveCardRegistry('card-effect-resolve-choice').setEffect(effect)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
