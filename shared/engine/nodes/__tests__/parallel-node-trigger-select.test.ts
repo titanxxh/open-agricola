@@ -140,6 +140,32 @@ describe('ParallelNode trigger-select mode', () => {
     expect(node.selectedChildId).toBe('a')
   })
 
+  it('keeps a selected non-card trigger child active for one-shot prompts', () => {
+    const child = new ActionNode(
+      'extra-a',
+      'activate-extra-turn',
+      'A092_AdoptiveParents',
+      { cardId: 'A092_AdoptiveParents' },
+    )
+    const node = new ParallelNode('ptn-extra', [child])
+    node.mode = 'trigger-select'
+    node.resolveAfterSelection = true
+    node.triggerOwnerPlayerId = 'p1'
+    node.ownerPlayerId = 'p1'
+    node.triggerChildren = [{
+      nodeId: child.id,
+      cardId: 'A092_AdoptiveParents',
+      listenerId: '',
+      mandatory: true,
+    }]
+
+    expect(node.chooseCard('A092_AdoptiveParents')).toBe(child)
+
+    expect(node.step(stubCtx)).toEqual({ kind: 'continue' })
+    expect(child.getState()).not.toBe('resolved')
+    expect(node.getState()).not.toBe('resolved')
+  })
+
   it('follow-up inserted after selected child runs before next trigger prompt', () => {
     const a = makeActivate('a', 'C1')
     const b = makeActivate('b', 'C2')
@@ -360,6 +386,58 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
+  it('disables pass for an enabled non-optional trigger flow even without explicit mandatory metadata', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['CleanupCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'CleanupCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'CleanupCard',
+        labelKey: 'cards.CleanupCard.name',
+        sourceCard: 'CleanupCard',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
+  it('keeps pass enabled for an enabled optional trigger flow', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['OptionalCard'],
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'OptionalCard', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'OptionalCard',
+        labelKey: 'cards.OptionalCard.name',
+        sourceCard: 'OptionalCard',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
   it('keeps non-resource continuation flows selectable', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
@@ -380,7 +458,11 @@ describe('ParallelNode trigger-select mode', () => {
         labelKey: 'cards.NonResourceFlowCard.name',
         sourceCard: 'NonResourceFlowCard',
       },
-      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
     ])
   })
 

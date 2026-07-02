@@ -231,6 +231,17 @@ const previewResourcesAfterChild = (
   return applyPureResourceFlowPreview(result.flow, player.resources, previewAvailability(state, player)) ?? undefined
 }
 
+const triggerResultMandatory = (
+  metadataMandatory: boolean,
+  phase: string,
+  result: ActionHookResult | undefined,
+): boolean => {
+  if (metadataMandatory) return true
+  if (phase === 'before') return false
+  if (!resultHasApplicabilitySignal(result)) return false
+  return result?.flow?.optional !== true
+}
+
 type TriggerSelectableChild = {
   child: EngineNode
   cardId: string
@@ -356,19 +367,21 @@ export const evaluateTriggerSelect = (
     const resourcesAfter = doable && previewPlayer.id === context.player.id
       ? previewResourcesAfterChild(result, previewState, previewPlayer)
       : undefined
+    const actionId = isActivateCardActionNode(child)
+      ? child.params.actionId
+      : isActivateCardEffectNode(child) ? child.actionId : 'stage-hook'
+    const phase = isActivateCardActionNode(child)
+      ? child.params.phase
+      : isActivateCardEffectNode(child) ? String(child.params?.hook ?? 'stage') : 'stage'
     const state: TriggerOptionState = {
       child,
       cardId: entry.cardId,
       listenerId: entry.listenerId,
-      mandatory: entry.mandatory,
+      mandatory: applicable ? triggerResultMandatory(entry.mandatory, phase, result) : entry.mandatory,
       applicable,
       doable,
-      actionId: isActivateCardActionNode(child)
-        ? child.params.actionId
-        : isActivateCardEffectNode(child) ? child.actionId : 'stage-hook',
-      phase: isActivateCardActionNode(child)
-        ? child.params.phase
-        : isActivateCardEffectNode(child) ? String(child.params?.hook ?? 'stage') : 'stage',
+      actionId,
+      phase,
       resourcesAfter,
     }
     optionStates.push(state)

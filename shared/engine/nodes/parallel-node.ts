@@ -121,7 +121,7 @@ export class ParallelNode extends BaseNode {
 
   private clearStaleSelection(): void {
     if (!this.selectedChildId) return
-    const sel = this.cardChildren().find((c) => c.id === this.selectedChildId)
+    const sel = this.children.find((c) => c.id === this.selectedChildId)
     if (!sel || sel.getState() === 'resolved') {
       if (this.resolveAfterSelection) {
         this.resolveRemainingTriggerChildrenForPass()
