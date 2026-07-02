@@ -4,6 +4,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { A028_ForestSchool } from '../../shared/cards/A/A028_ForestSchool'
 import { findTravelingPlayersSpace } from '../../shared/cards/helpers/action-space-categories'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/register-all'
 
@@ -69,6 +70,10 @@ const playOccupation = (
   expect(resp.ok).toBe(true)
   let guard = 8
   while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+    if (resp.interaction.request.kind === 'select-trigger') {
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+      continue
+    }
     if (resp.interaction.request.kind !== 'choice') break
     const option = resp.interaction.options?.find((entry) => entry.value === occupationId)
       ?? resp.interaction.options?.find((entry) => entry.value !== '__skip__')

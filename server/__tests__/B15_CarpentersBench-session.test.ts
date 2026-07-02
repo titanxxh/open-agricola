@@ -4,6 +4,7 @@ import { executeCardListener, type CardListenerContext } from '../../shared/card
 import { B015_CarpentersBench_impl } from '../../shared/cards/B/B015_CarpentersBench'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow } from '../../shared/contract/types'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B015_CarpentersBench'
 import '../../shared/cards/E/E016_BriarHedge'
@@ -115,6 +116,7 @@ describe('B015_CarpentersBench session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
     const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
@@ -159,6 +161,7 @@ describe('B015_CarpentersBench session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
     const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')

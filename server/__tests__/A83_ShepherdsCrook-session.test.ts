@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { DraftGameEvent } from '../../shared/contract/events'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A083_ShepherdsCrook'
 
@@ -49,6 +50,7 @@ describe('A083_ShepherdsCrook session flow', () => {
       edges: edgesForTwoByTwo,
       extraWood: 0,
     })
+    resp = resolveTriggerIfPresent(session, resp, 'A083_ShepherdsCrook')
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.resources.sheep).toBe(2)

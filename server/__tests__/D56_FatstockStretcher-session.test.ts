@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/D/D056_FatstockStretcher'
 
@@ -47,6 +48,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 2 sheep (Fireplace trade index 0 = sheep->2food)
     resp = session.resolveChoice(0, 'bulk:0=2')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -66,6 +68,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 2 boar (Fireplace trade index 1 = boar->2food)
     resp = session.resolveChoice(0, 'bulk:1=2')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -85,6 +88,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 1 sheep (index 0) + 1 boar (index 1)
     resp = session.resolveChoice(0, 'bulk:0=1,1=1')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -105,6 +109,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 2 cattle (Fireplace trade index 2 = cattle->3food)
     resp = session.resolveChoice(0, 'bulk:2=2')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -122,6 +127,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 2 vegetable (Fireplace trade index 3 = vegetable->2food)
     resp = session.resolveChoice(0, 'bulk:3=2')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
@@ -139,6 +145,7 @@ describe('D056_FatstockStretcher session', () => {
 
     // Cook 1 sheep (index 0) + 1 cattle (index 2)
     resp = session.resolveChoice(0, 'bulk:0=1,2=1')
+    resp = resolveTriggerIfPresent(session, resp, 'D056_FatstockStretcher')
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!

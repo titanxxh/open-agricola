@@ -13,12 +13,10 @@ describe('A126 MasterWorkman integration', () => {
     const p0 = s0.state.players[0]
 
     const woodBefore = p0.resources.wood
-    let resp = session.takeAction(0, 'sheep-market')
+    const resp = session.takeAction(0, 'sheep-market')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
 
-    resp = session.resolveChoice(0, 'A126_MasterWorkman')
     const woodAfter = resp.state.players[0].resources.wood
 
     expect(woodAfter).toBeGreaterThan(woodBefore)

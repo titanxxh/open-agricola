@@ -8,6 +8,7 @@ import { executeCardListener } from '../../shared/cards/card-listeners'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E053_BoarSpear'
 import '../../shared/cards/E/E085_MasterTanner'
@@ -232,6 +233,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, B137_ID)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionAnimalReorg')
 
@@ -263,6 +265,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, C148_ID)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionAnimalReorg')
 
@@ -331,6 +334,8 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
+    resp = resolveTriggerIfPresent(session, resp, B137_ID)
+    resp = resolveTriggerIfPresent(session, resp, C148_ID)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionAnimalReorg')
 

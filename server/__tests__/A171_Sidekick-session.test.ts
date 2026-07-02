@@ -4,6 +4,7 @@ import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A171_Sidekick'
 import '../../shared/cards/A/A156_Buyer'
 import '../../shared/cards/C/C004_WritingBoards'
@@ -83,6 +84,7 @@ describe('A171 Sidekick session', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'eastern-quarry')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     let accept = acceptOption(resp)
     expect(accept).toBeDefined()
 
@@ -94,6 +96,7 @@ describe('A171 Sidekick session', () => {
       { playerId: afterFirst.id, workerId: '2' },
     ])
 
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     accept = acceptOption(resp)
     expect(accept).toBeDefined()
 
@@ -113,6 +116,7 @@ describe('A171 Sidekick session', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'eastern-quarry')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
 
@@ -130,6 +134,7 @@ describe('A171 Sidekick session', () => {
     })
 
     let resp = session.takeAction(0, 'forest')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     const accept = acceptOption(resp)
     expect(accept).toBeDefined()
 
@@ -191,6 +196,7 @@ describe('A171 Sidekick session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'eastern-quarry')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     const sidekick = acceptOption(resp)
     expect(sidekick).toBeDefined()
     resp = session.resolveChoice(0, sidekick!.value)
@@ -241,9 +247,11 @@ describe('A171 Sidekick session', () => {
     })
     try {
       let resp = session.takeAction(0, 'eastern-quarry')
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
       const sidekick = acceptOption(resp)
       expect(sidekick).toBeDefined()
       resp = session.resolveChoice(0, sidekick!.value)
+      resp = resolveTriggerIfPresent(session, resp, STUB_ID)
 
       expect(resp.state.players[0]!.resources).toMatchObject({ food: 3, vegetable: 1 })
     } finally {

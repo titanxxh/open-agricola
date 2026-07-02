@@ -19,6 +19,7 @@ import '../../shared/cards/E/E016_BriarHedge'
 import '../../shared/cards/E/E089_Stallwright'
 import '../../shared/cards/E/E097_Beneficiary'
 import '../../shared/cards/A/A114_SeasonalWorker'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const FILLER = '__test_placeholder__'
 
@@ -568,7 +569,11 @@ describe('formatCost card session regressions', () => {
     const session = setupBeneficiaryWithStallwright()
 
     const played = playOccupation(session, 'E097_Beneficiary')
-    const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
+    const acceptedOccupationBranch = resolveTriggerIfPresent(
+      session,
+      chooseByLabel(session, played, 'actions.lessons.name'),
+      'E089_Stallwright',
+    )
     expect(acceptedOccupationBranch.interaction.stateId).toBe('wait')
     if (acceptedOccupationBranch.interaction.stateId !== 'wait') return
     expect(acceptedOccupationBranch.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
@@ -594,7 +599,11 @@ describe('formatCost card session regressions', () => {
 
     const played = playOccupation(session, 'E097_Beneficiary')
     expect(played.interaction.stateId).toBe('wait')
-    const skipped = session.resolveChoice(0, '__skip__')
+    const skipped = resolveTriggerIfPresent(
+      session,
+      session.resolveChoice(0, '__skip__'),
+      'E089_Stallwright',
+    )
     expect(skipped.ok).toBe(true)
     expect(skipped.interaction.stateId).toBe('wait')
     if (skipped.interaction.stateId !== 'wait') return
@@ -612,7 +621,11 @@ describe('formatCost card session regressions', () => {
     if (playedMinor.interaction.stateId !== 'wait') return
     expect(playedMinor.interaction.options?.some((entry) => entry.value === '__done__')).toBe(true)
 
-    const completedBonus = session.resolveChoice(0, '__done__')
+    const completedBonus = resolveTriggerIfPresent(
+      session,
+      session.resolveChoice(0, '__done__'),
+      'E089_Stallwright',
+    )
     expect(completedBonus.ok).toBe(true)
     expect(completedBonus.interaction.stateId).toBe('wait')
     if (completedBonus.interaction.stateId !== 'wait') return
@@ -624,7 +637,12 @@ describe('formatCost card session regressions', () => {
 
     const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
-    const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
+    let playedExtraOccupation = resolveTriggerIfPresent(
+      session,
+      chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker'),
+      'D042_EducationBonus',
+    )
+    playedExtraOccupation = resolveTriggerIfPresent(session, playedExtraOccupation, 'D042_EducationBonus')
 
     const player = playedExtraOccupation.state.players[0]!
     expect(player.occupationPlayed).toEqual([
@@ -642,7 +660,11 @@ describe('formatCost card session regressions', () => {
 
     const played = playOccupation(session, 'E097_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
-    const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
+    const playedExtraOccupation = resolveTriggerIfPresent(
+      session,
+      chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker'),
+      'B049_Scales',
+    )
 
     const player = playedExtraOccupation.state.players[0]!
     expect(player.occupationPlayed).toEqual([
