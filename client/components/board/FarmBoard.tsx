@@ -46,6 +46,7 @@ type CardAnimalDisplay = {
   allowedAnimalTypes?: AnimalType[]
   capacity: number
   zoneId: string
+  isReorgDraft: boolean
 }
 type BorrowedPlayedCardDisplay = CardAnimalDisplay & {
   cardId: string
@@ -80,12 +81,32 @@ const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
 const AnimalCount = ({
   count,
   animalType,
+  animalCounts,
   capacity,
 }: {
   count: number
   animalType: AnimalType | null
+  animalCounts?: Partial<Record<AnimalType, number>>
   capacity: number
 }) => {
+  const countEntries = animalCounts
+    ? ANIMAL_CONTROL_TYPES
+        .map((type) => [type, Math.max(0, animalCounts[type] ?? 0)] as const)
+        .filter(([, value]) => value > 0)
+    : []
+  if (countEntries.length > 0) {
+    return (
+      <span className="pasture-count">
+        {countEntries.map(([type, value]) => (
+          <span key={type}>
+            {value}
+            <span className={`res-icon res-icon-${type}`} style={{ marginLeft: '2px', marginRight: '2px' }} />
+          </span>
+        ))}
+        /{capacity}
+      </span>
+    )
+  }
   if (!animalType) {
     return (
       <span className="pasture-count">
@@ -883,6 +904,7 @@ export const FarmBoard = ({
       <AnimalCount
         count={cardDisplay.animalCount}
         animalType={cardDisplay.animalType}
+        animalCounts={cardDisplay.animalCounts}
         capacity={cardDisplay.capacity}
       />
       <div className="pasture-controls">
@@ -1368,10 +1390,11 @@ export const FarmBoard = ({
                     <AnimalCount
                       count={farmCardDisplay.animalCount}
                       animalType={farmCardDisplay.animalType}
+                      animalCounts={farmCardDisplay.animalCounts}
                       capacity={farmCardDisplay.capacity}
                     />
                   </div>
-                  {isReorgActive ? (
+                  {farmCardDisplay.isReorgDraft ? (
                     <div className="pasture-controls">
                       {ANIMAL_CONTROL_TYPES.map((animalType) => {
                         const cardAnimalCounts = farmCardDisplay.animalCounts ?? {}
@@ -1666,7 +1689,20 @@ export const FarmBoard = ({
                   <span>{m084LyingHorses}</span>
                 </div>
               ) : null}
-              {isReorgActive && cardDisplay ? renderPlayedCardReorg(cardDisplay) : null}
+              {cardDisplay
+                ? cardDisplay.isReorgDraft
+                  ? renderPlayedCardReorg(cardDisplay)
+                  : (
+                      <div className="played-card-readonly-animals">
+                        <AnimalCount
+                          count={cardDisplay.animalCount}
+                          animalType={cardDisplay.animalType}
+                          animalCounts={cardDisplay.animalCounts}
+                          capacity={cardDisplay.capacity}
+                        />
+                      </div>
+                    )
+                : null}
             </div>
           )
         })}
@@ -1698,6 +1734,7 @@ export const FarmBoard = ({
                         <AnimalCount
                           count={display.animalCount}
                           animalType={display.animalType}
+                          animalCounts={display.animalCounts}
                           capacity={display.capacity}
                         />
                       </div>

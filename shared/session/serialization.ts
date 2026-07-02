@@ -25,13 +25,14 @@ export type SerializedActionSpace = Omit<
 >
 
 /**
- * Player as seen by the client. Adds the generic `specialStables` display field
- * derived from `collectBuiltSpecialStables` — a snapshot-only projection of
- * each card's standing special stables (e.g. B85 FarmHand's 2×2 centre). The
- * domain truth stays in `cardStates`; this never enters `PlayerState`.
+ * Player as seen by the client. Adds generic snapshot-only display fields
+ * derived from card effects. The domain truth stays in `cardStates`; these
+ * never enter `PlayerState`.
  */
 export type SerializedPlayerState = PlayerState & {
   specialStables: BuiltSpecialStable[]
+  playedCardAnimalZones: InteractionAnimalReorgZone[]
+  farmCardAnimalZones: InteractionAnimalReorgZone[]
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
 }
 
@@ -101,6 +102,26 @@ const collectBorrowedPlayedCardAnimalZones = (
     )
     .map(serializeAnimalZone)
 
+const collectPlayedCardAnimalZones = (
+  state: GameState,
+  player: PlayerState,
+): InteractionAnimalReorgZone[] =>
+  computeAnimalZones(player, state)
+    .filter((zone) =>
+      zone.zoneType === 'card' &&
+      !zone.farmPosition &&
+      zone.displaySource !== 'borrowed-played-card'
+    )
+    .map(serializeAnimalZone)
+
+const collectFarmCardAnimalZones = (
+  state: GameState,
+  player: PlayerState,
+): InteractionAnimalReorgZone[] =>
+  computeAnimalZones(player, state)
+    .filter((zone) => zone.zoneType === 'card' && !!zone.farmPosition)
+    .map(serializeAnimalZone)
+
 export const serializeState = (
   state: GameState,
   ctx: SerializeStateContext,
@@ -112,6 +133,8 @@ export const serializeState = (
     players: players.map((player) => ({
       ...player,
       specialStables: collectBuiltSpecialStables(player),
+      playedCardAnimalZones: collectPlayedCardAnimalZones(state, player),
+      farmCardAnimalZones: collectFarmCardAnimalZones(state, player),
       borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(state, player),
     })),
     actionSpaces: actionSpaces.map(
@@ -723,6 +746,8 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
     ...rest,
     players: players.map(({
       specialStables: _specialStables,
+      playedCardAnimalZones: _playedCardAnimalZones,
+      farmCardAnimalZones: _farmCardAnimalZones,
       borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
       ...player
     }) => player),

@@ -23,19 +23,24 @@ type AnimalDisplay = {
   allowedAnimalTypes?: AnimalType[]
 }
 
-export type BorrowedPlayedCardDisplay = AnimalDisplay & {
+export type CardAnimalDisplay = AnimalDisplay & {
   capacity: number
   zoneId: string
+  isReorgDraft: boolean
+}
+
+export type BorrowedPlayedCardDisplay = CardAnimalDisplay & {
   cardId: string
   cardType: 'minor' | 'occupation' | 'major'
   ownerPlayerId?: string
   animalOwnerPlayerId?: string
   displayOwnerName?: string
   displaySource: 'borrowed-played-card'
-  isReorgDraft: boolean
 }
 
-type PlayerWithBorrowedPlayedCardZones = PlayerState & {
+type PlayerWithCardAnimalZones = PlayerState & {
+  playedCardAnimalZones?: AnimalReorgState['zones']
+  farmCardAnimalZones?: AnimalReorgState['zones']
   borrowedPlayedCardAnimalZones?: AnimalReorgState['zones']
 }
 
@@ -170,27 +175,32 @@ export const buildStableDisplayMap = (
 }
 
 export const buildCardDisplayMap = (
+  displayPlayer: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
-  const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  const map = new Map<string, CardAnimalDisplay>()
+  const putZone = (zone: AnimalReorgState['zones'][number], isReorgDraft: boolean) => {
+    if (zone.zoneType !== 'card') return
+    if (zone.farmPosition) return
+    if (zone.displaySource === 'borrowed-played-card') return
+    if (displayPlayer?.id && zone.animalOwnerPlayerId && zone.animalOwnerPlayerId !== displayPlayer.id) return
+    const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
+    const display: CardAnimalDisplay = {
+      animalType: zone.animalType ?? null,
+      animalCount: Math.max(0, zone.animalCount ?? 0),
+      capacity: zone.capacity,
+      zoneId: zone.id,
+      isReorgDraft,
+    }
+    if (zone.animalCounts) display.animalCounts = zone.animalCounts
+    if (zone.allowedAnimalType !== undefined) display.allowedAnimalType = zone.allowedAnimalType
+    if (zone.allowedAnimalTypes) display.allowedAnimalTypes = zone.allowedAnimalTypes
+    map.set(cardId, display)
+  }
+  ;((displayPlayer as PlayerWithCardAnimalZones | null | undefined)?.playedCardAnimalZones ?? [])
+    .forEach((zone) => putZone(zone, false))
   animalReorg?.zones
-    .filter((zone) =>
-      zone.zoneType === 'card' &&
-      !zone.farmPosition &&
-      zone.displaySource !== 'borrowed-played-card'
-    )
-    .forEach((zone) => {
-      const cardId = zone.cardId ?? zone.id.replace(/^card:/, '')
-      map.set(cardId, {
-        animalType: zone.animalType,
-        animalCount: zone.animalCount,
-        animalCounts: zone.animalCounts,
-        allowedAnimalType: zone.allowedAnimalType,
-        allowedAnimalTypes: zone.allowedAnimalTypes,
-        capacity: zone.capacity,
-        zoneId: zone.id,
-      })
-    })
+    .forEach((zone) => putZone(zone, true))
   return map
 }
 
@@ -262,7 +272,7 @@ export const buildBorrowedPlayedCardDisplays = (
 ) => {
   const map = new Map<string, BorrowedPlayedCardDisplay>()
   if (!state || !displayPlayer) return []
-  ;((displayPlayer as PlayerWithBorrowedPlayedCardZones).borrowedPlayedCardAnimalZones ?? []).forEach((zone) => {
+  ;((displayPlayer as PlayerWithCardAnimalZones).borrowedPlayedCardAnimalZones ?? []).forEach((zone) => {
     const display = borrowedPlayedCardDisplayFromZone(state, zone, false)
     if (display) map.set(display.zoneId, display)
   })
@@ -309,7 +319,7 @@ export const buildFarmCardDisplayMap = (
   player: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
-  const map = new Map<string, AnimalDisplay & { capacity: number; zoneId: string }>()
+  const map = new Map<string, CardAnimalDisplay>()
   Object.values(player?.cardStates ?? {}).forEach((state) => {
     const countsByZone = state?.extraData?.animalCountsByZone
     if (!countsByZone || typeof countsByZone !== 'object') return
@@ -320,28 +330,50 @@ export const buildFarmCardDisplayMap = (
       const animalCount = sumAnimalCounts(animalCounts)
       if (animalCount <= 0) return
       const compact = compactAnimalCounts(animalCounts)
-      map.set(positionKey(position), {
+      const display: CardAnimalDisplay = {
         animalType: animalTypeFromCounts(compact),
         animalCount,
         animalCounts: compact,
-        allowedAnimalType: readAllowedAnimalType(stored),
-        allowedAnimalTypes: readAllowedAnimalTypes(stored),
         capacity: readCapacity(stored, animalCount),
         zoneId,
-      })
+        isReorgDraft: false,
+      }
+      const allowedAnimalType = readAllowedAnimalType(stored)
+      const allowedAnimalTypes = readAllowedAnimalTypes(stored)
+      if (allowedAnimalType !== undefined) display.allowedAnimalType = allowedAnimalType
+      if (allowedAnimalTypes) display.allowedAnimalTypes = allowedAnimalTypes
+      map.set(positionKey(position), display)
     })
   })
+  ;((player as PlayerWithCardAnimalZones | null | undefined)?.farmCardAnimalZones ?? [])
+    .forEach((zone) => {
+      if (zone.zoneType !== 'card' || !zone.farmPosition) return
+      if (player?.id && zone.animalOwnerPlayerId && zone.animalOwnerPlayerId !== player.id) return
+      const display: CardAnimalDisplay = {
+        animalType: zone.animalType ?? null,
+        animalCount: Math.max(0, zone.animalCount ?? 0),
+        capacity: zone.capacity,
+        zoneId: zone.id,
+        isReorgDraft: false,
+      }
+      if (zone.animalCounts) display.animalCounts = zone.animalCounts
+      if (zone.allowedAnimalType !== undefined) display.allowedAnimalType = zone.allowedAnimalType
+      if (zone.allowedAnimalTypes) display.allowedAnimalTypes = zone.allowedAnimalTypes
+      map.set(positionKey(zone.farmPosition), display)
+    })
   animalReorg?.zones
     .filter((zone) => zone.zoneType === 'card' && zone.farmPosition)
     .forEach((zone) => {
+      if (player?.id && zone.animalOwnerPlayerId && zone.animalOwnerPlayerId !== player.id) return
       map.set(positionKey(zone.farmPosition!), {
-        animalType: zone.animalType,
-        animalCount: zone.animalCount,
-        animalCounts: zone.animalCounts,
-        allowedAnimalType: zone.allowedAnimalType,
-        allowedAnimalTypes: zone.allowedAnimalTypes,
+        animalType: zone.animalType ?? null,
+        animalCount: Math.max(0, zone.animalCount ?? 0),
+        ...(zone.animalCounts ? { animalCounts: zone.animalCounts } : {}),
+        ...(zone.allowedAnimalType !== undefined ? { allowedAnimalType: zone.allowedAnimalType } : {}),
+        ...(zone.allowedAnimalTypes ? { allowedAnimalTypes: zone.allowedAnimalTypes } : {}),
         capacity: zone.capacity,
         zoneId: zone.id,
+        isReorgDraft: true,
       })
     })
   return map

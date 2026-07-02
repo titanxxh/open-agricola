@@ -1610,8 +1610,8 @@ export const GameContainerApi = () => {
     return buildStableDisplayMap(displayPlayer, animalReorg)
   }, [displayPlayer, animalReorg])
   const cardDisplayMap = useMemo(() => {
-    return buildCardDisplayMap(animalReorg)
-  }, [animalReorg])
+    return buildCardDisplayMap(displayPlayer, animalReorg)
+  }, [displayPlayer, animalReorg])
   const borrowedPlayedCardDisplays = useMemo(() => {
     return buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
   }, [state, displayPlayer, animalReorg])
