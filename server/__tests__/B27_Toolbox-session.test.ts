@@ -5,9 +5,11 @@ import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-stat
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/B/B027_Toolbox'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
+import '../../shared/cards/E/E052_Cubbyhole'
 import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
 
 const CARD_ID = 'B027_Toolbox'
+const CUBBYHOLE_ID = 'E052_Cubbyhole'
 
 const setupPlayed = (food = 5) => {
   const session = new GameSession()
@@ -84,6 +86,46 @@ describe('B27 Toolbox session', () => {
     // grain-seeds 直接 gain 1 grain，不修房 / 围栏 / stable
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+  })
+
+  it('与 E52 同时 after construct 时仍显示并执行 Toolbox flag listener', () => {
+    const session = setupPlayed()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push(CUBBYHOLE_ID)
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+
+    let sawGroupedTrigger = false
+    let safety = 30
+    while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+      const promptKey = resp.interaction.promptKey
+      if (resp.interaction.request.kind === 'select-trigger') {
+        const opts = resp.interaction.options ?? []
+        expect(opts.find(o => o.sourceCard === CARD_ID)).toBeDefined()
+        expect(opts.find(o => o.sourceCard === CUBBYHOLE_ID)).toBeDefined()
+        const toolbox = opts.find(o => o.sourceCard === CARD_ID)!
+        expect(toolbox.disabled).not.toBe(true)
+        resp = session.resolveChoice(0, toolbox.value)
+        expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(true)
+        sawGroupedTrigger = true
+        break
+      }
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.farm.farmType === 'room') {
+        const tile = resp.interaction.farm.selectableTiles[0]!
+        resp = session.commitSelectionChoice(0, { rooms: [tile] })
+        continue
+      }
+      const opts = resp.interaction.options ?? []
+      const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
+      const doneOpt = opts.find(o => o.value === '__done__')
+      const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
+      resp = session.resolveChoice(0, choice.value)
+    }
+
+    expect(sawGroupedTrigger).toBe(true)
   })
 
   it('B27 在手里 + 已造过房（人工设置）+ 调 onBuy → flag set', () => {

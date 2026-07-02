@@ -329,6 +329,58 @@ describe('Engine flow nodes', () => {
     expect(parallel.children.every((child) => child instanceof ActionNode)).toBe(true)
   })
 
+  it('uses the event source card for grouped global reaction listeners', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C2']
+    const state = createState()
+    state.players = [p1]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'global-source-card-listener',
+          handler: () => undefined,
+        },
+        cardId: '',
+        ownerPlayerId: '',
+      },
+      {
+        registration: {
+          id: 'listener-2',
+          cardIds: ['C2'],
+          handler: () => undefined,
+        },
+        cardId: 'C2',
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      { sourceCard: 'B018_GrasslandHarrow' },
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const parallel = nodes[0] as ParallelNode
+    expect(parallel.mode).toBe('trigger-select')
+    expect(parallel.triggerChildren.map((child) => child.cardId)).toEqual(['B018_GrasslandHarrow', 'C2'])
+    expect((parallel.children[0] as ActionNode).sourceCard).toBe('B018_GrasslandHarrow')
+    expect((parallel.children[0] as ActionNode).params.cardId).toBe('B018_GrasslandHarrow')
+  })
+
   it('splits same-timing reaction groups by card owner', () => {
     const p1 = createPlayer()
     p1.minorPlayed = ['OWN_CARD']
