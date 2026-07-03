@@ -230,13 +230,11 @@ export const buildInteractionPresentationPlan = (
     return { kind: 'farm-sow-selection', farm, pendingChoice }
   }
   if (
-    interaction.request.kind === 'selection' &&
     interaction.selection?.kind === 'farm-position'
   ) {
     return { kind: 'position-selection', selection: interaction.selection, pendingChoice }
   }
   if (
-    interaction.request.kind === 'selection' &&
     interaction.selection?.kind === 'occupation-hand'
   ) {
     return { kind: 'occupation-hand-selection', selection: interaction.selection, pendingChoice }
@@ -385,7 +383,7 @@ export const buildInteractionSubmitCommand = (
       ...(draft.heatingPayment ? { payload: draft.heatingPayment } : {}),
     }
   }
-  if (interaction.request.kind === 'selection') {
+  if (interaction.selection) {
     if (interaction.selection?.kind === 'occupation-hand') {
       return {
         kind: 'commitSelection',

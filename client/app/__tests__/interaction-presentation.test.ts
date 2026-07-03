@@ -52,6 +52,17 @@ const waitSelection = (): InteractionState => ({
   anytimeActions: [],
 })
 
+const waitLegacySelectionChoice = (): InteractionState => ({
+  ...waitChoice([option('confirm', 'ui.interactionSelectionConfirm')], 'ui.interactionSelection'),
+  playerIndex: 1,
+  selection: {
+    kind: 'farm-position',
+    selectablePositions: [{ row: 0, col: 0 }],
+    maxSelections: 1,
+  },
+  allowedCommands: ['commitSelection', 'undoStep'],
+})
+
 const waitOccupationHandSelection = (): InteractionState => ({
   stateId: 'wait',
   playerIndex: 1,
@@ -73,6 +84,18 @@ const waitOccupationHandSelection = (): InteractionState => ({
   },
   allowedCommands: ['commitSelection', 'undoStep'],
   anytimeActions: [],
+})
+
+const waitLegacyOccupationHandChoice = (): InteractionState => ({
+  ...waitChoice([option('confirm', 'ui.interactionSelectionConfirm')], 'ui.interactionOccupationHand' as never),
+  playerIndex: 1,
+  selection: {
+    kind: 'occupation-hand',
+    selectableCards: ['A001_Farmer'],
+    minSelections: 1,
+    maxSelections: 1,
+  },
+  allowedCommands: ['commitSelection', 'undoStep'],
 })
 
 const waitFarm = (farm: InteractionFarmSelection): InteractionState => ({
@@ -309,6 +332,11 @@ describe('Interaction Presentation', () => {
     expect(plan.selection.selectablePositions).toEqual([{ row: 0, col: 0 }])
   })
 
+  it('routes legacy choice waits with selection payloads to selection plans', () => {
+    expect(buildInteractionPresentationPlan(waitLegacySelectionChoice()).kind).toBe('position-selection')
+    expect(buildInteractionPresentationPlan(waitLegacyOccupationHandChoice()).kind).toBe('occupation-hand-selection')
+  })
+
   it('routes every in-scope wait request kind to an explicit presentation plan', () => {
     expect(buildInteractionPresentationPlan(waitChoice([option('take-wood')])).kind).toBe('choice-bar')
     expect(buildInteractionPresentationPlan({
@@ -329,6 +357,14 @@ describe('Interaction Presentation', () => {
 
   it('builds a commitSelection command for position selection drafts', () => {
     expect(buildInteractionSubmitCommand(waitSelection(), {
+      value: 'confirm',
+      positionSelectionKeys: ['0-0'],
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 1,
+      payload: { positions: [{ row: 0, col: 0 }] },
+    })
+    expect(buildInteractionSubmitCommand(waitLegacySelectionChoice(), {
       value: 'confirm',
       positionSelectionKeys: ['0-0'],
     })).toEqual({
@@ -503,6 +539,14 @@ describe('Interaction Presentation', () => {
 
   it('builds commitSelection commands for resource and occupation-hand drafts', () => {
     expect(buildInteractionSubmitCommand(waitOccupationHandSelection(), {
+      value: 'confirm',
+      occupationCardIds: ['A001_Farmer'],
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 1,
+      payload: { cardIds: ['A001_Farmer'] },
+    })
+    expect(buildInteractionSubmitCommand(waitLegacyOccupationHandChoice(), {
       value: 'confirm',
       occupationCardIds: ['A001_Farmer'],
     })).toEqual({
