@@ -4,6 +4,7 @@ import type {
   InteractionAnimalReorgZone,
   InteractionFarmSelection,
   InteractionState,
+  ResourceBatchExchangePayload,
 } from '../../../shared/contract/types'
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
 
@@ -45,6 +46,29 @@ const waitSelection = (): InteractionState => ({
   selection: {
     kind: 'farm-position',
     selectablePositions: [{ row: 0, col: 0 }],
+    maxSelections: 1,
+  },
+  allowedCommands: ['commitSelection', 'undoStep'],
+  anytimeActions: [],
+})
+
+const waitOccupationHandSelection = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 1,
+  promptKey: 'ui.interactionSelection' as never,
+  request: {
+    kind: 'selection',
+    selection: {
+      selectionType: 'occupation-hand',
+      selectableCards: ['A001_Farmer'],
+      minSelections: 1,
+      maxSelections: 1,
+    },
+  },
+  selection: {
+    kind: 'occupation-hand',
+    selectableCards: ['A001_Farmer'],
+    minSelections: 1,
     maxSelections: 1,
   },
   allowedCommands: ['commitSelection', 'undoStep'],
@@ -134,6 +158,74 @@ const waitConfirmPlayerSwitch = (): InteractionState => ({
   anytimeActions: [],
 })
 
+const waitEngineBlocked = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.interactionChooseOne' as never,
+  request: {
+    kind: 'engine-blocked',
+    actionId: 'test-action',
+    reasonKey: 'ui.interactionChooseOne' as never,
+  },
+  allowedCommands: ['undoStep'],
+  anytimeActions: [],
+})
+
+const waitResourceQuantity = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.interactionChooseOne' as never,
+  request: {
+    kind: 'resource-quantity-select',
+    cardId: 'B157_Salter',
+    availableByResource: { sheep: 2 },
+    promptKey: 'ui.interactionChooseOne' as never,
+    requireAtLeastOne: true,
+  },
+  allowedCommands: ['commitSelection', 'undoStep'],
+  anytimeActions: [],
+})
+
+const batchPayload: ResourceBatchExchangePayload = {
+  discard: { food: 1 },
+  receive: { wood: 1 },
+}
+
+const waitResourceBatchExchange = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 1,
+  promptKey: 'ui.interactionChooseOne' as never,
+  request: {
+    kind: 'resource-batch-exchange-select',
+    cardId: 'E078_SleightOfHand',
+    discardAvailableByResource: { food: 2 },
+    receiveResources: ['wood'],
+    maxTotal: 1,
+    promptKey: 'ui.interactionChooseOne' as never,
+  },
+  allowedCommands: ['commitSelection', 'undoStep'],
+  anytimeActions: [],
+})
+
+const waitCardDraft = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.interactionChooseOne' as never,
+  request: {
+    kind: 'card-draft',
+    mode: 'simultaneous',
+    round: 1,
+    totalRounds: 7,
+    poolSize: 7,
+    seatOrder: ['p1', 'p2'],
+    pools: {},
+    pendingPicks: [],
+    kept: {},
+  },
+  allowedCommands: [],
+  anytimeActions: [],
+})
+
 describe('Interaction Presentation', () => {
   it('routes generic choice waits to the choice bar surface', () => {
     const plan = buildInteractionPresentationPlan(waitChoice([option('take-wood')]))
@@ -215,6 +307,24 @@ describe('Interaction Presentation', () => {
     expect(plan.kind).toBe('position-selection')
     if (plan.kind !== 'position-selection') return
     expect(plan.selection.selectablePositions).toEqual([{ row: 0, col: 0 }])
+  })
+
+  it('routes every in-scope wait request kind to an explicit presentation plan', () => {
+    expect(buildInteractionPresentationPlan(waitChoice([option('take-wood')])).kind).toBe('choice-bar')
+    expect(buildInteractionPresentationPlan({
+      ...waitChoice([option('trigger')]),
+      request: { kind: 'select-trigger', ownerPlayerId: 'p1', options: [option('trigger')] },
+    }).kind).toBe('choice-bar')
+    expect(buildInteractionPresentationPlan(waitAnimalReorg()).kind).toBe('animal-reorg')
+    expect(buildInteractionPresentationPlan(waitConfirmNextPlayer()).kind).toBe('confirm-next-player')
+    expect(buildInteractionPresentationPlan(waitConfirmPlayerSwitch()).kind).toBe('confirm-player-switch')
+    expect(buildInteractionPresentationPlan(waitFeed()).kind).toBe('harvest-feed')
+    expect(buildInteractionPresentationPlan(waitHeating()).kind).toBe('heating')
+    expect(buildInteractionPresentationPlan(waitOccupationHandSelection()).kind).toBe('occupation-hand-selection')
+    expect(buildInteractionPresentationPlan(waitEngineBlocked()).kind).toBe('engine-blocked')
+    expect(buildInteractionPresentationPlan(waitResourceQuantity()).kind).toBe('resource-quantity-select')
+    expect(buildInteractionPresentationPlan(waitResourceBatchExchange()).kind).toBe('resource-batch-exchange-select')
+    expect(buildInteractionPresentationPlan(waitCardDraft()).kind).toBe('card-draft')
   })
 
   it('builds a commitSelection command for position selection drafts', () => {
@@ -388,6 +498,33 @@ describe('Interaction Presentation', () => {
     })
     expect(buildInteractionSubmitCommand(waitConfirmPlayerSwitch(), { value: 'confirm' })).toEqual({
       kind: 'confirmPlayerSwitch',
+    })
+  })
+
+  it('builds commitSelection commands for resource and occupation-hand drafts', () => {
+    expect(buildInteractionSubmitCommand(waitOccupationHandSelection(), {
+      value: 'confirm',
+      occupationCardIds: ['A001_Farmer'],
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 1,
+      payload: { cardIds: ['A001_Farmer'] },
+    })
+    expect(buildInteractionSubmitCommand(waitResourceQuantity(), {
+      value: 'confirm',
+      resourceCounts: { sheep: 1 },
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 0,
+      payload: { resourceCounts: { sheep: 1 } },
+    })
+    expect(buildInteractionSubmitCommand(waitResourceBatchExchange(), {
+      value: 'confirm',
+      resourceBatchExchange: batchPayload,
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 1,
+      payload: { resourceBatchExchange: batchPayload },
     })
   })
 })

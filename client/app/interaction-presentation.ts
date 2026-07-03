@@ -3,8 +3,11 @@ import type {
   FarmTilePosition,
   InteractionAnimalReorgZone,
   InteractionFarmSelection,
+  InteractionRequest,
   InteractionSelection,
   InteractionState,
+  Resource,
+  ResourceBatchExchangePayload,
 } from '../../shared/contract/types'
 import { parsePositionKey } from '../../shared/domain/farm'
 import type { PendingChoice } from '../types/ui'
@@ -19,6 +22,10 @@ type WaitInteraction = Extract<InteractionState, { stateId: 'wait' }>
 type FarmSelectionByType<T extends InteractionFarmSelection['farmType']> =
   Extract<InteractionFarmSelection, { farmType: T }>
 type FarmPositionSelection = Extract<InteractionSelection, { kind: 'farm-position' }>
+type OccupationHandSelection = Extract<InteractionSelection, { kind: 'occupation-hand' }>
+type CardDraftRequest = Extract<InteractionRequest, { kind: 'card-draft' }>
+type ResourceQuantityRequest = Extract<InteractionRequest, { kind: 'resource-quantity-select' }>
+type ResourceBatchExchangeRequest = Extract<InteractionRequest, { kind: 'resource-batch-exchange-select' }>
 
 export type InteractionPresentationPlan =
   | { kind: 'none' }
@@ -53,6 +60,54 @@ export type InteractionPresentationPlan =
       pendingChoice: PendingChoice
     }
   | {
+      kind: 'occupation-hand-selection'
+      selection: OccupationHandSelection
+      pendingChoice: PendingChoice
+    }
+  | {
+      kind: 'animal-reorg'
+      playerIndex: number
+      spaceId: string
+    }
+  | {
+      kind: 'confirm-next-player'
+      nextPlayerIndex: number | null
+    }
+  | {
+      kind: 'confirm-player-switch'
+      fromPlayerIndex: number
+      toPlayerIndex: number
+    }
+  | {
+      kind: 'harvest-feed'
+      playerIndex: number
+      remaining: number
+      foodUsed: number
+    }
+  | {
+      kind: 'heating'
+      playerIndex: number
+      playerId: string
+      required: number
+      maxFuelPayable: number
+      maxWoodConvertibleToFuel: number
+    }
+  | {
+      kind: 'engine-blocked'
+      promptKey: WaitInteraction['promptKey']
+      promptParams: WaitInteraction['promptParams']
+    }
+  | ({
+      kind: 'resource-quantity-select'
+    } & Pick<ResourceQuantityRequest, 'availableByResource' | 'promptKey' | 'requireAtLeastOne'>)
+  | ({
+      kind: 'resource-batch-exchange-select'
+    } & Pick<ResourceBatchExchangeRequest, 'discardAvailableByResource' | 'receiveResources' | 'maxTotal' | 'promptKey' | 'requireAtLeastOne'>)
+  | {
+      kind: 'card-draft'
+      request: CardDraftRequest
+    }
+  | {
       kind: 'choice-bar'
       pendingChoice: PendingChoice
       suppressChoiceOptions: boolean
@@ -73,6 +128,9 @@ export type InteractionSubmitDraft = {
   animalReorgZones?: readonly InteractionAnimalReorgZone[]
   feedSelections?: readonly InteractionFeedSelection[]
   heatingPayment?: HeatingPayment
+  occupationCardIds?: readonly string[]
+  resourceCounts?: Partial<Record<keyof Resource, number>>
+  resourceBatchExchange?: ResourceBatchExchangePayload
   positionSelectionKeys?: readonly string[]
   fenceEdges?: readonly string[]
   palisadeEdges?: readonly string[]
@@ -98,6 +156,7 @@ export type HeatingPayment = {
 
 export type InteractionSubmitCommand =
   | { kind: 'none' }
+  | { kind: 'undoStep' }
   | { kind: 'confirmNextPlayer' }
   | { kind: 'confirmPlayerSwitch' }
   | {
@@ -175,6 +234,78 @@ export const buildInteractionPresentationPlan = (
     interaction.selection?.kind === 'farm-position'
   ) {
     return { kind: 'position-selection', selection: interaction.selection, pendingChoice }
+  }
+  if (
+    interaction.request.kind === 'selection' &&
+    interaction.selection?.kind === 'occupation-hand'
+  ) {
+    return { kind: 'occupation-hand-selection', selection: interaction.selection, pendingChoice }
+  }
+  if (interaction.request.kind === 'animal-reorg') {
+    return {
+      kind: 'animal-reorg',
+      playerIndex: interaction.playerIndex,
+      spaceId: interaction.spaceId ?? '',
+    }
+  }
+  if (interaction.request.kind === 'confirm-next-player') {
+    return {
+      kind: 'confirm-next-player',
+      nextPlayerIndex: interaction.nextPlayerIndex ?? interaction.request.nextPlayerIndex ?? null,
+    }
+  }
+  if (interaction.request.kind === 'confirm-player-switch') {
+    return {
+      kind: 'confirm-player-switch',
+      fromPlayerIndex: interaction.fromPlayerIndex ?? interaction.request.fromPlayerIndex,
+      toPlayerIndex: interaction.toPlayerIndex ?? interaction.request.toPlayerIndex,
+    }
+  }
+  if (interaction.request.kind === 'feed') {
+    return {
+      kind: 'harvest-feed',
+      playerIndex: interaction.playerIndex,
+      remaining: interaction.remaining ?? interaction.request.remaining,
+      foodUsed: interaction.foodUsed ?? interaction.request.foodUsed,
+    }
+  }
+  if (interaction.request.kind === 'heating') {
+    return {
+      kind: 'heating',
+      playerIndex: interaction.playerIndex,
+      playerId: interaction.request.playerId,
+      required: interaction.request.required,
+      maxFuelPayable: interaction.request.maxFuelPayable,
+      maxWoodConvertibleToFuel: interaction.request.maxWoodConvertibleToFuel,
+    }
+  }
+  if (interaction.request.kind === 'engine-blocked') {
+    return {
+      kind: 'engine-blocked',
+      promptKey: interaction.promptKey,
+      promptParams: interaction.promptParams,
+    }
+  }
+  if (interaction.request.kind === 'resource-quantity-select') {
+    return {
+      kind: 'resource-quantity-select',
+      availableByResource: interaction.request.availableByResource,
+      promptKey: interaction.request.promptKey,
+      requireAtLeastOne: interaction.request.requireAtLeastOne,
+    }
+  }
+  if (interaction.request.kind === 'resource-batch-exchange-select') {
+    return {
+      kind: 'resource-batch-exchange-select',
+      discardAvailableByResource: interaction.request.discardAvailableByResource,
+      receiveResources: interaction.request.receiveResources,
+      maxTotal: interaction.request.maxTotal,
+      promptKey: interaction.request.promptKey,
+      requireAtLeastOne: interaction.request.requireAtLeastOne,
+    }
+  }
+  if (interaction.request.kind === 'card-draft') {
+    return { kind: 'card-draft', request: interaction.request }
   }
   if (!isChoiceSurfaceInteraction(interaction)) return { kind: 'none' }
 
@@ -255,6 +386,13 @@ export const buildInteractionSubmitCommand = (
     }
   }
   if (interaction.request.kind === 'selection') {
+    if (interaction.selection?.kind === 'occupation-hand') {
+      return {
+        kind: 'commitSelection',
+        playerIndex: interaction.playerIndex,
+        payload: { cardIds: [...(draft.occupationCardIds ?? [])] },
+      }
+    }
     if (draft.value === 'cancel') {
       return {
         kind: 'commitSelection',
@@ -266,6 +404,22 @@ export const buildInteractionSubmitCommand = (
       kind: 'commitSelection',
       playerIndex: interaction.playerIndex,
       payload: { positions: positionsFromKeys(draft.positionSelectionKeys) },
+    }
+  }
+  if (interaction.request.kind === 'resource-quantity-select') {
+    if (draft.value === 'cancel') return { kind: 'undoStep' }
+    return {
+      kind: 'commitSelection',
+      playerIndex: interaction.playerIndex,
+      payload: { resourceCounts: draft.resourceCounts ?? {} },
+    }
+  }
+  if (interaction.request.kind === 'resource-batch-exchange-select') {
+    if (draft.value === 'cancel') return { kind: 'undoStep' }
+    return {
+      kind: 'commitSelection',
+      playerIndex: interaction.playerIndex,
+      payload: { resourceBatchExchange: draft.resourceBatchExchange },
     }
   }
   if (interaction.request.kind === 'farm-select' && interaction.farm) {
