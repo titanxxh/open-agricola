@@ -1524,9 +1524,8 @@ export class GameCore {
     const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
-    const pendingEnvelope = this.engineStack.peekPendingEnvelope()
     const pendingSnapshot = this.peekHostContextSnapshot()
-    const pendingSourceCard = pendingEnvelope?.sourceCard ?? pendingSnapshot?.sourceCard
+    const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
