@@ -1221,6 +1221,34 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
     expect(player.resources.wood).toBe(0)
   })
 
+  it('typed-flat Partial<Resource> without reserve applies selected multi-solution payment', () => {
+    const player = createMockPlayer({ food: 3, wood: 1 })
+    player.activeModifiers = [A028_ForestSchool.impl.modifiers![0] as TradeModifier]
+    const params = {
+      cost: { food: 1 },
+      costType: 'occupation',
+      optionPrefix: 'pay:typed-flat-test',
+    }
+
+    const { result: initial } = callPay(player, params)
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') throw new Error('expected request')
+    if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
+    const woodOption = initial.request.options.find((option) => {
+      const paid = (
+        (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+          ?.resourcesPaid ?? {}
+      )
+      return paid.wood === 1
+    })
+    expect(woodOption).toBeDefined()
+
+    const { result } = callPayResolveChoice(player, params, woodOption!.value)
+    expect(result?.type).toBe('ok')
+    expect(player.resources.food).toBe(3)
+    expect(player.resources.wood).toBe(0)
+  })
+
 })
 
 describe('payAction: ComplexCost multi-solution choice', () => {

@@ -326,10 +326,10 @@ export const payAction: ActionDefinition = {
     const optionPrefix = p.optionPrefix ?? 'pay:generic'
     const choiceLooksLikePayment =
       choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
-    if (!PaymentSolver.isComplexCost(p.cost) && !(p.costType && p.reserveResources)) {
+    if (!PaymentSolver.isComplexCost(p.cost) && !p.costType) {
       return { type: 'ok' }
     }
-    if (!PaymentSolver.isComplexCost(p.cost) && p.costType && p.reserveResources) {
+    if (!PaymentSolver.isComplexCost(p.cost) && p.costType) {
       if (!choiceLooksLikePayment) {
         return payAction.execute({
           player,
