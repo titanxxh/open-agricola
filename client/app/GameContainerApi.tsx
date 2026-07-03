@@ -85,9 +85,7 @@ import {
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
-  shouldShowPendingChoiceInInteractionBar,
   shouldShowDevPanel,
-  shouldSuppressPendingChoiceOptionsInInteractionBar,
   splitBoardActionSpaces,
   type FarmCommitType,
   type WsStatus,
@@ -122,6 +120,7 @@ import {
   type ReplayTimelineEntry,
   type ReplayTimelineFilter,
 } from './replay-timeline'
+import { buildInteractionPresentationPlan } from './interaction-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type ReorgAnimalType = AnimalKey
@@ -647,12 +646,16 @@ export const GameContainerApi = () => {
         : new Map(),
     [interaction],
   )
+  const interactionPresentationPlan = useMemo(
+    () => buildInteractionPresentationPlan(interaction),
+    [interaction],
+  )
   const pendingMoorSpecialActionChoices = useMemo(
     () =>
-      interaction.stateId === 'wait'
-        ? buildPendingMoorSpecialActionChoiceMaps(interaction.options)
+      interactionPresentationPlan.kind === 'moor-special-action'
+        ? interactionPresentationPlan.choices
         : buildPendingMoorSpecialActionChoiceMaps(),
-    [interaction],
+    [interactionPresentationPlan],
   )
 
   const takeAction = useCallback((space: ActionSpace) => {
@@ -955,11 +958,15 @@ export const GameContainerApi = () => {
           promptParams: interaction.promptParams,
         }
       : null
-  const pendingChoice =
+  const choiceSurfacePendingChoice =
+    interactionPresentationPlan.kind === 'choice-bar' ||
+    interactionPresentationPlan.kind === 'exchange-center' ||
+    interactionPresentationPlan.kind === 'moor-special-action'
+      ? interactionPresentationPlan.pendingChoice
+      : null
+  const fallbackPendingChoice =
     interaction.stateId === 'wait' &&
-    (interactionRequestKind === 'choice' ||
-      interactionRequestKind === 'select-trigger' ||
-      interactionRequestKind === 'farm-select' ||
+    (interactionRequestKind === 'farm-select' ||
       interactionRequestKind === 'selection' ||
       interaction.farm !== undefined ||
       interaction.selection !== undefined)
@@ -976,7 +983,14 @@ export const GameContainerApi = () => {
               : undefined,
         }
       : null
-  const suppressPendingChoiceOptions = shouldSuppressPendingChoiceOptionsInInteractionBar(pendingChoice)
+  const pendingChoice = choiceSurfacePendingChoice ?? fallbackPendingChoice
+  const interactionBarPendingChoice =
+    interactionPresentationPlan.kind === 'choice-bar'
+      ? interactionPresentationPlan.pendingChoice
+      : choiceSurfacePendingChoice
+        ? null
+        : fallbackPendingChoice
+  const suppressPendingChoiceOptions = interactionPresentationPlan.kind === 'moor-special-action'
   const pendingNextPlayerIndex =
     interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player'
       ? interaction.nextPlayerIndex ?? null
@@ -2760,7 +2774,7 @@ export const GameContainerApi = () => {
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg}
-        pendingChoice={shouldShowPendingChoiceInInteractionBar(pendingChoice) ? pendingChoice : null}
+        pendingChoice={interactionBarPendingChoice}
         suppressChoiceOptions={suppressPendingChoiceOptions}
         pendingEngineBlocked={pendingEngineBlocked}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
