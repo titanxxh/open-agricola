@@ -8,12 +8,19 @@ import '../../shared/cards/A/A017_ReclamationPlow'
 import '../../shared/cards/D/D150_GodlySpouse'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
+const stabilizeRandomHands = (players: { minorHand: string[]; occupationHand: string[] }[]) => {
+  for (const player of players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+}
 
 describe('card flow regressions', () => {
   it('A017_ReclamationPlow still triggers after animal reorg resumes the collect flow', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
@@ -52,6 +59,7 @@ describe('card flow regressions', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
@@ -104,6 +112,7 @@ describe('card flow regressions', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    stabilizeRandomHands(state.players)
     state.round = 2
     state.currentPlayerIndex = 0
 
