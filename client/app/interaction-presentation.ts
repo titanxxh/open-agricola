@@ -1,6 +1,7 @@
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
 import type {
   FarmTilePosition,
+  InteractionAnimalReorgZone,
   InteractionFarmSelection,
   InteractionSelection,
   InteractionState,
@@ -69,6 +70,9 @@ export type InteractionPresentationPlan =
 
 export type InteractionSubmitDraft = {
   value: string
+  animalReorgZones?: readonly InteractionAnimalReorgZone[]
+  feedSelections?: readonly InteractionFeedSelection[]
+  heatingPayment?: HeatingPayment
   positionSelectionKeys?: readonly string[]
   fenceEdges?: readonly string[]
   palisadeEdges?: readonly string[]
@@ -80,8 +84,33 @@ export type InteractionSubmitDraft = {
   sowSelections?: Record<string, 'grain' | 'vegetable' | 'wood' | 'stone'>
 }
 
+export type InteractionFeedSelection = {
+  count: number
+  sourceName?: string
+  sourceId: string
+  exchangeIndex: number
+}
+
+export type HeatingPayment = {
+  fuelUsed: number
+  woodToFuel: number
+}
+
 export type InteractionSubmitCommand =
   | { kind: 'none' }
+  | { kind: 'confirmNextPlayer' }
+  | { kind: 'confirmPlayerSwitch' }
+  | {
+      kind: 'confirmFeed'
+      playerIndex: number
+      selections: InteractionFeedSelection[]
+    }
+  | {
+      kind: 'resolveChoice'
+      playerIndex: number
+      value: string
+      payload?: Record<string, unknown>
+    }
   | {
       kind: 'localFarmError'
       farmType: FarmCommitType
@@ -188,6 +217,43 @@ export const buildInteractionSubmitCommand = (
   draft: InteractionSubmitDraft,
 ): InteractionSubmitCommand => {
   if (interaction.stateId !== 'wait') return { kind: 'none' }
+  if (interaction.request.kind === 'confirm-next-player') {
+    return { kind: 'confirmNextPlayer' }
+  }
+  if (interaction.request.kind === 'confirm-player-switch') {
+    return { kind: 'confirmPlayerSwitch' }
+  }
+  if (interaction.request.kind === 'animal-reorg') {
+    const zones = [...(draft.animalReorgZones ?? interaction.zones ?? interaction.request.zones)]
+    return {
+      kind: 'resolveChoice',
+      playerIndex: interaction.playerIndex,
+      value: draft.value,
+      ...(draft.value === 'confirm' ? { payload: { zones } } : {}),
+    }
+  }
+  if (interaction.request.kind === 'feed') {
+    if (draft.value === 'confirm') {
+      return {
+        kind: 'confirmFeed',
+        playerIndex: interaction.playerIndex,
+        selections: [...(draft.feedSelections ?? [])],
+      }
+    }
+    return {
+      kind: 'resolveChoice',
+      playerIndex: interaction.playerIndex,
+      value: draft.value,
+    }
+  }
+  if (interaction.request.kind === 'heating') {
+    return {
+      kind: 'resolveChoice',
+      playerIndex: interaction.playerIndex,
+      value: draft.value,
+      ...(draft.heatingPayment ? { payload: draft.heatingPayment } : {}),
+    }
+  }
   if (interaction.request.kind === 'selection') {
     if (draft.value === 'cancel') {
       return {

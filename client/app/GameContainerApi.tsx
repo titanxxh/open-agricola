@@ -121,6 +121,7 @@ import {
 import {
   buildInteractionPresentationPlan,
   buildInteractionSubmitCommand,
+  type InteractionSubmitCommand,
 } from './interaction-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
@@ -769,6 +770,46 @@ export const GameContainerApi = () => {
     setFarmCommitError(farmType, typeof error === 'string' ? error : error.code)
   }, [setFarmCommitError, setFenceError])
 
+  const runInteractionSubmitCommand = useCallback((
+    submitCommand: InteractionSubmitCommand,
+    farmType?: FarmCommitType,
+  ) => {
+    if (submitCommand.kind === 'none') return false
+    if (submitCommand.kind === 'localFarmError') {
+      setLocalFarmSubmitError(submitCommand.farmType, submitCommand.error)
+      return true
+    }
+    if (submitCommand.kind === 'commitSelection') {
+      void transport.commitSelection(submitCommand.playerIndex, submitCommand.payload)
+        .then((resp) => {
+          if (!resp.ok && farmType) setFarmCommitError(farmType, resp.error)
+        })
+        .catch((e) => {
+          console.error(e)
+          if (farmType) setFarmCommitError(farmType)
+        })
+      return true
+    }
+    if (submitCommand.kind === 'resolveChoice') {
+      void transport
+        .resolveChoice(submitCommand.playerIndex, submitCommand.value, submitCommand.payload)
+        .catch((e) => console.error(e))
+      return true
+    }
+    if (submitCommand.kind === 'confirmFeed') {
+      void transport
+        .confirmFeed(submitCommand.playerIndex, submitCommand.selections)
+        .catch((e) => console.error(e))
+      return true
+    }
+    if (submitCommand.kind === 'confirmNextPlayer') {
+      void transport.confirmNextPlayer().catch((e) => console.error(e))
+      return true
+    }
+    void transport.confirmPlayerSwitch().catch((e) => console.error(e))
+    return true
+  }, [setFarmCommitError, setLocalFarmSubmitError, transport])
+
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
@@ -783,37 +824,18 @@ export const GameContainerApi = () => {
       farmHand: pendingFarmHand,
       plowTile: pendingPlowTile,
       sowSelections: pendingSowSelections,
+      animalReorgZones: animalReorg?.zones,
     })
-    if (submitCommand.kind === 'localFarmError') {
-      setLocalFarmSubmitError(submitCommand.farmType, submitCommand.error)
-      return
-    }
-    if (submitCommand.kind === 'commitSelection') {
-      const farmType = interaction.stateId === 'wait' && interaction.farm
-        ? interaction.farm.farmType
-        : null
-      void transport.commitSelection(submitCommand.playerIndex, submitCommand.payload)
-        .then((resp) => {
-          if (!resp.ok && farmType) setFarmCommitError(farmType, resp.error)
-        })
-        .catch((e) => {
-          console.error(e)
-          if (farmType) setFarmCommitError(farmType)
-        })
-      return
-    }
-    if (interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg') {
-      if (value === 'confirm' && animalReorg) {
-        void transport.resolveChoice(interaction.playerIndex, 'confirm', { zones: animalReorg.zones }).catch((e) => console.error(e))
-      } else {
-        void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-      }
+    const farmType = interaction.stateId === 'wait' && interaction.farm
+      ? interaction.farm.farmType
+      : undefined
+    if (runInteractionSubmitCommand(submitCommand, farmType)) {
       return
     }
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, setFarmCommitError, setLocalFarmSubmitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, runInteractionSubmitCommand])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -854,12 +876,16 @@ export const GameContainerApi = () => {
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
+    const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'confirm' })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.confirmNextPlayer().catch((e) => console.error(e))
-  }, [transport, isInteractive])
+  }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const confirmPlayerSwitch = useCallback(() => {
     if (!isInteractive) return
+    const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'confirm' })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
-  }, [transport, isInteractive])
+  }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
     const seed = resetSeedInput ? Number(resetSeedInput) : undefined
@@ -1321,13 +1347,23 @@ export const GameContainerApi = () => {
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (interaction.stateId !== 'wait' || interaction.request.kind !== 'feed') return
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value: 'confirm',
+      feedSelections: harvestFeedSelections,
+    })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.confirmFeed(interaction.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
-  }, [interaction, transport, isInteractive, harvestFeedSelections])
+  }, [interaction, transport, isInteractive, harvestFeedSelections, runInteractionSubmitCommand])
   const confirmHeating = useCallback((payload: { fuelUsed: number; woodToFuel: number }) => {
     if (!isInteractive) return
     if (interaction.stateId !== 'wait' || interaction.request.kind !== 'heating') return
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value: 'confirm',
+      heatingPayment: payload,
+    })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.resolveChoice(interaction.playerIndex, 'confirm', payload).catch((e) => console.error(e))
-  }, [interaction, transport, isInteractive])
+  }, [interaction, transport, isInteractive, runInteractionSubmitCommand])
 
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])

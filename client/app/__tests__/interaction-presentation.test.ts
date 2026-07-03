@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type {
   ActionChoiceOption,
+  InteractionAnimalReorgZone,
   InteractionFarmSelection,
   InteractionState,
 } from '../../../shared/contract/types'
@@ -62,6 +63,74 @@ const waitFarm = (farm: InteractionFarmSelection): InteractionState => ({
   farm,
   options: [option('confirm'), option('cancel')],
   allowedCommands: ['commitSelection', 'undoStep'],
+  anytimeActions: [],
+})
+
+const reorgZone = (id: string): InteractionAnimalReorgZone => ({
+  id,
+  zoneType: 'pasture',
+  animalType: 'sheep',
+  animalCount: 1,
+  capacity: 2,
+})
+
+const waitAnimalReorg = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.interactionReorgAnimalsTitle' as never,
+  request: {
+    kind: 'animal-reorg',
+    zones: [reorgZone('pasture-1')],
+  },
+  zones: [reorgZone('pasture-1')],
+  allowedCommands: ['resolveChoice', 'undoStep'],
+  anytimeActions: [],
+})
+
+const waitFeed = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 1,
+  promptKey: 'ui.harvestFeedTitle' as never,
+  request: { kind: 'feed', remaining: 2, foodUsed: 1 },
+  remaining: 2,
+  foodUsed: 1,
+  allowedCommands: ['resolveChoice', 'undoStep'],
+  anytimeActions: [],
+})
+
+const waitHeating = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.heatingTitle' as never,
+  request: {
+    kind: 'heating',
+    playerId: 'p1',
+    required: 2,
+    maxFuelPayable: 1,
+    maxWoodConvertibleToFuel: 1,
+  },
+  allowedCommands: ['resolveChoice', 'undoStep'],
+  anytimeActions: [],
+})
+
+const waitConfirmNextPlayer = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 0,
+  promptKey: 'ui.interactionConfirmNextPlayer' as never,
+  request: { kind: 'confirm-next-player', nextPlayerIndex: 1 },
+  nextPlayerIndex: 1,
+  allowedCommands: ['resolveChoice'],
+  anytimeActions: [],
+})
+
+const waitConfirmPlayerSwitch = (): InteractionState => ({
+  stateId: 'wait',
+  playerIndex: 1,
+  promptKey: 'ui.interactionConfirmSwitch' as never,
+  request: { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
+  fromPlayerIndex: 0,
+  toPlayerIndex: 1,
+  allowedCommands: ['resolveChoice'],
   anytimeActions: [],
 })
 
@@ -271,6 +340,54 @@ describe('Interaction Presentation', () => {
         edges: ['H-0-0'],
         newEdges: ['H-0-0'],
       },
+    })
+  })
+
+  it('builds resolveChoice commands for animal reorg and heating drafts', () => {
+    const zones = [reorgZone('pasture-1'), reorgZone('house')]
+
+    expect(buildInteractionSubmitCommand(waitAnimalReorg(), {
+      value: 'confirm',
+      animalReorgZones: zones,
+    })).toEqual({
+      kind: 'resolveChoice',
+      playerIndex: 0,
+      value: 'confirm',
+      payload: { zones },
+    })
+
+    expect(buildInteractionSubmitCommand(waitHeating(), {
+      value: 'confirm',
+      heatingPayment: { fuelUsed: 2, woodToFuel: 1 },
+    })).toEqual({
+      kind: 'resolveChoice',
+      playerIndex: 0,
+      value: 'confirm',
+      payload: { fuelUsed: 2, woodToFuel: 1 },
+    })
+  })
+
+  it('builds feed and handoff submit commands', () => {
+    const selections = [{
+      count: 1,
+      sourceId: 'C109_SchnappsDistiller',
+      sourceName: 'Schnapps Distiller',
+      exchangeIndex: 0,
+    }]
+
+    expect(buildInteractionSubmitCommand(waitFeed(), {
+      value: 'confirm',
+      feedSelections: selections,
+    })).toEqual({
+      kind: 'confirmFeed',
+      playerIndex: 1,
+      selections,
+    })
+    expect(buildInteractionSubmitCommand(waitConfirmNextPlayer(), { value: 'confirm' })).toEqual({
+      kind: 'confirmNextPlayer',
+    })
+    expect(buildInteractionSubmitCommand(waitConfirmPlayerSwitch(), { value: 'confirm' })).toEqual({
+      kind: 'confirmPlayerSwitch',
     })
   })
 })
