@@ -428,6 +428,53 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
+  it('before-action pass is disabled when a non-resource trigger can unlock continuation', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['TestPlowBeforeSow'],
+      actions: ['sow'],
+      phases: ['before'],
+      handler: () => ({
+        flow: {
+          type: 'seq',
+          optional: true,
+          children: [
+            { type: 'leaf', actionId: 'pay', params: { cost: { food: 3 } } },
+            { type: 'leaf', actionId: 'plow' },
+          ],
+        },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      resources: baseResources({ food: 3 }),
+    })
+    const child = makeActivate('a', 'TestPlowBeforeSow', false, {
+      phase: 'before',
+      actionId: 'sow',
+    })
+    const node = makeTriggerSelect([child])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player), {
+      canContinueWithoutTriggers: () => false,
+      canReachContinuationThroughTriggers: (_actionId, resources) => resources === undefined,
+    })
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'TestPlowBeforeSow',
+        labelKey: 'cards.TestPlowBeforeSow.name',
+        sourceCard: 'TestPlowBeforeSow',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
   it('disabled-only trigger-select keeps pass enabled', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
