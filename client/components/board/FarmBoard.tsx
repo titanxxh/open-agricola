@@ -1185,7 +1185,7 @@ export const FarmBoard = ({
                     : isStable
                       ? ' stable'
                       : ''
-              }${terrain ? ` farm-terrain-${terrain.kind}` : ''}${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
+              }${terrain ? ` farm-terrain-${terrain.kind}` : ''}${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isFieldSelectable ? ' position-selectable' : ''}${isTileSelected ? ' selected' : ''}${isFieldSelected ? ' position-selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
               }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
               title={tileLabel}
@@ -1219,6 +1219,9 @@ export const FarmBoard = ({
                   <div className={`empty-node ${emptySlotClass(tileRow, tileCol)}`} />
                 )}
               </div>
+              {isFieldSelected ? (
+                <span className="farm-position-selected-icon" aria-hidden="true" />
+              ) : null}
               {isStable ? (
                 <div
                   className="stable-barn-icon"

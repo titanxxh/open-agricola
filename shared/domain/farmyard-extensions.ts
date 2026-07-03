@@ -1,7 +1,7 @@
 import type { FarmTilePosition, PlayerState } from '../contract/types'
 import {
+  getAllTilePositions,
   getFarmyardTileKeySet,
-  getFarmyardTilePositions,
   positionKey,
 } from './farm'
 
@@ -25,18 +25,21 @@ const normalizeTwoTiles = (tiles: FarmTilePosition[]) => {
   return [...byKey.values()].sort((a, b) => a.row - b.row || a.col - b.col)
 }
 
+const originalFarmyardKeys = () => new Set(getAllTilePositions().map(positionKey))
+
 export const isValidFarmyardExtensionTiles = (
   player: Pick<PlayerState, 'farmyardExtensions'>,
   tiles: FarmTilePosition[],
 ) => {
   const selected = normalizeTwoTiles(tiles)
   if (!selected) return false
-  const existing = getFarmyardTileKeySet(player)
-  if (selected.some((tile) => existing.has(positionKey(tile)))) return false
+  const occupied = getFarmyardTileKeySet(player)
+  if (selected.some((tile) => occupied.has(positionKey(tile)))) return false
   if (!adjacent(selected[0]!, selected[1]!)) return false
+  const original = originalFarmyardKeys()
   return directions.some((dir) =>
     selected.every((tile) =>
-      existing.has(positionKey({ row: tile.row + dir.dr, col: tile.col + dir.dc })),
+      original.has(positionKey({ row: tile.row + dir.dr, col: tile.col + dir.dc })),
     ),
   )
 }
@@ -44,13 +47,13 @@ export const isValidFarmyardExtensionTiles = (
 export const getFarmyardExtensionCandidates = (
   player: Pick<PlayerState, 'farmyardExtensions'>,
 ): FarmTilePosition[][] => {
-  const existing = getFarmyardTileKeySet(player)
+  const occupied = getFarmyardTileKeySet(player)
   const candidateMap = new Map<string, FarmTilePosition>()
-  for (const tile of getFarmyardTilePositions(player)) {
+  for (const tile of getAllTilePositions()) {
     for (const dir of directions) {
       const next = { row: tile.row + dir.dr, col: tile.col + dir.dc }
       const key = positionKey(next)
-      if (!existing.has(key)) candidateMap.set(key, next)
+      if (!occupied.has(key)) candidateMap.set(key, next)
     }
   }
   const candidates = [...candidateMap.values()]
