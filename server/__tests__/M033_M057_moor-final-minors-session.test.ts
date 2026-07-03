@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
+import { markAllWorkersUsed, newbornCount, setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import type { SessionResponse } from '../game/authoritative-session'
 
@@ -82,6 +82,12 @@ const triggerOptionFor = (resp: SessionResponse, sourceCard: string): ActionChoi
   expect(option).toBeDefined()
   return option!
 }
+
+const a92AnytimeIds = (session: GameSession): string[] =>
+  session
+    .listAnytimeEntries()
+    .filter((entry) => entry.descriptor.sourceCard === A092)
+    .map((entry) => entry.descriptor.id)
 
 const acceptOptional = (session: GameSession, resp: SessionResponse): SessionResponse => {
   expect(resp.interaction.stateId).toBe('wait')
@@ -239,6 +245,7 @@ describe('M057 Taps', () => {
     expect(reqKind(offer)).toBe('select-trigger')
     expect(triggerOptionFor(offer, M057)).toBeDefined()
     expect(triggerOptionFor(offer, A092)).toBeDefined()
+    expect(a92AnytimeIds(session)).toEqual([])
     expect(offer.interaction.stateId === 'wait'
       ? offer.interaction.options?.some((option) => option.labelKey === 'moor.specialActions.hiring-fair')
       : false).toBe(false)
@@ -253,6 +260,34 @@ describe('M057 Taps', () => {
     expect(reqKind(undone)).toBe('select-trigger')
     expect(triggerOptionFor(undone, M057)).toBeDefined()
     expect(triggerOptionFor(undone, A092)).toBeDefined()
+  })
+
+  it('continues the Adoptive Parents use branch after choosing it from the Taps provider offer', () => {
+    const session = setupM057Rotation([M057], [A092])
+    const player = session.state.players[0]!
+    player.resources.food = 2
+    player.workers.find((worker) => worker.isActive)!.isNewborn = true
+    session.loadState(session.state)
+
+    const offer = driveToM057Offer(session)
+    expect(reqKind(offer)).toBe('select-trigger')
+
+    const selectedA92 = session.resolveChoice(0, A092)
+    expect(reqKind(selectedA92)).toBe('choice')
+    const useBranch = selectedA92.interaction.stateId === 'wait'
+      ? selectedA92.interaction.options?.find((option) => option.labelKey === 'ui.interactionUseAbility')
+      : undefined
+    expect(useBranch).toBeDefined()
+
+    const afterUse = session.resolveChoice(0, useBranch!.value)
+
+    expect(reqKind(afterUse)).toBe('choice')
+    expect(afterUse.interaction.stateId === 'wait' ? afterUse.interaction.promptKey : undefined)
+      .toBe('ui.interactionPlaceFarmerExtra')
+    expect(a92AnytimeIds(session)).toEqual([])
+    expect(afterUse.state.players[0]!.resources.food).toBe(1)
+    expect(newbornCount(afterUse.state.players[0]!)).toBe(0)
+    expect(workersAvailable(afterUse.state, afterUse.state.players[0]!)).toBe(1)
   })
 
   it('undoAction restores the pending Taps extra-turn offer after resolving a borrowed card action', () => {

@@ -2,7 +2,7 @@ import type { ActionDefinition, GameState, PlayerState } from '../../../contract
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { playerBoard } from '../../../domain'
 import { getUsedFarmyardTileKeys } from '../../../domain/farmyard-usage'
-import { runSelectionEffect } from '../../helpers/selection-effect-registry'
+import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
   positions: string[],
@@ -140,6 +140,11 @@ export const selectionAction: ActionDefinition = {
       const validationError = validateOccupationCards(cards, player.occupationHand, actionContext)
       if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
+    const effect = actionContext?.selectionEffect as string | undefined
+    if (effect) {
+      const validationError = validateSelectionEffect(effect, { player, positions, cards, sourceCard, state, actionContext })
+      if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
+    }
 
     if (sourceCard) {
       // selectedPositions keeps the existing extra-data key:
@@ -148,7 +153,6 @@ export const selectionAction: ActionDefinition = {
       writeCardExtraData(player, sourceCard, 'selectedPositions', stored)
     }
 
-    const effect = actionContext?.selectionEffect as string | undefined
     const extraData: Record<string, unknown> = { selectedPositions: positions }
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {

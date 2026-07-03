@@ -76,6 +76,10 @@ _Avoid_: 前端从 DOM 或规则代码推断可操作性
 等待玩家输入的结构化请求，常见 kind 有 `choice`、`farm-select`、`selection`、`animal-reorg`、`feed`、`confirm-next-player`、`confirm-player-switch`、`card-draft`。
 _Avoid_: 未类型化 pending blob
 
+**Interaction Presentation**:
+前端把服务端 `InteractionState` 映射为具体交互展示面和提交动作的边界。它只消费服务端交互真相，不做规则裁定。
+_Avoid_: 后端规则裁定、Pending Envelope、DOM 状态推断
+
 **Pending Envelope**:
 引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
 _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
@@ -158,7 +162,7 @@ _Avoid_: stacked terrain、hidden terrain、删除的地形
 _Avoid_: UI 按钮定义
 
 **Payment Pipeline**:
-统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
+统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、统一支付求解入口和执行器处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
 **Card-Provided Payment Resource（卡牌提供的支付资源）**:

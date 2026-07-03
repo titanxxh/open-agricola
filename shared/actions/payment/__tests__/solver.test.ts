@@ -290,4 +290,201 @@ describe('PaymentSolver', () => {
       expect(PaymentSolver.isComplexCost({ cards: { type: 'Major', list: ['K2'], required: true } })).toBe(true)
     })
   })
+
+  describe('resolvePayment', () => {
+    it('builds a payment choice and executes the selected option through the public lifecycle', () => {
+      const player = makePlayerWithResources({ food: 2, grain: 1 })
+      const state = makeState(player)
+      const cost = { fees: [{ food: 2 }, { grain: 1 }] }
+      const lifecycleCtx: PaymentCtx = {
+        actionId: 'pay',
+        costType: 'none',
+        optionPrefix: 'pay:test',
+      }
+
+      const prompt = PaymentSolver.resolvePayment(state, 0, cost, lifecycleCtx)
+      expect(prompt.type).toBe('request')
+      if (prompt.type !== 'request') return
+      expect(prompt.request.promptKey).toBe('prompt.selectPayment')
+      expect(prompt.request.request.kind).toBe('choice')
+      if (prompt.request.request.kind !== 'choice') return
+      const grainOption = prompt.request.request.options.find((option) => {
+        const paid = (
+          (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+            ?.resourcesPaid ?? {}
+        )
+        return paid.grain === 1
+      })
+      expect(grainOption).toBeDefined()
+
+      const paid = PaymentSolver.resolvePayment(state, 0, cost, {
+        ...lifecycleCtx,
+        paymentChoice: grainOption!.value,
+      })
+      expect(paid.type).toBe('paid')
+      if (paid.type !== 'paid') return
+      expect(player.resources.food).toBe(2)
+      expect(player.resources.grain).toBe(0)
+      expect(paid.receipt.resourcesPaid.grain).toBe(1)
+    })
+
+    it('returns candidate attribution for auto-resolved payments', () => {
+      const player = makePlayerWithResources({ wood: 1 })
+      const state = makeState(player)
+      const paid = PaymentSolver.resolvePayment(
+        state,
+        0,
+        { fees: [{ wood: 1 }] },
+        {
+          actionId: 'pay',
+          costType: 'minor-improvement',
+          candidateMetadataByFeeIndex: {
+            0: {
+              originalFeeIndex: 0,
+              sources: ['A075_LumberMill'],
+              costAttribution: {
+                A075_LumberMill: { saved: { wood: 1 } },
+              },
+            },
+          },
+        },
+      )
+
+      expect(paid.type).toBe('paid')
+      if (paid.type !== 'paid') return
+      expect(paid.receipt.candidateSources).toEqual(['A075_LumberMill'])
+      expect(paid.receipt.originalFeeIndex).toBe(0)
+      expect(paid.receipt.costAttribution).toEqual({
+        A075_LumberMill: { saved: { wood: 1 } },
+      })
+    })
+
+    it('rejects invalid payment choices without mutating resources', () => {
+      const player = makePlayerWithResources({ food: 2, grain: 1 })
+      const state = makeState(player)
+      const failed = PaymentSolver.resolvePayment(
+        state,
+        0,
+        { fees: [{ food: 2 }, { grain: 1 }] },
+        {
+          actionId: 'pay',
+          costType: 'none',
+          optionPrefix: 'pay:test',
+          paymentChoice: 'pay:test:99',
+        },
+      )
+
+      expect(failed.type).toBe('failed')
+      if (failed.type !== 'failed') return
+      expect(failed.reason).toBe('invalid-choice')
+      expect(player.resources.food).toBe(2)
+      expect(player.resources.grain).toBe(1)
+    })
+
+    it('filters lifecycle options by reserved resources before auto-paying', () => {
+      const player = makePlayerWithResources({ food: 3 })
+      const state = makeState(player)
+      const paid = PaymentSolver.resolvePayment(
+        state,
+        0,
+        { fees: [{ food: 2 }, { food: 1 }] },
+        {
+          actionId: 'pay',
+          costType: 'none',
+          reserveResources: { food: 2 },
+        },
+      )
+
+      expect(paid.type).toBe('paid')
+      if (paid.type !== 'paid') return
+      expect(paid.receipt.resourcesPaid).toEqual({ food: 1 })
+      expect(player.resources.food).toBe(2)
+    })
+
+    it('returns required returned-card provenance in the payment receipt', () => {
+      const player = makePlayerWithResources({ clay: 2 })
+      player.improvements = ['Major_ClayOven']
+      const state = makeState(player)
+      const paid = PaymentSolver.resolvePayment(
+        state,
+        0,
+        {
+          fee: { clay: 2 },
+          cards: {
+            type: 'Major',
+            list: ['Major_ClayOven'],
+            required: true,
+          },
+        },
+        {
+          actionId: 'pay',
+          costType: 'none',
+          playedCards: player.improvements,
+          includeReturnedCard: true,
+        },
+      )
+
+      expect(paid.type).toBe('paid')
+      if (paid.type !== 'paid') return
+      expect(paid.receipt.returnedCardId).toBe('Major_ClayOven')
+      expect(paid.receipt.resourcesPaid).toEqual({ clay: 2 })
+      expect(player.resources.clay).toBe(0)
+    })
+
+    it('executes card-provided payment resources and reports provider metadata', () => {
+      const providerKey = 'B155_ArtTeacher:traveling-players-food'
+      const player = makePlayerWithResources({ food: 1 })
+      const state = {
+        ...makeState(player),
+        actionSpaces: [
+          {
+            id: 'traveling-players',
+            resources: { food: 1 },
+          },
+        ],
+      } as unknown as GameState
+      const cost = {
+        fee: { food: 1 },
+        paymentResourceProviders: [
+          {
+            key: providerKey,
+            sourceCard: 'B155_ArtTeacher',
+            available: 1,
+            covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+            consume: { type: 'actionSpace', spaceId: 'traveling-players', resource: 'food' },
+          },
+        ],
+      }
+      const prompt = PaymentSolver.resolvePayment(state, 0, cost, {
+        actionId: 'pay',
+        costType: 'occupation',
+        optionPrefix: 'pay:provider',
+      })
+      expect(prompt.type).toBe('request')
+      if (prompt.type !== 'request') return
+      if (prompt.request.request.kind !== 'choice') return
+      const providerOption = prompt.request.request.options.find((option) => {
+        const paid = (
+          (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+            ?.resourcesPaid ?? {}
+        )
+        return paid[providerKey] === 1
+      })
+      expect(providerOption).toBeDefined()
+
+      const paid = PaymentSolver.resolvePayment(state, 0, cost, {
+        actionId: 'pay',
+        costType: 'occupation',
+        optionPrefix: 'pay:provider',
+        paymentChoice: providerOption!.value,
+      })
+
+      expect(paid.type).toBe('paid')
+      if (paid.type !== 'paid') return
+      expect(player.resources.food).toBe(1)
+      expect(state.actionSpaces[0]!.resources.food).toBe(0)
+      expect(paid.receipt.resourcesPaid[providerKey]).toBe(1)
+      expect(paid.receipt.paymentResourceProviders?.[0]?.sourceCard).toBe('B155_ArtTeacher')
+    })
+  })
 })

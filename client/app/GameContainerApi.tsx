@@ -13,7 +13,6 @@ import {
   getFarmyardTileKeySet,
   getAdjacentTilesForEdge,
   isFarmyardBorderEdge,
-  parsePositionKey,
   positionKey,
 } from '../../shared/domain/farm'
 import { emptyResources } from '../../shared/contract/state-constants'
@@ -58,7 +57,6 @@ import {
   buildAnytimeExchangeBulkChoice,
   buildAnytimeExchangeOptions,
 } from './anytime-exchange-ui'
-import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
@@ -85,9 +83,7 @@ import {
   playerIdFromWsStatus,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
-  shouldShowPendingChoiceInInteractionBar,
   shouldShowDevPanel,
-  shouldSuppressPendingChoiceOptionsInInteractionBar,
   splitBoardActionSpaces,
   type FarmCommitType,
   type WsStatus,
@@ -122,6 +118,11 @@ import {
   type ReplayTimelineEntry,
   type ReplayTimelineFilter,
 } from './replay-timeline'
+import {
+  buildInteractionPresentationPlan,
+  buildInteractionSubmitCommand,
+  type InteractionSubmitCommand,
+} from './interaction-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type ReorgAnimalType = AnimalKey
@@ -647,12 +648,16 @@ export const GameContainerApi = () => {
         : new Map(),
     [interaction],
   )
+  const interactionPresentationPlan = useMemo(
+    () => buildInteractionPresentationPlan(interaction),
+    [interaction],
+  )
   const pendingMoorSpecialActionChoices = useMemo(
     () =>
-      interaction.stateId === 'wait'
-        ? buildPendingMoorSpecialActionChoiceMaps(interaction.options)
+      interactionPresentationPlan.kind === 'moor-special-action'
+        ? interactionPresentationPlan.choices
         : buildPendingMoorSpecialActionChoiceMaps(),
-    [interaction],
+    [interactionPresentationPlan],
   )
 
   const takeAction = useCallback((space: ActionSpace) => {
@@ -754,144 +759,94 @@ export const GameContainerApi = () => {
     setSowError(error ?? 'UNKNOWN')
   }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
 
+  const setLocalFarmSubmitError = useCallback((
+    farmType: FarmCommitType,
+    error: string | { code: string; edges: string[]; newEdges: string[] },
+  ) => {
+    if (farmType === 'fence' && typeof error !== 'string') {
+      setFenceError(error)
+      return
+    }
+    setFarmCommitError(farmType, typeof error === 'string' ? error : error.code)
+  }, [setFarmCommitError, setFenceError])
+
+  const runInteractionSubmitCommand = useCallback((
+    submitCommand: InteractionSubmitCommand,
+    farmType?: FarmCommitType,
+  ) => {
+    if (submitCommand.kind === 'none') return false
+    if (submitCommand.kind === 'undoStep') {
+      void transport.undoStep().catch((e) => console.error('undoStep error', e))
+      return true
+    }
+    if (submitCommand.kind === 'localFarmError') {
+      setLocalFarmSubmitError(submitCommand.farmType, submitCommand.error)
+      return true
+    }
+    if (submitCommand.kind === 'commitSelection') {
+      void transport.commitSelection(submitCommand.playerIndex, submitCommand.payload)
+        .then((resp) => {
+          if (!resp.ok && farmType) setFarmCommitError(farmType, resp.error)
+        })
+        .catch((e) => {
+          console.error(e)
+          if (farmType) setFarmCommitError(farmType)
+        })
+      return true
+    }
+    if (submitCommand.kind === 'resolveChoice') {
+      void transport
+        .resolveChoice(submitCommand.playerIndex, submitCommand.value, submitCommand.payload)
+        .catch((e) => console.error(e))
+      return true
+    }
+    if (submitCommand.kind === 'confirmFeed') {
+      void transport
+        .confirmFeed(submitCommand.playerIndex, submitCommand.selections)
+        .catch((e) => console.error(e))
+      return true
+    }
+    if (submitCommand.kind === 'confirmNextPlayer') {
+      void transport.confirmNextPlayer().catch((e) => console.error(e))
+      return true
+    }
+    void transport.confirmPlayerSwitch().catch((e) => console.error(e))
+    return true
+  }, [setFarmCommitError, setLocalFarmSubmitError, transport])
+
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
-    if (interaction.stateId === 'wait' && interaction.selection) {
-      const pendingPlayerIndex = interaction.playerIndex
-      if (value === 'cancel') {
-        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
-        return
-      }
-      const positions = [...pendingPositionSelections]
-        .map((key) => parsePositionKey(key))
-        .filter((tile): tile is FarmTilePosition => !!tile)
-      void transport.commitSelection(pendingPlayerIndex, { positions }).catch((e) => console.error(e))
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value,
+      positionSelectionKeys: [...pendingPositionSelections],
+      fenceEdges: pendingFenceEdges,
+      palisadeEdges: pendingPalisadeEdges,
+      fenceSources: pendingFenceSources,
+      roomTiles: pendingRoomTiles,
+      stableTiles: pendingStableTiles,
+      farmHand: pendingFarmHand,
+      plowTile: pendingPlowTile,
+      sowSelections: pendingSowSelections,
+      animalReorgZones: animalReorg?.zones,
+    })
+    const farmType = interaction.stateId === 'wait' && interaction.farm
+      ? interaction.farm.farmType
+      : undefined
+    if (runInteractionSubmitCommand(submitCommand, farmType)) {
       return
     }
-    if (interaction.stateId === 'wait' && interaction.farm) {
-      const pendingPlayerIndex = interaction.playerIndex
-      const farm = interaction.farm
-      if (value === 'cancel') {
-        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
-        return
-      }
-      if (farm.farmType === 'fence') {
-        if (
-          farm.fenceSource?.kind === 'borrowed' &&
-          pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId])
-        ) {
-          setFenceError({
-            code: 'BORROWED_FENCE_SOURCE_REQUIRED',
-            edges: pendingFenceEdges,
-            newEdges: pendingFenceEdges,
-          })
-          return
-        }
-        void transport.commitSelection(
-          pendingPlayerIndex,
-          buildFenceCommitPayload(
-            pendingFenceEdges,
-            pendingPalisadeEdges,
-            farm.extraWood ?? 0,
-            farm.fenceSource,
-            pendingFenceSources,
-          ),
-        )
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('fence', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('fence')
-          })
-        return
-      }
-      if (farm.farmType === 'room') {
-        void transport.commitSelection(pendingPlayerIndex, { rooms: pendingRoomTiles })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('room', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('room')
-          })
-        return
-      }
-      if (farm.farmType === 'stable') {
-        const stablePayload = buildStableCommitPayload(pendingStableTiles, pendingFarmHand)
-        if (!stablePayload) {
-          setStableError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, stablePayload)
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('stable', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('stable')
-          })
-        return
-      }
-      if (farm.farmType === 'plow') {
-        if (!pendingPlowTile) {
-          setPlowError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, { tile: pendingPlowTile })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('plow', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('plow')
-          })
-        return
-      }
-      if (farm.farmType === 'sow') {
-        const crops = Object.entries(pendingSowSelections)
-          .map(([key, crop]) => {
-            const tile = parsePositionKey(key)
-            if (!tile) return null
-            return { row: tile.row, col: tile.col, crop }
-          })
-          .filter(
-            (entry): entry is { row: number; col: number; crop: PendingSowCrop } =>
-              !!entry &&
-              (entry.crop === 'grain' ||
-                entry.crop === 'vegetable' ||
-                entry.crop === 'wood' ||
-                entry.crop === 'stone'),
-          )
-        if (crops.length === 0) {
-          setSowError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, { crops })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('sow', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('sow')
-          })
-        return
-      }
+    if (
+      interactionPresentationPlan.kind !== 'choice-bar' &&
+      interactionPresentationPlan.kind !== 'exchange-center' &&
+      interactionPresentationPlan.kind !== 'moor-special-action'
+    ) {
       return
     }
-    if (interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg') {
-      if (value === 'confirm' && animalReorg) {
-        void transport.resolveChoice(interaction.playerIndex, 'confirm', { zones: animalReorg.zones }).catch((e) => console.error(e))
-      } else {
-        void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-      }
-      return
-    }
-    if (interaction.stateId !== 'wait') return
-    if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
-    void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setFenceError, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
+    void transport
+      .resolveChoice(interactionPresentationPlan.pendingChoice.playerIndex, value)
+      .catch((e) => console.error(e))
+  }, [interaction, interactionPresentationPlan, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, runInteractionSubmitCommand])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -932,92 +887,84 @@ export const GameContainerApi = () => {
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
+    const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'confirm' })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.confirmNextPlayer().catch((e) => console.error(e))
-  }, [transport, isInteractive])
+  }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const confirmPlayerSwitch = useCallback(() => {
     if (!isInteractive) return
+    const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'confirm' })
+    if (runInteractionSubmitCommand(submitCommand)) return
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
-  }, [transport, isInteractive])
+  }, [interaction, runInteractionSubmitCommand, transport, isInteractive])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
     const seed = resetSeedInput ? Number(resetSeedInput) : undefined
     void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
   }, [transport, isInteractive, resetSeedInput])
 
-  const interactionRequestKind =
-    interaction.stateId === 'wait'
-      ? (interaction.request as { kind?: string }).kind
-      : null
   const pendingEngineBlocked =
-    interaction.stateId === 'wait' && interactionRequestKind === 'engine-blocked'
+    interactionPresentationPlan.kind === 'engine-blocked'
       ? {
-          promptKey: interaction.promptKey,
-          promptParams: interaction.promptParams,
+          promptKey: interactionPresentationPlan.promptKey,
+          promptParams: interactionPresentationPlan.promptParams,
         }
       : null
-  const pendingChoice =
-    interaction.stateId === 'wait' &&
-    (interactionRequestKind === 'choice' ||
-      interactionRequestKind === 'select-trigger' ||
-      interactionRequestKind === 'farm-select' ||
-      interactionRequestKind === 'selection' ||
-      interaction.farm !== undefined ||
-      interaction.selection !== undefined)
-      ? {
-          promptKey: interaction.promptKey,
-          promptParams: interaction.promptParams,
-          options: interaction.options ?? [],
-          playerIndex: interaction.playerIndex,
-          spaceId: interaction.spaceId ?? '',
-          sourceCard: interaction.sourceCard,
-          fenceExtraWood:
-            interaction.farm?.farmType === 'fence'
-              ? interaction.farm.extraWood ?? 0
-              : undefined,
-        }
+  const planPendingChoice =
+    'pendingChoice' in interactionPresentationPlan
+      ? interactionPresentationPlan.pendingChoice
       : null
-  const suppressPendingChoiceOptions = shouldSuppressPendingChoiceOptionsInInteractionBar(pendingChoice)
+  const pendingChoice = planPendingChoice
+  const interactionBarPendingChoice =
+    interactionPresentationPlan.kind === 'exchange-center' ||
+    interactionPresentationPlan.kind === 'moor-special-action'
+      ? null
+      : planPendingChoice
+  const suppressPendingChoiceOptions = interactionPresentationPlan.kind === 'moor-special-action'
   const pendingNextPlayerIndex =
-    interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player'
-      ? interaction.nextPlayerIndex ?? null
+    interactionPresentationPlan.kind === 'confirm-next-player'
+      ? interactionPresentationPlan.nextPlayerIndex
       : null
   const pendingPlayerSwitch =
-    interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
+    interactionPresentationPlan.kind === 'confirm-player-switch'
       ? {
-          fromPlayerIndex: interaction.fromPlayerIndex ?? 0,
-          toPlayerIndex: interaction.toPlayerIndex ?? 0,
+          fromPlayerIndex: interactionPresentationPlan.fromPlayerIndex,
+          toPlayerIndex: interactionPresentationPlan.toPlayerIndex,
         }
       : null
   const pendingAnimalReorg = useMemo(
     () =>
-      interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg'
-        ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId ?? '' }
+      interactionPresentationPlan.kind === 'animal-reorg'
+        ? {
+            playerIndex: interactionPresentationPlan.playerIndex,
+            spaceId: interactionPresentationPlan.spaceId,
+          }
         : null,
-    [interaction],
+    [interactionPresentationPlan],
   )
   const harvestPending = useMemo(
     () =>
-      interaction.stateId === 'wait' && interaction.request.kind === 'feed' && state
+      interactionPresentationPlan.kind === 'harvest-feed' && state
         ? {
-            playerIndex: interaction.playerIndex,
-            playerName: state.players[interaction.playerIndex]?.name ?? '',
-            remaining: interaction.remaining ?? 0,
-            foodUsed: interaction.foodUsed ?? 0,
+            playerIndex: interactionPresentationPlan.playerIndex,
+            playerName: state.players[interactionPresentationPlan.playerIndex]?.name ?? '',
+            remaining: interactionPresentationPlan.remaining,
+            foodUsed: interactionPresentationPlan.foodUsed,
           }
         : null,
-    [interaction, state],
+    [interactionPresentationPlan, state],
   )
   const heatingPending = useMemo(
     () =>
-      interaction.stateId === 'wait' && interaction.request.kind === 'heating' && state
+      interactionPresentationPlan.kind === 'heating' && state
         ? {
-            playerName: state.players[interaction.playerIndex]?.name ?? '',
-            required: interaction.request.required,
-            maxFuelPayable: interaction.request.maxFuelPayable,
-            maxWoodConvertibleToFuel: interaction.request.maxWoodConvertibleToFuel,
+            playerName: state.players[interactionPresentationPlan.playerIndex]?.name ?? '',
+            required: interactionPresentationPlan.required,
+            maxFuelPayable: interactionPresentationPlan.maxFuelPayable,
+            maxWoodConvertibleToFuel: interactionPresentationPlan.maxWoodConvertibleToFuel,
           }
         : null,
-    [interaction, state],
+    [interactionPresentationPlan, state],
   )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
@@ -1292,11 +1239,10 @@ export const GameContainerApi = () => {
   const hasAnytimeExchangeSelection = Object.values(activeAnytimeExchangeCounts).some((value) => value > 0)
   const hasAnytimeExchangeSummary = Object.values(anytimeExchangeSummary).some((value) => value > 0)
 
-  const isHarvestFeedExchange =
-    interaction.stateId === 'wait' && interaction.request.kind === 'feed'
+  const isHarvestFeedExchange = interactionPresentationPlan.kind === 'harvest-feed'
   const harvestFeedPlayer =
-    isHarvestFeedExchange && state && interaction.stateId === 'wait'
-      ? state.players[interaction.playerIndex] ?? null
+    isHarvestFeedExchange && state && interactionPresentationPlan.kind === 'harvest-feed'
+      ? state.players[interactionPresentationPlan.playerIndex] ?? null
       : null
   const harvestFeedOptions = useMemo(
     () =>
@@ -1387,14 +1333,28 @@ export const GameContainerApi = () => {
   const hasHarvestFeedSummary = Object.values(harvestFeedSummary).some((value) => value > 0)
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
-    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'feed') return
-    void transport.confirmFeed(interaction.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
-  }, [interaction, transport, isInteractive, harvestFeedSelections])
+    if (interactionPresentationPlan.kind !== 'harvest-feed') return
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value: 'confirm',
+      feedSelections: harvestFeedSelections,
+    })
+    if (runInteractionSubmitCommand(submitCommand)) return
+    void transport
+      .confirmFeed(interactionPresentationPlan.playerIndex, harvestFeedSelections)
+      .catch((e) => console.error(e))
+  }, [interaction, interactionPresentationPlan, transport, isInteractive, harvestFeedSelections, runInteractionSubmitCommand])
   const confirmHeating = useCallback((payload: { fuelUsed: number; woodToFuel: number }) => {
     if (!isInteractive) return
-    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'heating') return
-    void transport.resolveChoice(interaction.playerIndex, 'confirm', payload).catch((e) => console.error(e))
-  }, [interaction, transport, isInteractive])
+    if (interactionPresentationPlan.kind !== 'heating') return
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value: 'confirm',
+      heatingPayment: payload,
+    })
+    if (runInteractionSubmitCommand(submitCommand)) return
+    void transport
+      .resolveChoice(interactionPresentationPlan.playerIndex, 'confirm', payload)
+      .catch((e) => console.error(e))
+  }, [interaction, interactionPresentationPlan, transport, isInteractive, runInteractionSubmitCommand])
 
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
@@ -1436,9 +1396,18 @@ export const GameContainerApi = () => {
   )
 
   const farmInteraction =
-    interaction.stateId === 'wait' ? interaction.farm ?? null : null
+    interactionPresentationPlan.kind === 'farm-fence-selection' ||
+    interactionPresentationPlan.kind === 'farm-room-selection' ||
+    interactionPresentationPlan.kind === 'farm-stable-selection' ||
+    interactionPresentationPlan.kind === 'farm-plow-selection' ||
+    interactionPresentationPlan.kind === 'farm-sow-selection'
+      ? interactionPresentationPlan.farm
+      : null
   const selectionInteraction =
-    interaction.stateId === 'wait' ? interaction.selection ?? null : null
+    interactionPresentationPlan.kind === 'position-selection' ||
+    interactionPresentationPlan.kind === 'occupation-hand-selection'
+      ? interactionPresentationPlan.selection
+      : null
   const borrowedFenceSource =
     farmInteraction?.farmType === 'fence' ? farmInteraction.fenceSource : undefined
   const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'
@@ -1477,12 +1446,10 @@ export const GameContainerApi = () => {
 
   const occupationHandInteraction = useMemo(
     () =>
-      interaction.stateId === 'wait' &&
-      interaction.selection &&
-      interaction.selection.kind === 'occupation-hand'
-        ? interaction.selection
+      interactionPresentationPlan.kind === 'occupation-hand-selection'
+        ? interactionPresentationPlan.selection
         : null,
-    [interaction],
+    [interactionPresentationPlan],
   )
 
   const maxRoomSelections = useMemo(
@@ -2704,9 +2671,11 @@ export const GameContainerApi = () => {
               highlightedFenceEdgeIds={highlightedFenceEdgeIds}
               onConfirmOccupationHandSelection={(ids) => {
                 if (!isInteractive) return
-                const pendingPlayerIndex =
-                  interaction.stateId === 'wait' && interaction.selection ? interaction.playerIndex : 0
-                void transport.commitSelection(pendingPlayerIndex, { cardIds: ids }).catch((e) => console.error(e))
+                const submitCommand = buildInteractionSubmitCommand(interaction, {
+                  value: 'confirm',
+                  occupationCardIds: ids,
+                })
+                runInteractionSubmitCommand(submitCommand)
               }}
             />
           </section>
@@ -2760,7 +2729,7 @@ export const GameContainerApi = () => {
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg}
-        pendingChoice={shouldShowPendingChoiceInInteractionBar(pendingChoice) ? pendingChoice : null}
+        pendingChoice={interactionBarPendingChoice}
         suppressChoiceOptions={suppressPendingChoiceOptions}
         pendingEngineBlocked={pendingEngineBlocked}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
@@ -2802,42 +2771,46 @@ export const GameContainerApi = () => {
         confirmAnimalReorg={confirmAnimalReorg}
         cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
         resourceQuantitySelect={
-          interaction.stateId === 'wait' &&
-          interaction.request.kind === 'resource-quantity-select'
+          interactionPresentationPlan.kind === 'resource-quantity-select'
             ? {
-                availableByResource: interaction.request.availableByResource,
-                promptKey: interaction.request.promptKey,
-                requireAtLeastOne: interaction.request.requireAtLeastOne,
+                availableByResource: interactionPresentationPlan.availableByResource,
+                promptKey: interactionPresentationPlan.promptKey,
+                requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
                 onConfirm: (counts) => {
                   if (!isInteractive) return
-                  void transport
-                    .commitSelection(interaction.playerIndex, { resourceCounts: counts })
-                    .catch((e) => console.error(e))
+                  const submitCommand = buildInteractionSubmitCommand(interaction, {
+                    value: 'confirm',
+                    resourceCounts: counts,
+                  })
+                  runInteractionSubmitCommand(submitCommand)
                 },
                 onCancel: () => {
                   if (!isInteractive) return
-                  void transport.undoStep().catch((e) => console.error('undoStep error', e))
+                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+                  runInteractionSubmitCommand(submitCommand)
                 },
               }
             : null
         }
         resourceBatchExchangeSelect={
-          interaction.stateId === 'wait' &&
-          interaction.request.kind === 'resource-batch-exchange-select'
+          interactionPresentationPlan.kind === 'resource-batch-exchange-select'
             ? {
-                discardAvailableByResource: interaction.request.discardAvailableByResource,
-                receiveResources: interaction.request.receiveResources,
-                maxTotal: interaction.request.maxTotal,
-                promptKey: interaction.request.promptKey,
+                discardAvailableByResource: interactionPresentationPlan.discardAvailableByResource,
+                receiveResources: interactionPresentationPlan.receiveResources,
+                maxTotal: interactionPresentationPlan.maxTotal,
+                promptKey: interactionPresentationPlan.promptKey,
                 onConfirm: (payload) => {
                   if (!isInteractive) return
-                  void transport
-                    .commitSelection(interaction.playerIndex, { resourceBatchExchange: payload })
-                    .catch((e) => console.error(e))
+                  const submitCommand = buildInteractionSubmitCommand(interaction, {
+                    value: 'confirm',
+                    resourceBatchExchange: payload,
+                  })
+                  runInteractionSubmitCommand(submitCommand)
                 },
                 onCancel: () => {
                   if (!isInteractive) return
-                  void transport.undoStep().catch((e) => console.error('undoStep error', e))
+                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+                  runInteractionSubmitCommand(submitCommand)
                 },
               }
             : null

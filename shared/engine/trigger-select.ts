@@ -321,7 +321,7 @@ export const canPassTriggerSelect = (
     !beforeActionIds.every((actionId) => options.canContinueWithoutTriggers!(actionId))
   ) {
     const enabledTriggerCanAdvanceContinuation = evaluation.optionStates.some((entry) => {
-      if (!entry.applicable || !entry.doable || !entry.resourcesAfter) return false
+      if (!entry.applicable || !entry.doable) return false
       return beforeActionIds.every((actionId) =>
         options.canContinueWithoutTriggers!(actionId, entry.resourcesAfter) ||
         (options.canReachContinuationThroughTriggers?.(actionId, entry.resourcesAfter) ?? false),

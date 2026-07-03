@@ -408,11 +408,19 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     ))
   }
   if (node instanceof XorNode) {
-    return copySharedNodeMetadata(node, new XorNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.children.map((child) => cloneNode(int, child)),
-      node.promptKey,
-    ))
+    const children = node.children.map((child) => cloneNode(int, child))
+    const clone = new XorNode(`${node.id}-clone-${int.counterRef.value++}`, children, node.promptKey)
+    if (node.selectedChildId) {
+      const selectedIndex = node.children.findIndex((child) => child.id === node.selectedChildId)
+      clone.selectedChildId = selectedIndex >= 0 ? children[selectedIndex]?.id ?? null : null
+    }
+    clone.emittedChoices = [...node.emittedChoices]
+    clone.emittedPromptKey = node.emittedPromptKey
+    clone.emittedPromptParams = node.emittedPromptParams
+    clone.emittedRequest = node.emittedRequest
+    clone.pendingActionId = node.pendingActionId
+    clone.pendingContextSnapshot = node.pendingContextSnapshot
+    return copySharedNodeMetadata(node, clone)
   }
   return node
 }

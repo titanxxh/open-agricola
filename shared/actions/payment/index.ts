@@ -6,4 +6,6 @@ export type {
   PaymentCtx,
   PaymentExecuteResult,
   PaymentExecuteError,
+  PaymentReceipt,
+  PaymentResolveResult,
 } from './types'
