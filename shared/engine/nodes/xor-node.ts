@@ -6,6 +6,7 @@ import { BaseNode } from './base'
 export class XorNode extends BaseNode {
   public children: EngineNode[]
   public promptKey?: PromptKey
+  public selectedChildId: string | null = null
   public emittedChoices: ActionChoiceOption[] = []
   public emittedPromptKey?: PromptKey
   public emittedPromptParams?: Record<string, unknown>
@@ -21,6 +22,10 @@ export class XorNode extends BaseNode {
   }
 
   step(_ctx: EngineContext): NodeStepResult {
+    if (this.selectedChildId) {
+      const selected = this.children.find((child) => child.id === this.selectedChildId)
+      if (selected && selected.getState() !== 'resolved') return { kind: 'continue' }
+    }
     const resolved = this.children.filter((c) => c.getState() === 'resolved').length
     if (resolved >= 1) return { kind: 'done' }
     return { kind: 'continue' }
@@ -30,6 +35,7 @@ export class XorNode extends BaseNode {
     return {
       childrenIds: this.children.map((c) => c.id),
       promptKey: this.promptKey,
+      selectedChildId: this.selectedChildId,
       emittedChoices: this.emittedChoices,
       emittedPromptKey: this.emittedPromptKey,
       emittedPromptParams: this.emittedPromptParams,

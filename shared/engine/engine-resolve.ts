@@ -8,7 +8,7 @@ import type {
   Resource,
   ActionSpace,
 } from '../contract/types'
-import type { InteractionContextSnapshot } from './types'
+import type { EngineNode, InteractionContextSnapshot } from './types'
 import {
   ActionNode,
   OrNode,
@@ -161,6 +161,19 @@ const rollbackAndReturn = (
   int.events.rollbackTransaction()
   clearEventLogDerivations(int)
   return result
+}
+
+const rememberXorSelection = (node: OrNode | XorNode, targetNode: EngineNode | undefined): void => {
+  if (node instanceof XorNode && targetNode) node.selectedChildId = targetNode.id
+}
+
+const resolveXorIfSelectedBranchComplete = (node: XorNode): void => {
+  if (!node.selectedChildId) {
+    node.resolve()
+    return
+  }
+  const selected = node.children.find((child) => child.id === node.selectedChildId)
+  if (!selected || selected.getState() === 'resolved') node.resolve(node.selectedChildId)
 }
 
 const triggerSelectEvaluationOptions = (
@@ -475,6 +488,7 @@ export function engineResolveChoice(
         node.optionalActive = true
       }
       const targetNode = node.children.find((item) => item.id === choice)
+      rememberXorSelection(node, targetNode)
       const child = targetNode ? findActionNode(targetNode) : null
       if (!child) {
         int.pendingNodeIdRef.value = null
@@ -513,7 +527,11 @@ export function engineResolveChoice(
         enforceCompositeContinuationMandatory(flowNode)
         int.tree.insertAfter(node.id, [flowNode])
         targetNode!.resolve(choice)
-        node.resolve(choice)
+        if (node instanceof XorNode) {
+          resolveXorIfSelectedBranchComplete(node)
+        } else {
+          node.resolve(choice)
+        }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -548,7 +566,7 @@ export function engineResolveChoice(
         }
         resolveSubtree(targetNode!)
         if (node instanceof XorNode) {
-          node.resolve(choice)
+          resolveXorIfSelectedBranchComplete(node)
         }
         int.tree.insertBefore(node.id, [...beforeActivateNodes, deferredTarget])
         int.pendingNodeIdRef.value = null
@@ -623,7 +641,7 @@ export function engineResolveChoice(
         const insertAnchor = node instanceof XorNode ? node.id : child.id
         child.resolve(result)
         if (node instanceof XorNode) {
-          node.resolve(choice)
+          resolveXorIfSelectedBranchComplete(node)
         }
         int.pendingNodeIdRef.value = null
         int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
@@ -794,7 +812,7 @@ export function engineResolveChoice(
       recordInternalChildResult(int, child, result)
       child.resolve(result)
       if (node instanceof XorNode) {
-        node.resolve(choice)
+        resolveXorIfSelectedBranchComplete(node)
       }
       int.pendingNodeIdRef.value = null
       commitIfEngineComplete(int, context, result)
@@ -984,7 +1002,7 @@ export function engineResolveChoice(
     pendingHost.resolve(result)
     if (pendingEnvelope?.ownerNodeId) {
       const ownerNode = int.tree.findNodeById(pendingEnvelope.ownerNodeId)
-      if (ownerNode instanceof XorNode) ownerNode.resolve()
+      if (ownerNode instanceof XorNode) resolveXorIfSelectedBranchComplete(ownerNode)
     }
     int.pendingNodeIdRef.value = null
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
@@ -1172,7 +1190,7 @@ export function engineResolveChoice(
   if (ownerNodeIdToResolve) {
     const ownerNode = int.tree.findNodeById(ownerNodeIdToResolve)
     if (ownerNode instanceof XorNode) {
-      ownerNode.resolve()
+      resolveXorIfSelectedBranchComplete(ownerNode)
     }
   }
   int.pendingNodeIdRef.value = null

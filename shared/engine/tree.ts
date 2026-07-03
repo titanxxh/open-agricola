@@ -175,6 +175,19 @@ export class EngineTree {
         if (node.getState() !== 'resolved') node.resolve()
         return null
       }
+      if (node instanceof XorNode && node.selectedChildId) {
+        const selected = node.children.find((child) => child.id === node.selectedChildId)
+        if (!selected) {
+          node.selectedChildId = null
+        } else if (selected.getState() !== 'resolved') {
+          const next = visit(selected)
+          if (next) return next
+          return null
+        } else {
+          node.resolve(node.selectedChildId)
+          return null
+        }
+      }
       if (node instanceof OrNode || node instanceof XorNode) {
         for (const child of node.children) {
           if (child.getState() === 'resolved' || !hasStartedDescendant(child)) {

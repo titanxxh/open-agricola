@@ -4,7 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { newbornCount } from '../../domain/player'
+import { newbornCount, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A092_AdoptiveParents'
@@ -18,9 +18,10 @@ const FORFEITED_KEY = 'forfeitedThisRound'
  * BGA models this as a pull / strict-alternation effect with two entry points,
  * both gated by the same `adoptiveAvailable` predicate:
  *
- *  - Capability A (anytime grow-only): in any interactive window the player may
- *    pay 1 food to promote the first newborn (child→adult, leaves any action
- *    space, becomes an available worker). It does NOT place immediately — the
+ *  - Capability A (anytime grow-only): while the player still has an ordinary
+ *    worker to place, they may pay 1 food to promote the first newborn
+ *    (child→adult, leaves any action space, becomes an available worker). It
+ *    does NOT place immediately — the
  *    promoted worker waits in `home` and is placed via the normal rotation, so
  *    alternation with the opponent is preserved (this is the fix for the old
  *    push model's "place two workers in a row" bug). Template: E22 GuestRoom.
@@ -63,6 +64,7 @@ const anytimeGrowListener: CardListenerRegistration = {
     // extra turn, double-dipping a placement and bypassing the use/forfeit XOR.
     if (context.pendingSourceCard === CARD_ID) return
     if (!adoptiveAvailable(context.player)) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     return {
       sourceCard: CARD_ID,
       labelKey: 'ui.interactionUseGrowOffspring',

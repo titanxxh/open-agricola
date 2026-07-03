@@ -200,15 +200,17 @@ describe('A92 P2 fixes', () => {
       expect(a92AnytimeIds(session)).toEqual([])
     })
 
-    it('regression: A92 anytime grow IS available outside its own pending frame', () => {
+    it('regression: A92 anytime grow IS available outside its own pending frame when a worker can still act', () => {
       // The suppression is scoped to A92's own pending frame, not a blanket
-      // disable. Exercise the listener directly: with no A92 pending frame it
-      // must still contribute its grow flow (P0 has a newborn + food). This
-      // avoids `listAnytimeEntries`, which only lists the active interaction
-      // owner's entries (P1 here), so it cannot observe P0's anytime.
+      // disable. Exercise the listener directly: with no A92 pending frame and
+      // an ordinary worker still available, it must still contribute its grow
+      // flow.
       const session = setupRotation({ food: 3 })
       const state = session.getState().state
       const p0 = state.players[0]!
+      setActiveWorkerCount(p0, 2)
+      p0.workers.find((worker) => worker.id === '2')!.isNewborn = false
+      expect(workersAvailable(state, p0)).toBe(1)
       expect(newbornCount(p0)).toBe(1)
       const reg = getListenerById('A92-adoptive-parents-anytime-grow')!
       const noFrame = executeCardListener(reg, {
@@ -229,6 +231,25 @@ describe('A92 P2 fixes', () => {
         pendingSourceCard: A92,
       })
       expect(inFrame).toBeUndefined()
+    })
+
+    it('A92 anytime grow is NOT available when the player has no ordinary worker left', () => {
+      const session = setupRotation({ food: 3 })
+      const state = session.getState().state
+      const p0 = state.players[0]!
+      expect(workersAvailable(state, p0)).toBe(0)
+      expect(newbornCount(p0)).toBe(1)
+      const reg = getListenerById('A92-adoptive-parents-anytime-grow')!
+
+      const result = executeCardListener(reg, {
+        state,
+        player: p0,
+        space: state.actionSpaces[0]!,
+        actionId: 'anytime',
+        phase: 'anytime',
+      })
+
+      expect(result).toBeUndefined()
     })
   })
 

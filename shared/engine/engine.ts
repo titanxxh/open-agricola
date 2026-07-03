@@ -217,6 +217,9 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
       }
       case 'xor': {
         const xor = new XorNode(cursor.id, buildChildren(), data.promptKey as PromptKey | undefined)
+        xor.selectedChildId = typeof data.selectedChildId === 'string'
+          ? data.selectedChildId
+          : null
         xor.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
         xor.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
         xor.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
