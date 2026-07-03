@@ -13,7 +13,6 @@ import {
   getFarmyardTileKeySet,
   getAdjacentTilesForEdge,
   isFarmyardBorderEdge,
-  parsePositionKey,
   positionKey,
 } from '../../shared/domain/farm'
 import { emptyResources } from '../../shared/contract/state-constants'
@@ -58,7 +57,6 @@ import {
   buildAnytimeExchangeBulkChoice,
   buildAnytimeExchangeOptions,
 } from './anytime-exchange-ui'
-import { buildFenceCommitPayload, buildStableCommitPayload } from './farm-commit-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
@@ -120,7 +118,10 @@ import {
   type ReplayTimelineEntry,
   type ReplayTimelineFilter,
 } from './replay-timeline'
-import { buildInteractionPresentationPlan } from './interaction-presentation'
+import {
+  buildInteractionPresentationPlan,
+  buildInteractionSubmitCommand,
+} from './interaction-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type ReorgAnimalType = AnimalKey
@@ -757,130 +758,48 @@ export const GameContainerApi = () => {
     setSowError(error ?? 'UNKNOWN')
   }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
 
+  const setLocalFarmSubmitError = useCallback((
+    farmType: FarmCommitType,
+    error: string | { code: string; edges: string[]; newEdges: string[] },
+  ) => {
+    if (farmType === 'fence' && typeof error !== 'string') {
+      setFenceError(error)
+      return
+    }
+    setFarmCommitError(farmType, typeof error === 'string' ? error : error.code)
+  }, [setFarmCommitError, setFenceError])
+
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
-    if (interaction.stateId === 'wait' && interaction.selection) {
-      const pendingPlayerIndex = interaction.playerIndex
-      if (value === 'cancel') {
-        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
-        return
-      }
-      const positions = [...pendingPositionSelections]
-        .map((key) => parsePositionKey(key))
-        .filter((tile): tile is FarmTilePosition => !!tile)
-      void transport.commitSelection(pendingPlayerIndex, { positions }).catch((e) => console.error(e))
+    const submitCommand = buildInteractionSubmitCommand(interaction, {
+      value,
+      positionSelectionKeys: [...pendingPositionSelections],
+      fenceEdges: pendingFenceEdges,
+      palisadeEdges: pendingPalisadeEdges,
+      fenceSources: pendingFenceSources,
+      roomTiles: pendingRoomTiles,
+      stableTiles: pendingStableTiles,
+      farmHand: pendingFarmHand,
+      plowTile: pendingPlowTile,
+      sowSelections: pendingSowSelections,
+    })
+    if (submitCommand.kind === 'localFarmError') {
+      setLocalFarmSubmitError(submitCommand.farmType, submitCommand.error)
       return
     }
-    if (interaction.stateId === 'wait' && interaction.farm) {
-      const pendingPlayerIndex = interaction.playerIndex
-      const farm = interaction.farm
-      if (value === 'cancel') {
-        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
-        return
-      }
-      if (farm.farmType === 'fence') {
-        if (
-          farm.fenceSource?.kind === 'borrowed' &&
-          pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId])
-        ) {
-          setFenceError({
-            code: 'BORROWED_FENCE_SOURCE_REQUIRED',
-            edges: pendingFenceEdges,
-            newEdges: pendingFenceEdges,
-          })
-          return
-        }
-        void transport.commitSelection(
-          pendingPlayerIndex,
-          buildFenceCommitPayload(
-            pendingFenceEdges,
-            pendingPalisadeEdges,
-            farm.extraWood ?? 0,
-            farm.fenceSource,
-            pendingFenceSources,
-          ),
-        )
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('fence', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('fence')
-          })
-        return
-      }
-      if (farm.farmType === 'room') {
-        void transport.commitSelection(pendingPlayerIndex, { rooms: pendingRoomTiles })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('room', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('room')
-          })
-        return
-      }
-      if (farm.farmType === 'stable') {
-        const stablePayload = buildStableCommitPayload(pendingStableTiles, pendingFarmHand)
-        if (!stablePayload) {
-          setStableError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, stablePayload)
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('stable', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('stable')
-          })
-        return
-      }
-      if (farm.farmType === 'plow') {
-        if (!pendingPlowTile) {
-          setPlowError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, { tile: pendingPlowTile })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('plow', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('plow')
-          })
-        return
-      }
-      if (farm.farmType === 'sow') {
-        const crops = Object.entries(pendingSowSelections)
-          .map(([key, crop]) => {
-            const tile = parsePositionKey(key)
-            if (!tile) return null
-            return { row: tile.row, col: tile.col, crop }
-          })
-          .filter(
-            (entry): entry is { row: number; col: number; crop: PendingSowCrop } =>
-              !!entry &&
-              (entry.crop === 'grain' ||
-                entry.crop === 'vegetable' ||
-                entry.crop === 'wood' ||
-                entry.crop === 'stone'),
-          )
-        if (crops.length === 0) {
-          setSowError('NO_SELECTION')
-          return
-        }
-        void transport.commitSelection(pendingPlayerIndex, { crops })
-          .then((resp) => {
-            if (!resp.ok) setFarmCommitError('sow', resp.error)
-          })
-          .catch((e) => {
-            console.error(e)
-            setFarmCommitError('sow')
-          })
-        return
-      }
+    if (submitCommand.kind === 'commitSelection') {
+      const farmType = interaction.stateId === 'wait' && interaction.farm
+        ? interaction.farm.farmType
+        : null
+      void transport.commitSelection(submitCommand.playerIndex, submitCommand.payload)
+        .then((resp) => {
+          if (!resp.ok && farmType) setFarmCommitError(farmType, resp.error)
+        })
+        .catch((e) => {
+          console.error(e)
+          if (farmType) setFarmCommitError(farmType)
+        })
       return
     }
     if (interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg') {
@@ -894,7 +813,7 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setFenceError, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, setFarmCommitError, setLocalFarmSubmitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
