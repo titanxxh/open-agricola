@@ -162,7 +162,7 @@ _Avoid_: stacked terrain、hidden terrain、删除的地形
 _Avoid_: UI 按钮定义
 
 **Payment Pipeline**:
-统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
+统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、统一支付求解入口和执行器处理建房、翻修、围栏、出牌、pay leaf 等成本。
 _Avoid_: 每张卡手写支付分支
 
 **Card-Provided Payment Resource（卡牌提供的支付资源）**:

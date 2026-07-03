@@ -5,6 +5,8 @@ import type {
   PaymentChoice,
   PaymentCtx,
   PaymentExecuteResult,
+  PaymentReceipt,
+  PaymentResolveResult,
 } from './types'
 import {
   isComplexCost,
@@ -19,6 +21,76 @@ import {
   canConsumePaymentResourceProviders,
   executePaymentSolution,
 } from './internal/execute'
+import {
+  cardCostCandidateMetadataForSolution,
+  filterPaymentSolutionsByReserve,
+  resolvePaymentSolutionSelection,
+} from './internal'
+
+const normalizePaymentChoiceValue = (
+  paymentChoice: string | undefined,
+  optionValuePrefix: string,
+) => {
+  if (!paymentChoice) return undefined
+  const prefix = `${optionValuePrefix}:`
+  return paymentChoice.startsWith(prefix)
+    ? paymentChoice.slice(prefix.length)
+    : paymentChoice
+}
+
+const solutionPaymentResourceProviders = (cost: Cost, ctx: PaymentCtx) =>
+  ctx.paymentResourceProviders ?? (
+    isComplexCost(cost) ? cost.paymentResourceProviders : undefined
+  )
+
+const receiptForSolution = (
+  solution: Option,
+  cost: Cost,
+  ctx: PaymentCtx,
+): PaymentReceipt => {
+  const metadata = cardCostCandidateMetadataForSolution(
+    ctx.candidateMetadataByFeeIndex,
+    solution,
+  )
+  return {
+    solution,
+    resourcesPaid: solution.resourcesPaid,
+    ...(solution.bonusUsed ? { bonusUsed: solution.bonusUsed } : {}),
+    ...(solution.bonusChoiceIndex ? { bonusChoiceIndex: solution.bonusChoiceIndex } : {}),
+    ...(ctx.includeReturnedCard && solution.cardUsed ? { returnedCardId: solution.cardUsed } : {}),
+    ...(solution.feeIndex !== undefined ? { feeIndex: solution.feeIndex } : {}),
+    ...(metadata?.originalFeeIndex !== undefined ? { originalFeeIndex: metadata.originalFeeIndex } : {}),
+    ...(metadata?.sources ? { candidateSources: metadata.sources } : {}),
+    ...(metadata?.costAttribution ? { costAttribution: metadata.costAttribution } : {}),
+    ...(solutionPaymentResourceProviders(cost, ctx)
+      ? { paymentResourceProviders: solutionPaymentResourceProviders(cost, ctx) }
+      : {}),
+  }
+}
+
+const normalizeLifecycleCost = (cost: Cost, ctx: PaymentCtx): Cost =>
+  !isComplexCost(cost) && ctx.costType !== 'none'
+    ? { fee: cost }
+    : cost
+
+const computeLifecycleOptions = (
+  state: GameState,
+  idx: number,
+  cost: Cost,
+  ctx: PaymentCtx,
+): { cost: Cost; options: Option[] } => {
+  const player = state.players[idx]
+  const effectiveCost = normalizeLifecycleCost(cost, ctx)
+  if (!player) return { cost: effectiveCost, options: [] }
+  return {
+    cost: effectiveCost,
+    options: filterPaymentSolutionsByReserve(
+      player,
+      computeOptions(state, idx, effectiveCost, ctx),
+      ctx.reserveResources,
+    ),
+  }
+}
 
 const computeOptions = (
   state: GameState,
@@ -89,6 +161,61 @@ const execute = (
   return { ok: true, state }
 }
 
+const resolvePayment = (
+  state: GameState,
+  idx: number,
+  cost: Cost,
+  ctx: PaymentCtx,
+): PaymentResolveResult => {
+  const player = state.players[idx]
+  if (!player) return { type: 'failed', reason: 'cannot-afford' }
+  const { cost: effectiveCost, options } = computeLifecycleOptions(state, idx, cost, ctx)
+  const paymentResourceProviders = solutionPaymentResourceProviders(effectiveCost, ctx)
+  const optionPrefix = ctx.optionPrefix ?? 'pay:generic'
+  const selection = resolvePaymentSolutionSelection(
+    options,
+    normalizePaymentChoiceValue(ctx.paymentChoice, optionPrefix),
+    optionPrefix,
+    ctx.includeReturnedCard ?? false,
+    { type: 'fail', errorKey: 'log.payFail' },
+    {
+      extraSourcesForSolution: (solution) =>
+        cardCostCandidateMetadataForSolution(
+          ctx.candidateMetadataByFeeIndex,
+          solution,
+        )?.sources ?? [],
+      paymentResourceProviders,
+    },
+  )
+  if (selection.type === 'request') {
+    return { type: 'request', request: selection }
+  }
+  if (selection.type !== 'selected') {
+    return { type: 'failed', reason: options.length === 0 ? 'cannot-afford' : 'invalid-choice' }
+  }
+  if (isComplexCost(effectiveCost)) {
+    if (!canConsumePaymentResourceProviders(state, selection.solution, paymentResourceProviders)) {
+      return { type: 'failed', reason: 'cannot-afford' }
+    }
+    executePaymentSolution(player, selection.solution, {
+      state,
+      costType: ctx.costType === 'none' ? undefined : ctx.costType,
+      paymentResourceProviders,
+    })
+  } else {
+    payResources(player, selection.solution.resourcesPaid)
+    paySupplyTokens(player, selection.solution.resourcesPaid)
+  }
+  return { type: 'paid', receipt: receiptForSolution(selection.solution, effectiveCost, ctx) }
+}
+
+const hasPaymentOption = (
+  state: GameState,
+  idx: number,
+  cost: Cost,
+  ctx: PaymentCtx,
+): boolean => computeLifecycleOptions(state, idx, cost, ctx).options.length > 0
+
 const pickAuto = (options: Option[]): Option | undefined => {
   return options.length === 1 ? options[0] : undefined
 }
@@ -103,6 +230,8 @@ export const PaymentSolver = {
   computeOptions,
   canAfford,
   execute,
+  resolvePayment,
+  hasPaymentOption,
   pickAuto,
   clearCache,
   isComplexCost: isComplexCostPublic,
