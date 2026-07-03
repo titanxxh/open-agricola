@@ -9,6 +9,7 @@ import { getUnusedTerrainTiles } from '../../shared/moor/terrain-flow'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { M051_MoorEnclosures } from '../../shared/cards/M/M051_MoorEnclosures'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { selectionAction } from '../../shared/actions/effects/internal/selection'
 import type { FarmTilePosition, Resource } from '../../shared/contract/types'
 
 const PLACEHOLDER = '__test_placeholder__'
@@ -170,6 +171,74 @@ describe('M050/M051 farmyard extension', () => {
       { row: -1, col: 3 },
     ])).toBe(true)
     expect(player.farmyardExtensions).toHaveLength(2)
+  })
+
+  it('does not allow a later extension to grow beyond the original farmyard rim', () => {
+    const session = setup('M051_MoorEnclosures')
+    const player = session.state.players[0]!
+    player.minorPlayed.push('M050_FarmExtension')
+    expect(addFarmyardExtension(player, 'M050_FarmExtension', [
+      { row: -1, col: 0 },
+      { row: -1, col: 1 },
+    ])).toBe(true)
+    session.loadState(session.state)
+
+    const resp = playMinor(session, 'M051_MoorEnclosures')
+    const selectableKeys = resp.interaction.selection?.selectablePositions.map(positionKey) ?? []
+    expect(selectableKeys).not.toContain('-2-0')
+    expect(selectableKeys).not.toContain('-2-1')
+
+    const invalid = commitPositions(session, resp, [
+      { row: -2, col: 0 },
+      { row: -2, col: 1 },
+    ])
+    expect(invalid.ok).toBe(false)
+
+    const valid = commitPositions(session, resp, [
+      { row: -1, col: 2 },
+      { row: -1, col: 3 },
+    ])
+    expect(valid.ok).toBe(true)
+  })
+
+  it('rejects stale extension selection context that still names tiles beyond the original rim', () => {
+    const session = setup('M051_MoorEnclosures')
+    const player = session.state.players[0]!
+    expect(addFarmyardExtension(player, 'M050_FarmExtension', [
+      { row: -1, col: 0 },
+      { row: -1, col: 1 },
+    ])).toBe(true)
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'M051_MoorEnclosures',
+        state: session.state,
+        actionContext: {
+          selectionKind: 'farm-position',
+          selectionEffect: 'moor-farmyard-extension-place',
+          minSelections: 2,
+          maxSelections: 2,
+          allowedSelectionCounts: [2],
+          selectableTiles: [
+            { row: -2, col: 0 },
+            { row: -2, col: 1 },
+          ],
+          validPositionGroups: [[
+            { row: -2, col: 0 },
+            { row: -2, col: 1 },
+          ]],
+        },
+      } as never,
+      'confirm',
+      { positions: ['-2-0', '-2-1'] },
+    )
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'invalid selection position',
+      recoverable: true,
+    })
   })
 
   it('M051 adds the extension and places one moor on each new space', () => {

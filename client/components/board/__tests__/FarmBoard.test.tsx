@@ -212,6 +212,23 @@ describe('FarmBoard', () => {
     expect(togglePositionSelection).toHaveBeenCalledWith({ row: -1, col: 0 })
   })
 
+  it('renders a subtle selected icon inside selected farm-position tiles', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: '1-1', type: 'tile', tileRow: -1, tileCol: 0 }],
+          positionSelectableSet: new Set(['-1-0']),
+          pendingPositionSelections: new Set(['-1-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-tile[^"]*\bposition-selected\b/)
+    expect(html).toContain('farm-position-selected-icon')
+  })
+
   it('renders supply capacities with icons in the compact resource panel', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

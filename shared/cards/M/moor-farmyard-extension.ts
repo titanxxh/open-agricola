@@ -1,8 +1,9 @@
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { registerSelectionEffect, registerSelectionValidator } from '../../actions/helpers/selection-effect-registry'
 import {
   addFarmyardExtension,
   getFarmyardExtensionCandidates,
+  isValidFarmyardExtensionTiles,
 } from '../../domain/farmyard-extensions'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 
@@ -13,6 +14,11 @@ const parsePositions = (positions: string[]): FarmTilePosition[] =>
     const parsed = parsePositionKey(position)
     return parsed ? [parsed] : []
   })
+
+registerSelectionValidator(SELECTION_EFFECT, ({ player, positions }) => {
+  const tiles = parsePositions(positions)
+  return isValidFarmyardExtensionTiles(player, tiles) ? undefined : 'invalid selection position'
+})
 
 registerSelectionEffect(SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext }) => {
   if (!sourceCard) return

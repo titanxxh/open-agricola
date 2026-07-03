@@ -37,6 +37,7 @@ import {
   applySeasonPreparationAdjustments,
 } from '../seasons/state.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
+import { validateSelectionEffect } from '../actions/helpers/selection-effect-registry.ts'
 import {
   applyIsDoableHooksDetailed,
   clearActionHooks,
@@ -1436,7 +1437,46 @@ export class GameCore {
       return buildOccupationHandSelectionInteraction(player, actionContext)
     }
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('farm-position', { actionContext })
+    const interaction = playerBoard(this.state, idx).farmyard.selectableTiles('farm-position', { actionContext })
+    return this.filterSelectionInteractionByEffectValidator(player, interaction, actionContext)
+  }
+
+  private filterSelectionInteractionByEffectValidator(
+    player: PlayerState,
+    interaction: InteractionSelection,
+    actionContext: Record<string, unknown> | undefined,
+  ): InteractionSelection {
+    if (interaction.kind !== 'farm-position') return interaction
+    const effect = actionContext?.selectionEffect
+    if (typeof effect !== 'string') return interaction
+    const validatePositions = (positions: FarmTilePosition[]) =>
+      validateSelectionEffect(effect, {
+        player,
+        positions: positions.map(positionKey),
+        cards: [],
+        sourceCard: this.peekPendingSourceCard(),
+        state: this.state,
+        actionContext,
+      })
+    if (interaction.validPositionGroups && interaction.validPositionGroups.length > 0) {
+      const validPositionGroups = interaction.validPositionGroups.filter((group) =>
+        !validatePositions(group),
+      )
+      const validKeys = new Set(validPositionGroups.flat().map(positionKey))
+      return {
+        ...interaction,
+        selectablePositions: interaction.selectablePositions.filter((pos) =>
+          validKeys.has(positionKey(pos)),
+        ),
+        validPositionGroups,
+      }
+    }
+    return {
+      ...interaction,
+      selectablePositions: interaction.selectablePositions.filter((pos) =>
+        !validatePositions([pos]),
+      ),
+    }
   }
 
   private buildFarmInteractionFromNode(
@@ -5011,6 +5051,20 @@ export class GameCore {
       const selectedGroup = positions.map(positionKey).sort().join('|')
       if (!validPositionGroups.includes(selectedGroup)) {
         return this.respond(false, 'invalid selection position')
+      }
+    }
+    const selectionEffect = interactionContext?.selectionEffect
+    if (typeof selectionEffect === 'string') {
+      const validationError = validateSelectionEffect(selectionEffect, {
+        player,
+        positions: positions.map(positionKey),
+        cards: [],
+        sourceCard: pendingSourceCard,
+        state: this.state,
+        actionContext: interactionContext,
+      })
+      if (validationError) {
+        return this.respond(false, validationError)
       }
     }
 

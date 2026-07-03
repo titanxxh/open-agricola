@@ -15,7 +15,12 @@ export type SelectionEffectHandler = (
   ctx: SelectionEffectContext,
 ) => ActionFlow | void
 
+export type SelectionValidationHandler = (
+  ctx: SelectionEffectContext,
+) => string | void
+
 const registry = new Map<string, SelectionEffectHandler>()
+const validators = new Map<string, SelectionValidationHandler>()
 
 export const registerSelectionEffect = (
   name: string,
@@ -24,11 +29,27 @@ export const registerSelectionEffect = (
   registry.set(name, handler)
 }
 
+export const registerSelectionValidator = (
+  name: string,
+  handler: SelectionValidationHandler,
+) => {
+  validators.set(name, handler)
+}
+
 export const runSelectionEffect = (
   name: string,
   ctx: SelectionEffectContext,
 ): ActionFlow | void => {
   const handler = registry.get(name)
+  if (!handler) return
+  return handler(ctx)
+}
+
+export const validateSelectionEffect = (
+  name: string,
+  ctx: SelectionEffectContext,
+): string | void => {
+  const handler = validators.get(name)
   if (!handler) return
   return handler(ctx)
 }
