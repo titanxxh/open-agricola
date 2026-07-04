@@ -45,11 +45,14 @@ export type PublicEventCardPassAnimation = {
   toPlayerId: string
 }
 
-export type PublicEventFeedbackBatch = PublicEventNotificationBatch & {
+export type PublicEventFeedback = {
+  notifications: PublicEventNotification[]
   highlights: PublicEventHighlightTargets
   resourceAnimations: PublicEventResourceAnimation[]
   cardPassAnimations: PublicEventCardPassAnimation[]
 }
+
+export type PublicEventFeedbackBatch = PublicEventNotificationBatch & PublicEventFeedback
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> =>
   Object.fromEntries(
@@ -508,6 +511,41 @@ export const collectPublicEventNotifications = (
   return notifications
 }
 
+const namespacePublicEventResourceAnimations = (
+  animations: readonly PublicEventResourceAnimation[],
+  idPrefix: string,
+): PublicEventResourceAnimation[] => (
+  idPrefix
+    ? animations.map((animation) => ({ ...animation, id: `${idPrefix}:${animation.id}` }))
+    : [...animations]
+)
+
+const namespacePublicEventCardPassAnimations = (
+  animations: readonly PublicEventCardPassAnimation[],
+  idPrefix: string,
+): PublicEventCardPassAnimation[] => (
+  idPrefix
+    ? animations.map((animation) => ({ ...animation, id: `${idPrefix}:${animation.id}` }))
+    : [...animations]
+)
+
+export const collectPublicEventFeedback = (
+  events: readonly GameEvent[],
+  locale: Locale,
+  idPrefix = '',
+): PublicEventFeedback => ({
+  notifications: collectPublicEventNotifications(events, locale, idPrefix),
+  highlights: collectPublicEventHighlightTargets(events),
+  resourceAnimations: namespacePublicEventResourceAnimations(
+    collectPublicEventResourceAnimations(events),
+    idPrefix,
+  ),
+  cardPassAnimations: namespacePublicEventCardPassAnimations(
+    collectPublicEventCardPassAnimations(events),
+    idPrefix,
+  ),
+})
+
 export const maxPublicEventSeq = (events?: readonly { seq: number }[]): number =>
   events?.reduce((max, event) => Math.max(max, event.seq), 0) ?? 0
 
@@ -529,10 +567,7 @@ export const collectNewPublicEventFeedback = (
   }
   const nextEvents = events.filter((event) => event.seq > lastSeenSeq)
   return {
-    notifications: collectPublicEventNotifications(nextEvents, locale, idPrefix),
-    highlights: collectPublicEventHighlightTargets(nextEvents),
-    resourceAnimations: collectPublicEventResourceAnimations(nextEvents),
-    cardPassAnimations: collectPublicEventCardPassAnimations(nextEvents),
+    ...collectPublicEventFeedback(nextEvents, locale, idPrefix),
     nextCursor: maxSeq,
   }
 }

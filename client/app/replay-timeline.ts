@@ -108,10 +108,6 @@ export const replayTimelineOrder = (entry: ReplayTimelineEntry): [number, number
   entry.packetLocalIndex,
 ]
 
-export const replayTimelineNamespaceId = (entry: ReplayTimelineEntry, id: string): string => (
-  `replay:${entry.key}:${id}`
-)
-
 export const filterReplayTimeline = (
   entries: readonly ReplayTimelineEntry[],
   filter: ReplayTimelineFilter,

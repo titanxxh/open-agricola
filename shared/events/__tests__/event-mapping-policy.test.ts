@@ -343,6 +343,7 @@ describe('event mapping policy', () => {
       'server/__tests__/M027_M093_M102_moor-cross-player-markers-session.test.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
+      'shared/events/__tests__/public-event-presentation.test.ts',
       'client/app/__tests__/public-event-notifications.test.ts',
       'client/app/__tests__/GameContainerApi.ws.test.ts',
     ]

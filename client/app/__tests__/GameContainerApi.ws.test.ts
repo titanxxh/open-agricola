@@ -387,7 +387,7 @@ describe('GameContainerApi WS player identity', () => {
     const feedback = collectNewPublicEventFeedback([moved], 0, 'en', 'public-test')
 
     expect(feedback.notifications).toEqual([])
-    expect(feedback.resourceAnimations).toEqual([expect.objectContaining({ id: 'evt-moved:move:0' })])
+    expect(feedback.resourceAnimations).toEqual([expect.objectContaining({ id: 'public-test:evt-moved:move:0' })])
     expect(mergePublicEventResourceAnimations([], feedback.resourceAnimations)).toHaveLength(1)
   })
 
