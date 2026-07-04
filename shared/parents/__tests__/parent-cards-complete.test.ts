@@ -15,7 +15,6 @@ import {
 } from '../index'
 import type {
   FatherRewardEffect,
-  FatherRequirement,
   MotherRoundGain,
   ParentCardDefinition,
 } from '../types'
@@ -50,19 +49,6 @@ const assertMotherGainShape = (gain: MotherRoundGain, id: string) => {
     fromSupply: true,
     freeBuild: true,
   })
-}
-
-const assertReviewedManualRequirement = (requirement: FatherRequirement, id: string): void => {
-  if (requirement.type === 'manual') {
-    expect(requirement.key, id).not.toBe('')
-    expect(requirement.reviewed, id).toBe(true)
-    return
-  }
-
-  if (requirement.type === 'all' || requirement.type === 'any') {
-    expect(requirement.requirements.length, id).toBeGreaterThan(0)
-    requirement.requirements.forEach(child => assertReviewedManualRequirement(child, id))
-  }
 }
 
 const assertReviewedManualEffect = (effect: FatherRewardEffect, id: string): void => {
@@ -114,7 +100,6 @@ describe('complete parent card extraction', () => {
         expect(reward.requirementText.trim(), card.id).not.toBe('')
         expect(reward.rewardText.trim(), card.id).not.toBe('')
         expect(reward.effects.length, card.id).toBeGreaterThan(0)
-        assertReviewedManualRequirement(reward.requirement, card.id)
         reward.effects.forEach(effect => assertReviewedManualEffect(effect, card.id))
       }
     }

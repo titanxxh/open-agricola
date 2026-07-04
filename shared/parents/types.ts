@@ -44,7 +44,6 @@ export type FatherRequirement =
   | { type: 'total-cards-in-play-including-parents-at-least'; amount: number }
   | { type: 'all'; requirements: FatherRequirement[] }
   | { type: 'any'; requirements: FatherRequirement[] }
-  | { type: 'manual'; key: string; reviewed: true }
 
 export type FatherRewardEffect =
   | { type: 'gain-resources'; resources: Partial<Record<Exclude<ResourceKey, 'begging'>, number>> }

@@ -304,18 +304,6 @@ const expectedFatherCards = {
   }[]
 }>
 
-const assertReviewedManualRequirement = (requirement: FatherRequirement): void => {
-  if (requirement.type === 'manual') {
-    expect(requirement.key).not.toBe('')
-    expect(requirement.reviewed).toBe(true)
-    return
-  }
-
-  if (requirement.type === 'all' || requirement.type === 'any') {
-    requirement.requirements.forEach(assertReviewedManualRequirement)
-  }
-}
-
 describe('father parent cards', () => {
   it('keeps each father card in a dedicated definition file', () => {
     const fathersRegistrySource = readFileSync(fathersRegistryPath, 'utf8')
@@ -351,7 +339,6 @@ describe('father parent cards', () => {
         expect(reward.requirementText).not.toBe('')
         expect(reward.rewardText).not.toBe('')
         expect(reward.effects.length).toBeGreaterThan(0)
-        assertReviewedManualRequirement(reward.requirement)
 
         for (const effect of reward.effects) {
           if (effect.type === 'manual') {
