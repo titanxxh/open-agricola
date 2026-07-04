@@ -390,6 +390,10 @@ _Avoid_: 直接写 UI log 当规则事实
 写入 `GameState.events` 的公开规则事实，用于派生日志、动画提示、审计和 replay。
 _Avoid_: 直接写 state.log
 
+**Public Event Presentation**:
+从 **Public Event** 派生 transient 展示提示，包括 notification、highlight、resource animation、card pass animation 和 replay cue；只描述要展示什么，不处理 DOM 定位。
+_Avoid_: 前端调用点各自解释 public event payload
+
 **Private Event**:
 只发给特定 viewer 的私有同步附加层，例如私有 prompt、手牌变化、draft 信息；不进入公共 replay 事件流。
 _Avoid_: public event

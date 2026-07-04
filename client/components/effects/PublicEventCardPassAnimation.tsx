@@ -1,26 +1,26 @@
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import type { CardPassedEvent } from '../../../shared/contract/events'
+import type { PublicEventCardPassAnimation as PublicEventCardPassAnimationCue } from '../../app/public-event-notifications'
 
 type Props = {
-  events: CardPassedEvent[]
+  animations: PublicEventCardPassAnimationCue[]
 }
 
-export function PublicEventCardPassAnimation({ events }: Props) {
+export function PublicEventCardPassAnimation({ animations }: Props) {
   const [played, setPlayed] = useState<Set<string>>(new Set())
-  const onDone = useCallback((eventId: string) => {
+  const onDone = useCallback((animationId: string) => {
     setPlayed((prev) => {
       const next = new Set(prev)
-      next.add(eventId)
+      next.add(animationId)
       return next
     })
   }, [])
-  const unplayed = events.filter((e) => !played.has(e.id))
+  const unplayed = animations.filter((animation) => !played.has(animation.id))
   return (
     <>
-      {unplayed.map((event) => (
+      {unplayed.map((animation) => (
         <CardFlyOverlay
-          key={event.id}
-          event={event}
+          key={animation.id}
+          animation={animation}
           onDone={onDone}
         />
       ))}
@@ -28,15 +28,21 @@ export function PublicEventCardPassAnimation({ events }: Props) {
   )
 }
 
-function CardFlyOverlay({ event, onDone }: { event: CardPassedEvent; onDone: (eventId: string) => void }) {
+function CardFlyOverlay({
+  animation,
+  onDone,
+}: {
+  animation: PublicEventCardPassAnimationCue
+  onDone: (animationId: string) => void
+}) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [style, setStyle] = useState<CSSProperties | null>(null)
 
   useLayoutEffect(() => {
-    const fromEl = document.querySelector(`[data-card-anchor="${event.cardId}"]`) as HTMLElement | null
-    const toEl = document.querySelector(`[data-hand-anchor="${event.toPlayerId}"]`) as HTMLElement | null
+    const fromEl = document.querySelector(`[data-card-anchor="${animation.cardId}"]`) as HTMLElement | null
+    const toEl = document.querySelector(`[data-hand-anchor="${animation.toPlayerId}"]`) as HTMLElement | null
     if (!fromEl || !toEl) {
-      onDone(event.id)
+      onDone(animation.id)
       return
     }
     const fromBox = fromEl.getBoundingClientRect()
@@ -49,15 +55,15 @@ function CardFlyOverlay({ event, onDone }: { event: CardPassedEvent; onDone: (ev
       '--to-x': `${toBox.left + toBox.width / 2 - rootRect.left}px`,
       '--to-y': `${toBox.top + toBox.height / 2 - rootRect.top}px`,
     } as CSSProperties)
-    const timer = window.setTimeout(() => onDone(event.id), 1200)
+    const timer = window.setTimeout(() => onDone(animation.id), 1200)
     return () => window.clearTimeout(timer)
-  }, [event.cardId, event.toPlayerId, event.id, onDone])
+  }, [animation.cardId, animation.toPlayerId, animation.id, onDone])
 
   if (!style) return <div ref={rootRef} style={{ display: 'none' }} />
   return (
     <div className="card-pass-animation-layer" ref={rootRef} aria-hidden="true">
       <div className="card-pass-overlay" style={style}>
-        <div className="card-pass-card">{event.cardId}</div>
+        <div className="card-pass-card">{animation.cardId}</div>
       </div>
     </div>
   )

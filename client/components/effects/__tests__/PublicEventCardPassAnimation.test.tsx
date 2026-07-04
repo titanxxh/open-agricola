@@ -2,7 +2,7 @@
 
 import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CardPassedEvent } from '../../../../shared/contract/events'
+import type { PublicEventCardPassAnimation as PublicEventCardPassAnimationCue } from '../../../app/public-event-notifications'
 import { PublicEventCardPassAnimation } from '../PublicEventCardPassAnimation'
 
 const rect = (left: number, top: number, width = 50, height = 50) => ({
@@ -17,14 +17,9 @@ const rect = (left: number, top: number, width = 50, height = 50) => ({
   toJSON: () => ({}),
 }) as DOMRect
 
-const makeEvent = (overrides: Partial<CardPassedEvent> = {}): CardPassedEvent => ({
-  type: 'card.passed',
-  schemaVersion: 1,
+const makeAnimation = (overrides: Partial<PublicEventCardPassAnimationCue> = {}): PublicEventCardPassAnimationCue => ({
   id: 'evt-1',
-  seq: 1,
-  round: 1,
-  phase: 'work',
-  visibility: 'public',
+  eventId: 'evt-1',
   cardId: 'A001_Shelter',
   fromPlayerId: 'p1',
   toPlayerId: 'p2',
@@ -56,7 +51,7 @@ describe('PublicEventCardPassAnimation', () => {
     toHandEl.dataset.handAnchor = 'p2'
     document.body.appendChild(toHandEl)
 
-    const { container } = render(<PublicEventCardPassAnimation events={[makeEvent()]} />)
+    const { container } = render(<PublicEventCardPassAnimation animations={[makeAnimation()]} />)
 
     const overlay = container.querySelector('.card-pass-overlay') as HTMLElement | null
     expect(overlay).not.toBeNull()
@@ -66,7 +61,7 @@ describe('PublicEventCardPassAnimation', () => {
 
   it('缺失 anchor 时不渲染 overlay', () => {
     const { container } = render(
-      <PublicEventCardPassAnimation events={[makeEvent({ id: 'evt-2' })]} />,
+      <PublicEventCardPassAnimation animations={[makeAnimation({ id: 'evt-2' })]} />,
     )
     expect(container.querySelector('.card-pass-overlay')).toBeNull()
   })
