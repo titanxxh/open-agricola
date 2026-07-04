@@ -5,11 +5,6 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import {
-  resolveCardPreviewCostByProvider,
-  resolveCardPreviewCostDetailedByProvider,
-  type ResolvedCardCostWithMetadata,
-} from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard, isCookingHearthIdentityCard } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 import { getActiveCardRegistry } from '../../cards/active-registry'
@@ -17,6 +12,7 @@ import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 export type { ResolvedMinorImprovement }
+type ResolvedCardCostWithMetadata = NonNullable<ReturnType<typeof PaymentSolver.resolveCardPreviewCostDetailedByProvider>>
 
 export const isBlockedByMajorImprovementActionGate = (
   improvement: ResolvedMinorImprovement | undefined,
@@ -254,7 +250,7 @@ export const getMajorImprovementPreviewCost = (
   improvementId: string,
   actionCardId?: string,
 ) => {
-  return resolveCardPreviewCostByProvider(
+  return PaymentSolver.resolveCardPreviewCostByProvider(
     state,
     player,
     'improvement',
@@ -270,7 +266,7 @@ export const getMajorImprovementPreviewCostDetailed = (
   improvementId: string,
   actionCardId?: string,
 ): ResolvedCardCostWithMetadata | null => {
-  return resolveCardPreviewCostDetailedByProvider(
+  return PaymentSolver.resolveCardPreviewCostDetailedByProvider(
     state,
     player,
     'improvement',
@@ -288,7 +284,7 @@ export const getMinorImprovementPreviewCost = (
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
-  const previewCost = resolveCardPreviewCostByProvider(
+  const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
     state,
     player,
     'improvement',
@@ -307,7 +303,7 @@ export const getMinorImprovementPreviewCostDetailed = (
 ): ResolvedCardCostWithMetadata | null => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
-  const previewCost = resolveCardPreviewCostDetailedByProvider(
+  const previewCost = PaymentSolver.resolveCardPreviewCostDetailedByProvider(
     state,
     player,
     'improvement',

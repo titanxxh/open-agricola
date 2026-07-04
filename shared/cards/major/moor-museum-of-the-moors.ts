@@ -2,7 +2,7 @@ import { defineMajorCard } from '../card-source'
 import type { CardSourceMetaInput } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 import type { ActionHookPhase } from '../../actions/hooks'
 
 const CARD_ID = 'Major_Moor_MuseumOfTheMoors'
@@ -34,7 +34,7 @@ const museumCostListener: CardListenerRegistration = {
     if (!context.cardId) return null
     const resource = discountByTarget[context.cardId as keyof typeof discountByTarget]
     if (!resource) return null
-    return discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 })
   },
 }
 

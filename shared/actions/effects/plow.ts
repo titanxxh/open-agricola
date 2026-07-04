@@ -14,18 +14,7 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
-// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
-// plow.ts only uses typed-flat helpers (shim scope), so no PaymentSolver
-// call sites exist here yet.
-import {
-  canAffordTypedFlatCost,
-  executeResolvedTypedFlatPayment,
-  readExactCost,
-  resolveUnitCostWithDelta,
-  resolveTypedFlatPaymentSelection,
-} from '../payment/internal'
+import { PaymentSolver } from '../payment'
 
 const getOccupiedKeys = (player: PlayerState) => {
   const keys = new Set<string>()
@@ -161,7 +150,7 @@ const isPlowTileAllowed = (
 const resolvePlowCost = (
   actionContext: Record<string, unknown> | undefined,
   costs: Partial<Resource> | undefined,
-) => resolveUnitCostWithDelta({}, readExactCost(actionContext), costs, 1)
+) => PaymentSolver.resolveUnitCostWithDelta({}, PaymentSolver.readExactCost(actionContext), costs, 1)
 
 const canPayPlowCost = (
   player: PlayerState,
@@ -169,7 +158,7 @@ const canPayPlowCost = (
   costs: Partial<Resource> | undefined,
 ) => {
   const cost = resolvePlowCost(actionContext, costs)
-  return !!cost && canAffordTypedFlatCost(player, cost, 'plow')
+  return !!cost && PaymentSolver.canAffordTypedFlatCost(player, cost, 'plow')
 }
 
 const sanitizePayableCost = (
@@ -208,7 +197,7 @@ const finalizePlow = (
   const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
   if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
   const plowCost = sanitizePayableCost(resolvedCost)
-  const payment = resolveTypedFlatPaymentSelection(
+  const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     plowCost,
     'pay:plow',
@@ -219,7 +208,7 @@ const finalizePlow = (
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
+  PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
@@ -304,7 +293,7 @@ export const plowAction: ActionDefinition = {
       const selectedTile = tile as FarmTilePosition
       const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
       if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
-      const payment = resolveTypedFlatPaymentSelection(
+      const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         sanitizePayableCost(resolvedCost),
         'pay:plow',

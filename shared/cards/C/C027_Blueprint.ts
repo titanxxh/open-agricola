@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'C027_Blueprint'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
@@ -27,7 +27,7 @@ const computeCostsListener: CardListenerRegistration = {
     if (!context.cardId || !ALLOWED_MAJORS.includes(context.cardId as typeof ALLOWED_MAJORS[number])) {
       return null
     }
-    return discountCardCostCandidate(candidate, CARD_ID, { stone: 1 })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { stone: 1 })
   },
 }
 

@@ -12,20 +12,51 @@ import {
   isComplexCost,
   canPayResources,
   canPaySupplyTokens,
+  applyCostOverride,
   payResources,
   paySupplyTokens,
 } from './internal/affordability'
 import { clearPaymentCache } from './internal/cache'
 import { computeAllBuyableCombinations } from './internal/enumerate'
 import {
+  applyTradeSideEffect,
   canConsumePaymentResourceProviders,
   executePaymentSolution,
 } from './internal/execute'
 import {
+  addCardCostCandidateAttribution,
   cardCostCandidateMetadataForSolution,
+  discountCardCostCandidate,
   filterPaymentSolutionsByReserve,
   resolvePaymentSolutionSelection,
 } from './internal'
+import {
+  canAffordActionPreviewCost,
+  canAffordCardPreviewCostByProvider,
+  payCardPreviewCostByProvider,
+  resolveActionPreviewCost,
+  resolveCardPreviewCostByProvider,
+  resolveCardPreviewCostDetailedByProvider,
+} from './internal/preview-cost'
+import {
+  canAffordTypedFlatCost,
+  executeResolvedTypedFlatPayment,
+  payTypedFlatCost,
+  payTypedFlatCostDetailed,
+  resolveTypedFlatPaymentSelection,
+} from './internal/typed-flat'
+import {
+  readExactCost,
+  resolveExactUnitCost,
+  resolveUnitCostWithDelta,
+} from './internal/exact-cost'
+import {
+  buildConstructCost,
+  getBuildRoomCost,
+  getMaxBuildableRooms,
+  readConstructCostDelta,
+  resolveRoomPaymentSelection,
+} from './internal/room-payment'
 
 const normalizePaymentChoiceValue = (
   paymentChoice: string | undefined,
@@ -232,6 +263,32 @@ export const PaymentSolver = {
   execute,
   resolvePayment,
   hasPaymentOption,
+  resolveActionPreviewCost,
+  canAffordActionPreviewCost,
+  resolveCardPreviewCostByProvider,
+  resolveCardPreviewCostDetailedByProvider,
+  canAffordCardPreviewCostByProvider,
+  payCardPreviewCostByProvider,
+  canAffordTypedFlatCost,
+  payTypedFlatCost,
+  payTypedFlatCostDetailed,
+  resolveTypedFlatPaymentSelection,
+  executeResolvedTypedFlatPayment,
+  filterPaymentSolutionsByReserve,
+  discountCardCostCandidate,
+  addCardCostCandidateAttribution,
+  applyCostOverride,
+  canPayResources,
+  payResources,
+  applyTradeSideEffect,
+  readExactCost,
+  resolveExactUnitCost,
+  resolveUnitCostWithDelta,
+  buildConstructCost,
+  getBuildRoomCost,
+  getMaxBuildableRooms,
+  readConstructCostDelta,
+  resolveRoomPaymentSelection,
   pickAuto,
   clearCache,
   isComplexCost: isComplexCostPublic,

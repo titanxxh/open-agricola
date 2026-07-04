@@ -532,14 +532,14 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `shared/actions/payment/`：
 
-- `solver.ts` —— 生产支付生命周期入口：计算可支付方案、判断可支付性、构造支付选择、解析玩家选择、执行支付并返回结构化 receipt。
+- `solver.ts` —— 生产支付生命周期和支付相关 facade 入口：计算可支付方案、判断可支付性、构造支付选择、解析玩家选择、执行支付并返回结构化 receipt；preview-cost、typed-flat、room payment、simple resource/trade side effect、card cost candidate helper 也从这里进入。
 - `internal/enumerate.ts` —— `computeAllBuyableCombinations` / `keepOnlyOptimals`（资源可行性过滤后的严格支配剪枝；豁免 feeIdentity / 有状态副作用的 bonus choice / card 支付；卡牌提供的支付资源按自身 key 参与比较，ADR 0004 Amendment）/ `sortPaymentSolutions`
 - `internal/execute.ts` —— `payResources` / `executePaymentSolution`
 - `internal/cost-modifiers.ts` / `internal/preview-cost.ts` —— `computeCosts` hook 集成与 card-purchase cost preview glue
 - `internal/room-payment.ts` / `internal/typed-flat.ts` —— 房间 / typed flat cost 兼容 helper
 - `internal/cache.ts` —— solution cache
 
-生产 effect / helper 默认通过 `PaymentSolver` 进入支付生命周期；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
+生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
 
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 

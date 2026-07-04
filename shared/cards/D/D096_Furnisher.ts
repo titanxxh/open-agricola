@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'D096_Furnisher'
 const afterConstructListener: CardListenerRegistration = {
@@ -47,7 +47,7 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['improvement'],
   deriveCardCostCandidate: (context, candidate) => {
     if (context.actionCardId !== CARD_ID) return null
-    return discountCardCostCandidate(candidate, CARD_ID, { wood: 1 })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { wood: 1 })
   },
 }
 

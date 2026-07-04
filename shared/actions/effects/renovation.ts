@@ -14,17 +14,7 @@ import type {
   Trade,
 } from '../../contract/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
-// renovation.ts only uses typed-flat helpers (shim scope), so no PaymentSolver
-// call sites exist here yet.
-import {
-  canAffordTypedFlatCost,
-  payTypedFlatCost,
-  readExactCost,
-  resolveUnitCostWithDelta,
-} from '../payment/internal'
+import { PaymentSolver } from '../payment'
 import { mergeResources } from '../../utils/resources'
 import { buildInternalPayChild } from '../helpers/pay-child'
 
@@ -130,9 +120,9 @@ const resolveRenovationActionCost = (
   costOverride?: Partial<Resource>,
   costAdjustments?: RenovationCostAdjustments,
 ): ComplexCost | null => {
-  const exactCost = readExactCost(actionContext)
+  const exactCost = PaymentSolver.readExactCost(actionContext)
   if (exactCost) {
-    const resolved = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+    const resolved = PaymentSolver.resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
     return resolved ? appendRenovationAdjustments({ fee: resolved }, costAdjustments) : null
   }
   return appendRenovationAdjustments(mergeRenovationCost(baseCost, costOverride), costAdjustments)
@@ -204,7 +194,7 @@ export const canRenovate = (
   const renovation = renovationOverride ?? getRenovation(player)
   if (!renovation) return false
   const cost = mergeRenovationCost(renovation.cost, costOverride)
-  return canAffordTypedFlatCost(player, cost, 'renovation')
+  return PaymentSolver.canAffordTypedFlatCost(player, cost, 'renovation')
 }
 
 export const renovateHouse = (
@@ -215,7 +205,7 @@ export const renovateHouse = (
   const renovation = renovationOverride ?? getRenovation(player)
   if (!renovation) return false
   const cost = mergeRenovationCost(renovation.cost, costOverride)
-  if (!payTypedFlatCost(player, cost, 'renovation')) return false
+  if (!PaymentSolver.payTypedFlatCost(player, cost, 'renovation')) return false
   player.houseType = renovation.nextType
   return true
 }
@@ -244,15 +234,15 @@ const renovateHouseCostPreview: ActionCostPreview = {
       costOverride,
       readRenovationCostAdjustments(context),
     )
-    return cost ? canAffordTypedFlatCost(player, cost, 'renovation') : false
+    return cost ? PaymentSolver.canAffordTypedFlatCost(player, cost, 'renovation') : false
   },
   getBaseCost: (context) => {
     const { player, params } = context
     const plan = planForContext(player, params)
     if (!plan) return {}
     const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
-    const exactCost = readExactCost(actionContext)
-    if (exactCost) return resolveUnitCostWithDelta({}, exactCost, undefined, 1) ?? {}
+    const exactCost = PaymentSolver.readExactCost(actionContext)
+    if (exactCost) return PaymentSolver.resolveUnitCostWithDelta({}, exactCost, undefined, 1) ?? {}
     return flattenRenovationCost(plan.cost)
   },
 }

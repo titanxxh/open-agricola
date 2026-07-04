@@ -11,22 +11,10 @@ import type {
 } from '../../contract/types'
 import type { FarmStableBuiltEvent } from '../../contract/events'
 import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
-import {
-  canAffordTypedFlatCost,
-  payResources,
-  readExactCost,
-  resolveUnitCostWithDelta,
-} from '../payment/internal'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
-import {
-  resolveTypedFlatPaymentSelection,
-} from '../payment/internal'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import {
@@ -81,7 +69,7 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
   if (!PaymentSolver.canAfford(buildSingletonState(player), 0, { wood: stableWoodCost }, stableCtx)) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
-  payResources(player, { wood: stableWoodCost })
+  PaymentSolver.payResources(player, { wood: stableWoodCost })
   player.stableTiles.push(next)
   return { type: 'ok' }
 }
@@ -99,7 +87,7 @@ const readStableCostDelta = (
   costs: Partial<Resource> | undefined,
 ): Partial<Resource> | undefined => {
   if (costs && Object.keys(costs).length > 0) return costs
-  return readExactCost(actionContext) ? undefined : readCostOverride(actionContext)
+  return PaymentSolver.readExactCost(actionContext) ? undefined : readCostOverride(actionContext)
 }
 
 const readStableActionContext = (
@@ -164,9 +152,9 @@ const resolveStableTotalCost = (
   count: number,
 ) => {
   if (!isWithinStableMax(actionContext, count)) return null
-  return resolveUnitCostWithDelta(
+  return PaymentSolver.resolveUnitCostWithDelta(
     { wood: stableWoodCost },
-    readExactCost(actionContext),
+    PaymentSolver.readExactCost(actionContext),
     readStableCostDelta(actionContext, costs),
     count,
   )
@@ -239,12 +227,12 @@ const buildStableFarmSelection = (
   for (let count = 1; count <= selectionMax; count += 1) {
     const total = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
     if (!total) break
-    if (!canAffordTypedFlatCost(player, total, 'stables', state)) break
+    if (!PaymentSolver.canAffordTypedFlatCost(player, total, 'stables', state)) break
     affordableMax = count
   }
   const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
     costOverride: readStableCostDelta(actionContext, costs),
-    exactCost: readExactCost(actionContext),
+    exactCost: PaymentSolver.readExactCost(actionContext),
     zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
     max: selectionMax,
   })
@@ -327,7 +315,7 @@ const finalizeStables = (
     totalUnits,
   )
   if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
-  const payment = resolveTypedFlatPaymentSelection(
+  const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
     ctx.player,
     totalCost,
     'pay:stable',
@@ -462,7 +450,7 @@ export const stablesAction: ActionDefinition = {
         totalUnits,
       )
       if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
-      const payment = resolveTypedFlatPaymentSelection(
+      const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         ctx.player,
         totalCost,
         'pay:stable',
@@ -491,6 +479,3 @@ export const stablesAction: ActionDefinition = {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   },
 }
-
-// re-export for external callers building actionContext
-export { applyCostOverride } from '../payment/internal'

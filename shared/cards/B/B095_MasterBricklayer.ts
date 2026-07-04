@@ -3,7 +3,7 @@ import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'B095_MasterBricklayer'
 /**
@@ -21,7 +21,7 @@ const computeCostsListener: CardListenerRegistration = {
     if (!context.cardId || !isMajorCardId(context.cardId)) return null
     const nbNewRooms = (context.player.rooms ?? 2) - 2
     if (nbNewRooms <= 0) return null
-    return discountCardCostCandidate(candidate, CARD_ID, { stone: nbNewRooms })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { stone: nbNewRooms })
   },
 }
 
