@@ -7,9 +7,11 @@ import {
 import {
   stubBonusChoiceModifier,
 } from '../Stub_BonusChoiceModifier'
-import { resolveCardCostWithModifiers } from '../../../actions/payment/internal'
 import { PaymentSolver } from '../../../actions/payment'
-import { computeAllBuyableCombinations } from '../../../actions/payment/internal'
+import {
+  computePaymentOptionsForTest,
+  resolveCardCostForTest,
+} from '../../../actions/payment/__tests__/test-helpers'
 import type { GameState, PlayerState, ComplexCost } from '../../../contract/types'
 import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../active-registry'
@@ -80,10 +82,10 @@ describe('bonus.choices multi-path matrix', () => {
     const state = createState(player)
     requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
-    const cost = resolveCardCostWithModifiers(
+    const cost = resolveCardCostForTest(
       state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },
     ) as ComplexCost
-    const solutions = computeAllBuyableCombinations(player, cost)
+    const solutions = computePaymentOptionsForTest(player, cost)
     // optional: true. Paths: skip {clay:2, stone:2}, ChA {clay:0, stone:2, wood:1},
     // ChB {clay:2, stone:0, wood:1}. All 3 are Pareto-incomparable (skip uses 0 wood
     // vs 1 for choices; choices save 2 resources but spend 1 wood).
@@ -95,7 +97,7 @@ describe('bonus.choices multi-path matrix', () => {
     player.activeModifiers = [stubBonusChoiceModifier]
 
     const cost: ComplexCost = { fee: { clay: 2, stone: 2 } }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    const solutions = computePaymentOptionsForTest(player, cost, 'construct')
     // optional: true. Paths: skip {clay:2, stone:2, wood:0},
     // ChA {clay:0, stone:2, wood:1}, ChB {clay:2, stone:0, wood:1}.
     // All 3 are Pareto-incomparable (skip spends 0 wood; choices save 2 of
@@ -126,7 +128,7 @@ describe('bonus.choices multi-path matrix', () => {
     const state = createState(player)
     requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
-    const cost = resolveCardCostWithModifiers(
+    const cost = resolveCardCostForTest(
       state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },
     ) as ComplexCost
     // resolveCardCostWithModifiers never reads costType, so Path-B modifiers
@@ -134,7 +136,7 @@ describe('bonus.choices multi-path matrix', () => {
     expect(cost.trades).toBeUndefined()
     // And computeAllBuyableCombinations called WITHOUT costType must not pull
     // in Path-B modifiers either. Only the Path-A bonus.choices expansion applies.
-    const solutions = computeAllBuyableCombinations(player, cost)
+    const solutions = computePaymentOptionsForTest(player, cost)
     expect(solutions.length).toBe(3)
     // No solution should have used the Path-B food->reed trade.
     const anyUsedFoodReedTrade = solutions.some((s) =>
@@ -159,7 +161,7 @@ describe('bonus.choices multi-path matrix', () => {
     player.resources.reed = 0
     player.resources.food = 1
     const cost: ComplexCost = { fee: { reed: 1 } }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    const solutions = computePaymentOptionsForTest(player, cost, 'construct')
     expect(solutions.length).toBeGreaterThanOrEqual(1)
     const usedTheTrade = solutions.some((s) =>
       s.tradesUsed?.some((t) => t.trade.from?.food !== undefined && t.trade.to?.reed !== undefined),

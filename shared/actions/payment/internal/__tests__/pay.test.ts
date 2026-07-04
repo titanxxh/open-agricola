@@ -9,10 +9,11 @@ import {
   executePaymentSolution,
   getCheapestSolution,
   clearPaymentCache,
-} from '../../payment/internal'
-import { returnCardToBoard } from '../../../cards/helpers/return-card'
-import { buildPaymentChoiceResult, payTypedFlatCost } from '../../payment/internal'
-import { payAction } from '../pay'
+} from '../index'
+import { returnCardToBoard } from '../../../../cards/helpers/return-card'
+import { buildPaymentChoiceResult } from '../payment-choice-result'
+import { payTypedFlatCost } from '../typed-flat'
+import { payAction } from '../../../effects/pay'
 
 beforeEach(() => {
   clearPaymentCache()
@@ -27,11 +28,11 @@ import type {
   PaymentSolution,
   Trade,
   TradeModifier,
-} from '../../../contract/types'
-import type { DraftGameEvent, EventSink } from '../../../contract/events'
-import { A028_ForestSchool } from '../../../cards/A/A028_ForestSchool'
-import { A088_HedgeKeeper } from '../../../cards/A/A088_HedgeKeeper'
-import { readCardResourceStats } from '../../../cards/helpers/card-state'
+} from '../../../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../../../contract/events'
+import { A028_ForestSchool } from '../../../../cards/A/A028_ForestSchool'
+import { A088_HedgeKeeper } from '../../../../cards/A/A088_HedgeKeeper'
+import { readCardResourceStats } from '../../../../cards/helpers/card-state'
 
 const hedgeKeeperModifier = A088_HedgeKeeper.impl.modifiers![0] as TradeModifier
 

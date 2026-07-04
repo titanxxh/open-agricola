@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { PaymentSolver } from '../index'
 import type { PaymentCtx } from '../index'
-import { computeAllBuyableCombinations } from '../internal'
 import type { GameState, PlayerState } from '../../../contract/types'
 
 const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerState => {
@@ -84,8 +83,8 @@ describe('PaymentSolver', () => {
         resourcesPaid: { wood: 2, stable: 1 },
       })
 
-      const result = PaymentSolver.execute(state, 0, cost, { optionIndex: 0 }, cardCtx)
-      expect(result.ok).toBe(true)
+      const result = PaymentSolver.resolvePayment(state, 0, cost, cardCtx)
+      expect(result.type).toBe('paid')
       expect(player.resources.wood).toBe(0)
       expect(player.supplyTokensConsumed?.stable).toBe(1)
       expect(player.stableTiles).toHaveLength(0)
@@ -118,8 +117,12 @@ describe('PaymentSolver', () => {
       expect(cardOptionIndex).toBeGreaterThanOrEqual(0)
       expect(options[cardOptionIndex]?.resourcesPaid).toEqual({ stable: 1 })
 
-      const result = PaymentSolver.execute(state, 0, cost, { optionIndex: cardOptionIndex }, cardCtx)
-      expect(result.ok).toBe(true)
+      const result = PaymentSolver.resolvePayment(state, 0, cost, {
+        ...cardCtx,
+        optionPrefix: 'pay:test',
+        paymentChoice: `pay:test:${cardOptionIndex}`,
+      })
+      expect(result.type).toBe('paid')
       expect(player.supplyTokensConsumed?.stable).toBe(1)
       expect(player.stableTiles).toHaveLength(0)
 
@@ -188,20 +191,6 @@ describe('PaymentSolver', () => {
       })
     })
 
-    it('does not pay required returned-card supply-token cost without state', () => {
-      const player = makePlayerWithResources({ wood: 1 })
-      const cost = {
-        fee: { wood: 1 },
-        cards: {
-          type: 'Major',
-          list: ['Major_Fireplace1'],
-          cost: { stable: 1 },
-          required: true,
-        },
-      }
-      const options = computeAllBuyableCombinations(player, cost, ['Major_Fireplace1'])
-      expect(options).toEqual([])
-    })
   })
 
   describe('canAfford', () => {
@@ -229,45 +218,32 @@ describe('PaymentSolver', () => {
     })
   })
 
-  describe('execute', () => {
-    it('returns ok:true with deducted state on valid choice', () => {
+  describe('resolvePayment execution', () => {
+    it('returns paid with deducted state on valid choice', () => {
       const state = makeState(makePlayerWithResources({ wood: 5 }))
-      const result = PaymentSolver.execute(state, 0, { wood: 3 }, { optionIndex: 0 }, ctx)
-      expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.state.players[0].resources.wood).toBe(2)
-      }
+      const result = PaymentSolver.resolvePayment(state, 0, { wood: 3 }, ctx)
+      expect(result.type).toBe('paid')
+      expect(state.players[0].resources.wood).toBe(2)
     })
 
-    it('returns ok:false reason:invalid-choice for out-of-range index', () => {
+    it('returns failed reason:invalid-choice for out-of-range index', () => {
       const state = makeState(makePlayerWithResources({ wood: 5 }))
-      const result = PaymentSolver.execute(state, 0, { wood: 3 }, { optionIndex: 99 }, ctx)
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.reason).toBe('invalid-choice')
-      }
+      const result = PaymentSolver.resolvePayment(state, 0, { wood: 3 }, {
+        ...ctx,
+        optionPrefix: 'pay:test',
+        paymentChoice: 'pay:test:99',
+      })
+      expect(result.type).toBe('failed')
+      if (result.type !== 'failed') return
+      expect(result.reason).toBe('invalid-choice')
     })
 
-    it('returns ok:false reason:cannot-afford when state can no longer pay', () => {
+    it('returns failed reason:cannot-afford when state can no longer pay', () => {
       const state = makeState(makePlayerWithResources({ wood: 0 }))
-      const result = PaymentSolver.execute(state, 0, { wood: 3 }, { optionIndex: 0 }, ctx)
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.reason).toBe('cannot-afford')
-      }
-    })
-  })
-
-  describe('pickAuto', () => {
-    it('returns the single option when length === 1', () => {
-      const state = makeState(makePlayerWithResources({ wood: 5 }))
-      const options = PaymentSolver.computeOptions(state, 0, { wood: 3 }, ctx)
-      const auto = PaymentSolver.pickAuto(options)
-      expect(auto).toBe(options[0])
-    })
-
-    it('returns undefined when length === 0', () => {
-      expect(PaymentSolver.pickAuto([])).toBeUndefined()
+      const result = PaymentSolver.resolvePayment(state, 0, { wood: 3 }, ctx)
+      expect(result.type).toBe('failed')
+      if (result.type !== 'failed') return
+      expect(result.reason).toBe('cannot-afford')
     })
   })
 

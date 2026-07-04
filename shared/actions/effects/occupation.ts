@@ -392,16 +392,13 @@ export const collectOccupationActionPaymentOptions = (
   const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(previewCost)
     ? previewCost
     : { fee: previewCost }
-  return PaymentSolver.filterPaymentSolutionsByReserve(
-    player,
-    PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
-      actionId: 'pay',
-      costType: 'occupation',
-      sourceCard: occupationId,
-      spaceId: actionCardId,
-    }),
+  return PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
+    actionId: 'pay',
+    costType: 'occupation',
+    sourceCard: occupationId,
+    spaceId: actionCardId,
     reserveResources,
-  )
+  })
 }
 
 type OccupationCommitData = {

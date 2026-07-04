@@ -4,7 +4,7 @@ import type { ActionFlow, GameState, Resource, SessionResponse } from '../../sha
 import type { DraftGameEvent } from '../../shared/contract/events'
 import { Scoring } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { resolveCardCostWithModifiersDetailed } from '../../shared/actions/payment/internal'
+import { resolveCardCostDetailedForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import { runCardListeners } from '../../shared/cards/card-listeners'
 import { passMinorCardToLeftAction } from '../../shared/actions/effects/internal/pass-minor-card-to-left'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -177,7 +177,7 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
     const player = state.players[0]!
     player.minorPlayed = [M093]
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',

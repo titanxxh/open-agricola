@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ComplexCost, GameState, PaymentResourceMap, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 import { requireActiveCardRegistry } from '../active-registry'
 import { playImprovement } from '../../actions/effects/improvement'
-import { computeAllBuyableCombinations, resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
+import { computePaymentOptionsForTest, resolveCardCostDetailedForTest } from '../../actions/payment/__tests__/test-helpers'
 import type { CardListenerRegistration } from '../card-listeners'
 import { createInitialPlayerStats } from '../../session/stats'
 
@@ -132,7 +132,7 @@ const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap =>
   return out
 }
 
-const candidateOptions = (result: ReturnType<typeof resolveCardCostWithModifiersDetailed>) => {
+const candidateOptions = (result: ReturnType<typeof resolveCardCostDetailedForTest>) => {
   const cost = result.cost as ComplexCost
   return (cost.fees ?? []).map((resources, index) => ({
     resources: positiveResources(resources),
@@ -207,7 +207,7 @@ describe('fixed card-purchase cost candidates', () => {
     player.resources.clay = 3
     player.resources.stone = 1
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -230,7 +230,7 @@ describe('fixed card-purchase cost candidates', () => {
     state.players = [player]
     player.minorPlayed = ['A075_LumberMill']
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -263,7 +263,7 @@ describe('fixed card-purchase cost candidates', () => {
       stone: 2,
     }
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -279,7 +279,7 @@ describe('fixed card-purchase cost candidates', () => {
     })
     expect(cost.bonuses?.[0]?.choices).toHaveLength(10)
 
-    const payments = computeAllBuyableCombinations(player, cost).map(nonZeroPaid)
+    const payments = computePaymentOptionsForTest(player, cost).map(nonZeroPaid)
     expect(sortedJson(payments)).toEqual(sortedJson([
       { wood: 1, clay: 2, reed: 2, stone: 2 },
       { wood: 2, clay: 1, reed: 2, stone: 2 },
@@ -299,7 +299,7 @@ describe('fixed card-purchase cost candidates', () => {
       'D117_WoodExpert',
     ]
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -358,7 +358,7 @@ describe('fixed card-purchase cost candidates', () => {
     state.players = [player]
     player.occupationPlayed = ['D095_SiteManager']
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -432,7 +432,7 @@ describe('fixed card-purchase cost candidates', () => {
     player.minorPlayed = ['A027_OvenSite']
     player.occupationPlayed = ['A143_Stonecutter']
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -453,7 +453,7 @@ describe('fixed card-purchase cost candidates', () => {
     player.minorPlayed = ['A075_LumberMill']
     player.occupationPlayed = ['D117_WoodExpert']
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
