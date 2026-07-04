@@ -4,6 +4,9 @@ import {
   buildLogPresentationPlan,
   type EventLogMapperContext,
   type LogPresentationEventRef,
+  type LogPresentationRow,
+  logPresentationRowIdentity,
+  logPresentationRowIdentityKey,
 } from '../../shared/events/log-mapper'
 import type { Locale } from '../../shared/i18n'
 import { collectPublicEventFeedback } from './public-event-notifications'
@@ -79,42 +82,13 @@ const groupStateLog = (
   return buckets
 }
 
-const stableValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(stableValue)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entryValue]) => [key, stableValue(entryValue)]),
-  )
-}
-
-const logEntryIdentityParams = (entry: LogEntry): unknown => {
-  const params = entry.params ?? {}
-  if (
-    entry.key !== 'log.playImprovement' &&
-    entry.key !== 'log.playMinorImprovement' &&
-    entry.key !== 'log.playOccupation'
-  ) {
-    return params
-  }
-  const { player: _player, ...rest } = params
-  return rest
-}
-
-const logEntryIdentity = (entry: LogEntry): string =>
-  JSON.stringify({
-    key: entry.key,
-    params: stableValue(logEntryIdentityParams(entry)),
-  })
-
 type ReplayEventTimelineEntry = ReplayTimelineEntry & { event: GameEvent }
 
 const presentationEventRefKey = (ref: LogPresentationEventRef): string =>
   JSON.stringify([ref.type, ref.id, ref.seq])
 
 type ContextualLogEntries = {
-  map: Map<string, LogEntry>
+  map: Map<string, LogPresentationRow>
   consumedEventKeys: Set<string>
 }
 
@@ -129,10 +103,10 @@ const buildContextualLogEntryMapForGroup = (
     entryByRef.set(presentationEventRefKey(entry.event), entry)
   })
   const plan = buildLogPresentationPlan(eventEntries.map((entry) => entry.event), context)
-  const map = new Map<string, LogEntry>()
+  const map = new Map<string, LogPresentationRow>()
   plan.rows.forEach((row) => {
     const entry = entryByRef.get(presentationEventRefKey(row.sourceEventRef))
-    if (entry && !map.has(entry.key)) map.set(entry.key, row.logEntry)
+    if (entry && !map.has(entry.key)) map.set(entry.key, row)
   })
   const consumedEventKeys = new Set<string>()
   plan.consumedEvents.forEach((consumed) => {
@@ -146,7 +120,7 @@ const buildContextualLogEntryMap = (
   entries: readonly ReplayTimelineEntry[],
   context: EventLogMapperContext,
 ): ContextualLogEntries => {
-  const map = new Map<string, LogEntry>()
+  const map = new Map<string, LogPresentationRow>()
   const consumedEventKeys = new Set<string>()
   const groups = new Map<number, ReplayTimelineEntry[]>()
   entries
@@ -164,13 +138,13 @@ const buildContextualLogEntryMap = (
 }
 
 const visibleReplayDerivedLogCounts = (
-  contextualLogEntries: ReadonlyMap<string, LogEntry>,
+  contextualLogEntries: ReadonlyMap<string, LogPresentationRow>,
 ): Map<string, number> => {
   const counts = new Map<string, number>()
   ;[...contextualLogEntries.values()]
-    .filter((entry) => entry.key !== 'log.enterRound')
-    .forEach((entry) => {
-      const key = logEntryIdentity(entry)
+    .filter((row) => row.logEntry.key !== 'log.enterRound')
+    .forEach((row) => {
+      const key = logPresentationRowIdentityKey(row.identity)
       counts.set(key, (counts.get(key) ?? 0) + 1)
     })
   return counts
@@ -178,13 +152,13 @@ const visibleReplayDerivedLogCounts = (
 
 const removeReplayDerivedStateLogRows = (
   stateLog: readonly LogEntry[],
-  contextualLogEntries: ReadonlyMap<string, LogEntry>,
+  contextualLogEntries: ReadonlyMap<string, LogPresentationRow>,
 ): LogEntry[] => {
   const counts = visibleReplayDerivedLogCounts(contextualLogEntries)
   if (counts.size === 0) return [...stateLog]
   return stateLog.filter((entry) => {
     if (entry.key === 'log.enterRound') return true
-    const key = logEntryIdentity(entry)
+    const key = logPresentationRowIdentityKey(logPresentationRowIdentity(entry))
     const remaining = counts.get(key) ?? 0
     if (remaining <= 0) return true
     counts.set(key, remaining - 1)
@@ -212,11 +186,11 @@ const eventLabel = (
   locale: Locale,
   playerNames: Record<string, string>,
   actionNames?: Record<string, string>,
-  contextualLogEntry?: LogEntry,
+  contextualLogRow?: LogPresentationRow,
 ): { logEntry: LogEntry | null; label: string } => {
   if (!entry.event) return { logEntry: null, label: locale === 'zh' ? 'archive 缺口' : 'Archive gap' }
 
-  if (contextualLogEntry) return { logEntry: contextualLogEntry, label: '' }
+  if (contextualLogRow) return { logEntry: contextualLogRow.logEntry, label: '' }
 
   const [notification] = collectPublicEventFeedback([entry.event], locale).notifications
   if (notification) return { logEntry: null, label: notification.message }

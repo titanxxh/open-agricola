@@ -53,11 +53,8 @@ export type LogPresentationConsumedEvent = {
 }
 
 export type LogPresentationRowIdentity = {
-  sourceEventId: string
-  sourceEventSeq: number
-  sourceEventType: GameEvent['type']
-  rowIndex: number
   logKey: LogEntry['key']
+  params: unknown
 }
 
 export type LogPresentationRow = {
@@ -77,6 +74,38 @@ const eventRef = (event: GameEvent): LogPresentationEventRef => ({
   seq: event.seq,
   type: event.type,
 })
+
+const stablePresentationValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stablePresentationValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => [key, stablePresentationValue(entryValue)]),
+  )
+}
+
+const logPresentationIdentityParams = (entry: LogEntry): unknown => {
+  const params = entry.params ?? {}
+  if (
+    entry.key !== 'log.playImprovement' &&
+    entry.key !== 'log.playMinorImprovement' &&
+    entry.key !== 'log.playOccupation'
+  ) {
+    return params
+  }
+  const { player: _player, ...rest } = params
+  return rest
+}
+
+export const logPresentationRowIdentity = (entry: LogEntry): LogPresentationRowIdentity => ({
+  logKey: entry.key,
+  params: stablePresentationValue(logPresentationIdentityParams(entry)),
+})
+
+export const logPresentationRowIdentityKey = (identity: LogPresentationRowIdentity): string =>
+  JSON.stringify(identity)
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> =>
   Object.fromEntries(Object.entries(resources).filter(([, value]) => typeof value === 'number' && value > 0))
@@ -663,17 +692,11 @@ const presentationRows = (
   entries: readonly LogEntry[],
   consumedEvents: readonly LogPresentationConsumedEvent[] = [],
 ): LogPresentationRow[] =>
-  entries.map((logEntry, rowIndex) => ({
+  entries.map((logEntry) => ({
     logEntry,
     sourceEventRef: eventRef(event),
     consumedEventRefs: consumedEvents.map((consumed) => consumed.consumedEventRef),
-    identity: {
-      sourceEventId: event.id,
-      sourceEventSeq: event.seq,
-      sourceEventType: event.type,
-      rowIndex,
-      logKey: logEntry.key,
-    },
+    identity: logPresentationRowIdentity(logEntry),
   }))
 
 export const buildLogPresentationPlan = (
