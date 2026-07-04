@@ -429,6 +429,44 @@ describe('GameContainerApi WS player identity', () => {
     expect(feedback.highlights.actionIds).toEqual(['forest'])
   })
 
+  it('namespaces replay card pass animations', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'evt-pass',
+      seq: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'card.passed',
+      fromPlayerId: 'p1',
+      toPlayerId: 'p2',
+      cardId: 'A004_Passed',
+    } satisfies GameEvent
+    const entry = {
+      key: 'event:1:0:evt-pass:1',
+      kind: 'event',
+      packetSeq: 1,
+      packetLocalIndex: 0,
+      event,
+      eventId: event.id,
+      eventSeq: event.seq,
+      status: 'active',
+      payloadSource: 'currentEvents',
+      replayable: true,
+    } satisfies ReplayTimelineEntry
+
+    const feedback = buildReplayFeedback(entry, 'en')
+
+    expect(feedback.cardPassAnimations).toEqual([
+      expect.objectContaining({
+        id: 'replay:event:1:0:evt-pass:1:evt-pass:card-pass:0',
+        eventId: 'evt-pass',
+        cardId: 'A004_Passed',
+      }),
+    ])
+  })
+
   it('does not build replay feedback for missing entries', () => {
     expect(buildReplayFeedback({
       key: 'event:1:0:missing:9',
@@ -495,6 +533,7 @@ describe('GameContainerApi WS player identity', () => {
         notifications: [],
         highlights: { actionIds: [], farmTiles: [], fenceEdges: [] },
         resourceAnimations: [],
+        cardPassAnimations: [],
         nextCursor: 2,
       })
   })

@@ -522,6 +522,7 @@ describe('public event notifications', () => {
       notifications: [],
       highlights: { actionIds: [], farmTiles: [], fenceEdges: [] },
       resourceAnimations: [],
+      cardPassAnimations: [],
       nextCursor: 2,
     })
   })
@@ -600,6 +601,28 @@ describe('public event notifications', () => {
     expect(collectPublicEventHighlightTargets([silent]).actionIds).toEqual(['reed-bank'])
     expect(collectPublicEventResourceAnimations([silent])).toEqual([
       expect.objectContaining({ id: 'evt:accumulate:0', resources: { reed: 1 } }),
+    ])
+  })
+
+  it('projects card pass events into feedback animations', () => {
+    const passed = {
+      ...base,
+      type: 'card.passed',
+      fromPlayerId: 'p1',
+      toPlayerId: 'p2',
+      cardId: 'A004_Passed',
+    } satisfies GameEvent
+
+    const feedback = collectNewPublicEventFeedback([passed], 0, 'en')
+
+    expect(feedback.cardPassAnimations).toEqual([
+      {
+        id: 'evt:card-pass:0',
+        eventId: 'evt',
+        cardId: 'A004_Passed',
+        fromPlayerId: 'p1',
+        toPlayerId: 'p2',
+      },
     ])
   })
 
