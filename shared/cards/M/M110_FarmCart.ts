@@ -42,7 +42,7 @@ export const M110_FarmCart = defineMinorCard({
     number: 110,
     category: "CROP_PROVIDER",
     desc: [
-        "Each time you take at least 5 wood, 4 clay, 3 reed, or 2 stone from an accumulation space, you also get 1 grain."
+        "Each time you take at least 5 <WOOD>, 4 <CLAY>, 3 <REED>, or 2 <STONE> from an accumulation space, you also get 1 <GRAIN>."
     ],
     cost: {
         "wood": 3

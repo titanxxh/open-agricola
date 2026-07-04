@@ -46,7 +46,7 @@ export const C070_LettucePatch = defineMinorCard({
     isField: true,
     cardField: { allowedCrops: ['vegetable'], capacity: 1 },
     desc: [
-        'This card is a field that can only grow vegetables. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>.',
+        'This card is a <FIELD> that can only grow <VEGETABLE>. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>.',
       ],
   },
   impl: cardImpl,

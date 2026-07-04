@@ -21,7 +21,7 @@ export const E084_DollysMother = defineMinorCard({
     name: "Dolly's Mother",
     deck: "E",
     number: 84,
-    desc: ["You only require 1 <SHEEP> to breed sheep during the breeding phase of a harvest. This card can hold 1 <SHEEP>."],
+    desc: ["You only require 1 <SHEEP> to breed <SHEEP> during the breeding phase of a harvest. This card can hold 1 <SHEEP>."],
     cost: {},
     animalHolder: true,
     vp: 1,

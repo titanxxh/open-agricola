@@ -42,7 +42,7 @@ export const E018_SeedAlmanac = defineMinorCard({
     number: 18,
     category: 'FARMYARD_-_PLOWING',
     desc: [
-        'Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 field.',
+        'Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 <FIELD>.',
       ],
     cost: { reed: 1 },
     prerequisite: '4 Occupations',

@@ -27,7 +27,7 @@ export const E023_Apiary = defineMinorCard({
     deck: 'E',
     number: 23,
     category: 'ACTION',
-    desc: ['At the end of each work phase, you can sow exactly 1 crop on 1 field.'],
+    desc: ['At the end of each work phase, you can sow exactly 1 crop on 1 <FIELD>.'],
     cost: {},
     prerequisite: '4 Occupations',
     occupationPrerequisites: { min: 4 },

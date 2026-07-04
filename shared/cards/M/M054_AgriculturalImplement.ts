@@ -42,7 +42,7 @@ export const M054_AgriculturalImplement = defineMinorCard({
     number: 54,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Immediately after each time you use the \"Farmland\" or \"Cultivation\" action space, you can take a face-up special action card. The special action card costs 0 or 2 food, as usual."
+        "Immediately after each time you use the __Farmland__ or __Cultivation__ action space, you can take a face-up special action card. The special action card costs 0 or 2 <FOOD>, as usual."
     ],
     cost: {
         "wood": 1

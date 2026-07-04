@@ -28,7 +28,7 @@ export const B174_RiverbankGardener = defineOccupationCard({
     deck: 'B',
     number: 174,
     category: 'CROP_PROVIDER',
-    desc: ['Each time you use the "Riverbank Forest" accumulation space, you also get 1 vegetable.'],
+    desc: ['Each time you use the __Riverbank Forest__ accumulation space, you also get 1 <VEGETABLE>.'],
     cost: {},
     players: '5+',
   },

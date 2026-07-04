@@ -25,7 +25,7 @@ export const E002_RenovationMaterials = defineMinorCard({
     deck: 'E',
     number: 2,
     category: 'PASSING_-_ACTION_-_FARMYARD',
-    desc: ['Immediately renovate to clay at no cost. (You must pay the cost of this card though.)'],
+    desc: ['Immediately renovate to <CLAY> at no cost. (You must pay the cost of this card though.)'],
     cost: { clay: 3, reed: 1 },
     passing: true,
     prerequisite: 'Wooden House',

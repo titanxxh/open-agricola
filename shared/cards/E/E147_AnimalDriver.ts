@@ -29,7 +29,7 @@ export const E147_AnimalDriver = defineOccupationCard({
     deck: "E",
     number: 147,
     category: "ANIMALS_-_ALL",
-    desc: ["At the start of each harvest, if you have 1/2/3+ fenced stables, you get 1 <SHEEP>/<PIG>/<CATTLE>."],
+    desc: ["At the start of each harvest, if you have 1/2/3+ fenced <STABLE>, you get 1 <SHEEP>/<PIG>/<CATTLE>."],
     cost: {},
     players: "3+",
   },

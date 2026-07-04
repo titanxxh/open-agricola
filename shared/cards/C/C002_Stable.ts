@@ -25,7 +25,7 @@ export const C002_Stable = defineMinorCard({
     deck: "C",
     number: 2,
     category: "FARM_PLANNER",
-    desc: ["Immediately build 1 stable. (The stable costs you nothing, but you must pay the cost shown on this card.)"],
+    desc: ["Immediately build 1 <STABLE>. (The <STABLE> costs you nothing, but you must pay the cost shown on this card.)"],
     cost: { wood: 1 },
     passing: true,
   },

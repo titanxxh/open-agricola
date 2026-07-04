@@ -16,7 +16,7 @@ export const D075_WoodField = defineMinorCard({
     number: 75,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'You can plant <WOOD> on this card as though it were 2 fields, but it is considered 1 field. Sow and harvest <WOOD> on this card as you would <GRAIN>.',
+        'You can plant <WOOD> on this card as though it were 2 <FIELD>, but it is considered 1 <FIELD>. Sow and harvest <WOOD> on this card as you would <GRAIN>.',
       ],
     vp: 1,
     cost: { food: 1 },

@@ -42,7 +42,7 @@ export const D168_Stockman = defineOccupationCard({
     number: 168,
     category: 'LIVESTOCK_PROVIDER',
     desc: [
-        'When you build your 2nd/3rd/4th stable, you immediately get 1 <CATTLE>/<PIG>/<SHEEP>, even if built on the same turn (but not retroactively).',
+        'When you build your 2nd/3rd/4th <STABLE>, you immediately get 1 <CATTLE>/<PIG>/<SHEEP>, even if built on the same turn (but not retroactively).',
       ],
     cost: {},
     players: '4+',

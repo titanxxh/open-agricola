@@ -66,7 +66,7 @@ export const E106_EmergencySeller = defineOccupationCard({
     number: 106,
     category: 'FOOD',
     desc: [
-        'When you play this card, you can immediately turn as many building resources into food as you have people:',
+        'When you play this card, you can immediately turn as many building resources into <FOOD> as you have people:',
         '<WOOD>/<CLAY> <ARROW> 2 <FOOD>',
         '<REED>/<STONE> <ARROW> 3 <FOOD>',
       ],

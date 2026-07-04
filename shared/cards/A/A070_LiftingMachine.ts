@@ -52,7 +52,7 @@ export const A070_LiftingMachine = defineMinorCard({
     deck: "A",
     number: 70,
     category: "CROP_PROVIDER",
-    desc: ["At the end of each round that does not end with a harvest, you can move 1 <VEGETABLE> from one of your fields to your supply. (This is not considered a field phase.)"],
+    desc: ["At the end of each round that does not end with a harvest, you can move 1 <VEGETABLE> from one of your <FIELD> to your supply. (This is not considered a field phase.)"],
     cost: {"wood":1},
     prerequisite: "3 Fields",
   },

@@ -25,7 +25,7 @@ export const M020_PeatPellets = defineMinorCard({
     number: 20,
     category: "GOODS_PROVIDER",
     desc: [
-        "You immediately get 1 <FUEL> for each visible moor that you have."
+        "You immediately get 1 <FUEL> for each visible <MOOR> that you have."
     ],
     cost: {},
     prerequisite: "1 Major Improvement",

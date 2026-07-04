@@ -38,7 +38,7 @@ export const M119_AlderSwamp = defineMinorCard({
     number: 119,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take the \"Fell Trees\" special action, you also get your choice of 1 wood or 1 reed."
+        "Each time you take the __Fell Trees__ special action, you also get your choice of 1 <WOOD> or 1 <REED>."
     ],
     cost: {
         "vegetable": 2

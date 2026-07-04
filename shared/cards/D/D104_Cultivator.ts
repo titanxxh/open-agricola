@@ -27,7 +27,7 @@ export const D104_Cultivator = defineOccupationCard({
     deck: 'D',
     number: 104,
     category: 'GOODS_PROVIDER',
-    desc: ['For each new field tile you get, you also get 1 <WOOD> and 1 <FOOD>.'],
+    desc: ['For each new <FIELD> tile you get, you also get 1 <WOOD> and 1 <FOOD>.'],
     cost: {},
     players: '1+',
   },

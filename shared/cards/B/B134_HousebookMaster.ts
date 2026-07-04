@@ -54,7 +54,7 @@ export const B134_HousebookMaster = defineOccupationCard({
     deck: 'B',
     number: 134,
     category: 'POINTS_PROVIDER',
-    desc: ['After playing this card, if you renovate to stone in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>.'],
+    desc: ['After playing this card, if you renovate to <STONE> in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>.'],
     cost: {},
     players: '3+',
     extraVp: true,

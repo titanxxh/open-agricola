@@ -34,7 +34,7 @@ export const D174_LoessGardener = defineOccupationCard({
     deck: 'D',
     number: 174,
     category: 'CROP_PROVIDER',
-    desc: ['Each time you use the "Clay Pit" accumulation space, you can also buy 1 vegetable for 1 food.'],
+    desc: ['Each time you use the __Clay Pit__ accumulation space, you can also buy 1 <VEGETABLE> for 1 <FOOD>.'],
     cost: {},
     players: '5+',
   },

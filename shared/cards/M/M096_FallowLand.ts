@@ -31,7 +31,7 @@ export const M096_FallowLand = defineMinorCard({
     number: 96,
     category: "FOOD_PROVIDER",
     desc: [
-        "Each time you take the \"Fell Trees\" or \"Cut Peat\" special action, place 1 food on the emptied farmyard space. This farmyard space is still considered unused. Once the farmyard space is no longer unused, you get the food."
+        "Each time you take the __Fell Trees__ or __Cut Peat__ special action, place 1 <FOOD> on the emptied farmyard space. This farmyard space is still considered unused. Once the farmyard space is no longer unused, you get the <FOOD>."
     ],
     cost: {},
     prerequisite: "2 Improvements",

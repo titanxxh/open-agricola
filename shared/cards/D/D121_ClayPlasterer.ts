@@ -59,7 +59,7 @@ export const D121_ClayPlasterer = defineOccupationCard({
     number: 121,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'Renovating to clay only costs you exactly 1 <CLAY> and 1 <REED>. Each clay room only costs you 3 <CLAY> and 2 <REED> to build.',
+        'Renovating to <CLAY> only costs you exactly 1 <CLAY> and 1 <REED>. Each clay room only costs you 3 <CLAY> and 2 <REED> to build.',
       ],
     cost: {},
     players: '1+',

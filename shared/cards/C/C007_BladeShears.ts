@@ -37,7 +37,7 @@ export const C007_BladeShears = defineMinorCard({
     deck: "C",
     number: 7,
     category: "FOOD_PROVIDER",
-    desc: ["You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each sheep you have. (Keep the sheep.)"],
+    desc: ["You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each <SHEEP> you have. (Keep the <SHEEP>.)"],
     cost: { wood: 1 },
     passing: true,
     prerequisite: "1 Pasture",

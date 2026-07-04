@@ -73,7 +73,7 @@ export const D020_TurnwrestPlow = defineMinorCard({
     deck: 'D',
     number: 20,
     category: 'FARM_PLANNER',
-    desc: ['Place 2 field tiles on this card. Each time you use the __Farmland__ or __Cultivation__ action space, you can also plow up to 2 fields from this card.'],
+    desc: ['Place 2 <FIELD> tiles on this card. Each time you use the __Farmland__ or __Cultivation__ action space, you can also plow up to 2 <FIELD> from this card.'],
     cost: { wood: 3 },
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },

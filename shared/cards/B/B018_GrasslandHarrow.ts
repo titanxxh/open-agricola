@@ -53,7 +53,7 @@ export const B018_GrasslandHarrow = defineMinorCard({
     number: 18,
     category: 'FARM_PLANNER',
     desc: [
-        'Add 1 to the current round for each building resource in your supply and place 1 field on the corresponding round space. At the start of the round, you can plow the field.',
+        'Add 1 to the current round for each building resource in your supply and place 1 <FIELD> on the corresponding round space. At the start of the round, you can plow the <FIELD>.',
       ],
     cost: { wood: 2 },
     prerequisite: '2 Occ., 1 Resource After Payment',

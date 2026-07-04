@@ -35,7 +35,7 @@ export const B091_AssistantTiller = defineOccupationCard({
     deck: 'B',
     number: 91,
     category: 'FARM_PLANNER',
-    desc: ['Each time you use the __Day Laborer__ action space, you can also plow 1 field.'],
+    desc: ['Each time you use the __Day Laborer__ action space, you can also plow 1 <FIELD>.'],
     cost: {},
     players: '1+',
   },

@@ -48,7 +48,7 @@ export const A173_ClayThief = defineOccupationCard({
     deck: 'A',
     number: 173,
     category: 'FOOD_PROVIDER',
-    desc: ['Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the clay on the "Hollow" action space.'],
+    desc: ['Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the <CLAY> on the "Hollow" action space.'],
     cost: {},
     players: '5+',
   },

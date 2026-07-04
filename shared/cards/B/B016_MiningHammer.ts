@@ -50,7 +50,7 @@ export const B016_MiningHammer = defineMinorCard({
     number: 16,
     category: 'FARM_PLANNER',
     desc: [
-        'When you play this card, you immediately get 1 <FOOD>. Each time you renovate, you can also build a stable without paying <WOOD>.',
+        'When you play this card, you immediately get 1 <FOOD>. Each time you renovate, you can also build a <STABLE> without paying <WOOD>.',
       ],
     cost: { wood: 1 },
   },

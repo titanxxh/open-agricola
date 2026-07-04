@@ -26,7 +26,7 @@ export const A019_Handplow = defineMinorCard({
     deck: 'A',
     number: 19,
     category: 'FARM_PLANNER',
-    desc: ['Add 5 to the current round and place 1 field tile on the corresponding round space. At the start of that round, you can plow the field.'],
+    desc: ['Add 5 to the current round and place 1 <FIELD> tile on the corresponding round space. At the start of that round, you can plow the <FIELD>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

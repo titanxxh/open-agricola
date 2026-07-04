@@ -57,7 +57,7 @@ export const M118_TimberMill = defineMinorCard({
     number: 118,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take the \"Fell Trees\" special action or take at least 4 wood from an accumulation space, you get 1 additional wood. If you pay 1 fuel, you get 2 additional wood instead of 1."
+        "Each time you take the __Fell Trees__ special action or take at least 4 <WOOD> from an accumulation space, you get 1 additional <WOOD>. If you pay 1 <FUEL>, you get 2 additional <WOOD> instead of 1."
     ],
     cost: {
         "clay": 3,

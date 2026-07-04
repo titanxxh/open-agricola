@@ -72,7 +72,7 @@ export const A043_FarmyardManure = defineMinorCard({
     number: 43,
     category: 'FOOD_PROVIDER',
     desc: [
-        'Each time you build 1 or more stables in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.',
+        'Each time you build 1 or more <STABLE> in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.',
       ],
     cost: {},
     prerequisite: '1 Animal',

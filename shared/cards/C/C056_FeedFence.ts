@@ -47,7 +47,7 @@ export const C056_FeedFence = defineMinorCard({
     number: 56,
     category: 'FOOD_PROVIDER',
     desc: [
-        'For each new stable you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build stables, you can build exactly 1 stable for 1 <CLAY> instead of 2 <WOOD>.',
+        'For each new <STABLE> you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build <STABLE>, you can build exactly 1 <STABLE> for 1 <CLAY> instead of 2 <WOOD>.',
       ],
     cost: { wood: 1 },
   },

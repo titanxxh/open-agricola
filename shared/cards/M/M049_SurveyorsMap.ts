@@ -28,7 +28,7 @@ export const M049_SurveyorsMap = defineMinorCard({
     number: 49,
     category: "FARM_PLANNER",
     desc: [
-        "Place a field tile on round space 11, a moor on round space 12, and a forest on round space 13. At the start of these rounds, you can place the respective tile on an unused farmyard space per the normal rules."
+        "Place a <FIELD> tile on round space 11, a <MOOR> on round space 12, and a <FOREST> on round space 13. At the start of these rounds, you can place the respective tile on an unused farmyard space per the normal rules."
     ],
     cost: {
         "vegetable": 2

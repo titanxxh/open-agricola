@@ -55,7 +55,7 @@ export const M062_HearthBrush = defineMinorCard({
     number: 62,
     category: "POINTS_PROVIDER",
     desc: [
-        "You can immediately move up the Tiled Oven. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, it is worth 1 additional bonus point for you."
+        "You can immediately move up the Tiled Oven. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, it is worth 1 additional bonus <SCORE> for you."
     ],
     cost: {
         "reed": 1

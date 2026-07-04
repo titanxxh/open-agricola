@@ -20,7 +20,7 @@ export const M047_BogForest = defineMinorCard({
     number: 47,
     category: "FARM_PLANNER",
     desc: [
-        "Place 1 forest each on as many of your moors as you wish. You cannot take the \"Slash and Burn\" special action or use the covered moor on these farmyard spaces unless you remove the forest with a \"Fell Trees\" special action first."
+        "Place 1 <FOREST> each on as many of your <MOOR> as you wish. You cannot take the __Slash and Burn__ special action or use the covered <MOOR> on these farmyard spaces unless you remove the <FOREST> with a __Fell Trees__ special action first."
     ],
     cost: {
         "vegetable": 1

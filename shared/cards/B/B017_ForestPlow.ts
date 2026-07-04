@@ -49,7 +49,7 @@ export const B017_ForestPlow = defineMinorCard({
     deck: 'B',
     number: 17,
     category: 'FARM_PLANNER',
-    desc: ['Each time after you use a wood accumulation space, you can pay 2 <WOOD> to plow 1 field. Place the paid <WOOD> on the accumulation space (for the next visitor).'],
+    desc: ['Each time after you use a <WOOD> accumulation space, you can pay 2 <WOOD> to plow 1 <FIELD>. Place the paid <WOOD> on the accumulation space (for the next visitor).'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

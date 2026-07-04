@@ -29,7 +29,7 @@ export const D031_Storeroom = defineMinorCard({
     number: 31,
     category: "POINTS_PROVIDER",
     desc: [
-        'During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and fields), rounded up.',
+        'During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and <FIELD>), rounded up.',
       ],
     cost: { wood: 1, stone: 2 },
     vp: 1,

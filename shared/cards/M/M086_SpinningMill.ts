@@ -24,7 +24,7 @@ export const M086_SpinningMill = defineMinorCard({
     number: 86,
     category: "GOODS_PROVIDER",
     desc: [
-        "For every 2 sheep that you have in the field phase of each harvest, you pay 1 fuel less to heat your house in the feeding phase of that harvest, but not less than 0 fuel."
+        "For every 2 <SHEEP> that you have in the field phase of each harvest, you pay 1 <FUEL> less to heat your house in the feeding phase of that harvest, but not less than 0 <FUEL>."
     ],
     cost: {
         "wood": 2,

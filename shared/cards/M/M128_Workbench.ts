@@ -23,7 +23,7 @@ export const M128_Workbench = defineMinorCard({
     number: 128,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "In the field phase of each harvest at the end of rounds 13 and 14, you get 3 wood, 2 clay, and 1 reed. You can use these, for example, to earn bonus points from the Joinery, Pottery, or Basketmaker's Workshop."
+        "In the field phase of each harvest at the end of rounds 13 and 14, you get 3 <WOOD>, 2 <CLAY>, and 1 <REED>. You can use these, for example, to earn bonus <SCORE> from the Joinery, Pottery, or Basketmaker's Workshop."
     ],
     cost: {
         "wood": 2

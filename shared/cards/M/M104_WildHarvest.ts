@@ -31,7 +31,7 @@ export const M104_WildHarvest = defineMinorCard({
     number: 104,
     category: "FOOD_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 1 food. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of forests you have, you immediately get 1 food."
+        "When you play this card, you immediately get 1 <FOOD>. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of <FOREST> you have, you immediately get 1 <FOOD>."
     ],
     cost: {},
     implemented: true,

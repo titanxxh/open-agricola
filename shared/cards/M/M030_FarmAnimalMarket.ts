@@ -34,7 +34,7 @@ export const M030_FarmAnimalMarket = defineMinorCard({
     number: 30,
     category: "LIVESTOCK_PROVIDER",
     desc: [
-        "You can immediately exchange exactly 2 <SHEEP> for 1 <CATTLE> and 1 <HORSE>. You may not exchange only 1 sheep."
+        "You can immediately exchange exactly 2 <SHEEP> for 1 <CATTLE> and 1 <HORSE>. You may not exchange only 1 <SHEEP>."
     ],
     cost: {
         "food": 1

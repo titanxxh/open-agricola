@@ -25,7 +25,7 @@ export const D177_Graduate = defineOccupationCard({
     deck: 'D',
     number: 177,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['When you play this card you immediately pay 1 food. If you do, you get 2 stone and 2 reed.'],
+    desc: ['When you play this card you immediately pay 1 <FOOD>. If you do, you get 2 <STONE> and 2 <REED>.'],
     cost: {},
     players: '5+',
   },

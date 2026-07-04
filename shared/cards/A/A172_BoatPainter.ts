@@ -33,7 +33,7 @@ export const A172_BoatPainter = defineOccupationCard({
     deck: 'A',
     number: 172,
     category: 'FOOD_PROVIDER',
-    desc: ['At the end of each work phase, if both the "Fishing" and "Traveling Players" accumulation spaces are occupied, you get your choice of 1 grain or 2 food.'],
+    desc: ['At the end of each work phase, if both the __Fishing__ and __Traveling Players__ accumulation spaces are occupied, you get your choice of 1 <GRAIN> or 2 <FOOD>.'],
     cost: {},
     players: '5+',
   },

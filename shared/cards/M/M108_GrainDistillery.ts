@@ -30,7 +30,7 @@ export const M108_GrainDistillery = defineMinorCard({
     number: 108,
     category: "FOOD_PROVIDER",
     desc: [
-        "Harvest: once, you can turn 1 <FUEL> and 1 <GRAIN> into 5 <FOOD>. Any number of times during scoring: 1 <FUEL> and 1 <GRAIN> <ARROW> 1 bonus point."
+        "Harvest: once, you can turn 1 <FUEL> and 1 <GRAIN> into 5 <FOOD>. Any number of times during scoring: 1 <FUEL> and 1 <GRAIN> <ARROW> 1 bonus <SCORE>."
     ],
     cost: {
         "stone": 2,

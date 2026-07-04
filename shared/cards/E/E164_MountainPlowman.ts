@@ -27,7 +27,7 @@ export const E164_MountainPlowman = defineOccupationCard({
     deck: 'E',
     number: 164,
     category: 'ANIMALS_-_SHEEP',
-    desc: ['Each time you plow at least 1 field, you get 1 <SHEEP> for each field that you just plowed.'],
+    desc: ['Each time you plow at least 1 <FIELD>, you get 1 <SHEEP> for each <FIELD> that you just plowed.'],
     cost: {},
     players: '4+',
   },

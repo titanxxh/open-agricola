@@ -59,7 +59,7 @@ export const B178_TagAlong = defineOccupationCard({
     deck: 'B',
     number: 178,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Immediately after each time another player uses the "Resource Market" action space, you can also place a person there to take the action as well.'],
+    desc: ['Immediately after each time another player uses the __Resource Market__ action space, you can also place a person there to take the action as well.'],
     cost: {},
     players: '5+',
   },

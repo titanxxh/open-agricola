@@ -71,7 +71,7 @@ export const E127_DiligentFarmer = defineOccupationCard({
     deck: 'E',
     number: 127,
     category: 'FARMYARD_-_PLACE_FOR_PERSON',
-    desc: ['When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced stables), you can extend your house by 1 room at no cost.'],
+    desc: ['When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced <STABLE>), you can extend your house by 1 room at no cost.'],
     players: '3+',
   },
   impl: cardImpl,

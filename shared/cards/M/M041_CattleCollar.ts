@@ -44,7 +44,7 @@ export const M041_CattleCollar = defineMinorCard({
     number: 41,
     category: "FARM_PLANNER",
     desc: [
-        "Each time after you use the \"Farmland\" or \"Cultivation\" action space or take the \"Slash and Burn\" special action, if you have at least 1 cattle, you can plow 1 additional field."
+        "Each time after you use the __Farmland__ or __Cultivation__ action space or take the __Slash and Burn__ special action, if you have at least 1 <CATTLE>, you can plow 1 additional <FIELD>."
     ],
     cost: {
         "wood": 1

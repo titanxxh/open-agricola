@@ -22,7 +22,7 @@ export const D034_LuxuriousHostel = defineMinorCard({
     number: 34,
     category: "POINTS_PROVIDER",
     desc: [
-        'During scoring, if you then have more stone rooms than people, you get 4 bonus <SCORE>. You can only use one card to get bonus points for your stone house.',
+        'During scoring, if you then have more stone rooms than people, you get 4 bonus <SCORE>. You can only use one card to get bonus <SCORE> for your stone house.',
       ],
     cost: { wood: 1, clay: 2 },
     extraVp: true,

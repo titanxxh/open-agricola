@@ -64,7 +64,7 @@ export const B176_VillageIdiot = defineOccupationCard({
     deck: 'B',
     number: 176,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['The Village Idiot is your lone occupation. Each time another player uses the "Meeting Place" action space, you get 1 wood and 1 food.'],
+    desc: ['The Village Idiot is your lone occupation. Each time another player uses the __Meeting Place__ action space, you get 1 <WOOD> and 1 <FOOD>.'],
     cost: {},
     prerequisite: 'No Occupations',
     occupationPrerequisites: { max: 0 },

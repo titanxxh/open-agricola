@@ -36,7 +36,7 @@ export const A116_WoodCutter = defineOccupationCard({
     number: 116,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you use a wood accumulation space, you get 1 additional <WOOD>.",
+        "Each time you use a <WOOD> accumulation space, you get 1 additional <WOOD>.",
       ],
     cost: {},
     players: "1+",

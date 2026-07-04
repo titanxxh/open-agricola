@@ -30,7 +30,7 @@ export const B020_ChainFloat = defineMinorCard({
     deck: 'B',
     number: 20,
     category: 'FARM_PLANNER',
-    desc: ['Add 7, 8, and 9 to the current round and place 1 field on each corresponding round space. At the start of these rounds, you can plow the field.'],
+    desc: ['Add 7, 8, and 9 to the current round and place 1 <FIELD> on each corresponding round space. At the start of these rounds, you can plow the <FIELD>.'],
     cost: { wood: 3 },
   },
   impl: cardImpl,

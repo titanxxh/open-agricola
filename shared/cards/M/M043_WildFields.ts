@@ -30,7 +30,7 @@ export const M043_WildFields = defineMinorCard({
     number: 43,
     category: "FARM_PLANNER",
     desc: [
-        "You can immediately place up to 2 field tiles, one at a time, on unused farmyard spaces that are not adjacent to existing fields. You can connect your fields later. All future fields must be adjacent to at least one existing field."
+        "You can immediately place up to 2 <FIELD> tiles, one at a time, on unused farmyard spaces that are not adjacent to existing <FIELD>. You can connect your <FIELD> later. All future <FIELD> must be adjacent to at least one existing <FIELD>."
     ],
     cost: {
         "vegetable": 2

@@ -37,7 +37,7 @@ export const A170_Hayward = defineOccupationCard({
     deck: 'A',
     number: 170,
     category: 'FARM_PLANNER',
-    desc: ['You can build fences at any time without placing a person. (This is not considered a "Build Fences" action.)'],
+    desc: ['You can build <FENCE> at any time without placing a person. (This is not considered a __Build Fences__ action.)'],
     cost: {},
     players: '5+',
   },

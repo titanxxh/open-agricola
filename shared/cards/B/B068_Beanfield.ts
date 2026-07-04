@@ -15,7 +15,7 @@ export const B068_Beanfield = defineMinorCard({
     deck: 'B',
     number: 68,
     category: 'CROP_PROVIDER',
-    desc: ['This card is a field that can only grow vegetables.'],
+    desc: ['This card is a <FIELD> that can only grow <VEGETABLE>.'],
     cost: { food: 1 },
     vp: 1,
     prerequisite: '2 Occupations',

@@ -29,7 +29,7 @@ export const M097_VillageHall = defineMinorCard({
     number: 97,
     category: "FOOD_PROVIDER",
     desc: [
-        "At the start of each returning home phase in which there is no special action card in front of you, you get 2 food."
+        "At the start of each returning home phase in which there is no special action card in front of you, you get 2 <FOOD>."
     ],
     cost: {
         "wood": 2,

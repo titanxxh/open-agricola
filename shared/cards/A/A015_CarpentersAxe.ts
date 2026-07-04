@@ -40,7 +40,7 @@ export const A015_CarpentersAxe = defineMinorCard({
     deck: 'A',
     number: 15,
     category: 'FARM_PLANNER',
-    desc: ["Each time after you use a wood accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 stable for 1 <WOOD>."],
+    desc: ["Each time after you use a <WOOD> accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 <STABLE> for 1 <WOOD>."],
     cost: { wood: 1 },
   },
   impl: cardImpl,

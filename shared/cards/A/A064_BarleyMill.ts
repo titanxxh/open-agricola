@@ -30,7 +30,7 @@ export const A064_BarleyMill = defineMinorCard({
     deck: "A",
     number: 64,
     category: "FOOD_PROVIDER",
-    desc: ["In the field phase of each harvest, you get 1 <FOOD> for each grain field that you harvest."],
+    desc: ["In the field phase of each harvest, you get 1 <FOOD> for each <GRAIN> <FIELD> that you harvest."],
     vp: 1,
     altCosts: [{ clay: 4 }, { stone: 2 }],
   },

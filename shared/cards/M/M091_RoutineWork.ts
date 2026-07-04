@@ -112,7 +112,7 @@ export const M091_RoutineWork = defineMinorCard({
     number: 91,
     category: "GOODS_PROVIDER",
     desc: [
-        "Each harvest, you get your choice of 1 fuel or 1 food for each of your craft buildings (Joinery, Pottery, and Basketmaker's Workshop) that you choose not to use to turn a building resource into food."
+        "Each harvest, you get your choice of 1 <FUEL> or 1 <FOOD> for each of your craft buildings (Joinery, Pottery, and Basketmaker's Workshop) that you choose not to use to turn a building resource into <FOOD>."
     ],
     cost: {
         "vegetable": 1

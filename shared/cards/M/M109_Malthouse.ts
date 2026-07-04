@@ -40,7 +40,7 @@ export const M109_Malthouse = defineMinorCard({
     number: 109,
     category: "FOOD_PROVIDER",
     desc: [
-        "Each time you take the \"Cut Peat\" special action, you can also turn exactly 1 grain into 4 food."
+        "Each time you take the __Cut Peat__ special action, you can also turn exactly 1 <GRAIN> into 4 <FOOD>."
     ],
     cost: {
         "clay": 2

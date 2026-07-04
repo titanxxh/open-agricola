@@ -55,7 +55,7 @@ export const D175_Countryman = defineOccupationCard({
     deck: 'D',
     number: 175,
     category: 'CROP_PROVIDER',
-    desc: ['Each time any player (including you) takes a "Renovation" action on an action space, you can sow crops in exactly 1 field.'],
+    desc: ['Each time any player (including you) takes a __Renovation__ action on an action space, you can sow crops in exactly 1 <FIELD>.'],
     cost: {},
     players: '5+',
   },

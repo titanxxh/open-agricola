@@ -140,7 +140,7 @@ export const M095_FallowFields = defineMinorCard({
     number: 95,
     category: "FOOD_PROVIDER",
     desc: [
-        "Place 2 food on each of up to 3 of your empty fields. You cannot harvest the food. You get it when you sow in these fields."
+        "Place 2 <FOOD> on each of up to 3 of your empty <FIELD>. You cannot harvest the <FOOD>. You get it when you sow in these <FIELD>."
     ],
     cost: {},
     implemented: true,
