@@ -19,15 +19,11 @@ import type {
   PublicEventResourceAnimation,
 } from './public-event-notifications'
 import {
-  collectPublicEventHighlightTargets,
-  collectPublicEventCardPassAnimations,
-  collectPublicEventNotifications,
-  collectPublicEventResourceAnimations,
+  collectPublicEventFeedback,
   emptyPublicEventHighlightTargets,
   maxPublicEventSeq,
 } from './public-event-notifications'
 import type { ReplayTimelineEntry } from './replay-timeline'
-import { replayTimelineNamespaceId } from './replay-timeline'
 import type { WsStatus } from './ws-status'
 
 export type { WsStatus } from './ws-status'
@@ -113,19 +109,7 @@ export const buildReplayFeedback = (
   locale: Locale,
 ): ReplayFeedback => {
   if (!entry?.event || !entry.replayable || entry.kind !== 'event') return clearReplayFeedback()
-  const idPrefix = `replay:${entry.key}`
-  return {
-    notifications: collectPublicEventNotifications([entry.event], locale, idPrefix),
-    highlights: collectPublicEventHighlightTargets([entry.event]),
-    resourceAnimations: collectPublicEventResourceAnimations([entry.event]).map((animation) => ({
-      ...animation,
-      id: replayTimelineNamespaceId(entry, animation.id),
-    })),
-    cardPassAnimations: collectPublicEventCardPassAnimations([entry.event]).map((animation) => ({
-      ...animation,
-      id: replayTimelineNamespaceId(entry, animation.id),
-    })),
-  }
+  return collectPublicEventFeedback([entry.event], locale, `replay:${entry.key}`)
 }
 
 export type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
