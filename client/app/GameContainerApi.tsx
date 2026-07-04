@@ -6,7 +6,7 @@ import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Re
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
-import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
+import type { AnimalReorgState } from '../types/ui'
 import {
   isFarmyardBorderEdge,
   positionKey,
@@ -69,7 +69,6 @@ import {
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
   devResourceKeysForState,
-  getCurrentlySelectableRoomKeys,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
@@ -187,9 +186,6 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
     ? playerIndex
     : undefined
 }
-
-const isOffBoardSowTile = (tile: FarmTilePosition) =>
-  tile.row < 0 || tile.row > 2 || tile.col < 0 || tile.col > 4
 
 const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
@@ -1506,25 +1502,53 @@ export const GameContainerApi = () => {
   const sowErrorText: string | null = sowError
     ? t(locale, farmCommitErrorMessageKey('sow', sowError))
     : null
+  const specialTerrainSelectableSet = useMemo(() => {
+    if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
+    if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
+    const key = pendingMoorSpecialActionKey(selectedSpecialAction.cardId, selectedSpecialAction.actionId)
+    if (pendingMoorSpecialActionChoices.isActive) {
+      if (!isInteractive || interaction.stateId !== 'wait') return new Set<string>()
+      if (displayPlayer.id !== activePlayer?.id) return new Set<string>()
+      return new Set(pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key) ?? [])
+    }
+    if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
+    if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
+    const targetKind = selectedSpecialAction.actionId === 'cut-peat' ? 'moor' : 'forest'
+    return new Set(
+      (displayPlayer.farmTerrain ?? [])
+        .filter((tile) => tile.kind === targetKind)
+        .map((tile) => positionKey(tile)),
+    )
+  }, [activePlayer?.id, currentPlayer, displayPlayer, interaction.stateId, isInteractive, pendingMoorSpecialActionChoices, selectedSpecialAction, state])
   const farmBoardProjection = useMemo(
     () => buildFarmBoardProjection({
       displayPlayer,
       interaction,
+      farmInteraction,
       selectionInteraction,
       players: state?.players,
       state,
       pastureCapacities,
       animalReorg,
       pendingAnimalReorg,
+      pendingRoomTiles,
+      pendingStableTiles,
+      pendingFarmHand,
+      extraPositionSelectableSet: specialTerrainSelectableSet,
     }),
     [
       displayPlayer,
       interaction,
+      farmInteraction,
       selectionInteraction,
       state,
       pastureCapacities,
       animalReorg,
       pendingAnimalReorg,
+      pendingRoomTiles,
+      pendingStableTiles,
+      pendingFarmHand,
+      specialTerrainSelectableSet,
     ],
   )
   const {
@@ -1533,7 +1557,18 @@ export const GameContainerApi = () => {
     roomPositions,
     fieldMap,
     stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    farmHandSelectableSet,
+    pendingFarmHandKey,
+    builtSpecialStableKeys,
+    positionSelectableSet,
+    sowSelectableMap,
+    extraSowTargets,
     existingFenceSet,
+    fenceSelectableSet,
     pastureTiles,
     pastureDisplayMap,
     pastureCapacityMap,
@@ -1572,104 +1607,6 @@ export const GameContainerApi = () => {
     }
     resolveChoice('confirm')
   }, [animalReorg, reorgRemaining, resolveChoice])
-  const roomSelectableSet = useMemo(
-    () => {
-      if (farmInteraction?.farmType !== 'room') return new Set<string>()
-      return getCurrentlySelectableRoomKeys(
-        farmInteraction.selectableTiles,
-        roomPositions,
-        new Set(pendingRoomTiles.map((tile) => positionKey(tile))),
-      )
-    },
-    [farmInteraction, pendingRoomTiles, roomPositions],
-  )
-  const stableSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'stable'
-          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const farmHandSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'stable'
-          ? (farmInteraction.farmHandPositions ?? []).map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const builtSpecialStableKeys = useMemo(
-    () =>
-      new Set(
-        (displayPlayer?.specialStables ?? []).map((entry) => positionKey(entry.position)),
-      ),
-    [displayPlayer?.specialStables],
-  )
-  const fenceSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'fence'
-          ? farmInteraction.selectableEdges
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const positionSelectableSet = useMemo(
-    () =>
-      new Set(
-        selectionInteraction?.kind === 'farm-position'
-          ? selectionInteraction.selectablePositions.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [selectionInteraction],
-  )
-  const specialTerrainSelectableSet = useMemo(() => {
-    if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
-    if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
-    const key = pendingMoorSpecialActionKey(selectedSpecialAction.cardId, selectedSpecialAction.actionId)
-    if (pendingMoorSpecialActionChoices.isActive) {
-      if (!isInteractive || interaction.stateId !== 'wait') return new Set<string>()
-      if (displayPlayer.id !== activePlayer?.id) return new Set<string>()
-      return new Set(pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key) ?? [])
-    }
-    if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
-    if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
-    const targetKind = selectedSpecialAction.actionId === 'cut-peat' ? 'moor' : 'forest'
-    return new Set(
-      (displayPlayer.farmTerrain ?? [])
-        .filter((tile) => tile.kind === targetKind)
-        .map((tile) => positionKey(tile)),
-    )
-  }, [activePlayer?.id, currentPlayer, displayPlayer, interaction.stateId, isInteractive, pendingMoorSpecialActionChoices, selectedSpecialAction, state])
-  const combinedPositionSelectableSet = useMemo(
-    () => new Set([...positionSelectableSet, ...specialTerrainSelectableSet]),
-    [positionSelectableSet, specialTerrainSelectableSet],
-  )
-  const { sowSelectableMap, extraSowTargets } = useMemo(() => {
-    const map = new Map<string, PendingSowCrop[]>()
-    const extraTargets: ExtraSowTarget[] = []
-    if (farmInteraction?.farmType !== 'sow') {
-      return { sowSelectableMap: map, extraSowTargets: extraTargets }
-    }
-    farmInteraction.selectableFields.forEach((entry) => {
-      const key = positionKey(entry.tile)
-      if (isOffBoardSowTile(entry.tile)) {
-        extraTargets.push({
-          key,
-          tile: entry.tile,
-          allowedCrops: entry.allowedCrops,
-          sourceCard: entry.sourceCard,
-          groupKey: entry.groupKey,
-        })
-        return
-      }
-      map.set(key, entry.allowedCrops)
-    })
-    return { sowSelectableMap: map, extraSowTargets: extraTargets }
-  }, [farmInteraction])
   const groupKeyByTile = useMemo(() => {
     const map = new Map<string, string | undefined>()
     if (farmInteraction?.farmType === 'sow') {
@@ -2567,14 +2504,14 @@ export const GameContainerApi = () => {
               nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
               playedCards={playedCards} farmCells={farmCells} farmGridColumns={farmGridColumns} roomPositions={roomPositions} fieldPositions={fieldPositions}
               fieldMap={fieldMap} stablePositions={stablePositions}
-              pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-              pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
+              pendingRoomSet={pendingRoomSet}
+              pendingStableSet={pendingStableSet}
               roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
               farmHandSelectableSet={farmHandSelectableSet}
-              pendingFarmHandKey={pendingFarmHand ? positionKey(pendingFarmHand) : null}
+              pendingFarmHandKey={pendingFarmHandKey}
               builtSpecialStableKeys={builtSpecialStableKeys}
               maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-              positionSelectableSet={combinedPositionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
+              positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
               pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
               pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
               stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} borrowedPlayedCardDisplays={borrowedPlayedCardDisplays} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
