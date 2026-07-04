@@ -1,6 +1,10 @@
 import type { GameEvent } from '../../shared/contract/events'
 import type { LogEntry } from '../../shared/contract/types'
-import { eventsToLogEntries } from '../../shared/events/log-mapper'
+import {
+  buildLogPresentationPlan,
+  type EventLogMapperContext,
+  type LogPresentationEventRef,
+} from '../../shared/events/log-mapper'
 import type { Locale } from '../../shared/i18n'
 import { collectPublicEventFeedback } from './public-event-notifications'
 import type { ReplayTimelineEntry } from './replay-timeline'
@@ -40,10 +44,6 @@ type BuildActionLogTimelineRowsInput = {
   playerNames: Record<string, string>
   actionNames?: Record<string, string>
 }
-
-type ResourcePaidEvent = Extract<GameEvent, { type: 'resource.paid' }>
-
-const minorImprovementPaymentPurpose = ['minor', 'improvement'].join('-') as ResourcePaidEvent['paymentFor']
 
 const groupStateLog = (
   log: readonly LogEntry[],
@@ -108,110 +108,46 @@ const logEntryIdentity = (entry: LogEntry): string =>
     params: stableValue(logEntryIdentityParams(entry)),
   })
 
-const paymentForEvent = (
-  events: readonly GameEvent[],
-  event: GameEvent,
-  paymentFor: ResourcePaidEvent['paymentFor'],
-): GameEvent | undefined =>
-  [...events]
-    .filter((candidate) =>
-      candidate.type === 'resource.paid' &&
-      candidate.seq < event.seq &&
-      candidate.actorPlayerId === event.actorPlayerId &&
-      candidate.paymentFor === paymentFor)
-    .sort((left, right) => right.seq - left.seq)[0]
+type ReplayEventTimelineEntry = ReplayTimelineEntry & { event: GameEvent }
 
-const consumedPaymentSeqsFor = (events: readonly GameEvent[]): Set<number> => {
-  const consumed = new Set<number>()
-  events.forEach((event) => {
-    if (event.type === 'card.played') {
-      const purposes = event.cardType === 'occupation'
-        ? ['occupation' as const]
-        : ['major-improvement' as const, minorImprovementPaymentPurpose]
-      const payment = purposes
-        .map((purpose) => paymentForEvent(events, event, purpose))
-        .find(Boolean)
-      if (payment) consumed.add(payment.seq)
-    }
-    if (event.type === 'farm.renovated') {
-      const payment = paymentForEvent(events, event, 'renovation')
-      if (payment) consumed.add(payment.seq)
-    }
-    if (event.type === 'farm.stableBuilt') {
-      // Stable payments are emitted AFTER farm.stableBuilt (the pay child
-      // runs in afterHostListeners) — find the nearest FOLLOWING stables
-      // payment, bounded by the next stableBuilt (mirrors the shared
-      // mapper's stablePaymentForEvent).
-      const nextStableBuiltSeq = events
-        .filter((candidate) =>
-          candidate.type === 'farm.stableBuilt' &&
-          candidate.seq > event.seq &&
-          candidate.actorPlayerId === event.actorPlayerId)
-        .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
-      const payment = events
-        .filter((candidate) =>
-          candidate.type === 'resource.paid' &&
-          candidate.seq > event.seq &&
-          candidate.seq < nextStableBuiltSeq &&
-          candidate.actorPlayerId === event.actorPlayerId &&
-          candidate.paymentFor === 'stables')
-        .sort((left, right) => left.seq - right.seq)[0]
-      if (payment) consumed.add(payment.seq)
-    }
-  })
-  return consumed
-}
-
-type LogMapperContextInput = {
-  playerNames: Record<string, string>,
-  actionNames?: Record<string, string>,
-}
-
-const entryHasStandaloneLog = (
-  entry: ReplayTimelineEntry,
-  context: LogMapperContextInput,
-): boolean =>
-  !!entry.event && eventsToLogEntries([entry.event], context).length > 0
+const presentationEventRefKey = (ref: LogPresentationEventRef): string =>
+  JSON.stringify([ref.type, ref.id, ref.seq])
 
 type ContextualLogEntries = {
   map: Map<string, LogEntry>
-  /** Replay entry keys for resource.paid events absorbed into a card.played/renovated/stable row. */
-  consumedPaymentKeys: Set<string>
+  consumedEventKeys: Set<string>
 }
 
 const buildContextualLogEntryMapForGroup = (
   entries: readonly ReplayTimelineEntry[],
-  context: LogMapperContextInput,
+  context: EventLogMapperContext,
 ): ContextualLogEntries => {
-  const eventEntries = entries.filter((entry): entry is ReplayTimelineEntry & { event: GameEvent } =>
+  const eventEntries = entries.filter((entry): entry is ReplayEventTimelineEntry =>
     !!entry.event)
-  const events = eventEntries.map((entry) => entry.event)
-  const consumedPaymentSeqs = consumedPaymentSeqsFor(events)
-  const consumedPaymentKeys = new Set(
-    eventEntries
-      .filter((entry) => consumedPaymentSeqs.has(entry.event.seq))
-      .map((entry) => entry.key),
-  )
-  const visibleEntries = [...eventEntries]
-    .sort((left, right) => right.event.seq - left.event.seq)
-    .filter((entry) =>
-      !consumedPaymentKeys.has(entry.key) &&
-      entryHasStandaloneLog(entry, context))
-  const logEntries = eventsToLogEntries(events, context)
-  const map = new Map<string, LogEntry>()
-  visibleEntries.forEach((entry, index) => {
-    const logEntry = logEntries[index]
-    if (logEntry) map.set(entry.key, logEntry)
+  const entryByRef = new Map<string, ReplayEventTimelineEntry>()
+  eventEntries.forEach((entry) => {
+    entryByRef.set(presentationEventRefKey(entry.event), entry)
   })
-  return { map, consumedPaymentKeys }
+  const plan = buildLogPresentationPlan(eventEntries.map((entry) => entry.event), context)
+  const map = new Map<string, LogEntry>()
+  plan.rows.forEach((row) => {
+    const entry = entryByRef.get(presentationEventRefKey(row.sourceEventRef))
+    if (entry && !map.has(entry.key)) map.set(entry.key, row.logEntry)
+  })
+  const consumedEventKeys = new Set<string>()
+  plan.consumedEvents.forEach((consumed) => {
+    const entry = entryByRef.get(presentationEventRefKey(consumed.consumedEventRef))
+    if (entry) consumedEventKeys.add(entry.key)
+  })
+  return { map, consumedEventKeys }
 }
 
 const buildContextualLogEntryMap = (
   entries: readonly ReplayTimelineEntry[],
-  context: LogMapperContextInput,
+  context: EventLogMapperContext,
 ): ContextualLogEntries => {
   const map = new Map<string, LogEntry>()
-  const consumedPaymentKeys = new Set<string>()
+  const consumedEventKeys = new Set<string>()
   const groups = new Map<number, ReplayTimelineEntry[]>()
   entries
     .filter((entry) => !!entry.event)
@@ -221,10 +157,10 @@ const buildContextualLogEntryMap = (
   groups.forEach((groupEntries) => {
     const group = buildContextualLogEntryMapForGroup(groupEntries, context)
     group.map.forEach((logEntry, key) => map.set(key, logEntry))
-    group.consumedPaymentKeys.forEach((key) => consumedPaymentKeys.add(key))
+    group.consumedEventKeys.forEach((key) => consumedEventKeys.add(key))
   })
 
-  return { map, consumedPaymentKeys }
+  return { map, consumedEventKeys }
 }
 
 const visibleReplayDerivedLogCounts = (
@@ -282,9 +218,6 @@ const eventLabel = (
 
   if (contextualLogEntry) return { logEntry: contextualLogEntry, label: '' }
 
-  const [logEntry] = eventsToLogEntries([entry.event], { playerNames, actionNames })
-  if (logEntry) return { logEntry, label: '' }
-
   const [notification] = collectPublicEventFeedback([entry.event], locale).notifications
   if (notification) return { logEntry: null, label: notification.message }
 
@@ -314,16 +247,13 @@ export const buildActionLogTimelineRows = ({
   actionNames,
 }: BuildActionLogTimelineRowsInput): ActionLogTimelineBucket[] => {
   const mapperContext = { playerNames, actionNames }
-  const { map: contextualLogEntries, consumedPaymentKeys } =
+  const { map: contextualLogEntries, consumedEventKeys } =
     buildContextualLogEntryMap(entries, mapperContext)
   const eventRows: ActionLogTimelineRow[] = [...entries]
     .sort((left, right) =>
       right.packetSeq - left.packetSeq || right.packetLocalIndex - left.packetLocalIndex)
     .flatMap((entry): ActionLogTimelineRow[] => {
-      // A payment absorbed into its card.played/renovated/stable row must not
-      // fall through to the standalone single-event rendering — that would
-      // duplicate the payment as a "pays X for Y" line.
-      if (entry.event && consumedPaymentKeys.has(entry.key)) return []
+      if (entry.event && consumedEventKeys.has(entry.key)) return []
       const { logEntry, label } = eventLabel(
         entry,
         locale,
