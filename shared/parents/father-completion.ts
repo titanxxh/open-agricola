@@ -62,46 +62,6 @@ const animalCounts = (state: GameState, player: PlayerState): Partial<Record<Ani
   return counts
 }
 
-const manualRequirementSatisfied = (
-  state: GameState,
-  player: PlayerState,
-  key: string,
-): boolean => {
-  const totalCards = key.match(/^total-cards-in-play-including-parents-at-least-(\d+)$/)
-  if (totalCards) {
-    return isFatherRequirementSatisfied(state, player, {
-      type: 'total-cards-in-play-including-parents-at-least',
-      amount: Number(totalCards[1]),
-    })
-  }
-
-  const unusedSpaces = key.match(/^unused-farmyard-spaces-at-most-(\d+)$/)
-  if (unusedSpaces) {
-    return isFatherRequirementSatisfied(state, player, {
-      type: 'unused-farmyard-spaces-at-most',
-      amount: Number(unusedSpaces[1]),
-    })
-  }
-
-  const animalTypes = key.match(/^animal-type-count-at-least-(\d+)$/)
-  if (animalTypes) {
-    return isFatherRequirementSatisfied(state, player, {
-      type: 'animal-type-count-at-least',
-      amount: Number(animalTypes[1]),
-    })
-  }
-
-  const sameAnimal = key.match(/^same-animal-type-at-least-(\d+)$/)
-  if (sameAnimal) {
-    return isFatherRequirementSatisfied(state, player, {
-      type: 'same-animal-type-at-least',
-      amount: Number(sameAnimal[1]),
-    })
-  }
-
-  return false
-}
-
 export const isFatherRequirementSatisfied = (
   state: GameState,
   player: PlayerState,
@@ -151,8 +111,6 @@ export const isFatherRequirementSatisfied = (
       return requirement.requirements.every((child) => isFatherRequirementSatisfied(state, player, child))
     case 'any':
       return requirement.requirements.some((child) => isFatherRequirementSatisfied(state, player, child))
-    case 'manual':
-      return manualRequirementSatisfied(state, player, requirement.key)
   }
 }
 
