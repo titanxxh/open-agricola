@@ -11,20 +11,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
-// construct.ts only uses room-payment helpers (S4 domain aggregate scope),
-// so no PaymentSolver call sites exist here yet.
-import {
-  buildConstructCost,
-  type ConstructCostAdjustments,
-  getBuildRoomCost,
-  getMaxBuildableRooms,
-  readConstructCostDelta,
-  readExactCost,
-  resolveRoomPaymentSelection,
-} from '../payment/internal'
+import { PaymentSolver, type ConstructCostAdjustments } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
@@ -69,13 +56,13 @@ const readConstructCostAdjustments = (
 
 const constructCostPreview: ActionCostPreview = {
   getBaseCost: (context) => {
-    const cost = buildConstructCost(
+    const cost = PaymentSolver.buildConstructCost(
       context.player,
       undefined,
       1,
       readConstructActionContext(context),
     )
-    return cost?.unitFee ?? getBuildRoomCost(context.player.houseType)
+    return cost?.unitFee ?? PaymentSolver.getBuildRoomCost(context.player.houseType)
   },
   canExecute: (context, costs) =>
     canStartConstruct(
@@ -100,11 +87,11 @@ const canStartConstruct = (
   actionContext: Record<string, unknown> | undefined,
   costAdjustments: ConstructCostAdjustments | undefined,
 ): boolean => {
-  if (getMaxBuildableRooms(player, costs, actionContext, costAdjustments) <= 0) return false
-  const costDelta = readConstructCostDelta(actionContext, costs)
+  if (PaymentSolver.getMaxBuildableRooms(player, costs, actionContext, costAdjustments) <= 0) return false
+  const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
   const farm = boardForPlayer(state, player).farmyard.selectableTiles('room', {
     costOverride: costDelta,
-    exactCost: readExactCost(actionContext),
+    exactCost: PaymentSolver.readExactCost(actionContext),
     actionContext,
   })
   if (farm.farmType !== 'room') return false
@@ -205,7 +192,7 @@ const buildConstructPayCost = (
   actionContext: Record<string, unknown> | undefined,
   rooms: number,
   costAdjustments: ConstructCostAdjustments | undefined,
-): ComplexCost | null => buildConstructCost(player, costs, rooms, actionContext, costAdjustments)
+): ComplexCost | null => PaymentSolver.buildConstructCost(player, costs, rooms, actionContext, costAdjustments)
 
 const finalizeRoom = (
   ctx: ActionMutationContext,
@@ -217,7 +204,7 @@ const finalizeRoom = (
   const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
   if (!selection.ok) return { type: 'fail', errorKey: selection.code ?? 'log.action' }
 
-  const maxBuildableRooms = getMaxBuildableRooms(
+  const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
     ctx.player,
     ctx.costs,
     ctx.actionContext,
@@ -227,7 +214,7 @@ const finalizeRoom = (
     return { type: 'fail', errorKey: 'log.buildRoomFail' }
   }
 
-  const payment = resolveRoomPaymentSelection(
+  const payment = PaymentSolver.resolveRoomPaymentSelection(
     ctx.player,
     ctx.costs,
     rooms.length,
@@ -310,15 +297,15 @@ export const constructAction: ActionDefinition = {
   execute: (context): ActionExecutionResult => {
     const { state, player, costs, actionContext } = context
     const idx = state.players.indexOf(player)
-    const costDelta = readConstructCostDelta(actionContext, costs)
+    const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
     let farm = playerBoard(state, idx).farmyard.selectableTiles('room', {
       costOverride: costDelta,
-      exactCost: readExactCost(actionContext),
+      exactCost: PaymentSolver.readExactCost(actionContext),
       actionContext,
     })
     const roomFarm = farm.farmType === 'room' ? farm : undefined
     if (roomFarm) {
-      const maxBuildableRooms = getMaxBuildableRooms(
+      const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
         player,
         costs,
         actionContext,
@@ -381,7 +368,7 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail' }
       }
 
-      const maxBuildableRooms = getMaxBuildableRooms(
+      const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
         ctx.player,
         ctx.costs,
         ctx.actionContext,
@@ -391,7 +378,7 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', errorKey: 'log.buildRoomFail' }
       }
 
-      const payment = resolveRoomPaymentSelection(
+      const payment = PaymentSolver.resolveRoomPaymentSelection(
         ctx.player,
         ctx.costs,
         rooms.length,

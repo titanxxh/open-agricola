@@ -1,5 +1,8 @@
 export { PaymentSolver } from './solver'
 export type {
+  ConstructCostAdjustments,
+} from './internal/room-payment'
+export type {
   Cost,
   Option,
   PaymentChoice,

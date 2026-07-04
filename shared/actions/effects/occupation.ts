@@ -2,18 +2,6 @@ import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, Actio
 import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
-import {
-  canAffordCardPreviewCostByProvider,
-  payCardPreviewCostByProvider,
-  filterPaymentSolutionsByReserve,
-  payTypedFlatCost,
-  readExactCost,
-  resolveCardPreviewCostByProvider,
-  resolveExactUnitCost,
-} from '../payment/internal'
-// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
 import { PaymentSolver } from '../payment'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCardEffect } from './internal/activate-card-effect'
@@ -64,7 +52,7 @@ const canAffordOccupationPreviewCost = (
   costOverride?: Partial<PlayerState['resources']>,
   actionCardId?: string,
 ) =>
-  canAffordCardPreviewCostByProvider(
+  PaymentSolver.canAffordCardPreviewCostByProvider(
     state,
     player,
     'occupation',
@@ -108,7 +96,7 @@ export const playOccupation = (
   }
   const cost = buildOccupationCostProvider(player, occupationId, costOverride)()
   const paySucceeded = state
-    ? payCardPreviewCostByProvider(
+    ? PaymentSolver.payCardPreviewCostByProvider(
         state,
         player,
         'occupation',
@@ -117,7 +105,7 @@ export const playOccupation = (
         actionCardId,
         'occupation',
       )
-    : payTypedFlatCost(
+    : PaymentSolver.payTypedFlatCost(
         player,
         cost,
         'occupation',
@@ -261,8 +249,8 @@ const getOccupationActionBaseCost = (
   spaceId: string,
   params?: Record<string, unknown>,
 ) => {
-  const exactCost = readExactCost(params)
-  if (exactCost) return resolveExactUnitCost(exactCost, 1)
+  const exactCost = PaymentSolver.readExactCost(params)
+  if (exactCost) return PaymentSolver.resolveExactUnitCost(exactCost, 1)
   return getLessonsCost(player, spaceId)
 }
 
@@ -388,7 +376,7 @@ export const collectOccupationActionPaymentOptions = (
   actionCardId?: string,
   reserveResources?: Partial<Resource>,
 ): PaymentSolution[] => {
-  const previewCost = resolveCardPreviewCostByProvider(
+  const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
     state,
     player,
     'occupation',
@@ -404,7 +392,7 @@ export const collectOccupationActionPaymentOptions = (
   const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(previewCost)
     ? previewCost
     : { fee: previewCost }
-  return filterPaymentSolutionsByReserve(
+  return PaymentSolver.filterPaymentSolutionsByReserve(
     player,
     PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
       actionId: 'pay',
@@ -531,7 +519,7 @@ export const playOccupationAction: ActionDefinition = {
     // wood→food) and bonus modifiers participate in the pay leaf's
     // multi-solution enumeration. Without this the pay leaf only sees the
     // raw lessons cost and ignores B109's wood-for-food trade.
-    const previewCost = resolveCardPreviewCostByProvider(
+    const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
       state,
       player,
       'occupation',

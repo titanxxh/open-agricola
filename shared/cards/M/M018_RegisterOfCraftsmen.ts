@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardListenerRegistration } from '../card-listeners'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 import { isMajorImprovementPlayable } from '../../actions/helpers/improvement-helpers'
 
 const CARD_ID = 'M018_RegisterOfCraftsmen'
@@ -15,7 +15,7 @@ const costListener: CardListenerRegistration = {
   deriveCardCostCandidate: (context, candidate) => {
     if (context.actionCardId !== CARD_ID) return null
     if (!context.cardId || !TARGETS.includes(context.cardId as typeof TARGETS[number])) return null
-    return discountCardCostCandidate(candidate, CARD_ID, { stone: 1 })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { stone: 1 })
   },
 }
 

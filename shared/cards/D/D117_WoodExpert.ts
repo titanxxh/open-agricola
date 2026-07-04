@@ -4,7 +4,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { addCardCostCandidateAttribution } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'D117_WoodExpert'
 /**
@@ -35,7 +35,7 @@ const computeCostsListener: CardListenerRegistration = {
     } else {
       resources.wood = afterWood
     }
-    return addCardCostCandidateAttribution(
+    return PaymentSolver.addCardCostCandidateAttribution(
       {
         ...candidate,
         resources,
