@@ -67,7 +67,7 @@ export const D170_FoldBuilder = defineOccupationCard({
     deck: 'D',
     number: 170,
     category: 'FARM_PLANNER',
-    desc: ['This card is an action space for all. It provides a "Build Fences" action and then 1 sheep. If another player uses it, they must first pay you 1 food.'],
+    desc: ['This card is an action space for all. It provides a __Build Fences__ action and then 1 <SHEEP>. If another player uses it, they must first pay you 1 <FOOD>.'],
     cost: {},
     players: '5+',
   },

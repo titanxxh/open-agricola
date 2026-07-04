@@ -39,7 +39,7 @@ export const M065_FireBrigade = defineMinorCard({
     number: 65,
     category: "POINTS_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 2 food. Additionally, if there are forests on at least 2/3/4/5 of your farmyard spaces, you immediately get 1/2/3/4 bonus points. Crops and wood do not count but you can exchange them."
+        "When you play this card, you immediately get 2 <FOOD>. Additionally, if there are <FOREST> on at least 2/3/4/5 of your farmyard spaces, you immediately get 1/2/3/4 bonus <SCORE>. Crops and <WOOD> do not count but you can exchange them."
     ],
     cost: {
         "clay": 1,

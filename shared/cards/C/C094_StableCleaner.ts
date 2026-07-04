@@ -94,7 +94,7 @@ export const C094_StableCleaner = defineOccupationCard({
     deck: 'C',
     number: 94,
     category: 'ACTIONS_BOOSTER',
-    desc: ['At any time, you can take the __Build Stables__ action without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.'],
+    desc: ['At any time, you can take the __Build Stables__ action without placing a person. If you do, each <STABLE> costs you 1 <WOOD> and 1 <FOOD>.'],
     cost: {},
     players: '1+',
   },

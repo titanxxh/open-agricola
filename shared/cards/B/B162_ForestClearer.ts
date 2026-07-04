@@ -51,7 +51,7 @@ export const B162_ForestClearer = defineOccupationCard({
     number: 162,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'Each time you obtain exactly 2/3/4 <WOOD> from a wood accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>.',
+        'Each time you obtain exactly 2/3/4 <WOOD> from a <WOOD> accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>.',
       ],
     cost: {},
     players: '4+',

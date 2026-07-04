@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
-import { applyTradeSideEffect } from '../../shared/actions/payment/internal'
+import { PaymentSolver } from '../../shared/actions/payment'
 
 import '../../shared/cards/C/C062_CookeryExtension'
 
@@ -195,7 +195,7 @@ describe('C62 + harvest feed integration (simplified)', () => {
     })
 
     applyTrade(p1, derived!, 1)
-    applyTradeSideEffect(state, p1, derived!.sideEffect!, 1, derived!.sourceId ?? 'unknown')
+    PaymentSolver.applyTradeSideEffect(state, p1, derived!.sideEffect!, 1, derived!.sourceId ?? 'unknown')
 
     expect(p1.resources.vegetable).toBe(0)
     expect(p1.resources.food).toBe(4)

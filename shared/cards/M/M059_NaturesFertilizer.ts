@@ -85,7 +85,7 @@ export const M059_NaturesFertilizer = defineMinorCard({
     number: 59,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Each time after you take the \"Slash and Burn\" special action, you also get a \"Sow\" action for the new field only. This also applies when you exchange 1 moor for 1 field tile via a minor improvement."
+        "Each time after you take the __Slash and Burn__ special action, you also get a __Sow__ action for the new <FIELD> only. This also applies when you exchange 1 <MOOR> for 1 <FIELD> tile via a minor improvement."
     ],
     cost: {
         "vegetable": 2,

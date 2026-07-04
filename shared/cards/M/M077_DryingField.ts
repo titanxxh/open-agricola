@@ -38,7 +38,7 @@ export const M077_DryingField = defineMinorCard({
     number: 77,
     category: "GOODS_PROVIDER",
     desc: [
-        "Each time you take the \"Cut Peat\" special action, add 3 to the current round and place 2 fuel on the corresponding round space. At the start of that round, you get the fuel."
+        "Each time you take the __Cut Peat__ special action, add 3 to the current round and place 2 <FUEL> on the corresponding round space. At the start of that round, you get the <FUEL>."
     ],
     cost: {
         "vegetable": 2

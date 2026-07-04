@@ -46,7 +46,7 @@ export const D058_Gritter = defineMinorCard({
     number: 58,
     category: 'FOOD_PROVIDER',
     desc: [
-        'At the end of each action in which you sow vegetables in a field, you get 1 <FOOD> for each vegetable field you have (including the new ones).',
+        'At the end of each action in which you sow <VEGETABLE> in a <FIELD>, you get 1 <FOOD> for each <VEGETABLE> <FIELD> you have (including the new ones).',
       ],
     cost: { wood: 1 },
     prerequisite: 'Play in Round 5 or Later',

@@ -30,7 +30,7 @@ export const A047_Trellises = defineMinorCard({
     deck: 'A',
     number: 47,
     category: 'FOOD_PROVIDER',
-    desc: ['Immediately place 1 <FOOD> on each of the next round spaces, up to the number of fences you have built. At the start of these rounds, you get the <FOOD>.'],
+    desc: ['Immediately place 1 <FOOD> on each of the next round spaces, up to the number of <FENCE> you have built. At the start of these rounds, you get the <FOOD>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

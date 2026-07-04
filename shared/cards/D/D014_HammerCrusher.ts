@@ -51,7 +51,7 @@ export const D014_HammerCrusher = defineMinorCard({
     deck: "D",
     number: 14,
     category: "FARM_PLANNER",
-    desc: ["Immediately before you renovate to stone, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."],
+    desc: ["Immediately before you renovate to <STONE>, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."],
     cost: {"wood":1},
   },
   impl: cardImpl,

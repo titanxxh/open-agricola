@@ -23,7 +23,7 @@ export const A002_ShiftingCultivation = defineMinorCard({
     deck: 'A',
     number: 2,
     category: 'FARM_PLANNER',
-    desc: ['Immediately plow 1 field.'],
+    desc: ['Immediately plow 1 <FIELD>.'],
     cost: { food: 2 },
     passing: true,
   },

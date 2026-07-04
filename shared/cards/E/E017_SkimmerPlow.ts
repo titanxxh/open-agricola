@@ -37,7 +37,7 @@ export const E017_SkimmerPlow = defineMinorCard({
     deck: 'E',
     number: 17,
     category: 'FARMYARD_-_PLOWING',
-    desc: ['Each time you use the __Farmland__ or __Cultivation__  action space, you can plow 2 fields instead of 1. Each time you sow, you must place 1 fewer good on each field you sow.'],
+    desc: ['Each time you use the __Farmland__ or __Cultivation__  action space, you can plow 2 <FIELD> instead of 1. Each time you sow, you must place 1 fewer good on each <FIELD> you sow.'],
     cost: { wood: 1 },
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },

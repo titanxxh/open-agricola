@@ -40,7 +40,7 @@ export const M100_Pheromones = defineMinorCard({
     number: 100,
     category: "FOOD_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 1 food. Additionally, each player, including you, with at least 1 stable or pasture immediately gets 2 food."
+        "When you play this card, you immediately get 1 <FOOD>. Additionally, each player, including you, with at least 1 <STABLE> or pasture immediately gets 2 <FOOD>."
     ],
     cost: {},
     prerequisite: "At Most 2 Improvements",

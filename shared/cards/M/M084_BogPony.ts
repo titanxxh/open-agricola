@@ -123,7 +123,7 @@ export const M084_BogPony = defineMinorCard({
     number: 84,
     category: "GOODS_PROVIDER",
     desc: [
-        "At any time, you can lie a standing horse on its side to get 2 fuel. Lying horses do not count for breeding and are only worth 1/2 point during scoring. They can, however, be turned into food with an appropriate improvement."
+        "At any time, you can lie a standing <HORSE> on its side to get 2 <FUEL>. Lying <HORSE> do not count for breeding and are only worth 1/2 point during scoring. They can, however, be turned into <FOOD> with an appropriate improvement."
     ],
     cost: {},
     prerequisite: "1 Major Improvement",

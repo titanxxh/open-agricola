@@ -25,7 +25,7 @@ export const M023_EdgeOfTheForest = defineMinorCard({
     number: 23,
     category: "GOODS_PROVIDER",
     desc: [
-        "You immediately get 1 <FOOD> for each of your fence spaces between a forest and a field, and 1 <FUEL> for each of your fence spaces between a forest and a moor."
+        "You immediately get 1 <FOOD> for each of your <FENCE> spaces between a <FOREST> and a <FIELD>, and 1 <FUEL> for each of your <FENCE> spaces between a <FOREST> and a <MOOR>."
     ],
     cost: {},
     prerequisite: "3 Improvements",

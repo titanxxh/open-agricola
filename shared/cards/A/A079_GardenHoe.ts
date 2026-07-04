@@ -35,7 +35,7 @@ export const A079_GardenHoe = defineMinorCard({
     deck: "A",
     number: 79,
     category: "BUILDING_RESOURCE_PROVIDER",
-    desc: ["Each time you take an unconditional __Sow__ action planting <VEGETABLE> in at least 1 field, you get 1 <CLAY> and 1 <STONE>."],
+    desc: ["Each time you take an unconditional __Sow__ action planting <VEGETABLE> in at least 1 <FIELD>, you get 1 <CLAY> and 1 <STONE>."],
     cost: {"wood":1},
   },
   impl: cardImpl,

@@ -34,7 +34,7 @@ export const C089_StableMaster = defineOccupationCard({
     deck: 'C',
     number: 89,
     category: 'FARM_PLANNER',
-    desc: ['When you play this card, you can immediately build exactly 1 stable for 1 <WOOD>. Exactly one of your unfenced stables can hold up to 3 animals of one type.'],
+    desc: ['When you play this card, you can immediately build exactly 1 <STABLE> for 1 <WOOD>. Exactly one of your unfenced <STABLE> can hold up to 3 animals of one type.'],
     cost: {},
     players: '1+',
   },

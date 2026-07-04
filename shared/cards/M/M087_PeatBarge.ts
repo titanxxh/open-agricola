@@ -30,7 +30,7 @@ export const M087_PeatBarge = defineMinorCard({
     number: 87,
     category: "GOODS_PROVIDER",
     desc: [
-        "Each time you use the \"Fishing\" accumulation space, you also get 2 fuel."
+        "Each time you use the __Fishing__ accumulation space, you also get 2 <FUEL>."
     ],
     cost: {
         "wood": 2

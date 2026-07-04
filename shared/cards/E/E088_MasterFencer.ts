@@ -64,7 +64,7 @@ export const E088_MasterFencer = defineOccupationCard({
     deck: 'E',
     number: 88,
     category: 'FARMYARD_-_FENCING',
-    desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
+    desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 <FENCE>, respectively.'],
     cost: {},
     players: '1+',
   },

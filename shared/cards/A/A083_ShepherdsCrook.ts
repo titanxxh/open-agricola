@@ -50,7 +50,7 @@ export const A083_ShepherdsCrook = defineMinorCard({
     deck: "A",
     number: 83,
     category: "LIVESTOCK_PROVIDER",
-    desc: ["Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."],
+    desc: ["Each time you <FENCE> a new pasture covering at least 4 farmyard spaces, you immediately get 2 <SHEEP> on this pasture."],
     cost: {"wood":1},
   },
   impl: cardImpl,

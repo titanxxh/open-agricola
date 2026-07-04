@@ -16,8 +16,8 @@ export const D025_WitchesDanceFloor = defineMinorCard({
     number: 25,
     category: 'ACTIONS_BOOSTER',
     desc: [
-        'This card is a field that you can sow in, an occupation, and the "Fireplace" major improvement with all of its effects.',
-        'You can play it only via a "Minor Improvement" action.',
+        'This card is a <FIELD> that you can sow in, an occupation, and the "Fireplace" major improvement with all of its effects.',
+        'You can play it only via a __Minor Improvement__ action.',
         '[Anytime]',
         '<VEGETABLE> <ARROW> 2<FOOD>      <BOAR> <ARROW> 2<FOOD>',
         '<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>',

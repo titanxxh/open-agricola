@@ -40,7 +40,7 @@ export const C015_Trellis = defineMinorCard({
     deck: 'C',
     number: 15,
     category: 'FARM_PLANNER',
-    desc: ['Each time before you use the __Pig Market__ accumulation space, you can take a __Build Fences__ action. (You must pay <WOOD> for the fences as usual.)'],
+    desc: ['Each time before you use the __Pig Market__ accumulation space, you can take a __Build Fences__ action. (You must pay <WOOD> for the <FENCE> as usual.)'],
     cost: {},
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },

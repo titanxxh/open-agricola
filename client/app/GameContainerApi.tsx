@@ -4,7 +4,6 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
-import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
@@ -76,11 +75,13 @@ import {
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
+  mergePublicEventCardPassAnimations,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
   pendingMoorSpecialActionKey,
   pendingMoorSpecialActionTileKey,
   playerIdFromWsStatus,
+  removePublicEventCardPassAnimations,
   removePublicEventHighlights,
   removePublicEventResourceAnimations,
   shouldShowDevPanel,
@@ -109,6 +110,7 @@ import {
   emptyPublicEventHighlightTargets,
   type PublicEventHighlightTargets,
   type PublicEventNotification,
+  type PublicEventCardPassAnimation as PublicEventCardPassAnimationCue,
   type PublicEventResourceAnimation,
 } from './public-event-notifications'
 import {
@@ -386,12 +388,14 @@ export const GameContainerApi = () => {
   const publicEventNotificationTimersRef = useRef<number[]>([])
   const publicEventHighlightTimersRef = useRef<number[]>([])
   const publicEventResourceAnimationTimersRef = useRef<number[]>([])
+  const publicEventCardPassAnimationTimersRef = useRef<number[]>([])
   const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
   const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
   const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
   const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
+  const [publicEventCardPassAnimations, setPublicEventCardPassAnimations] = useState<PublicEventCardPassAnimationCue[]>([])
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
   const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
@@ -432,6 +436,8 @@ export const GameContainerApi = () => {
     publicEventHighlightTimersRef.current = []
     publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     publicEventResourceAnimationTimersRef.current = []
+    publicEventCardPassAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventCardPassAnimationTimersRef.current = []
   }, [])
 
   const clearPublicEventFeedback = useCallback(() => {
@@ -439,6 +445,7 @@ export const GameContainerApi = () => {
     setPublicEventNotifications([])
     setPublicEventHighlights(emptyPublicEventHighlightTargets())
     setPublicEventResourceAnimations([])
+    setPublicEventCardPassAnimations([])
   }, [clearPublicEventFeedbackTimers])
 
   const clearReplayCue = useCallback(() => {
@@ -503,6 +510,19 @@ export const GameContainerApi = () => {
           publicEventResourceAnimationTimersRef.current.filter((entry) => entry !== timer)
       }, 1400)
       publicEventResourceAnimationTimersRef.current.push(timer)
+    }
+    if (batch.cardPassAnimations.length > 0) {
+      setPublicEventCardPassAnimations((current) =>
+        mergePublicEventCardPassAnimations(current, batch.cardPassAnimations).slice(0, 12),
+      )
+      const timer = window.setTimeout(() => {
+        setPublicEventCardPassAnimations((current) =>
+          removePublicEventCardPassAnimations(current, batch.cardPassAnimations),
+        )
+        publicEventCardPassAnimationTimersRef.current =
+          publicEventCardPassAnimationTimersRef.current.filter((entry) => entry !== timer)
+      }, 1400)
+      publicEventCardPassAnimationTimersRef.current.push(timer)
     }
     if (batch.notifications.length > 0) {
       setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
@@ -1382,6 +1402,13 @@ export const GameContainerApi = () => {
     ).slice(0, 12),
     [publicEventResourceAnimations, replayFeedback.resourceAnimations],
   )
+  const displayPublicEventCardPassAnimations = useMemo(
+    () => mergePublicEventCardPassAnimations(
+      publicEventCardPassAnimations,
+      replayFeedback.cardPassAnimations,
+    ).slice(0, 12),
+    [publicEventCardPassAnimations, replayFeedback.cardPassAnimations],
+  )
   const highlightedActionIds = useMemo(
     () => new Set(displayPublicEventHighlights.actionIds),
     [displayPublicEventHighlights.actionIds],
@@ -2208,7 +2235,7 @@ export const GameContainerApi = () => {
         locale={locale}
       />
       <PublicEventCardPassAnimation
-        events={(state.events ?? []).filter((e): e is CardPassedEvent => e.type === 'card.passed')}
+        animations={displayPublicEventCardPassAnimations}
       />
       {selfPlayer ? (
         <OrdinaryCardDrawOverlay

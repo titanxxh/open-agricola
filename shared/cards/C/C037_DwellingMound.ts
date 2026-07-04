@@ -26,7 +26,7 @@ export const C037_DwellingMound = defineMinorCard({
     deck: "C",
     number: 37,
     category: "POINTS_PROVIDER",
-    desc: ["From now on, you must pay 1 <FOOD> for each new field tile that you place in your farmyard."],
+    desc: ["From now on, you must pay 1 <FOOD> for each new <FIELD> tile that you place in your farmyard."],
     cost: { food: 1 },
     prerequisite: "Play in Round 3 or Before",
     maxRound: 3,

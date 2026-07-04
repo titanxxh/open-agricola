@@ -16,7 +16,7 @@ export const E080_RockGarden = defineMinorCard({
     number: 80,
     category: 'BUILDING_RESOURCES_-_STONE',
     desc: [
-        'You can only plant <STONE> on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest <STONE> on this card as you would vegetables.',
+        'You can only plant <STONE> on this card. Plant as though it were 3 <FIELD>, but it is considered 1 <FIELD>. Sow and harvest <STONE> on this card as you would <VEGETABLE>.',
       ],
     isField: true,
     cardField: { allowedCrops: ['stone'], capacity: 3 },

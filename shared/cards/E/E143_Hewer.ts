@@ -38,7 +38,7 @@ export const E143_Hewer = defineOccupationCard({
     number: 143,
     category: 'BUILDING_RESOURCES_-_CLAY_OR_STONE',
     desc: [
-        'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
+        'From round 3 on, at the end of each work phase in which all <CLAY> accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
       ],
     cost: {},
     players: '3+',

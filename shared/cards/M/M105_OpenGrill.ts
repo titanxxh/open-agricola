@@ -10,7 +10,7 @@ export const M105_OpenGrill = defineMinorCard({
     number: 105,
     category: "FOOD_PROVIDER",
     desc: [
-        "At any time: <VEGETABLE> <ARROW> 2 <FOOD>; <SHEEP> <ARROW> 2 <FOOD>; <PIG> <ARROW> 3 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>. \"Bake Bread\" action: <GRAIN> <ARROW> 2 <FOOD>."
+        "At any time: <VEGETABLE> <ARROW> 2 <FOOD>; <SHEEP> <ARROW> 2 <FOOD>; <PIG> <ARROW> 3 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>. __Bake Bread__ action: <GRAIN> <ARROW> 2 <FOOD>."
     ],
     cost: {},
     vp: 2,

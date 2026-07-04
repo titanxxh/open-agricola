@@ -334,6 +334,7 @@ describe('event mapping policy', () => {
       'shared/contract/events.ts',
       'shared/events/guards.ts',
       'shared/events/event-mapping-policy.ts',
+      'shared/events/public-event-presentation.ts',
       'shared/events/log-mapper.ts',
       'shared/events/__tests__/log-mapper.test.ts',
       'shared/actions/effects/improvement.ts',
@@ -342,9 +343,9 @@ describe('event mapping policy', () => {
       'server/__tests__/M027_M093_M102_moor-cross-player-markers-session.test.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
-      'client/components/effects/PublicEventCardPassAnimation.tsx',
-      'client/components/effects/__tests__/PublicEventCardPassAnimation.test.tsx',
-      'client/app/GameContainerApi.tsx',
+      'shared/events/__tests__/public-event-presentation.test.ts',
+      'client/app/__tests__/public-event-notifications.test.ts',
+      'client/app/__tests__/GameContainerApi.ws.test.ts',
     ]
     const unexpectedEmitters = findCardPassedReferences()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))

@@ -51,7 +51,7 @@ export const M039_SpecialPasture = defineMinorCard({
     number: 39,
     category: "FARM_PLANNER",
     desc: [
-        "Immediately fence a farmyard space that is not adjacent to an existing pasture, without paying wood for the fences. You can connect your pastures later. All future pastures must be adjacent to at least one existing pasture."
+        "Immediately <FENCE> a farmyard space that is not adjacent to an existing pasture, without paying <WOOD> for the <FENCE>. You can connect your pastures later. All future pastures must be adjacent to at least one existing pasture."
     ],
     cost: {
         "wood": 2

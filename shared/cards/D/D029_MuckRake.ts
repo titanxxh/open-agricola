@@ -26,7 +26,7 @@ export const D029_MuckRake = defineMinorCard({
     number: 29,
     category: "POINTS_PROVIDER",
     desc: [
-        'During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced stable holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced stables.',
+        'During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced <STABLE> holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced <STABLE>.',
       ],
     cost: { wood: 1 },
     extraVp: true,

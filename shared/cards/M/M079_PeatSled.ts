@@ -41,7 +41,7 @@ export const M079_PeatSled = defineMinorCard({
     number: 79,
     category: "GOODS_PROVIDER",
     desc: [
-        "Add your choice of 2/4/7/10 to the current round and place 3/4/5/6 fuel on the corresponding round space. At the start of that round, you get the fuel."
+        "Add your choice of 2/4/7/10 to the current round and place 3/4/5/6 <FUEL> on the corresponding round space. At the start of that round, you get the <FUEL>."
     ],
     cost: {
         "wood": 1

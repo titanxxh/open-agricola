@@ -22,7 +22,7 @@ export const M046_Thicket = defineMinorCard({
     number: 46,
     category: "FARM_PLANNER",
     desc: [
-        "Choose up to 2 of your forests and place 1 additional forest on top of each of them. You cannot take the \"Slash and Burn\" special action on these farmyard spaces unless you remove a tile with a \"Fell Trees\" special action first."
+        "Choose up to 2 of your <FOREST> and place 1 additional <FOREST> on top of each of them. You cannot take the __Slash and Burn__ special action on these farmyard spaces unless you remove a tile with a __Fell Trees__ special action first."
     ],
     cost: {},
     prerequisite: "4 Forests",

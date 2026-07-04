@@ -60,7 +60,7 @@ export const B051_DiggingSpade = defineMinorCard({
     number: 51,
     category: 'FOOD_PROVIDER',
     desc: [
-        'Each time you use a clay accumulation space, you also get a number of <FOOD> equal to the number of <PIG> in your farmyard.',
+        'Each time you use a <CLAY> accumulation space, you also get a number of <FOOD> equal to the number of <PIG> in your farmyard.',
       ],
     cost: { wood: 1 },
     prerequisite: 'Play in Round 7 or Later',

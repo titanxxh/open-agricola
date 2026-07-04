@@ -63,7 +63,7 @@ export const C018_RollOverPlow = defineMinorCard({
     deck: 'C',
     number: 18,
     category: 'FARM_PLANNER',
-    desc: ['At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field.'],
+    desc: ['At any time, if you have at least 3 planted <FIELD>, you can discard all goods from one of those <FIELD> to plow 1 <FIELD>.'],
     cost: { wood: 2 },
   },
   impl: cardImpl,

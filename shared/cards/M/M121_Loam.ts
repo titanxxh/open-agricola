@@ -34,7 +34,7 @@ export const M121_Loam = defineMinorCard({
     number: 121,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "In each work phase, if you have placed all but one of your people when taking the \"Hiring Fair\" special action, you also get 1 clay."
+        "In each work phase, if you have placed all but one of your people when taking the __Hiring Fair__ special action, you also get 1 <CLAY>."
     ],
     cost: {},
     prerequisite: "1 Improvement",

@@ -30,7 +30,7 @@ export const M130_Nosebag = defineMinorCard({
     number: 130,
     category: "LIVESTOCK_PROVIDER",
     desc: [
-        "Each time you use the \"Grain Seeds\" action space, you also get 1 horse."
+        "Each time you use the __Grain Seeds__ action space, you also get 1 <HORSE>."
     ],
     cost: {
         "vegetable": 1

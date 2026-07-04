@@ -11,12 +11,7 @@ import type {
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
-// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
-// exchange.ts only uses applyTradeSideEffect (shim scope), so no PaymentSolver
-// call sites exist here yet.
-import { applyTradeSideEffect } from '../payment/internal'
+import { PaymentSolver } from '../payment'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
@@ -528,7 +523,7 @@ const resolveExchangeChoice = (
         applyTrade(player, trade, times, animalPaymentPreference, state)
         recordCookeryConversion(player, trade, times)
         if (trade.sideEffect) {
-          applyTradeSideEffect(
+          PaymentSolver.applyTradeSideEffect(
             state,
             player,
             trade.sideEffect,
@@ -569,7 +564,7 @@ const resolveExchangeChoice = (
       applyTrade(player, trade, times, animalPaymentPreference, state)
       recordCookeryConversion(player, trade, times)
       if (trade.sideEffect) {
-        applyTradeSideEffect(
+        PaymentSolver.applyTradeSideEffect(
           state,
           player,
           trade.sideEffect,
@@ -649,7 +644,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       applyTrade(player, directTrade, 1, animalPaymentPreference, state)
       recordCookeryConversion(player, directTrade, 1)
       if (directTrade.sideEffect) {
-        applyTradeSideEffect(
+        PaymentSolver.applyTradeSideEffect(
           state,
           player,
           directTrade.sideEffect,

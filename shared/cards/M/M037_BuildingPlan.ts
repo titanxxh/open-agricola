@@ -39,7 +39,7 @@ export const M037_BuildingPlan = defineMinorCard({
     number: 37,
     category: "FARM_PLANNER",
     desc: [
-        "Each time after you build at least 2 rooms at once, you can build up to 2 stables without paying wood."
+        "Each time after you build at least 2 rooms at once, you can build up to 2 <STABLE> without paying <WOOD>."
     ],
     cost: {
         "food": 1

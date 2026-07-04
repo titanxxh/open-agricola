@@ -62,32 +62,6 @@ const animalCounts = (state: GameState, player: PlayerState): Partial<Record<Ani
   return counts
 }
 
-const manualRequirementSatisfied = (
-  state: GameState,
-  player: PlayerState,
-  key: string,
-): boolean => {
-  const totalCards = key.match(/^total-cards-in-play-including-parents-at-least-(\d+)$/)
-  if (totalCards) return totalCardsIncludingParents(player) >= Number(totalCards[1])
-
-  const unusedSpaces = key.match(/^unused-farmyard-spaces-at-most-(\d+)$/)
-  if (unusedSpaces) return countUnusedFarmyardSpaces(player) <= Number(unusedSpaces[1])
-
-  const animalTypes = key.match(/^animal-type-count-at-least-(\d+)$/)
-  if (animalTypes) {
-    const required = Number(animalTypes[1])
-    return Object.values(animalCounts(state, player)).filter((count) => count > 0).length >= required
-  }
-
-  const sameAnimal = key.match(/^same-animal-type-at-least-(\d+)$/)
-  if (sameAnimal) {
-    const required = Number(sameAnimal[1])
-    return Object.values(animalCounts(state, player)).some((count) => count >= required)
-  }
-
-  return false
-}
-
 export const isFatherRequirementSatisfied = (
   state: GameState,
   player: PlayerState,
@@ -103,6 +77,10 @@ export const isFatherRequirementSatisfied = (
       }
       return (counts[requirement.animal] ?? 0) >= requirement.amount
     }
+    case 'animal-type-count-at-least':
+      return Object.values(animalCounts(state, player)).filter((count) => count > 0).length >= requirement.amount
+    case 'same-animal-type-at-least':
+      return Object.values(animalCounts(state, player)).some((count) => count >= requirement.amount)
     case 'farm-count-at-least':
       switch (requirement.target) {
         case 'room':
@@ -123,14 +101,16 @@ export const isFatherRequirementSatisfied = (
           return countUnusedFarmyardSpaces(player) >= requirement.amount
       }
       return false
+    case 'unused-farmyard-spaces-at-most':
+      return countUnusedFarmyardSpaces(player) <= requirement.amount
     case 'played-card-at-least':
       return countPlayedCards(player, requirement) >= requirement.amount
+    case 'total-cards-in-play-including-parents-at-least':
+      return totalCardsIncludingParents(player) >= requirement.amount
     case 'all':
       return requirement.requirements.every((child) => isFatherRequirementSatisfied(state, player, child))
     case 'any':
       return requirement.requirements.some((child) => isFatherRequirementSatisfied(state, player, child))
-    case 'manual':
-      return manualRequirementSatisfied(state, player, requirement.key)
   }
 }
 

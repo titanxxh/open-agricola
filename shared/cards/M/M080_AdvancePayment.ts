@@ -29,7 +29,7 @@ export const M080_AdvancePayment = defineMinorCard({
     number: 80,
     category: "GOODS_PROVIDER",
     desc: [
-        "You immediately get 1 fuel, 1 food, 1 wood, 1 clay, 1 reed, 1 stone, 1 sheep, and 1 grain."
+        "You immediately get 1 <FUEL>, 1 <FOOD>, 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <SHEEP>, and 1 <GRAIN>."
     ],
     cost: {},
     vp: -4,

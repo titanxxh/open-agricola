@@ -6,10 +6,7 @@ import { collectPrivateEventNotifications } from '../private-event-notifications
 import {
   buildEventNotificationStackItems,
   collectNewPublicEventFeedback,
-  collectNewPublicEventNotifications,
-  collectPublicEventHighlightTargets,
-  collectPublicEventNotifications,
-  collectPublicEventResourceAnimations,
+  collectPublicEventFeedback,
   maxPublicEventSeq,
 } from '../public-event-notifications'
 
@@ -29,6 +26,29 @@ type ClientConsumerFixtures = {
   silent?: GameEvent
 }
 type ClientFixtureMatrix = Partial<Record<GameEvent['type'], Partial<Record<ClientConsumerSurface, ClientConsumerFixtures>>>>
+type PublicEventFeedbackLocale = Parameters<typeof collectPublicEventFeedback>[1]
+
+const collectPublicEventNotifications = (
+  events: readonly GameEvent[],
+  locale: PublicEventFeedbackLocale,
+  idPrefix = '',
+) => collectPublicEventFeedback(events, locale, idPrefix).notifications
+
+const collectNewPublicEventNotifications = (
+  events: readonly GameEvent[],
+  lastSeenSeq: number | null,
+  locale: PublicEventFeedbackLocale,
+  idPrefix = '',
+) => {
+  const { notifications, nextCursor } = collectNewPublicEventFeedback(events, lastSeenSeq, locale, idPrefix)
+  return { notifications, nextCursor }
+}
+
+const collectPublicEventHighlightTargets = (events: readonly GameEvent[]) =>
+  collectPublicEventFeedback(events, 'en').highlights
+
+const collectPublicEventResourceAnimations = (events: readonly GameEvent[]) =>
+  collectPublicEventFeedback(events, 'en').resourceAnimations
 
 const clientFixtureMatrix = {
   'resource.moved': {
@@ -522,6 +542,7 @@ describe('public event notifications', () => {
       notifications: [],
       highlights: { actionIds: [], farmTiles: [], fenceEdges: [] },
       resourceAnimations: [],
+      cardPassAnimations: [],
       nextCursor: 2,
     })
   })
@@ -600,6 +621,28 @@ describe('public event notifications', () => {
     expect(collectPublicEventHighlightTargets([silent]).actionIds).toEqual(['reed-bank'])
     expect(collectPublicEventResourceAnimations([silent])).toEqual([
       expect.objectContaining({ id: 'evt:accumulate:0', resources: { reed: 1 } }),
+    ])
+  })
+
+  it('projects card pass events into feedback animations', () => {
+    const passed = {
+      ...base,
+      type: 'card.passed',
+      fromPlayerId: 'p1',
+      toPlayerId: 'p2',
+      cardId: 'A004_Passed',
+    } satisfies GameEvent
+
+    const feedback = collectNewPublicEventFeedback([passed], 0, 'en')
+
+    expect(feedback.cardPassAnimations).toEqual([
+      {
+        id: 'evt:card-pass:0',
+        eventId: 'evt',
+        cardId: 'A004_Passed',
+        fromPlayerId: 'p1',
+        toPlayerId: 'p2',
+      },
     ])
   })
 

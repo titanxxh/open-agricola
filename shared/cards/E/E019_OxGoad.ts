@@ -38,7 +38,7 @@ export const E019_OxGoad = defineMinorCard({
     deck: 'E',
     number: 19,
     category: 'FARMYARD_-_PLOWING',
-    desc: ['Each time after you use the __Cattle Market__ accumulation space, you can pay 2 <FOOD> to plow 1 field.'],
+    desc: ['Each time after you use the __Cattle Market__ accumulation space, you can pay 2 <FOOD> to plow 1 <FIELD>.'],
     cost: { wood: 1 },
     vp: 1,
     prerequisite: '3 Occupations',

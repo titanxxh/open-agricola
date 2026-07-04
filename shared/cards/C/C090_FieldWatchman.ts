@@ -35,7 +35,7 @@ export const C090_FieldWatchman = defineOccupationCard({
     deck: 'C',
     number: 90,
     category: 'FARM_PLANNER',
-    desc: ['Each time you use the __Grain Seeds__ action space, you can also plow 1 field.'],
+    desc: ['Each time you use the __Grain Seeds__ action space, you can also plow 1 <FIELD>.'],
     cost: {},
     players: '1+',
   },

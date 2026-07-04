@@ -69,19 +69,19 @@ const expectedFatherCards = {
     rewards: [
       {
         requirementText: 'animals of 1 type',
-        requirement: { type: 'manual', key: 'animal-type-count-at-least-1', reviewed: true },
+        requirement: { type: 'animal-type-count-at-least', amount: 1 },
         rewardText: 'If you do, you immediately get 1 minor improvement. To do so, draw three cards of each eligible type and keep one.',
         effects: [{ type: 'manual', key: 'draw-3-minor-improvements-keep-1', reviewed: true }],
       },
       {
         requirementText: 'animals of 2 types',
-        requirement: { type: 'manual', key: 'animal-type-count-at-least-2', reviewed: true },
+        requirement: { type: 'animal-type-count-at-least', amount: 2 },
         rewardText: 'If you do, you immediately get 1 occupation. To do so, draw three cards of each eligible type and keep one.',
         effects: [{ type: 'manual', key: 'draw-3-occupations-keep-1', reviewed: true }],
       },
       {
         requirementText: 'animals of 3 types',
-        requirement: { type: 'manual', key: 'animal-type-count-at-least-3', reviewed: true },
+        requirement: { type: 'animal-type-count-at-least', amount: 3 },
         rewardText: 'If you do, you immediately get both 1 minor improvement and 1 occupation. To do so, draw three cards of each eligible type and keep one.',
         effects: [{ type: 'manual', key: 'draw-3-minor-improvements-and-3-occupations-keep-1-each', reviewed: true }],
       },
@@ -92,19 +92,19 @@ const expectedFatherCards = {
     rewards: [
       {
         requirementText: '3 animals of the same type',
-        requirement: { type: 'manual', key: 'same-animal-type-at-least-3', reviewed: true },
+        requirement: { type: 'same-animal-type-at-least', amount: 3 },
         rewardText: 'If you do, you immediately get 1 different building resource of your choice.',
         effects: [{ type: 'manual', key: 'choose-1-different-building-resource', reviewed: true }],
       },
       {
         requirementText: '4 animals of the same type',
-        requirement: { type: 'manual', key: 'same-animal-type-at-least-4', reviewed: true },
+        requirement: { type: 'same-animal-type-at-least', amount: 4 },
         rewardText: 'If you do, you immediately get 2 different building resources of your choice.',
         effects: [{ type: 'manual', key: 'choose-2-different-building-resources', reviewed: true }],
       },
       {
         requirementText: '6 animals of the same type',
-        requirement: { type: 'manual', key: 'same-animal-type-at-least-6', reviewed: true },
+        requirement: { type: 'same-animal-type-at-least', amount: 6 },
         rewardText: 'If you do, you immediately get 3 different building resources of your choice.',
         effects: [{ type: 'manual', key: 'choose-3-different-building-resources', reviewed: true }],
       },
@@ -138,19 +138,19 @@ const expectedFatherCards = {
     rewards: [
       {
         requirementText: '6 total cards in play, including the parent cards',
-        requirement: { type: 'manual', key: 'total-cards-in-play-including-parents-at-least-6', reviewed: true },
+        requirement: { type: 'total-cards-in-play-including-parents-at-least', amount: 6 },
         rewardText: 'If you do, you immediately get 1 food.',
         effects: [{ type: 'gain-resources', resources: { food: 1 } }],
       },
       {
         requirementText: '8 total cards in play, including the parent cards',
-        requirement: { type: 'manual', key: 'total-cards-in-play-including-parents-at-least-8', reviewed: true },
+        requirement: { type: 'total-cards-in-play-including-parents-at-least', amount: 8 },
         rewardText: 'If you do, you immediately get 3 food.',
         effects: [{ type: 'gain-resources', resources: { food: 3 } }],
       },
       {
         requirementText: '10 total cards in play, including the parent cards',
-        requirement: { type: 'manual', key: 'total-cards-in-play-including-parents-at-least-10', reviewed: true },
+        requirement: { type: 'total-cards-in-play-including-parents-at-least', amount: 10 },
         rewardText: 'If you do, you immediately get 5 food.',
         effects: [{ type: 'gain-resources', resources: { food: 5 } }],
       },
@@ -162,19 +162,19 @@ const expectedFatherCards = {
       {
         requirementText: '2 occupations',
         requirement: { type: 'played-card-at-least', cardType: 'occupation', amount: 2 },
-        rewardText: 'If you do, you can immediately sow up to 1 field. (This is considered a single "Sow" action.)',
+        rewardText: 'If you do, you can immediately sow up to 1 field. (This is considered a single __Sow__ action.)',
         effects: [{ type: 'manual', key: 'sow-up-to-1-field-single-sow-action', reviewed: true }],
       },
       {
         requirementText: '3 occupations',
         requirement: { type: 'played-card-at-least', cardType: 'occupation', amount: 3 },
-        rewardText: 'If you do, you can immediately sow up to 2 fields. (This is considered a single "Sow" action.)',
+        rewardText: 'If you do, you can immediately sow up to 2 fields. (This is considered a single __Sow__ action.)',
         effects: [{ type: 'manual', key: 'sow-up-to-2-fields-single-sow-action', reviewed: true }],
       },
       {
         requirementText: '4 occupations',
         requirement: { type: 'played-card-at-least', cardType: 'occupation', amount: 4 },
-        rewardText: 'If you do, you can immediately sow up to 3 fields. (This is considered a single "Sow" action.)',
+        rewardText: 'If you do, you can immediately sow up to 3 fields. (This is considered a single __Sow__ action.)',
         effects: [{ type: 'manual', key: 'sow-up-to-3-fields-single-sow-action', reviewed: true }],
       },
     ],
@@ -184,19 +184,19 @@ const expectedFatherCards = {
     rewards: [
       {
         requirementText: 'at most 7 unused farmyard spaces left',
-        requirement: { type: 'manual', key: 'unused-farmyard-spaces-at-most-7', reviewed: true },
+        requirement: { type: 'unused-farmyard-spaces-at-most', amount: 7 },
         rewardText: 'If you do, you immediately get 1 grain.',
         effects: [{ type: 'gain-resources', resources: { grain: 1 } }],
       },
       {
         requirementText: 'at most 5 unused farmyard spaces left',
-        requirement: { type: 'manual', key: 'unused-farmyard-spaces-at-most-5', reviewed: true },
+        requirement: { type: 'unused-farmyard-spaces-at-most', amount: 5 },
         rewardText: 'If you do, you immediately get 1 vegetable.',
         effects: [{ type: 'gain-resources', resources: { vegetable: 1 } }],
       },
       {
         requirementText: 'at most 3 unused farmyard spaces left',
-        requirement: { type: 'manual', key: 'unused-farmyard-spaces-at-most-3', reviewed: true },
+        requirement: { type: 'unused-farmyard-spaces-at-most', amount: 3 },
         rewardText: 'If you do, you immediately get both 1 grain and 1 vegetable.',
         effects: [{ type: 'gain-resources', resources: { grain: 1, vegetable: 1 } }],
       },
@@ -304,18 +304,6 @@ const expectedFatherCards = {
   }[]
 }>
 
-const assertReviewedManualRequirement = (requirement: FatherRequirement): void => {
-  if (requirement.type === 'manual') {
-    expect(requirement.key).not.toBe('')
-    expect(requirement.reviewed).toBe(true)
-    return
-  }
-
-  if (requirement.type === 'all' || requirement.type === 'any') {
-    requirement.requirements.forEach(assertReviewedManualRequirement)
-  }
-}
-
 describe('father parent cards', () => {
   it('keeps each father card in a dedicated definition file', () => {
     const fathersRegistrySource = readFileSync(fathersRegistryPath, 'utf8')
@@ -351,7 +339,6 @@ describe('father parent cards', () => {
         expect(reward.requirementText).not.toBe('')
         expect(reward.rewardText).not.toBe('')
         expect(reward.effects.length).toBeGreaterThan(0)
-        assertReviewedManualRequirement(reward.requirement)
 
         for (const effect of reward.effects) {
           if (effect.type === 'manual') {
@@ -374,6 +361,20 @@ describe('father parent cards', () => {
         rewardText,
         effects,
       }))).toEqual(expected.rewards)
+    }
+  })
+
+  it('uses typed requirement data for characterized father runtime requirements', () => {
+    const expectedTypes = {
+      PS03: 'animal-type-count-at-least',
+      PS04: 'same-animal-type-at-least',
+      PS06: 'total-cards-in-play-including-parents-at-least',
+      PS08: 'unused-farmyard-spaces-at-most',
+    } as const
+
+    for (const [id, type] of Object.entries(expectedTypes)) {
+      const card = fatherParentCards.find(candidate => candidate.id === id)
+      expect(card?.rewards.map(reward => reward.requirement.type)).toEqual([type, type, type])
     }
   })
 

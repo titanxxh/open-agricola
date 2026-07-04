@@ -22,7 +22,7 @@ export const M067_ChamberOfCommerce = defineMinorCard({
     number: 67,
     category: "POINTS_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 1 wood and 1 reed. During scoring, you get 1 additional bonus point for each of the \"Joinery\", \"Pottery\", and \"Basketmaker's Workshop\" major improvements that you have."
+        "When you play this card, you immediately get 1 <WOOD> and 1 <REED>. During scoring, you get 1 additional bonus <SCORE> for each of the \"Joinery\", \"Pottery\", and \"Basketmaker's Workshop\" major improvements that you have."
     ],
     cost: {
         "clay": 2,

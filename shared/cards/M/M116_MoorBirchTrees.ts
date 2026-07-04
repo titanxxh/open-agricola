@@ -16,7 +16,7 @@ export const M116_MoorBirchTrees = defineMinorCard({
     number: 116,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take the \"Cut Peat\" special action, you also get 2 wood."
+        "Each time you take the __Cut Peat__ special action, you also get 2 <WOOD>."
     ],
     cost: {
         "vegetable": 2

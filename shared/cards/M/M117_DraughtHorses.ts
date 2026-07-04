@@ -49,7 +49,7 @@ export const M117_DraughtHorses = defineMinorCard({
     number: 117,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take exactly 3 or at least 4 wood from an accumulation space, if you have at least 1 horse, you can pay exactly 1 food to get 1 or 2 additional wood, respectively."
+        "Each time you take exactly 3 or at least 4 <WOOD> from an accumulation space, if you have at least 1 <HORSE>, you can pay exactly 1 <FOOD> to get 1 or 2 additional <WOOD>, respectively."
     ],
     cost: {},
     implemented: true,

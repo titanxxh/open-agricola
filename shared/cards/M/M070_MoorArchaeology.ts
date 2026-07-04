@@ -36,7 +36,7 @@ export const M070_MoorArchaeology = defineMinorCard({
     number: 70,
     category: "POINTS_PROVIDER",
     desc: [
-        "Each time you take the \"Cut Peat\" special action, you can place 1 fence from your supply on the emptied farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+        "Each time you take the __Cut Peat__ special action, you can place 1 <FENCE> from your supply on the emptied farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus <SCORE>."
     ],
     cost: {},
     vp: 1,

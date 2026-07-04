@@ -74,7 +74,7 @@ export const A087_Conservator = defineOccupationCard({
     number: 87,
     category: 'FARM_PLANNER',
     desc: [
-        'When you renovate your home, you can renovate from wood directly into stone.',
+        'When you renovate your home, you can renovate from <WOOD> directly into <STONE>.',
       ],
     cost: {},
     players: '1+',

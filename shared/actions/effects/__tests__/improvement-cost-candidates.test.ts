@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
 import { requireActiveCardRegistry } from '../../../cards/active-registry'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
-import { discountCardCostCandidate } from '../../payment/internal'
+import { PaymentSolver } from '../../payment'
 import { playImprovement } from '../improvement'
 
 import '../../../cards/A/A053_Claypipe'
@@ -80,7 +80,7 @@ const registerCandidateListener = (discount: { clay: number }) => {
     actions: ['improvement'],
     handler: () => undefined,
     deriveCardCostCandidate: (_context, candidate) =>
-      discountCardCostCandidate(candidate, SOURCE_CARD, discount),
+      PaymentSolver.discountCardCostCandidate(candidate, SOURCE_CARD, discount),
   })
 }
 

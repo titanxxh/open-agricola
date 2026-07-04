@@ -51,7 +51,7 @@ export const C006_StoneClearing = defineMinorCard({
     deck: "C",
     number: 6,
     category: "BUILDING_RESOURCE_PROVIDER",
-    desc: ["Immediately place 1 <STONE> on each of your empty fields. Harvest them during the next field phase. These fields are considered planted until then."],
+    desc: ["Immediately place 1 <STONE> on each of your empty <FIELD>. Harvest them during the next field phase. These <FIELD> are considered planted until then."],
     cost: { food: 1 },
     passing: true,
   },

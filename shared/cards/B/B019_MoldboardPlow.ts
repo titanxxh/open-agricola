@@ -46,7 +46,7 @@ export const B019_MoldboardPlow = defineMinorCard({
     deck: 'B',
     number: 19,
     category: 'FARM_PLANNER',
-    desc: ['Place 2 field tiles on this card. Twice this game, when you use the __Farmland__ action space, you can also plow 1 field from this card.'],
+    desc: ['Place 2 <FIELD> tiles on this card. Twice this game, when you use the __Farmland__ action space, you can also plow 1 <FIELD> from this card.'],
     cost: { wood: 2 },
     prerequisite: '1 Occupation',
     occupationPrerequisites: { min: 1 },

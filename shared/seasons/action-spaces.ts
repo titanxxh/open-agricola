@@ -7,9 +7,7 @@ import { sowAction } from '../actions/effects/sow'
 import { isActionDoableInFlowContext } from '../actions/flow'
 import { getActionDefinition } from '../actions/index'
 import { summerBreadOrSellAction, summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
-import {
-  canAffordTypedFlatCost,
-} from '../actions/payment/internal'
+import { PaymentSolver } from '../actions/payment'
 import { isThroughTheSeasonsSeason, romanticEveningCost } from './rules'
 import { seasonIds, type SeasonId } from './types'
 
@@ -265,7 +263,7 @@ const canUseRomanticEvening: ActionDefinition['canBeExecutedByPlayer'] =
     return (
     isThroughTheSeasonsSeason(state, 'winter') &&
     canGrowWithoutRoom(state, player, space) &&
-    canAffordTypedFlatCost(player, romanticEveningCost(state), undefined, state)
+    PaymentSolver.canAffordTypedFlatCost(player, romanticEveningCost(state), undefined, state)
     )
   }
 

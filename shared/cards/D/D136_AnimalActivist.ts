@@ -38,7 +38,7 @@ export const D136_AnimalActivist = defineOccupationCard({
     number: 136,
     category: "POINTS_PROVIDER",
     desc: [
-        'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced stables gets 2 bonus <SCORE>.',
+        'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced <STABLE> gets 2 bonus <SCORE>.',
       ],
     cost: {},
     players: "3+",

@@ -32,7 +32,7 @@ export const M016_ClearFelling = defineMinorCard({
     number: 16,
     category: "FARM_PLANNER",
     desc: [
-        "You immediately get 2 <WOOD>. On each of up to 2 farmyard spaces containing nothing but exactly 1 forest, you can immediately turn that forest to the moor side."
+        "You immediately get 2 <WOOD>. On each of up to 2 farmyard spaces containing nothing but exactly 1 <FOREST>, you can immediately turn that <FOREST> to the <MOOR> side."
     ],
     cost: {},
     prerequisite: "At Most 3 Forests",

@@ -49,7 +49,7 @@ export const B054_Tumbrel = defineMinorCard({
     number: 54,
     category: 'FOOD_PROVIDER',
     desc: [
-        'When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each stable you have.',
+        'When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each <STABLE> you have.',
       ],
     cost: { wood: 1 },
   },

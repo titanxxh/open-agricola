@@ -11,7 +11,7 @@ export const A088_HedgeKeeper = defineOccupationCard({
     deck: "A",
     number: 88,
     category: "FARM_PLANNER",
-    desc: ["Each time you take a __Build Fences__ action, you do not have to pay <WOOD> for 3 of the fences you build."],
+    desc: ["Each time you take a __Build Fences__ action, you do not have to pay <WOOD> for 3 of the <FENCE> you build."],
     cost: {},
     players: "1+",
   },

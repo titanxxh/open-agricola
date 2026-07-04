@@ -36,11 +36,14 @@ export type MotherCardDefinition = {
 export type FatherRequirement =
   | { type: 'resource-at-least'; resource: ResourceKey; amount: number }
   | { type: 'animal-at-least'; animal: AnimalKey | 'any'; amount: number }
+  | { type: 'animal-type-count-at-least'; amount: number }
+  | { type: 'same-animal-type-at-least'; amount: number }
   | { type: 'farm-count-at-least'; target: 'room' | 'field' | 'pasture' | 'stable' | 'fenced-stable' | 'family-member' | 'fence' | 'empty-space'; amount: number }
+  | { type: 'unused-farmyard-spaces-at-most'; amount: number }
   | { type: 'played-card-at-least'; cardType: 'occupation' | 'minor-improvement' | 'major-improvement' | 'improvement'; amount: number }
+  | { type: 'total-cards-in-play-including-parents-at-least'; amount: number }
   | { type: 'all'; requirements: FatherRequirement[] }
   | { type: 'any'; requirements: FatherRequirement[] }
-  | { type: 'manual'; key: string; reviewed: true }
 
 export type FatherRewardEffect =
   | { type: 'gain-resources'; resources: Partial<Record<Exclude<ResourceKey, 'begging'>, number>> }

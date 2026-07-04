@@ -58,7 +58,7 @@ export const A068_AsparagusGift = defineMinorCard({
     deck: 'A',
     number: 68,
     category: 'CROP_PROVIDER',
-    desc: ['Each time you build a number of fences equal to or greater than the current round, you immediately get 1 <VEGETABLE>.'],
+    desc: ['Each time you build a number of <FENCE> equal to or greater than the current round, you immediately get 1 <VEGETABLE>.'],
     cost: {},
     prerequisite: '1 Unplanted Field',
   },

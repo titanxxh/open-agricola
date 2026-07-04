@@ -27,7 +27,7 @@ export const A176_Wheelmaker = defineOccupationCard({
     deck: 'A',
     number: 176,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['When you play this card, if you have another occupation in play and more wood than all other players combined, you immediately get wood from the general supply until you have 15 wood.'],
+    desc: ['When you play this card, if you have another occupation in play and more <WOOD> than all other players combined, you immediately get <WOOD> from the general supply until you have 15 <WOOD>.'],
     cost: {},
     players: '5+',
   },

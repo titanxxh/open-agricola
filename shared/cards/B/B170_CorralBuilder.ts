@@ -49,7 +49,7 @@ export const B170_CorralBuilder = defineOccupationCard({
     deck: 'B',
     number: 170,
     category: 'FARM_PLANNER',
-    desc: ['When the "Pig Market" and "Cattle Market" action space cards are each revealed (and placed on the round space), you can immediately fence exactly 1 farmyard space without playing wood.'],
+    desc: ['When the __Pig Market__ and __Cattle Market__ action space cards are each revealed (and placed on the round space), you can immediately <FENCE> exactly 1 farmyard space without playing <WOOD>.'],
     cost: {},
     players: '5+',
   },

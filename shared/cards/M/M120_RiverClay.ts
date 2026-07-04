@@ -30,7 +30,7 @@ export const M120_RiverClay = defineMinorCard({
     number: 120,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you use the \"Fishing\" accumulation space, you also get 2 clay."
+        "Each time you use the __Fishing__ accumulation space, you also get 2 <CLAY>."
     ],
     cost: {},
     prerequisite: "1 Major Improvement",

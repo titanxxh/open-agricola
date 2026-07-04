@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardListenerRegistration } from '../card-listeners'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'M113_LivingHistoryMuseum'
 const discountByTarget = {
@@ -25,7 +25,7 @@ const costListener: CardListenerRegistration = {
     if (!context.cardId) return null
     const resource = discountByTarget[context.cardId as keyof typeof discountByTarget]
     if (!resource) return null
-    return discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 })
+    return PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { [resource]: 1 })
   },
 }
 

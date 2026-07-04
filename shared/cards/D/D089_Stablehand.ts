@@ -51,7 +51,7 @@ export const D089_Stablehand = defineOccupationCard({
     deck: 'D',
     number: 89,
     category: 'FARM_PLANNER',
-    desc: ['Each time you build at least 1 fence, you can also build a stable without paying <WOOD> for the stable.'],
+    desc: ['Each time you build at least 1 <FENCE>, you can also build a <STABLE> without paying <WOOD> for the <STABLE>.'],
     cost: {},
     players: '1+',
   },

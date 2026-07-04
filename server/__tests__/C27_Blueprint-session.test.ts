@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAllBuyableCombinations, resolveCardCostWithModifiers, resolveCardCostWithModifiersDetailed } from '../../shared/actions/payment/internal'
-import { isComplexCost } from '../../shared/actions/payment/internal'
+import { PaymentSolver } from '../../shared/actions/payment'
+import {
+  computePaymentOptionsForTest,
+  resolveCardCostDetailedForTest,
+  resolveCardCostForTest,
+} from '../../shared/actions/payment/__tests__/test-helpers'
 import {
   collectComputeChoiceCandidates,
   executeCardListener,
@@ -42,15 +46,15 @@ describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', ()
   it.each(ALLOWED_MAJORS)('adds sourced stone discount candidate for %s', (majorId) => {
     const { state, player } = setup()
     const baseCost = { wood: 2, stone: 2 }
-    const resolved = resolveCardCostWithModifiersDetailed(
+    const resolved = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       majorId,
       baseCost,
     )
-    expect(isComplexCost(resolved.cost)).toBe(true)
-    if (!isComplexCost(resolved.cost)) return
+    expect(PaymentSolver.isComplexCost(resolved.cost)).toBe(true)
+    if (!PaymentSolver.isComplexCost(resolved.cost)) return
     expect(resolved.cost.fees).toEqual([
       baseCost,
       { wood: 2, stone: 1 },
@@ -66,17 +70,17 @@ describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', ()
       wood: 5,
       stone: 5,
     }
-    const resolved = resolveCardCostWithModifiersDetailed(
+    const resolved = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       'Major_Joinery',
       { wood: 2, stone: 2 },
     )
-    expect(isComplexCost(resolved.cost)).toBe(true)
-    if (!isComplexCost(resolved.cost)) return
+    expect(PaymentSolver.isComplexCost(resolved.cost)).toBe(true)
+    if (!PaymentSolver.isComplexCost(resolved.cost)) return
 
-    const options = computeAllBuyableCombinations(player, resolved.cost)
+    const options = computePaymentOptionsForTest(player, resolved.cost)
     // ADR 0004 amendment: the printed {wood:2, stone:2} row is strictly
     // dominated by the discounted row and pruned from the payment options.
     expect(options.some((option) =>
@@ -94,15 +98,15 @@ describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', ()
   it('does NOT reduce cost for non-listed majors (e.g. Major_Fireplace)', () => {
     const { state, player } = setup()
     const baseCost = { clay: 2 }
-    const resolved = resolveCardCostWithModifiers(
+    const resolved = resolveCardCostForTest(
       state,
       player,
       'improvement',
       'Major_Fireplace',
       baseCost,
     )
-    expect(isComplexCost(resolved)).toBe(false)
-    if (isComplexCost(resolved)) return
+    expect(PaymentSolver.isComplexCost(resolved)).toBe(false)
+    if (PaymentSolver.isComplexCost(resolved)) return
     expect(resolved.clay).toBe(2)
   })
 
@@ -110,15 +114,15 @@ describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', ()
     const { state } = setup()
     const other = state.players[1]!
     const baseCost = { wood: 2, stone: 2 }
-    const resolved = resolveCardCostWithModifiers(
+    const resolved = resolveCardCostForTest(
       state,
       other,
       'improvement',
       'Major_Joinery',
       baseCost,
     )
-    expect(isComplexCost(resolved)).toBe(false)
-    if (isComplexCost(resolved)) return
+    expect(PaymentSolver.isComplexCost(resolved)).toBe(false)
+    if (PaymentSolver.isComplexCost(resolved)) return
     expect(resolved.stone).toBe(2)
   })
 })

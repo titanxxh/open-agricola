@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { A123_FrameBuilder } from '../../cards/A/A123_FrameBuilder'
 import { PaymentSolver } from '../../actions/payment'
-import { computeAllBuyableCombinations } from '../../actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import type {
   BonusModifier,
   ComplexCost,
@@ -105,7 +105,7 @@ describe('A123_FrameBuilder', () => {
     // only k=2 is affordable (clay:6 + wood:2).
     const player = createMockPlayer({ wood: 2, clay: 6, reed: 4 }, 'clay')
     const cost: ComplexCost = { unitFee: { clay: 5, reed: 2 }, nb: 2 }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    const solutions = computePaymentOptionsForTest(player, cost, 'construct')
     expect(solutions.length).toBeGreaterThan(0)
     const swapCounts = new Set(
       solutions.map((s) =>
@@ -124,7 +124,7 @@ describe('A123_FrameBuilder', () => {
   it('construct stone house: only stone-swap trade applies (clay-swap filtered by condition)', () => {
     const player = createMockPlayer({ wood: 1, stone: 3, reed: 2 }, 'stone')
     const cost: ComplexCost = { unitFee: { stone: 5, reed: 2 }, nb: 1 }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    const solutions = computePaymentOptionsForTest(player, cost, 'construct')
     expect(solutions.length).toBeGreaterThan(0)
     // Best swap solution: 1 wood replaces 2 stone → pays {stone:3, reed:2, wood:1}.
     const swapped = solutions.some(
@@ -140,7 +140,7 @@ describe('A123_FrameBuilder', () => {
   it('construct wood house: A123 trade modifiers filtered out entirely', () => {
     const player = createMockPlayer({ wood: 5, reed: 2 }, 'wood')
     const cost: ComplexCost = { unitFee: { wood: 5, reed: 2 }, nb: 1 }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'construct')
+    const solutions = computePaymentOptionsForTest(player, cost, 'construct')
     expect(solutions.length).toBeGreaterThan(0)
     // No trade should fire (both conditions houseTypeClay/Stone are false).
     solutions.forEach((s) => {
@@ -152,7 +152,7 @@ describe('A123_FrameBuilder', () => {
   it('renovation cost offers stone-save as a valid solution (BonusModifier path)', () => {
     const player = createMockPlayer({ wood: 1, stone: 2, reed: 2 }, 'stone')
     const cost: ComplexCost = { fee: { stone: 2, reed: 2 } }
-    const solutions = computeAllBuyableCombinations(player, cost, undefined, 'renovation')
+    const solutions = computePaymentOptionsForTest(player, cost, 'renovation')
     expect(solutions.length).toBeGreaterThan(0)
     // Stone-replace bonus: pay 1 wood instead of 2 stone.
     const swapped = solutions.some(

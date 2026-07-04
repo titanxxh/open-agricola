@@ -15,17 +15,15 @@ import type {
   PublicEventFarmTileHighlightTarget,
   PublicEventHighlightTargets,
   PublicEventNotification,
+  PublicEventCardPassAnimation,
   PublicEventResourceAnimation,
 } from './public-event-notifications'
 import {
-  collectPublicEventHighlightTargets,
-  collectPublicEventNotifications,
-  collectPublicEventResourceAnimations,
+  collectPublicEventFeedback,
   emptyPublicEventHighlightTargets,
   maxPublicEventSeq,
 } from './public-event-notifications'
 import type { ReplayTimelineEntry } from './replay-timeline'
-import { replayTimelineNamespaceId } from './replay-timeline'
 import type { WsStatus } from './ws-status'
 
 export type { WsStatus } from './ws-status'
@@ -96,12 +94,14 @@ export type ReplayFeedback = {
   notifications: PublicEventNotification[]
   highlights: PublicEventHighlightTargets
   resourceAnimations: PublicEventResourceAnimation[]
+  cardPassAnimations: PublicEventCardPassAnimation[]
 }
 
 export const clearReplayFeedback = (): ReplayFeedback => ({
   notifications: [],
   highlights: emptyPublicEventHighlightTargets(),
   resourceAnimations: [],
+  cardPassAnimations: [],
 })
 
 export const buildReplayFeedback = (
@@ -109,15 +109,7 @@ export const buildReplayFeedback = (
   locale: Locale,
 ): ReplayFeedback => {
   if (!entry?.event || !entry.replayable || entry.kind !== 'event') return clearReplayFeedback()
-  const idPrefix = `replay:${entry.key}`
-  return {
-    notifications: collectPublicEventNotifications([entry.event], locale, idPrefix),
-    highlights: collectPublicEventHighlightTargets([entry.event]),
-    resourceAnimations: collectPublicEventResourceAnimations([entry.event]).map((animation) => ({
-      ...animation,
-      id: replayTimelineNamespaceId(entry, animation.id),
-    })),
-  }
+  return collectPublicEventFeedback([entry.event], locale, `replay:${entry.key}`)
 }
 
 export type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
@@ -364,6 +356,11 @@ export const mergePublicEventResourceAnimations = (
   incoming: readonly PublicEventResourceAnimation[],
 ): PublicEventResourceAnimation[] => [...incoming, ...current]
 
+export const mergePublicEventCardPassAnimations = (
+  current: readonly PublicEventCardPassAnimation[],
+  incoming: readonly PublicEventCardPassAnimation[],
+): PublicEventCardPassAnimation[] => [...incoming, ...current]
+
 const removeCountedItems = <T>(
   current: readonly T[],
   removing: readonly T[],
@@ -411,6 +408,12 @@ export const removePublicEventResourceAnimations = (
   removing: readonly PublicEventResourceAnimation[],
 ): PublicEventResourceAnimation[] =>
   removeCountedItems(current, removing, resourceAnimationKey)
+
+export const removePublicEventCardPassAnimations = (
+  current: readonly PublicEventCardPassAnimation[],
+  removing: readonly PublicEventCardPassAnimation[],
+): PublicEventCardPassAnimation[] =>
+  removeCountedItems(current, removing, (animation) => animation.id)
 
 export const filterPublicFarmHighlightsForPlayer = (
   targets: readonly PublicEventFarmTileHighlightTarget[],

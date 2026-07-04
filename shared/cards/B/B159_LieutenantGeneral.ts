@@ -48,7 +48,7 @@ export const B159_LieutenantGeneral = defineOccupationCard({
     number: 159,
     category: 'FOOD_PROVIDER',
     desc: [
-        'For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
+        'For each <FIELD> tile that another player places next to an existing <FIELD> tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
       ],
     cost: {},
     players: '4+',

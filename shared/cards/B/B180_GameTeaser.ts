@@ -33,7 +33,7 @@ export const B180_GameTeaser = defineOccupationCard({
     deck: 'B',
     number: 180,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time you take 1/2/3 food from a food accumulation space, you also get 1 cattle/wild boar/sheep.'],
+    desc: ['Each time you take 1/2/3 <FOOD> from a <FOOD> accumulation space, you also get 1 <CATTLE>/<<PIG>>/<SHEEP>.'],
     cost: {},
     players: '5+',
   },

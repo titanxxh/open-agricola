@@ -31,7 +31,7 @@ export const A178_CarpentersBoy = defineOccupationCard({
     deck: 'A',
     number: 178,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time another player builds a room, you immediately get 1 wood.'],
+    desc: ['Each time another player builds a room, you immediately get 1 <WOOD>.'],
     cost: {},
     players: '5+',
   },

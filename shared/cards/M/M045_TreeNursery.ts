@@ -27,7 +27,7 @@ export const M045_TreeNursery = defineMinorCard({
     number: 45,
     category: "FARM_PLANNER",
     desc: [
-        "Place 1 forest each on the round spaces 12 and 13. At the start of these rounds, you can place the forest on an unused farmyard space."
+        "Place 1 <FOREST> each on the round spaces 12 and 13. At the start of these rounds, you can place the <FOREST> on an unused farmyard space."
     ],
     cost: {
         "wood": 1

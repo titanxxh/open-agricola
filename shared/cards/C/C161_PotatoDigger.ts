@@ -32,7 +32,7 @@ export const C161_PotatoDigger = defineOccupationCard({
     deck: "C",
     number: 161,
     category: "CROP_PROVIDER",
-    desc: ["When you play this card, if you have at least 2/4/5 unplanted field tiles, you immediately get 1/2/3 <VEGETABLE>."],
+    desc: ["When you play this card, if you have at least 2/4/5 unplanted <FIELD> tiles, you immediately get 1/2/3 <VEGETABLE>."],
     players: "4+",
   },
   impl: cardImpl,

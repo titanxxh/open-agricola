@@ -66,7 +66,7 @@ export const B027_Toolbox = defineMinorCard({
     number: 27,
     category: 'ACTIONS_BOOSTER',
     desc: [
-        "In the work phase, after each turn in which you build at least 1 room, stable, or fence, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement.",
+        "In the work phase, after each turn in which you build at least 1 room, <STABLE>, or <FENCE>, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement.",
       ],
     cost: { wood: 1 },
   },

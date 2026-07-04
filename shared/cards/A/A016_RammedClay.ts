@@ -29,7 +29,7 @@ export const A016_RammedClay = defineMinorCard({
     number: 16,
     category: 'FARM_PLANNER',
     desc: [
-        'When you play this card, you immediately get 1 <CLAY>. You can use <CLAY> instead of <WOOD> to build fences.',
+        'When you play this card, you immediately get 1 <CLAY>. You can use <CLAY> instead of <WOOD> to build <FENCE>.',
       ],
     cost: {},
   },

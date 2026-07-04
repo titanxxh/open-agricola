@@ -34,7 +34,7 @@ export const M078_Barge = defineMinorCard({
     number: 78,
     category: "GOODS_PROVIDER",
     desc: [
-        "Alternate placing 1 fuel and 1 food on each remaining round space, starting with fuel. At the start of these rounds, you get the respective good."
+        "Alternate placing 1 <FUEL> and 1 <FOOD> on each remaining round space, starting with <FUEL>. At the start of these rounds, you get the respective good."
     ],
     cost: {
         "wood": 3
