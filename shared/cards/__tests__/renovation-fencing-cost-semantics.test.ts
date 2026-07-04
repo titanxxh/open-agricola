@@ -12,7 +12,7 @@ import type {
   Trade,
 } from '../../contract/types'
 import { buildRenovationPlan } from '../../actions/effects/renovation'
-import { computeAllBuyableCombinations } from '../../actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import { runCardListeners } from '../card-listeners'
 import { getCardModifiers } from '../card-modifiers'
 import './setup-register-all'
@@ -206,7 +206,7 @@ const paymentOptions = (scenario: CostCase): PaymentOption[] => {
   const state = makeState(player)
   const cost = buildCost(scenario, state, player)
   const costType: CostModifierType = scenario.kind
-  return computeAllBuyableCombinations(player, cost, undefined, costType, state)
+  return computePaymentOptionsForTest(player, cost, costType, state)
     .map((solution) => ({
       resources: positiveResources(solution.resourcesPaid),
       sources: solutionSources(solution),

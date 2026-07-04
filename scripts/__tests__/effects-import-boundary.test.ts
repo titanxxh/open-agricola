@@ -161,4 +161,27 @@ describe('effects import boundary', () => {
 
     expect(offenders.sort()).toEqual([])
   })
+
+  it('keeps non-payment-internal tests from importing payment internals', () => {
+    const roots = [
+      path.join(process.cwd(), 'shared'),
+      path.join(process.cwd(), 'server'),
+      path.join(process.cwd(), 'client'),
+    ]
+    const offenders = roots.flatMap((root) => walkTsFiles(root))
+      .filter((file) =>
+        file.includes(`${path.sep}__tests__${path.sep}`) &&
+        !file.includes(`${path.sep}shared${path.sep}actions${path.sep}payment${path.sep}internal${path.sep}__tests__${path.sep}`))
+      .flatMap((absFile) => {
+        const source = readFileSync(absFile, 'utf8')
+        const file = path.relative(process.cwd(), absFile)
+        const importsPaymentInternal =
+          /from ['"][^'"]*payment\/internal(?:\/[^'"]*)?['"]/.test(source) ||
+          (file.startsWith(`shared${path.sep}actions${path.sep}payment${path.sep}__tests__${path.sep}`) &&
+            /from ['"]\.\.\/internal(?:\/[^'"]*)?['"]/.test(source))
+        return importsPaymentInternal ? [file] : []
+      })
+
+    expect(offenders.sort()).toEqual([])
+  })
 })

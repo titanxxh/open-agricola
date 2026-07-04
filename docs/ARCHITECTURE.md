@@ -539,7 +539,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `internal/room-payment.ts` / `internal/typed-flat.ts` —— 房间 / typed flat cost 兼容 helper
 - `internal/cache.ts` —— solution cache
 
-生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
+生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`，只有 `shared/actions/payment/internal/__tests__` 保留算法白盒测试；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码和非 payment 内部测试直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
 
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 

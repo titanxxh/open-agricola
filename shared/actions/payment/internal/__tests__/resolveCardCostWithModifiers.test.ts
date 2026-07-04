@@ -1,11 +1,11 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../cards/card-listeners'
+import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../../cards/card-listeners'
+import { discountCardCostCandidate } from '../card-cost-candidates'
 import {
-  discountCardCostCandidate,
   resolveCardCostWithModifiers,
   resolveCardCostWithModifiersDetailed,
-} from '../../payment/internal'
-import type { CardCostCandidateMetadata, ComplexCost as ComplexCostType, PaymentResourceMap } from '../../../contract/types'
+} from '../preview-cost'
+import type { CardCostCandidateMetadata, ComplexCost as ComplexCostType, PaymentResourceMap } from '../../../../contract/types'
 
 // Closure output order is traversal-defined; assert fees+metadata as a set.
 const candidateRows = (
@@ -30,9 +30,9 @@ const expectRowsEqual = (
 ) => {
   expect(sortedRows(actual)).toEqual(sortedRows(expected))
 }
-import type { GameState, PlayerState, ComplexCost } from '../../../contract/types'
-import { CardRegistry } from '../../../../shared/cards/registry'
-import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../../shared/cards/active-registry'
+import type { GameState, PlayerState, ComplexCost } from '../../../../contract/types'
+import { CardRegistry } from '../../../../cards/registry'
+import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../../cards/active-registry'
 
 // Snapshot + restore approach: avoid blowing away module-level listeners
 // registered by other cards (e.g. D095_SiteManager) when this test file runs

@@ -5,7 +5,7 @@ import { buildCardsManifest } from '../../../scripts/build-cards-manifest'
 import { ALL_CARD_IMPLS } from '../register-all'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
-import { computeAllBuyableCombinations } from '../../actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import { runCardEffectHook } from '../card-effects'
 import { getCardDefinition } from '../catalog'
 import { implementedMinorImprovementCardsList, minorImprovementCardsList } from '../catalog.generated'
@@ -66,10 +66,9 @@ describe('Card Source representative migrations', () => {
     const after = session.getState().state.players[0]!
     expect(after.activeModifiers.filter((m) => m.cardId === 'E060_WorkingGloves')).toHaveLength(4)
 
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       after,
       { fee: { food: 2 } },
-      undefined,
       'occupation',
     )
 

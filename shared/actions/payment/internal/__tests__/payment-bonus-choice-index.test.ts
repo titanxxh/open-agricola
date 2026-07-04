@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeAllBuyableCombinations } from '../../payment/internal'
-import type { PlayerState, ComplexCost } from '../../../contract/types'
+import { computeAllBuyableCombinations } from '../enumerate'
+import type { PlayerState, ComplexCost } from '../../../../contract/types'
 
 const mkPlayer = (resources: Partial<PlayerState['resources']>): PlayerState =>
   ({
