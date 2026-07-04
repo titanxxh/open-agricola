@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import type { GameEvent } from '../../../shared/contract/events'
 import type { LogEntry } from '../../../shared/contract/types'
 import type { ReplayTimelineEntry } from '../replay-timeline'
@@ -111,6 +113,13 @@ const replayEntryForEvent = (
 })
 
 describe('buildActionLogTimelineRows', () => {
+  it('does not keep timeline-local state log identity rules', () => {
+    const source = readFileSync(fileURLToPath(new URL('../action-log-timeline.ts', import.meta.url)), 'utf8')
+
+    expect(source).not.toContain('const stableValue')
+    expect(source).not.toContain('const logEntryIdentity')
+  })
+
   it('does not render an extra pays-for row for a payment absorbed by card.played', () => {
     const paid: GameEvent = {
       ...paidEvent('evt-paid', 7),
