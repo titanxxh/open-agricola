@@ -264,7 +264,7 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
   return null
 }
 
-export const collectPublicEventHighlightTargets = (
+const collectPublicEventHighlightTargets = (
   events: readonly GameEvent[],
 ): PublicEventHighlightTargets => {
   const highlights = emptyPublicEventHighlightTargets()
@@ -377,7 +377,7 @@ export const collectPublicEventHighlightTargets = (
   return highlights
 }
 
-export const collectPublicEventResourceAnimations = (
+const collectPublicEventResourceAnimations = (
   events: readonly GameEvent[],
 ): PublicEventResourceAnimation[] => {
   const animations: PublicEventResourceAnimation[] = []
@@ -472,7 +472,7 @@ export const collectPublicEventResourceAnimations = (
   return animations
 }
 
-export const collectPublicEventCardPassAnimations = (
+const collectPublicEventCardPassAnimations = (
   events: readonly GameEvent[],
 ): PublicEventCardPassAnimation[] => {
   const animations: PublicEventCardPassAnimation[] = []
@@ -490,7 +490,7 @@ export const collectPublicEventCardPassAnimations = (
   return animations
 }
 
-export const collectPublicEventNotifications = (
+const collectPublicEventNotifications = (
   events: readonly GameEvent[],
   locale: Locale,
   idPrefix = '',
@@ -570,14 +570,4 @@ export const collectNewPublicEventFeedback = (
     ...collectPublicEventFeedback(nextEvents, locale, idPrefix),
     nextCursor: maxSeq,
   }
-}
-
-export const collectNewPublicEventNotifications = (
-  events: readonly GameEvent[],
-  lastSeenSeq: number | null,
-  locale: Locale,
-  idPrefix = '',
-): PublicEventNotificationBatch => {
-  const { notifications, nextCursor } = collectNewPublicEventFeedback(events, lastSeenSeq, locale, idPrefix)
-  return { notifications, nextCursor }
 }

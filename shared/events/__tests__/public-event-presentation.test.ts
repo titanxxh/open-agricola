@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../../contract/events'
+import * as publicEventPresentation from '../public-event-presentation'
 import { collectPublicEventFeedback } from '../public-event-presentation'
 
 const base = {
@@ -13,6 +14,15 @@ const base = {
 } as const
 
 describe('public event presentation', () => {
+  it('keeps detailed cue collectors behind the public feedback entrypoint', () => {
+    expect(Object.keys(publicEventPresentation).sort()).toEqual([
+      'collectNewPublicEventFeedback',
+      'collectPublicEventFeedback',
+      'emptyPublicEventHighlightTargets',
+      'maxPublicEventSeq',
+    ])
+  })
+
   it('projects all live and replay feedback surfaces through one namespaced batch', () => {
     const paid = {
       ...base,
