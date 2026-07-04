@@ -2,15 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
 import {
-  getFarmyardBounds,
-  getFarmyardTileKeySet,
-  getAdjacentTilesForEdge,
   isFarmyardBorderEdge,
   positionKey,
 } from '../../shared/domain/farm'
@@ -40,6 +37,7 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
+import { buildFarmBoardProjection } from './farm-board-projection'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
@@ -1376,15 +1374,7 @@ export const GameContainerApi = () => {
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, transport, isInteractive, runInteractionSubmitCommand])
 
-  const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
-  const fieldMap = useMemo(() => {
-    const map = new Map<string, { stacks: CropStack[] }>()
-    ;(displayPlayer?.fields ?? []).forEach((f) => { map.set(positionKey({ row: f.row, col: f.col }), { stacks: f.stacks }) })
-    return map
-  }, [displayPlayer?.fields])
-  const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])
-  const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
   const displayPublicEventNotifications = useMemo(
@@ -1521,71 +1511,23 @@ export const GameContainerApi = () => {
   const sowErrorText: string | null = sowError
     ? t(locale, farmCommitErrorMessageKey('sow', sowError))
     : null
-  const farmGrid = useMemo(() => {
-    if (!displayPlayer) return { cells: [], columns: 11 }
-    const bounds = { ...getFarmyardBounds(displayPlayer) }
-    const tileKeys = new Set(getFarmyardTileKeySet(displayPlayer))
-    const pendingSelectionTiles =
-      interaction.stateId === 'wait' &&
-      selectionInteraction?.kind === 'farm-position' &&
-      state?.players[interaction.playerIndex]?.id === displayPlayer.id
-        ? selectionInteraction.selectablePositions
-        : []
-    pendingSelectionTiles.forEach((tile) => {
-      tileKeys.add(positionKey(tile))
-      bounds.minRow = Math.min(bounds.minRow, tile.row)
-      bounds.maxRow = Math.max(bounds.maxRow, tile.row)
-      bounds.minCol = Math.min(bounds.minCol, tile.col)
-      bounds.maxCol = Math.max(bounds.maxCol, tile.col)
-    })
-    const rows = (bounds.maxRow - bounds.minRow + 1) * 2 + 1
-    const cols = (bounds.maxCol - bounds.minCol + 1) * 2 + 1
-    const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v' | 'void'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
-    const hasAdjacentTileForPost = (boundaryRow: number, boundaryCol: number) =>
-      [
-        { row: boundaryRow - 1, col: boundaryCol - 1 },
-        { row: boundaryRow - 1, col: boundaryCol },
-        { row: boundaryRow, col: boundaryCol - 1 },
-        { row: boundaryRow, col: boundaryCol },
-      ].some((tile) => tileKeys.has(positionKey(tile)))
-    const hasAdjacentTileForEdge = (edgeId: string) =>
-      getAdjacentTilesForEdge(edgeId).some((tile) => tileKeys.has(positionKey(tile)))
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-      const isTile = row % 2 === 1 && col % 2 === 1
-      const isPost = row % 2 === 0 && col % 2 === 0
-      const isFenceH = row % 2 === 0 && col % 2 === 1
-      const isFenceV = row % 2 === 1 && col % 2 === 0
-      const tileRow = isTile ? bounds.minRow + (row - 1) / 2 : undefined
-      const tileCol = isTile ? bounds.minCol + (col - 1) / 2 : undefined
-      const boundaryRow = bounds.minRow + row / 2
-      const boundaryCol = bounds.minCol + col / 2
-      const fenceId = isFenceH
-        ? `H-${boundaryRow}-${bounds.minCol + (col - 1) / 2}`
-        : isFenceV
-          ? `V-${bounds.minRow + (row - 1) / 2}-${boundaryCol}`
-          : undefined
-      const type =
-        isTile
-          ? tileKeys.has(positionKey({ row: tileRow!, col: tileCol! })) ? 'tile' : 'void'
-          : isFenceH || isFenceV
-            ? fenceId && hasAdjacentTileForEdge(fenceId)
-              ? isFenceH ? 'fence-h' : 'fence-v'
-              : 'void'
-            : isPost && hasAdjacentTileForPost(boundaryRow, boundaryCol)
-              ? 'post'
-              : 'void'
-      cells.push({
-        key: `${row}-${col}`,
-        type,
-        tileRow,
-        tileCol,
-        fenceId,
-      })
-    }
-    return { cells, columns: cols }
-  }, [displayPlayer, interaction, selectionInteraction, state?.players])
-  const farmCells = farmGrid.cells
-  const farmGridColumns = farmGrid.columns
+  const farmBoardProjection = useMemo(
+    () => buildFarmBoardProjection({
+      displayPlayer,
+      interaction,
+      selectionInteraction,
+      players: state?.players,
+    }),
+    [displayPlayer, interaction, selectionInteraction, state?.players],
+  )
+  const {
+    farmCells,
+    farmGridColumns,
+    roomPositions,
+    fieldMap,
+    stablePositions,
+    existingFenceSet,
+  } = farmBoardProjection
 
   const pastureTiles = useMemo(() => {
     const map = new Map<string, { pastureId: string; isCorner: boolean }>()
