@@ -3,7 +3,7 @@ import type { BonusModifier } from '../../contract/types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { discountCardCostCandidate } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
 
 const CARD_ID = 'C122_Bricklayer'
 /**
@@ -21,7 +21,7 @@ const improvementCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement'],
   deriveCardCostCandidate: (_context, candidate) =>
-    discountCardCostCandidate(candidate, CARD_ID, { clay: 1 }),
+    PaymentSolver.discountCardCostCandidate(candidate, CARD_ID, { clay: 1 }),
 }
 
 const cardImpl = {

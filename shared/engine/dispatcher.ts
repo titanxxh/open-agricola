@@ -17,7 +17,7 @@ import {
   type MatchedCardListener,
 } from '../cards/card-listeners'
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
-import { canPayResources } from '../actions/payment/internal'
+import { PaymentSolver } from '../actions/payment'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
 import { applyComputeCostResults } from './compute-cost-results'
 
@@ -80,7 +80,7 @@ export class HookDispatcher {
       return preview.canExecute(previewContext, costOverride)
     }
     const previewCost = resolveActionPreviewCost(preview, previewContext, costOverride)
-    return canPayResources(context.player, previewCost)
+    return PaymentSolver.canPayResources(context.player, previewCost)
   }
 
   applyComputeReplace(context: ActionExecutionContext & { actionId: string }): ComputeReplaceResult {

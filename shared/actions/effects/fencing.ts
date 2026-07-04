@@ -14,15 +14,7 @@ import type {
   Resource,
   Trade,
 } from '../../contract/types'
-// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
-// the new payment module. Other helpers (preview-cost / typed-flat /
-// room-payment / cost-modifier internals) remain on the shim through S3.
-// fencing.ts only uses typed-flat helpers (shim scope), so no PaymentSolver
-// call sites exist here yet.
-import {
-  canAffordTypedFlatCost,
-  resolveTypedFlatPaymentSelection,
-} from '../payment/internal/typed-flat'
+import { PaymentSolver } from '../payment'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { getAllEdgeIds, playerBoard, normalizePlayerFarm } from '../../domain'
 import {
@@ -385,7 +377,7 @@ const canStartWithFencePolicy = (
         fixedWoodCost
       const cost: ComplexCost = { fee: { wood: woodCost } }
       if (policy.paymentBudget) cost.paymentBudget = policy.paymentBudget
-      if (canAffordTypedFlatCost(player, cost, 'fencing')) {
+      if (PaymentSolver.canAffordTypedFlatCost(player, cost, 'fencing')) {
         return true
       }
     }
@@ -638,7 +630,7 @@ export const canStartFencing = (
     }
   }
   const minimumWoodCost = applyWoodCostOverride(minimumFenceSegments, costOverride)
-  if (!canAffordTypedFlatCost(player, { wood: minimumWoodCost }, 'fencing')) {
+  if (!PaymentSolver.canAffordTypedFlatCost(player, { wood: minimumWoodCost }, 'fencing')) {
     return false
   }
   return !canCheckLayout || hasPossibleFenceCommit(state, player, policy)
@@ -753,7 +745,7 @@ const canAffordFencePayment = (
   player: PlayerState,
   paymentCost: ComplexCost,
 ): boolean =>
-  canAffordTypedFlatCost(player, paymentCost, 'fencing')
+  PaymentSolver.canAffordTypedFlatCost(player, paymentCost, 'fencing')
 
 const countBorrowedFenceSources = (
   policy: FenceActionPolicy,
@@ -822,7 +814,7 @@ const finalizeFence = (
   if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
     return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
   }
-  const payment = resolveTypedFlatPaymentSelection(
+  const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     paymentCost,
     'pay:fence',
@@ -930,7 +922,7 @@ export const fenceAction: ActionDefinition = {
       isThroughTheSeasonsSeason(state, 'spring') &&
       !sourceCard &&
       !hasCanStartPolicy(policy) &&
-      !canAffordTypedFlatCost(player, { wood: 1 }, 'fencing', state)
+      !PaymentSolver.canAffordTypedFlatCost(player, { wood: 1 }, 'fencing', state)
     ) {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
@@ -1045,7 +1037,7 @@ export const fenceAction: ActionDefinition = {
       if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost)) {
         return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
       }
-      const payment = resolveTypedFlatPaymentSelection(
+      const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         paymentCost,
         'pay:fence',

@@ -2,17 +2,7 @@ import type { ActionDefinition, ActionExecutionResult, CardCostCandidateMetadata
 import type { EventSink } from '../../contract/events'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
-// PaymentSolver namespace (S3 Task 6): core payment APIs migrated to the
-// new payment module. Legacy helpers (payResources / executePaymentSolution
-// / resolvePaymentSolutionSelection) remain on the shim through S3 and
-// migrate in S4 (preview-cost domain aggregation per Decision C).
 import { PaymentSolver } from '../payment'
-import type { PaymentCtx } from '../payment'
-import {
-  canConsumePaymentResourceProviders,
-  cardCostCandidateMetadataForSolution,
-  executePaymentSolution,
-} from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
@@ -20,7 +10,6 @@ import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCardEffect } from './internal/activate-card-effect'
-import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { recordCardCostAttribution } from '../../cards/helpers/card-state'
@@ -335,55 +324,33 @@ const resolveImprovementPayment = (
     } => {
   const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
   const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
-  const ctx: PaymentCtx = {
+  const paymentResourceProviders = PaymentSolver.isComplexCost(cost)
+    ? cost.paymentResourceProviders
+    : undefined
+  const resolved = PaymentSolver.resolvePayment(effectiveState, effectiveIndex, cost, {
     actionId,
     costType: 'none',
     sourceCard: improvementId,
     playedCards,
-  }
-  const solutions = PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx)
-  const resolved = resolvePaymentSolutionSelection(
-    solutions,
+    optionPrefix: optionValuePrefix,
     paymentChoice,
-    optionValuePrefix,
     includeReturnedCard,
-    failure,
-    {
-      extraSourcesForSolution: (solution) =>
-        cardCostCandidateMetadataForSolution(
-          candidateMetadataByFeeIndex,
-          solution,
-        )?.sources ?? [],
-      paymentResourceProviders: PaymentSolver.isComplexCost(cost)
-        ? cost.paymentResourceProviders
-        : undefined,
-    },
-  )
-  if (resolved.type !== 'selected') {
-    return resolved
-  }
-  const metadata = cardCostCandidateMetadataForSolution(
     candidateMetadataByFeeIndex,
-    resolved.solution,
-  )
-  const paymentResourceProviders = PaymentSolver.isComplexCost(cost)
-    ? cost.paymentResourceProviders
-    : undefined
-
-  if (!canConsumePaymentResourceProviders(effectiveState, resolved.solution, paymentResourceProviders)) {
-    return failure
-  }
-  const returnedCardId = executePaymentSolution(player, resolved.solution, {
-    state: effectiveState,
     paymentResourceProviders,
   })
-  recordCardCostAttribution(player, metadata?.costAttribution)
+  if (resolved.type === 'request') {
+    return resolved.request
+  }
+  if (resolved.type === 'failed') {
+    return failure
+  }
+  recordCardCostAttribution(player, resolved.receipt.costAttribution)
   return {
     type: 'selected',
-    resourcesPaid: resolved.solution.resourcesPaid,
-    feeIndex: resolved.solution.feeIndex,
-    originalFeeIndex: metadata?.originalFeeIndex,
-    returnedCardId,
+    resourcesPaid: resolved.receipt.resourcesPaid,
+    feeIndex: resolved.receipt.feeIndex,
+    originalFeeIndex: resolved.receipt.originalFeeIndex,
+    returnedCardId: resolved.receipt.returnedCardId,
   }
 }
 

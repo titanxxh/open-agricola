@@ -21,11 +21,7 @@ import {
   parseEdgeId,
   positionKey,
 } from '../domain/farm.ts'
-import {
-  canAffordTypedFlatCost,
-  getMaxBuildableRooms,
-  resolveUnitCostWithDelta,
-} from '../actions/payment/internal'
+import { PaymentSolver } from '../actions/payment'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import { ANIMAL_KEYS, readAnimalHolderCounts } from './animal-holder-state.ts'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
@@ -1542,7 +1538,7 @@ export const buildRoomFarmInteraction = (
   })
   const maxSelections = Math.min(
     selectableTiles.length,
-    getMaxBuildableRooms(player, costOverride, actionContext),
+    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext),
   )
   const reachableTiles = getReachableRoomTiles(
     normalized,
@@ -1603,13 +1599,13 @@ export const buildStableFarmInteraction = (
   )
   let resourceMax = 0
   for (let count = 1; count <= structuralMax; count += 1) {
-    const totalCost = resolveUnitCostWithDelta(
+    const totalCost = PaymentSolver.resolveUnitCostWithDelta(
       { wood: STABLE_WOOD_COST },
       options?.exactCost,
       costOverride,
       count,
     )
-    if (!totalCost || !canAffordTypedFlatCost(player, totalCost, 'stables')) break
+    if (!totalCost || !PaymentSolver.canAffordTypedFlatCost(player, totalCost, 'stables')) break
     resourceMax = count
   }
   return {
@@ -1625,10 +1621,10 @@ export const buildPlowFarmInteraction = (
   exactCost?: ExactCost,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
-  const payableCost = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+  const payableCost = PaymentSolver.resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
   const canAffordPlow =
     payableCost !== null &&
-    canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
+    PaymentSolver.canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
     ? getFarmyardTilePositions(normalized).filter(

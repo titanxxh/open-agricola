@@ -5,9 +5,8 @@
  * (Minor) and optionally returns it to the global available-major pool.
  * Pure mutation; no payment / cost concept.
  *
- * Moved out of `shared/actions/payment/internal/execute.ts` (S3 Task 8 A3
- * decision) — semantically belongs to the cards / retire domain rather than
- * the payment domain. May relocate again to `shared/domain/` aggregates in S4.
+ * Moved out of payment execution internals (S3 Task 8 A3 decision) because it
+ * belongs to the cards / retire domain rather than the payment domain.
  */
 
 import type { GameState, PlayerState } from '../../contract/types'

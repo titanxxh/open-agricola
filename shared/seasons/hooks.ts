@@ -2,7 +2,7 @@ import { registerActionHook } from '../actions/hooks'
 import { canStartFencing } from '../actions/effects/fencing'
 import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
-import { canAffordTypedFlatCost } from '../actions/payment/internal'
+import { PaymentSolver } from '../actions/payment'
 import {
   readActionSnapshotExtraData,
   readActionSnapshotToken,
@@ -40,7 +40,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     phases: ['isDoable'],
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'winter')) return
-      if (canAffordTypedFlatCost(context.player, { food: 1 }, 'plow', context.state)) return
+      if (PaymentSolver.canAffordTypedFlatCost(context.player, { food: 1 }, 'plow', context.state)) return
       return { doable: false }
     },
   })
@@ -52,7 +52,7 @@ export const registerThroughTheSeasonsHooks = (): void => {
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'spring')) return
       if (context.doable) return
-      if (!canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) return
+      if (!PaymentSolver.canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) return
       if (canStartFencing(context.state, context.player, { wood: -2 }, context.actionContext)) {
         return { doable: true }
       }

@@ -143,9 +143,7 @@ import {
   assertPublicEventArchiveCanAppend,
   PublicEventArchivePayloadError,
 } from '../events/archive.ts'
-import {
-  applyTradeSideEffect,
-} from '../actions/payment/internal'
+import { PaymentSolver } from '../actions/payment'
 import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
@@ -4395,7 +4393,7 @@ export class GameCore {
         this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
         // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
         if (exchange.sideEffect && times > 0) {
-          applyTradeSideEffect(
+          PaymentSolver.applyTradeSideEffect(
             this.state,
             player,
             exchange.sideEffect,

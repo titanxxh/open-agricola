@@ -2,16 +2,13 @@ import type {
   ActionAvailabilityContext,
   ActionCostPreview,
 } from '../../contract/types'
-import {
-  canAffordActionPreviewCost,
-  resolveActionPreviewCost as resolveActionPreviewCostFromPay,
-} from '../payment/internal'
+import { PaymentSolver } from '../payment'
 
 export const resolveActionPreviewCost = (
   preview: ActionCostPreview,
   context: ActionAvailabilityContext,
   costOverride?: Partial<ActionAvailabilityContext['player']['resources']>,
-) => resolveActionPreviewCostFromPay(context, preview.getBaseCost, costOverride)
+) => PaymentSolver.resolveActionPreviewCost(context, preview.getBaseCost, costOverride)
 
 export const canExecuteWithCostPreview = (
   preview: ActionCostPreview,
@@ -24,5 +21,5 @@ export const canExecuteWithCostPreview = (
   if (preview.canExecute) {
     return preview.canExecute(context, costOverride)
   }
-  return canAffordActionPreviewCost(context, preview.getBaseCost, costOverride)
+  return PaymentSolver.canAffordActionPreviewCost(context, preview.getBaseCost, costOverride)
 }
