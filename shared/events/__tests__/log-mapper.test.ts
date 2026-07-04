@@ -49,11 +49,11 @@ describe('eventsToLogEntries', () => {
         sourceEventRef: { id: 'play', seq: 2, type: 'card.played' },
         consumedEventRefs: [{ id: 'pay', seq: 1, type: 'resource.paid' }],
         identity: {
-          sourceEventId: 'play',
-          sourceEventSeq: 2,
-          sourceEventType: 'card.played',
-          rowIndex: 0,
           logKey: 'log.playMinorImprovement',
+          params: {
+            costResources: { food: 1 },
+            improvements: 'D020_TurnwrestPlow',
+          },
         },
       }),
     ])
@@ -67,6 +67,36 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual(
       plan.rows.map((row) => row.logEntry),
     )
+  })
+
+  it('uses legacy state log dedupe params for presentation row identity', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'play',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'card.played',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        sourceCardId: 'A001_TestMinor',
+        cardId: 'A001_TestMinor',
+        cardType: 'minor',
+      },
+    ] satisfies GameEvent[]
+
+    const [row] = buildLogPresentationPlan(events, { playerNames: { p1: 'Alice' } }).rows
+
+    expect(row?.identity).toEqual({
+      logKey: 'log.playMinorImprovement',
+      params: {
+        costResources: {},
+        improvements: 'A001_TestMinor',
+      },
+    })
+    expect(row?.logEntry.params?.player).toBe('Alice')
   })
 
   it('records a consumed payment once when repeated consumers match it', () => {
