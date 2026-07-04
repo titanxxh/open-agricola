@@ -2,7 +2,7 @@ import type { GameEvent } from '../../shared/contract/events'
 import type { LogEntry } from '../../shared/contract/types'
 import { eventsToLogEntries } from '../../shared/events/log-mapper'
 import type { Locale } from '../../shared/i18n'
-import { collectPublicEventNotifications } from './public-event-notifications'
+import { collectPublicEventFeedback } from './public-event-notifications'
 import type { ReplayTimelineEntry } from './replay-timeline'
 
 export type ActionLogTimelineRow =
@@ -285,7 +285,7 @@ const eventLabel = (
   const [logEntry] = eventsToLogEntries([entry.event], { playerNames, actionNames })
   if (logEntry) return { logEntry, label: '' }
 
-  const [notification] = collectPublicEventNotifications([entry.event], locale)
+  const [notification] = collectPublicEventFeedback([entry.event], locale).notifications
   if (notification) return { logEntry: null, label: notification.message }
 
   if (!entry.replayable) return { logEntry: null, label: '' }

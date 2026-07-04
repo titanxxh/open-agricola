@@ -6,10 +6,7 @@ import { collectPrivateEventNotifications } from '../private-event-notifications
 import {
   buildEventNotificationStackItems,
   collectNewPublicEventFeedback,
-  collectNewPublicEventNotifications,
-  collectPublicEventHighlightTargets,
-  collectPublicEventNotifications,
-  collectPublicEventResourceAnimations,
+  collectPublicEventFeedback,
   maxPublicEventSeq,
 } from '../public-event-notifications'
 
@@ -29,6 +26,29 @@ type ClientConsumerFixtures = {
   silent?: GameEvent
 }
 type ClientFixtureMatrix = Partial<Record<GameEvent['type'], Partial<Record<ClientConsumerSurface, ClientConsumerFixtures>>>>
+type PublicEventFeedbackLocale = Parameters<typeof collectPublicEventFeedback>[1]
+
+const collectPublicEventNotifications = (
+  events: readonly GameEvent[],
+  locale: PublicEventFeedbackLocale,
+  idPrefix = '',
+) => collectPublicEventFeedback(events, locale, idPrefix).notifications
+
+const collectNewPublicEventNotifications = (
+  events: readonly GameEvent[],
+  lastSeenSeq: number | null,
+  locale: PublicEventFeedbackLocale,
+  idPrefix = '',
+) => {
+  const { notifications, nextCursor } = collectNewPublicEventFeedback(events, lastSeenSeq, locale, idPrefix)
+  return { notifications, nextCursor }
+}
+
+const collectPublicEventHighlightTargets = (events: readonly GameEvent[]) =>
+  collectPublicEventFeedback(events, 'en').highlights
+
+const collectPublicEventResourceAnimations = (events: readonly GameEvent[]) =>
+  collectPublicEventFeedback(events, 'en').resourceAnimations
 
 const clientFixtureMatrix = {
   'resource.moved': {
