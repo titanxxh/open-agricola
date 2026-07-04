@@ -1,28 +1,26 @@
 import type { GameState, PlayerState } from '../../../shared/contract/types'
 import { getPlayerPanelSupplySummary } from '../../../shared/domain/player-panel-summary'
-import { FarmBoard, type FarmBoardProps } from './FarmBoard'
+import {
+  FarmBoard,
+  type FarmBoardActions,
+  type FarmBoardView,
+} from './FarmBoard'
 
-/**
- * Props for PlayerFarmPanel.
- *
- * The panel resolves which player's farm to render from `state` + `viewedPlayerId`,
- * so callers no longer need to pass `players` / `displayPlayer` directly.
- * `currentPlayer` (the active turn player) is still derived from `state.currentPlayerIndex`.
- *
- * Every other prop is forwarded to the underlying FarmBoard untouched. This keeps
- * the extraction faithful — no behavior change, just a wrapper that hides the
- * `displayPlayer` lookup behind a `viewedPlayerId` string.
- */
-export interface PlayerFarmPanelProps
-  extends Omit<FarmBoardProps, 'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount'> {
+export interface PlayerFarmPanelProps {
   state: GameState
   viewedPlayerId: string
+  view: Omit<
+    FarmBoardView,
+    'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount' | 'playerPanelSummary'
+  >
+  actions: FarmBoardActions
 }
 
 export function PlayerFarmPanel({
   state,
   viewedPlayerId,
-  ...rest
+  view,
+  actions,
 }: PlayerFarmPanelProps) {
   const currentPlayer: PlayerState | undefined = state.players[state.currentPlayerIndex]
   const displayPlayer: PlayerState | undefined =
@@ -38,12 +36,15 @@ export function PlayerFarmPanel({
   return (
     <div className="player-farm-panel">
       <FarmBoard
-        {...rest}
-        players={state.players}
-        currentPlayer={currentPlayer}
-        displayPlayer={displayPlayer}
-        infirmaryWorkerCount={infirmaryWorkerCount}
-        playerPanelSummary={getPlayerPanelSupplySummary(state, displayPlayer)}
+        view={{
+          ...view,
+          players: state.players,
+          currentPlayer,
+          displayPlayer,
+          infirmaryWorkerCount,
+          playerPanelSummary: getPlayerPanelSupplySummary(state, displayPlayer),
+        }}
+        actions={actions}
       />
       {/* occupations CardCarousel — added in Task 6 */}
       {/* minor improvements CardCarousel — added in Task 6 */}
