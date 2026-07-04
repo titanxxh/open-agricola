@@ -25,7 +25,7 @@ export const D100_LordoftheManor = defineOccupationCard({
     deck: "D",
     number: 100,
     category: "POINTS_PROVIDER",
-    desc: ["During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus point is also awarded for 4 fenced stables.)"],
+    desc: ["During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus <SCORE> is also awarded for 4 fenced <STABLE>.)"],
     cost: {},
     players: "1+",
     extraVp: true,

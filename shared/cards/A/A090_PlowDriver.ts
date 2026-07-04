@@ -30,7 +30,7 @@ export const A090_PlowDriver = defineOccupationCard({
     deck: 'A',
     number: 90,
     category: 'FARM_PLANNER',
-    desc: ['Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 field.'],
+    desc: ['Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 <FIELD>.'],
     cost: {},
     players: '1+',
   },

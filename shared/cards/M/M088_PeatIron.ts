@@ -24,7 +24,7 @@ export const M088_PeatIron = defineMinorCard({
     number: 88,
     category: "GOODS_PROVIDER",
     desc: [
-        "At the start of each harvest, if you have at least 2 moors, you get 1 fuel."
+        "At the start of each harvest, if you have at least 2 <MOOR>, you get 1 <FUEL>."
     ],
     cost: {
         "wood": 1

@@ -33,7 +33,7 @@ export const M075_FuelStorage = defineMinorCard({
     number: 75,
     category: "GOODS_PROVIDER",
     desc: [
-        "Add 1, 3, 5, 7, 9, and 11 to the current round. Alternate placing 1 wood and 1 fuel on the corresponding round spaces, starting with wood. At the start of these rounds, you get the good."
+        "Add 1, 3, 5, 7, 9, and 11 to the current round. Alternate placing 1 <WOOD> and 1 <FUEL> on the corresponding round spaces, starting with <WOOD>. At the start of these rounds, you get the good."
     ],
     cost: {
         "clay": 1,

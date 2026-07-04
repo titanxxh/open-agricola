@@ -94,7 +94,7 @@ export const A071_ClearingSpade = defineMinorCard({
     deck: 'A',
     number: 71,
     category: 'CROP_PROVIDER',
-    desc: ['At any time, you can move 1 crop from a planted field containing at least 2 crops to an empty field.'],
+    desc: ['At any time, you can move 1 crop from a planted <FIELD> containing at least 2 crops to an empty <FIELD>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

@@ -52,7 +52,7 @@ export const M061_HayWagon = defineMinorCard({
     number: 61,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Each time after you take at least 3 wood, 3 clay, 2 reed, or 2 stone from an accumulation space, you can take a \"Build Rooms\" or \"Renovation\" action without placing a person."
+        "Each time after you take at least 3 <WOOD>, 3 <CLAY>, 2 <REED>, or 2 <STONE> from an accumulation space, you can take a __Build Rooms__ or __Renovation__ action without placing a person."
     ],
     cost: {
         "wood": 2

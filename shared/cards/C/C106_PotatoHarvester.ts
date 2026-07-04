@@ -29,7 +29,7 @@ export const C106_PotatoHarvester = defineOccupationCard({
     number: 106,
     category: 'FOOD_PROVIDER',
     desc: [
-        'When you play this card, you immediately get 3 <FOOD>. For each <VEGETABLE> you get from your fields during the field phase of the harvest, you get 1 additional <FOOD>.',
+        'When you play this card, you immediately get 3 <FOOD>. For each <VEGETABLE> you get from your <FIELD> during the field phase of the harvest, you get 1 additional <FOOD>.',
       ],
     cost: {},
     players: '1+',

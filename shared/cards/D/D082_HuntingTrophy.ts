@@ -100,7 +100,7 @@ export const D082_HuntingTrophy = defineMinorCard({
     number: 82,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. Fences built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
+        'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. <FENCE> built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
       ],
     vp: 1,
   },

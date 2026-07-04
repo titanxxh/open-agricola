@@ -73,7 +73,7 @@ export const A081_InterimStorage = defineMinorCard({
     deck: "A",
     number: 81,
     category: "BUILDING_RESOURCE_PROVIDER",
-    desc: ["Each time you use a clay/reed/stone accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."],
+    desc: ["Each time you use a <CLAY>/<REED>/<STONE> accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."],
     cost: {"food":2},
   },
   impl: cardImpl,

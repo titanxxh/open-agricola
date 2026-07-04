@@ -32,7 +32,7 @@ export const A011_MudPatch = defineMinorCard({
     deck: 'A',
     number: 11,
     category: 'FARM_PLANNER',
-    desc: ['When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted field tiles.'],
+    desc: ['When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted <FIELD> tiles.'],
   },
   impl: cardImpl,
 })

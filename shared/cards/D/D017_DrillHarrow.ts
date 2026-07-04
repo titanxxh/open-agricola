@@ -70,7 +70,7 @@ export const D017_DrillHarrow = defineMinorCard({
     deck: 'D',
     number: 17,
     category: 'FARM_PLANNER',
-    desc: ['Each time before you take an unconditional __Sow__ action, you can pay 3 <FOOD> to plow 1 field.'],
+    desc: ['Each time before you take an unconditional __Sow__ action, you can pay 3 <FOOD> to plow 1 <FIELD>.'],
     cost: { wood: 1 },
     evenMoreSet: true,
   },

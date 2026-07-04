@@ -72,7 +72,7 @@ const MOOR_MAJOR_DISPLAY: Record<string, MoorMajorDisplay> = {
   Major_Moor_CeramicsStall: moorMajorDisplay('M009'),
   Major_Moor_BasketStall: moorMajorDisplay('M010'),
   Major_Moor_PeatCharcoalKiln: moorMajorDisplay('M011'),
-  Major_Moor_ForestersLodge: moorMajorDisplay('M012', false),
+  Major_Moor_ForestersLodge: moorMajorDisplay('M012'),
   Major_Moor_MuseumOfTheMoors: moorMajorDisplay('M013'),
   Major_Moor_RidingStables: moorMajorDisplay('M014'),
 }

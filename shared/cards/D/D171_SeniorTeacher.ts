@@ -41,7 +41,7 @@ export const D171_SeniorTeacher = defineOccupationCard({
     deck: 'D',
     number: 171,
     category: 'ACTIONS_BOOSTER',
-    desc: ['Each time another player pays food on a "Lessons" action space, you get exactly 1 of that food.'],
+    desc: ['Each time another player pays <FOOD> on a __Lessons__ action space, you get exactly 1 of that <FOOD>.'],
     cost: {},
     players: '5+',
   },

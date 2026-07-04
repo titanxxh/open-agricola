@@ -108,7 +108,7 @@ export const C069_LandConsolidation = defineMinorCard({
     number: 69,
     category: 'CROP_PROVIDER',
     desc: [
-        'At any time, if you have a grain field with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the field for 1 <VEGETABLE> on the field.',
+        'At any time, if you have a <GRAIN> <FIELD> with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the <FIELD> for 1 <VEGETABLE> on the <FIELD>.',
       ],
     cost: {},
   },

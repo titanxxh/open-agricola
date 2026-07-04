@@ -94,7 +94,7 @@ export const M131_CattleStall = defineMinorCard({
     number: 131,
     category: "LIVESTOCK_PROVIDER",
     desc: [
-        "Add 2, 4, 6, and 8 to the current round and place 1 animal of your choice on each corresponding round space. All the animals must be different. At the start of these rounds, you can buy the respective animal for 1 food."
+        "Add 2, 4, 6, and 8 to the current round and place 1 animal of your choice on each corresponding round space. All the animals must be different. At the start of these rounds, you can buy the respective animal for 1 <FOOD>."
     ],
     cost: {
         "wood": 2,

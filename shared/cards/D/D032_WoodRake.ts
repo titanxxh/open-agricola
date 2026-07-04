@@ -36,7 +36,7 @@ export const D032_WoodRake = defineMinorCard({
     deck: "D",
     number: 32,
     category: "POINTS_PROVIDER",
-    desc: ["During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."],
+    desc: ["During scoring, if you had at least 7 goods in your <FIELD> before the final harvest, you get 2 bonus <SCORE>."],
     cost: { wood: 1 },
     extraVp: true,
   },

@@ -138,7 +138,7 @@ export const M111_NoTillFarming = defineMinorCard({
     number: 111,
     category: "CROP_PROVIDER",
     desc: [
-        "You can plant grain or vegetables on up to 2 unused farmyard spaces. Even if you do, these farmyard spaces are not considered fields but still unused. You can discard crops from these farmyard spaces at any time."
+        "You can plant <GRAIN> or <VEGETABLE> on up to 2 unused farmyard spaces. Even if you do, these farmyard spaces are not considered <FIELD> but still unused. You can discard crops from these farmyard spaces at any time."
     ],
     cost: {},
     prerequisite: "2 Fields",

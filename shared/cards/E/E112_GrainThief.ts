@@ -108,7 +108,7 @@ export const E112_GrainThief = defineOccupationCard({
     name: "Grain Thief",
     deck: "E",
     number: 112,
-    desc: ["Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."],
+    desc: ["Each time you would harvest a <GRAIN> <FIELD>, you can leave the <GRAIN> on the <FIELD> and take 1 <GRAIN> from the general supply instead."],
     cost: {},
     players: "1+",
     category: 'CROPS_-_GRAIN',

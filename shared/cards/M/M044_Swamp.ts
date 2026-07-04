@@ -24,7 +24,7 @@ export const M044_Swamp = defineMinorCard({
     number: 44,
     category: "FARM_PLANNER",
     desc: [
-        "Place 1 moor on round space 12. At the start of that round, you can place the moor on an unused farmyard space."
+        "Place 1 <MOOR> on round space 12. At the start of that round, you can place the <MOOR> on an unused farmyard space."
     ],
     cost: {},
     prerequisite: "Play in Round 4 or Before",

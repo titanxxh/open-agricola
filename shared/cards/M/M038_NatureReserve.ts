@@ -162,7 +162,7 @@ export const M038_NatureReserve = defineMinorCard({
     number: 38,
     category: "FARM_PLANNER",
     desc: [
-        "Immediately fence a farmyard space containing at least 1 forest or moor that is adjacent to a pasture, without paying wood for the fences. Once there are no tiles left in the fenced area, the farmyard space becomes a pasture."
+        "Immediately <FENCE> a farmyard space containing at least 1 <FOREST> or <MOOR> that is adjacent to a pasture, without paying <WOOD> for the <FENCE>. Once there are no tiles left in the fenced area, the farmyard space becomes a pasture."
     ],
     cost: {
         "food": 1

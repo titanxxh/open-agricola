@@ -26,7 +26,7 @@ export const C017_NewlyPlowedField = defineMinorCard({
     deck: "C",
     number: 17,
     category: "FARM_PLANNER",
-    desc: ["When you play this card, you can immediately plow 1 field, which needs not be adjacent to another field."],
+    desc: ["When you play this card, you can immediately plow 1 <FIELD>, which needs not be adjacent to another <FIELD>."],
     cost: {},
     prerequisite: "Exactly 3 Field Tiles",
   },

@@ -52,7 +52,7 @@ export const A103_Portmonger = defineOccupationCard({
     deck: 'A',
     number: 103,
     category: 'GOODS_PROVIDER',
-    desc: ['Each time you take 1/2/3+ <FOOD> from a food accumulation space, you also get 1 <VEGETABLE>/<GRAIN>/<REED>.'],
+    desc: ['Each time you take 1/2/3+ <FOOD> from a <FOOD> accumulation space, you also get 1 <VEGETABLE>/<GRAIN>/<REED>.'],
     cost: {},
     players: '1+',
   },

@@ -36,7 +36,7 @@ export const M040_MoorFire = defineMinorCard({
     number: 40,
     category: "FARM_PLANNER",
     desc: [
-        "Once you only have 1 remaining moor, at any time, you can exchange it for 1 field tile."
+        "Once you only have 1 remaining <MOOR>, at any time, you can exchange it for 1 <FIELD> tile."
     ],
     cost: {},
     prerequisite: "2 Moors",

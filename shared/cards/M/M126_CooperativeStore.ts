@@ -60,7 +60,7 @@ export const M126_CooperativeStore = defineMinorCard({
     number: 126,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Place 4 usage counters on this card. At any time, you can return 1 usage counter from this card plus 1 building resource of your choice to get 1 of any other building resource except stone."
+        "Place 4 usage counters on this card. At any time, you can return 1 usage counter from this card plus 1 building resource of your choice to get 1 of any other building resource except <STONE>."
     ],
     cost: {
         "wood": 2,

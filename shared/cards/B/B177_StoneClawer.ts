@@ -27,7 +27,7 @@ export const B177_StoneClawer = defineOccupationCard({
     deck: 'B',
     number: 177,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time you plow at least 1 field, you also get 1 stone.'],
+    desc: ['Each time you plow at least 1 <FIELD>, you also get 1 <STONE>.'],
     cost: {},
     players: '5+',
   },

@@ -29,7 +29,7 @@ export const D061_BaleofStraw = defineMinorCard({
     deck: "D",
     number: 61,
     category: "FOOD_PROVIDER",
-    desc: ["At the start of each harvest, if you have at least 3 grain fields (including field cards with planted grain), you get 2 <FOOD>."],
+    desc: ["At the start of each harvest, if you have at least 3 <GRAIN> <FIELD> (including <FIELD> cards with planted <GRAIN>), you get 2 <FOOD>."],
     cost: {},
   },
   impl: cardImpl,

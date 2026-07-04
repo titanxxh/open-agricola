@@ -55,7 +55,7 @@ export const E108_BlackberryFarmer = defineOccupationCard({
     number: 108,
     category: 'FOOD',
     desc: [
-        'Each time you build fences, place 1 <FOOD> on each remaining round space, up to the number of fences just built. At the start of these rounds, you get the <FOOD>.',
+        'Each time you build <FENCE>, place 1 <FOOD> on each remaining round space, up to the number of <FENCE> just built. At the start of these rounds, you get the <FOOD>.',
       ],
     cost: {},
     players: '1+',

@@ -87,7 +87,7 @@ export const E083_ShepherdsWhistle = defineMinorCard({
     deck: 'E',
     number: 83,
     category: 'ANIMALS_',
-    desc: ['At the start of the breeding phase of each harvest, if you have at least 1 unfenced stable without an animal, you get 1 <SHEEP>.'],
+    desc: ['At the start of the breeding phase of each harvest, if you have at least 1 unfenced <STABLE> without an animal, you get 1 <SHEEP>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

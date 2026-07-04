@@ -20,7 +20,7 @@ export const M017_Reforestation = defineMinorCard({
     number: 17,
     category: "FARM_PLANNER",
     desc: [
-        "Place 1 forest on an unused farmyard space."
+        "Place 1 <FOREST> on an unused farmyard space."
     ],
     cost: {},
     prerequisite: "3 Major Improvements",

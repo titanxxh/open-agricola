@@ -52,7 +52,7 @@ export const M112_PeatAshFertilizer = defineMinorCard({
     number: 112,
     category: "CROP_PROVIDER",
     desc: [
-        "Each time before you take the \"Cut Peat\" special action, you can place 1 additional crop of the same type on all fields and farmyard spaces containing grain or vegetables. Do not place any crops on empty fields and farmyard spaces."
+        "Each time before you take the __Cut Peat__ special action, you can place 1 additional crop of the same type on all <FIELD> and farmyard spaces containing <GRAIN> or <VEGETABLE>. Do not place any crops on empty <FIELD> and farmyard spaces."
     ],
     cost: {
         "vegetable": 1

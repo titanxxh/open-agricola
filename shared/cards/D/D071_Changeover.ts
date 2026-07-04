@@ -65,7 +65,7 @@ export const D071_Changeover = defineMinorCard({
     deck: 'D',
     number: 71,
     category: 'CROP_PROVIDER',
-    desc: ['At any time, if a field contains exactly 1 good as a result of a harvest, you can discard that good and immediately take a __Sow__ action limited to that field.'],
+    desc: ['At any time, if a <FIELD> contains exactly 1 good as a result of a harvest, you can discard that good and immediately take a __Sow__ action limited to that <FIELD>.'],
     cost: {},
   },
   impl: cardImpl,

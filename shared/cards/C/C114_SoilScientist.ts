@@ -45,7 +45,7 @@ export const C114_SoilScientist = defineOccupationCard({
     number: 114,
     category: 'CROP_PROVIDER',
     desc: [
-        'Each time after you use a clay/stone accumulation space, you can place 1 <STONE>/2 <CLAY> from your supply on the space to get 2 <GRAIN>/1 <VEGETABLE>, respectively.',
+        'Each time after you use a <CLAY>/<STONE> accumulation space, you can place 1 <STONE>/2 <CLAY> from your supply on the space to get 2 <GRAIN>/1 <VEGETABLE>, respectively.',
       ],
     cost: {},
     players: '1+',

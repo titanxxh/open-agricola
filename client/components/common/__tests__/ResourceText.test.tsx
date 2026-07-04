@@ -74,6 +74,14 @@ describe('ResourceText', () => {
     expect(container.querySelector('.res-icon-grain-veg-stack')).toBeTruthy()
   })
 
+  it('renders Farmers of the Moor terrain placeholders as sprites', () => {
+    const { container } = render(<ResourceText text="<FOREST> <MOOR>" />)
+    expect(container.querySelector('.res-icon-forest')).toBeTruthy()
+    expect(container.querySelector('.res-icon-moor')).toBeTruthy()
+    expect(container.textContent).not.toContain('<FOREST>')
+    expect(container.textContent).not.toContain('<MOOR>')
+  })
+
   it('strips [text] brackets and wraps the inner content in card-desc-label', () => {
     const { container } = render(<ResourceText text="[Anytime]" />)
     const label = container.querySelector('.card-desc-label')

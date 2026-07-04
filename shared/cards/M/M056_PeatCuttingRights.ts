@@ -38,7 +38,7 @@ export const M056_PeatCuttingRights = defineMinorCard({
     number: 56,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Add 4 and 7 to the current round and place 1 fuel on each corresponding round space. At the start of these rounds, you can discard the fuel and take the \"Cut Peat\" special action by taking the appropriate special action card."
+        "Add 4 and 7 to the current round and place 1 <FUEL> on each corresponding round space. At the start of these rounds, you can discard the <FUEL> and take the __Cut Peat__ special action by taking the appropriate special action card."
     ],
     cost: {},
     prerequisite: "1 Horse",

@@ -37,7 +37,7 @@ export const M034_HomeWood = defineMinorCard({
     number: 34,
     category: "FARM_PLANNER",
     desc: [
-        "You can keep exactly 1 animal, except sheep, on each farmyard space containing at least 1 forest."
+        "You can keep exactly 1 animal, except <SHEEP>, on each farmyard space containing at least 1 <FOREST>."
     ],
     cost: {},
     prerequisite: "3 Improvements",

@@ -57,7 +57,7 @@ export const D149_CasualWorker = defineOccupationCard({
     number: 149,
     category: 'FARM_PLANNER',
     desc: [
-        'Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a stable without paying wood.',
+        'Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a <STABLE> without paying <WOOD>.',
       ],
     cost: {},
     players: '4+',

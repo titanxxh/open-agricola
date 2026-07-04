@@ -50,7 +50,7 @@ export const C008_PlantFertilizer = defineMinorCard({
     deck: "C",
     number: 8,
     category: "CROP_PROVIDER",
-    desc: ["In each field with exactly 1 good, you can immediately place 1 additional good of the same type."],
+    desc: ["In each <FIELD> with exactly 1 good, you can immediately place 1 additional good of the same type."],
     cost: {},
     passing: true,
   },

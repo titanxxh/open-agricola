@@ -65,7 +65,7 @@ export const M055_ToolShed = defineMinorCard({
     number: 55,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Once per round, immediately before or after you take the \"Slash and Burn\" or \"Cut Peat\" special action, you can also take the respective other special action."
+        "Once per round, immediately before or after you take the __Slash and Burn__ or __Cut Peat__ special action, you can also take the respective other special action."
     ],
     cost: {
         "wood": 1,

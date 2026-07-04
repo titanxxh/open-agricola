@@ -31,7 +31,7 @@ export const C076_WoodCart = defineMinorCard({
     deck: 'C',
     number: 76,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time you use a wood accumulation space, you get 2 additional <WOOD>.'],
+    desc: ['Each time you use a <WOOD> accumulation space, you get 2 additional <WOOD>.'],
     cost: { wood: 3 },
     prerequisite: '3 Occupations',
     occupationPrerequisites: { min: 3 },

@@ -53,7 +53,7 @@ export const C172_FieldCounter = defineOccupationCard({
     deck: 'C',
     number: 172,
     category: 'FOOD_PROVIDER',
-    desc: ['Each time another player plows a field, place 1 food on this card. Once this game, you can turn this card face down to get the food on it.'],
+    desc: ['Each time another player plows a <FIELD>, place 1 <FOOD> on this card. Once this game, you can turn this card face down to get the <FOOD> on it.'],
     cost: {},
     players: '5+',
   },

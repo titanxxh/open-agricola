@@ -32,7 +32,7 @@ export const C047_GardenClaw = defineMinorCard({
     deck: "C",
     number: 47,
     category: "FOOD_PROVIDER",
-    desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
+    desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted <FIELD> you have. At the start of these rounds, you get the <FOOD>."],
     cost: { wood: 1 },
   },
   impl: cardImpl,

@@ -902,7 +902,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       }
     ],
     "desc": [
-      "[Special action: Cut Peat]",
+      "[Special action: __Cut Peat__]",
       "+1<FUEL> if you have 0<HORSE>; +2<FUEL> if you have at least 1<HORSE>.",
       "[Scoring]",
       "3/5<FUEL> <ARROW-1X> 1/2<SCORE>"
@@ -931,10 +931,10 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
       }
     ],
     "desc": [
-      "[Special action: Fell Trees]",
+      "[Special action: __Fell Trees__]",
       "Gain 1 extra <WOOD>, or 2 extra <WOOD> if you have at least 1<HORSE>.",
       "[Scoring]",
-      "Gain 1 <SCORE> for each forest in your farmyard."
+      "Gain 1 <SCORE> for each <FOREST> in your farmyard."
     ],
     "kind": "major"
   },

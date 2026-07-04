@@ -79,7 +79,7 @@ export const M060_SowingMachine = defineMinorCard({
     number: 60,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Each time after you take a special action, if you then have at least 2 horses, you can also take a \"Sow\" action."
+        "Each time after you take a special action, if you then have at least 2 <HORSE>, you can also take a __Sow__ action."
     ],
     cost: {
         "wood": 3

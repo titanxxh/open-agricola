@@ -53,7 +53,7 @@ export const M069_LeatherSaddle = defineMinorCard({
     number: 69,
     category: "POINTS_PROVIDER",
     desc: [
-        "Each time you have at least 3 horses, you get 1 bonus point for each cattle that you turn into food."
+        "Each time you have at least 3 <HORSE>, you get 1 bonus <SCORE> for each <CATTLE> that you turn into <FOOD>."
     ],
     cost: {
         "vegetable": 1

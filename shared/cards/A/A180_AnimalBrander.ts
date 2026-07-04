@@ -71,7 +71,7 @@ export const A180_AnimalBrander = defineOccupationCard({
     deck: 'A',
     number: 180,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time you use the "Animal Market" action space, you can pay 1 food to use the same option twice (instead of once).'],
+    desc: ['Each time you use the __Animal Market__ action space, you can pay 1 <FOOD> to use the same option twice (instead of once).'],
     cost: {},
     players: '5+',
   },

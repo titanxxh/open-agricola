@@ -23,7 +23,7 @@ export const D011_LawnFertilizer = defineMinorCard({
     deck: 'D',
     number: 11,
     category: 'FARM_PLANNER',
-    desc: ['Your pastures of size 1 can hold up to 3 animals of the same type. (With a stable, they can hold up to 6 animals of the same type.)'],
+    desc: ['Your pastures of size 1 can hold up to 3 animals of the same type. (With a <STABLE>, they can hold up to 6 animals of the same type.)'],
     cost: {},
   },
   impl: cardImpl,

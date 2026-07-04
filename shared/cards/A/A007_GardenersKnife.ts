@@ -32,7 +32,7 @@ export const A007_GardenersKnife = defineMinorCard({
     deck: 'A',
     number: 7,
     category: 'FOOD_PROVIDER',
-    desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
+    desc: ['You immediately get 1 <FOOD> for each <GRAIN> <FIELD> you have and 1 <GRAIN> for each <VEGETABLE> <FIELD> you have.'],
     cost: { wood: 1 },
     passing: true,
   },

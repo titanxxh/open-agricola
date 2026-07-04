@@ -27,7 +27,7 @@ export const E048_TownHall = defineMinorCard({
     deck: "E",
     number: 48,
     category: "FOOD",
-    desc: ["In the feeding phase of each harvest, if you live in a clay or stone house, you get 1 or 2 <FOOD>, respectively."],
+    desc: ["In the feeding phase of each harvest, if you live in a <CLAY> or stone house, you get 1 or 2 <FOOD>, respectively."],
     vp: 2,
     cost: { wood: 2, clay: 2 },
   },

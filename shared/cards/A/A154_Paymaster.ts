@@ -65,7 +65,7 @@ export const A154_Paymaster = defineOccupationCard({
     number: 154,
     category: 'POINTS_PROVIDER',
     desc: [
-        'Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
+        'Each time another player uses a <FOOD> accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>.',
       ],
     cost: {},
     players: '4+',

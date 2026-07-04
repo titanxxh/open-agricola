@@ -47,7 +47,7 @@ export const D088_Millwright = defineOccupationCard({
     number: 88,
     category: 'FARM_PLANNER',
     desc: [
-        'You immediately get 1 <GRAIN>. Each time you build fences, stables, and rooms, or renovate your house, you can replace up to 2 building resources of any type with 1 <GRAIN> each.',
+        'You immediately get 1 <GRAIN>. Each time you build <FENCE>, <STABLE>, and rooms, or renovate your house, you can replace up to 2 building resources of any type with 1 <GRAIN> each.',
       ],
     cost: {},
     players: '1+',

@@ -29,7 +29,7 @@ export const A020_DoubleTurnPlow = defineMinorCard({
     deck: 'A',
     number: 20,
     category: 'FARM_PLANNER',
-    desc: ['When you play this card, you can immediately plow up to 2 fields.'],
+    desc: ['When you play this card, you can immediately plow up to 2 <FIELD>.'],
     cost: { grain: 1 },
     maxRound: 5,
     prerequisite: 'Play in Round 3 (5) or Before',

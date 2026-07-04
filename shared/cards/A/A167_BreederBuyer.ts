@@ -103,7 +103,7 @@ export const A167_BreederBuyer = defineOccupationCard({
     number: 167,
     category: 'LIVESTOCK_PROVIDER',
     desc: [
-        'Each time you build at least 1 wood/clay/stone room and at least 1 stable on the same turn, you also get 1 <SHEEP>/<PIG>/<CATTLE>.',
+        'Each time you build at least 1 <WOOD>/<CLAY>/stone room and at least 1 <STABLE> on the same turn, you also get 1 <SHEEP>/<PIG>/<CATTLE>.',
       ],
     cost: {},
     players: '4+',

@@ -90,7 +90,7 @@ export const C016_FieldFences = defineMinorCard({
     deck: 'C',
     number: 16,
     category: 'FARM_PLANNER',
-    desc: ['You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for fences that you build next to field tiles.'],
+    desc: ['You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for <FENCE> that you build next to <FIELD> tiles.'],
     cost: { food: 2 },
   },
   impl: cardImpl,

@@ -31,7 +31,7 @@ export const D105_Sculptor = defineOccupationCard({
     deck: 'D',
     number: 105,
     category: 'GOODS_PROVIDER',
-    desc: ['Each time you use a clay accumulation space, you also get 1 <FOOD>. Each time you use a stone accumulation space, you also get 1 <GRAIN>.'],
+    desc: ['Each time you use a <CLAY> accumulation space, you also get 1 <FOOD>. Each time you use a <STONE> accumulation space, you also get 1 <GRAIN>.'],
     cost: {},
     players: '1+',
   },

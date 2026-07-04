@@ -42,7 +42,7 @@ export const M099_HealingClay = defineMinorCard({
     number: 99,
     category: "FOOD_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 1 food. Each time you use the \"Infirmary\" action space with a person lying in bed, you get 1 additional food."
+        "When you play this card, you immediately get 1 <FOOD>. Each time you use the \"Infirmary\" action space with a person lying in bed, you get 1 additional <FOOD>."
     ],
     cost: {
         "clay": 1

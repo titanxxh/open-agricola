@@ -29,7 +29,7 @@ export const A179_MountainShepherd = defineOccupationCard({
     deck: 'A',
     number: 179,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time you use either "Quarry" accumulation space, you immediately get an additional 1 sheep from the general supply.'],
+    desc: ['Each time you use either __Quarry__ accumulation space, you immediately get an additional 1 <SHEEP> from the general supply.'],
     cost: {},
     players: '5+',
   },

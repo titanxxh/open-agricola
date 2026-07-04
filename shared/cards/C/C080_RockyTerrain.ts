@@ -74,7 +74,7 @@ export const C080_RockyTerrain = defineMinorCard({
     deck: 'C',
     number: 80,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time you plow a field (tile or card), you can also buy 1 <STONE> for 1 <FOOD>.'],
+    desc: ['Each time you plow a <FIELD> (tile or card), you can also buy 1 <STONE> for 1 <FOOD>.'],
     cost: { food: 1 },
     players: '1+',
   },

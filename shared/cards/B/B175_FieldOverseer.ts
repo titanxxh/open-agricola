@@ -28,7 +28,7 @@ export const B175_FieldOverseer = defineOccupationCard({
     deck: 'B',
     number: 175,
     category: 'CROP_PROVIDER',
-    desc: ['Each time the other players harvest grain from at least 3/4/6 fields combined, you get 1 food/grain/vegetable.'],
+    desc: ['Each time the other players harvest <GRAIN> from at least 3/4/6 <FIELD> combined, you get 1 <FOOD>/<GRAIN>/<VEGETABLE>.'],
     cost: {},
     players: '5+',
   },

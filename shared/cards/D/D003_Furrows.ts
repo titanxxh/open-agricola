@@ -24,7 +24,7 @@ export const D003_Furrows = defineMinorCard({
     deck: 'D',
     number: 3,
     category: 'ACTIONS_BOOSTER',
-    desc: ['You can immediately sow in exactly 1 field.'],
+    desc: ['You can immediately sow in exactly 1 <FIELD>.'],
     cost: {},
     passing: true,
   },

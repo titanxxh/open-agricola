@@ -42,7 +42,7 @@ export const A104_WoodHarvester = defineOccupationCard({
     deck: "A",
     number: 104,
     category: "GOODS_PROVIDER",
-    desc: ["In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each wood accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."],
+    desc: ["In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each <WOOD> accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."],
     cost: {},
     players: "1+",
   },

@@ -22,7 +22,7 @@ export const E072_ArtichokeField = defineMinorCard({
     number: 72,
     category: 'CROPS_-_GRAIN_AND_VEGETABLE',
     desc: [
-        'This card is a field. During the field phase of each harvest, if you harvest at least 1\u00a0good from this card, you also get 1 <FOOD>.',
+        'This card is a <FIELD>. During the field phase of each harvest, if you harvest at least 1 good from this card, you also get 1 <FOOD>.',
       ],
     cost: { wood: 1 },
     vp: 1,

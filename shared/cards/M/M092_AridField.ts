@@ -31,7 +31,7 @@ export const M092_AridField = defineMinorCard({
     number: 92,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Each time you take the \"Cut Peat\" special action, place 1 fuel and 1 food on the emptied farmyard space. This farmyard space is still considered unused. You get the goods once the farmyard space is no longer unused."
+        "Each time you take the __Cut Peat__ special action, place 1 <FUEL> and 1 <FOOD> on the emptied farmyard space. This farmyard space is still considered unused. You get the goods once the farmyard space is no longer unused."
     ],
     cost: {},
     prerequisite: "3 Improvements",

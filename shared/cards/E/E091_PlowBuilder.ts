@@ -89,7 +89,7 @@ export const E091_PlowBuilder = defineOccupationCard({
     name: 'Plow Builder',
     deck: 'E',
     number: 91,
-    desc: ['You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 field.'],
+    desc: ['You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 <FIELD>.'],
     cost: {},
     players: '1+',
     category: 'FARMYARD_-_PLOWING',

@@ -34,7 +34,7 @@ export const C102_TreeGuard = defineOccupationCard({
     number: 102,
     category: 'GOODS_PROVIDER',
     desc: [
-        'Each time after you use a wood accumulation space, you can place 4 <WOOD> from your supply on that space to get 2 <STONE>, 1 <CLAY>, 1 <REED>, and 1 <GRAIN>.',
+        'Each time after you use a <WOOD> accumulation space, you can place 4 <WOOD> from your supply on that space to get 2 <STONE>, 1 <CLAY>, 1 <REED>, and 1 <GRAIN>.',
       ],
     cost: {},
     players: '1+',

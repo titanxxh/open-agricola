@@ -39,7 +39,7 @@ export const A115_ChiefForester = defineOccupationCard({
     deck: 'A',
     number: 115,
     category: 'CROP_PROVIDER',
-    desc: ['Each time you use a wood accumulation space, you also get a __Sow__ action for exactly 1 field.'],
+    desc: ['Each time you use a <WOOD> accumulation space, you also get a __Sow__ action for exactly 1 <FIELD>.'],
     cost: {},
     players: '1+',
   },

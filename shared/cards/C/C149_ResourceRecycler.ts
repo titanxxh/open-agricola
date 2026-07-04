@@ -60,7 +60,7 @@ export const C149_ResourceRecycler = defineOccupationCard({
     number: 149,
     category: 'FARM_PLANNER',
     desc: [
-        'Each time another player renovates to stone, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost.',
+        'Each time another player renovates to <STONE>, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost.',
       ],
     cost: {},
     players: '4+',

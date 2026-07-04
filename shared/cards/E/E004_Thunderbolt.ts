@@ -49,7 +49,7 @@ export const E004_Thunderbolt = defineMinorCard({
     name: "Thunderbolt",
     deck: "E",
     number: 4,
-    desc: ["Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
+    desc: ["Immediately remove all <GRAIN> from one of your <FIELD> to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
     cost: {},
     prerequisite: "1 Grain Field",
     passing: true,

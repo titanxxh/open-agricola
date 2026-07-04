@@ -22,7 +22,7 @@ export const A012_DrinkingTrough = defineMinorCard({
     deck: "A",
     number: 12,
     category: "FARM_PLANNER",
-    desc: ["Each of your pastures (with or without a stable) can hold up to 2 more animals."],
+    desc: ["Each of your pastures (with or without a <STABLE>) can hold up to 2 more animals."],
     cost: { clay: 1 },
   },
   impl: cardImpl,

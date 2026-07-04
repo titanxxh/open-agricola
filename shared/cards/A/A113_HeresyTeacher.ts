@@ -36,7 +36,7 @@ export const A113_HeresyTeacher = defineOccupationCard({
     number: 113,
     category: 'CROP_PROVIDER',
     desc: [
-        'Each time you use a "Lessons" action space, you get 1 <VEGETABLE> in each of your fields with at least 3 <GRAIN> and no <VEGETABLE>. Place the <VEGETABLE> below the <GRAIN>.',
+        'Each time you use a __Lessons__ action space, you get 1 <VEGETABLE> in each of your <FIELD> with at least 3 <GRAIN> and no <VEGETABLE>. Place the <VEGETABLE> below the <GRAIN>.',
       ],
     cost: {},
     players: '1+',

@@ -30,7 +30,7 @@ export const E107_LandSurveyor = defineOccupationCard({
     deck: "E",
     number: 107,
     category: "FOOD",
-    desc: ["In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 <FOOD>."],
+    desc: ["In the field phase of each harvest, if you have at least 2/4/6/7 <FIELD>, you get 1/2/3/4 <FOOD>."],
     cost: {},
     players: "1+",
   },

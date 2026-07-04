@@ -40,7 +40,7 @@ export const B122_Mineralogist = defineOccupationCard({
     number: 122,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'Each time you use a clay/stone accumulation space, you also get 1 of the other good, <STONE>/<CLAY>.',
+        'Each time you use a <CLAY>/<STONE> accumulation space, you also get 1 of the other good, <STONE>/<CLAY>.',
       ],
     cost: {},
     players: '1+',

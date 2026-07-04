@@ -50,7 +50,7 @@ export const C049_BeerStall = defineMinorCard({
     deck: "C",
     number: 49,
     category: "FOOD_PROVIDER",
-    desc: ['In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
+    desc: ['In the feeding phase of each harvest, for each empty unfenced <STABLE> you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

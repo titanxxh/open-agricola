@@ -71,7 +71,7 @@ export const C019_SwingPlow = defineMinorCard({
     deck: 'C',
     number: 19,
     category: 'FARM_PLANNER',
-    desc: ['Place 4 field tiles on this card. Each time you use the __Farmland__ action space, you can also plow up to 2 fields from this card.'],
+    desc: ['Place 4 <FIELD> tiles on this card. Each time you use the __Farmland__ action space, you can also plow up to 2 <FIELD> from this card.'],
     cost: { wood: 3 },
     prerequisite: '3 Occupations',
     occupationPrerequisites: { min: 3 },

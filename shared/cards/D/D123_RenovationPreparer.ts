@@ -35,7 +35,7 @@ export const D123_RenovationPreparer = defineOccupationCard({
     deck: 'D',
     number: 123,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['For each new wood/clay room you build, you get 2 <CLAY>/2 <STONE>.'],
+    desc: ['For each new <WOOD>/clay room you build, you get 2 <CLAY>/2 <STONE>.'],
     cost: {},
     players: '1+',
   },

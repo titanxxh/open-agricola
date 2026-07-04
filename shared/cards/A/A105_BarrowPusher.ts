@@ -27,7 +27,7 @@ export const A105_BarrowPusher = defineOccupationCard({
     deck: "A",
     number: 105,
     category: "GOODS_PROVIDER",
-    desc: ["For each new field tile you get, you also get 1 <CLAY> and 1 <FOOD>."],
+    desc: ["For each new <FIELD> tile you get, you also get 1 <CLAY> and 1 <FOOD>."],
     cost: {},
     players: "1+",
   },

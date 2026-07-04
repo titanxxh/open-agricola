@@ -22,7 +22,7 @@ export const E069_MelonPatch = defineMinorCard({
     number: 69,
     category: 'CROPS_-_VEGETABLE',
     desc: [
-        'This card is a field that can only grow vegetables. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field.',
+        'This card is a <FIELD> that can only grow <VEGETABLE>. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 <FIELD>.',
       ],
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },

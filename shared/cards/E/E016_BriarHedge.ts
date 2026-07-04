@@ -50,7 +50,7 @@ export const E016_BriarHedge = defineMinorCard({
     name: 'Briar Hedge',
     deck: 'E',
     number: 16,
-    desc: ['You do not need to pay wood for fences that you build on the edge of your farmyard board.'],
+    desc: ['You do not need to pay <WOOD> for <FENCE> that you build on the edge of your farmyard board.'],
     cost: {},
     prerequisite: '1 Animal of Each Type',
     category: 'FARMYARD_-__FENCING_OR_STABLE_BUILDING',

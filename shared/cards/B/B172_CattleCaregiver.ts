@@ -32,7 +32,7 @@ export const B172_CattleCaregiver = defineOccupationCard({
     deck: 'B',
     number: 172,
     category: 'FOOD_PROVIDER',
-    desc: ['At the start of each round, if 3/4/5+ players each have at least 1 cattle, you get 1/2/3 food.'],
+    desc: ['At the start of each round, if 3/4/5+ players each have at least 1 <CATTLE>, you get 1/2/3 <FOOD>.'],
     cost: {},
     players: '5+',
   },
