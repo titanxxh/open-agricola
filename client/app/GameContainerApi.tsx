@@ -89,11 +89,6 @@ import {
 } from './game-container-helpers'
 import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
-  buildBorrowedPlayedCardDisplays,
-  buildCardDisplayMap,
-  buildFarmCardDisplayMap,
-  buildPastureDisplayMap,
-  buildStableDisplayMap,
   computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
   wouldExceedExclusiveCardZoneLimit,
@@ -1517,8 +1512,20 @@ export const GameContainerApi = () => {
       interaction,
       selectionInteraction,
       players: state?.players,
+      state,
+      pastureCapacities,
+      animalReorg,
+      pendingAnimalReorg,
     }),
-    [displayPlayer, interaction, selectionInteraction, state?.players],
+    [
+      displayPlayer,
+      interaction,
+      selectionInteraction,
+      state,
+      pastureCapacities,
+      animalReorg,
+      pendingAnimalReorg,
+    ],
   )
   const {
     farmCells,
@@ -1527,62 +1534,17 @@ export const GameContainerApi = () => {
     fieldMap,
     stablePositions,
     existingFenceSet,
+    pastureTiles,
+    pastureDisplayMap,
+    pastureCapacityMap,
+    houseDisplay,
+    stableDisplayMap,
+    cardDisplayMap,
+    farmCardDisplayMap,
+    borrowedPlayedCardDisplays,
+    reorgRemaining,
   } = farmBoardProjection
-
-  const pastureTiles = useMemo(() => {
-    const map = new Map<string, { pastureId: string; isCorner: boolean }>()
-    ;(displayPlayer?.pastures ?? []).forEach((pasture) => {
-      if (!pasture.tiles || pasture.tiles.length === 0) return
-      let corner = pasture.tiles[0]
-      pasture.tiles.forEach((tile) => {
-        if (tile.row > corner.row || (tile.row === corner.row && tile.col > corner.col)) corner = tile
-      })
-      const cornerKey = positionKey(corner)
-      pasture.tiles.forEach((tile) => {
-        map.set(positionKey(tile), { pastureId: pasture.id, isCorner: positionKey(tile) === cornerKey })
-      })
-    })
-    return map
-  }, [displayPlayer?.pastures])
-  const pastureDisplayMap = useMemo(() => {
-    return buildPastureDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const pastureCapacityMap = useMemo(() => {
-    const map = new Map<string, number>()
-    ;(displayPlayer?.pastures ?? []).forEach((p) => {
-      if (p.tiles.length > 0) {
-        map.set(p.id, pastureCapacities[displayPlayer?.id ?? '']?.[p.id] ?? 0)
-      }
-    })
-    return map
-  }, [displayPlayer?.pastures, displayPlayer?.id, pastureCapacities])
   const isReorgActive = !!animalReorg
-
-  const houseDisplay = useMemo(() => {
-    if (isReorgActive && animalReorg) {
-      const zone = animalReorg.zones.find((entry) => entry.zoneType === 'house')
-      return {
-        animalType: zone?.animalType ?? null,
-        animalCount: zone?.animalCount ?? 0,
-      }
-    }
-    return { 
-      animalType: displayPlayer?.houseAnimalType ?? null,
-      animalCount: displayPlayer?.houseAnimalCount ?? 0 
-    }
-  }, [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount, isReorgActive, animalReorg])
-  const stableDisplayMap = useMemo(() => {
-    return buildStableDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const cardDisplayMap = useMemo(() => {
-    return buildCardDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const borrowedPlayedCardDisplays = useMemo(() => {
-    return buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
-  }, [state, displayPlayer, animalReorg])
-  const farmCardDisplayMap = useMemo(() => {
-    return buildFarmCardDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
@@ -1602,13 +1564,6 @@ export const GameContainerApi = () => {
   const hasReorgOverflow = useMemo(() => {
     if (!reorgAvailable) return false
     return REORG_ANIMAL_TYPES.some((animal) => reorgTotals[animal] > reorgAvailable[animal])
-  }, [reorgAvailable, reorgTotals])
-  const reorgRemaining = useMemo(() => {
-    if (!reorgAvailable) return null
-    return REORG_ANIMAL_TYPES.reduce((acc, animal) => {
-      acc[animal] = Math.max(0, reorgAvailable[animal] - reorgTotals[animal])
-      return acc
-    }, emptyAnimalTotals())
   }, [reorgAvailable, reorgTotals])
   const confirmAnimalReorg = useCallback(() => {
     if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {

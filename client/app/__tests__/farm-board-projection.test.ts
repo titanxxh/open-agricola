@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
-import type { PlayerState, Resource } from '../../../shared/contract/types'
+import type {
+  GameState,
+  InteractionAnimalReorgZone,
+  PlayerState,
+  Resource,
+} from '../../../shared/contract/types'
 import { buildFarmBoardProjection } from '../farm-board-projection'
 
-const resources = (): Resource => ({
+const resources = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
   clay: 0,
   reed: 0,
@@ -16,6 +21,7 @@ const resources = (): Resource => ({
   boar: 0,
   cattle: 0,
   begging: 0,
+  ...overrides,
 })
 
 const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -70,6 +76,11 @@ const idleInteraction = (): ClientInteractionState => ({
   allowedCommands: [],
   anytimeActions: [],
 })
+
+const createState = (players: PlayerState[], currentPlayerIndex = 0): GameState => ({
+  players,
+  currentPlayerIndex,
+} as GameState)
 
 describe('buildFarmBoardProjection', () => {
   it('projects farm layout cells and occupied room field stable fence sets', () => {
@@ -154,6 +165,172 @@ describe('buildFarmBoardProjection', () => {
       tileRow: -2,
       tileCol: 5,
       fenceId: undefined,
+    })
+  })
+
+  it('does not expand layout for another player farm-position selection', () => {
+    const activePlayer = createPlayer({ id: 'p1' })
+    const displayPlayer = createPlayer({ id: 'p2' })
+    const interaction: ClientInteractionState = {
+      stateId: 'wait',
+      playerIndex: 0,
+      request: {
+        kind: 'selection',
+        selection: {
+          selectionType: 'farm-position',
+          selectablePositions: [{ row: -2, col: 5 }],
+          maxSelections: 1,
+        },
+      },
+      selection: {
+        kind: 'farm-position',
+        selectablePositions: [{ row: -2, col: 5 }],
+        maxSelections: 1,
+      },
+      allowedCommands: ['commitSelection'],
+      anytimeActions: [],
+    }
+
+    const projection = buildFarmBoardProjection({
+      displayPlayer,
+      interaction,
+      selectionInteraction: interaction.selection,
+      players: [activePlayer, displayPlayer],
+    })
+
+    expect(projection.farmGridColumns).toBe(11)
+    expect(projection.farmCells).not.toContainEqual({
+      key: '1-11',
+      type: 'tile',
+      tileRow: -2,
+      tileCol: 5,
+      fenceId: undefined,
+    })
+  })
+
+  it('projects animal displays for farm board props', () => {
+    const displayPlayer = createPlayer({
+      resources: resources({ sheep: 4, boar: 2, cattle: 1, horse: 1 }),
+      pastures: [{
+        id: 'pasture-1',
+        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+        animalType: 'sheep',
+        animalCount: 2,
+      }],
+      houseAnimalType: 'boar',
+      houseAnimalCount: 1,
+      stableTiles: [{ row: 1, col: 0 }],
+      stableAnimals: { '1-0': 'cattle' },
+    })
+    const owner = createPlayer({
+      id: 'owner',
+      name: 'Owner',
+      occupationPlayed: ['O001_Test'],
+    })
+    const zones: InteractionAnimalReorgZone[] = [
+      {
+        id: 'pasture-1',
+        zoneType: 'pasture',
+        animalType: 'cattle',
+        animalCount: 1,
+        capacity: 5,
+      },
+      {
+        id: 'house',
+        zoneType: 'house',
+        animalType: 'sheep',
+        animalCount: 1,
+        capacity: 1,
+      },
+      {
+        id: 'stable:1-0',
+        zoneType: 'stable',
+        animalType: 'boar',
+        animalCount: 1,
+        capacity: 1,
+      },
+      {
+        id: 'card:CARD1',
+        zoneType: 'card',
+        cardId: 'CARD1',
+        animalType: 'horse',
+        animalCount: 1,
+        capacity: 2,
+      },
+      {
+        id: 'card:FARMCARD',
+        zoneType: 'card',
+        cardId: 'FARMCARD',
+        animalType: 'sheep',
+        animalCount: 2,
+        capacity: 3,
+        farmPosition: { row: 2, col: 1 },
+      },
+      {
+        id: 'card:O001_Test:owner:owner:animalOwner:p1',
+        zoneType: 'card',
+        cardId: 'O001_Test',
+        ownerPlayerId: 'owner',
+        animalOwnerPlayerId: 'p1',
+        displayOwnerName: 'Owner',
+        displaySource: 'borrowed-played-card',
+        animalType: 'boar',
+        animalCount: 1,
+        capacity: 2,
+      },
+    ]
+
+    const projection = buildFarmBoardProjection({
+      displayPlayer,
+      interaction: idleInteraction(),
+      selectionInteraction: null,
+      players: [displayPlayer, owner],
+      state: createState([displayPlayer, owner]),
+      pastureCapacities: { p1: { 'pasture-1': 5 } },
+      animalReorg: { zones, confirmDiscard: false },
+      pendingAnimalReorg: { playerIndex: 0, spaceId: 'animal-reorg' },
+    })
+
+    expect(projection.pastureTiles).toEqual(new Map([
+      ['0-0', { pastureId: 'pasture-1', isCorner: false }],
+      ['0-1', { pastureId: 'pasture-1', isCorner: true }],
+    ]))
+    expect(projection.pastureDisplayMap.get('pasture-1')).toEqual({
+      animalType: 'cattle',
+      animalCount: 1,
+    })
+    expect(projection.pastureCapacityMap).toEqual(new Map([['pasture-1', 5]]))
+    expect(projection.houseDisplay).toEqual({ animalType: 'sheep', animalCount: 1 })
+    expect(projection.stableDisplayMap.get('1-0')).toEqual({ animalType: 'boar', animalCount: 1 })
+    expect(projection.cardDisplayMap.get('CARD1')).toMatchObject({
+      animalType: 'horse',
+      animalCount: 1,
+      capacity: 2,
+      zoneId: 'card:CARD1',
+      isReorgDraft: true,
+    })
+    expect(projection.farmCardDisplayMap.get('2-1')).toMatchObject({
+      animalType: 'sheep',
+      animalCount: 2,
+      capacity: 3,
+      zoneId: 'card:FARMCARD',
+      isReorgDraft: true,
+    })
+    expect(projection.borrowedPlayedCardDisplays).toEqual([
+      expect.objectContaining({
+        cardId: 'O001_Test',
+        cardType: 'occupation',
+        displayOwnerName: 'Owner',
+        animalType: 'boar',
+        animalCount: 1,
+        isReorgDraft: true,
+      }),
+    ])
+    expect(projection.reorgRemaining).toEqual({
+      sheep: 1,
+      boar: 0,
+      cattle: 0,
+      horse: 0,
     })
   })
 })
