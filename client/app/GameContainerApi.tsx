@@ -1551,34 +1551,7 @@ export const GameContainerApi = () => {
       specialTerrainSelectableSet,
     ],
   )
-  const {
-    farmCells,
-    farmGridColumns,
-    roomPositions,
-    fieldMap,
-    stablePositions,
-    pendingRoomSet,
-    pendingStableSet,
-    roomSelectableSet,
-    stableSelectableSet,
-    farmHandSelectableSet,
-    pendingFarmHandKey,
-    builtSpecialStableKeys,
-    positionSelectableSet,
-    sowSelectableMap,
-    extraSowTargets,
-    existingFenceSet,
-    fenceSelectableSet,
-    pastureTiles,
-    pastureDisplayMap,
-    pastureCapacityMap,
-    houseDisplay,
-    stableDisplayMap,
-    cardDisplayMap,
-    farmCardDisplayMap,
-    borrowedPlayedCardDisplays,
-    reorgRemaining,
-  } = farmBoardProjection
+  const { reorgRemaining } = farmBoardProjection
   const isReorgActive = !!animalReorg
 
   const reorgAvailable = useMemo(() => {
@@ -2060,6 +2033,63 @@ export const GameContainerApi = () => {
     )
   }
 
+  const farmBoardView = {
+    ...farmBoardProjection,
+    locale,
+    activePlayerId: activePlayer?.id,
+    currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
+    nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
+    playedCards,
+    fieldPositions,
+    maxStableSelections,
+    plowSelectableSet,
+    pendingPlowTile,
+    pendingPositionSelections,
+    pendingSowSelections,
+    sowRemaining,
+    isReorgActive,
+    hasReorgOverflow,
+    animalReorg,
+    pendingFenceSet,
+    pendingFenceSourceMap: isBorrowedFenceSelection ? pendingFenceSources : undefined,
+    pendingPalisadeSet,
+    fencePlacementMode: isBorrowedFenceSelection ? 'fence' as const : fencePlacementMode,
+    isSelectingMinor,
+    isSelectingOccupation,
+    isSelectingImprovementAny,
+    selectableMinorIds,
+    selectableOccupationIds,
+    cardAvailability,
+    futureCardResources,
+    devMode,
+    isInteractive,
+    occupationHandSelection: occupationHandInteraction ?? undefined,
+    highlightedFarmTileKeys,
+    highlightedFenceEdgeIds,
+  }
+  const farmBoardActions = {
+    toggleRoomTile: wrappedToggleRoom,
+    toggleStableTile: wrappedToggleStable,
+    toggleFarmHand: wrappedToggleFarmHand,
+    togglePlowTile: wrappedTogglePlow,
+    updateSowSelection: wrappedUpdateSow,
+    togglePositionSelection: wrappedTogglePositionSelection,
+    toggleFenceEdge: wrappedToggleFenceEdge,
+    adjustReorgAnimal,
+    confirmAnimalReorg,
+    cancelAnimalDiscardPrompt,
+    setViewPlayerId: setViewPlayerIdSafe,
+    resolveChoice,
+    onConfirmOccupationHandSelection: (ids: string[]) => {
+      if (!isInteractive) return
+      const submitCommand = buildInteractionSubmitCommand(interaction, {
+        value: 'confirm',
+        occupationCardIds: ids,
+      })
+      runInteractionSubmitCommand(submitCommand)
+    },
+  }
+
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {notificationStack}
@@ -2498,46 +2528,11 @@ export const GameContainerApi = () => {
             onChange={setViewPlayerIdSafe}
           />
           <section className="board-panel board-farm">
-            <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
-              activePlayerId={activePlayer?.id}
-              currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-              nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-              playedCards={playedCards} farmCells={farmCells} farmGridColumns={farmGridColumns} roomPositions={roomPositions} fieldPositions={fieldPositions}
-              fieldMap={fieldMap} stablePositions={stablePositions}
-              pendingRoomSet={pendingRoomSet}
-              pendingStableSet={pendingStableSet}
-              roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-              farmHandSelectableSet={farmHandSelectableSet}
-              pendingFarmHandKey={pendingFarmHandKey}
-              builtSpecialStableKeys={builtSpecialStableKeys}
-              maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-              positionSelectableSet={positionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
-              pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
-              pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} borrowedPlayedCardDisplays={borrowedPlayedCardDisplays} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
-              existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-              fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}
-              toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-              toggleFarmHand={wrappedToggleFarmHand}
-              togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-              toggleFenceEdge={wrappedToggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-              confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-              setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-              isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-              selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-              isInteractive={isInteractive}
-              occupationHandSelection={occupationHandInteraction ?? undefined}
-              highlightedFarmTileKeys={highlightedFarmTileKeys}
-              highlightedFenceEdgeIds={highlightedFenceEdgeIds}
-              onConfirmOccupationHandSelection={(ids) => {
-                if (!isInteractive) return
-                const submitCommand = buildInteractionSubmitCommand(interaction, {
-                  value: 'confirm',
-                  occupationCardIds: ids,
-                })
-                runInteractionSubmitCommand(submitCommand)
-              }}
+            <PlayerFarmPanel
+              state={state}
+              viewedPlayerId={displayPlayer.id}
+              view={farmBoardView}
+              actions={farmBoardActions}
             />
           </section>
         </div>
