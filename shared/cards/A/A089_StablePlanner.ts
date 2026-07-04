@@ -50,7 +50,7 @@ export const A089_StablePlanner = defineOccupationCard({
     deck: 'A',
     number: 89,
     category: 'FARM_PLANNER',
-    desc: ['Add 3, 6, and 9 to the current round. You can place 1 stable on each corresponding round space. At the start of these rounds (not earlier), you can build the stable at no cost.'],
+    desc: ['Add 3, 6, and 9 to the current round. You can place 1 <STABLE> on each corresponding round space. At the start of these rounds (not earlier), you can build the <STABLE> at no cost.'],
     cost: {},
     players: '1+',
   },

@@ -183,7 +183,7 @@ export const B072_LoveforAgriculture = defineMinorCard({
     number: 72,
     category: "CROP_PROVIDER",
     desc: [
-        "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered fields and hold 1 and 2 animals less, respectively.",
+        "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered <FIELD> and hold 1 and 2 animals less, respectively.",
       ],
     cost: {},
   },

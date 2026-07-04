@@ -25,7 +25,7 @@ export const D005_FieldClay = defineMinorCard({
     deck: "D",
     number: 5,
     category: "BUILDING_RESOURCE_PROVIDER",
-    desc: ["You immediately get 1 <CLAY> for each planted field you have."],
+    desc: ["You immediately get 1 <CLAY> for each planted <FIELD> you have."],
     cost: { food: 1 },
     passing: true,
     prerequisite: "1 Planted Field",

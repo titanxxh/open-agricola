@@ -28,7 +28,7 @@ export const A001_Shelter = defineMinorCard({
     deck: 'A',
     number: 1,
     category: 'FARM_PLANNER',
-    desc: ['You can immediately build a stable at no cost, but only if you place it in a pasture covering exactly 1 farmyard space.'],
+    desc: ['You can immediately build a <STABLE> at no cost, but only if you place it in a pasture covering exactly 1 farmyard space.'],
     passing: true,
   },
   impl: cardImpl,

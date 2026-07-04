@@ -34,7 +34,7 @@ export const D115_FodderPlanter = defineOccupationCard({
     deck: "D",
     number: 115,
     category: "CROP_PROVIDER",
-    desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."],
+    desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 <FIELD>."],
     cost: {},
     players: "1+",
   },

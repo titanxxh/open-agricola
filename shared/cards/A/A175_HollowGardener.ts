@@ -32,7 +32,7 @@ export const A175_HollowGardener = defineOccupationCard({
     deck: 'A',
     number: 175,
     category: 'CROP_PROVIDER',
-    desc: ['Each time you take at least 3 clay from the "Hollow" accumulation space, you also get 1 grain. If you take at least 6 clay from it, you also get 1 vegetable (instead of grain).'],
+    desc: ['Each time you take at least 3 <CLAY> from the "Hollow" accumulation space, you also get 1 <GRAIN>. If you take at least 6 <CLAY> from it, you also get 1 <VEGETABLE> (instead of <GRAIN>).'],
     cost: {},
     players: '5+',
   },

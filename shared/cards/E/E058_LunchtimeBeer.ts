@@ -35,7 +35,7 @@ export const E058_LunchtimeBeer = defineMinorCard({
     deck: 'E',
     number: 58,
     category: 'FOOD',
-    desc: ['At the start of each harvest, you can choose to skip the field and breeding phase of that harvest and get exactly 1 <FOOD> instead.'],
+    desc: ['At the start of each harvest, you can choose to skip the <FIELD> and breeding phase of that harvest and get exactly 1 <FOOD> instead.'],
     cost: {},
   },
   impl: cardImpl,

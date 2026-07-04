@@ -43,7 +43,7 @@ export const D125_ForestTrader = defineOccupationCard({
     deck: 'D',
     number: 125,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time you use a wood or clay accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 food.'],
+    desc: ['Each time you use a <WOOD> or <CLAY> accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 <FOOD>.'],
     cost: {},
     players: '1+',
   },

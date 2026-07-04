@@ -33,7 +33,7 @@ export const M103_ForestKindergarten = defineMinorCard({
     number: 103,
     category: "FOOD_PROVIDER",
     desc: [
-        "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 food for each of your farmyard spaces containing at least 1 forest."
+        "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 <FOOD> for each of your farmyard spaces containing at least 1 <FOREST>."
     ],
     cost: {
         "wood": 1,

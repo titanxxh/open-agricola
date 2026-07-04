@@ -50,7 +50,7 @@ export const M035_HorseTrough = defineMinorCard({
     number: 35,
     category: "FARM_PLANNER",
     desc: [
-        "You can keep up to 2 horses in an unused farmyard space adjacent to your house. Even if you do, this farmyard space is still considered unused. You can change in which farmyard space you keep the horses."
+        "You can keep up to 2 <HORSE> in an unused farmyard space adjacent to your house. Even if you do, this farmyard space is still considered unused. You can change in which farmyard space you keep the <HORSE>."
     ],
     cost: {
         "stone": 1

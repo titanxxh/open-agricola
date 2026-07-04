@@ -32,7 +32,7 @@ export const M114_RiversideWoods = defineMinorCard({
     number: 114,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "With this card, each time you use the \"Fishing\" accumulation space, you also get 1 wood for each of your farmyard spaces containing at least 1 forest, up to a maximum of 3 wood."
+        "With this card, each time you use the __Fishing__ accumulation space, you also get 1 <WOOD> for each of your farmyard spaces containing at least 1 <FOREST>, up to a maximum of 3 <WOOD>."
     ],
     cost: {},
     prerequisite: "3 Major Improvements",

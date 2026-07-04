@@ -39,7 +39,7 @@ export const M129_PlowhorseMarket = defineMinorCard({
     number: 129,
     category: "LIVESTOCK_PROVIDER",
     desc: [
-        "Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also buy exactly 1 horse for 1 food."
+        "Each time you use the __Farmland__ or __Cultivation__ action space, you can also buy exactly 1 <HORSE> for 1 <FOOD>."
     ],
     cost: {
         "clay": 1

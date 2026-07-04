@@ -43,7 +43,7 @@ export const C173_TopOuter = defineOccupationCard({
     deck: 'C',
     number: 173,
     category: 'FOOD_PROVIDER',
-    desc: ['Each time the "House Building" action space on the game board extension is used, you get all of the food from the "Traveling Players" accumulation space.'],
+    desc: ['Each time the __House Building__ action space on the game board extension is used, you get all of the <FOOD> from the __Traveling Players__ accumulation space.'],
     cost: {},
     players: '5+',
   },

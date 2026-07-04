@@ -64,7 +64,7 @@ export const D163_JourneymanBricklayer = defineOccupationCard({
     number: 163,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
-        'When you play this card, you immediately get 2 <STONE>. Each time another player renovates to stone or builds a stone room, you get 1 <STONE>.',
+        'When you play this card, you immediately get 2 <STONE>. Each time another player renovates to <STONE> or builds a stone room, you get 1 <STONE>.',
       ],
     cost: {},
     players: '4+',

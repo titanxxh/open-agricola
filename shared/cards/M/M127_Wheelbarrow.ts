@@ -49,7 +49,7 @@ export const M127_Wheelbarrow = defineMinorCard({
     number: 127,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take at least 4 of the same building resource from an accumulation space, you also get 1 fuel. Each time you take the \"Cut Peat\" special action, you also get 1 building resource of your choice."
+        "Each time you take at least 4 of the same building resource from an accumulation space, you also get 1 <FUEL>. Each time you take the __Cut Peat__ special action, you also get 1 building resource of your choice."
     ],
     cost: {
         "wood": 2

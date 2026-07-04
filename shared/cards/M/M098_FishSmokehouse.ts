@@ -38,7 +38,7 @@ export const M098_FishSmokehouse = defineMinorCard({
     number: 98,
     category: "FOOD_PROVIDER",
     desc: [
-        "Each time you use the \"Fishing\" accumulation space, you can pay 1 fuel to get an additional 3 food."
+        "Each time you use the __Fishing__ accumulation space, you can pay 1 <FUEL> to get an additional 3 <FOOD>."
     ],
     cost: {
         "wood": 1,

@@ -83,6 +83,39 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('<WOOD>')
   })
 
+  it('renders Moor minor resource descriptions as inline icons', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="M080_AdvancePayment" cardType="minor" />,
+    )
+
+    for (const className of [
+      'res-icon-fuel',
+      'res-icon-food',
+      'res-icon-wood',
+      'res-icon-clay',
+      'res-icon-reed',
+      'res-icon-stone',
+      'res-icon-sheep',
+      'res-icon-grain',
+    ]) {
+      expect(html).toContain(className)
+    }
+    expect(html).not.toContain('1 fuel, 1 food, 1 wood')
+  })
+
+  it('renders Moor minor terrain and scoring descriptions as inline icons', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="M021_PeatCuttingExpedition" cardType="minor" />,
+    )
+
+    expect(html).toContain('res-icon-moor')
+    expect(html).toContain('res-icon-score')
+    expect(html).toContain('res-icon-horse')
+    expect(html).not.toContain('visible moors')
+    expect(html).not.toContain('bonus point')
+    expect(html).not.toContain('horses')
+  })
+
   it('uses a local player56 portrait when the card numbering has one', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
@@ -162,6 +195,17 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-moor-major="true"')
     expect(html).toContain('data-deck="M"')
     expect(html).toContain('/assets/moor/major/M001.png')
+  })
+
+  it('renders Forester Lodge with local Moor art and terrain icon text', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_ForestersLodge" cardType="major" />,
+    )
+
+    expect(html).toContain('data-numbering="M012"')
+    expect(html).toContain('/assets/moor/major/M012.png')
+    expect(html).toContain('res-icon-forest')
+    expect(html).not.toContain('each forest')
   })
 
   it('renders Moor minor cards with local Moor art and M numbering', () => {

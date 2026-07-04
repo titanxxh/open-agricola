@@ -31,7 +31,7 @@ export const E020_IronHoe = defineMinorCard({
     deck: 'E',
     number: 20,
     category: 'FARMYARD_-_PLOWING',
-    desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field.'],
+    desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 <FIELD>.'],
     cost: { wood: 1 },
   },
   impl: cardImpl,

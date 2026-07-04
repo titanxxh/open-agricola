@@ -40,7 +40,7 @@ export const M042_DeepPlow = defineMinorCard({
     number: 42,
     category: "FARM_PLANNER",
     desc: [
-        "You can immediately place 1 moor on an unused farmyard space. Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also exchange 1 moor for 1 field tile."
+        "You can immediately place 1 <MOOR> on an unused farmyard space. Each time you use the __Farmland__ or __Cultivation__ action space, you can also exchange 1 <MOOR> for 1 <FIELD> tile."
     ],
     cost: {
         "wood": 3

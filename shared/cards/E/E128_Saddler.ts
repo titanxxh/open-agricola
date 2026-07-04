@@ -37,7 +37,7 @@ export const E128_Saddler = defineOccupationCard({
     deck: "E",
     number: 128,
     category: "FARMYARD",
-    desc: ["Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 field."],
+    desc: ["Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 <FIELD>."],
     cost: {},
     players: "3+",
   },

@@ -47,7 +47,7 @@ export const M021_PeatCuttingExpedition = defineMinorCard({
     number: 21,
     category: "GOODS_PROVIDER",
     desc: [
-        "Immediately remove any number of visible moors from your farmyard and get 1 bonus point and 2 <FUEL> each. Additionally, if you have at least 2/4/5/6 horses, you immediately get 1/2/3/4 <FUEL>."
+        "Immediately remove any number of visible <MOOR> from your farmyard and get 1 bonus <SCORE> and 2 <FUEL> each. Additionally, if you have at least 2/4/5/6 <HORSE>, you immediately get 1/2/3/4 <FUEL>."
     ],
     cost: {
         "food": 4

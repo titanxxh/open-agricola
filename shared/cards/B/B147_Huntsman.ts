@@ -35,7 +35,7 @@ export const B147_Huntsman = defineOccupationCard({
     deck: 'B',
     number: 147,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time after you use a wood accumulation space, you can pay 1 <GRAIN> to get 1 <PIG>.'],
+    desc: ['Each time after you use a <WOOD> accumulation space, you can pay 1 <GRAIN> to get 1 <PIG>.'],
     cost: {},
     players: '3+',
   },

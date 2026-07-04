@@ -321,7 +321,7 @@ describe('Card Source representative migrations', () => {
       category: 'FARM_PLANNER',
       passing: true,
       desc: [
-        'You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 moor for 1 field tile.',
+        'You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 <MOOR> for 1 <FIELD> tile.',
       ],
     })
     expect(entries['M032_PeatHut']?.meta).toMatchObject({

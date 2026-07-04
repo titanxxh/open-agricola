@@ -40,7 +40,7 @@ export const M058_PeatFertilizer = defineMinorCard({
     number: 58,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Each time after you take the \"Cut Peat\" special action, you can also take a \"Sow\" action."
+        "Each time after you take the __Cut Peat__ special action, you can also take a __Sow__ action."
     ],
     cost: {},
     prerequisite: "2 Fields",

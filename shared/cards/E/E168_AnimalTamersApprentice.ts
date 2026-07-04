@@ -36,7 +36,7 @@ export const E168_AnimalTamersApprentice = defineOccupationCard({
     deck: 'E',
     number: 168,
     category: 'ANIMALS_-_ALL',
-    desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house.'],
+    desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied <WOOD>/<CLAY>/stone room in your house.'],
     cost: {},
     players: '4+',
   },

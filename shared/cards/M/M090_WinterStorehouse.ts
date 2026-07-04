@@ -49,7 +49,7 @@ export const M090_WinterStorehouse = defineMinorCard({
     number: 90,
     category: "GOODS_PROVIDER",
     desc: [
-        "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to get as much fuel and food until you have at least 2 fuel and 2 food."
+        "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to get as much <FUEL> and <FOOD> until you have at least 2 <FUEL> and 2 <FOOD>."
     ],
     cost: {
         "wood": 1,

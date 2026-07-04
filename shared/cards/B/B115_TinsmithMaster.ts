@@ -113,7 +113,7 @@ export const B115_TinsmithMaster = defineOccupationCard({
     deck: 'B',
     number: 115,
     category: 'CROP_PROVIDER',
-    desc: ['You can hold 1 additional animal in each pasture without a stable. Each time you sow in a field, you can place 1 additional crop of the respective type in that field.'],
+    desc: ['You can hold 1 additional animal in each pasture without a <STABLE>. Each time you sow in a <FIELD>, you can place 1 additional crop of the respective type in that <FIELD>.'],
     cost: {},
     players: '1+',
     implemented: true,

@@ -13,7 +13,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 1,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can immediately build a stable at no cost, but only if you place it in a pasture covering exactly 1 farmyard space."
+      "You can immediately build a <STABLE> at no cost, but only if you place it in a pasture covering exactly 1 farmyard space."
     ],
     "passing": true,
     "kind": "minor"
@@ -25,7 +25,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 2,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately plow 1 field."
+      "Immediately plow 1 <FIELD>."
     ],
     "cost": {
       "food": 2
@@ -104,7 +104,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 7,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have."
+      "You immediately get 1 <FOOD> for each <GRAIN> <FIELD> you have and 1 <GRAIN> for each <VEGETABLE> <FIELD> you have."
     ],
     "cost": {
       "wood": 1
@@ -174,7 +174,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 11,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted field tiles."
+      "When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted <FIELD> tiles."
     ],
     "kind": "minor"
   },
@@ -185,7 +185,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 12,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each of your pastures (with or without a stable) can hold up to 2 more animals."
+      "Each of your pastures (with or without a <STABLE>) can hold up to 2 more animals."
     ],
     "cost": {
       "clay": 1
@@ -214,7 +214,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 14,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you build at least 2 wood/clay/stone rooms at once, you get a total discount of 2 <REED> as well as 2 <WOOD>/3 <CLAY>/4 <STONE>."
+      "Each time you build at least 2 <WOOD>/<CLAY>/stone rooms at once, you get a total discount of 2 <REED> as well as 2 <WOOD>/3 <CLAY>/4 <STONE>."
     ],
     "cost": {
       "wood": 1
@@ -228,7 +228,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 15,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time after you use a wood accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 stable for 1 <WOOD>."
+      "Each time after you use a <WOOD> accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 <STABLE> for 1 <WOOD>."
     ],
     "cost": {
       "wood": 1
@@ -242,7 +242,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 16,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you immediately get 1 <CLAY>. You can use <CLAY> instead of <WOOD> to build fences."
+      "When you play this card, you immediately get 1 <CLAY>. You can use <CLAY> instead of <WOOD> to build <FENCE>."
     ],
     "cost": {},
     "kind": "minor"
@@ -254,7 +254,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARM_PLANNER",
     "desc": [
-      "After the next time you take animals from an accumulation space and accommodate all of them on your farm, you can plow 1 field."
+      "After the next time you take animals from an accumulation space and accommodate all of them on your farm, you can plow 1 <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -268,7 +268,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 18,
     "category": "FARM_PLANNER",
     "desc": [
-      "Once this game, when you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 2 additional fields."
+      "Once this game, when you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 2 additional <FIELD>."
     ],
     "cost": {
       "wood": 2
@@ -286,7 +286,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 19,
     "category": "FARM_PLANNER",
     "desc": [
-      "Add 5 to the current round and place 1 field tile on the corresponding round space. At the start of that round, you can plow the field."
+      "Add 5 to the current round and place 1 <FIELD> tile on the corresponding round space. At the start of that round, you can plow the <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -300,7 +300,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you can immediately plow up to 2 fields."
+      "When you play this card, you can immediately plow up to 2 <FIELD>."
     ],
     "cost": {
       "grain": 1
@@ -333,7 +333,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 22,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply."
+      "Add 1 to the current round for each <FENCE> in your supply and mark the corresponding round space. In that round only, you can place a person from your supply."
     ],
     "cost": {
       "food": 2
@@ -523,7 +523,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 34,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Each time you build 1 or more fences, you can also use this card to exchange 1 <WOOD> and 1 <FENCE> in your supply for 2 <FOOD> and 1 bonus <SCORE>."
+      "Each time you build 1 or more <FENCE>, you can also use this card to exchange 1 <WOOD> and 1 <FENCE> in your supply for 2 <FOOD> and 1 bonus <SCORE>."
     ],
     "cost": {
       "wood": 1
@@ -598,7 +598,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 38,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."
+      "During scoring, if you live in a wooden/<CLAY>/stone house by then, you get 3/2/0 bonus <SCORE>."
     ],
     "cost": {},
     "prerequisite": "5 Sheep",
@@ -634,7 +634,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 40,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Immediately place 1 <CLAY> on each unused space in your farmyard. Each time you turn a space into a used space, you get the clay and you can immediately exchange it for 2 <FOOD>."
+      "Immediately place 1 <CLAY> on each unused space in your farmyard. Each time you turn a space into a used space, you get the <CLAY> and you can immediately exchange it for 2 <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -686,7 +686,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 43,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you build 1 or more stables in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>."
+      "Each time you build 1 or more <STABLE> in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>."
     ],
     "cost": {},
     "prerequisite": "1 Animal",
@@ -751,7 +751,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 47,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Immediately place 1 <FOOD> on each of the next round spaces, up to the number of fences you have built. At the start of these rounds, you get the <FOOD>."
+      "Immediately place 1 <FOOD> on each of the next round spaces, up to the number of <FENCE> you have built. At the start of these rounds, you get the <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -833,7 +833,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 52,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>."
+      "Each time you use a <WOOD> accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -892,7 +892,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 56,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Immediately after each time you use a wood accumulation space, you can exchange 2 <WOOD> for 3 <FOOD>. If you do, place those 2 <WOOD> on the accumulation space."
+      "Immediately after each time you use a <WOOD> accumulation space, you can exchange 2 <WOOD> for 3 <FOOD>. If you do, place those 2 <WOOD> on the accumulation space."
     ],
     "cost": {
       "reed": 1
@@ -928,7 +928,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the returning home phase of rounds 8, 10, and 12, you can take 1 <VEGETABLE> from exactly 1 vegetable field. You can immediately exchange it for 3 <FOOD> and 1 bonus <SCORE>."
+      "In the returning home phase of rounds 8, 10, and 12, you can take 1 <VEGETABLE> from exactly 1 <VEGETABLE> <FIELD>. You can immediately exchange it for 3 <FOOD> and 1 bonus <SCORE>."
     ],
     "cost": {
       "wood": 1
@@ -1080,7 +1080,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 64,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the field phase of each harvest, you get 1 <FOOD> for each grain field that you harvest."
+      "In the field phase of each harvest, you get 1 <FOOD> for each <GRAIN> <FIELD> that you harvest."
     ],
     "vp": 1,
     "altCosts": [
@@ -1141,7 +1141,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 68,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you build a number of fences equal to or greater than the current round, you immediately get 1 <VEGETABLE>."
+      "Each time you build a number of <FENCE> equal to or greater than the current round, you immediately get 1 <VEGETABLE>."
     ],
     "cost": {},
     "prerequisite": "1 Unplanted Field",
@@ -1172,7 +1172,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 70,
     "category": "CROP_PROVIDER",
     "desc": [
-      "At the end of each round that does not end with a harvest, you can move 1 <VEGETABLE> from one of your fields to your supply. (This is not considered a field phase.)"
+      "At the end of each round that does not end with a harvest, you can move 1 <VEGETABLE> from one of your <FIELD> to your supply. (This is not considered a field phase.)"
     ],
     "cost": {
       "wood": 1
@@ -1187,7 +1187,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 71,
     "category": "CROP_PROVIDER",
     "desc": [
-      "At any time, you can move 1 crop from a planted field containing at least 2 crops to an empty field."
+      "At any time, you can move 1 crop from a planted <FIELD> containing at least 2 crops to an empty <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -1201,7 +1201,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 72,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted fields growing a single type of crop."
+      "Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted <FIELD> growing a single type of crop."
     ],
     "cost": {},
     "prerequisite": "No Field Tiles",
@@ -1227,7 +1227,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 74,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you build 1 or more stables on your turn, place 1 <WOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <WOOD>."
+      "Each time you build 1 or more <STABLE> on your turn, place 1 <WOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <WOOD>."
     ],
     "cost": {
       "wood": 1
@@ -1307,7 +1307,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 79,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take an unconditional __Sow__ action planting <VEGETABLE> in at least 1 field, you get 1 <CLAY> and 1 <STONE>."
+      "Each time you take an unconditional __Sow__ action planting <VEGETABLE> in at least 1 <FIELD>, you get 1 <CLAY> and 1 <STONE>."
     ],
     "cost": {
       "wood": 1
@@ -1321,7 +1321,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 80,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a stone accumulation space, you get 1 additional <STONE>."
+      "Each time you use a <STONE> accumulation space, you get 1 additional <STONE>."
     ],
     "cost": {
       "wood": 1
@@ -1335,7 +1335,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 81,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a clay/reed/stone accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."
+      "Each time you use a <CLAY>/<REED>/<STONE> accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."
     ],
     "cost": {
       "food": 2
@@ -1367,7 +1367,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 83,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."
+      "Each time you <FENCE> a new pasture covering at least 4 farmyard spaces, you immediately get 2 <SHEEP> on this pasture."
     ],
     "cost": {
       "wood": 1
@@ -1381,7 +1381,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 84,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a field - to breed exactly one type of animal."
+      "In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a <FIELD> - to breed exactly one type of animal."
     ],
     "cost": {},
     "prerequisite": "2 Fields",
@@ -1394,7 +1394,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 85,
     "category": "FARM_PLANNER",
     "desc": [
-      "Exactly one clay or stone room in your house can hold an additional person if the room is adjacent to both a field and a pasture."
+      "Exactly one <CLAY> or stone room in your house can hold an additional person if the room is adjacent to both a <FIELD> and a pasture."
     ],
     "cost": {},
     "players": "1+",
@@ -1420,7 +1420,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 87,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you renovate your home, you can renovate from wood directly into stone."
+      "When you renovate your home, you can renovate from <WOOD> directly into <STONE>."
     ],
     "cost": {},
     "players": "1+",
@@ -1433,7 +1433,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 88,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you take a __Build Fences__ action, you do not have to pay <WOOD> for 3 of the fences you build."
+      "Each time you take a __Build Fences__ action, you do not have to pay <WOOD> for 3 of the <FENCE> you build."
     ],
     "cost": {},
     "players": "1+",
@@ -1446,7 +1446,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "FARM_PLANNER",
     "desc": [
-      "Add 3, 6, and 9 to the current round. You can place 1 stable on each corresponding round space. At the start of these rounds (not earlier), you can build the stable at no cost."
+      "Add 3, 6, and 9 to the current round. You can place 1 <STABLE> on each corresponding round space. At the start of these rounds (not earlier), you can build the <STABLE> at no cost."
     ],
     "cost": {},
     "players": "1+",
@@ -1459,7 +1459,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 90,
     "category": "FARM_PLANNER",
     "desc": [
-      "Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 field."
+      "Once you live in a stone house, at the start of each round, you can pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1472,7 +1472,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 91,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use a wood accumulation space, you can also pay 3 <FOOD> to plow 1 field."
+      "Each time you use a <WOOD> accumulation space, you can also pay 3 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1537,7 +1537,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 96,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "When you play this card and each time a stone accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action."
+      "When you play this card and each time a <STONE> accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action."
     ],
     "cost": {},
     "players": "1+",
@@ -1563,7 +1563,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 98,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, you get 1 bonus <SCORE> for each unfenced stable in your farmyard."
+      "During scoring, you get 1 bonus <SCORE> for each unfenced <STABLE> in your farmyard."
     ],
     "cost": {},
     "players": "1+",
@@ -1633,7 +1633,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 103,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time you take 1/2/3+ <FOOD> from a food accumulation space, you also get 1 <VEGETABLE>/<GRAIN>/<REED>."
+      "Each time you take 1/2/3+ <FOOD> from a <FOOD> accumulation space, you also get 1 <VEGETABLE>/<GRAIN>/<REED>."
     ],
     "cost": {},
     "players": "1+",
@@ -1646,7 +1646,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 104,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each wood accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."
+      "In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each <WOOD> accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1659,7 +1659,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 105,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "For each new field tile you get, you also get 1 <CLAY> and 1 <FOOD>."
+      "For each new <FIELD> tile you get, you also get 1 <CLAY> and 1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1672,7 +1672,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 106,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the field phase of each harvest, each time you take the last <GRAIN>/<VEGETABLE> from a field, you also get 2 <FOOD>/1 <FOOD>."
+      "In the field phase of each harvest, each time you take the last <GRAIN>/<VEGETABLE> from a <FIELD>, you also get 2 <FOOD>/1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1698,7 +1698,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 108,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Immediately after each time you use a wood accumulation space, you can exchange 1 <WOOD> for 2 <FOOD>. If you do, place the <WOOD> on the accumulation space."
+      "Immediately after each time you use a <WOOD> accumulation space, you can exchange 1 <WOOD> for 2 <FOOD>. If you do, place the <WOOD> on the accumulation space."
     ],
     "cost": {},
     "players": "1+",
@@ -1730,7 +1730,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 110,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you build at least 1 clay room or renovate your house from clay to stone, you also get 3 <FOOD>."
+      "Each time you build at least 1 clay room or renovate your house from <CLAY> to <STONE>, you also get 3 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1756,7 +1756,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 112,
     "category": "CROP_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 <GRAIN>. In the field phase of each harvest, you can harvest 1 additional <GRAIN> from each of your grain fields."
+      "When you play this card, you immediately get 1 <GRAIN>. In the field phase of each harvest, you can harvest 1 additional <GRAIN> from each of your <GRAIN> <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1769,7 +1769,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 113,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you use a \"Lessons\" action space, you get 1 <VEGETABLE> in each of your fields with at least 3 <GRAIN> and no <VEGETABLE>. Place the <VEGETABLE> below the <GRAIN>."
+      "Each time you use a __Lessons__ action space, you get 1 <VEGETABLE> in each of your <FIELD> with at least 3 <GRAIN> and no <VEGETABLE>. Place the <VEGETABLE> below the <GRAIN>."
     ],
     "cost": {},
     "players": "1+",
@@ -1795,7 +1795,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, you also get a __Sow__ action for exactly 1 field."
+      "Each time you use a <WOOD> accumulation space, you also get a __Sow__ action for exactly 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1808,7 +1808,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 116,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, you get 1 additional <WOOD>."
+      "Each time you use a <WOOD> accumulation space, you get 1 additional <WOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -1964,7 +1964,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 128,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time another player uses the __Reed Bank__ accumulation space, you can build a room: if you build a clay/stone room, you get a discount of 1 <CLAY>/2 <STONE>."
+      "Each time another player uses the __Reed Bank__ accumulation space, you can build a room: if you build a <CLAY>/stone room, you get a discount of 1 <CLAY>/2 <STONE>."
     ],
     "cost": {},
     "players": "3+",
@@ -2184,7 +2184,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 144,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Place 3 <REED> and 4 <CLAY> on this card. The next player to have 3 pastures/5 field tiles gets the 3 <REED>/4 <CLAY> (not retroactively)."
+      "Place 3 <REED> and 4 <CLAY> on this card. The next player to have 3 pastures/5 <FIELD> tiles gets the 3 <REED>/4 <CLAY> (not retroactively)."
     ],
     "cost": {},
     "players": "3+",
@@ -2210,7 +2210,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 146,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take exactly 2/3/4/5 <FOOD> from a food accumulation space, you also get 1 <STONE>/<REED>/<CLAY>/<WOOD>. (If you take 6 or more <FOOD>, you do not get a bonus good)."
+      "Each time you take exactly 2/3/4/5 <FOOD> from a <FOOD> accumulation space, you also get 1 <STONE>/<REED>/<CLAY>/<WOOD>. (If you take 6 or more <FOOD>, you do not get a bonus good)."
     ],
     "cost": {},
     "players": "3+",
@@ -2316,7 +2316,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 154,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Each time another player uses a food accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>."
+      "Each time another player uses a <FOOD> accumulation space, you can give them 1 <GRAIN> from your supply to get 1 bonus <SCORE>."
     ],
     "cost": {},
     "players": "4+",
@@ -2343,7 +2343,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 156,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time another player uses a reed, stone, sheep, or wild boar accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply."
+      "Each time another player uses a <REED>, <STONE>, <SHEEP>, or <<PIG>> accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply."
     ],
     "cost": {},
     "players": "4+",
@@ -2493,7 +2493,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 167,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you build at least 1 wood/clay/stone room and at least 1 stable on the same turn, you also get 1 <SHEEP>/<PIG>/<CATTLE>."
+      "Each time you build at least 1 <WOOD>/<CLAY>/stone room and at least 1 <STABLE> on the same turn, you also get 1 <SHEEP>/<PIG>/<CATTLE>."
     ],
     "cost": {},
     "players": "4+",
@@ -2533,7 +2533,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 170,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can build fences at any time without placing a person. (This is not considered a \"Build Fences\" action.)"
+      "You can build <FENCE> at any time without placing a person. (This is not considered a __Build Fences__ action.)"
     ],
     "cost": {},
     "players": "5+",
@@ -2546,7 +2546,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 171,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Immediately after each time you place a person on an action space card, you can pay 1 food to place another person on the card immediately left to it (and so on)."
+      "Immediately after each time you place a person on an action space card, you can pay 1 <FOOD> to place another person on the card immediately left to it (and so on)."
     ],
     "cost": {},
     "players": "5+",
@@ -2559,7 +2559,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 172,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the end of each work phase, if both the \"Fishing\" and \"Traveling Players\" accumulation spaces are occupied, you get your choice of 1 grain or 2 food."
+      "At the end of each work phase, if both the __Fishing__ and __Traveling Players__ accumulation spaces are occupied, you get your choice of 1 <GRAIN> or 2 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -2572,7 +2572,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 173,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the clay on the \"Hollow\" action space."
+      "Once this game, at the start of a work phase of your choice, you can turn this card face down to get all of the <CLAY> on the \"Hollow\" action space."
     ],
     "cost": {},
     "players": "5+",
@@ -2585,7 +2585,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 174,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Immediately before each time you place a person on an action space with the (meeple) symbol on the game board extension, you can buy 1 vegetable for 1 food."
+      "Immediately before each time you place a person on an action space with the (meeple) symbol on the game board extension, you can buy 1 <VEGETABLE> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -2598,7 +2598,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 175,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you take at least 3 clay from the \"Hollow\" accumulation space, you also get 1 grain. If you take at least 6 clay from it, you also get 1 vegetable (instead of grain)."
+      "Each time you take at least 3 <CLAY> from the \"Hollow\" accumulation space, you also get 1 <GRAIN>. If you take at least 6 <CLAY> from it, you also get 1 <VEGETABLE> (instead of <GRAIN>)."
     ],
     "cost": {},
     "players": "5+",
@@ -2611,7 +2611,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 176,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "When you play this card, if you have another occupation in play and more wood than all other players combined, you immediately get wood from the general supply until you have 15 wood."
+      "When you play this card, if you have another occupation in play and more <WOOD> than all other players combined, you immediately get <WOOD> from the general supply until you have 15 <WOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -2624,7 +2624,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 177,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Place 1 stone and 1 food on all action spaces with the (meeple) symbol on the game board extension. Next time you place a person on them, you get the goods."
+      "Place 1 <STONE> and 1 <FOOD> on all action spaces with the (meeple) symbol on the game board extension. Next time you place a person on them, you get the goods."
     ],
     "cost": {},
     "players": "5+",
@@ -2637,7 +2637,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 178,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time another player builds a room, you immediately get 1 wood."
+      "Each time another player builds a room, you immediately get 1 <WOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -2650,7 +2650,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 179,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use either \"Quarry\" accumulation space, you immediately get an additional 1 sheep from the general supply."
+      "Each time you use either __Quarry__ accumulation space, you immediately get an additional 1 <SHEEP> from the general supply."
     ],
     "cost": {},
     "players": "5+",
@@ -2663,7 +2663,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use the \"Animal Market\" action space, you can pay 1 food to use the same option twice (instead of once)."
+      "Each time you use the __Animal Market__ action space, you can pay 1 <FOOD> to use the same option twice (instead of once)."
     ],
     "cost": {},
     "players": "5+",
@@ -2691,7 +2691,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 2,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately fence a farmyard space, without paying <WOOD> for the fences. (If you already have pastures, the new one must be adjacent to an existing one.)"
+      "Immediately <FENCE> a farmyard space, without paying <WOOD> for the <FENCE>. (If you already have pastures, the new one must be adjacent to an existing one.)"
     ],
     "cost": {
       "food": 2
@@ -2881,7 +2881,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 15,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately after each time you use a wood accumulation space, you can use the taken wood (and only that) to build exactly 1 pasture. If you do, one of the fences is free."
+      "Immediately after each time you use a <WOOD> accumulation space, you can use the taken <WOOD> (and only that) to build exactly 1 pasture. If you do, one of the <FENCE> is free."
     ],
     "cost": {
       "wood": 1
@@ -2896,7 +2896,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 16,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you immediately get 1 <FOOD>. Each time you renovate, you can also build a stable without paying <WOOD>."
+      "When you play this card, you immediately get 1 <FOOD>. Each time you renovate, you can also build a <STABLE> without paying <WOOD>."
     ],
     "cost": {
       "wood": 1
@@ -2910,7 +2910,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time after you use a wood accumulation space, you can pay 2 <WOOD> to plow 1 field. Place the paid <WOOD> on the accumulation space (for the next visitor)."
+      "Each time after you use a <WOOD> accumulation space, you can pay 2 <WOOD> to plow 1 <FIELD>. Place the paid <WOOD> on the accumulation space (for the next visitor)."
     ],
     "cost": {
       "wood": 1
@@ -2924,7 +2924,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 18,
     "category": "FARM_PLANNER",
     "desc": [
-      "Add 1 to the current round for each building resource in your supply and place 1 field on the corresponding round space. At the start of the round, you can plow the field."
+      "Add 1 to the current round for each building resource in your supply and place 1 <FIELD> on the corresponding round space. At the start of the round, you can plow the <FIELD>."
     ],
     "cost": {
       "wood": 2
@@ -2943,7 +2943,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 19,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 2 field tiles on this card. Twice this game, when you use the __Farmland__ action space, you can also plow 1 field from this card."
+      "Place 2 <FIELD> tiles on this card. Twice this game, when you use the __Farmland__ action space, you can also plow 1 <FIELD> from this card."
     ],
     "cost": {
       "wood": 2
@@ -2961,7 +2961,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "FARM_PLANNER",
     "desc": [
-      "Add 7, 8, and 9 to the current round and place 1 field on each corresponding round space. At the start of these rounds, you can plow the field."
+      "Add 7, 8, and 9 to the current round and place 1 <FIELD> on each corresponding round space. At the start of these rounds, you can plow the <FIELD>."
     ],
     "cost": {
       "wood": 3
@@ -3059,7 +3059,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 27,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "In the work phase, after each turn in which you build at least 1 room, stable, or fence, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement."
+      "In the work phase, after each turn in which you build at least 1 room, <STABLE>, or <FENCE>, you can build the __Joinery__, __Pottery__, or __Basketmaker's Workshop__ major improvement."
     ],
     "cost": {
       "wood": 1
@@ -3104,7 +3104,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 30,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Instead of a fence piece, you can place 2 <WOOD> from your supply on the fence spaces at the edge of your farmyard. These fence spaces with 2 <WOOD> are each worth 1 <SCORE>."
+      "Instead of a <FENCE> piece, you can place 2 <WOOD> from your supply on the <FENCE> spaces at the edge of your farmyard. These <FENCE> spaces with 2 <WOOD> are each worth 1 <SCORE>."
     ],
     "cost": {
       "food": 1
@@ -3457,7 +3457,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 48,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Place 2 <FOOD> on this card. Each time you use a wood accumulation space, move 1 of these <FOOD> to your supply. Each time you use a stone accumulation space, add 2 <FOOD> to this card."
+      "Place 2 <FOOD> on this card. Each time you use a <WOOD> accumulation space, move 1 of these <FOOD> to your supply. Each time you use a <STONE> accumulation space, add 2 <FOOD> to this card."
     ],
     "altCosts": [
       {
@@ -3518,7 +3518,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 51,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use a clay accumulation space, you also get a number of <FOOD> equal to the number of <PIG> in your farmyard."
+      "Each time you use a <CLAY> accumulation space, you also get a number of <FOOD> equal to the number of <PIG> in your farmyard."
     ],
     "cost": {
       "wood": 1
@@ -3574,7 +3574,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 54,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each stable you have."
+      "When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each <STABLE> you have."
     ],
     "cost": {
       "wood": 1
@@ -3588,7 +3588,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 55,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Place 3 <FOOD> on this card. Each time you use a wood accumulation space, you get 1 <FOOD> from this card. Each time you renovate restock this card to 3 <FOOD>."
+      "Place 3 <FOOD> on this card. Each time you use a <WOOD> accumulation space, you get 1 <FOOD> from this card. Each time you renovate restock this card to 3 <FOOD>."
     ],
     "cost": {},
     "prerequisite": "2 Occupations",
@@ -3632,7 +3632,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 <FOOD>. For each <VEGETABLE> you take from a field in the field phase of a harvest, you also get 1 <FOOD>."
+      "When you play this card, you immediately get 1 <FOOD>. For each <VEGETABLE> you take from a <FIELD> in the field phase of a harvest, you also get 1 <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -3672,7 +3672,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 61,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the start of the field phase of each harvest, if you have at least 1 <GRAIN> field, 1 <VEGETABLE> field, and 1 empty field, you get 3 <FOOD>."
+      "At the start of the field phase of each harvest, if you have at least 1 <GRAIN> <FIELD>, 1 <VEGETABLE> <FIELD>, and 1 empty <FIELD>, you get 3 <FOOD>."
     ],
     "cost": {},
     "prerequisite": "3 Occupations",
@@ -3787,7 +3787,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 68,
     "category": "CROP_PROVIDER",
     "desc": [
-      "This card is a field that can only grow vegetables."
+      "This card is a <FIELD> that can only grow <VEGETABLE>."
     ],
     "cost": {
       "food": 1
@@ -3858,7 +3858,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 72,
     "category": "CROP_PROVIDER",
     "desc": [
-      "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered fields and hold 1 and 2 animals less, respectively."
+      "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered <FIELD> and hold 1 and 2 animals less, respectively."
     ],
     "cost": {},
     "kind": "minor"
@@ -4095,7 +4095,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 85,
     "category": "FARM_PLANNER",
     "desc": [
-      "Once this game, if you have 4 field tiles in a 2x2, you can build a stable in the center of the 2x2 during a __Build Stables__ action. This stable provides room for a person but not animals."
+      "Once this game, if you have 4 <FIELD> tiles in a 2x2, you can build a <STABLE> in the center of the 2x2 during a __Build Stables__ action. This <STABLE> provides room for a person but not animals."
     ],
     "players": "1+",
     "implemented": true,
@@ -4148,7 +4148,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, immediately get 1 <WOOD>. Once you live in a stone house, at the start of each round, you can build exactly 1 stable for 1 <WOOD>."
+      "When you play this card, immediately get 1 <WOOD>. Once you live in a stone house, at the start of each round, you can build exactly 1 <STABLE> for 1 <WOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4161,7 +4161,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 90,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Farmland__ action space while the __Grain Seeds__ action space is occupied, you can plow 1 additional field."
+      "Each time you use the __Farmland__ action space while the __Grain Seeds__ action space is occupied, you can plow 1 additional <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4174,7 +4174,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 91,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Day Laborer__ action space, you can also plow 1 field."
+      "Each time you use the __Day Laborer__ action space, you can also plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4434,7 +4434,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 108,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, you get an additional __Bake Bread__ action."
+      "Each time you use a <WOOD> accumulation space, you get an additional __Bake Bread__ action."
     ],
     "cost": {},
     "players": "1+",
@@ -4506,7 +4506,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 113,
     "category": "CROP_PROVIDER",
     "desc": [
-      "When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a field."
+      "When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4542,7 +4542,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "CROP_PROVIDER",
     "desc": [
-      "You can hold 1 additional animal in each pasture without a stable. Each time you sow in a field, you can place 1 additional crop of the respective type in that field."
+      "You can hold 1 additional animal in each pasture without a <STABLE>. Each time you sow in a <FIELD>, you can place 1 additional crop of the respective type in that <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4595,7 +4595,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 119,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "You immediately get 1 <WOOD>. Additionally, place 1 <WOOD> on each of the next round spaces, up to the number of fences you built. At the start of these rounds, you get the <WOOD>."
+      "You immediately get 1 <WOOD>. Additionally, place 1 <WOOD> on each of the next round spaces, up to the number of <FENCE> you built. At the start of these rounds, you get the <WOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -4634,7 +4634,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 122,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a clay/stone accumulation space, you also get 1 of the other good, <STONE>/<CLAY>."
+      "Each time you use a <CLAY>/<STONE> accumulation space, you also get 1 of the other good, <STONE>/<CLAY>."
     ],
     "cost": {},
     "players": "1+",
@@ -4752,7 +4752,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 131,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Immediately after each time you use a wood accumulation space, you can play a minor improvement."
+      "Immediately after each time you use a <WOOD> accumulation space, you can play a minor improvement."
     ],
     "cost": {},
     "players": "3+",
@@ -4792,7 +4792,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 134,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "After playing this card, if you renovate to stone in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>."
+      "After playing this card, if you renovate to <STONE> in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>."
     ],
     "cost": {},
     "players": "3+",
@@ -4860,7 +4860,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 139,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the returning home phase of each round, if there is no wood left on the game board, you get 1 <FOOD>—from round 5 on, even 2 <FOOD>."
+      "In the returning home phase of each round, if there is no <WOOD> left on the game board, you get 1 <FOOD>—from round 5 on, even 2 <FOOD>."
     ],
     "cost": {},
     "players": "3+",
@@ -4886,7 +4886,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 141,
     "category": "CROP_PROVIDER",
     "desc": [
-      "When you play this card, you can immediately exchange 0/1/3 <CLAY> for 1/2/3 <GRAIN>. This card is a field."
+      "When you play this card, you can immediately exchange 0/1/3 <CLAY> for 1/2/3 <GRAIN>. This card is a <FIELD>."
     ],
     "cost": {},
     "players": "3+",
@@ -4975,7 +4975,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 147,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time after you use a wood accumulation space, you can pay 1 <GRAIN> to get 1 <PIG>."
+      "Each time after you use a <WOOD> accumulation space, you can pay 1 <GRAIN> to get 1 <PIG>."
     ],
     "cost": {},
     "players": "3+",
@@ -5002,7 +5002,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 149,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you remove exactly 3 <STABLE> in your supply from play to build a pasture covering 2 farmyard spaces. You only need to pay a total of 2 <WOOD> for fences"
+      "When you play this card, you remove exactly 3 <STABLE> in your supply from play to build a pasture covering 2 farmyard spaces. You only need to pay a total of 2 <WOOD> for <FENCE>"
     ],
     "cost": {},
     "players": "4+",
@@ -5136,7 +5136,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 159,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead."
+      "For each <FIELD> tile that another player places next to an existing <FIELD> tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead."
     ],
     "cost": {},
     "players": "4+",
@@ -5176,7 +5176,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 162,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you obtain exactly 2/3/4 <WOOD> from a wood accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>."
+      "Each time you obtain exactly 2/3/4 <WOOD> from a <WOOD> accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>."
     ],
     "cost": {},
     "players": "4+",
@@ -5216,7 +5216,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 165,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different fields to get 1/2/3 <PIG>."
+      "Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different <FIELD> to get 1/2/3 <PIG>."
     ],
     "cost": {},
     "players": "4+",
@@ -5255,7 +5255,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 168,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you renovate, you get 2 <FOOD> and 1 additional animal of the respective type in each of your pastures with stable."
+      "Each time you renovate, you get 2 <FOOD> and 1 additional animal of the respective type in each of your pastures with <STABLE>."
     ],
     "cost": {},
     "players": "4+",
@@ -5282,7 +5282,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 170,
     "category": "FARM_PLANNER",
     "desc": [
-      "When the \"Pig Market\" and \"Cattle Market\" action space cards are each revealed (and placed on the round space), you can immediately fence exactly 1 farmyard space without playing wood."
+      "When the __Pig Market__ and __Cattle Market__ action space cards are each revealed (and placed on the round space), you can immediately <FENCE> exactly 1 farmyard space without playing <WOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -5295,7 +5295,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 171,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "This is an action space for you only. It provides a choice of \"Fencing\", \"House Redevelopment\", or \"Vegetable Seeds\" if the corresponding action space is already in play."
+      "This is an action space for you only. It provides a choice of __Fencing__, __House Redevelopment__, or __Vegetable Seeds__ if the corresponding action space is already in play."
     ],
     "cost": {},
     "players": "5+",
@@ -5308,7 +5308,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 172,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the start of each round, if 3/4/5+ players each have at least 1 cattle, you get 1/2/3 food."
+      "At the start of each round, if 3/4/5+ players each have at least 1 <CATTLE>, you get 1/2/3 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -5321,7 +5321,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 173,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use an action space with the (meeple) symbol, place 1 food on this card. Once this game, you can turn this card face down to get the food on it."
+      "Each time you use an action space with the (meeple) symbol, place 1 <FOOD> on this card. Once this game, you can turn this card face down to get the <FOOD> on it."
     ],
     "cost": {},
     "players": "5+",
@@ -5334,7 +5334,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 174,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you use the \"Riverbank Forest\" accumulation space, you also get 1 vegetable."
+      "Each time you use the __Riverbank Forest__ accumulation space, you also get 1 <VEGETABLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -5347,7 +5347,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 175,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time the other players harvest grain from at least 3/4/6 fields combined, you get 1 food/grain/vegetable."
+      "Each time the other players harvest <GRAIN> from at least 3/4/6 <FIELD> combined, you get 1 <FOOD>/<GRAIN>/<VEGETABLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -5360,7 +5360,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 176,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "The Village Idiot is your lone occupation. Each time another player uses the \"Meeting Place\" action space, you get 1 wood and 1 food."
+      "The Village Idiot is your lone occupation. Each time another player uses the __Meeting Place__ action space, you get 1 <WOOD> and 1 <FOOD>."
     ],
     "cost": {},
     "prerequisite": "No Occupations",
@@ -5377,7 +5377,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 177,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you plow at least 1 field, you also get 1 stone."
+      "Each time you plow at least 1 <FIELD>, you also get 1 <STONE>."
     ],
     "cost": {},
     "players": "5+",
@@ -5390,7 +5390,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 178,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Immediately after each time another player uses the \"Resource Market\" action space, you can also place a person there to take the action as well."
+      "Immediately after each time another player uses the __Resource Market__ action space, you can also place a person there to take the action as well."
     ],
     "cost": {},
     "players": "5+",
@@ -5403,7 +5403,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 179,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "In the returning home phase of each round, if at least 3 wood accumulation spaces are occupied, you can pay 1 wood to get 1 wild boar."
+      "In the returning home phase of each round, if at least 3 <WOOD> accumulation spaces are occupied, you can pay 1 <WOOD> to get 1 <<PIG>>."
     ],
     "cost": {},
     "players": "5+",
@@ -5416,7 +5416,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you take 1/2/3 food from a food accumulation space, you also get 1 cattle/wild boar/sheep."
+      "Each time you take 1/2/3 <FOOD> from a <FOOD> accumulation space, you also get 1 <CATTLE>/<<PIG>>/<SHEEP>."
     ],
     "cost": {},
     "players": "5+",
@@ -5429,7 +5429,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 1,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately raze all of your fences, add up to 3 fences from your supply, and rebuild them. (You do not lose any animals during this.)"
+      "Immediately raze all of your <FENCE>, add up to 3 <FENCE> from your supply, and rebuild them. (You do not lose any animals during this.)"
     ],
     "cost": {
       "wood": 1
@@ -5448,7 +5448,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 2,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately build 1 stable. (The stable costs you nothing, but you must pay the cost shown on this card.)"
+      "Immediately build 1 <STABLE>. (The <STABLE> costs you nothing, but you must pay the cost shown on this card.)"
     ],
     "cost": {
       "wood": 1
@@ -5507,7 +5507,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 6,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Immediately place 1 <STONE> on each of your empty fields. Harvest them during the next field phase. These fields are considered planted until then."
+      "Immediately place 1 <STONE> on each of your empty <FIELD>. Harvest them during the next field phase. These <FIELD> are considered planted until then."
     ],
     "cost": {
       "food": 1
@@ -5522,7 +5522,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 7,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each sheep you have. (Keep the sheep.)"
+      "You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each <SHEEP> you have. (Keep the <SHEEP>.)"
     ],
     "cost": {
       "wood": 1
@@ -5538,7 +5538,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 8,
     "category": "CROP_PROVIDER",
     "desc": [
-      "In each field with exactly 1 good, you can immediately place 1 additional good of the same type."
+      "In each <FIELD> with exactly 1 good, you can immediately place 1 additional good of the same type."
     ],
     "cost": {},
     "passing": true,
@@ -5617,7 +5617,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 13,
     "category": "FARM_PLANNER",
     "desc": [
-      "On your first renovation, if you have at least 5 wood rooms, you can renovate to stone directly and you get a discount of 2 <STONE> on the renovation cost."
+      "On your first renovation, if you have at least 5 wood rooms, you can renovate to <STONE> directly and you get a discount of 2 <STONE> on the renovation cost."
     ],
     "cost": {
       "wood": 1
@@ -5645,7 +5645,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 15,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time before you use the __Pig Market__ accumulation space, you can take a __Build Fences__ action. (You must pay <WOOD> for the fences as usual.)"
+      "Each time before you use the __Pig Market__ accumulation space, you can take a __Build Fences__ action. (You must pay <WOOD> for the <FENCE> as usual.)"
     ],
     "cost": {},
     "prerequisite": "2 Occupations",
@@ -5661,7 +5661,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 16,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for fences that you build next to field tiles."
+      "You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for <FENCE> that you build next to <FIELD> tiles."
     ],
     "cost": {
       "food": 2
@@ -5675,7 +5675,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you can immediately plow 1 field, which needs not be adjacent to another field."
+      "When you play this card, you can immediately plow 1 <FIELD>, which needs not be adjacent to another <FIELD>."
     ],
     "cost": {},
     "prerequisite": "Exactly 3 Field Tiles",
@@ -5688,7 +5688,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 18,
     "category": "FARM_PLANNER",
     "desc": [
-      "At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field."
+      "At any time, if you have at least 3 planted <FIELD>, you can discard all goods from one of those <FIELD> to plow 1 <FIELD>."
     ],
     "cost": {
       "wood": 2
@@ -5702,7 +5702,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 19,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 4 field tiles on this card. Each time you use the __Farmland__ action space, you can also plow up to 2 fields from this card."
+      "Place 4 <FIELD> tiles on this card. Each time you use the __Farmland__ action space, you can also plow up to 2 <FIELD> from this card."
     ],
     "cost": {
       "wood": 3
@@ -5720,7 +5720,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Farmland__ or __Cultivation__ action space, you can plow 1 additional field."
+      "Each time you use the __Farmland__ or __Cultivation__ action space, you can plow 1 additional <FIELD>."
     ],
     "cost": {
       "wood": 3,
@@ -5872,7 +5872,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 30,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, you get 1 bonus <SCORE> for each stone room you have. You can only use one card to get bonus points for your stone house."
+      "During scoring, you get 1 bonus <SCORE> for each stone room you have. You can only use one card to get bonus <SCORE> for your stone house."
     ],
     "cost": {
       "wood": 1,
@@ -5921,7 +5921,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 33,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you then have at least 2/4/5/6 unplanted fields, you get 1/2/3/5 bonus <SCORE>."
+      "During scoring, if you then have at least 2/4/5/6 unplanted <FIELD>, you get 1/2/3/5 bonus <SCORE>."
     ],
     "cost": {
       "food": 3
@@ -5977,7 +5977,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 36,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Immediately after each time you use a clay accumulation space, you can exchange 1 <CLAY> for 1 bonus <SCORE>. If you do, place the <CLAY> on the accumulation space."
+      "Immediately after each time you use a <CLAY> accumulation space, you can exchange 1 <CLAY> for 1 bonus <SCORE>. If you do, place the <CLAY> on the accumulation space."
     ],
     "cost": {
       "food": 2
@@ -5996,7 +5996,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 37,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "From now on, you must pay 1 <FOOD> for each new field tile that you place in your farmyard."
+      "From now on, you must pay 1 <FOOD> for each new <FIELD> tile that you place in your farmyard."
     ],
     "cost": {
       "food": 1
@@ -6165,7 +6165,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 47,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."
+      "Place 1 <FOOD> on each remaining round space, up to three times the number of planted <FIELD> you have. At the start of these rounds, you get the <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -6195,7 +6195,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 49,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>."
+      "In the feeding phase of each harvest, for each empty unfenced <STABLE> you have, you can exchange 1 <GRAIN> for 5 <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -6326,7 +6326,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 56,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "For each new stable you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build stables, you can build exactly 1 stable for 1 <CLAY> instead of 2 <WOOD>."
+      "For each new <STABLE> you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build <STABLE>, you can build exactly 1 <STABLE> for 1 <CLAY> instead of 2 <WOOD>."
     ],
     "cost": {
       "wood": 1
@@ -6340,7 +6340,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 57,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you can immediately buy exactly 1 <VEGETABLE> for 3 <FOOD>. At any time, you can discard 1 <VEGETABLE> on top of another <VEGETABLE> in a field to get 4 <FOOD>."
+      "When you play this card, you can immediately buy exactly 1 <VEGETABLE> for 3 <FOOD>. At any time, you can discard 1 <VEGETABLE> on top of another <VEGETABLE> in a <FIELD> to get 4 <FOOD>."
     ],
     "cost": {},
     "evenMoreSet": true,
@@ -6353,7 +6353,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, if immediately afterward you have at most 5 <WOOD> in your supply, you get 1 <FOOD>."
+      "Each time you use a <WOOD> accumulation space, if immediately afterward you have at most 5 <WOOD> in your supply, you get 1 <FOOD>."
     ],
     "prerequisite": "1 Occupation",
     "occupationPrerequisites": {
@@ -6449,7 +6449,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 63,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the feeding phase of each harvest, you can use this card to exchange 1 <GRAIN> from your supply plus 1 <GRAIN> from a field for 2 bonus <SCORE> and 4 <FOOD>."
+      "In the feeding phase of each harvest, you can use this card to exchange 1 <GRAIN> from your supply plus 1 <GRAIN> from a <FIELD> for 2 bonus <SCORE> and 4 <FOOD>."
     ],
     "cost": {
       "wood": 2,
@@ -6547,7 +6547,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 69,
     "category": "CROP_PROVIDER",
     "desc": [
-      "At any time, if you have a grain field with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the field for 1 <VEGETABLE> on the field."
+      "At any time, if you have a <GRAIN> <FIELD> with exactly 3 sown <GRAIN>, you can exchange the <GRAIN> on the <FIELD> for 1 <VEGETABLE> on the <FIELD>."
     ],
     "cost": {},
     "kind": "minor"
@@ -6573,7 +6573,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "capacity": 1
     },
     "desc": [
-      "This card is a field that can only grow vegetables. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>."
+      "This card is a <FIELD> that can only grow <VEGETABLE>. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>."
     ],
     "kind": "minor"
   },
@@ -6660,7 +6660,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 76,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, you get 2 additional <WOOD>."
+      "Each time you use a <WOOD> accumulation space, you get 2 additional <WOOD>."
     ],
     "cost": {
       "wood": 3
@@ -6724,7 +6724,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 80,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you plow a field (tile or card), you can also buy 1 <STONE> for 1 <FOOD>."
+      "Each time you plow a <FIELD> (tile or card), you can also buy 1 <STONE> for 1 <FOOD>."
     ],
     "cost": {
       "food": 1
@@ -6802,7 +6802,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 85,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you live in a clay or stone house, you can pay 1 <GRAIN> and 2 <FOOD>. If you do, for the rest of the game, this card provides room for exactly one person."
+      "When you live in a <CLAY> or stone house, you can pay 1 <GRAIN> and 2 <FOOD>. If you do, for the rest of the game, this card provides room for exactly one person."
     ],
     "cost": {},
     "players": "1+",
@@ -6847,7 +6847,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 88,
     "category": "FARM_PLANNER",
     "desc": [
-      "Wood rooms cost you 2 <WOOD> less. Your 3rd and 4th stable each cost you 1 <WOOD> less. Your 13th to 15th fence each cost you nothing."
+      "Wood rooms cost you 2 <WOOD> less. Your 3rd and 4th <STABLE> each cost you 1 <WOOD> less. Your 13th to 15th <FENCE> each cost you nothing."
     ],
     "cost": {},
     "players": "1+",
@@ -6860,7 +6860,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, you can immediately build exactly 1 stable for 1 <WOOD>. Exactly one of your unfenced stables can hold up to 3 animals of one type."
+      "When you play this card, you can immediately build exactly 1 <STABLE> for 1 <WOOD>. Exactly one of your unfenced <STABLE> can hold up to 3 animals of one type."
     ],
     "cost": {},
     "players": "1+",
@@ -6873,7 +6873,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 90,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Grain Seeds__ action space, you can also plow 1 field."
+      "Each time you use the __Grain Seeds__ action space, you can also plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -6886,7 +6886,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 91,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 1 additional field for 1 <FOOD>."
+      "Each time you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 1 additional <FIELD> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -6925,7 +6925,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 94,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "At any time, you can take the __Build Stables__ action without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>."
+      "At any time, you can take the __Build Stables__ action without placing a person. If you do, each <STABLE> costs you 1 <WOOD> and 1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -6992,7 +6992,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 99,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "At the start of scoring, you can place <FOOD> in empty fields. You get 1/2/3 bonus <SCORE> for each field in which you place 1/4/7 <FOOD>."
+      "At the start of scoring, you can place <FOOD> in empty <FIELD>. You get 1/2/3 bonus <SCORE> for each <FIELD> in which you place 1/4/7 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -7021,7 +7021,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 101,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Once per round, if you have 0/1/2/3/4 unfenced stables on your farm, you can exchange 2 <GRAIN> for 1 bonus <SCORE> and 1/2/3/4/5 <FOOD>."
+      "Once per round, if you have 0/1/2/3/4 unfenced <STABLE> on your farm, you can exchange 2 <GRAIN> for 1 bonus <SCORE> and 1/2/3/4/5 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -7035,7 +7035,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 102,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time after you use a wood accumulation space, you can place 4 <WOOD> from your supply on that space to get 2 <STONE>, 1 <CLAY>, 1 <REED>, and 1 <GRAIN>."
+      "Each time after you use a <WOOD> accumulation space, you can place 4 <WOOD> from your supply on that space to get 2 <STONE>, 1 <CLAY>, 1 <REED>, and 1 <GRAIN>."
     ],
     "cost": {},
     "players": "1+",
@@ -7105,7 +7105,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 106,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 3 <FOOD>. For each <VEGETABLE> you get from your fields during the field phase of the harvest, you get 1 additional <FOOD>."
+      "When you play this card, you immediately get 3 <FOOD>. For each <VEGETABLE> you get from your <FIELD> during the field phase of the harvest, you get 1 additional <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -7225,7 +7225,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 114,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time after you use a clay/stone accumulation space, you can place 1 <STONE>/2 <CLAY> from your supply on the space to get 2 <GRAIN>/1 <VEGETABLE>, respectively."
+      "Each time after you use a <CLAY>/<STONE> accumulation space, you can place 1 <STONE>/2 <CLAY> from your supply on the space to get 2 <GRAIN>/1 <VEGETABLE>, respectively."
     ],
     "cost": {},
     "players": "1+",
@@ -7459,7 +7459,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 132,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you renovate to stone, you can place up to 1 <WOOD> from your supply in each of your rooms. During scoring, each such <WOOD> is worth 1 bonus <SCORE>."
+      "When you renovate to <STONE>, you can place up to 1 <WOOD> from your supply in each of your rooms. During scoring, each such <WOOD> is worth 1 bonus <SCORE>."
     ],
     "cost": {},
     "players": "3+",
@@ -7704,7 +7704,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 149,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time another player renovates to stone, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost."
+      "Each time another player renovates to <STONE>, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost."
     ],
     "cost": {},
     "players": "4+",
@@ -7807,7 +7807,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 156,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Immediately add 1 <CATTLE> from the general supply to the __Cattle Market__ accumulation space. Afterward, for each cattle on __Cattle Market__, you get 1 <GRAIN> plus 1 <FOOD>."
+      "Immediately add 1 <CATTLE> from the general supply to the __Cattle Market__ accumulation space. Afterward, for each <CATTLE> on __Cattle Market__, you get 1 <GRAIN> plus 1 <FOOD>."
     ],
     "cost": {},
     "players": "4+",
@@ -7873,7 +7873,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 161,
     "category": "CROP_PROVIDER",
     "desc": [
-      "When you play this card, if you have at least 2/4/5 unplanted field tiles, you immediately get 1/2/3 <VEGETABLE>."
+      "When you play this card, if you have at least 2/4/5 unplanted <FIELD> tiles, you immediately get 1/2/3 <VEGETABLE>."
     ],
     "players": "4+",
     "kind": "occupation"
@@ -7977,7 +7977,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 169,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately after each time you use a clay/stone accumulation space, you can renovate your house to clay/stone without paying reed."
+      "Immediately after each time you use a <CLAY>/<STONE> accumulation space, you can renovate your house to <CLAY>/<STONE> without paying <REED>."
     ],
     "cost": {},
     "players": "5+",
@@ -7990,7 +7990,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 170,
     "category": "FARM_PLANNER",
     "desc": [
-      "When you play this card, if you have no pastures yet, you can immediately fence exactly 1 space in your farmyard without paying wood for the fences."
+      "When you play this card, if you have no pastures yet, you can immediately <FENCE> exactly 1 space in your farmyard without paying <WOOD> for the <FENCE>."
     ],
     "cost": {},
     "players": "5+",
@@ -8003,7 +8003,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 171,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "In the returning home phase of each round, you can pay 1 food to either take a \"Minor Improvement\" action or to draw 2 new minor improvements."
+      "In the returning home phase of each round, you can pay 1 <FOOD> to either take a __Minor Improvement__ action or to draw 2 new minor improvements."
     ],
     "cost": {},
     "players": "5+",
@@ -8016,7 +8016,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 172,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time another player plows a field, place 1 food on this card. Once this game, you can turn this card face down to get the food on it."
+      "Each time another player plows a <FIELD>, place 1 <FOOD> on this card. Once this game, you can turn this card face down to get the <FOOD> on it."
     ],
     "cost": {},
     "players": "5+",
@@ -8029,7 +8029,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 173,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time the \"House Building\" action space on the game board extension is used, you get all of the food from the \"Traveling Players\" accumulation space."
+      "Each time the __House Building__ action space on the game board extension is used, you get all of the <FOOD> from the __Traveling Players__ accumulation space."
     ],
     "cost": {},
     "players": "5+",
@@ -8042,7 +8042,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 174,
     "category": "CROP_PROVIDER",
     "desc": [
-      "At the end of each work phase, if 1 stone accumulation space has stone left, you get 1 grain If 2 stone accumulation spaces have stone left, you get 1 vegetable instead."
+      "At the end of each work phase, if 1 <STONE> accumulation space has <STONE> left, you get 1 <GRAIN> If 2 <STONE> accumulation spaces have <STONE> left, you get 1 <VEGETABLE> instead."
     ],
     "cost": {},
     "players": "5+",
@@ -8055,7 +8055,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 175,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Immediately after each time you use a \"Lessons\" action space, if this is the 1st/2nd/3rd occupied Lessons action space that round, you get 1 food/grain/vegetable."
+      "Immediately after each time you use a __Lessons__ action space, if this is the 1st/2nd/3rd occupied __Lessons__ action space that round, you get 1 <FOOD>/<GRAIN>/<VEGETABLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -8068,7 +8068,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 176,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use the \"Farmland\", \"Cultivation\", or \"Farming Supplies\" action (the latter only being available with 6 players), you also get 2 clay."
+      "Each time you use the __Farmland__, __Cultivation__, or __Farm Supplies__ action (the latter only being available with 6 players), you also get 2 <CLAY>."
     ],
     "cost": {},
     "players": "5+",
@@ -8081,7 +8081,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 177,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Immediately after each time you use an accumulation space on the game board extension, you can buy 1 stone for 1 food."
+      "Immediately after each time you use an accumulation space on the game board extension, you can buy 1 <STONE> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -8107,7 +8107,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 179,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you create at least one new pasture from unfenced farmyard spaces you get 1 cattle."
+      "Each time you create at least one new pasture from unfenced farmyard spaces you get 1 <CATTLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -8120,7 +8120,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time after you use a wood accumulation space, if this is the 2nd/3rd/4th occupied wood accumulation space that round, you can buy 1 sheep/wild boar/cattle for 1 food."
+      "Each time after you use a <WOOD> accumulation space, if this is the 2nd/3rd/4th occupied <WOOD> accumulation space that round, you can buy 1 <SHEEP>/<<PIG>>/<CATTLE> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -8147,7 +8147,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 1,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can immediately plow 1 field such that it completes a \"zigzag\" pattern."
+      "You can immediately plow 1 <FIELD> such that it completes a \"zigzag\" pattern."
     ],
     "cost": {
       "wood": 1
@@ -8178,7 +8178,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 3,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "You can immediately sow in exactly 1 field."
+      "You can immediately sow in exactly 1 <FIELD>."
     ],
     "cost": {},
     "passing": true,
@@ -8210,7 +8210,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 5,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "You immediately get 1 <CLAY> for each planted field you have."
+      "You immediately get 1 <CLAY> for each planted <FIELD> you have."
     ],
     "cost": {
       "food": 1
@@ -8305,7 +8305,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 11,
     "category": "FARM_PLANNER",
     "desc": [
-      "Your pastures of size 1 can hold up to 3 animals of the same type. (With a stable, they can hold up to 6 animals of the same type.)"
+      "Your pastures of size 1 can hold up to 3 animals of the same type. (With a <STABLE>, they can hold up to 6 animals of the same type.)"
     ],
     "cost": {},
     "kind": "minor"
@@ -8333,7 +8333,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 13,
     "category": "FARM_PLANNER",
     "desc": [
-      "At any time, you can renovate your house to stone. From a wooden house, this costs 1 <STONE>, 1 <REED>, and 1 <FOOD> per room. From a clay house, this costs 1 <STONE> per room."
+      "At any time, you can renovate your house to <STONE>. From a wooden house, this costs 1 <STONE>, 1 <REED>, and 1 <FOOD> per room. From a clay house, this costs 1 <STONE> per room."
     ],
     "cost": {
       "wood": 1
@@ -8347,7 +8347,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 14,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately before you renovate to stone, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."
+      "Immediately before you renovate to <STONE>, you get 2 <CLAY> and 1 <REED> and you can take a __Build Rooms__ action."
     ],
     "cost": {
       "wood": 1
@@ -8375,7 +8375,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 16,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time before you use the __Sheep Market__/__Cattle Market__ accumulation space, you can build exactly 1 stable for 1 <WOOD>/at no cost."
+      "Each time before you use the __Sheep Market__/__Cattle Market__ accumulation space, you can build exactly 1 <STABLE> for 1 <WOOD>/at no cost."
     ],
     "cost": {
       "wood": 1,
@@ -8390,7 +8390,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time before you take an unconditional __Sow__ action, you can pay 3 <FOOD> to plow 1 field."
+      "Each time before you take an unconditional __Sow__ action, you can pay 3 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -8421,7 +8421,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 19,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately after each time you use a clay accumulation space, you can pay 1 <CLAY> to plow 1 field. If you do, place that 1 <CLAY> on the accumulation space."
+      "Immediately after each time you use a <CLAY> accumulation space, you can pay 1 <CLAY> to plow 1 <FIELD>. If you do, place that 1 <CLAY> on the accumulation space."
     ],
     "cost": {
       "wood": 2
@@ -8439,7 +8439,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 2 field tiles on this card. Each time you use the __Farmland__ or __Cultivation__ action space, you can also plow up to 2 fields from this card."
+      "Place 2 <FIELD> tiles on this card. Each time you use the __Farmland__ or __Cultivation__ action space, you can also plow up to 2 <FIELD> from this card."
     ],
     "cost": {
       "wood": 3
@@ -8515,8 +8515,8 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 25,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "This card is a field that you can sow in, an occupation, and the \"Fireplace\" major improvement with all of its effects.",
-      "You can play it only via a \"Minor Improvement\" action.",
+      "This card is a <FIELD> that you can sow in, an occupation, and the \"Fireplace\" major improvement with all of its effects.",
+      "You can play it only via a __Minor Improvement__ action.",
       "[Anytime]",
       "<VEGETABLE> <ARROW> 2<FOOD>      <BOAR> <ARROW> 2<FOOD>",
       "<SHEEP> <ARROW> 2<FOOD>      <CATTLE> <ARROW> 3<FOOD>",
@@ -8664,7 +8664,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 29,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced stable holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced stables."
+      "During scoring, you get 1 bonus <SCORE> for exactly 1 unfenced <STABLE> holding exactly 1 <SHEEP>. The same applies to <PIG> and <CATTLE>, if held in different unfenced <STABLE>."
     ],
     "cost": {
       "wood": 1
@@ -8696,7 +8696,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 31,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and fields), rounded up."
+      "During scoring, you get ½ bonus <SCORE> for each pair of <GRAIN> plus <VEGETABLE> you have (considering all crops in your supply and <FIELD>), rounded up."
     ],
     "cost": {
       "wood": 1,
@@ -8713,7 +8713,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 32,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."
+      "During scoring, if you had at least 7 goods in your <FIELD> before the final harvest, you get 2 bonus <SCORE>."
     ],
     "cost": {
       "wood": 1
@@ -8745,7 +8745,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 34,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you then have more stone rooms than people, you get 4 bonus <SCORE>. You can only use one card to get bonus points for your stone house."
+      "During scoring, if you then have more stone rooms than people, you get 4 bonus <SCORE>. You can only use one card to get bonus <SCORE> for your stone house."
     ],
     "cost": {
       "wood": 1,
@@ -8778,7 +8778,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 36,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any sheep into food, you get 3 bonus <SCORE>."
+      "During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any <SHEEP> into <FOOD>, you get 3 bonus <SCORE>."
     ],
     "cost": {},
     "prerequisite": "No Sheep",
@@ -8827,7 +8827,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 39,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>."
+      "Each time you use a <WOOD> accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>."
     ],
     "cost": {
       "wood": 1
@@ -9153,7 +9153,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the end of each action in which you sow vegetables in a field, you get 1 <FOOD> for each vegetable field you have (including the new ones)."
+      "At the end of each action in which you sow <VEGETABLE> in a <FIELD>, you get 1 <FOOD> for each <VEGETABLE> <FIELD> you have (including the new ones)."
     ],
     "cost": {
       "wood": 1
@@ -9296,7 +9296,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 61,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the start of each harvest, if you have at least 3 grain fields (including field cards with planted grain), you get 2 <FOOD>."
+      "At the start of each harvest, if you have at least 3 <GRAIN> <FIELD> (including <FIELD> cards with planted <GRAIN>), you get 2 <FOOD>."
     ],
     "cost": {},
     "kind": "minor"
@@ -9363,7 +9363,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 63,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "In the field phase of each harvest, you get 1 <FOOD> for each harvested field tile that is orthogonally adjacent to your house."
+      "In the field phase of each harvest, you get 1 <FOOD> for each harvested <FIELD> tile that is orthogonally adjacent to your house."
     ],
     "cost": {},
     "evenMoreSet": true,
@@ -9484,7 +9484,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 70,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 vegetable fields."
+      "Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 <VEGETABLE> <FIELD>."
     ],
     "cost": {},
     "prerequisite": "2 Fields",
@@ -9497,7 +9497,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 71,
     "category": "CROP_PROVIDER",
     "desc": [
-      "At any time, if a field contains exactly 1 good as a result of a harvest, you can discard that good and immediately take a __Sow__ action limited to that field."
+      "At any time, if a <FIELD> contains exactly 1 good as a result of a harvest, you can discard that good and immediately take a __Sow__ action limited to that <FIELD>."
     ],
     "cost": {},
     "kind": "minor"
@@ -9509,7 +9509,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 72,
     "category": "CROP_PROVIDER",
     "desc": [
-      "In the field phase of each harvest, you can harvest 1 additional good from a number of fields equal to the number of unfenced stables you have."
+      "In the field phase of each harvest, you can harvest 1 additional good from a number of <FIELD> equal to the number of unfenced <STABLE> you have."
     ],
     "cost": {},
     "prerequisite": "At Most 1 Occupation",
@@ -9558,7 +9558,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 75,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "You can plant <WOOD> on this card as though it were 2 fields, but it is considered 1 field. Sow and harvest <WOOD> on this card as you would <GRAIN>."
+      "You can plant <WOOD> on this card as though it were 2 <FIELD>, but it is considered 1 <FIELD>. Sow and harvest <WOOD> on this card as you would <GRAIN>."
     ],
     "vp": 1,
     "cost": {
@@ -9602,7 +9602,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 77,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time any player (including you) renovates to stone, you get 1 <CLAY> for each newly renovated room."
+      "Each time any player (including you) renovates to <STONE>, you get 1 <CLAY> for each newly renovated room."
     ],
     "cost": {
       "food": 1
@@ -9636,7 +9636,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 79,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "At the end of rounds 8, 10, and 12, you get 1 <STONE> for each vegetable field you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."
+      "At the end of rounds 8, 10, and 12, you get 1 <STONE> for each <VEGETABLE> <FIELD> you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."
     ],
     "vp": 2,
     "cost": {
@@ -9686,7 +9686,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 82,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. Fences built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less."
+      "Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. <FENCE> built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less."
     ],
     "vp": 1,
     "kind": "minor"
@@ -9729,7 +9729,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 85,
     "category": "FARM_PLANNER",
     "desc": [
-      "As soon as you have 6 (__7 in draft mode__) occupations in front of you (including this one), this card provides room for one person."
+      "As soon as you have 6 (7 in draft mode) occupations in front of you (including this one), this card provides room for one person."
     ],
     "cost": {},
     "players": "1+",
@@ -9771,7 +9771,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 88,
     "category": "FARM_PLANNER",
     "desc": [
-      "You immediately get 1 <GRAIN>. Each time you build fences, stables, and rooms, or renovate your house, you can replace up to 2 building resources of any type with 1 <GRAIN> each."
+      "You immediately get 1 <GRAIN>. Each time you build <FENCE>, <STABLE>, and rooms, or renovate your house, you can replace up to 2 building resources of any type with 1 <GRAIN> each."
     ],
     "cost": {},
     "players": "1+",
@@ -9784,7 +9784,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you build at least 1 fence, you can also build a stable without paying <WOOD> for the stable."
+      "Each time you build at least 1 <FENCE>, you can also build a <STABLE> without paying <WOOD> for the <STABLE>."
     ],
     "cost": {},
     "players": "1+",
@@ -9797,7 +9797,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 90,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time you use the __Farmland__ or __Cultivation__ action space, you can pay 1 <FOOD> to plow 1 additional field."
+      "Each time you use the __Farmland__ or __Cultivation__ action space, you can pay 1 <FOOD> to plow 1 additional <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -9810,7 +9810,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 91,
     "category": "FARM_PLANNER",
     "desc": [
-      "Add 4, 7, and 10 to the current round and place a field tile on each corresponding round space. At the start of these rounds, you can plow the field for 1 <FOOD>."
+      "Add 4, 7, and 10 to the current round and place a <FIELD> tile on each corresponding round space. At the start of these rounds, you can plow the <FIELD> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -9931,7 +9931,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 100,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus point is also awarded for 4 fenced stables.)"
+      "During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus <SCORE> is also awarded for 4 fenced <STABLE>.)"
     ],
     "cost": {},
     "players": "1+",
@@ -9959,7 +9959,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 102,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "At the start of each returning home phase, you can return a built stable to your supply to get 1 <WOOD>, 1 <GRAIN>, 1 <FOOD>, and a __Minor Improvement__ action."
+      "At the start of each returning home phase, you can return a built <STABLE> to your supply to get 1 <WOOD>, 1 <GRAIN>, 1 <FOOD>, and a __Minor Improvement__ action."
     ],
     "cost": {},
     "players": "1+",
@@ -9985,7 +9985,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 104,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "For each new field tile you get, you also get 1 <WOOD> and 1 <FOOD>."
+      "For each new <FIELD> tile you get, you also get 1 <WOOD> and 1 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -9998,7 +9998,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 105,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time you use a clay accumulation space, you also get 1 <FOOD>. Each time you use a stone accumulation space, you also get 1 <GRAIN>."
+      "Each time you use a <CLAY> accumulation space, you also get 1 <FOOD>. Each time you use a <STONE> accumulation space, you also get 1 <GRAIN>."
     ],
     "cost": {},
     "players": "1+",
@@ -10087,7 +10087,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 110,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time there is 1/2/3+ food on the __Fishing__ accumulation space, you get an additional 2 <FOOD> on the __Reed Bank__/ __Clay Pit__/ __Forest__ accumulation spaces."
+      "Each time there is 1/2/3+ <FOOD> on the __Fishing__ accumulation space, you get an additional 2 <FOOD> on the __Reed Bank__/ __Clay Pit__/ __Forest__ accumulation spaces."
     ],
     "cost": {},
     "players": "1+",
@@ -10126,7 +10126,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 113,
     "category": "CROP_PROVIDER",
     "desc": [
-      "For each <GRAIN> you harvest from a field, you can buy 1 <VEGETABLE> for 3 <FOOD>. If you harvest the last <GRAIN> from a field, the <VEGETABLE> costs you only 2 <FOOD>."
+      "For each <GRAIN> you harvest from a <FIELD>, you can buy 1 <VEGETABLE> for 3 <FOOD>. If you harvest the last <GRAIN> from a <FIELD>, the <VEGETABLE> costs you only 2 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -10152,7 +10152,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "CROP_PROVIDER",
     "desc": [
-      "In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."
+      "In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -10166,7 +10166,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "playerActionCardType": "occupation",
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "This card is a __1 <WOOD>__ accumulation space for you only. Each time the newly revealed action space card is a __Quarry__ accumulation space, you must discard all <WOOD> from this card."
+      "This card is a 1 <WOOD> accumulation space for you only. Each time the newly revealed action space card is a __Quarry__ accumulation space, you must discard all <WOOD> from this card."
     ],
     "cost": {},
     "players": "1+",
@@ -10231,7 +10231,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 121,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Renovating to clay only costs you exactly 1 <CLAY> and 1 <REED>. Each clay room only costs you 3 <CLAY> and 2 <REED> to build."
+      "Renovating to <CLAY> only costs you exactly 1 <CLAY> and 1 <REED>. Each clay room only costs you 3 <CLAY> and 2 <REED> to build."
     ],
     "cost": {},
     "players": "1+",
@@ -10257,7 +10257,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 123,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "For each new wood/clay room you build, you get 2 <CLAY>/2 <STONE>."
+      "For each new <WOOD>/clay room you build, you get 2 <CLAY>/2 <STONE>."
     ],
     "cost": {},
     "players": "1+",
@@ -10284,7 +10284,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 125,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use a wood or clay accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 food."
+      "Each time you use a <WOOD> or <CLAY> accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -10297,7 +10297,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 126,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Pile 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <REED>, 1 <CLAY>, and 1 <WOOD> on this card. Each time you harvest a field tile, you can also take the top good from the pile."
+      "Pile 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <REED>, 1 <CLAY>, and 1 <WOOD> on this card. Each time you harvest a <FIELD> tile, you can also take the top good from the pile."
     ],
     "cost": {},
     "players": "1+",
@@ -10311,7 +10311,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "playerActionCardType": "occupation",
     "category": "FARM_PLANNER",
     "desc": [
-      "This card is an action space for you only. If each other player has more rooms than you, it provides the __Day Laborer__, __Building Rooms__, and __Major Improvement__ actions (all three)."
+      "This card is an action space for you only. If each other player has more rooms than you, it provides the __Day Laborer__, __Build Rooms__, and __Major Improvement__ actions (all three)."
     ],
     "cost": {},
     "players": "3+",
@@ -10423,7 +10423,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 135,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most vegetables in their fields gets 2 bonus <SCORE>."
+      "If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most <VEGETABLE> in their <FIELD> gets 2 bonus <SCORE>."
     ],
     "cost": {},
     "players": "3+",
@@ -10437,7 +10437,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 136,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced stables gets 2 bonus <SCORE>."
+      "If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced <STABLE> gets 2 bonus <SCORE>."
     ],
     "cost": {},
     "players": "3+",
@@ -10451,7 +10451,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 137,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time after you use a __Lesson__ action space, you can buy up to 2 different goods: <GRAIN>, <STONE>, <SHEEP>, and <PIG> for 1 <FOOD> each; <CATTLE> and <VEGETABLE> for 2 food each."
+      "Each time after you use a __Lessons__ action space, you can buy up to 2 different goods: <GRAIN>, <STONE>, <SHEEP>, and <PIG> for 1 <FOOD> each; <CATTLE> and <VEGETABLE> for 2 <FOOD> each."
     ],
     "cost": {},
     "players": "3+",
@@ -10595,7 +10595,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "D",
     "number": 148,
     "desc": [
-      "You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms."
+      "You can keep 2 <SHEEP> on the border between each pair of orthogonally adjacent rooms."
     ],
     "cost": {},
     "players": "4+",
@@ -10609,7 +10609,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 149,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a stable without paying wood."
+      "Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a <STABLE> without paying <WOOD>."
     ],
     "cost": {},
     "players": "4+",
@@ -10661,7 +10661,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 153,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "At the start of each of the 1st/2nd/3rd/4th/5th/6th harvest, if you have at least 1/2/3/4/5/6 grain fields, you get 1 bonus <SCORE>."
+      "At the start of each of the 1st/2nd/3rd/4th/5th/6th harvest, if you have at least 1/2/3/4/5/6 <GRAIN> <FIELD>, you get 1 bonus <SCORE>."
     ],
     "cost": {},
     "players": "4+",
@@ -10675,7 +10675,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 154,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Renovating to stone costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house."
+      "Renovating to <STONE> costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house."
     ],
     "cost": {},
     "players": "4+",
@@ -10757,7 +10757,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 159,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At any time, you can turn 1 reed into 3 food. Any other player can prevent this by buying the reed for 2 food from you. If multiple players are interested, choose one."
+      "At any time, you can turn 1 <REED> into 3 <FOOD>. Any other player can prevent this by buying the <REED> for 2 <FOOD> from you. If multiple players are interested, choose one."
     ],
     "cost": {},
     "players": "4+",
@@ -10833,7 +10833,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 163,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 <STONE>. Each time another player renovates to stone or builds a stone room, you get 1 <STONE>."
+      "When you play this card, you immediately get 2 <STONE>. Each time another player renovates to <STONE> or builds a stone room, you get 1 <STONE>."
     ],
     "cost": {},
     "players": "4+",
@@ -10873,7 +10873,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 166,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you build at least 2 stables on the same turn, you also get 1 <CATTLE>."
+      "Each time you build at least 2 <STABLE> on the same turn, you also get 1 <CATTLE>."
     ],
     "cost": {},
     "players": "4+",
@@ -10900,7 +10900,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 168,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "When you build your 2nd/3rd/4th stable, you immediately get 1 <CATTLE>/<PIG>/<SHEEP>, even if built on the same turn (but not retroactively)."
+      "When you build your 2nd/3rd/4th <STABLE>, you immediately get 1 <CATTLE>/<PIG>/<SHEEP>, even if built on the same turn (but not retroactively)."
     ],
     "cost": {},
     "players": "4+",
@@ -10913,7 +10913,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 169,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time another player takes at least 4 wood from an accumulation space, you can immediately pay 1 food to plow 1 field."
+      "Each time another player takes at least 4 <WOOD> from an accumulation space, you can immediately pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "5+",
@@ -10926,7 +10926,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 170,
     "category": "FARM_PLANNER",
     "desc": [
-      "This card is an action space for all. It provides a \"Build Fences\" action and then 1 sheep. If another player uses it, they must first pay you 1 food."
+      "This card is an action space for all. It provides a __Build Fences__ action and then 1 <SHEEP>. If another player uses it, they must first pay you 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -10939,7 +10939,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 171,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time another player pays food on a \"Lessons\" action space, you get exactly 1 of that food."
+      "Each time another player pays <FOOD> on a __Lessons__ action space, you get exactly 1 of that <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -10952,7 +10952,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 172,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At any time, you can exchange 1 reed for 2 food."
+      "At any time, you can exchange 1 <REED> for 2 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -10978,7 +10978,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 173,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time a major improvement is built, place 1 food on this card. Once this game, you can turn this card face down to get the food on it."
+      "Each time a major improvement is built, place 1 <FOOD> on this card. Once this game, you can turn this card face down to get the <FOOD> on it."
     ],
     "cost": {},
     "players": "5+",
@@ -10991,7 +10991,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 174,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you use the \"Clay Pit\" accumulation space, you can also buy 1 vegetable for 1 food."
+      "Each time you use the __Clay Pit__ accumulation space, you can also buy 1 <VEGETABLE> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -11004,7 +11004,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 175,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time any player (including you) takes a \"Renovation\" action on an action space, you can sow crops in exactly 1 field."
+      "Each time any player (including you) takes a __Renovation__ action on an action space, you can sow crops in exactly 1 <FIELD>."
     ],
     "cost": {},
     "players": "5+",
@@ -11017,7 +11017,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 176,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "In the work phase of each round, the first and the second time you use a wood accumulation space, you also get 1 and 2 clay respectively."
+      "In the work phase of each round, the first and the second time you use a <WOOD> accumulation space, you also get 1 and 2 <CLAY> respectively."
     ],
     "cost": {},
     "players": "5+",
@@ -11030,7 +11030,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 177,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "When you play this card you immediately pay 1 food. If you do, you get 2 stone and 2 reed."
+      "When you play this card you immediately pay 1 <FOOD>. If you do, you get 2 <STONE> and 2 <REED>."
     ],
     "cost": {},
     "players": "5+",
@@ -11043,7 +11043,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 178,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time all three \"Lessons\" action spaces are occupied, you can use this card with a person to get your choice of 1 building resource or 1 crop of each type."
+      "Each time all three __Lessons__ action spaces are occupied, you can use this card with a person to get your choice of 1 building resource or 1 crop of each type."
     ],
     "cost": {},
     "players": "5+",
@@ -11056,7 +11056,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 179,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "When both action spaces on round spaces 3 and 6 are occupied, you can use this card with a person to get 1 cattle and 2 food."
+      "When both action spaces on round spaces 3 and 6 are occupied, you can use this card with a person to get 1 <CATTLE> and 2 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -11069,7 +11069,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 sheep/wild boar/cattle."
+      "Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 <SHEEP>/<<PIG>>/<CATTLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -11082,7 +11082,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 1,
     "category": "PASSING_-_FARMYARD",
     "desc": [
-      "You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)"
+      "You can immediately build up to 3 <STABLE> at no cost. (You must pay the cost of this card though.)"
     ],
     "cost": {
       "wood": 2
@@ -11098,7 +11098,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 2,
     "category": "PASSING_-_ACTION_-_FARMYARD",
     "desc": [
-      "Immediately renovate to clay at no cost. (You must pay the cost of this card though.)"
+      "Immediately renovate to <CLAY> at no cost. (You must pay the cost of this card though.)"
     ],
     "cost": {
       "clay": 3,
@@ -11130,7 +11130,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 4,
     "desc": [
-      "Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."
+      "Immediately remove all <GRAIN> from one of your <FIELD> to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."
     ],
     "cost": {},
     "prerequisite": "1 Grain Field",
@@ -11243,7 +11243,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 12,
     "category": "FARMYARD_-_PLACE_FOR_ANIMALS",
     "desc": [
-      "You can keep 1 additional animal (of the same type) in each of your unfenced stables, and 2 additional animals (of the same type) in each pasture with stable."
+      "You can keep 1 additional animal (of the same type) in each of your unfenced <STABLE>, and 2 additional animals (of the same type) in each pasture with <STABLE>."
     ],
     "cost": {},
     "vp": 1,
@@ -11286,7 +11286,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 15,
     "category": "FARMYARD_-__FENCING_OR_STABLE_BUILDING",
     "desc": [
-      "Each time after you use a wood accumulation space, you can place 1 <STONE> from your supply on that space (for the next visitor) to take a __Build Fences__ action."
+      "Each time after you use a <WOOD> accumulation space, you can place 1 <STONE> from your supply on that space (for the next visitor) to take a __Build Fences__ action."
     ],
     "cost": {
       "reed": 1
@@ -11300,7 +11300,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 16,
     "desc": [
-      "You do not need to pay wood for fences that you build on the edge of your farmyard board."
+      "You do not need to pay <WOOD> for <FENCE> that you build on the edge of your farmyard board."
     ],
     "cost": {},
     "prerequisite": "1 Animal of Each Type",
@@ -11314,7 +11314,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARMYARD_-_PLOWING",
     "desc": [
-      "Each time you use the __Farmland__ or __Cultivation__  action space, you can plow 2 fields instead of 1. Each time you sow, you must place 1 fewer good on each field you sow."
+      "Each time you use the __Farmland__ or __Cultivation__  action space, you can plow 2 <FIELD> instead of 1. Each time you sow, you must place 1 fewer good on each <FIELD> you sow."
     ],
     "cost": {
       "wood": 1
@@ -11332,7 +11332,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 18,
     "category": "FARMYARD_-_PLOWING",
     "desc": [
-      "Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 field."
+      "Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {
       "reed": 1
@@ -11350,7 +11350,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 19,
     "category": "FARMYARD_-_PLOWING",
     "desc": [
-      "Each time after you use the __Cattle Market__ accumulation space, you can pay 2 <FOOD> to plow 1 field."
+      "Each time after you use the __Cattle Market__ accumulation space, you can pay 2 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -11369,7 +11369,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "FARMYARD_-_PLOWING",
     "desc": [
-      "At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field."
+      "At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -11414,7 +11414,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 23,
     "category": "ACTION",
     "desc": [
-      "At the end of each work phase, you can sow exactly 1 crop on 1 field."
+      "At the end of each work phase, you can sow exactly 1 crop on 1 <FIELD>."
     ],
     "cost": {},
     "prerequisite": "4 Occupations",
@@ -11566,7 +11566,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 33,
     "category": "BONUS_POINTS_-_GET",
     "desc": [
-      "From now on, one of your pastures with stable cannot hold animals. Each time you get <REED> from an action space, you get 1 bonus <SCORE>."
+      "From now on, one of your pastures with <STABLE> cannot hold animals. Each time you get <REED> from an action space, you get 1 bonus <SCORE>."
     ],
     "vp": 1,
     "cost": {},
@@ -11723,7 +11723,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 43,
     "category": "FOOD_-_FUTURE_ROUND_SPACES",
     "desc": [
-      "If you have 1/2/3/4 stables, place 1 <FOOD> on each of the next 2/3/4/5 round spaces. At the start of these rounds, you get the <FOOD>."
+      "If you have 1/2/3/4 <STABLE>, place 1 <FOOD> on each of the next 2/3/4/5 round spaces. At the start of these rounds, you get the <FOOD>."
     ],
     "vp": 1,
     "prerequisite": "1 Stable",
@@ -11797,7 +11797,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 48,
     "category": "FOOD",
     "desc": [
-      "In the feeding phase of each harvest, if you live in a clay or stone house, you get 1 or 2 <FOOD>, respectively."
+      "In the feeding phase of each harvest, if you live in a <CLAY> or stone house, you get 1 or 2 <FOOD>, respectively."
     ],
     "vp": 2,
     "cost": {
@@ -11982,7 +11982,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "FOOD",
     "desc": [
-      "At the start of each harvest, you can choose to skip the field and breeding phase of that harvest and get exactly 1 <FOOD> instead."
+      "At the start of each harvest, you can choose to skip the <FIELD> and breeding phase of that harvest and get exactly 1 <FOOD> instead."
     ],
     "cost": {},
     "kind": "minor"
@@ -12168,7 +12168,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 68,
     "category": "CROPS_-_VEGETABLE",
     "desc": [
-      "This card is a field on which you can only sow and harvest <WOOD> as you would <GRAIN>. Each time you harvest the last <WOOD> from this card, you also receive 1 <VEGETABLE>."
+      "This card is a <FIELD> on which you can only sow and harvest <WOOD> as you would <GRAIN>. Each time you harvest the last <WOOD> from this card, you also receive 1 <VEGETABLE>."
     ],
     "isField": true,
     "cardField": {
@@ -12186,7 +12186,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 69,
     "category": "CROPS_-_VEGETABLE",
     "desc": [
-      "This card is a field that can only grow vegetables. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field."
+      "This card is a <FIELD> that can only grow <VEGETABLE>. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 <FIELD>."
     ],
     "prerequisite": "2 Occupations",
     "occupationPrerequisites": {
@@ -12208,7 +12208,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 70,
     "category": "CROPS_-_VEGETABLE",
     "desc": [
-      "This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively."
+      "This card is a <FIELD>. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively."
     ],
     "cost": {},
     "prerequisite": "1 Occupation",
@@ -12231,7 +12231,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 71,
     "desc": [
-      "Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it."
+      "Each time you sow in a <FIELD> that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it."
     ],
     "cost": {},
     "vp": 1,
@@ -12247,7 +12247,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 72,
     "category": "CROPS_-_GRAIN_AND_VEGETABLE",
     "desc": [
-      "This card is a field. During the field phase of each harvest, if you harvest at least 1 good from this card, you also get 1 <FOOD>."
+      "This card is a <FIELD>. During the field phase of each harvest, if you harvest at least 1 good from this card, you also get 1 <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -12273,7 +12273,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 73,
     "desc": [
-      "During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."
+      "During the field phase of each harvest, you can select exactly one of your <FIELD> and harvest all the crops planted in it."
     ],
     "cost": {
       "wood": 1
@@ -12287,7 +12287,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 74,
     "desc": [
-      "When you play this card, immediately place (up to) 5 fences from your supply on it. When you build fences, fences taken from this card cost you nothing."
+      "When you play this card, immediately place (up to) 5 <FENCE> from your supply on it. When you build <FENCE>, <FENCE> taken from this card cost you nothing."
     ],
     "cost": {},
     "prerequisite": "2 Planted Fields",
@@ -12300,7 +12300,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 75,
     "desc": [
-      "Each time you use a wood accumulation space, you can return 1 <STONE> to the general supply to get an additional 3 <WOOD>."
+      "Each time you use a <WOOD> accumulation space, you can return 1 <STONE> to the general supply to get an additional 3 <WOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -12361,7 +12361,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 79,
     "category": "BUILDING_RESOURCES_-_STONE",
     "desc": [
-      "Each time after you sow in at least 1 field, you get 1 <STONE>."
+      "Each time after you sow in at least 1 <FIELD>, you get 1 <STONE>."
     ],
     "cost": {
       "wood": 1
@@ -12375,7 +12375,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 80,
     "category": "BUILDING_RESOURCES_-_STONE",
     "desc": [
-      "You can only plant <STONE> on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest <STONE> on this card as you would vegetables."
+      "You can only plant <STONE> on this card. Plant as though it were 3 <FIELD>, but it is considered 1 <FIELD>. Sow and harvest <STONE> on this card as you would <VEGETABLE>."
     ],
     "isField": true,
     "cardField": {
@@ -12423,7 +12423,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 83,
     "category": "ANIMALS_",
     "desc": [
-      "At the start of the breeding phase of each harvest, if you have at least 1 unfenced stable without an animal, you get 1 <SHEEP>."
+      "At the start of the breeding phase of each harvest, if you have at least 1 unfenced <STABLE> without an animal, you get 1 <SHEEP>."
     ],
     "cost": {
       "wood": 1
@@ -12436,7 +12436,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 84,
     "desc": [
-      "You only require 1 <SHEEP> to breed sheep during the breeding phase of a harvest. This card can hold 1 <SHEEP>."
+      "You only require 1 <SHEEP> to breed <SHEEP> during the breeding phase of a harvest. This card can hold 1 <SHEEP>."
     ],
     "cost": {},
     "animalHolder": true,
@@ -12492,7 +12492,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 88,
     "category": "FARMYARD_-_FENCING",
     "desc": [
-      "Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively."
+      "Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 <FENCE>, respectively."
     ],
     "cost": {},
     "players": "1+",
@@ -12505,7 +12505,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "FARMYARD_-_STABLE_BUILDING",
     "desc": [
-      "After you play your 2nd, 3rd, 5th, and 7th occupation (including this one), you can build 1 stable at no cost."
+      "After you play your 2nd, 3rd, 5th, and 7th occupation (including this one), you can build 1 <STABLE> at no cost."
     ],
     "cost": {},
     "players": "1+",
@@ -12517,7 +12517,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 90,
     "desc": [
-      "Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 field."
+      "Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -12530,7 +12530,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 91,
     "desc": [
-      "You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 field."
+      "You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "1+",
@@ -12543,7 +12543,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 92,
     "desc": [
-      "Once this game, if you live in a house with exactly 2 rooms surrounded by 4 field tiles, you can use any __Wish for Children__ action space even without room."
+      "Once this game, if you live in a house with exactly 2 rooms surrounded by 4 <FIELD> tiles, you can use any __Wish for Children__ action space even without room."
     ],
     "cost": {},
     "players": "1+",
@@ -12726,7 +12726,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 106,
     "category": "FOOD",
     "desc": [
-      "When you play this card, you can immediately turn as many building resources into food as you have people:",
+      "When you play this card, you can immediately turn as many building resources into <FOOD> as you have people:",
       "<WOOD>/<CLAY> <ARROW> 2 <FOOD>",
       "<REED>/<STONE> <ARROW> 3 <FOOD>"
     ],
@@ -12757,7 +12757,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 107,
     "category": "FOOD",
     "desc": [
-      "In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 <FOOD>."
+      "In the field phase of each harvest, if you have at least 2/4/6/7 <FIELD>, you get 1/2/3/4 <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -12770,7 +12770,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 108,
     "category": "FOOD",
     "desc": [
-      "Each time you build fences, place 1 <FOOD> on each remaining round space, up to the number of fences just built. At the start of these rounds, you get the <FOOD>."
+      "Each time you build <FENCE>, place 1 <FOOD> on each remaining round space, up to the number of <FENCE> just built. At the start of these rounds, you get the <FOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -12840,7 +12840,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 112,
     "desc": [
-      "Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."
+      "Each time you would harvest a <GRAIN> <FIELD>, you can leave the <GRAIN> on the <FIELD> and take 1 <GRAIN> from the general supply instead."
     ],
     "cost": {},
     "players": "1+",
@@ -12867,7 +12867,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 114,
     "category": "CROPS_-_GRAIN_AND_VEGETABLE",
     "desc": [
-      "When you build your 1st and 2nd stable, you get 1 <GRAIN>. When you build your 3rd and 4th stable, you get 1 <VEGETABLE>. (This does not apply to stables you have already built.)"
+      "When you build your 1st and 2nd <STABLE>, you get 1 <GRAIN>. When you build your 3rd and 4th <STABLE>, you get 1 <VEGETABLE>. (This does not apply to <STABLE> you have already built.)"
     ],
     "cost": {},
     "players": "1+",
@@ -12880,7 +12880,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "CROPS_-_SOWING",
     "desc": [
-      "Each time after you use the __Grain Seeds__ action space, you can take a __Bake bread__ action. Each time after you use the __Vegetable Seeds__ action space, you can take a __Sow__ action."
+      "Each time after you use the __Grain Seeds__ action space, you can take a __Bake Bread__ action. Each time after you use the __Vegetable Seeds__ action space, you can take a __Sow__ action."
     ],
     "cost": {},
     "players": "1+",
@@ -12907,7 +12907,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 117,
     "category": "BUILDING_RESOURCES_-_WOOD",
     "desc": [
-      "At the start of each harvest, if you have at least 1 grain field, you get 2 <WOOD>."
+      "At the start of each harvest, if you have at least 1 <GRAIN> <FIELD>, you get 2 <WOOD>."
     ],
     "cost": {},
     "players": "1+",
@@ -13036,7 +13036,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 127,
     "category": "FARMYARD_-_PLACE_FOR_PERSON",
     "desc": [
-      "When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced stables), you can extend your house by 1 room at no cost."
+      "When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced <STABLE>), you can extend your house by 1 room at no cost."
     ],
     "players": "3+",
     "kind": "occupation"
@@ -13048,7 +13048,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 128,
     "category": "FARMYARD",
     "desc": [
-      "Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 field."
+      "Each time after you build a major improvement, you can pay 1 <FOOD> to plow 1 <FIELD>."
     ],
     "cost": {},
     "players": "3+",
@@ -13252,7 +13252,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 143,
     "category": "BUILDING_RESOURCES_-_CLAY_OR_STONE",
     "desc": [
-      "From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>."
+      "From round 3 on, at the end of each work phase in which all <CLAY> accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>."
     ],
     "cost": {},
     "players": "3+",
@@ -13303,7 +13303,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 147,
     "category": "ANIMALS_-_ALL",
     "desc": [
-      "At the start of each harvest, if you have 1/2/3+ fenced stables, you get 1 <SHEEP>/<PIG>/<CATTLE>."
+      "At the start of each harvest, if you have 1/2/3+ fenced <STABLE>, you get 1 <SHEEP>/<PIG>/<CATTLE>."
     ],
     "cost": {},
     "players": "3+",
@@ -13328,7 +13328,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "deck": "E",
     "number": 149,
     "desc": [
-      "At the start of the last harvest, you can take up to 2 of each other player's unbuilt fences and build them on your farm at no cost. (Your farm can then have over 15 fences.)"
+      "At the start of the last harvest, you can take up to 2 of each other player's unbuilt <FENCE> and build them on your farm at no cost. (Your farm can then have over 15 <FENCE>.)"
     ],
     "cost": {},
     "players": "4+",
@@ -13342,7 +13342,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 150,
     "category": "ACTION",
     "desc": [
-      "You can use an action space providing both stone and a different building resource even if it is occupied by another player. Stone rooms cost you 2 <STONE> less each."
+      "You can use an action space providing both <STONE> and a different building resource even if it is occupied by another player. Stone rooms cost you 2 <STONE> less each."
     ],
     "cost": {},
     "players": "4+",
@@ -13472,7 +13472,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 158,
     "category": "FOOD",
     "desc": [
-      "At the end of each work phase, you get 1 <FOOD> for each stone accumulation space with stone on it."
+      "At the end of each work phase, you get 1 <FOOD> for each <STONE> accumulation space with <STONE> on it."
     ],
     "cost": {},
     "players": "4+",
@@ -13551,7 +13551,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 164,
     "category": "ANIMALS_-_SHEEP",
     "desc": [
-      "Each time you plow at least 1 field, you get 1 <SHEEP> for each field that you just plowed."
+      "Each time you plow at least 1 <FIELD>, you get 1 <SHEEP> for each <FIELD> that you just plowed."
     ],
     "cost": {},
     "players": "4+",
@@ -13603,7 +13603,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 168,
     "category": "ANIMALS_-_ALL",
     "desc": [
-      "At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house."
+      "At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied <WOOD>/<CLAY>/stone room in your house."
     ],
     "cost": {},
     "players": "4+",
@@ -13616,7 +13616,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 15,
     "category": "FARM_PLANNER",
     "desc": [
-      "You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 moor for 1 field tile."
+      "You immediately get 1 <FUEL>. Additionally, you can immediately exchange 1 <MOOR> for 1 <FIELD> tile."
     ],
     "cost": {},
     "passing": true,
@@ -13631,7 +13631,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 16,
     "category": "FARM_PLANNER",
     "desc": [
-      "You immediately get 2 <WOOD>. On each of up to 2 farmyard spaces containing nothing but exactly 1 forest, you can immediately turn that forest to the moor side."
+      "You immediately get 2 <WOOD>. On each of up to 2 farmyard spaces containing nothing but exactly 1 <FOREST>, you can immediately turn that <FOREST> to the <MOOR> side."
     ],
     "cost": {},
     "prerequisite": "At Most 3 Forests",
@@ -13647,7 +13647,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 17,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 1 forest on an unused farmyard space."
+      "Place 1 <FOREST> on an unused farmyard space."
     ],
     "cost": {},
     "prerequisite": "3 Major Improvements",
@@ -13663,7 +13663,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 18,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Immediately acquire your choice of the Joinery, Pottery, or Basketmaker's Workshop without placing a person. You pay 1 stone less for it."
+      "Immediately acquire your choice of the Joinery, Pottery, or Basketmaker's Workshop without placing a person. You pay 1 <STONE> less for it."
     ],
     "cost": {},
     "prerequisite": "2 Major Improvements",
@@ -13695,7 +13695,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 20,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "You immediately get 1 <FUEL> for each visible moor that you have."
+      "You immediately get 1 <FUEL> for each visible <MOOR> that you have."
     ],
     "cost": {},
     "prerequisite": "1 Major Improvement",
@@ -13711,7 +13711,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 21,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Immediately remove any number of visible moors from your farmyard and get 1 bonus point and 2 <FUEL> each. Additionally, if you have at least 2/4/5/6 horses, you immediately get 1/2/3/4 <FUEL>."
+      "Immediately remove any number of visible <MOOR> from your farmyard and get 1 bonus <SCORE> and 2 <FUEL> each. Additionally, if you have at least 2/4/5/6 <HORSE>, you immediately get 1/2/3/4 <FUEL>."
     ],
     "cost": {
       "food": 4
@@ -13729,7 +13729,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 22,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "You immediately get 2 <FOOD> if you have an animal type that no one else has; 1 <FOOD> each if only you are growing grain and/or vegetables; 1 <FUEL> each if you have the single most forests and/or moors."
+      "You immediately get 2 <FOOD> if you have an animal type that no one else has; 1 <FOOD> each if only you are growing <GRAIN> and/or <VEGETABLE>; 1 <FUEL> each if you have the single most <FOREST> and/or <MOOR>."
     ],
     "cost": {},
     "passing": true,
@@ -13744,7 +13744,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 23,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "You immediately get 1 <FOOD> for each of your fence spaces between a forest and a field, and 1 <FUEL> for each of your fence spaces between a forest and a moor."
+      "You immediately get 1 <FOOD> for each of your <FENCE> spaces between a <FOREST> and a <FIELD>, and 1 <FUEL> for each of your <FENCE> spaces between a <FOREST> and a <MOOR>."
     ],
     "cost": {},
     "prerequisite": "3 Improvements",
@@ -13863,7 +13863,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 30,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "You can immediately exchange exactly 2 <SHEEP> for 1 <CATTLE> and 1 <HORSE>. You may not exchange only 1 sheep."
+      "You can immediately exchange exactly 2 <SHEEP> for 1 <CATTLE> and 1 <HORSE>. You may not exchange only 1 <SHEEP>."
     ],
     "cost": {
       "food": 1
@@ -13896,7 +13896,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 32,
     "category": "FARM_PLANNER",
     "desc": [
-      "This card provides room for one person. In the feeding phase of each harvest, it must be heated with 1 <FUEL>. Instead of a \"Renovation\" action, you can remove this card from play and add 1 wooden room to your wood house at no cost."
+      "This card provides room for one person. In the feeding phase of each harvest, it must be heated with 1 <FUEL>. Instead of a __Renovation__ action, you can remove this card from play and add 1 wooden room to your wood house at no cost."
     ],
     "cost": {
       "fuel": 5,
@@ -13931,7 +13931,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 34,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can keep exactly 1 animal, except sheep, on each farmyard space containing at least 1 forest."
+      "You can keep exactly 1 animal, except <SHEEP>, on each farmyard space containing at least 1 <FOREST>."
     ],
     "cost": {},
     "prerequisite": "3 Improvements",
@@ -13947,7 +13947,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 35,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can keep up to 2 horses in an unused farmyard space adjacent to your house. Even if you do, this farmyard space is still considered unused. You can change in which farmyard space you keep the horses."
+      "You can keep up to 2 <HORSE> in an unused farmyard space adjacent to your house. Even if you do, this farmyard space is still considered unused. You can change in which farmyard space you keep the <HORSE>."
     ],
     "cost": {
       "stone": 1
@@ -13979,7 +13979,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 37,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time after you build at least 2 rooms at once, you can build up to 2 stables without paying wood."
+      "Each time after you build at least 2 rooms at once, you can build up to 2 <STABLE> without paying <WOOD>."
     ],
     "cost": {
       "food": 1
@@ -13995,7 +13995,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 38,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately fence a farmyard space containing at least 1 forest or moor that is adjacent to a pasture, without paying wood for the fences. Once there are no tiles left in the fenced area, the farmyard space becomes a pasture."
+      "Immediately <FENCE> a farmyard space containing at least 1 <FOREST> or <MOOR> that is adjacent to a pasture, without paying <WOOD> for the <FENCE>. Once there are no tiles left in the fenced area, the farmyard space becomes a pasture."
     ],
     "cost": {
       "food": 1
@@ -14012,7 +14012,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 39,
     "category": "FARM_PLANNER",
     "desc": [
-      "Immediately fence a farmyard space that is not adjacent to an existing pasture, without paying wood for the fences. You can connect your pastures later. All future pastures must be adjacent to at least one existing pasture."
+      "Immediately <FENCE> a farmyard space that is not adjacent to an existing pasture, without paying <WOOD> for the <FENCE>. You can connect your pastures later. All future pastures must be adjacent to at least one existing pasture."
     ],
     "cost": {
       "wood": 2
@@ -14029,7 +14029,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 40,
     "category": "FARM_PLANNER",
     "desc": [
-      "Once you only have 1 remaining moor, at any time, you can exchange it for 1 field tile."
+      "Once you only have 1 remaining <MOOR>, at any time, you can exchange it for 1 <FIELD> tile."
     ],
     "cost": {},
     "prerequisite": "2 Moors",
@@ -14044,7 +14044,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 41,
     "category": "FARM_PLANNER",
     "desc": [
-      "Each time after you use the \"Farmland\" or \"Cultivation\" action space or take the \"Slash and Burn\" special action, if you have at least 1 cattle, you can plow 1 additional field."
+      "Each time after you use the __Farmland__ or __Cultivation__ action space or take the __Slash and Burn__ special action, if you have at least 1 <CATTLE>, you can plow 1 additional <FIELD>."
     ],
     "cost": {
       "wood": 1
@@ -14062,7 +14062,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 42,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can immediately place 1 moor on an unused farmyard space. Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also exchange 1 moor for 1 field tile."
+      "You can immediately place 1 <MOOR> on an unused farmyard space. Each time you use the __Farmland__ or __Cultivation__ action space, you can also exchange 1 <MOOR> for 1 <FIELD> tile."
     ],
     "cost": {
       "wood": 3
@@ -14080,7 +14080,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 43,
     "category": "FARM_PLANNER",
     "desc": [
-      "You can immediately place up to 2 field tiles, one at a time, on unused farmyard spaces that are not adjacent to existing fields. You can connect your fields later. All future fields must be adjacent to at least one existing field."
+      "You can immediately place up to 2 <FIELD> tiles, one at a time, on unused farmyard spaces that are not adjacent to existing <FIELD>. You can connect your <FIELD> later. All future <FIELD> must be adjacent to at least one existing <FIELD>."
     ],
     "cost": {
       "vegetable": 2
@@ -14097,7 +14097,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 44,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 1 moor on round space 12. At the start of that round, you can place the moor on an unused farmyard space."
+      "Place 1 <MOOR> on round space 12. At the start of that round, you can place the <MOOR> on an unused farmyard space."
     ],
     "cost": {},
     "prerequisite": "Play in Round 4 or Before",
@@ -14113,7 +14113,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 45,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 1 forest each on the round spaces 12 and 13. At the start of these rounds, you can place the forest on an unused farmyard space."
+      "Place 1 <FOREST> each on the round spaces 12 and 13. At the start of these rounds, you can place the <FOREST> on an unused farmyard space."
     ],
     "cost": {
       "wood": 1
@@ -14133,7 +14133,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 46,
     "category": "FARM_PLANNER",
     "desc": [
-      "Choose up to 2 of your forests and place 1 additional forest on top of each of them. You cannot take the \"Slash and Burn\" special action on these farmyard spaces unless you remove a tile with a \"Fell Trees\" special action first."
+      "Choose up to 2 of your <FOREST> and place 1 additional <FOREST> on top of each of them. You cannot take the __Slash and Burn__ special action on these farmyard spaces unless you remove a tile with a __Fell Trees__ special action first."
     ],
     "cost": {},
     "prerequisite": "4 Forests",
@@ -14148,7 +14148,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 47,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place 1 forest each on as many of your moors as you wish. You cannot take the \"Slash and Burn\" special action or use the covered moor on these farmyard spaces unless you remove the forest with a \"Fell Trees\" special action first."
+      "Place 1 <FOREST> each on as many of your <MOOR> as you wish. You cannot take the __Slash and Burn__ special action or use the covered <MOOR> on these farmyard spaces unless you remove the <FOREST> with a __Fell Trees__ special action first."
     ],
     "cost": {
       "vegetable": 1
@@ -14165,7 +14165,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 48,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, add 4 to the current round and place 1 forest on the corresponding round space. At the start of that round, you can place the forest on an unused farmyard space."
+      "Each time you take the __Cut Peat__ special action, add 4 to the current round and place 1 <FOREST> on the corresponding round space. At the start of that round, you can place the <FOREST> on an unused farmyard space."
     ],
     "cost": {},
     "prerequisite": "2 Major Improvements",
@@ -14180,7 +14180,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 49,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place a field tile on round space 11, a moor on round space 12, and a forest on round space 13. At the start of these rounds, you can place the respective tile on an unused farmyard space per the normal rules."
+      "Place a <FIELD> tile on round space 11, a <MOOR> on round space 12, and a <FOREST> on round space 13. At the start of these rounds, you can place the respective tile on an unused farmyard space per the normal rules."
     ],
     "cost": {
       "vegetable": 2
@@ -14215,7 +14215,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 51,
     "category": "FARM_PLANNER",
     "desc": [
-      "Place a farmyard extension at one of the four sides of your farmyard board and place 1 moor on each of the 2 new farmyard spaces. Both new farmyard spaces must be adjacent to existing farmyard spaces."
+      "Place a farmyard extension at one of the four sides of your farmyard board and place 1 <MOOR> on each of the 2 new farmyard spaces. Both new farmyard spaces must be adjacent to existing farmyard spaces."
     ],
     "cost": {
       "stone": 1
@@ -14251,7 +14251,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 53,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Place 1 person from your supply on a forest. Once you remove the forest, you can place the person that round. In the returning home phase of that round, return the person to your supply. Until then, you cannot use it for family growth."
+      "Place 1 person from your supply on a <FOREST>. Once you remove the <FOREST>, you can place the person that round. In the returning home phase of that round, return the person to your supply. Until then, you cannot use it for family growth."
     ],
     "cost": {
       "wood": 2
@@ -14268,7 +14268,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 54,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Immediately after each time you use the \"Farmland\" or \"Cultivation\" action space, you can take a face-up special action card. The special action card costs 0 or 2 food, as usual."
+      "Immediately after each time you use the __Farmland__ or __Cultivation__ action space, you can take a face-up special action card. The special action card costs 0 or 2 <FOOD>, as usual."
     ],
     "cost": {
       "wood": 1
@@ -14284,7 +14284,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 55,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Once per round, immediately before or after you take the \"Slash and Burn\" or \"Cut Peat\" special action, you can also take the respective other special action."
+      "Once per round, immediately before or after you take the __Slash and Burn__ or __Cut Peat__ special action, you can also take the respective other special action."
     ],
     "cost": {
       "wood": 1,
@@ -14303,7 +14303,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 56,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Add 4 and 7 to the current round and place 1 fuel on each corresponding round space. At the start of these rounds, you can discard the fuel and take the \"Cut Peat\" special action by taking the appropriate special action card."
+      "Add 4 and 7 to the current round and place 1 <FUEL> on each corresponding round space. At the start of these rounds, you can discard the <FUEL> and take the __Cut Peat__ special action by taking the appropriate special action card."
     ],
     "cost": {},
     "prerequisite": "1 Horse",
@@ -14318,7 +14318,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 57,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "In each work phase, after you have placed all of your people, when it would be your turn again, you get exactly one more turn in which you can take a face-up special action card. The special action card costs 0 or 2 food, as usual."
+      "In each work phase, after you have placed all of your people, when it would be your turn again, you get exactly one more turn in which you can take a face-up special action card. The special action card costs 0 or 2 <FOOD>, as usual."
     ],
     "cost": {},
     "prerequisite": "2 Improvements",
@@ -14333,7 +14333,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 58,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time after you take the \"Cut Peat\" special action, you can also take a \"Sow\" action."
+      "Each time after you take the __Cut Peat__ special action, you can also take a __Sow__ action."
     ],
     "cost": {},
     "prerequisite": "2 Fields",
@@ -14348,7 +14348,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 59,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time after you take the \"Slash and Burn\" special action, you also get a \"Sow\" action for the new field only. This also applies when you exchange 1 moor for 1 field tile via a minor improvement."
+      "Each time after you take the __Slash and Burn__ special action, you also get a __Sow__ action for the new <FIELD> only. This also applies when you exchange 1 <MOOR> for 1 <FIELD> tile via a minor improvement."
     ],
     "cost": {
       "vegetable": 2,
@@ -14366,7 +14366,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 60,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time after you take a special action, if you then have at least 2 horses, you can also take a \"Sow\" action."
+      "Each time after you take a special action, if you then have at least 2 <HORSE>, you can also take a __Sow__ action."
     ],
     "cost": {
       "wood": 3
@@ -14383,7 +14383,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 61,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time after you take at least 3 wood, 3 clay, 2 reed, or 2 stone from an accumulation space, you can take a \"Build Rooms\" or \"Renovation\" action without placing a person."
+      "Each time after you take at least 3 <WOOD>, 3 <CLAY>, 2 <REED>, or 2 <STONE> from an accumulation space, you can take a __Build Rooms__ or __Renovation__ action without placing a person."
     ],
     "cost": {
       "wood": 2
@@ -14401,7 +14401,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 62,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "You can immediately move up the Tiled Oven. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, it is worth 1 additional bonus point for you."
+      "You can immediately move up the Tiled Oven. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, it is worth 1 additional bonus <SCORE> for you."
     ],
     "cost": {
       "reed": 1
@@ -14418,7 +14418,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 63,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "You can immediately move up the Village Church. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, the Church and Village Church are each worth 1 additional bonus point for you."
+      "You can immediately move up the Village Church. From the next round on, you can build it immediately after a person action by paying its cost. During scoring, the Church and Village Church are each worth 1 additional bonus <SCORE> for you."
     ],
     "cost": {},
     "extraVp": true,
@@ -14434,7 +14434,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 64,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you play this card, you can immediately place the \"Tombstone\" token on an unused farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+      "When you play this card, you can immediately place the \"Tombstone\" token on an unused farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus <SCORE>."
     ],
     "cost": {
       "stone": 1
@@ -14453,7 +14453,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 65,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 food. Additionally, if there are forests on at least 2/3/4/5 of your farmyard spaces, you immediately get 1/2/3/4 bonus points. Crops and wood do not count but you can exchange them."
+      "When you play this card, you immediately get 2 <FOOD>. Additionally, if there are <FOREST> on at least 2/3/4/5 of your farmyard spaces, you immediately get 1/2/3/4 bonus <SCORE>. Crops and <WOOD> do not count but you can exchange them."
     ],
     "cost": {
       "clay": 1,
@@ -14472,7 +14472,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 66,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Place 1 forest on an unused farmyard space. During scoring, if you have 1/2/3+ unused farmyard spaces, you get +2/-1/-3 bonus points on top of the negative points for the unused spaces."
+      "Place 1 <FOREST> on an unused farmyard space. During scoring, if you have 1/2/3+ unused farmyard spaces, you get +2/-1/-3 bonus <SCORE> on top of the negative points for the unused spaces."
     ],
     "cost": {},
     "extraVp": true,
@@ -14488,7 +14488,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 67,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 wood and 1 reed. During scoring, you get 1 additional bonus point for each of the \"Joinery\", \"Pottery\", and \"Basketmaker's Workshop\" major improvements that you have."
+      "When you play this card, you immediately get 1 <WOOD> and 1 <REED>. During scoring, you get 1 additional bonus <SCORE> for each of the \"Joinery\", \"Pottery\", and \"Basketmaker's Workshop\" major improvements that you have."
     ],
     "cost": {
       "clay": 2,
@@ -14507,7 +14507,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 68,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Returning home phase: once, you can pay 1 <FUEL> to get 1 bonus point. When you build this upgrade, you immediately get 2 food. The Village Church starts under the Well."
+      "Returning home phase: once, you can pay 1 <FUEL> to get 1 bonus <SCORE>. When you build this upgrade, you immediately get 2 <FOOD>. The Village Church starts under the Well."
     ],
     "cost": {},
     "vp": 5,
@@ -14524,7 +14524,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 69,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Each time you have at least 3 horses, you get 1 bonus point for each cattle that you turn into food."
+      "Each time you have at least 3 <HORSE>, you get 1 bonus <SCORE> for each <CATTLE> that you turn into <FOOD>."
     ],
     "cost": {
       "vegetable": 1
@@ -14543,7 +14543,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 70,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, you can place 1 fence from your supply on the emptied farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+      "Each time you take the __Cut Peat__ special action, you can place 1 <FENCE> from your supply on the emptied farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus <SCORE>."
     ],
     "cost": {},
     "vp": 1,
@@ -14560,7 +14560,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 71,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, the owner of the Museum of the Moors and the owner of the Living History Museum each get 1 bonus point. The Museum of the Moors is a major improvement; the Living History Museum is a minor improvement."
+      "During scoring, the owner of the Museum of the Moors and the owner of the Living History Museum each get 1 bonus <SCORE>. The Museum of the Moors is a major improvement; the Living History Museum is a minor improvement."
     ],
     "cost": {},
     "vp": 1,
@@ -14577,7 +14577,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 72,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 3 fuel. During scoring, you get 1 additional bonus point each for the \"Clay Oven\", \"Stone Oven\", \"Heating Oven\", and \"Tiled Oven\" major improvements and the \"Oven Installation\" upgrade."
+      "When you play this card, you immediately get 3 <FUEL>. During scoring, you get 1 additional bonus <SCORE> each for the \"Clay Oven\", \"Stone Oven\", \"Heating Oven\", and \"Tiled Oven\" major improvements and the \"Oven Installation\" upgrade."
     ],
     "cost": {
       "stone": 2
@@ -14595,7 +14595,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 73,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "During scoring, if you have at least 1 animal of each of the 4 types, you get 1 bonus point for each other player in the game. These points are doubled or tripled if you have 2 or 3 animals of each type, respectively."
+      "During scoring, if you have at least 1 animal of each of the 4 types, you get 1 bonus <SCORE> for each other player in the game. These points are doubled or tripled if you have 2 or 3 animals of each type, respectively."
     ],
     "cost": {
       "sheep": 1
@@ -14613,7 +14613,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 74,
     "category": "POINTS_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 food. In the harvest at the end of round 14, for each major improvement you have, you can exchange 1 food for 1 bonus point. This card counts as an improvement in hand for its prerequisite."
+      "When you play this card, you immediately get 2 <FOOD>. In the harvest at the end of round 14, for each major improvement you have, you can exchange 1 <FOOD> for 1 bonus <SCORE>. This card counts as an improvement in hand for its prerequisite."
     ],
     "cost": {
       "wood": 1,
@@ -14632,7 +14632,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 75,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Add 1, 3, 5, 7, 9, and 11 to the current round. Alternate placing 1 wood and 1 fuel on the corresponding round spaces, starting with wood. At the start of these rounds, you get the good."
+      "Add 1, 3, 5, 7, 9, and 11 to the current round. Alternate placing 1 <WOOD> and 1 <FUEL> on the corresponding round spaces, starting with <WOOD>. At the start of these rounds, you get the good."
     ],
     "cost": {
       "clay": 1,
@@ -14650,7 +14650,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 76,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Alternate placing 1 fuel and 1 horse on each of the next 7 round spaces, starting with fuel. At the start of these rounds, you get the respective good."
+      "Alternate placing 1 <FUEL> and 1 <HORSE> on each of the next 7 round spaces, starting with <FUEL>. At the start of these rounds, you get the respective good."
     ],
     "cost": {
       "wood": 4
@@ -14666,7 +14666,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 77,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, add 3 to the current round and place 2 fuel on the corresponding round space. At the start of that round, you get the fuel."
+      "Each time you take the __Cut Peat__ special action, add 3 to the current round and place 2 <FUEL> on the corresponding round space. At the start of that round, you get the <FUEL>."
     ],
     "cost": {
       "vegetable": 2
@@ -14683,7 +14683,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 78,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Alternate placing 1 fuel and 1 food on each remaining round space, starting with fuel. At the start of these rounds, you get the respective good."
+      "Alternate placing 1 <FUEL> and 1 <FOOD> on each remaining round space, starting with <FUEL>. At the start of these rounds, you get the respective good."
     ],
     "cost": {
       "wood": 3
@@ -14704,7 +14704,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 79,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Add your choice of 2/4/7/10 to the current round and place 3/4/5/6 fuel on the corresponding round space. At the start of that round, you get the fuel."
+      "Add your choice of 2/4/7/10 to the current round and place 3/4/5/6 <FUEL> on the corresponding round space. At the start of that round, you get the <FUEL>."
     ],
     "cost": {
       "wood": 1
@@ -14720,7 +14720,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 80,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "You immediately get 1 fuel, 1 food, 1 wood, 1 clay, 1 reed, 1 stone, 1 sheep, and 1 grain."
+      "You immediately get 1 <FUEL>, 1 <FOOD>, 1 <WOOD>, 1 <CLAY>, 1 <REED>, 1 <STONE>, 1 <SHEEP>, and 1 <GRAIN>."
     ],
     "cost": {},
     "vp": -4,
@@ -14827,7 +14827,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 82,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 fuel. During each harvest, if you exchange at least 1 wood for 1 fuel to heat your house, you need a total of 1 fuel less to heat it."
+      "When you play this card, you immediately get 1 <FUEL>. During each harvest, if you exchange at least 1 <WOOD> for 1 <FUEL> to heat your house, you need a total of 1 <FUEL> less to heat it."
     ],
     "cost": {
       "wood": 1
@@ -14845,7 +14845,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 83,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "When you play this card, you immediately get 1 fuel. Each time you take the \"Hiring Fair\" special action or use the \"Day Laborer\" action space, you also get 1 fuel."
+      "When you play this card, you immediately get 1 <FUEL>. Each time you take the __Hiring Fair__ special action or use the __Day Laborer__ action space, you also get 1 <FUEL>."
     ],
     "cost": {
       "wood": 1,
@@ -14863,7 +14863,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 84,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "At any time, you can lie a standing horse on its side to get 2 fuel. Lying horses do not count for breeding and are only worth 1/2 point during scoring. They can, however, be turned into food with an appropriate improvement."
+      "At any time, you can lie a standing <HORSE> on its side to get 2 <FUEL>. Lying <HORSE> do not count for breeding and are only worth 1/2 point during scoring. They can, however, be turned into <FOOD> with an appropriate improvement."
     ],
     "cost": {},
     "prerequisite": "1 Major Improvement",
@@ -14899,7 +14899,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 86,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "For every 2 sheep that you have in the field phase of each harvest, you pay 1 fuel less to heat your house in the feeding phase of that harvest, but not less than 0 fuel."
+      "For every 2 <SHEEP> that you have in the field phase of each harvest, you pay 1 <FUEL> less to heat your house in the feeding phase of that harvest, but not less than 0 <FUEL>."
     ],
     "cost": {
       "wood": 2,
@@ -14918,7 +14918,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 87,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time you use the \"Fishing\" accumulation space, you also get 2 fuel."
+      "Each time you use the __Fishing__ accumulation space, you also get 2 <FUEL>."
     ],
     "cost": {
       "wood": 2
@@ -14935,7 +14935,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 88,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "At the start of each harvest, if you have at least 2 moors, you get 1 fuel."
+      "At the start of each harvest, if you have at least 2 <MOOR>, you get 1 <FUEL>."
     ],
     "cost": {
       "wood": 1
@@ -14951,7 +14951,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 89,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 fuel, 1 food, and 1 bonus point."
+      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 <FUEL>, 1 <FOOD>, and 1 bonus <SCORE>."
     ],
     "cost": {
       "clay": 2,
@@ -14970,7 +14970,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 90,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to get as much fuel and food until you have at least 2 fuel and 2 food."
+      "Place 3 usage counters on this card. At any time, you can return 1 usage counter from this card to get as much <FUEL> and <FOOD> until you have at least 2 <FUEL> and 2 <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -14988,7 +14988,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 91,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each harvest, you get your choice of 1 fuel or 1 food for each of your craft buildings (Joinery, Pottery, and Basketmaker's Workshop) that you choose not to use to turn a building resource into food."
+      "Each harvest, you get your choice of 1 <FUEL> or 1 <FOOD> for each of your craft buildings (Joinery, Pottery, and Basketmaker's Workshop) that you choose not to use to turn a building resource into <FOOD>."
     ],
     "cost": {
       "vegetable": 1
@@ -15005,7 +15005,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 92,
     "category": "ACTIONS_BOOSTER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, place 1 fuel and 1 food on the emptied farmyard space. This farmyard space is still considered unused. You get the goods once the farmyard space is no longer unused."
+      "Each time you take the __Cut Peat__ special action, place 1 <FUEL> and 1 <FOOD> on the emptied farmyard space. This farmyard space is still considered unused. You get the goods once the farmyard space is no longer unused."
     ],
     "cost": {},
     "prerequisite": "3 Improvements",
@@ -15020,7 +15020,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 93,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time you build a major improvement, you can replace 1 building resource of your choice with 1 fuel. Each time you get an improvement in your hand from the player to your right, you also get 1 food."
+      "Each time you build a major improvement, you can replace 1 building resource of your choice with 1 <FUEL>. Each time you get an improvement in your hand from the player to your right, you also get 1 <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -15037,7 +15037,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 94,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use the \"Infirmary\" action space, place 1 food on as many of the next round spaces as there are moors visible on your farmyard board. At the start of these rounds, you get the food."
+      "Each time you use the \"Infirmary\" action space, place 1 <FOOD> on as many of the next round spaces as there are <MOOR> visible on your farmyard board. At the start of these rounds, you get the <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -15055,7 +15055,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 95,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Place 2 food on each of up to 3 of your empty fields. You cannot harvest the food. You get it when you sow in these fields."
+      "Place 2 <FOOD> on each of up to 3 of your empty <FIELD>. You cannot harvest the <FOOD>. You get it when you sow in these <FIELD>."
     ],
     "cost": {},
     "implemented": true,
@@ -15069,7 +15069,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 96,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you take the \"Fell Trees\" or \"Cut Peat\" special action, place 1 food on the emptied farmyard space. This farmyard space is still considered unused. Once the farmyard space is no longer unused, you get the food."
+      "Each time you take the __Fell Trees__ or __Cut Peat__ special action, place 1 <FOOD> on the emptied farmyard space. This farmyard space is still considered unused. Once the farmyard space is no longer unused, you get the <FOOD>."
     ],
     "cost": {},
     "prerequisite": "2 Improvements",
@@ -15084,7 +15084,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 97,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the start of each returning home phase in which there is no special action card in front of you, you get 2 food."
+      "At the start of each returning home phase in which there is no special action card in front of you, you get 2 <FOOD>."
     ],
     "cost": {
       "wood": 2,
@@ -15102,7 +15102,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 98,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you use the \"Fishing\" accumulation space, you can pay 1 fuel to get an additional 3 food."
+      "Each time you use the __Fishing__ accumulation space, you can pay 1 <FUEL> to get an additional 3 <FOOD>."
     ],
     "cost": {
       "wood": 1,
@@ -15120,7 +15120,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 99,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 food. Each time you use the \"Infirmary\" action space with a person lying in bed, you get 1 additional food."
+      "When you play this card, you immediately get 1 <FOOD>. Each time you use the \"Infirmary\" action space with a person lying in bed, you get 1 additional <FOOD>."
     ],
     "cost": {
       "clay": 1
@@ -15137,7 +15137,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 100,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 food. Additionally, each player, including you, with at least 1 stable or pasture immediately gets 2 food."
+      "When you play this card, you immediately get 1 <FOOD>. Additionally, each player, including you, with at least 1 <STABLE> or pasture immediately gets 2 <FOOD>."
     ],
     "cost": {},
     "prerequisite": "At Most 2 Improvements",
@@ -15152,7 +15152,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 101,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "You cannot play this card in rounds 4, 7, 9, 11, 13, and 14. All other players must and you can turn any 1 animal into food: <SHEEP> <ARROW> 1 <FOOD>, <PIG> <ARROW> 2 <FOOD>, <CATTLE> <ARROW> 3 <FOOD>, <HORSE> <ARROW> 2 <FOOD>."
+      "You cannot play this card in rounds 4, 7, 9, 11, 13, and 14. All other players must and you can turn any 1 animal into <FOOD>: <SHEEP> <ARROW> 1 <FOOD>, <PIG> <ARROW> 2 <FOOD>, <CATTLE> <ARROW> 3 <FOOD>, <HORSE> <ARROW> 2 <FOOD>."
     ],
     "cost": {
       "wood": 1
@@ -15170,7 +15170,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 102,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the amount of clay you have, you immediately get 6 food. Then pass this card to the player on your left, who adds it to their hand."
+      "At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the amount of <CLAY> you have, you immediately get 6 <FOOD>. Then pass this card to the player on your left, who adds it to their hand."
     ],
     "cost": {
       "vegetable": 2
@@ -15187,7 +15187,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 103,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 food for each of your farmyard spaces containing at least 1 forest."
+      "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 <FOOD> for each of your farmyard spaces containing at least 1 <FOREST>."
     ],
     "cost": {
       "wood": 1,
@@ -15206,7 +15206,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 104,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 1 food. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of forests you have, you immediately get 1 food."
+      "When you play this card, you immediately get 1 <FOOD>. At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the number of <FOREST> you have, you immediately get 1 <FOOD>."
     ],
     "cost": {},
     "implemented": true,
@@ -15220,7 +15220,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 105,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At any time: <VEGETABLE> <ARROW> 2 <FOOD>; <SHEEP> <ARROW> 2 <FOOD>; <PIG> <ARROW> 3 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>. \"Bake Bread\" action: <GRAIN> <ARROW> 2 <FOOD>."
+      "At any time: <VEGETABLE> <ARROW> 2 <FOOD>; <SHEEP> <ARROW> 2 <FOOD>; <PIG> <ARROW> 3 <FOOD>; <CATTLE> <ARROW> 3 <FOOD>; <HORSE> <ARROW> 2 <FOOD>. __Bake Bread__ action: <GRAIN> <ARROW> 2 <FOOD>."
     ],
     "cost": {},
     "vp": 2,
@@ -15398,7 +15398,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 107,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "At any time, you can use your \"Fireplace\" and \"Cooking Hearth\" major improvements to turn 1 horse into 2 food."
+      "At any time, you can use your \"Fireplace\" and \"Cooking Hearth\" major improvements to turn 1 <HORSE> into 2 <FOOD>."
     ],
     "cost": {},
     "prerequisite": "2 Horses",
@@ -15413,7 +15413,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 108,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Harvest: once, you can turn 1 <FUEL> and 1 <GRAIN> into 5 <FOOD>. Any number of times during scoring: 1 <FUEL> and 1 <GRAIN> <ARROW> 1 bonus point."
+      "Harvest: once, you can turn 1 <FUEL> and 1 <GRAIN> into 5 <FOOD>. Any number of times during scoring: 1 <FUEL> and 1 <GRAIN> <ARROW> 1 bonus <SCORE>."
     ],
     "cost": {
       "stone": 2,
@@ -15448,7 +15448,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 109,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, you can also turn exactly 1 grain into 4 food."
+      "Each time you take the __Cut Peat__ special action, you can also turn exactly 1 <GRAIN> into 4 <FOOD>."
     ],
     "cost": {
       "clay": 2
@@ -15465,7 +15465,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 110,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time you take at least 5 wood, 4 clay, 3 reed, or 2 stone from an accumulation space, you also get 1 grain."
+      "Each time you take at least 5 <WOOD>, 4 <CLAY>, 3 <REED>, or 2 <STONE> from an accumulation space, you also get 1 <GRAIN>."
     ],
     "cost": {
       "wood": 3
@@ -15482,7 +15482,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 111,
     "category": "CROP_PROVIDER",
     "desc": [
-      "You can plant grain or vegetables on up to 2 unused farmyard spaces. Even if you do, these farmyard spaces are not considered fields but still unused. You can discard crops from these farmyard spaces at any time."
+      "You can plant <GRAIN> or <VEGETABLE> on up to 2 unused farmyard spaces. Even if you do, these farmyard spaces are not considered <FIELD> but still unused. You can discard crops from these farmyard spaces at any time."
     ],
     "cost": {},
     "prerequisite": "2 Fields",
@@ -15497,7 +15497,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 112,
     "category": "CROP_PROVIDER",
     "desc": [
-      "Each time before you take the \"Cut Peat\" special action, you can place 1 additional crop of the same type on all fields and farmyard spaces containing grain or vegetables. Do not place any crops on empty fields and farmyard spaces."
+      "Each time before you take the __Cut Peat__ special action, you can place 1 additional crop of the same type on all <FIELD> and farmyard spaces containing <GRAIN> or <VEGETABLE>. Do not place any crops on empty <FIELD> and farmyard spaces."
     ],
     "cost": {
       "vegetable": 1
@@ -15532,7 +15532,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 114,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "With this card, each time you use the \"Fishing\" accumulation space, you also get 1 wood for each of your farmyard spaces containing at least 1 forest, up to a maximum of 3 wood."
+      "With this card, each time you use the __Fishing__ accumulation space, you also get 1 <WOOD> for each of your farmyard spaces containing at least 1 <FOREST>, up to a maximum of 3 <WOOD>."
     ],
     "cost": {},
     "prerequisite": "3 Major Improvements",
@@ -15547,7 +15547,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 wood. Each time you turn wild boar, cattle, or horses into food, you get 1 additional wood for each of these animals that you turn."
+      "When you play this card, you immediately get 2 <WOOD>. Each time you turn <<PIG>>, <CATTLE>, or <HORSE> into <FOOD>, you get 1 additional <WOOD> for each of these animals that you turn."
     ],
     "cost": {
       "vegetable": 1
@@ -15564,7 +15564,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 116,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take the \"Cut Peat\" special action, you also get 2 wood."
+      "Each time you take the __Cut Peat__ special action, you also get 2 <WOOD>."
     ],
     "cost": {
       "vegetable": 2
@@ -15589,7 +15589,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 117,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take exactly 3 or at least 4 wood from an accumulation space, if you have at least 1 horse, you can pay exactly 1 food to get 1 or 2 additional wood, respectively."
+      "Each time you take exactly 3 or at least 4 <WOOD> from an accumulation space, if you have at least 1 <HORSE>, you can pay exactly 1 <FOOD> to get 1 or 2 additional <WOOD>, respectively."
     ],
     "cost": {},
     "implemented": true,
@@ -15603,7 +15603,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 118,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take the \"Fell Trees\" special action or take at least 4 wood from an accumulation space, you get 1 additional wood. If you pay 1 fuel, you get 2 additional wood instead of 1."
+      "Each time you take the __Fell Trees__ special action or take at least 4 <WOOD> from an accumulation space, you get 1 additional <WOOD>. If you pay 1 <FUEL>, you get 2 additional <WOOD> instead of 1."
     ],
     "cost": {
       "clay": 3,
@@ -15621,7 +15621,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 119,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take the \"Fell Trees\" special action, you also get your choice of 1 wood or 1 reed."
+      "Each time you take the __Fell Trees__ special action, you also get your choice of 1 <WOOD> or 1 <REED>."
     ],
     "cost": {
       "vegetable": 2
@@ -15639,7 +15639,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 120,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use the \"Fishing\" accumulation space, you also get 2 clay."
+      "Each time you use the __Fishing__ accumulation space, you also get 2 <CLAY>."
     ],
     "cost": {},
     "prerequisite": "1 Major Improvement",
@@ -15654,7 +15654,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 121,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "In each work phase, if you have placed all but one of your people when taking the \"Hiring Fair\" special action, you also get 1 clay."
+      "In each work phase, if you have placed all but one of your people when taking the __Hiring Fair__ special action, you also get 1 <CLAY>."
     ],
     "cost": {},
     "prerequisite": "1 Improvement",
@@ -15669,7 +15669,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 122,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take the \"Fell Trees\" special action, you also get 1 reed."
+      "Each time you take the __Fell Trees__ special action, you also get 1 <REED>."
     ],
     "cost": {},
     "prerequisite": "1 Major Improvement",
@@ -15691,7 +15691,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 123,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Place 5 stone--only 3 stone in 3-player games--on this card. Each time you take the \"Hiring Fair\" special action, you also get 1 stone from this card."
+      "Place 5 <STONE>--only 3 <STONE> in 3-player games--on this card. Each time you take the __Hiring Fair__ special action, you also get 1 <STONE> from this card."
     ],
     "cost": {
       "vegetable": 3
@@ -15708,7 +15708,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 124,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you use the \"Day Laborer\" action space, you also get 1 stone."
+      "Each time you use the __Day Laborer__ action space, you also get 1 <STONE>."
     ],
     "cost": {
       "wood": 2
@@ -15742,7 +15742,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 126,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Place 4 usage counters on this card. At any time, you can return 1 usage counter from this card plus 1 building resource of your choice to get 1 of any other building resource except stone."
+      "Place 4 usage counters on this card. At any time, you can return 1 usage counter from this card plus 1 building resource of your choice to get 1 of any other building resource except <STONE>."
     ],
     "cost": {
       "wood": 2,
@@ -15760,7 +15760,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 127,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "Each time you take at least 4 of the same building resource from an accumulation space, you also get 1 fuel. Each time you take the \"Cut Peat\" special action, you also get 1 building resource of your choice."
+      "Each time you take at least 4 of the same building resource from an accumulation space, you also get 1 <FUEL>. Each time you take the __Cut Peat__ special action, you also get 1 building resource of your choice."
     ],
     "cost": {
       "wood": 2
@@ -15777,7 +15777,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 128,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "In the field phase of each harvest at the end of rounds 13 and 14, you get 3 wood, 2 clay, and 1 reed. You can use these, for example, to earn bonus points from the Joinery, Pottery, or Basketmaker's Workshop."
+      "In the field phase of each harvest at the end of rounds 13 and 14, you get 3 <WOOD>, 2 <CLAY>, and 1 <REED>. You can use these, for example, to earn bonus <SCORE> from the Joinery, Pottery, or Basketmaker's Workshop."
     ],
     "cost": {
       "wood": 2
@@ -15797,7 +15797,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 129,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use the \"Farmland\" or \"Cultivation\" action space, you can also buy exactly 1 horse for 1 food."
+      "Each time you use the __Farmland__ or __Cultivation__ action space, you can also buy exactly 1 <HORSE> for 1 <FOOD>."
     ],
     "cost": {
       "clay": 1
@@ -15815,7 +15815,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 130,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use the \"Grain Seeds\" action space, you also get 1 horse."
+      "Each time you use the __Grain Seeds__ action space, you also get 1 <HORSE>."
     ],
     "cost": {
       "vegetable": 1
@@ -15832,7 +15832,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 131,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Add 2, 4, 6, and 8 to the current round and place 1 animal of your choice on each corresponding round space. All the animals must be different. At the start of these rounds, you can buy the respective animal for 1 food."
+      "Add 2, 4, 6, and 8 to the current round and place 1 animal of your choice on each corresponding round space. All the animals must be different. At the start of these rounds, you can buy the respective animal for 1 <FOOD>."
     ],
     "cost": {
       "wood": 2,

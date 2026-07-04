@@ -46,7 +46,7 @@ export const B108_OvenFiringBoy = defineOccupationCard({
     number: 108,
     category: 'FOOD_PROVIDER',
     desc: [
-        'Each time you use a wood accumulation space, you get an additional __Bake Bread__ action.',
+        'Each time you use a <WOOD> accumulation space, you get an additional __Bake Bread__ action.',
       ],
     cost: {},
     players: '1+',

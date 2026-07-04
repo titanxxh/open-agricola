@@ -46,7 +46,7 @@ export const M094_PeatBath = defineMinorCard({
     number: 94,
     category: "FOOD_PROVIDER",
     desc: [
-        "Each time you use the \"Infirmary\" action space, place 1 food on as many of the next round spaces as there are moors visible on your farmyard board. At the start of these rounds, you get the food."
+        "Each time you use the \"Infirmary\" action space, place 1 <FOOD> on as many of the next round spaces as there are <MOOR> visible on your farmyard board. At the start of these rounds, you get the <FOOD>."
     ],
     cost: {
         "wood": 1,

@@ -41,7 +41,7 @@ export const E114_ShedBuilder = defineOccupationCard({
     number: 114,
     category: 'CROPS_-_GRAIN_AND_VEGETABLE',
     desc: [
-        'When you build your 1st and 2nd stable, you get 1 <GRAIN>. When you build your 3rd and 4th stable, you get 1 <VEGETABLE>. (This does not apply to stables you have already built.)',
+        'When you build your 1st and 2nd <STABLE>, you get 1 <GRAIN>. When you build your 3rd and 4th <STABLE>, you get 1 <VEGETABLE>. (This does not apply to <STABLE> you have already built.)',
       ],
     cost: {},
     players: '1+',

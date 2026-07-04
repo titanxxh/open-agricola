@@ -74,7 +74,7 @@ export const M032_PeatHut = defineMinorCard({
     number: 32,
     category: "FARM_PLANNER",
     desc: [
-        "This card provides room for one person. In the feeding phase of each harvest, it must be heated with 1 <FUEL>. Instead of a \"Renovation\" action, you can remove this card from play and add 1 wooden room to your wood house at no cost."
+        "This card provides room for one person. In the feeding phase of each harvest, it must be heated with 1 <FUEL>. Instead of a __Renovation__ action, you can remove this card from play and add 1 wooden room to your wood house at no cost."
     ],
     cost: {
         "fuel": 5,

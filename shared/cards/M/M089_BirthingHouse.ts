@@ -36,7 +36,7 @@ export const M089_BirthingHouse = defineMinorCard({
     number: 89,
     category: "GOODS_PROVIDER",
     desc: [
-        "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 fuel, 1 food, and 1 bonus point."
+        "Immediately after each time you take a \"Family Growth\" action with or without room, you get 1 <FUEL>, 1 <FOOD>, and 1 bonus <SCORE>."
     ],
     cost: {
         "clay": 2,

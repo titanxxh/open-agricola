@@ -35,7 +35,7 @@ export const A038_WoolBlankets = defineMinorCard({
     deck: "A",
     number: 38,
     category: "POINTS_PROVIDER",
-    desc: ["During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."],
+    desc: ["During scoring, if you live in a wooden/<CLAY>/stone house by then, you get 3/2/0 bonus <SCORE>."],
     cost: {},
     prerequisite: "5 Sheep",
     extraVp: true,

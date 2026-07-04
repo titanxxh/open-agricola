@@ -44,7 +44,7 @@ export const B113_PatchCaregiver = defineOccupationCard({
     deck: 'B',
     number: 113,
     category: 'CROP_PROVIDER',
-    desc: ['When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a field.'],
+    desc: ['When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a <FIELD>.'],
     cost: {},
     players: '1+',
     isField: true,

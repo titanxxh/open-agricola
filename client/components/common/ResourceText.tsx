@@ -43,6 +43,8 @@ const RESOURCE_TAGS: Record<string, string> = {
   // ── Action / farm iconography ──
   BAKE: 'bake', // BGA meeple-bake: bread-baking action icon
   FIELD: 'field',
+  FOREST: 'forest',
+  MOOR: 'moor',
   FENCE: 'fence-icon',
   GRAIN_VEG_STACK: 'grain-veg-stack',
 }

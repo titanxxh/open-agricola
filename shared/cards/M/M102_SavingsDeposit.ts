@@ -42,7 +42,7 @@ export const M102_SavingsDeposit = defineMinorCard({
     number: 102,
     category: "FOOD_PROVIDER",
     desc: [
-        "At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the amount of clay you have, you immediately get 6 food. Then pass this card to the player on your left, who adds it to their hand."
+        "At the start of each harvest, shuffle all start cards and draw one. If its number is equal to or lower than the amount of <CLAY> you have, you immediately get 6 <FOOD>. Then pass this card to the player on your left, who adds it to their hand."
     ],
     cost: {
         "vegetable": 2

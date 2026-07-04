@@ -29,7 +29,7 @@ export const M071_BogBody = defineMinorCard({
     number: 71,
     category: "POINTS_PROVIDER",
     desc: [
-        "During scoring, the owner of the Museum of the Moors and the owner of the Living History Museum each get 1 bonus point. The Museum of the Moors is a major improvement; the Living History Museum is a minor improvement."
+        "During scoring, the owner of the Museum of the Moors and the owner of the Living History Museum each get 1 bonus <SCORE>. The Museum of the Moors is a major improvement; the Living History Museum is a minor improvement."
     ],
     cost: {},
     vp: 1,

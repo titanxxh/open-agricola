@@ -30,7 +30,7 @@ export const M124_StoneWagon = defineMinorCard({
     number: 124,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you use the \"Day Laborer\" action space, you also get 1 stone."
+        "Each time you use the __Day Laborer__ action space, you also get 1 <STONE>."
     ],
     cost: {
         "wood": 2

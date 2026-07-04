@@ -153,7 +153,7 @@ export const D180_PartTimeWorker = defineOccupationCard({
     deck: 'D',
     number: 180,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 sheep/wild boar/cattle.'],
+    desc: ['Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 <SHEEP>/<<PIG>>/<CATTLE>.'],
     cost: {},
     players: '5+',
   },

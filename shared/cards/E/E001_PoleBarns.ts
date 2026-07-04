@@ -25,7 +25,7 @@ export const E001_PoleBarns = defineMinorCard({
     deck: 'E',
     number: 1,
     category: 'PASSING_-_FARMYARD',
-    desc: ['You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)'],
+    desc: ['You can immediately build up to 3 <STABLE> at no cost. (You must pay the cost of this card though.)'],
     cost: { wood: 2 },
     passing: true,
     prerequisite: '15 Fences Built',

@@ -97,7 +97,7 @@ export const D001_ZigzagHarrow = defineMinorCard({
     deck: 'D',
     number: 1,
     category: 'FARM_PLANNER',
-    desc: ['You can immediately plow 1 field such that it completes a "zigzag" pattern.'],
+    desc: ['You can immediately plow 1 <FIELD> such that it completes a "zigzag" pattern.'],
     cost: { wood: 1 },
     prerequisite: '3 Fields in an "L" Shape',
     passing: true,

@@ -39,7 +39,7 @@ export const A052_ThrowingAxe = defineMinorCard({
     deck: 'A',
     number: 52,
     category: 'FOOD_PROVIDER',
-    desc: ['Each time you use a wood accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>.'],
+    desc: ['Each time you use a <WOOD> accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>.'],
     cost: { wood: 1 },
     prerequisite: 'Play in Round 7 or Later',
   },

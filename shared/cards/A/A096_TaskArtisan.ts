@@ -63,7 +63,7 @@ export const A096_TaskArtisan = defineOccupationCard({
     number: 96,
     category: 'ACTIONS_BOOSTER',
     desc: [
-        'When you play this card and each time a stone accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action.',
+        'When you play this card and each time a <STONE> accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action.',
       ],
     cost: {},
     players: '1+',

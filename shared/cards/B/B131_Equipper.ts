@@ -39,7 +39,7 @@ export const B131_Equipper = defineOccupationCard({
     deck: 'B',
     number: 131,
     category: 'ACTIONS_BOOSTER',
-    desc: ['Immediately after each time you use a wood accumulation space, you can play a minor improvement.'],
+    desc: ['Immediately after each time you use a <WOOD> accumulation space, you can play a minor improvement.'],
     cost: {},
     players: '3+',
   },

@@ -46,7 +46,7 @@ export const M107_PotRoastRecipe = defineMinorCard({
     number: 107,
     category: "FOOD_PROVIDER",
     desc: [
-        "At any time, you can use your \"Fireplace\" and \"Cooking Hearth\" major improvements to turn 1 horse into 2 food."
+        "At any time, you can use your \"Fireplace\" and \"Cooking Hearth\" major improvements to turn 1 <HORSE> into 2 <FOOD>."
     ],
     cost: {},
     prerequisite: "2 Horses",

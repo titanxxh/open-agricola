@@ -49,7 +49,7 @@ export const B168_PastureMaster = defineOccupationCard({
     number: 168,
     category: 'LIVESTOCK_PROVIDER',
     desc: [
-        'Each time you renovate, you get 2 <FOOD> and 1 additional animal of the respective type in each of your pastures with stable.',
+        'Each time you renovate, you get 2 <FOOD> and 1 additional animal of the respective type in each of your pastures with <STABLE>.',
       ],
     cost: {},
     players: '4+',

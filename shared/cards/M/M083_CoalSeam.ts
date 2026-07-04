@@ -34,7 +34,7 @@ export const M083_CoalSeam = defineMinorCard({
     number: 83,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "When you play this card, you immediately get 1 fuel. Each time you take the \"Hiring Fair\" special action or use the \"Day Laborer\" action space, you also get 1 fuel."
+        "When you play this card, you immediately get 1 <FUEL>. Each time you take the __Hiring Fair__ special action or use the __Day Laborer__ action space, you also get 1 <FUEL>."
     ],
     cost: {
         "wood": 1,

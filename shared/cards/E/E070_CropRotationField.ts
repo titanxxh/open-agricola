@@ -33,7 +33,7 @@ export const E070_CropRotationField = defineMinorCard({
     number: 70,
     category: 'CROPS_-_VEGETABLE',
     desc: [
-        'This card is a field. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
+        'This card is a <FIELD>. Each time you remove the last <GRAIN> or <VEGETABLE> from this card, you can immediately sow <VEGETABLE> or <GRAIN> on this card, respectively.',
       ],
     cost: {},
     prerequisite: '1 Occupation',

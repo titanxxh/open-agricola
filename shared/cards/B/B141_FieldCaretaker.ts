@@ -45,7 +45,7 @@ export const B141_FieldCaretaker = defineOccupationCard({
     deck: 'B',
     number: 141,
     category: 'CROP_PROVIDER',
-    desc: ['When you play this card, you can immediately exchange 0/1/3 <CLAY> for 1/2/3 <GRAIN>. This card is a field.'],
+    desc: ['When you play this card, you can immediately exchange 0/1/3 <CLAY> for 1/2/3 <GRAIN>. This card is a <FIELD>.'],
     cost: {},
     players: '3+',
     isField: true,

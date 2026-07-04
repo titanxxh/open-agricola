@@ -23,7 +23,7 @@ export const A098_StableArchitect = defineOccupationCard({
     deck: "A",
     number: 98,
     category: "POINTS_PROVIDER",
-    desc: ["During scoring, you get 1 bonus <SCORE> for each unfenced stable in your farmyard."],
+    desc: ["During scoring, you get 1 bonus <SCORE> for each unfenced <STABLE> in your farmyard."],
     cost: {},
     players: "1+",
     extraVp: true,

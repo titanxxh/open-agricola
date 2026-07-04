@@ -49,7 +49,7 @@ export const D148_DomesticianExpert = defineOccupationCard({
     name: 'Domestician Expert',
     deck: 'D',
     number: 148,
-    desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
+    desc: ['You can keep 2 <SHEEP> on the border between each pair of orthogonally adjacent rooms.'],
     cost: {},
     players: '4+',
     category: 'FARM_PLANNER',

@@ -37,7 +37,7 @@ export const M068_Church = defineMinorCard({
     number: 68,
     category: "POINTS_PROVIDER",
     desc: [
-        "Returning home phase: once, you can pay 1 <FUEL> to get 1 bonus point. When you build this upgrade, you immediately get 2 food. The Village Church starts under the Well."
+        "Returning home phase: once, you can pay 1 <FUEL> to get 1 bonus <SCORE>. When you build this upgrade, you immediately get 2 <FOOD>. The Village Church starts under the Well."
     ],
     cost: {},
     vp: 5,

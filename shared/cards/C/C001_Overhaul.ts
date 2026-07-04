@@ -64,7 +64,7 @@ export const C001_Overhaul = defineMinorCard({
     deck: 'C',
     number: 1,
     category: 'FARM_PLANNER',
-    desc: ['Immediately raze all of your fences, add up to 3 fences from your supply, and rebuild them. (You do not lose any animals during this.)'],
+    desc: ['Immediately raze all of your <FENCE>, add up to 3 <FENCE> from your supply, and rebuild them. (You do not lose any animals during this.)'],
     cost: { wood: 1 },
     prerequisite: '2 Occupations',
     occupationPrerequisites: { min: 2 },

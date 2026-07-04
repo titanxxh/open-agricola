@@ -32,7 +32,7 @@ export const M066_LandParcel = defineMinorCard({
     number: 66,
     category: "POINTS_PROVIDER",
     desc: [
-        "Place 1 forest on an unused farmyard space. During scoring, if you have 1/2/3+ unused farmyard spaces, you get +2/-1/-3 bonus points on top of the negative points for the unused spaces."
+        "Place 1 <FOREST> on an unused farmyard space. During scoring, if you have 1/2/3+ unused farmyard spaces, you get +2/-1/-3 bonus <SCORE> on top of the negative points for the unused spaces."
     ],
     cost: {},
     extraVp: true,

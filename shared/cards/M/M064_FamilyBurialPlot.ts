@@ -63,7 +63,7 @@ export const M064_FamilyBurialPlot = defineMinorCard({
     number: 64,
     category: "POINTS_PROVIDER",
     desc: [
-        "When you play this card, you can immediately place the \"Tombstone\" token on an unused farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus point."
+        "When you play this card, you can immediately place the \"Tombstone\" token on an unused farmyard space. That space counts as used but it is blocked for the rest of the game. During scoring, it is worth 1 additional bonus <SCORE>."
     ],
     cost: {
         "stone": 1

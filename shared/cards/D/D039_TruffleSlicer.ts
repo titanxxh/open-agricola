@@ -51,7 +51,7 @@ export const D039_TruffleSlicer = defineMinorCard({
     deck: 'D',
     number: 39,
     category: 'POINTS_PROVIDER',
-    desc: ['Each time you use a wood accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
+    desc: ['Each time you use a <WOOD> accumulation space, if you have at least 1 <PIG>, you can pay 1 <FOOD> for 1 bonus <SCORE>.'],
     cost: { wood: 1 },
     prerequisite: 'Play in Round 8 or Later',
     extraVp: true,

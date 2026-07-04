@@ -24,7 +24,7 @@ export const C174_StoneCustodian = defineOccupationCard({
     deck: 'C',
     number: 174,
     category: 'CROP_PROVIDER',
-    desc: ['At the end of each work phase, if 1 stone accumulation space has stone left, you get 1 grain If 2 stone accumulation spaces have stone left, you get 1 vegetable instead.'],
+    desc: ['At the end of each work phase, if 1 <STONE> accumulation space has <STONE> left, you get 1 <GRAIN> If 2 <STONE> accumulation spaces have <STONE> left, you get 1 <VEGETABLE> instead.'],
     cost: {},
     players: '5+',
   },

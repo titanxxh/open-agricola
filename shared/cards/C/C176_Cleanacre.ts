@@ -29,7 +29,7 @@ export const C176_Cleanacre = defineOccupationCard({
     deck: 'C',
     number: 176,
     category: 'BUILDING_RESOURCE_PROVIDER',
-    desc: ['Each time you use the "Farmland", "Cultivation", or "Farming Supplies" action (the latter only being available with 6 players), you also get 2 clay.'],
+    desc: ['Each time you use the __Farmland__, __Cultivation__, or __Farm Supplies__ action (the latter only being available with 6 players), you also get 2 <CLAY>.'],
     cost: {},
     players: '5+',
   },

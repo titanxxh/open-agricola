@@ -34,7 +34,7 @@ export const Major_Moor_PeatCharcoalKiln = defineMajorCard({
       { actionId: 'cut-peat', resource: 'fuel', amount: 1, horseAmount: 2 },
     ],
     desc: [
-      '[Special action: Cut Peat]',
+      '[Special action: __Cut Peat__]',
       '+1<FUEL> if you have 0<HORSE>; +2<FUEL> if you have at least 1<HORSE>.',
       '[Scoring]',
       '3/5<FUEL> <ARROW-1X> 1/2<SCORE>',

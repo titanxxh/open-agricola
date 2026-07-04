@@ -60,7 +60,7 @@ export const A072_CalciumFertilizers = defineMinorCard({
     deck: "A",
     number: 72,
     category: "CROP_PROVIDER",
-    desc: ["Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted fields growing a single type of crop."],
+    desc: ["Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted <FIELD> growing a single type of crop."],
     cost: {},
     prerequisite: "No Field Tiles",
   },

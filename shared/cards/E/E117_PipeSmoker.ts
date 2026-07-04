@@ -28,7 +28,7 @@ export const E117_PipeSmoker = defineOccupationCard({
     deck: "E",
     number: 117,
     category: "BUILDING_RESOURCES_-_WOOD",
-    desc: ['At the start of each harvest, if you have at least 1 grain field, you get 2\u00a0<WOOD>.'],
+    desc: ['At the start of each harvest, if you have at least 1 <GRAIN> <FIELD>, you get 2 <WOOD>.'],
     cost: {},
     players: "1+",
   },

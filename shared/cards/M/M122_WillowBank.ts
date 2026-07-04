@@ -17,7 +17,7 @@ export const M122_WillowBank = defineMinorCard({
     number: 122,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you take the \"Fell Trees\" special action, you also get 1 reed."
+        "Each time you take the __Fell Trees__ special action, you also get 1 <REED>."
     ],
     cost: {},
     prerequisite: "1 Major Improvement",

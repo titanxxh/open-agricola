@@ -48,7 +48,7 @@ export const M018_RegisterOfCraftsmen = defineMinorCard({
     number: 18,
     category: "ACTIONS_BOOSTER",
     desc: [
-        "Immediately acquire your choice of the Joinery, Pottery, or Basketmaker's Workshop without placing a person. You pay 1 stone less for it."
+        "Immediately acquire your choice of the Joinery, Pottery, or Basketmaker's Workshop without placing a person. You pay 1 <STONE> less for it."
     ],
     cost: {},
     prerequisite: "2 Major Improvements",

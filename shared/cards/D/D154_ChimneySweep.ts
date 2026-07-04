@@ -38,7 +38,7 @@ export const D154_ChimneySweep = defineOccupationCard({
     number: 154,
     category: "POINTS_PROVIDER",
     desc: [
-        'Renovating to stone costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house.',
+        'Renovating to <STONE> costs you 2 <STONE> less. During scoring, you get 1 bonus <SCORE> for each other player living in a stone house.',
       ],
     cost: {},
     players: "4+",

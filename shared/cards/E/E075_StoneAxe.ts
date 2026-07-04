@@ -40,7 +40,7 @@ export const E075_StoneAxe = defineMinorCard({
     name: "Stone Axe",
     deck: "E",
     number: 75,
-    desc: ["Each time you use a wood accumulation space, you can return 1 <STONE> to the general supply to get an additional 3 <WOOD>."],
+    desc: ["Each time you use a <WOOD> accumulation space, you can return 1 <STONE> to the general supply to get an additional 3 <WOOD>."],
     cost: { wood: 1, clay: 1 },
     vp: 1,
     prerequisite: "2 Occupations",

@@ -37,7 +37,7 @@ export const A080_StoneTongs = defineMinorCard({
     number: 80,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "Each time you use a stone accumulation space, you get 1 additional <STONE>.",
+        "Each time you use a <STONE> accumulation space, you get 1 additional <STONE>.",
       ],
     cost: { wood: 1 },
   },
