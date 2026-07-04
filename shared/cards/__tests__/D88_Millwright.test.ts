@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import { D088_Millwright } from '../D/D088_Millwright'
 import type { CostModifier, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 
@@ -86,10 +86,9 @@ describe('D088_Millwright', () => {
   })
 
   it('construct replaces zero, one, or two building resources with one grain each', () => {
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       makePlayer(),
       { unitFee: { wood: 5, reed: 2 }, nb: 1 },
-      undefined,
       'construct',
     )
 

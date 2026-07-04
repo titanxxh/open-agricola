@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { canRenovate } from '../../shared/actions/effects/renovation'
-import {
-  applyCostModifiers,
-  computeAllBuyableCombinations,
-  getModifiersForCostType,
-} from '../../shared/actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import type { BonusModifier } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A087_Conservator'
@@ -35,6 +31,12 @@ const setupOwner = () => {
   return { session, state, player }
 }
 
+const c13RenovationModifiers = (player: ReturnType<typeof setupOwner>['player']) =>
+  player.activeModifiers.filter((modifier) =>
+    modifier.cardId === CARD_ID &&
+    modifier.type === 'bonus' &&
+    modifier.appliesTo.includes('renovation'))
+
 describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditions', () => {
   it('5 wood rooms → modifier surfaces and reduces required stone by 2', () => {
     const { player } = setupOwner()
@@ -46,7 +48,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     ]
     player.resources = { ...player.resources, reed: 5, stone: 3, clay: 0 }
 
-    const mods = getModifiersForCostType(player, 'renovation')
+    const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
     expect(mods[0]).toMatchObject({
       cardId: CARD_ID,
@@ -66,17 +68,14 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     ]
     player.resources = { ...player.resources, reed: 4, stone: 4, clay: 0 }
 
-    // T1.7: getModifiersForCostType uses static-only filter; minNumRooms
-    // is deferred to evaluateConditions(_, _, nb) inside enumerate.
-    const mods = getModifiersForCostType(player, 'renovation')
+    const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
 
     // End-to-end: 4 rooms wood→stone renovation. C13 condition
     // (minNumRooms:5) fails at the enumerate condition gate → no discount.
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       player,
       { fee: { stone: 4, reed: 1 } },
-      undefined,
       'renovation',
     )
     expect(sols.length).toBeGreaterThan(0)
@@ -88,8 +87,10 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     player.houseType = 'clay'
     player.rooms = 5
 
-    const mods = getModifiersForCostType(player, 'renovation')
-    expect(mods).toHaveLength(0)
+    player.resources = { ...player.resources, stone: 6, reed: 2 }
+    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    expect(sols.length).toBeGreaterThan(0)
+    expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
 
   it('houseType stone → modifier filtered out', () => {
@@ -97,8 +98,10 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     player.houseType = 'stone'
     player.rooms = 5
 
-    const mods = getModifiersForCostType(player, 'renovation')
-    expect(mods).toHaveLength(0)
+    player.resources = { ...player.resources, stone: 6, reed: 2 }
+    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
+    expect(sols.length).toBeGreaterThan(0)
+    expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })
 
   it('canRenovate path: with 5 wood rooms + 3 stone, can renovate (without discount would need clay anyway)', () => {
@@ -122,7 +125,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
     player.houseType = 'wood'
     player.rooms = 5
 
-    const mods = getModifiersForCostType(player, 'renovation')
+    const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(0)
   })
 })
@@ -130,9 +133,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
 describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E follow-up)', () => {
   // These cases verify the conditions chain end-to-end on the unified
   // ComplexCost.bonuses payment path. The C13 BonusModifier flows through:
-  //   getModifiersForCostType (static-only) → applyCostModifiers
-  //   (propagates nb-aware conditions to Bonus.conditions) →
-  //   computeAllBuyableCombinations (evaluateConditions(_, _, nb)).
+  //   active modifier → PaymentSolver.computeOptions().
   // The post-unification design preserves Bonus.conditions so the nb-aware
   // gate (minNumRooms) runs against the actual renovation/construct nb.
 
@@ -146,16 +147,9 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
     // renovation cost (matching wood→stone direct path that A87 Conservator
     // would surface). Without C13 the player would pay 5 stone; with C13 the
     // bonus path reduces it to 3.
-    const mods = getModifiersForCostType(player, 'renovation')
+    const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
-    const effective = applyCostModifiers({ fee: { stone: 5, reed: 1 } }, mods)
-    // Generated Bonus retains nb-aware conditions so enumerate can gate on
-    // minNumRooms against the actual nb (renovation nb defaults to player.rooms).
-    expect(effective.bonuses).toBeDefined()
-    expect(effective.bonuses!.length).toBe(1)
-    expect(effective.bonuses![0].conditions).toEqual({ houseTypeWood: 1, minNumRooms: 5 })
-
-    const sols = computeAllBuyableCombinations(player, { fee: { stone: 5, reed: 1 } }, undefined, 'renovation')
+    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
     expect(sols.length).toBeGreaterThan(0)
     // At least one solution applies the C13 discount → stone paid <= 3.
     expect(sols.some((s) => (s.resourcesPaid.stone ?? 0) <= 3)).toBe(true)
@@ -169,9 +163,9 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
 
     // T1.7: static-only filter at getModifiersForCostType (houseType passes).
     // The end-to-end check below verifies minNumRooms still gates the discount.
-    const mods = getModifiersForCostType(player, 'renovation')
+    const mods = c13RenovationModifiers(player)
     expect(mods).toHaveLength(1)
-    const sols = computeAllBuyableCombinations(player, { fee: { stone: 4, reed: 1 } }, undefined, 'renovation')
+    const sols = computePaymentOptionsForTest(player, { fee: { stone: 4, reed: 1 } }, 'renovation')
     // No bonus path → all solutions pay full stone (and full reed).
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 4)).toBe(true)
@@ -183,9 +177,7 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
     player.rooms = 5
     player.resources = { ...player.resources, stone: 6, reed: 2 }
 
-    const mods = getModifiersForCostType(player, 'renovation')
-    expect(mods).toHaveLength(0)
-    const sols = computeAllBuyableCombinations(player, { fee: { stone: 5, reed: 1 } }, undefined, 'renovation')
+    const sols = computePaymentOptionsForTest(player, { fee: { stone: 5, reed: 1 } }, 'renovation')
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
   })

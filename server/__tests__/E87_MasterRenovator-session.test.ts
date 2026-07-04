@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E087_MasterRenovator'
 
@@ -61,10 +61,9 @@ describe('E087_MasterRenovator session — chooseOne renovation discount', () =>
     const { state, player } = setup(7)
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     // wood→clay base cost: { clay: 2, reed: 1 } for 2 rooms
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       player,
       { fee: { clay: 2, reed: 1 } },
-      undefined,
       'renovation',
     )
     // Expect at least 4 distinct payment paths (one per building resource discount).

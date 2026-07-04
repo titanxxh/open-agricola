@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
+import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import type { PaymentSolution } from '../../shared/contract/types'
 import '../../shared/cards/E/E060_WorkingGloves'
 
@@ -48,10 +48,9 @@ describe('E060_WorkingGloves session — trade-style modifier on occupation cost
   it('cost-pipeline emits ≥5 PaymentSolution paths (base + 4 trade alternatives)', () => {
     const { player } = setup()
     // Simulate playing an occupation with cost { food: 2 }.
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       player,
       { fee: { food: 2 } },
-      undefined,
       'occupation',
     )
     expect(solutions.length).toBeGreaterThanOrEqual(5)
@@ -80,10 +79,9 @@ describe('E060_WorkingGloves session — trade-style modifier on occupation cost
     const { player } = setup()
     // Renovation cost: pay 2 clay + 1 reed. The 4 occupation trades must not
     // appear because their appliesTo doesn't include 'renovation'.
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       player,
       { fee: { clay: 1, reed: 1 } },
-      undefined,
       'renovation',
     )
     // All solutions should pay the literal cost (or be limited by what's
@@ -105,10 +103,9 @@ describe('E060_WorkingGloves session — trade-style modifier on occupation cost
       food: 0,
     }
 
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       player,
       { fee: { food: 4 } },
-      undefined,
       'occupation',
     )
 
@@ -126,10 +123,9 @@ describe('E060_WorkingGloves session — trade-style modifier on occupation cost
       food: 2,
     }
 
-    const solutions = computeAllBuyableCombinations(
+    const solutions = computePaymentOptionsForTest(
       player,
       { fee: { food: 4 } },
-      undefined,
       'occupation',
     )
 

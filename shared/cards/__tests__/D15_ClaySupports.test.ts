@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import { D015_ClaySupports } from '../../cards/D/D015_ClaySupports'
 import type { CostModifier, PlayerState } from '../../contract/types'
 
@@ -64,10 +64,9 @@ describe('D015_ClaySupports unit-scope trade migration', () => {
   })
 
   it('clay-house nb=2: scope:unit budget allows k∈{0,1,2} per-room swaps', () => {
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       makePlayer('clay'),
       { unitFee: { clay: 5, reed: 2 }, nb: 2 },
-      undefined,
       'construct',
     )
     const swapCounts = new Set(
@@ -78,10 +77,9 @@ describe('D015_ClaySupports unit-scope trade migration', () => {
   })
 
   it('clay-house nb=1: swap counts in {0,1} (single room)', () => {
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       makePlayer('clay'),
       { unitFee: { clay: 5, reed: 2 }, nb: 1 },
-      undefined,
       'construct',
     )
     const swapCounts = new Set(
@@ -99,10 +97,9 @@ describe('D015_ClaySupports unit-scope trade migration', () => {
   })
 
   it('wood-house: D15 trade filtered out by houseTypeClay condition', () => {
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       makePlayer('wood'),
       { unitFee: { wood: 5, reed: 2 }, nb: 1 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBeGreaterThan(0)
@@ -115,10 +112,9 @@ describe('D015_ClaySupports unit-scope trade migration', () => {
   })
 
   it('stone-house: D15 trade filtered out', () => {
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       makePlayer('stone'),
       { unitFee: { stone: 5, reed: 2 }, nb: 1 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBeGreaterThan(0)

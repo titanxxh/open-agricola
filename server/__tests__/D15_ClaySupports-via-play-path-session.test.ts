@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
 import { D015_ClaySupports } from '../../shared/cards/D/D015_ClaySupports'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
+import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
@@ -63,10 +63,9 @@ describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () 
     )
 
     // Construct enumeration for 1 clay room surfaces both base and D15 swap.
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       after,
       { unitFee: { clay: 5, reed: 2 }, nb: 1 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBeGreaterThan(0)

@@ -3,7 +3,7 @@ import { executeCardListener, getRegisteredCardListeners, type CardListenerConte
 import type { ActionSpace, ComplexCost, GameState, PlayerState } from '../../shared/contract/types'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 import { getMinorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
-import { isComplexCost } from '../../shared/actions/payment/internal'
+import { PaymentSolver } from '../../shared/actions/payment'
 
 import '../../shared/cards/D/D080_BrickHammer'
 import '../../shared/cards/D/D117_WoodExpert'
@@ -156,7 +156,7 @@ describe('printed improvement cost listeners', () => {
       'E030_ChildsToy',
     )
 
-    expect(isComplexCost(result?.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(result?.cost)).toBe(true)
     const fees = (result?.cost as ComplexCost).fees ?? []
     const rows = fees.map((resources, index) => ({
       resources,

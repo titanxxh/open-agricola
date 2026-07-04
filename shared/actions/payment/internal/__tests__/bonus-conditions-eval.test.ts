@@ -4,12 +4,13 @@ import type {
   ComplexCost,
   PlayerState,
   Resource,
-} from '../../../contract/types'
+} from '../../../../contract/types'
 import {
   applyCostModifiers,
-  computeAllBuyableCombinations,
-  clearPaymentCache,
-} from '../../payment/internal'
+  getModifiersForCostType,
+} from '../cost-modifiers'
+import { computeAllBuyableCombinations } from '../enumerate'
+import { clearPaymentCache } from '../cache'
 
 beforeEach(() => {
   clearPaymentCache()

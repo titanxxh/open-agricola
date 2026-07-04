@@ -9,7 +9,8 @@ import type {
   Resource,
 } from '../../contract/types'
 import type { ActionHookResult } from '../../actions/hooks'
-import { buildConstructCost, computeAllBuyableCombinations } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
+import { computePaymentOptionsForTest } from '../../actions/payment/__tests__/test-helpers'
 import { runCardListeners } from '../card-listeners'
 import './setup-register-all'
 
@@ -104,7 +105,7 @@ const mergeCosts = (results: ActionHookResult[]): Partial<Resource> => {
 }
 
 const buildCost = (player: PlayerState, results: ActionHookResult[]): ComplexCost => {
-  const cost = buildConstructCost(player, mergeCosts(results), 1)
+  const cost = PaymentSolver.buildConstructCost(player, mergeCosts(results), 1)
   expect(cost).not.toBeNull()
   return {
     ...cost!,
@@ -140,7 +141,7 @@ const optionKey = (option: { resources: PaymentResourceMap; sources: string[] })
   JSON.stringify(option)
 
 const paymentOptions = (player: PlayerState, cost: ComplexCost) =>
-  computeAllBuyableCombinations(player, cost, undefined, 'construct')
+  computePaymentOptionsForTest(player, cost, 'construct')
     .map((solution) => ({
       resources: positiveResources(solution.resourcesPaid),
       sources: solutionSources(solution),

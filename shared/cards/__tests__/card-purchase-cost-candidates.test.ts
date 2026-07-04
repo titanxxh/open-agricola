@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ComplexCost, CostAttributionBySource, GameState, PlayerState } from '../../contract/types'
-import { isComplexCost, resolveCardCostWithModifiersDetailed } from '../../actions/payment/internal'
+import { PaymentSolver } from '../../actions/payment'
+import { resolveCardCostDetailedForTest } from '../../actions/payment/__tests__/test-helpers'
 import { getMinorImprovementPreviewCostDetailed } from '../../actions/helpers/improvement-helpers'
 import { setActiveWorkerCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -103,12 +104,12 @@ describe('card-purchase cost candidate cards', () => {
     [...rows].sort((a, b) => (rowKey(a) < rowKey(b) ? -1 : rowKey(a) > rowKey(b) ? 1 : 0))
 
   const expectFeesAndSources = (
-    result: ReturnType<typeof resolveCardCostWithModifiersDetailed>,
+    result: ReturnType<typeof resolveCardCostDetailedForTest>,
     fees: NonNullable<ComplexCost['fees']>,
     sourcesByFeeIndex: Record<number, string[]>,
     attributionByFeeIndex: Record<number, CostAttributionBySource> = {},
   ) => {
-    expect(isComplexCost(result.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(result.cost)).toBe(true)
     const cost = result.cost as ComplexCost
     expect(cost.bonuses).toBeUndefined()
     expect(cost.trades).toBeUndefined()
@@ -192,7 +193,7 @@ describe('card-purchase cost candidate cards', () => {
     for (const entry of cases) {
       const player = createPlayer()
       player[entry.playedZone] = [entry.source]
-      const result = resolveCardCostWithModifiersDetailed(
+      const result = resolveCardCostDetailedForTest(
         createState(player),
         player,
         'improvement',
@@ -209,14 +210,14 @@ describe('card-purchase cost candidate cards', () => {
     player.rooms = 4
     const state = createState(player)
 
-    const major = resolveCardCostWithModifiersDetailed(
+    const major = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       'Major_Joinery',
       { fees: [{ stone: 1 }, { stone: 3 }] },
     )
-    expect(isComplexCost(major.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(major.cost)).toBe(true)
     const majorCost = major.cost as ComplexCost
     const majorRows = (majorCost.fees ?? []).map((resources, index) => ({
       resources,
@@ -230,7 +231,7 @@ describe('card-purchase cost candidate cards', () => {
         { resources: { stone: 1 }, meta: ['B095_MasterBricklayer'] },
       ]))
 
-    const minor = resolveCardCostWithModifiersDetailed(
+    const minor = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -246,21 +247,21 @@ describe('card-purchase cost candidate cards', () => {
     player.minorPlayed = ['C027_Blueprint']
     const state = createState(player)
 
-    const allowed = resolveCardCostWithModifiersDetailed(
+    const allowed = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
       'Major_Joinery',
       { wood: 2, stone: 2 },
     )
-    expect(isComplexCost(allowed.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(allowed.cost)).toBe(true)
     expect((allowed.cost as ComplexCost).fees).toEqual([
       { wood: 2, stone: 2 },
       { wood: 2, stone: 1 },
     ])
     expect(allowed.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['C027_Blueprint'])
 
-    const other = resolveCardCostWithModifiersDetailed(
+    const other = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -276,7 +277,7 @@ describe('card-purchase cost candidate cards', () => {
     player.occupationPlayed = ['D096_Furnisher']
     const state = createState(player)
 
-    const triggered = resolveCardCostWithModifiersDetailed(
+    const triggered = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -284,11 +285,11 @@ describe('card-purchase cost candidate cards', () => {
       { wood: 1 },
       'D096_Furnisher',
     )
-    expect(isComplexCost(triggered.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(triggered.cost)).toBe(true)
     expect((triggered.cost as ComplexCost).fees).toEqual([{ wood: 1 }, {}])
     expect(triggered.candidateMetadataByFeeIndex?.[1]?.sources).toEqual(['D096_Furnisher'])
 
-    const ordinary = resolveCardCostWithModifiersDetailed(
+    const ordinary = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -308,16 +309,16 @@ describe('card-purchase cost candidate cards', () => {
 
     state.round = 3
     const earlyPlow = getMinorImprovementPreviewCostDetailed(state, player, 'A020_DoubleTurnPlow')
-    expect(isComplexCost(earlyPlow?.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(earlyPlow?.cost)).toBe(true)
     expect((earlyPlow?.cost as ComplexCost).fees).toEqual([{ grain: 1, food: 0 }])
 
     state.round = 4
     const latePlow = getMinorImprovementPreviewCostDetailed(state, player, 'A020_DoubleTurnPlow')
-    expect(isComplexCost(latePlow?.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(latePlow?.cost)).toBe(true)
     expect((latePlow?.cost as ComplexCost).fees).toEqual([{ grain: 1, food: 1 }])
 
     const bottles = getMinorImprovementPreviewCostDetailed(state, player, 'B036_Bottles')
-    expect(isComplexCost(bottles?.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(bottles?.cost)).toBe(true)
     expect((bottles?.cost as ComplexCost).fees).toEqual([{ clay: 3, food: 3 }])
   })
 
@@ -326,7 +327,7 @@ describe('card-purchase cost candidate cards', () => {
     player.occupationPlayed = ['D117_WoodExpert']
     const state = createState(player)
 
-    const result = resolveCardCostWithModifiersDetailed(
+    const result = resolveCardCostDetailedForTest(
       state,
       player,
       'improvement',
@@ -334,7 +335,7 @@ describe('card-purchase cost candidate cards', () => {
       { fees: [{ wood: 1, clay: 1 }, { stone: 1 }, { wood: 3 }] },
     )
 
-    expect(isComplexCost(result.cost)).toBe(true)
+    expect(PaymentSolver.isComplexCost(result.cost)).toBe(true)
     const cost = result.cost as ComplexCost
     expect(sortedRows((cost.fees ?? []).map((resources) => ({ resources }))))
       .toEqual(sortedRows([

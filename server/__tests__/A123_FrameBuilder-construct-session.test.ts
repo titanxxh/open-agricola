@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
-import { getMaxBuildableRooms } from '../../shared/actions/payment/internal/room-payment'
-import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
+import { PaymentSolver } from '../../shared/actions/payment'
+import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import type { PlayerState } from '../../shared/contract/types'
 
 // Keep side-effect import referenced so registration runs.
@@ -59,11 +59,10 @@ const setup3RoomsClayHouse = (resources: Record<string, number>) => {
 describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.1.1)', () => {
   it('3 rooms no swap: {reed:6, clay:15} — affordable, k=0', () => {
     const { player } = setup3RoomsClayHouse({ clay: 15, reed: 6 })
-    expect(getMaxBuildableRooms(player)).toBe(3)
-    const sols = computeAllBuyableCombinations(
+    expect(PaymentSolver.getMaxBuildableRooms(player)).toBe(3)
+    const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBe(1)
@@ -76,11 +75,10 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
 
   it('3 rooms with 1 swap: {reed:6, clay:13, wood:1} affordable', () => {
     const { player } = setup3RoomsClayHouse({ clay: 13, reed: 6, wood: 1 })
-    expect(getMaxBuildableRooms(player)).toBe(3)
-    const sols = computeAllBuyableCombinations(
+    expect(PaymentSolver.getMaxBuildableRooms(player)).toBe(3)
+    const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
-      undefined,
       'construct',
     )
     // Both k=0 and k=1 enumerated, but only k=1 fits resources (clay only 13).
@@ -94,11 +92,10 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
 
   it('3 rooms with 3 swaps: {reed:6, clay:9, wood:3} affordable — A123 trade tagged with sourceId', () => {
     const { player } = setup3RoomsClayHouse({ clay: 9, reed: 6, wood: 3 })
-    expect(getMaxBuildableRooms(player)).toBe(3)
-    const sols = computeAllBuyableCombinations(
+    expect(PaymentSolver.getMaxBuildableRooms(player)).toBe(3)
+    const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
-      undefined,
       'construct',
     )
     const k3 = sols.find((s) => {
@@ -120,11 +117,10 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
     const { player } = setup3RoomsClayHouse({ clay: 7, reed: 6, wood: 4 })
     // 3-room cost requires clay ≥ 9 even after maximum 3 swaps; clay=7 falls
     // short, so the max buildable rooms is < 3.
-    expect(getMaxBuildableRooms(player)).toBeLessThan(3)
-    const sols = computeAllBuyableCombinations(
+    expect(PaymentSolver.getMaxBuildableRooms(player)).toBeLessThan(3)
+    const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { clay: 5, reed: 2 }, nb: 3 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBe(0)
@@ -136,10 +132,9 @@ describe('A123_FrameBuilder construct — per-room wood-for-clay swap (spec §7.
   it('wood house: A123 modifier filtered out — pure {wood:5, reed:2} per room', () => {
     const { player } = setup3RoomsClayHouse({ wood: 15, reed: 6 })
     ;(player as PlayerState).houseType = 'wood'
-    const sols = computeAllBuyableCombinations(
+    const sols = computePaymentOptionsForTest(
       player,
       { unitFee: { wood: 5, reed: 2 }, nb: 3 },
-      undefined,
       'construct',
     )
     expect(sols.length).toBe(1)
