@@ -392,7 +392,7 @@ const canCardZoneAcceptAnimal = (display: CardAnimalDisplay, animalType: AnimalT
   return true
 }
 
-export type FarmBoardProps = {
+export type FarmBoardView = {
   locale: Locale
   players: PlayerState[]
   currentPlayer: PlayerState
@@ -421,7 +421,6 @@ export type FarmBoardProps = {
   pendingPlowTile: FarmTilePosition | null
   positionSelectableSet: Set<string>
   pendingPositionSelections: Set<string>
-  togglePositionSelection: (tile: FarmTilePosition) => void
   pendingSowSelections: Record<string, PendingSowCrop>
   sowRemaining: Record<PendingSowCrop, number>
   sowSelectableMap: Map<string, PendingSowCrop[]>
@@ -450,20 +449,6 @@ export type FarmBoardProps = {
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
   fencePlacementMode?: 'fence' | 'palisade'
-  toggleRoomTile: (tile: FarmTilePosition) => void
-  toggleStableTile: (tile: FarmTilePosition) => void
-  toggleFarmHand: (tile: FarmTilePosition) => void
-  togglePlowTile: (tile: FarmTilePosition) => void
-  updateSowSelection: (tile: FarmTilePosition, value: string) => void
-  toggleFenceEdge: (edgeId: string) => void
-  adjustReorgAnimal: (
-    zoneId: string,
-    animalType: AnimalType,
-    delta: number,
-  ) => void
-  confirmAnimalReorg: () => void
-  cancelAnimalDiscardPrompt: () => void
-  setViewPlayerId: (value: string) => void
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
   isSelectingImprovementAny: boolean
@@ -479,7 +464,6 @@ export type FarmBoardProps = {
       resources: Partial<Resource>
     }[]
   >
-  resolveChoice: (value: string) => void
   isInteractive: boolean
   occupationHandSelection?: {
     kind: 'occupation-hand'
@@ -487,10 +471,34 @@ export type FarmBoardProps = {
     minSelections: number
     maxSelections: number
   }
-  onConfirmOccupationHandSelection?: (cardIds: string[]) => void
   infirmaryWorkerCount?: number
   highlightedFarmTileKeys?: ReadonlySet<string>
   highlightedFenceEdgeIds?: ReadonlySet<string>
+}
+
+export type FarmBoardActions = {
+  togglePositionSelection: (tile: FarmTilePosition) => void
+  toggleRoomTile: (tile: FarmTilePosition) => void
+  toggleStableTile: (tile: FarmTilePosition) => void
+  toggleFarmHand: (tile: FarmTilePosition) => void
+  togglePlowTile: (tile: FarmTilePosition) => void
+  updateSowSelection: (tile: FarmTilePosition, value: string) => void
+  toggleFenceEdge: (edgeId: string) => void
+  adjustReorgAnimal: (
+    zoneId: string,
+    animalType: AnimalType,
+    delta: number,
+  ) => void
+  confirmAnimalReorg: () => void
+  cancelAnimalDiscardPrompt: () => void
+  setViewPlayerId: (value: string) => void
+  resolveChoice: (value: string) => void
+  onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+}
+
+export type FarmBoardProps = {
+  view: FarmBoardView
+  actions: FarmBoardActions
 }
 
 type TooltipPosition = {
@@ -747,79 +755,82 @@ const ParentCardTile = ({
   )
 }
 
-export const FarmBoard = ({
-  locale,
-  players,
-  currentPlayer,
-  displayPlayer,
-  activePlayerId,
-  playerPanelSummary,
-  currentStartPlayerId,
-  nextStartPlayerId,
-  playedCards,
-  farmCells,
-  farmGridColumns = 11,
-  roomPositions,
-  fieldPositions,
-  fieldMap,
-  stablePositions,
-  pendingRoomSet,
-  pendingStableSet,
-  roomSelectableSet,
-  stableSelectableSet,
-  farmHandSelectableSet,
-  pendingFarmHandKey,
-  builtSpecialStableKeys,
-  maxStableSelections,
-  plowSelectableSet,
-  pendingPlowTile,
-  positionSelectableSet,
-  pendingPositionSelections,
-  togglePositionSelection,
-  pendingSowSelections,
-  sowRemaining,
-  sowSelectableMap,
-  extraSowTargets,
-  pastureTiles,
-  pastureDisplayMap,
-  pastureCapacityMap,
-  houseDisplay,
-  stableDisplayMap,
-  cardDisplayMap = new Map(),
-  farmCardDisplayMap = new Map(),
-  borrowedPlayedCardDisplays = [],
-  isReorgActive,
-  reorgRemaining,
-  pendingFenceSet,
-  pendingFenceSourceMap,
-  pendingPalisadeSet,
-  existingFenceSet,
-  fenceSelectableSet,
-  fencePlacementMode,
-  toggleRoomTile,
-  toggleStableTile,
-  toggleFarmHand,
-  togglePlowTile,
-  updateSowSelection,
-  toggleFenceEdge,
-  adjustReorgAnimal,
-  setViewPlayerId,
-  isSelectingMinor,
-  isSelectingOccupation,
-  isSelectingImprovementAny,
-  selectableMinorIds,
-  selectableOccupationIds,
-  cardAvailability,
-  futureCardResources,
-  resolveChoice,
-  devMode,
-  isInteractive,
-  occupationHandSelection,
-  onConfirmOccupationHandSelection,
-  infirmaryWorkerCount,
-  highlightedFarmTileKeys = new Set<string>(),
-  highlightedFenceEdgeIds = new Set<string>(),
-}: FarmBoardProps) => {
+export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
+  const {
+    locale,
+    players,
+    currentPlayer,
+    displayPlayer,
+    activePlayerId,
+    playerPanelSummary,
+    currentStartPlayerId,
+    nextStartPlayerId,
+    playedCards,
+    farmCells,
+    farmGridColumns = 11,
+    roomPositions,
+    fieldPositions,
+    fieldMap,
+    stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    farmHandSelectableSet,
+    pendingFarmHandKey,
+    builtSpecialStableKeys,
+    maxStableSelections,
+    plowSelectableSet,
+    pendingPlowTile,
+    positionSelectableSet,
+    pendingPositionSelections,
+    pendingSowSelections,
+    sowRemaining,
+    sowSelectableMap,
+    extraSowTargets,
+    pastureTiles,
+    pastureDisplayMap,
+    pastureCapacityMap,
+    houseDisplay,
+    stableDisplayMap,
+    cardDisplayMap = new Map(),
+    farmCardDisplayMap = new Map(),
+    borrowedPlayedCardDisplays = [],
+    isReorgActive,
+    reorgRemaining,
+    pendingFenceSet,
+    pendingFenceSourceMap,
+    pendingPalisadeSet,
+    existingFenceSet,
+    fenceSelectableSet,
+    fencePlacementMode,
+    isSelectingMinor,
+    isSelectingOccupation,
+    isSelectingImprovementAny,
+    selectableMinorIds,
+    selectableOccupationIds,
+    cardAvailability,
+    futureCardResources,
+    devMode,
+    isInteractive,
+    occupationHandSelection,
+    infirmaryWorkerCount,
+    highlightedFarmTileKeys = new Set<string>(),
+    highlightedFenceEdgeIds = new Set<string>(),
+  } = view
+  const {
+    togglePositionSelection,
+    toggleRoomTile,
+    toggleStableTile,
+    toggleFarmHand,
+    togglePlowTile,
+    updateSowSelection,
+    toggleFenceEdge,
+    adjustReorgAnimal,
+    setViewPlayerId,
+    resolveChoice,
+    onConfirmOccupationHandSelection,
+  } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
