@@ -5,6 +5,7 @@ import type {
   FarmTilePosition,
   GameState,
   InteractionAnimalReorgZone,
+  InteractionFarmSelection,
   InteractionSelection,
   PlayerState,
 } from '../../shared/contract/types'
@@ -12,9 +13,10 @@ import {
   getAdjacentTilesForEdge,
   getFarmyardBounds,
   getFarmyardTileKeySet,
+  parsePositionKey,
   positionKey,
 } from '../../shared/domain/farm'
-import type { AnimalReorgState, PendingAnimalReorg } from '../types/ui'
+import type { AnimalReorgState, ExtraSowTarget, PendingAnimalReorg, PendingSowCrop } from '../types/ui'
 import {
   buildBorrowedPlayedCardDisplays,
   buildCardDisplayMap,
@@ -48,7 +50,18 @@ export type FarmBoardProjection = {
   roomPositions: Set<string>
   fieldMap: Map<string, FarmBoardProjectionFieldInfo>
   stablePositions: Set<string>
+  pendingRoomSet: Set<string>
+  pendingStableSet: Set<string>
+  roomSelectableSet: Set<string>
+  stableSelectableSet: Set<string>
+  farmHandSelectableSet: Set<string>
+  pendingFarmHandKey: string | null
+  builtSpecialStableKeys: Set<string>
+  positionSelectableSet: Set<string>
+  sowSelectableMap: Map<string, PendingSowCrop[]>
+  extraSowTargets: ExtraSowTarget[]
   existingFenceSet: Set<string>
+  fenceSelectableSet: Set<string>
   pastureTiles: Map<string, FarmBoardProjectionPastureTile>
   pastureDisplayMap: Map<string, FarmBoardProjectionAnimalDisplay>
   pastureCapacityMap: Map<string, number>
@@ -63,12 +76,21 @@ export type FarmBoardProjection = {
 export type FarmBoardProjectionInput = {
   displayPlayer: PlayerState | null | undefined
   interaction: ClientInteractionState
+  farmInteraction?: InteractionFarmSelection | null
   selectionInteraction: InteractionSelection | null | undefined
   players?: readonly Pick<PlayerState, 'id'>[]
   state?: GameState | null
   pastureCapacities?: Record<string, Record<string, number>>
   animalReorg?: AnimalReorgState | null
   pendingAnimalReorg?: PendingAnimalReorg | null
+  pendingRoomTiles?: readonly FarmTilePosition[]
+  pendingStableTiles?: readonly FarmTilePosition[]
+  pendingFarmHand?: FarmTilePosition | null
+  extraPositionSelectableSet?: ReadonlySet<string>
+}
+
+type DisplayPlayerWithSpecialStables = PlayerState & {
+  specialStables?: readonly { position: FarmTilePosition }[]
 }
 
 const emptyAnimalTotals = (): FarmBoardProjectionAnimalTotals =>
@@ -198,6 +220,56 @@ const buildPastureCapacityMap = (
   return map
 }
 
+const roomNeighborKeys = (key: string) => {
+  const tile = parsePositionKey(key)
+  if (!tile) return []
+  return [
+    `${tile.row - 1}-${tile.col}`,
+    `${tile.row + 1}-${tile.col}`,
+    `${tile.row}-${tile.col - 1}`,
+    `${tile.row}-${tile.col + 1}`,
+  ]
+}
+
+const getCurrentlySelectableRoomKeys = (
+  baseTiles: FarmTilePosition[],
+  existingRoomKeys: Set<string>,
+  pendingRoomKeys: Set<string>,
+): Set<string> => {
+  const anchors = new Set([...existingRoomKeys, ...pendingRoomKeys])
+  return new Set(
+    baseTiles
+      .map((tile) => positionKey(tile))
+      .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
+  )
+}
+
+const isOffBoardSowTile = (tile: FarmTilePosition) =>
+  tile.row < 0 || tile.row > 2 || tile.col < 0 || tile.col > 4
+
+const buildSowSelectionDisplay = (
+  farmInteraction: InteractionFarmSelection | null | undefined,
+) => {
+  const sowSelectableMap = new Map<string, PendingSowCrop[]>()
+  const extraSowTargets: ExtraSowTarget[] = []
+  if (farmInteraction?.farmType !== 'sow') return { sowSelectableMap, extraSowTargets }
+  farmInteraction.selectableFields.forEach((entry) => {
+    const key = positionKey(entry.tile)
+    if (isOffBoardSowTile(entry.tile)) {
+      extraSowTargets.push({
+        key,
+        tile: entry.tile,
+        allowedCrops: entry.allowedCrops,
+        sourceCard: entry.sourceCard,
+        groupKey: entry.groupKey,
+      })
+      return
+    }
+    sowSelectableMap.set(key, entry.allowedCrops)
+  })
+  return { sowSelectableMap, extraSowTargets }
+}
+
 const buildHouseDisplay = (
   displayPlayer: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
@@ -238,12 +310,17 @@ const buildReorgRemaining = (
 export const buildFarmBoardProjection = ({
   displayPlayer,
   interaction,
+  farmInteraction,
   selectionInteraction,
   players = [],
   state,
   pastureCapacities = {},
   animalReorg,
   pendingAnimalReorg,
+  pendingRoomTiles = [],
+  pendingStableTiles = [],
+  pendingFarmHand = null,
+  extraPositionSelectableSet,
 }: FarmBoardProjectionInput): FarmBoardProjection => {
   const roomPositions = new Set(
     (displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos)),
@@ -255,7 +332,39 @@ export const buildFarmBoardProjection = ({
   const stablePositions = new Set(
     (displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos)),
   )
+  const pendingRoomSet = new Set(pendingRoomTiles.map((tile) => positionKey(tile)))
+  const pendingStableSet = new Set(pendingStableTiles.map((tile) => positionKey(tile)))
+  const roomSelectableSet = farmInteraction?.farmType === 'room'
+    ? getCurrentlySelectableRoomKeys(farmInteraction.selectableTiles, roomPositions, pendingRoomSet)
+    : new Set<string>()
+  const stableSelectableSet = new Set(
+    farmInteraction?.farmType === 'stable'
+      ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
+      : [],
+  )
+  const farmHandSelectableSet = new Set(
+    farmInteraction?.farmType === 'stable'
+      ? (farmInteraction.farmHandPositions ?? []).map((tile) => positionKey(tile))
+      : [],
+  )
+  const pendingFarmHandKey = pendingFarmHand ? positionKey(pendingFarmHand) : null
+  const builtSpecialStableKeys = new Set(
+    ((displayPlayer as DisplayPlayerWithSpecialStables | null | undefined)?.specialStables ?? [])
+      .map((entry) => positionKey(entry.position)),
+  )
+  const positionSelectableSet = new Set([
+    ...(selectionInteraction?.kind === 'farm-position'
+      ? selectionInteraction.selectablePositions.map((tile) => positionKey(tile))
+      : []),
+    ...(extraPositionSelectableSet ?? []),
+  ])
+  const { sowSelectableMap, extraSowTargets } = buildSowSelectionDisplay(farmInteraction)
   const existingFenceSet = new Set((displayPlayer?.fenceSegments ?? []).map((segment) => segment.edge))
+  const fenceSelectableSet = new Set(
+    farmInteraction?.farmType === 'fence'
+      ? farmInteraction.selectableEdges
+      : [],
+  )
   const pastureTiles = buildPastureTiles(displayPlayer)
   const pastureDisplayMap = buildPastureDisplayMap(displayPlayer, animalReorg)
   const pastureCapacityMap = buildPastureCapacityMap(displayPlayer, pastureCapacities)
@@ -272,7 +381,18 @@ export const buildFarmBoardProjection = ({
       roomPositions,
       fieldMap,
       stablePositions,
+      pendingRoomSet,
+      pendingStableSet,
+      roomSelectableSet,
+      stableSelectableSet,
+      farmHandSelectableSet,
+      pendingFarmHandKey,
+      builtSpecialStableKeys,
+      positionSelectableSet,
+      sowSelectableMap,
+      extraSowTargets,
       existingFenceSet,
+      fenceSelectableSet,
       pastureTiles,
       pastureDisplayMap,
       pastureCapacityMap,
@@ -291,7 +411,18 @@ export const buildFarmBoardProjection = ({
     roomPositions,
     fieldMap,
     stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    farmHandSelectableSet,
+    pendingFarmHandKey,
+    builtSpecialStableKeys,
+    positionSelectableSet,
+    sowSelectableMap,
+    extraSowTargets,
     existingFenceSet,
+    fenceSelectableSet,
     pastureTiles,
     pastureDisplayMap,
     pastureCapacityMap,

@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
 import type {
   GameState,
+  FarmTilePosition,
   InteractionAnimalReorgZone,
+  InteractionFarmSelection,
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
-import { buildFarmBoardProjection } from '../farm-board-projection'
+import { buildFarmBoardProjection, type FarmBoardProjectionInput } from '../farm-board-projection'
 
 const resources = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -81,6 +83,10 @@ const createState = (players: PlayerState[], currentPlayerIndex = 0): GameState 
   players,
   currentPlayerIndex,
 } as GameState)
+
+type PlayerStateWithSpecialStables = PlayerState & {
+  specialStables: { sourceCardId: string; position: FarmTilePosition }[]
+}
 
 describe('buildFarmBoardProjection', () => {
   it('projects farm layout cells and occupied room field stable fence sets', () => {
@@ -206,6 +212,96 @@ describe('buildFarmBoardProjection', () => {
       tileCol: 5,
       fenceId: undefined,
     })
+  })
+
+  it('projects farm board selection display props', () => {
+    const player: PlayerStateWithSpecialStables = {
+      ...createPlayer({
+        roomTiles: [{ row: 0, col: 0 }],
+      }),
+      specialStables: [{ sourceCardId: 'B085_FarmHand', position: { row: 2, col: 2 } }],
+    }
+    const buildSelectionProjection = (
+      farmInteraction: InteractionFarmSelection | null,
+      extras: Partial<FarmBoardProjectionInput> = {},
+    ) => buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      selectionInteraction: null,
+      players: [player],
+      farmInteraction,
+      ...extras,
+    })
+
+    const roomProjection = buildSelectionProjection(
+      {
+        farmType: 'room',
+        selectableTiles: [{ row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 2 }],
+        maxSelections: 2,
+      },
+      { pendingRoomTiles: [{ row: 1, col: 1 }] },
+    )
+    expect(roomProjection.pendingRoomSet).toEqual(new Set(['1-1']))
+    expect(roomProjection.roomSelectableSet).toEqual(new Set(['0-1', '1-1']))
+
+    const stableProjection = buildSelectionProjection(
+      {
+        farmType: 'stable',
+        selectableTiles: [{ row: 0, col: 1 }, { row: 2, col: 2 }],
+        maxSelections: 1,
+        farmHandPositions: [{ row: 2, col: 2 }],
+      },
+      {
+        pendingStableTiles: [{ row: 0, col: 1 }],
+        pendingFarmHand: { row: 2, col: 2 },
+      },
+    )
+    expect(stableProjection.pendingStableSet).toEqual(new Set(['0-1']))
+    expect(stableProjection.stableSelectableSet).toEqual(new Set(['0-1', '2-2']))
+    expect(stableProjection.farmHandSelectableSet).toEqual(new Set(['2-2']))
+    expect(stableProjection.pendingFarmHandKey).toBe('2-2')
+    expect(stableProjection.builtSpecialStableKeys).toEqual(new Set(['2-2']))
+
+    const fenceProjection = buildSelectionProjection({
+      farmType: 'fence',
+      selectableEdges: ['H-0-0', 'V-0-1'],
+    })
+    expect(fenceProjection.fenceSelectableSet).toEqual(new Set(['H-0-0', 'V-0-1']))
+
+    const positionProjection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      selectionInteraction: {
+        kind: 'farm-position',
+        selectablePositions: [{ row: -1, col: 0 }, { row: 2, col: 4 }],
+        maxSelections: 2,
+      },
+      players: [player],
+    })
+    expect(positionProjection.positionSelectableSet).toEqual(new Set(['-1-0', '2-4']))
+
+    const sowProjection = buildSelectionProjection({
+      farmType: 'sow',
+      selectableFields: [
+        { tile: { row: 0, col: 1 }, allowedCrops: ['grain'] },
+        {
+          tile: { row: 3, col: 0 },
+          allowedCrops: ['wood'],
+          sourceCard: 'B108_Forester',
+          groupKey: 'forest',
+        },
+      ],
+    })
+    expect(sowProjection.sowSelectableMap).toEqual(new Map([['0-1', ['grain']]]))
+    expect(sowProjection.extraSowTargets).toEqual([
+      {
+        key: '3-0',
+        tile: { row: 3, col: 0 },
+        allowedCrops: ['wood'],
+        sourceCard: 'B108_Forester',
+        groupKey: 'forest',
+      },
+    ])
   })
 
   it('projects animal displays for farm board props', () => {
