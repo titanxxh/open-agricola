@@ -4,6 +4,7 @@ import type { FatherParentCardId } from '../../shared/parents'
 import { completeParentFatherAction } from '../../shared/parents/father-completion'
 import type { DraftGameEvent, EventSink } from '../../shared/contract/events'
 import type { ActionSpace, AnytimeAction, GameState, PlayerState } from '../../shared/contract/types'
+import { countUnusedFarmyardSpaces, getAllTilePositions } from '../../shared/domain/farm'
 
 const ACTION_ID = 'complete-parent-father'
 
@@ -57,6 +58,30 @@ const pasture = (
   animalType,
   animalCount,
 })
+
+const numberedIds = (prefix: string, count: number): string[] =>
+  Array.from({ length: count }, (_, index) => `${prefix}-${index + 1}`)
+
+const setPlayedCardCounts = (
+  player: PlayerState,
+  counts: { occupations?: number, minors?: number, majors?: number },
+): void => {
+  player.occupationPlayed = numberedIds('occ', counts.occupations ?? 0)
+  player.minorPlayed = numberedIds('minor', counts.minors ?? 0)
+  player.improvements = numberedIds('major', counts.majors ?? 0)
+}
+
+const setUnusedFarmyardSpaces = (player: PlayerState, unusedSpaces: number): void => {
+  const tiles = getAllTilePositions()
+  const usedCount = tiles.length - unusedSpaces
+  player.rooms = 2
+  player.roomTiles = tiles.slice(0, 2)
+  player.fields = tiles.slice(2, usedCount).map(({ row, col }) => ({ row, col, stacks: [] }))
+  player.stableTiles = []
+  player.pastures = []
+  player.farmTerrain = []
+  player.farmyardSpaceStates = []
+}
 
 describe('Parent father completion session', () => {
   it('compiles simple father rewards to existing gain and completion-marker actions', () => {
@@ -332,6 +357,103 @@ describe('Parent father completion session', () => {
       ]
     })
     expect(anytimeIds(ps04.getState())).not.toContain(ACTION_ID)
+  })
+
+  it('counts occupations, minor improvements, major improvements, and parents for PS06 tiers', () => {
+    const below = setup('PS06', (player) => {
+      setPlayedCardCounts(player, { occupations: 1, minors: 1, majors: 1 })
+    })
+    expect(anytimeIds(below.getState())).not.toContain(ACTION_ID)
+
+    const tier1 = setup('PS06', (player) => {
+      setPlayedCardCounts(player, { occupations: 2, minors: 1, majors: 1 })
+      player.resources.food = 0
+    })
+    const tier1Completed = tier1.takeAnytimeAction(0, ACTION_ID)
+    expect(tier1Completed.ok).toBe(true)
+    expect(tier1Completed.interaction.stateId).toBe('idle')
+    expect(tier1Completed.state.players[0]!.resources.food).toBe(1)
+    expect(tier1Completed.state.players[0]!.cardStates.PS06?.extraData?.fatherCompletedTier).toBe(1)
+
+    const tier2 = setup('PS06', (player) => {
+      setPlayedCardCounts(player, { occupations: 2, minors: 2, majors: 2 })
+    })
+    const tier2Prompt = tier2.takeAnytimeAction(0, ACTION_ID)
+    expect(tier2Prompt.ok).toBe(true)
+    expect(tier2Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
+
+    const tier3 = setup('PS06', (player) => {
+      setPlayedCardCounts(player, { occupations: 3, minors: 3, majors: 2 })
+      player.resources.food = 0
+    })
+    const tier3Prompt = tier3.takeAnytimeAction(0, ACTION_ID)
+    expect(tier3Prompt.ok).toBe(true)
+    expect(tier3Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2', 'PS06:3'])
+    const tier3Completed = tier3.resolveChoice(0, 'PS06:3')
+    expect(tier3Completed.ok).toBe(true)
+    expect(tier3Completed.state.players[0]!.resources.food).toBe(5)
+    expect(tier3Completed.state.players[0]!.cardStates.PS06?.extraData?.fatherCompletedTier).toBe(3)
+  })
+
+  it('rejects a stale PS06 choice when total cards drop below the chosen threshold', () => {
+    const session = setup('PS06', (player) => {
+      setPlayedCardCounts(player, { occupations: 2, minors: 2, majors: 2 })
+      player.resources.food = 0
+    })
+
+    const prompt = session.takeAnytimeAction(0, ACTION_ID)
+    expect(prompt.ok).toBe(true)
+    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
+
+    setPlayedCardCounts(session.state.players[0]!, { occupations: 1, minors: 1, majors: 1 })
+    const stale = session.resolveChoice(0, 'PS06:2')
+    expect(stale.ok).toBe(false)
+    expect(stale.state.players[0]!.resources.food).toBe(0)
+    expect(stale.state.players[0]!.cardStates.PS06).toBeUndefined()
+  })
+
+  it('opens PS08 tiers from unused farmyard spaces and grants the chosen crop reward', () => {
+    const tooManyUnused = setup('PS08', (player) => {
+      setUnusedFarmyardSpaces(player, 8)
+    })
+    expect(countUnusedFarmyardSpaces(tooManyUnused.getState().state.players[0]!)).toBe(8)
+    expect(anytimeIds(tooManyUnused.getState())).not.toContain(ACTION_ID)
+
+    const tier1 = setup('PS08', (player) => {
+      setUnusedFarmyardSpaces(player, 7)
+    })
+    expect(countUnusedFarmyardSpaces(tier1.getState().state.players[0]!)).toBe(7)
+    const tier1Completed = tier1.takeAnytimeAction(0, ACTION_ID)
+    expect(tier1Completed.ok).toBe(true)
+    expect(tier1Completed.state.players[0]!.resources.grain).toBe(1)
+    expect(tier1Completed.state.players[0]!.resources.vegetable).toBe(0)
+    expect(tier1Completed.state.players[0]!.cardStates.PS08?.extraData?.fatherCompletedTier).toBe(1)
+
+    const tier2 = setup('PS08', (player) => {
+      setUnusedFarmyardSpaces(player, 5)
+    })
+    expect(countUnusedFarmyardSpaces(tier2.getState().state.players[0]!)).toBe(5)
+    const tier2Prompt = tier2.takeAnytimeAction(0, ACTION_ID)
+    expect(tier2Prompt.ok).toBe(true)
+    expect(tier2Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2'])
+    const tier2Completed = tier2.resolveChoice(0, 'PS08:2')
+    expect(tier2Completed.ok).toBe(true)
+    expect(tier2Completed.state.players[0]!.resources.grain).toBe(0)
+    expect(tier2Completed.state.players[0]!.resources.vegetable).toBe(1)
+    expect(tier2Completed.state.players[0]!.cardStates.PS08?.extraData?.fatherCompletedTier).toBe(2)
+
+    const tier3 = setup('PS08', (player) => {
+      setUnusedFarmyardSpaces(player, 3)
+    })
+    expect(countUnusedFarmyardSpaces(tier3.getState().state.players[0]!)).toBe(3)
+    const tier3Prompt = tier3.takeAnytimeAction(0, ACTION_ID)
+    expect(tier3Prompt.ok).toBe(true)
+    expect(tier3Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2', 'PS08:3'])
+    const tier3Completed = tier3.resolveChoice(0, 'PS08:3')
+    expect(tier3Completed.ok).toBe(true)
+    expect(tier3Completed.state.players[0]!.resources.grain).toBe(1)
+    expect(tier3Completed.state.players[0]!.resources.vegetable).toBe(1)
+    expect(tier3Completed.state.players[0]!.cardStates.PS08?.extraData?.fatherCompletedTier).toBe(3)
   })
 
   it('runs PS07 as a single sow flow and marks completion only after successful sowing', () => {
