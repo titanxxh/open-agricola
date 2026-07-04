@@ -1,8 +1,273 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../../contract/events'
-import { eventsToLogEntries } from '../log-mapper'
+import { buildLogPresentationPlan, eventsToLogEntries } from '../log-mapper'
 
 describe('eventsToLogEntries', () => {
+  it('builds a presentation plan with source identity and consumed payment refs', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'pay',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        resources: { food: 1 },
+        paymentFor: 'minor-improvement',
+      },
+      {
+        schemaVersion: 1,
+        id: 'play',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        type: 'card.played',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        sourceCardId: 'D020_TurnwrestPlow',
+        cardId: 'D020_TurnwrestPlow',
+        cardType: 'minor',
+      },
+    ] satisfies GameEvent[]
+
+    const plan = buildLogPresentationPlan(events, { playerNames: { p1: 'Alice' } })
+
+    expect(plan.rows).toEqual([
+      expect.objectContaining({
+        logEntry: {
+          key: 'log.playMinorImprovement',
+          params: {
+            player: 'Alice',
+            improvements: 'D020_TurnwrestPlow',
+            costResources: { food: 1 },
+          },
+        },
+        sourceEventRef: { id: 'play', seq: 2, type: 'card.played' },
+        consumedEventRefs: [{ id: 'pay', seq: 1, type: 'resource.paid' }],
+        identity: {
+          sourceEventId: 'play',
+          sourceEventSeq: 2,
+          sourceEventType: 'card.played',
+          rowIndex: 0,
+          logKey: 'log.playMinorImprovement',
+        },
+      }),
+    ])
+    expect(plan.consumedEvents).toEqual([
+      {
+        consumedEventRef: { id: 'pay', seq: 1, type: 'resource.paid' },
+        consumerEventRef: { id: 'play', seq: 2, type: 'card.played' },
+        reason: 'cardPayment',
+      },
+    ])
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual(
+      plan.rows.map((row) => row.logEntry),
+    )
+  })
+
+  it('records a consumed payment once when repeated consumers match it', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'pay',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        resources: { food: 1 },
+        paymentFor: 'minor-improvement',
+      },
+      {
+        schemaVersion: 1,
+        id: 'play-a',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        type: 'card.played',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        sourceCardId: 'A001_First',
+        cardId: 'A001_First',
+        cardType: 'minor',
+      },
+      {
+        schemaVersion: 1,
+        id: 'play-b',
+        seq: 3,
+        round: 1,
+        phase: 'work',
+        type: 'card.played',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'improvement',
+        sourceCardId: 'A002_Second',
+        cardId: 'A002_Second',
+        cardType: 'minor',
+      },
+    ] satisfies GameEvent[]
+
+    const plan = buildLogPresentationPlan(events, { playerNames: { p1: 'Alice' } })
+
+    expect(plan.rows.flatMap((row) => row.consumedEventRefs)).toEqual([
+      { id: 'pay', seq: 1, type: 'resource.paid' },
+    ])
+    expect(plan.consumedEvents).toHaveLength(1)
+    expect(plan.consumedEvents[0]).toEqual({
+      consumedEventRef: { id: 'pay', seq: 1, type: 'resource.paid' },
+      consumerEventRef: { id: 'play-b', seq: 3, type: 'card.played' },
+      reason: 'cardPayment',
+    })
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          player: 'Alice',
+          improvements: 'A002_Second',
+          costResources: { food: 1 },
+        },
+      },
+      {
+        key: 'log.playMinorImprovement',
+        params: {
+          player: 'Alice',
+          improvements: 'A001_First',
+          costResources: { food: 1 },
+        },
+      },
+    ])
+  })
+
+  it('records renovation payment metadata on the renovation row', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'pay-renovation',
+        seq: 1,
+        round: 6,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'renovate-house',
+        resources: { clay: 2, reed: 1 },
+        paymentFor: 'renovation',
+      },
+      {
+        schemaVersion: 1,
+        id: 'renovated',
+        seq: 2,
+        round: 6,
+        phase: 'work',
+        type: 'farm.renovated',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'renovate-house',
+        playerId: 'p1',
+        from: 'wood',
+        to: 'clay',
+        rooms: [{ row: 0, col: 0 }],
+      },
+    ] satisfies GameEvent[]
+
+    const plan = buildLogPresentationPlan(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { 'renovate-house': 'Renovate' },
+    })
+
+    expect(plan.rows).toEqual([
+      expect.objectContaining({
+        logEntry: {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'Renovate',
+            detailParts: {
+              costs: { clay: 2, reed: 1 },
+              effects: { renovate: { from: 'wood', to: 'clay' } },
+            },
+          },
+        },
+        sourceEventRef: { id: 'renovated', seq: 2, type: 'farm.renovated' },
+        consumedEventRefs: [{ id: 'pay-renovation', seq: 1, type: 'resource.paid' }],
+      }),
+    ])
+    expect(plan.consumedEvents).toEqual([
+      {
+        consumedEventRef: { id: 'pay-renovation', seq: 1, type: 'resource.paid' },
+        consumerEventRef: { id: 'renovated', seq: 2, type: 'farm.renovated' },
+        reason: 'renovationPayment',
+      },
+    ])
+  })
+
+  it('absorbs nearest following stable payment into stable plan metadata', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'stable',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'farm.stableBuilt',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'stables',
+        stables: [{ playerId: 'p1', row: 0, col: 0 }],
+      },
+      {
+        schemaVersion: 1,
+        id: 'pay-stable',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'stables',
+        resources: { wood: 2 },
+        paymentFor: 'stables',
+      },
+    ] satisfies GameEvent[]
+
+    const plan = buildLogPresentationPlan(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { stables: 'Build stables' },
+    })
+
+    expect(plan.rows).toEqual([
+      expect.objectContaining({
+        logEntry: {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'Build stables',
+            detailParts: {
+              costs: { wood: 2 },
+              effects: { buildStables: 1 },
+            },
+          },
+        },
+        sourceEventRef: { id: 'stable', seq: 1, type: 'farm.stableBuilt' },
+        consumedEventRefs: [{ id: 'pay-stable', seq: 2, type: 'resource.paid' }],
+      }),
+    ])
+    expect(plan.consumedEvents).toEqual([
+      {
+        consumedEventRef: { id: 'pay-stable', seq: 2, type: 'resource.paid' },
+        consumerEventRef: { id: 'stable', seq: 1, type: 'farm.stableBuilt' },
+        reason: 'stablePayment',
+      },
+    ])
+  })
+
   it('returns newest-first entries to match GameState.log order', () => {
     const events = [
       {
