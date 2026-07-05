@@ -59,6 +59,9 @@ import {
   buildCompactScoreRows,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
+  buildSelectableMajorIds,
+  buildSelectableMinorIds,
+  buildSelectableOccupationIds,
   buildReplayFeedback,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
@@ -68,14 +71,16 @@ import {
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
   devResourceKeysForState,
+  getPendingMoorSpecialActionChoice,
+  getPendingMoorSpecialActionTileChoice,
+  getPendingMoorSpecialActionTileKeys,
+  hasPendingMoorSpecialActionChoice,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
   mergePublicEventCardPassAnimations,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
-  pendingMoorSpecialActionKey,
-  pendingMoorSpecialActionTileKey,
   playerIdFromWsStatus,
   removePublicEventCardPassAnimations,
   removePublicEventHighlights,
@@ -721,9 +726,7 @@ export const GameContainerApi = () => {
   const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const key = pendingMoorSpecialActionKey(card.id, actionId)
-      return pendingMoorSpecialActionChoices.byCardAction.has(key) ||
-        (pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key)?.size ?? 0) > 0
+      return hasPendingMoorSpecialActionChoice(pendingMoorSpecialActionChoices, card.id, actionId)
     }
     if (interaction.stateId !== 'idle') return false
     return canTakeVisibleMoorSpecialAction(state, currentPlayer, card, actionId)
@@ -732,9 +735,7 @@ export const GameContainerApi = () => {
   const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
     if (!state || !isInteractive) return
     if (interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const option = pendingMoorSpecialActionChoices.byCardAction.get(
-        pendingMoorSpecialActionKey(cardId, actionId),
-      )
+      const option = getPendingMoorSpecialActionChoice(pendingMoorSpecialActionChoices, cardId, actionId)
       if (!option) return
       void transport.resolveChoice(interaction.playerIndex, option.value).catch((e) => {
         console.error('resolveChoice error', e)
@@ -1100,27 +1101,15 @@ export const GameContainerApi = () => {
   const pendingChoiceOptions = pendingChoice?.options
   const selectableMinorIds =
     pendingChoiceOptions && isSelectingMinor
-      ? new Set(
-          pendingChoiceOptions
-            .map((option) =>
-              option.value.startsWith('minor:') ? option.value.slice('minor:'.length) : option.value,
-            )
-            .filter((value) => !value.startsWith('major:')),
-        )
+      ? buildSelectableMinorIds(pendingChoiceOptions)
       : new Set<string>()
   const selectableOccupationIds =
     pendingChoiceOptions && isSelectingOccupation
-      ? new Set(pendingChoiceOptions.map((option) => option.value))
+      ? buildSelectableOccupationIds(pendingChoiceOptions)
       : new Set<string>()
   const selectableMajorIds =
     pendingChoiceOptions && isSelectingImprovementAny
-      ? new Set(
-          pendingChoiceOptions
-            .map((option) =>
-              option.value.startsWith('major:') ? option.value.slice('major:'.length) : option.value,
-            )
-            .filter((value) => availableMajorImprovements?.includes(value)),
-        )
+      ? buildSelectableMajorIds(pendingChoiceOptions, availableMajorImprovements)
       : new Set<string>()
 
   const isBakeExchange =
@@ -1502,11 +1491,14 @@ export const GameContainerApi = () => {
   const specialTerrainSelectableSet = useMemo(() => {
     if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
     if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
-    const key = pendingMoorSpecialActionKey(selectedSpecialAction.cardId, selectedSpecialAction.actionId)
     if (pendingMoorSpecialActionChoices.isActive) {
       if (!isInteractive || interaction.stateId !== 'wait') return new Set<string>()
       if (displayPlayer.id !== activePlayer?.id) return new Set<string>()
-      return new Set(pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key) ?? [])
+      return getPendingMoorSpecialActionTileKeys(
+        pendingMoorSpecialActionChoices,
+        selectedSpecialAction.cardId,
+        selectedSpecialAction.actionId,
+      )
     }
     if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
     if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
@@ -1608,12 +1600,11 @@ export const GameContainerApi = () => {
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
     if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const option = pendingMoorSpecialActionChoices.byCardActionTile.get(
-        pendingMoorSpecialActionTileKey(
-          selectedSpecialAction.cardId,
-          selectedSpecialAction.actionId,
-          positionKey(tile),
-        ),
+      const option = getPendingMoorSpecialActionTileChoice(
+        pendingMoorSpecialActionChoices,
+        selectedSpecialAction.cardId,
+        selectedSpecialAction.actionId,
+        tile,
       )
       if (!option) return
       void transport.resolveChoice(interaction.playerIndex, option.value).catch((e) => {
