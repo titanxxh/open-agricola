@@ -1,18 +1,18 @@
 import type { ComplexCost, GameState, PaymentResourceMap, PlayerState, ResourceKey } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
-import { PaymentSolver } from '../payment'
-import type { PaymentCtx } from '../payment'
+import { CardPurchasePayment, PaymentSolver } from '../payment'
+import type { CardPurchasePreview } from '../payment'
 import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import { isMajorCardId, isFireplaceIdentityCard, isCookingHearthIdentityCard } from '../../cards/helpers/card-type'
+import { isFireplaceIdentityCard, isMajorCardId } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 import { getActiveCardRegistry } from '../../cards/active-registry'
 import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 export type { ResolvedMinorImprovement }
-type ResolvedCardCostWithMetadata = NonNullable<ReturnType<typeof PaymentSolver.resolveCardPreviewCostDetailedByProvider>>
+type ResolvedCardCostWithMetadata = CardPurchasePreview
 
 export const isBlockedByMajorImprovementActionGate = (
   improvement: ResolvedMinorImprovement | undefined,
@@ -66,30 +66,6 @@ export const getFireplaceReturnPool = (player: PlayerState): string[] => [
   ...player.improvements.filter(isFireplaceIdentityCard),
   ...player.minorPlayed.filter(isFireplaceIdentityCard),
 ]
-
-const getReturnCardPool = (
-  player: PlayerState,
-  list: readonly string[],
-): string[] => {
-  const listed = new Set(list)
-  const hasFireplaceSlot = list.some(isFireplaceIdentityCard)
-  const hasCookingHearthSlot = list.some(isCookingHearthIdentityCard)
-  return [...player.improvements, ...player.minorPlayed].filter((id) =>
-    listed.has(id) ||
-    (hasFireplaceSlot && isFireplaceIdentityCard(id)) ||
-    (hasCookingHearthSlot && isCookingHearthIdentityCard(id)),
-  )
-}
-
-export const getPlayedCardsForCost = (
-  player: PlayerState,
-  cost: PaymentResourceMap | ComplexCost | null,
-): string[] => {
-  if (!cost || !PaymentSolver.isComplexCost(cost)) return player.improvements
-  const list = cost.cards?.list
-  if (!Array.isArray(list)) return player.improvements
-  return getReturnCardPool(player, list)
-}
 
 export const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | null; id: string } => {
   if (choice.startsWith('major:')) {
@@ -250,14 +226,14 @@ export const getMajorImprovementPreviewCost = (
   improvementId: string,
   actionCardId?: string,
 ) => {
-  return PaymentSolver.resolveCardPreviewCostByProvider(
+  return CardPurchasePayment.resolvePreviewCostByProvider(
     state,
     player,
     'improvement',
     improvementId,
     () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
-  )
+  )?.cost ?? null
 }
 
 export const getMajorImprovementPreviewCostDetailed = (
@@ -266,7 +242,7 @@ export const getMajorImprovementPreviewCostDetailed = (
   improvementId: string,
   actionCardId?: string,
 ): ResolvedCardCostWithMetadata | null => {
-  return PaymentSolver.resolveCardPreviewCostDetailedByProvider(
+  return CardPurchasePayment.resolvePreviewCostByProvider(
     state,
     player,
     'improvement',
@@ -284,7 +260,7 @@ export const getMinorImprovementPreviewCost = (
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
-  const previewCost = PaymentSolver.resolveCardPreviewCostByProvider(
+  const previewCost = CardPurchasePayment.resolvePreviewCostByProvider(
     state,
     player,
     'improvement',
@@ -292,7 +268,7 @@ export const getMinorImprovementPreviewCost = (
     () => getMinorImprovementEffectiveCost(state, player, improvement, actionCardId),
     actionCardId,
   )
-  return attachRequiredReturnCards(previewCost, improvement.returnCards)
+  return attachRequiredReturnCards(previewCost?.cost ?? null, improvement.returnCards)
 }
 
 export const getMinorImprovementPreviewCostDetailed = (
@@ -303,7 +279,7 @@ export const getMinorImprovementPreviewCostDetailed = (
 ): ResolvedCardCostWithMetadata | null => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) return null
-  const previewCost = PaymentSolver.resolveCardPreviewCostDetailedByProvider(
+  const previewCost = CardPurchasePayment.resolvePreviewCostByProvider(
     state,
     player,
     'improvement',
@@ -324,18 +300,17 @@ export const canAffordMajorImprovement = (
   improvementId: string,
   actionCardId?: string,
 ) => {
-  const previewCost = getMajorImprovementPreviewCost(state, player, improvementId, actionCardId)
+  const previewCost = getMajorImprovementPreviewCostDetailed(state, player, improvementId, actionCardId)
   if (!previewCost) return false
   const rawIndex = state.players.indexOf(player)
-  const effectiveState = rawIndex >= 0 ? state : { ...state, players: [player] }
-  const playerIndex = rawIndex >= 0 ? rawIndex : 0
-  const ctx: PaymentCtx = {
-    actionId: 'improvement-major',
-    costType: 'none',
-    sourceCard: improvementId,
-    playedCards: getPlayedCardsForCost(player, previewCost),
-  }
-  return PaymentSolver.canAfford(effectiveState, playerIndex, previewCost, ctx)
+  return CardPurchasePayment.hasPaymentOption({
+    state,
+    playerIndex: rawIndex,
+    player,
+    kind: 'major',
+    cardId: improvementId,
+    preview: previewCost,
+  })
 }
 
 export const isMajorImprovementPlayable = (
@@ -357,7 +332,7 @@ export const canAffordMinorImprovement = (
   improvement: ResolvedMinorImprovement,
   actionCardId?: string,
 ) => {
-  const previewCost = getMinorImprovementPreviewCost(
+  const previewCost = getMinorImprovementPreviewCostDetailed(
     state,
     player,
     improvement.id,
@@ -365,15 +340,14 @@ export const canAffordMinorImprovement = (
   )
   if (!previewCost) return false
   const rawIndex = state.players.indexOf(player)
-  const effectiveState = rawIndex >= 0 ? state : { ...state, players: [player] }
-  const playerIndex = rawIndex >= 0 ? rawIndex : 0
-  const ctx: PaymentCtx = {
-    actionId: 'improvement-minor',
-    costType: 'none',
-    sourceCard: improvement.id,
-    playedCards: getPlayedCardsForCost(player, previewCost),
-  }
-  return PaymentSolver.canAfford(effectiveState, playerIndex, previewCost, ctx)
+  return CardPurchasePayment.hasPaymentOption({
+    state,
+    playerIndex: rawIndex,
+    player,
+    kind: 'minor',
+    cardId: improvement.id,
+    preview: previewCost,
+  })
 }
 
 export const isMinorImprovementPlayable = (
