@@ -240,6 +240,37 @@ export const buildPlaceFarmerChoiceMap = (
   return new Map(entries)
 }
 
+const MINOR_IMPROVEMENT_CHOICE_PREFIX = 'minor:'
+const MAJOR_IMPROVEMENT_CHOICE_PREFIX = 'major:'
+
+const stripChoicePrefix = (value: string, prefix: string): string =>
+  value.startsWith(prefix) ? value.slice(prefix.length) : value
+
+export const buildSelectableMinorIds = (
+  options: readonly ActionChoiceOption[] | undefined,
+): Set<string> =>
+  new Set(
+    (options ?? [])
+      .map((option) => stripChoicePrefix(option.value, MINOR_IMPROVEMENT_CHOICE_PREFIX))
+      .filter((value) => !value.startsWith(MAJOR_IMPROVEMENT_CHOICE_PREFIX)),
+  )
+
+export const buildSelectableMajorIds = (
+  options: readonly ActionChoiceOption[] | undefined,
+  availableMajorImprovements: readonly string[] | undefined,
+): Set<string> => {
+  const available = new Set(availableMajorImprovements ?? [])
+  return new Set(
+    (options ?? [])
+      .map((option) => stripChoicePrefix(option.value, MAJOR_IMPROVEMENT_CHOICE_PREFIX))
+      .filter((value) => available.has(value)),
+  )
+}
+
+export const buildSelectableOccupationIds = (
+  options: readonly ActionChoiceOption[] | undefined,
+): Set<string> => new Set((options ?? []).map((option) => option.value))
+
 export type PendingMoorSpecialActionChoice = {
   value: string
   cardId: string
@@ -331,6 +362,42 @@ export const buildPendingMoorSpecialActionChoiceMaps = (
     selectableTileKeysByCardAction,
   }
 }
+
+export const getPendingMoorSpecialActionChoice = (
+  choices: PendingMoorSpecialActionChoiceMaps,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+): PendingMoorSpecialActionChoice | undefined =>
+  choices.byCardAction.get(pendingMoorSpecialActionKey(cardId, actionId))
+
+export const getPendingMoorSpecialActionTileChoice = (
+  choices: PendingMoorSpecialActionChoiceMaps,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+  tile: FarmTilePosition,
+): PendingMoorSpecialActionChoice | undefined =>
+  choices.byCardActionTile.get(
+    pendingMoorSpecialActionTileKey(cardId, actionId, positionKey(tile)),
+  )
+
+export const getPendingMoorSpecialActionTileKeys = (
+  choices: PendingMoorSpecialActionChoiceMaps,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+): Set<string> =>
+  new Set(
+    choices.selectableTileKeysByCardAction.get(
+      pendingMoorSpecialActionKey(cardId, actionId),
+    ) ?? [],
+  )
+
+export const hasPendingMoorSpecialActionChoice = (
+  choices: PendingMoorSpecialActionChoiceMaps,
+  cardId: string,
+  actionId: MoorSpecialActionId,
+): boolean =>
+  getPendingMoorSpecialActionChoice(choices, cardId, actionId) !== undefined ||
+  getPendingMoorSpecialActionTileKeys(choices, cardId, actionId).size > 0
 
 export const shouldSuppressPendingChoiceOptionsInInteractionBar = (
   pendingChoice: { options?: readonly ActionChoiceOption[] } | null,
