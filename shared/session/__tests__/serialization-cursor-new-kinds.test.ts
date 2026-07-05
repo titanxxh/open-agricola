@@ -77,6 +77,75 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
   })
 
+  it('splits public pending view from cursor metadata', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    session.loadState(state)
+
+    const request: InteractionRequest = {
+      kind: 'farm-select',
+      farm: {
+        farmType: 'plow',
+        selectableTiles: [{ row: 0, col: 0 }],
+      },
+    }
+    const choices = [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }]
+    pushSyntheticInteraction(session, request, 'ui.interactionPlowSelect', choices)
+
+    const stack = session.getEngineStack()
+    const envelope = stack.peekPendingEnvelope()
+    if (!envelope) throw new Error('expected pending envelope')
+    envelope.sourceCard = 'Public_Source'
+    envelope.ownerNodeId = 'owner-node'
+    envelope.contextSnapshot = {
+      costs: { wood: 2 },
+      sourceCard: 'Cursor_Source',
+      actionContext: { exactCost: { wood: 2 } },
+    }
+    envelope.internalHostNodeId = 'internal-host'
+    envelope.internalResultKey = 'result-key'
+    envelope.internalPaymentInfoFrom = 'payment-info'
+
+    const view = stack.peekPendingView()
+    expect(view?.request).toEqual(request)
+    expect(view?.choices).toEqual(choices)
+    expect(view?.promptKey).toBe('ui.interactionPlowSelect')
+    expect(view?.sourceCard).toBe('Public_Source')
+    expect(view?.costOverride).toEqual({ wood: 2 })
+    expect(JSON.stringify(view)).not.toContain('hostNodeId')
+    expect(JSON.stringify(view)).not.toContain('ownerNodeId')
+    expect(JSON.stringify(view)).not.toContain('contextSnapshot')
+    expect(JSON.stringify(view)).not.toContain('internalHostNodeId')
+    expect(JSON.stringify(view)).not.toContain('internalResultKey')
+    expect(JSON.stringify(view)).not.toContain('internalPaymentInfoFrom')
+
+    expect(stack.peekPendingCursor()).toMatchObject({
+      hostNodeId: envelope.hostNodeId,
+      pendingActionId: INTERACTION_ONLY_ACTION_ID,
+      ownerNodeId: 'owner-node',
+      internalHostNodeId: 'internal-host',
+      internalResultKey: 'result-key',
+      internalPaymentInfoFrom: 'payment-info',
+    })
+
+    const interaction = session.getState().interaction
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId === 'wait') {
+      expect(interaction.sourceCard).toBe('Public_Source')
+      expect(interaction.costOverride).toEqual({ wood: 2 })
+      expect(JSON.stringify(interaction)).not.toContain('hostNodeId')
+      expect(JSON.stringify(interaction)).not.toContain('ownerNodeId')
+      expect(JSON.stringify(interaction)).not.toContain('contextSnapshot')
+      expect(JSON.stringify(interaction)).not.toContain('internalHostNodeId')
+      expect(JSON.stringify(interaction)).not.toContain('internalResultKey')
+      expect(JSON.stringify(interaction)).not.toContain('internalPaymentInfoFrom')
+    }
+  })
+
   it('farm-select kind survives serialize/rehydrate', () => {
     const session = new GameSession()
     const state = session.getState().state
