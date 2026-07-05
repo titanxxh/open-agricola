@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
 import type {
+  ActionSpace,
   GameState,
   FarmTilePosition,
   InteractionAnimalReorgZone,
@@ -9,7 +10,11 @@ import type {
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
-import { buildFarmBoardProjection, type FarmBoardProjectionInput } from '../farm-board-projection'
+import {
+  buildActionBoardProjection,
+  buildFarmBoardProjection,
+  type FarmBoardProjectionInput,
+} from '../farm-board-projection'
 
 const resources = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -83,6 +88,18 @@ const createState = (players: PlayerState[], currentPlayerIndex = 0): GameState 
   players,
   currentPlayerIndex,
 } as GameState)
+
+const createAction = (id: string, nameKey = `actions.${id}.name`): ActionSpace => ({
+  id,
+  nameKey,
+  descriptionKey: `${nameKey}.desc`,
+  roundAvailable: 1,
+  gainPerRound: resources(),
+  canBeExecutedByPlayer: () => true,
+  execute: () => ({ type: 'ok' }),
+  resources: resources(),
+  takenBy: [],
+})
 
 type PlayerStateWithSpecialStables = PlayerState & {
   specialStables: { sourceCardId: string; position: FarmTilePosition }[]
@@ -428,5 +445,107 @@ describe('buildFarmBoardProjection', () => {
       cattle: 0,
       horse: 0,
     })
+  })
+
+  it('projects display-ready card state for farm board rendering', () => {
+    const player = createPlayer({
+      parentCards: { mother: 'PR01', father: 'PS01' },
+      minorPlayed: ['M084_BogPony', 'C146_WorkshopAssistant'],
+      occupationPlayed: ['C022_BasketChair'],
+      cardStates: {
+        PR01: { infobox: 'Mother ready' },
+        PS01: { infobox: 'Father tier 2', extraData: { fatherCompletedTier: 2 } },
+        M084_BogPony: { extraData: { lyingHorseCount: 2 } },
+        C146_WorkshopAssistant: {
+          counters: { bonusVp: 1, usedRound: 2, wood: 2 },
+          stack: ['reed'],
+          extraData: {
+            pairs: ['WC', 7],
+            resourceStats: { used: 1, saved: { wood: 2 } },
+            cardCrop: { crop: 'grain', remaining: 2 },
+          },
+        },
+        C022_BasketChair: {
+          stack: ['food'],
+          extraData: { heldWorkerId: 'worker-1' },
+        },
+        MarkerCard: {
+          extraData: {
+            farmTerrainMarkers: [{ row: 1, col: 2, kind: 'person', workerId: 'worker-2' }],
+            publicCardMarkers: [{ id: 'm1', label: '+1', sourceCardId: 'MarkerCard' }],
+          },
+        },
+      },
+    })
+
+    const projection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      selectionInteraction: null,
+      players: [player],
+    })
+
+    expect(projection.parentCardDisplays).toEqual([
+      { id: 'PR01', infobox: 'Mother ready', completedTier: undefined },
+      { id: 'PS01', infobox: 'Father tier 2', completedTier: 2 },
+    ])
+    expect(projection.playedCardDisplays.map((card) => card.rawId)).toEqual([
+      'M084_BogPony',
+      'C146_WorkshopAssistant',
+      'C022_BasketChair',
+    ])
+    expect(projection.playedCardDisplays.find((card) => card.rawId === 'M084_BogPony')?.m084LyingHorses).toBe(2)
+    expect(projection.playedCardDisplays.find((card) => card.rawId === 'C146_WorkshopAssistant')).toMatchObject({
+      displayCounters: { bonusVp: 1, wood: 2 },
+      resourceStats: { used: 1, saved: { wood: 2 } },
+      stack: ['WC'],
+      cardStacks: [{ kind: 'grain', remaining: 2 }],
+    })
+    expect(projection.playedCardDisplays.find((card) => card.rawId === 'C022_BasketChair')?.heldWorkerId).toBe('worker-1')
+    expect(projection.farmTerrainMarkerMap.get('1-2')).toEqual([
+      { row: 1, col: 2, kind: 'person', workerId: 'worker-2', sourceCard: 'MarkerCard' },
+    ])
+    expect(projection.publicCardMarkers).toEqual([
+      { id: 'm1', label: '+1', sourceCardId: 'MarkerCard', cardId: 'MarkerCard' },
+    ])
+  })
+
+  it('projects display-ready action board decorations', () => {
+    const player = createPlayer({
+      id: 'p1',
+      name: 'Alice',
+      color: 'blue',
+      cardStates: {
+        E148_Lazybones: {
+          extraData: { reservedActionSpaces: ['forest'] },
+        },
+        A177_Middleman: {
+          extraData: {
+            actionSpaceAttachments: [
+              { spaceId: 'copse-56', resources: { stone: 1, food: 1 } },
+            ],
+          },
+        },
+      },
+    })
+    const actions = [createAction('grain-seeds'), createAction('forest')]
+    const projection = buildActionBoardProjection({
+      locale: 'en',
+      players: [player],
+      baseActions: actions,
+      roundSlots: [{ round: 1, action: createAction('round-1') }],
+      currentRound: 1,
+    })
+
+    expect(projection.actionSpaceReservations.get('forest')).toEqual({
+      id: 'p1',
+      name: 'Alice',
+      color: 'blue',
+    })
+    expect(projection.actionSpaceAttachments.get('copse-56')).toEqual([
+      { id: 'p1', name: 'Alice', color: 'blue', resource: 'stone', amount: 1 },
+      { id: 'p1', name: 'Alice', color: 'blue', resource: 'food', amount: 1 },
+    ])
+    expect(projection.leftActionNames.get('forest')).toBe('Grain Seeds')
   })
 })

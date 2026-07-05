@@ -11,6 +11,7 @@ import {
   loadCardsManifest,
   type CardsManifestPayload,
 } from '../../../services/card-meta'
+import { buildFarmBoardProjection } from '../../../app/farm-board-projection'
 
 const manifestEntry = (
   id: string,
@@ -106,8 +107,15 @@ const createFarmBoardProps = (
   player: PlayerState,
   viewOverrides: Partial<FarmBoardProps['view']> = {},
   actionOverrides: Partial<FarmBoardProps['actions']> = {},
-): FarmBoardProps => ({
-  view: {
+): FarmBoardProps => {
+  const projected = buildFarmBoardProjection({
+    displayPlayer: player,
+    interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+    selectionInteraction: null,
+    players: [player],
+  })
+  return {
+    view: {
     locale: 'en',
     players: [player],
     currentPlayer: player,
@@ -157,6 +165,11 @@ const createFarmBoardProps = (
     cardAvailability: {},
     futureCardResources: {},
     isInteractive: true,
+    lockedTileKeys: projected.lockedTileKeys,
+    publicCardMarkers: projected.publicCardMarkers,
+    farmTerrainMarkerMap: projected.farmTerrainMarkerMap,
+    parentCardDisplays: projected.parentCardDisplays,
+    playedCardDisplays: projected.playedCardDisplays,
     ...viewOverrides,
   },
   actions: {
@@ -174,7 +187,8 @@ const createFarmBoardProps = (
     resolveChoice: () => {},
     ...actionOverrides,
   },
-})
+  }
+}
 
 describe('FarmBoard', () => {
   it('renders extension spaces inside the farm grid and submits real coordinates', () => {
@@ -638,6 +652,7 @@ describe('FarmBoard', () => {
 
   it('renders reorg controls for card animal zones', () => {
     const player = createPlayer('p1', 'Player A', 'red')
+    player.occupationPlayed = ['C148_MudWallower']
 
     const html = renderToStaticMarkup(
       <FarmBoard
