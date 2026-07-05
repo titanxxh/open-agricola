@@ -14,12 +14,7 @@ import type {
   Resource,
   Trade,
 } from '../shared/contract/types'
-import {
-  buildConstructCost,
-  computeAllBuyableCombinations,
-  isComplexCost,
-  resolveCardCostWithModifiersDetailed,
-} from '../shared/actions/payment/internal'
+import { CardPurchasePayment, PaymentSolver } from '../shared/actions/payment'
 import { buildRenovationPlan } from '../shared/actions/effects/renovation'
 import { getActiveCardRegistry } from '../shared/cards/active-registry'
 import { getCardModifiers } from '../shared/cards/card-modifiers'
@@ -497,7 +492,7 @@ const formatResourceMap = (resources: Record<string, unknown> | undefined): stri
 }
 
 const formatBaseCost = (cost: PaymentResourceMap | ComplexCost): string => {
-  if (!isComplexCost(cost)) return formatResourceMap(cost)
+  if (!PaymentSolver.isComplexCost(cost)) return formatResourceMap(cost)
   if (cost.fees?.length === 1) return formatResourceMap(cost.fees[0])
   if (cost.fee) return formatResourceMap(cost.fee)
   return JSON.stringify(cost)
@@ -630,7 +625,7 @@ const actionCost = (
   const adjustments = collectActionAdjustments(scenario, state, player)
   const units = scenario.units ?? 1
   if (scenario.kind === 'construct') {
-    const cost = buildConstructCost(player, adjustments.costs, units)
+    const cost = PaymentSolver.buildConstructCost(player, adjustments.costs, units)
     expect(cost, scenario.name).not.toBeNull()
     return appendAdjustments(cost!, adjustments)
   }
@@ -666,15 +661,17 @@ const actionExtraSources = (scenario: ActionScenario): string[] => {
 
 const oaCardPurchaseOptions = (scenario: CardPurchaseScenario): PaymentOption[] => {
   const { player, state } = setupScenarioPlayer(scenario)
-  const result = resolveCardCostWithModifiersDetailed(
+  const result = CardPurchasePayment.resolvePreviewCostByProvider(
     state,
     player,
     'improvement',
     scenario.targetId,
-    scenario.baseCost,
+    () => scenario.baseCost,
     scenario.actionCardId,
   )
-  let cost = isComplexCost(result.cost) ? { ...result.cost } : { fee: result.cost }
+  expect(result, scenario.name).not.toBeNull()
+  if (!result) return []
+  let cost = PaymentSolver.isComplexCost(result.cost) ? { ...result.cost } : { fee: result.cost }
   if (scenario.spaceId) {
     const extra = runCardListeners({
       state,
@@ -691,7 +688,11 @@ const oaCardPurchaseOptions = (scenario: CardPurchaseScenario): PaymentOption[] 
       if (entry.costs) cost = { ...cost, fee: mergeResourceDelta(cost.fee ?? {}, entry.costs) }
     }
   }
-  const solutions = computeAllBuyableCombinations(player, cost, undefined, undefined, state)
+  const solutions = PaymentSolver.computeOptions(state, 0, cost, {
+    actionId: 'improvement',
+    costType: 'none',
+    playedCards: CardPurchasePayment.getPlayedCards(player, cost),
+  })
   return uniqueSortedOptions(solutions.map((solution) => {
     const feeIndex = solution.feeIndex ?? 0
     const metadataSources = result.candidateMetadataByFeeIndex?.[feeIndex]?.sources ?? []
@@ -702,7 +703,10 @@ const oaCardPurchaseOptions = (scenario: CardPurchaseScenario): PaymentOption[] 
 const oaActionOptions = (scenario: ActionScenario): PaymentOption[] => {
   const { player, state } = setupScenarioPlayer(scenario)
   const cost = actionCost(scenario, state, player)
-  const solutions = computeAllBuyableCombinations(player, cost, undefined, costTypeFor(scenario.kind), state)
+  const solutions = PaymentSolver.computeOptions(state, 0, cost, {
+    actionId: scenario.kind,
+    costType: costTypeFor(scenario.kind),
+  })
   const extraSources = actionExtraSources(scenario)
   return uniqueSortedOptions(solutions.map((solution) => solutionToOption(solution, extraSources)))
 }

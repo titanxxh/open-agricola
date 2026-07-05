@@ -1,4 +1,9 @@
 export { PaymentSolver } from './solver'
+export { CardPurchasePayment } from './card-purchase'
+export type {
+  CardPurchasePreview,
+  CardPurchaseSelectedPayment,
+} from './card-purchase'
 export type {
   ConstructCostAdjustments,
 } from './internal/room-payment'
