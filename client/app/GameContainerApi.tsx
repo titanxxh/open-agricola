@@ -4,7 +4,6 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
-import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState } from '../types/ui'
 import {
@@ -37,7 +36,7 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
-import { buildFarmBoardProjection } from './farm-board-projection'
+import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
@@ -1090,8 +1089,6 @@ export const GameContainerApi = () => {
     if (space) takeAction(space)
   }, [seasonActions, takeAction])
 
-  const playedCards = displayPlayer ? getPlayedCardKeys(displayPlayer) : []
-
   const isSelectingFences = pendingChoice?.promptKey === 'ui.interactionFenceSelect'
   const isSelectingStables = pendingChoice?.promptKey === 'ui.interactionStableSelect'
   const isSelectingRooms = pendingChoice?.promptKey === 'ui.interactionRoomSelect'
@@ -1550,6 +1547,16 @@ export const GameContainerApi = () => {
       pendingFarmHand,
       specialTerrainSelectableSet,
     ],
+  )
+  const actionBoardProjection = useMemo(
+    () => buildActionBoardProjection({
+      locale,
+      players: state?.players ?? [],
+      baseActions,
+      roundSlots,
+      currentRound: state?.round ?? 1,
+    }),
+    [baseActions, locale, roundSlots, state?.players, state?.round],
   )
   const { reorgRemaining } = farmBoardProjection
   const isReorgActive = !!animalReorg
@@ -2039,7 +2046,6 @@ export const GameContainerApi = () => {
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
-    playedCards,
     fieldPositions,
     maxStableSelections,
     plowSelectableSet,
@@ -2477,7 +2483,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
           </section>
           {state.enableThroughTheSeasons && state.throughTheSeasons ? (
             <section className="board-panel board-seasons">
