@@ -70,6 +70,27 @@ export type PendingEnvelope = {
   internalPaymentInfoFrom?: string
 }
 
+export type PendingView = {
+  request: InteractionRequest
+  choices?: ActionChoiceOption[]
+  promptKey?: PromptKey
+  promptParams?: Record<string, unknown>
+  sourceCard?: string
+  effectiveOwnerPlayerId?: string
+  syntheticKind?: PendingSyntheticKind
+  costOverride?: ActionExecutionContext['costs']
+}
+
+export type PendingCursor = {
+  hostNodeId: string
+  pendingActionId?: string
+  ownerNodeId?: string | null
+  contextSnapshot?: unknown
+  internalHostNodeId?: string
+  internalResultKey?: string
+  internalPaymentInfoFrom?: string
+}
+
 export type InteractionContextSnapshot = Pick<
   ActionExecutionContext,
   | 'params'

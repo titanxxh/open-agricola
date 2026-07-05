@@ -23,7 +23,7 @@ import {
 } from './nodes'
 import { attachChoiceLabel, resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
-import type { PendingEnvelope, PendingSyntheticKind } from './types'
+import type { PendingCursor, PendingEnvelope, PendingSyntheticKind, PendingView } from './types'
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { getPlayOrderIndex } from './matched-trigger'
@@ -36,6 +36,7 @@ import {
   type ActivateCardActionParams,
 } from './activation-action'
 import { applyComputeCostResults } from './compute-cost-results'
+import { pendingEnvelopeChoices } from './pending-validation'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -1086,6 +1087,51 @@ function sourceCardFromContextSnapshot(snapshot: unknown): string | undefined {
   if (!snapshot || typeof snapshot !== 'object') return undefined
   const sourceCard = (snapshot as { sourceCard?: unknown }).sourceCard
   return typeof sourceCard === 'string' ? sourceCard : undefined
+}
+
+function costOverrideFromContextSnapshot(
+  snapshot: unknown,
+): ActionExecutionContext['costs'] | undefined {
+  if (!snapshot || typeof snapshot !== 'object') return undefined
+  const costs = (snapshot as { costs?: unknown }).costs
+  return costs && typeof costs === 'object'
+    ? costs as ActionExecutionContext['costs']
+    : undefined
+}
+
+export function pendingViewFromEnvelope(envelope: PendingEnvelope | null): PendingView | null {
+  if (!envelope) return null
+  const choices = pendingEnvelopeChoices(envelope)
+  const sourceCard = resolveChoiceSourceCard(
+    envelope.sourceCard ?? sourceCardFromContextSnapshot(envelope.contextSnapshot),
+    choices,
+  )
+  const costOverride = costOverrideFromContextSnapshot(envelope.contextSnapshot)
+  return {
+    request: envelope.request,
+    ...(choices.length > 0 ? { choices } : {}),
+    ...(envelope.promptKey !== undefined ? { promptKey: envelope.promptKey } : {}),
+    ...(envelope.promptParams !== undefined ? { promptParams: envelope.promptParams } : {}),
+    ...(sourceCard !== undefined ? { sourceCard } : {}),
+    ...(envelope.effectiveOwnerPlayerId !== undefined
+      ? { effectiveOwnerPlayerId: envelope.effectiveOwnerPlayerId }
+      : {}),
+    ...(envelope.syntheticKind !== undefined ? { syntheticKind: envelope.syntheticKind } : {}),
+    ...(costOverride !== undefined ? { costOverride } : {}),
+  }
+}
+
+export function pendingCursorFromEnvelope(envelope: PendingEnvelope | null): PendingCursor | null {
+  if (!envelope) return null
+  return {
+    hostNodeId: envelope.hostNodeId,
+    pendingActionId: envelope.pendingActionId,
+    ownerNodeId: envelope.ownerNodeId,
+    contextSnapshot: envelope.contextSnapshot,
+    internalHostNodeId: envelope.internalHostNodeId,
+    internalResultKey: envelope.internalResultKey,
+    internalPaymentInfoFrom: envelope.internalPaymentInfoFrom,
+  }
 }
 
 function ownerFromRequest(request: InteractionRequest): string | undefined {

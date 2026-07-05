@@ -67,7 +67,7 @@ import {
   pendingEnvelopeChoices,
 } from '../engine/pending-validation.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
-import type { PendingEnvelope } from '../engine/types.ts'
+import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
   createInitialState,
@@ -212,9 +212,9 @@ type PendingContextSnapshot = {
 }
 
 const pendingContextSnapshot = (
-  envelope: PendingEnvelope | null,
+  cursor: PendingCursor | null,
 ): PendingContextSnapshot | null => {
-  const snapshot = envelope?.contextSnapshot
+  const snapshot = cursor?.contextSnapshot
   return snapshot && typeof snapshot === 'object'
     ? snapshot as PendingContextSnapshot
     : null
@@ -678,9 +678,9 @@ export class GameCore {
 
   /** @internal — derive policy input from the current pending envelope. */
   private getAnytimePolicyInput(): AnytimePolicyInput {
-    const envelope = this.engineStack.peekPendingEnvelope()
-    const promptKey = envelope?.promptKey
-    const request = envelope?.request
+    const view = this.engineStack.peekPendingView()
+    const promptKey = view?.promptKey
+    const request = view?.request
     return {
       hasActiveContext: !!this.getActiveInteractionContext(),
       stageResume: this.stageResume,
@@ -1536,7 +1536,7 @@ export class GameCore {
    * adapter owns pending host lookup.
    */
   private peekHostContextSnapshot(): PendingContextSnapshot | null {
-    return pendingContextSnapshot(this.engineStack.peekPendingEnvelope())
+    return pendingContextSnapshot(this.engineStack.peekPendingCursor())
   }
 
   /**
@@ -1544,13 +1544,12 @@ export class GameCore {
    * undefined when no pending envelope or the host did not record an action id.
    */
   private peekHostPendingActionId(): string | undefined {
-    return this.engineStack.peekPendingEnvelope()?.pendingActionId
+    return this.engineStack.peekPendingCursor()?.pendingActionId
   }
 
   private peekPendingSourceCard(): string | undefined {
-    const envelope = this.engineStack.peekPendingEnvelope()
-    const snapshot = pendingContextSnapshot(envelope)
-    return envelope?.sourceCard ?? snapshot?.sourceCard ?? choicesSourceCard(pendingEnvelopeChoices(envelope))
+    const view = this.engineStack.peekPendingView()
+    return view?.sourceCard ?? choicesSourceCard(view?.choices ?? [])
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
@@ -1659,10 +1658,11 @@ export class GameCore {
       }
     }
     const frame = this.engineStack.current()
-    const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
     const pendingHost = this.engineStack.peekPendingHost()
 
-    if (!frame || !envelope) {
+    if (!frame || !view || !cursor) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
       const baseCommands: InteractionCommand[] = hasPendingOrdinaryCardDrawChoice(this.state)
         ? ['undoStep', 'undoAction']
@@ -1676,15 +1676,14 @@ export class GameCore {
       }
     }
 
-    const playerIndex = this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+    const playerIndex = this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
     const spaceId = frame.spaceId
-    const promptKey = envelope.promptKey
-    const promptParams = envelope.promptParams
-    const ctx = pendingContextSnapshot(envelope)
-    const request: InteractionRequest = envelope.request
-    const choiceOptions = pendingEnvelopeChoices(envelope)
-    const sourceCard = envelope.sourceCard ?? ctx?.sourceCard ?? choicesSourceCard(choiceOptions)
-    const costOverride = ctx?.costs
+    const promptKey = view.promptKey
+    const promptParams = view.promptParams
+    const request: InteractionRequest = view.request
+    const choiceOptions = view.choices ?? []
+    const sourceCard = view.sourceCard ?? choicesSourceCard(choiceOptions)
+    const costOverride = view.costOverride
     const player = this.state.players[playerIndex]
 
     const policy = this.computeAnytimePolicySnapshot()
@@ -2073,7 +2072,7 @@ export class GameCore {
   private currentIsChoicePending(): boolean {
     const frame = this.engineStack.current()
     if (!frame) return false
-    const kind = this.engineStack.peekPendingEnvelope()?.request.kind
+    const kind = this.engineStack.peekPendingView()?.request.kind
     return kind === 'choice'
       || kind === 'animal-reorg'
       || kind === 'farm-select'
@@ -3428,11 +3427,11 @@ export class GameCore {
   private effectiveOwnerIndexForFrame(
     frame: EngineFrame,
     nodeId?: string | null,
-    envelope?: PendingEnvelope | null,
+    pending?: { effectiveOwnerPlayerId?: string } | null,
   ): number {
     const frameOwnerId = this.state.players[frame.ownerPlayerIndex]?.id
     const ownerId =
-      envelope?.effectiveOwnerPlayerId ??
+      pending?.effectiveOwnerPlayerId ??
       (nodeId ? frame.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerId) : frameOwnerId)
     if (!ownerId) return frame.ownerPlayerIndex
     const ownerIndex = this.state.players.findIndex((player) => player.id === ownerId)
@@ -3592,18 +3591,18 @@ export class GameCore {
         // field and pivot to the same anytime sub-flow path the previous
         // 'animalReorg' result took. After Task 6 we leave the parent
         // frame on the stack and push a reorganize sub-flow frame.
-        // Task 2: read the request discriminator through PendingEnvelope.
-        // The engine owns the pending envelope regardless of host node type.
-        const pendingEnvelope = this.engineStack.peekPendingEnvelope()
-        const hostRequestKind = pendingEnvelope?.request.kind ?? null
+        // Task 2: read public wait data through PendingView and resume metadata through PendingCursor.
+        const pendingView = this.engineStack.peekPendingView()
+        const pendingCursor = this.engineStack.peekPendingCursor()
+        const hostRequestKind = pendingView?.request.kind ?? null
         const isReorgSubFlow =
           frame.source.kind === 'flow'
           && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
         if (hostRequestKind === 'animal-reorg' && !isReorgSubFlow) {
           const pIdx = this.effectiveOwnerIndexForFrame(
             frame,
-            pendingEnvelope?.hostNodeId,
-            pendingEnvelope,
+            pendingCursor?.hostNodeId,
+            pendingView,
           )
           this.acknowledgeCurrentActionAnimalReorgRequest()
           const trigger = frame.stageResume?.hook === 'onBreedPhase'
@@ -3637,8 +3636,8 @@ export class GameCore {
         // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
         const choiceOwnerIndex = this.effectiveOwnerIndexForFrame(
           frame,
-          pendingEnvelope?.hostNodeId,
-          pendingEnvelope,
+          pendingCursor?.hostNodeId,
+          pendingView,
         )
         const visiblePlayerIndex = frame.deferredPlayerSwitch?.confirmed
           ? frame.deferredPlayerSwitch.toPlayerIndex
@@ -3661,14 +3660,14 @@ export class GameCore {
         if (
           hostRequestKind === 'farm-select' ||
           hostRequestKind === 'selection' ||
-          !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
+          !!this.isSelectionPromptKey(pendingView?.promptKey)
         ) {
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           return
         }
         const pendingHost = this.engineStack.peekPendingHost()
-        const pendingActionId = pendingEnvelope?.pendingActionId
+        const pendingActionId = pendingCursor?.pendingActionId
         const pendingActionCanResolve = pendingActionId
           ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
           : false
@@ -4021,16 +4020,16 @@ export class GameCore {
     pushHistoryEntry: boolean,
     payload?: Record<string, unknown>,
   ): SessionResponse {
-    const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
     const frame = this.engineStack.current()
     const pendingPlayerIndex = frame
-      ? this.effectiveOwnerIndexForFrame(frame, envelope?.hostNodeId, envelope)
+      ? this.effectiveOwnerIndexForFrame(frame, cursor?.hostNodeId, view)
       : -1
-    const pendingOptions = pendingEnvelopeChoices(envelope)
-    const pendingSnapshot = pendingContextSnapshot(envelope)
+    const pendingOptions = view?.choices ?? []
+    const pendingSnapshot = pendingContextSnapshot(cursor)
     const pendingActionContext = pendingSnapshot?.actionContext
-    const pendingSourceCard =
-      envelope?.sourceCard ?? pendingSnapshot?.sourceCard ?? choicesSourceCard(pendingOptions)
+    const pendingSourceCard = view?.sourceCard ?? choicesSourceCard(pendingOptions)
     // 'choice' (typed), 'animal-reorg' (pending-envelope commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
     // resolveChoice path. Composite-node and optional-host emissions are
@@ -4039,7 +4038,7 @@ export class GameCore {
     // 'feed' / 'confirm-next-player' / 'confirm-player-switch' are
     // dispatched by the public `resolveChoice` to dedicated handlers and
     // never reach this method.
-    const requestKind = envelope?.request.kind
+    const requestKind = view?.request.kind
     const isResolveChoiceTarget =
       requestKind === 'choice' ||
       requestKind === 'animal-reorg' ||
@@ -4150,18 +4149,20 @@ export class GameCore {
     payload?: Record<string, unknown>,
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
-    const request = envelope?.request
-    if (request) {
-      const protectedDirectCancel = isProtectedActionCancel(envelope.pendingActionId, value)
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
+    const request = view?.request
+    if (request && envelope && view) {
+      const protectedDirectCancel = isProtectedActionCancel(cursor?.pendingActionId, value)
       if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
         const disabled = pendingEnvelopeChoices(envelope)
           .some((option) => option.value === value && option.disabled === true)
-        if (disabled && String(envelope.promptKey) === 'cards.B003_Moonshine.choice') return this.respond(false, 'choice disabled')
+        if (disabled && String(view.promptKey) === 'cards.B003_Moonshine.choice') return this.respond(false, 'choice disabled')
         return this.respond(false, 'invalid choice value')
       }
       if (
         request.kind === 'choice' &&
-        (this.isFarmPromptKey(envelope.promptKey) || this.isSelectionPromptKey(envelope.promptKey))
+        (this.isFarmPromptKey(view.promptKey) || this.isSelectionPromptKey(view.promptKey))
       ) {
         return this.respond(false, 'use commitSelectionChoice for selection')
       }
@@ -4281,9 +4282,7 @@ export class GameCore {
     playerIndex: number,
     selections: FeedSelections,
   ): SessionResponse {
-    // Read the synthetic feed request payload through PendingEnvelope.
-    const envelope = this.engineStack.peekPendingEnvelope()
-    const request = envelope?.request
+    const request = this.engineStack.peekPendingView()?.request
     const frame = this.engineStack.current()
     if (
       request?.kind !== 'feed' ||
@@ -4425,8 +4424,7 @@ export class GameCore {
     playerIndex: number,
     payload: HeatingPaymentPayload = {},
   ): SessionResponse {
-    const envelope = this.engineStack.peekPendingEnvelope()
-    const request = envelope?.request
+    const request = this.engineStack.peekPendingView()?.request
     const frame = this.engineStack.current()
     if (
       request?.kind !== 'heating' ||
@@ -4723,11 +4721,12 @@ export class GameCore {
     payload: SelectionCommitPayload,
     pushHistoryEntry: boolean,
   ): SessionResponse {
-    const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
     const frame = this.engineStack.current()
-    const farmType = this.isFarmPromptKey(envelope?.promptKey)
-    const pendingPlayerIndex = frame && envelope
-      ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+    const farmType = this.isFarmPromptKey(view?.promptKey)
+    const pendingPlayerIndex = frame && view && cursor
+      ? this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
       : -1
     if (!farmType || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection/resource choice for this player')
@@ -4820,15 +4819,17 @@ export class GameCore {
     payload: SelectionCommitPayload,
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
     const frame = this.engineStack.current()
-    const envelopeKind = envelope?.request.kind
+    const envelopeKind = view?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
-    const isFarmSelection = envelopeKind === 'farm-select' || (isPlainChoice && !!this.isFarmPromptKey(envelope?.promptKey))
-    const isGenericSelection = envelopeKind === 'selection' || (isPlainChoice && !!this.isSelectionPromptKey(envelope?.promptKey))
+    const isFarmSelection = envelopeKind === 'farm-select' || (isPlainChoice && !!this.isFarmPromptKey(view?.promptKey))
+    const isGenericSelection = envelopeKind === 'selection' || (isPlainChoice && !!this.isSelectionPromptKey(view?.promptKey))
     const isResourceQuantity = envelopeKind === 'resource-quantity-select'
     const isResourceBatchExchange = envelopeKind === 'resource-batch-exchange-select'
-    const pendingPlayerIndex = frame && envelope
-      ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+    const pendingPlayerIndex = frame && view && cursor
+      ? this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
       : -1
     if ((!isFarmSelection && !isGenericSelection && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection/resource choice for this player')
@@ -5249,15 +5250,15 @@ export class GameCore {
 
   private undoStepInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
-    const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
     const interactionFrame = this.engineStack.current()
     // Farm-select kind carries the same promptKey shape as the previous
     // choice farm prompts, so the history-restore undo path applies to both.
     const isPlainChoiceOrFarmSelect =
-      envelope &&
-      (envelope.request.kind === 'choice' ||
-        envelope.request.kind === 'farm-select')
-    const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(envelope.promptKey) : null
+      view &&
+      (view.request.kind === 'choice' ||
+        view.request.kind === 'farm-select')
+    const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(view.promptKey) : null
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
       const entry = this.history[this.history.length - 1]
       const canRestorePriorChoice =
