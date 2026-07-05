@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
-import {
-  ACTION_SPACE_ATTACHMENTS_KEY,
-  RESERVED_ACTION_SPACES_KEY,
-  type ActionSpaceAttachment,
-} from '../../../shared/cards/helpers/card-state'
-import { getLeftBoardActionSpaceId } from '../../../shared/cards/helpers/round-action-topology'
+import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
 import { PlayerCard } from '../common/PlayerCard'
 import { getCardMeta } from '../../services/card-meta'
 
@@ -386,6 +380,9 @@ type Props = {
   devMode: boolean
   highlightedActionIds?: ReadonlySet<string>
   actionSpaceSelectionActive?: boolean
+  actionSpaceReservations?: ReadonlyMap<string, ActionBoardPlayerDisplay>
+  actionSpaceAttachments?: ReadonlyMap<string, ActionSpaceAttachmentDisplay[]>
+  leftActionNames?: ReadonlyMap<string, string>
 }
 
 type TooltipInfo = {
@@ -408,9 +405,10 @@ type SpaceFarmerMarker = {
   isNewbornOnly: boolean
 }
 
-type ActionSpaceAttachmentDisplay = {
-  player: PlayerState
-  resource: keyof Resource
+type ActionBoardPlayerDisplay = Pick<PlayerState, 'id' | 'name' | 'color'>
+
+type ActionSpaceAttachmentDisplay = ActionBoardPlayerDisplay & {
+  resource: keyof FutureMeepleResourceMap
   amount: number
 }
 
@@ -590,6 +588,9 @@ export const ActionBoard = ({
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
   highlightedActionIds = new Set<string>(),
   actionSpaceSelectionActive = false,
+  actionSpaceReservations = new Map<string, ActionBoardPlayerDisplay>(),
+  actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>(),
+  leftActionNames = new Map<string, string>(),
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -611,36 +612,6 @@ export const ActionBoard = ({
     () => getLinkedActionConnectors(baseActions, basePositions),
     [baseActions, basePositions],
   )
-  const roundActionOrder = useMemo(() => {
-    const order: (string | null)[] = Array.from({ length: 14 }, () => null)
-    for (const slot of roundSlots) {
-      if (slot.round >= 1 && slot.round <= 14) order[slot.round - 1] = slot.action?.id ?? null
-    }
-    return order
-  }, [roundSlots])
-  const boardActionSpaces = useMemo(
-    () => [
-      ...baseActions,
-      ...roundSlots.map((slot) => slot.action).filter((action): action is ActionSpace => !!action),
-    ],
-    [baseActions, roundSlots],
-  )
-  const actionById = useMemo(
-    () => new Map(boardActionSpaces.map((action) => [action.id, action])),
-    [boardActionSpaces],
-  )
-  const getLeftActionName = useCallback((actionId: string): string | undefined => {
-    const leftActionId = getLeftBoardActionSpaceId({
-      players,
-      round: currentRound,
-      roundActionOrder,
-      actionSpaces: boardActionSpaces,
-    }, actionId)
-    if (!leftActionId) return undefined
-    const leftAction = actionById.get(leftActionId)
-    return leftAction ? t(locale, leftAction.nameKey) : undefined
-  }, [actionById, boardActionSpaces, currentRound, locale, players, roundActionOrder])
-
   const updateScale = useCallback(() => {
     const el = wrapperRef.current
     if (!el) return
@@ -693,7 +664,7 @@ export const ActionBoard = ({
       ? Object.entries(action.resources)
         .filter(([, amount]) => (amount ?? 0) > 0)
         .map(([resource, amount]) => ({
-          resource: resource as keyof Resource,
+          resource: resource as keyof FutureMeepleResourceMap,
           amount: amount ?? 0,
         }))
       : []
@@ -756,29 +727,8 @@ export const ActionBoard = ({
     )
   }
 
-  /**
-   * Map action-space id → owner player for any card that has reserved that
-   * space (currently only E148_Lazybones, but the renderer scans the generic
-   * `reservedActionSpaces` cardState key so additional cards with the same
-   * mechanic require no change here).
-   */
-  const reservedStablesBySpace = useMemo(() => {
-    const map = new Map<string, PlayerState>()
-    for (const player of players) {
-      const cardStates = player.cardStates ?? {}
-      for (const cardState of Object.values(cardStates)) {
-        const spaces = cardState?.extraData?.[RESERVED_ACTION_SPACES_KEY]
-        if (!Array.isArray(spaces)) continue
-        for (const spaceId of spaces) {
-          if (typeof spaceId === 'string') map.set(spaceId, player)
-        }
-      }
-    }
-    return map
-  }, [players])
-
   const renderStableMarker = (space: ActionSpace) => {
-    const owner = reservedStablesBySpace.get(space.id)
+    const owner = actionSpaceReservations.get(space.id)
     if (!owner) return null
     return (
       <div className="lazybones-stable-marker" data-player-color={owner.color} title={`${owner.name}: Lazybones`}>
@@ -787,29 +737,8 @@ export const ActionBoard = ({
     )
   }
 
-  const attachmentsBySpace = useMemo(() => {
-    const map = new Map<string, ActionSpaceAttachmentDisplay[]>()
-    for (const player of players) {
-      const cardStates = player.cardStates ?? {}
-      for (const cardState of Object.values(cardStates)) {
-        const attachments = cardState?.extraData?.[ACTION_SPACE_ATTACHMENTS_KEY]
-        if (!Array.isArray(attachments)) continue
-        for (const attachment of attachments as ActionSpaceAttachment[]) {
-          if (!attachment || typeof attachment.spaceId !== 'string') continue
-          for (const [resource, amount] of Object.entries(attachment.resources ?? {})) {
-            if (typeof amount !== 'number' || amount <= 0) continue
-            const items = map.get(attachment.spaceId) ?? []
-            items.push({ player, resource: resource as keyof Resource, amount })
-            map.set(attachment.spaceId, items)
-          }
-        }
-      }
-    }
-    return map
-  }, [players])
-
   const renderActionSpaceAttachments = (space: ActionSpace) => {
-    const items = attachmentsBySpace.get(space.id)
+    const items = actionSpaceAttachments.get(space.id)
     if (!items?.length) return null
     return (
       <div className="action-space-attachments">
@@ -817,17 +746,17 @@ export const ActionBoard = ({
           const label = getFutureResourceLabel(locale, item.resource)
           return Array.from({ length: Math.min(item.amount, 6) }, (_, index) => (
             <span
-              key={`${item.player.id}-${item.resource}-${itemIndex}-${index}`}
+              key={`${item.id}-${item.resource}-${itemIndex}-${index}`}
               className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
-              title={`${item.player.name}: ${label}`}
-              aria-label={`${item.player.name}: ${label}`}
-              data-owner-player={item.player.id}
-              data-owner-label={`${item.player.name}: ${label}`}
+              title={`${item.name}: ${label}`}
+              aria-label={`${item.name}: ${label}`}
+              data-owner-player={item.id}
+              data-owner-label={`${item.name}: ${label}`}
               onMouseEnter={(e) => {
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                 setTooltip({
                   kind: 'resource',
-                  title: item.player.name,
+                  title: item.name,
                   description: label,
                   x: rect.right + 8,
                   y: rect.top - 8,
@@ -915,7 +844,7 @@ export const ActionBoard = ({
       descKey: action.descriptionKey,
       spritePos,
       action,
-      leftActionName: getLeftActionName(action.id),
+      leftActionName: leftActionNames.get(action.id),
       x,
       y: rect.top,
     })

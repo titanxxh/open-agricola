@@ -1,17 +1,41 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
-import { ACTION_SPACE_ATTACHMENTS_KEY } from '../../../../shared/cards/helpers/card-state'
 import { ActionBoard } from '../ActionBoard'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+  type CardsManifestPayload,
+} from '../../../services/card-meta'
+
+beforeAll(async () => {
+  const manifest: CardsManifestPayload = {
+    D023_PioneeringSpirit: {
+      meta: { id: 'D023_PioneeringSpirit', name: 'Pioneering Spirit', deck: 'D', number: 23, type: 'minor' },
+      module: '',
+      reaches: [],
+    },
+  }
+  __resetCardsManifestCache()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => manifest,
+  }))
+  await loadCardsManifest()
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+afterAll(() => {
+  __resetCardsManifestCache()
 })
 
 const resources = (): Resource => ({
@@ -165,21 +189,18 @@ describe('ActionBoard', () => {
     expect(takeAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'D023_PioneeringSpirit' }))
   })
 
-  it('renders owner-labeled action-space resource attachments from card state', () => {
+  it('renders owner-labeled action-space resource attachments from projected display data', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
     const playerC = createPlayer('p3', 'PlayerC', 'yellow')
     const playerD = createPlayer('p4', 'PlayerD', 'black')
     const playerE = createPlayer('p5', 'PlayerE', 'green')
-    playerA.cardStates = {
-      A177_Middleman: {
-        extraData: {
-          [ACTION_SPACE_ATTACHMENTS_KEY]: [
-            { spaceId: 'copse-56', resources: { stone: 1, food: 1 } },
-          ],
-        },
-      },
-    }
+    const actionSpaceAttachments = new Map([
+      ['copse-56', [
+        { id: 'p1', name: 'PlayerA', color: 'red' as const, resource: 'stone' as const, amount: 1 },
+        { id: 'p1', name: 'PlayerA', color: 'red' as const, resource: 'food' as const, amount: 1 },
+      ]],
+    ])
 
     const html = renderToStaticMarkup(
       <ActionBoard
@@ -193,6 +214,7 @@ describe('ActionBoard', () => {
         takeAction={() => {}}
         currentRound={1}
         devMode={false}
+        actionSpaceAttachments={actionSpaceAttachments}
       />,
     )
 
@@ -248,6 +270,7 @@ describe('ActionBoard', () => {
         takeAction={() => {}}
         currentRound={1}
         devMode={false}
+        leftActionNames={new Map([['forest', 'Grain Seeds']])}
       />,
     )
 
