@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import * as path from 'node:path'
 import type { GameEvent } from '../../../shared/contract/events'
 
 import {
@@ -8,6 +10,9 @@ import {
   canTakeVisibleMoorSpecialAction,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
+  buildSelectableMajorIds,
+  buildSelectableMinorIds,
+  buildSelectableOccupationIds,
   buildReplayFeedback,
   clearReplayFeedback,
   devResourceKeysForState,
@@ -22,6 +27,10 @@ import {
   maxPlayersFromQuery,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
+  getPendingMoorSpecialActionChoice,
+  getPendingMoorSpecialActionTileChoice,
+  getPendingMoorSpecialActionTileKeys,
+  hasPendingMoorSpecialActionChoice,
   parsePendingMoorSpecialActionChoice,
   playerIdFromWsStatus,
   removePublicEventHighlights,
@@ -48,7 +57,34 @@ const animation = (id: string): PublicEventResourceAnimation => ({
   to: { kind: 'playerResources', playerId: 'p1' },
 })
 
+const appDir = path.resolve(process.cwd(), 'client/app')
+
+const listAppSourceFiles = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(dir, entry.name)
+    if (entry.isDirectory()) return listAppSourceFiles(fullPath)
+    return /\.(ts|tsx)$/.test(entry.name) ? [fullPath] : []
+  })
+
 describe('GameContainerApi WS player identity', () => {
+  it('keeps option string prefix parsing inside interaction helpers', () => {
+    const allowed = new Set([
+      'game-container-helpers.ts',
+      '__tests__/GameContainerApi.ws.test.ts',
+      '__tests__/interaction-presentation.test.ts',
+    ])
+    const offenders = listAppSourceFiles(appDir).flatMap((file) => {
+      const rel = path.relative(appDir, file).split(path.sep).join('/')
+      if (allowed.has(rel)) return []
+      const matches = readFileSync(file, 'utf8').match(
+        /(?:['"`](?:allow-occupied|card-action|minor|major):|OCCUPIED_SPACE_CHOICE_PREFIX)/g,
+      )
+      return matches ? [`${rel}: ${matches.join(', ')}`] : []
+    })
+
+    expect(offenders).toEqual([])
+  })
+
   it('uses the joined websocket seat as the local player when URL has no player param', () => {
     expect(playerIdFromWsStatus({ phase: 'ready', roomId: 'room-1', playerIndex: 1 })).toBe('p2')
   })
@@ -291,6 +327,22 @@ describe('GameContainerApi WS player identity', () => {
     ])).toEqual(new Map())
   })
 
+  it('builds selectable card ids from prefixed interaction options', () => {
+    const options = [
+      { value: 'minor:E001_ClayPipe', labelKey: 'improvements.E001_ClayPipe.name' },
+      { value: 'major:Major_Fireplace', labelKey: 'improvements.Major_Fireplace.name' },
+      { value: 'G001_PlowDriver', labelKey: 'occupations.G001_PlowDriver.name' },
+    ]
+
+    expect(buildSelectableMinorIds(options)).toEqual(new Set(['E001_ClayPipe', 'G001_PlowDriver']))
+    expect(buildSelectableMajorIds(options, ['Major_Fireplace'])).toEqual(new Set(['Major_Fireplace']))
+    expect(buildSelectableOccupationIds(options)).toEqual(new Set([
+      'minor:E001_ClayPipe',
+      'major:Major_Fireplace',
+      'G001_PlowDriver',
+    ]))
+  })
+
   it('parses pending Moor special action card choices', () => {
     expect(parsePendingMoorSpecialActionChoice({
       value: 'card-action:moor-special-hiring-fair:action:hiring-fair',
@@ -346,6 +398,13 @@ describe('GameContainerApi WS player identity', () => {
     expect(maps.byCardActionTile.get('moor-special-fell-trees:fell-trees:2-0')?.value)
       .toBe('card-action:moor-special-fell-trees:action:fell-trees:2:0')
     expect(maps.selectableTileKeysByCardAction.get('moor-special-fell-trees:fell-trees'))
+      .toEqual(new Set(['2-0']))
+    expect(hasPendingMoorSpecialActionChoice(maps, 'moor-special-hiring-fair', 'hiring-fair')).toBe(true)
+    expect(getPendingMoorSpecialActionChoice(maps, 'moor-special-hiring-fair', 'hiring-fair')?.value)
+      .toBe('card-action:moor-special-hiring-fair:action:hiring-fair')
+    expect(getPendingMoorSpecialActionTileChoice(maps, 'moor-special-fell-trees', 'fell-trees', { row: 2, col: 0 })?.value)
+      .toBe('card-action:moor-special-fell-trees:action:fell-trees:2:0')
+    expect(getPendingMoorSpecialActionTileKeys(maps, 'moor-special-fell-trees', 'fell-trees'))
       .toEqual(new Set(['2-0']))
   })
 
