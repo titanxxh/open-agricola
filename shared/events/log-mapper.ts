@@ -39,6 +39,74 @@ export type EventLogMapperContext = {
   actionNames?: Record<string, string>
 }
 
+export type LogPresentationEventRef = Pick<GameEvent, 'id' | 'seq' | 'type'>
+
+export type LogPresentationConsumedEventReason =
+  | 'cardPayment'
+  | 'renovationPayment'
+  | 'stablePayment'
+
+export type LogPresentationConsumedEvent = {
+  consumedEventRef: LogPresentationEventRef
+  consumerEventRef: LogPresentationEventRef
+  reason: LogPresentationConsumedEventReason
+}
+
+export type LogPresentationRowIdentity = {
+  logKey: LogEntry['key']
+  params: unknown
+}
+
+export type LogPresentationRow = {
+  logEntry: LogEntry
+  sourceEventRef: LogPresentationEventRef
+  consumedEventRefs: LogPresentationEventRef[]
+  identity: LogPresentationRowIdentity
+}
+
+export type LogPresentationPlan = {
+  rows: LogPresentationRow[]
+  consumedEvents: LogPresentationConsumedEvent[]
+}
+
+const eventRef = (event: GameEvent): LogPresentationEventRef => ({
+  id: event.id,
+  seq: event.seq,
+  type: event.type,
+})
+
+const stablePresentationValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stablePresentationValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => [key, stablePresentationValue(entryValue)]),
+  )
+}
+
+const logPresentationIdentityParams = (entry: LogEntry): unknown => {
+  const params = entry.params ?? {}
+  if (
+    entry.key !== 'log.playImprovement' &&
+    entry.key !== 'log.playMinorImprovement' &&
+    entry.key !== 'log.playOccupation'
+  ) {
+    return params
+  }
+  const { player: _player, ...rest } = params
+  return rest
+}
+
+export const logPresentationRowIdentity = (entry: LogEntry): LogPresentationRowIdentity => ({
+  logKey: entry.key,
+  params: stablePresentationValue(logPresentationIdentityParams(entry)),
+})
+
+export const logPresentationRowIdentityKey = (identity: LogPresentationRowIdentity): string =>
+  JSON.stringify(identity)
+
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> =>
   Object.fromEntries(Object.entries(resources).filter(([, value]) => typeof value === 'number' && value > 0))
 
@@ -619,132 +687,167 @@ const mapParentMotherScheduled = (
   },
 })
 
-export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] => {
+const presentationRows = (
+  event: GameEvent,
+  entries: readonly LogEntry[],
+  consumedEvents: readonly LogPresentationConsumedEvent[] = [],
+): LogPresentationRow[] =>
+  entries.map((logEntry) => ({
+    logEntry,
+    sourceEventRef: eventRef(event),
+    consumedEventRefs: consumedEvents.map((consumed) => consumed.consumedEventRef),
+    identity: logPresentationRowIdentity(logEntry),
+  }))
+
+export const buildLogPresentationPlan = (
+  events: readonly GameEvent[],
+  ctx: EventLogMapperContext,
+): LogPresentationPlan => {
   const consumedPaymentSeqs = new Set<number>()
-  return [...events]
+  const consumedEvents: LogPresentationConsumedEvent[] = []
+  const consumePayment = (
+    consumerEvent: GameEvent,
+    payment: ResourcePaidEvent,
+    reason: LogPresentationConsumedEventReason,
+  ): LogPresentationConsumedEvent[] => {
+    if (consumedPaymentSeqs.has(payment.seq)) return []
+    consumedPaymentSeqs.add(payment.seq)
+    const relation = {
+      consumedEventRef: eventRef(payment),
+      consumerEventRef: eventRef(consumerEvent),
+      reason,
+    }
+    consumedEvents.push(relation)
+    return [relation]
+  }
+
+  const rows = [...events]
     .sort((left, right) => right.seq - left.seq)
-    .flatMap((event): LogEntry[] => {
+    .flatMap((event): LogPresentationRow[] => {
       if (event.type === 'card.played') {
         const payment = cardPaymentFor(events, event)
-        if (payment) consumedPaymentSeqs.add(payment.seq)
-        return [mapCardPlayed(event, payment, ctx)]
+        return presentationRows(
+          event,
+          [mapCardPlayed(event, payment, ctx)],
+          payment ? consumePayment(event, payment, 'cardPayment') : [],
+        )
       }
 
       if (event.type === 'card.triggered') {
-        return [mapCardTriggered(event, ctx)]
+        return presentationRows(event, [mapCardTriggered(event, ctx)])
       }
 
       if (event.type === 'card.infoboxChanged') {
-        return [mapCardInfoboxChanged(event)]
+        return presentationRows(event, [mapCardInfoboxChanged(event)])
       }
 
       if (event.type === 'card.stackChanged') {
-        return [mapCardStackChanged(event)]
+        return presentationRows(event, [mapCardStackChanged(event)])
       }
 
       if (event.type === 'card.resourcePairsStored') {
-        return [mapCardResourcePairsStored(event, ctx)]
+        return presentationRows(event, [mapCardResourcePairsStored(event, ctx)])
       }
 
       if (event.type === 'card.swappedWithBoard') {
-        return [mapCardSwappedWithBoard(event, ctx)]
+        return presentationRows(event, [mapCardSwappedWithBoard(event, ctx)])
       }
 
       if (event.type === 'card.returnedToBoard') {
-        return [mapCardReturnedToBoard(event, ctx)]
+        return presentationRows(event, [mapCardReturnedToBoard(event, ctx)])
       }
 
       if (event.type === 'card.destroyed') {
-        return [mapCardDestroyed(event, ctx)]
+        return presentationRows(event, [mapCardDestroyed(event, ctx)])
       }
 
       if (event.type === 'card.passed') {
-        return [mapCardPassed(event, ctx)]
+        return presentationRows(event, [mapCardPassed(event, ctx)])
       }
 
       if (event.type === 'resource.moved') {
         const entry = mapResourceMoved(events, event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'action.accumulated') {
         const entry = mapActionAccumulated(event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'resource.accumulated') {
         const entry = mapResourceAccumulated(event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'worker.placed') {
         const entry = mapWorkerPlaced(event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'worker.returned') {
-        return [mapWorkerReturned(event)]
+        return presentationRows(event, [mapWorkerReturned(event)])
       }
 
       if (event.type === 'worker.promoted') {
-        return [mapWorkerPromoted(event, ctx)]
+        return presentationRows(event, [mapWorkerPromoted(event, ctx)])
       }
 
       if (event.type === 'turn.skipped') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.playerSkipped',
           params: { playerName: playerName(ctx, event.playerId) },
-        }]
+        }])
       }
 
       if (event.type === 'action.granted') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.cardGrantedAction',
           params: {
             player: playerName(ctx, event.playerId ?? event.actorPlayerId ?? event.targetPlayerId),
             actionId: event.actionId,
             cardId: event.cardId,
           },
-        }]
+        }])
       }
 
       if (event.type === 'startPlayer.changed') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.startPlayer',
           params: { player: playerName(ctx, event.playerId) },
-        }]
+        }])
       }
 
       if (event.type === 'round.started') {
-        return [{ key: 'log.enterRound', params: { round: event.round } }]
+        return presentationRows(event, [{ key: 'log.enterRound', params: { round: event.round } }])
       }
 
       if (event.type === 'work.started') {
-        return [{ key: 'log.workStarted' }]
+        return presentationRows(event, [{ key: 'log.workStarted' }])
       }
 
       if (event.type === 'returnHome.started') {
-        return [{ key: 'log.returnHomeStarted' }]
+        return presentationRows(event, [{ key: 'log.returnHomeStarted' }])
       }
 
       if (event.type === 'harvest.started') {
-        return [{ key: 'log.harvest', params: { round: event.round } }]
+        return presentationRows(event, [{ key: 'log.harvest', params: { round: event.round } }])
       }
 
       if (event.type === 'harvest.phaseStarted') {
-        return [mapHarvestPhaseStarted(event)]
+        return presentationRows(event, [mapHarvestPhaseStarted(event)])
       }
 
       if (event.type === 'harvest.reapSkipped') {
-        return [{ key: 'log.harvestReapSkipped', params: { player: playerName(ctx, event.playerId) } }]
+        return presentationRows(event, [{ key: 'log.harvestReapSkipped', params: { player: playerName(ctx, event.playerId) } }])
       }
 
       if (event.type === 'harvest.reapNothing') {
-        return [{ key: 'log.harvestReapNothing', params: { player: playerName(ctx, event.playerId) } }]
+        return presentationRows(event, [{ key: 'log.harvestReapNothing', params: { player: playerName(ctx, event.playerId) } }])
       }
 
       if (event.type === 'harvest.feedConverted') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.harvestFeedConvert',
           params: {
             player: playerName(ctx, event.playerId),
@@ -752,114 +855,120 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             cost: event.cost,
             food: event.food,
           },
-        }]
+        }])
       }
 
       if (event.type === 'harvest.heated') {
-        return [mapHarvestHeated(event, ctx)]
+        return presentationRows(event, [mapHarvestHeated(event, ctx)])
       }
 
       if (event.type === 'futureMeeple.queued') {
         const entry = mapFutureMeepleQueued(event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'futureMeeple.removed') {
-        return [mapFutureMeepleRemoved(event, ctx)]
+        return presentationRows(event, [mapFutureMeepleRemoved(event, ctx)])
       }
 
       if (event.type === 'futureMeeple.resolved') {
-        return [mapFutureMeepleResolved(event, ctx)]
+        return presentationRows(event, [mapFutureMeepleResolved(event, ctx)])
       }
 
       if (event.type === 'parent.motherScheduled') {
-        return [mapParentMotherScheduled(event, ctx)]
+        return presentationRows(event, [mapParentMotherScheduled(event, ctx)])
       }
 
       if (event.type === 'game.started') {
-        return [{ key: 'log.startGame' }]
+        return presentationRows(event, [{ key: 'log.startGame' }])
       }
 
       if (event.type === 'game.ended') {
-        return [{ key: 'log.gameOver' }]
+        return presentationRows(event, [{ key: 'log.gameOver' }])
       }
 
       if (event.type === 'farm.sown') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.sow',
           params: { player: playerName(ctx, event.actorPlayerId) },
-        }]
+        }])
       }
 
       if (event.type === 'farm.cropAdded') {
-        return [mapFarmCropAdded(event, ctx)]
+        return presentationRows(event, [mapFarmCropAdded(event, ctx)])
       }
 
       if (event.type === 'farm.cropRemoved') {
-        return [mapFarmCropRemoved(event, ctx)]
+        return presentationRows(event, [mapFarmCropRemoved(event, ctx)])
       }
 
       if (event.type === 'farm.fieldPlowed') {
-        return [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'plow', {
+        return presentationRows(event, [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'plow', {
           effects: { plow: event.fields.length },
-        })]
+        })])
       }
 
       if (event.type === 'farm.roomBuilt') {
-        return [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'construct', {
+        return presentationRows(event, [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'construct', {
           effects: { buildRoom: event.rooms.length },
-        })]
+        })])
       }
 
       if (event.type === 'farm.renovated') {
         const payment = paymentForEvent(events, event, 'renovation')
-        if (payment) consumedPaymentSeqs.add(payment.seq)
-        return [mapFarmRenovated(event, ctx, payment)]
+        return presentationRows(
+          event,
+          [mapFarmRenovated(event, ctx, payment)],
+          payment ? consumePayment(event, payment, 'renovationPayment') : [],
+        )
       }
 
       if (event.type === 'farm.stableBuilt') {
         const payment = stablePaymentForEvent(events, event)
-        if (payment) consumedPaymentSeqs.add(payment.seq)
-        return [mapStableBuilt(events, event, ctx, payment)]
+        return presentationRows(
+          event,
+          [mapStableBuilt(events, event, ctx, payment)],
+          payment ? consumePayment(event, payment, 'stablePayment') : [],
+        )
       }
 
       if (event.type === 'farm.fenceBuilt') {
         const entry = mapFenceBuilt(event, ctx)
-        return entry ? [entry] : []
+        return entry ? presentationRows(event, [entry]) : []
       }
 
       if (event.type === 'farm.fenceConsumed') {
-        return [mapFarmFenceConsumed(event, ctx)]
+        return presentationRows(event, [mapFarmFenceConsumed(event, ctx)])
       }
 
       if (event.type === 'farm.animalMoved') {
-        return [mapFarmAnimalMoved(event, ctx)]
+        return presentationRows(event, [mapFarmAnimalMoved(event, ctx)])
       }
 
       if (event.type === 'farm.animalBred') {
         if (event.source !== 'harvest') return []
-        return [{
+        return presentationRows(event, [{
           key: 'log.harvestBreedDetail',
           params: {
             player: playerName(ctx, event.actorPlayerId),
             resources: positiveResources(event.animals),
           },
-        }]
+        }])
       }
 
       if (event.type === 'farm.animalDiscarded') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.reorganizeDiscard',
           params: {
             player: playerName(ctx, event.actorPlayerId),
             resources: positiveResources(event.animals),
           },
-        }]
+        }])
       }
 
       if (event.type === 'resource.exchanged') {
         if ((event.paid.grain ?? 0) > 0 && (event.gained.food ?? 0) > 0 && event.exchangeSource) {
-          return [{
+          return presentationRows(event, [{
             key: 'log.bakeBread',
             params: {
               count: event.paid.grain,
@@ -867,14 +976,14 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
               ...(event.sourceActionId ? { sourceActionId: event.sourceActionId } : {}),
               ...(event.sourceCardId ? { sourceCard: event.sourceCardId } : {}),
             },
-          }]
+          }])
         }
-        return [
+        return presentationRows(event, [
           actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? event.exchangeSource ?? 'exchange', {
             gains: positiveResources(event.gained),
             costs: positiveResources(event.paid),
           }),
-        ]
+        ])
       }
 
       if (event.type === 'resource.paid') {
@@ -882,26 +991,26 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
         if (isNearestFollowingStablePayment(events, event)) return []
         const cost = positiveResources(event.resources)
         if (event.paymentFor === 'feeding' || event.paymentFor === 'begging') {
-          return [{
+          return presentationRows(event, [{
             key: 'log.harvestFeedDetail',
             params: {
               player: playerName(ctx, event.actorPlayerId),
               resources: event.resources,
             },
-          }]
+          }])
         }
         if (!event.sourceCardId) {
-          return [
+          return presentationRows(event, [
             actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? event.paymentFor, {
               costs: cost,
               ...(event.bonusSources?.length ? { bonusSources: event.bonusSources } : {}),
             }, {
               ...(event.bonusChoiceIndex ? { bonusChoiceIndex: event.bonusChoiceIndex } : {}),
             }),
-          ]
+          ])
         }
 
-        return [
+        return presentationRows(event, [
           {
             key: 'log.cardEffectPay',
             params: {
@@ -910,45 +1019,50 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
               cardId: event.sourceCardId,
             },
           },
-        ]
+        ])
       }
 
       if (event.type === 'action.revealed') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.actionRevealed',
           params: {
             action: actionName(ctx, event.actionId),
             roundSlot: event.roundSlot,
           },
-        }]
+        }])
       }
 
       if (event.type === 'action.exclusiveUseSet') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.actionExclusiveUseSet',
           params: {
             player: playerName(ctx, event.playerId),
             action: actionName(ctx, event.actionId),
             cardId: event.sourceCardId,
           },
-        }]
+        }])
       }
 
       if (event.type === 'action.exclusiveUseCleared') {
-        return [{
+        return presentationRows(event, [{
           key: 'log.actionExclusiveUseCleared',
           params: {
             player: playerName(ctx, event.playerId),
             action: actionName(ctx, event.actionId),
             cardId: event.sourceCardId,
           },
-        }]
+        }])
       }
 
       if (event.type === 'action.detailLogged') {
-        return [mapActionDetailLogged(event, ctx)]
+        return presentationRows(event, [mapActionDetailLogged(event, ctx)])
       }
 
       return []
     })
+
+  return { rows, consumedEvents }
 }
+
+export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] =>
+  buildLogPresentationPlan(events, ctx).rows.map((row) => row.logEntry)

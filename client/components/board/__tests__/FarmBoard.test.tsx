@@ -11,6 +11,7 @@ import {
   loadCardsManifest,
   type CardsManifestPayload,
 } from '../../../services/card-meta'
+import { buildFarmBoardProjection } from '../../../app/farm-board-projection'
 
 const manifestEntry = (
   id: string,
@@ -104,71 +105,90 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
 
 const createFarmBoardProps = (
   player: PlayerState,
-  overrides: Partial<FarmBoardProps> = {},
-): FarmBoardProps => ({
-  locale: 'en',
-  players: [player],
-  currentPlayer: player,
-  displayPlayer: player,
-  devMode: false,
-  currentStartPlayerId: '',
-  nextStartPlayerId: '',
-  playedCards: [],
-  farmCells: [],
-  roomPositions: new Set(),
-  fieldPositions: new Set(),
-  fieldMap: new Map(),
-  stablePositions: new Set(),
-  pendingRoomSet: new Set(),
-  pendingStableSet: new Set(),
-  roomSelectableSet: new Set(),
-  stableSelectableSet: new Set(),
-  farmHandSelectableSet: new Set(),
-  pendingFarmHandKey: null,
-  builtSpecialStableKeys: new Set(),
-  maxStableSelections: 0,
-  plowSelectableSet: new Set(),
-  pendingPlowTile: null,
-  positionSelectableSet: new Set(),
-  pendingPositionSelections: new Set(),
-  togglePositionSelection: () => {},
-  pendingSowSelections: {},
-  sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
-  sowSelectableMap: new Map(),
-  extraSowTargets: [],
-  pastureTiles: new Map(),
-  pastureDisplayMap: new Map(),
-  pastureCapacityMap: new Map(),
-  houseDisplay: { animalType: null, animalCount: 0 },
-  stableDisplayMap: new Map(),
-  isReorgActive: false,
-  reorgRemaining: null,
-  hasReorgOverflow: false,
-  animalReorg: null,
-  pendingFenceSet: new Set(),
-  existingFenceSet: new Set(),
-  fenceSelectableSet: new Set(),
-  toggleRoomTile: () => {},
-  toggleStableTile: () => {},
-  toggleFarmHand: () => {},
-  togglePlowTile: () => {},
-  updateSowSelection: () => {},
-  toggleFenceEdge: () => {},
-  adjustReorgAnimal: () => {},
-  confirmAnimalReorg: () => {},
-  cancelAnimalDiscardPrompt: () => {},
-  setViewPlayerId: () => {},
-  isSelectingMinor: false,
-  isSelectingOccupation: false,
-  isSelectingImprovementAny: false,
-  selectableMinorIds: new Set(),
-  selectableOccupationIds: new Set(),
-  cardAvailability: {},
-  futureCardResources: {},
-  resolveChoice: () => {},
-  isInteractive: true,
-  ...overrides,
-})
+  viewOverrides: Partial<FarmBoardProps['view']> = {},
+  actionOverrides: Partial<FarmBoardProps['actions']> = {},
+): FarmBoardProps => {
+  const projected = buildFarmBoardProjection({
+    displayPlayer: player,
+    interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+    selectionInteraction: null,
+    players: [player],
+  })
+  return {
+    view: {
+    locale: 'en',
+    players: [player],
+    currentPlayer: player,
+    displayPlayer: player,
+    devMode: false,
+    currentStartPlayerId: '',
+    nextStartPlayerId: '',
+    playedCards: [],
+    farmCells: [],
+    roomPositions: new Set(),
+    fieldPositions: new Set(),
+    fieldMap: new Map(),
+    stablePositions: new Set(),
+    pendingRoomSet: new Set(),
+    pendingStableSet: new Set(),
+    roomSelectableSet: new Set(),
+    stableSelectableSet: new Set(),
+    farmHandSelectableSet: new Set(),
+    pendingFarmHandKey: null,
+    builtSpecialStableKeys: new Set(),
+    maxStableSelections: 0,
+    plowSelectableSet: new Set(),
+    pendingPlowTile: null,
+    positionSelectableSet: new Set(),
+    pendingPositionSelections: new Set(),
+    pendingSowSelections: {},
+    sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+    sowSelectableMap: new Map(),
+    extraSowTargets: [],
+    pastureTiles: new Map(),
+    pastureDisplayMap: new Map(),
+    pastureCapacityMap: new Map(),
+    houseDisplay: { animalType: null, animalCount: 0 },
+    stableDisplayMap: new Map(),
+    isReorgActive: false,
+    reorgRemaining: null,
+    hasReorgOverflow: false,
+    animalReorg: null,
+    pendingFenceSet: new Set(),
+    existingFenceSet: new Set(),
+    fenceSelectableSet: new Set(),
+    isSelectingMinor: false,
+    isSelectingOccupation: false,
+    isSelectingImprovementAny: false,
+    selectableMinorIds: new Set(),
+    selectableOccupationIds: new Set(),
+    cardAvailability: {},
+    futureCardResources: {},
+    isInteractive: true,
+    lockedTileKeys: projected.lockedTileKeys,
+    publicCardMarkers: projected.publicCardMarkers,
+    farmTerrainMarkerMap: projected.farmTerrainMarkerMap,
+    parentCardDisplays: projected.parentCardDisplays,
+    playedCardDisplays: projected.playedCardDisplays,
+    ...viewOverrides,
+  },
+  actions: {
+    togglePositionSelection: () => {},
+    toggleRoomTile: () => {},
+    toggleStableTile: () => {},
+    toggleFarmHand: () => {},
+    togglePlowTile: () => {},
+    updateSowSelection: () => {},
+    toggleFenceEdge: () => {},
+    adjustReorgAnimal: () => {},
+    confirmAnimalReorg: () => {},
+    cancelAnimalDiscardPrompt: () => {},
+    setViewPlayerId: () => {},
+    resolveChoice: () => {},
+    ...actionOverrides,
+  },
+  }
+}
 
 describe('FarmBoard', () => {
   it('renders extension spaces inside the farm grid and submits real coordinates', () => {
@@ -196,6 +216,7 @@ describe('FarmBoard', () => {
             { key: '2-2', type: 'post' },
           ],
           positionSelectableSet: new Set(['-1-0']),
+        }, {
           togglePositionSelection,
         })}
       />,
@@ -461,7 +482,7 @@ describe('FarmBoard', () => {
               isReorgDraft: false,
             }],
           ]),
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -614,12 +635,13 @@ describe('FarmBoard', () => {
           players: [activePlayer, turnPlayer],
           currentPlayer: turnPlayer,
           displayPlayer: activePlayer,
+          activePlayerId: activePlayer.id,
           isSelectingMinor: true,
           isSelectingImprovementAny: true,
           selectableMinorIds: new Set(['B034_SpecialFood']),
+        }, {
           resolveChoice,
         })}
-        activePlayerId={activePlayer.id}
       />,
     )
 
@@ -630,6 +652,7 @@ describe('FarmBoard', () => {
 
   it('renders reorg controls for card animal zones', () => {
     const player = createPlayer('p1', 'Player A', 'red')
+    player.occupationPlayed = ['C148_MudWallower']
 
     const html = renderToStaticMarkup(
       <FarmBoard
@@ -678,7 +701,7 @@ describe('FarmBoard', () => {
               },
             ],
           ]),
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -708,7 +731,7 @@ describe('FarmBoard', () => {
               },
             ],
           ]),
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -741,7 +764,7 @@ describe('FarmBoard', () => {
               },
             ],
           ]),
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -777,7 +800,7 @@ describe('FarmBoard', () => {
               isReorgDraft: false,
             },
           ],
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -814,7 +837,7 @@ describe('FarmBoard', () => {
               isReorgDraft: false,
             },
           ],
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -852,7 +875,7 @@ describe('FarmBoard', () => {
               isReorgDraft: true,
             },
           ],
-        } as Partial<FarmBoardProps>)}
+        })}
       />,
     )
 
@@ -1183,67 +1206,9 @@ describe('FarmBoard', () => {
 
     const html = renderToStaticMarkup(
       <FarmBoard
-        locale="en"
-        players={[player]}
-        currentPlayer={player}
-        displayPlayer={player}
-        devMode={false}
-        currentStartPlayerId=""
-        nextStartPlayerId=""
-        playedCards={[]}
-        farmCells={[{ key: '1-1', type: 'tile', tileRow: 0, tileCol: 0 }]}
-        roomPositions={new Set()}
-        fieldPositions={new Set()}
-        fieldMap={new Map()}
-        stablePositions={new Set()}
-        pendingRoomSet={new Set()}
-        pendingStableSet={new Set()}
-        roomSelectableSet={new Set()}
-        stableSelectableSet={new Set()}
-        farmHandSelectableSet={new Set()}
-        pendingFarmHandKey={null}
-        builtSpecialStableKeys={new Set()}
-        maxStableSelections={0}
-        plowSelectableSet={new Set()}
-        pendingPlowTile={null}
-        positionSelectableSet={new Set()}
-        pendingPositionSelections={new Set()}
-        togglePositionSelection={() => {}}
-        pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 2, stone: 0 }}
-        sowSelectableMap={new Map()}
-        pastureTiles={new Map()}
-        pastureDisplayMap={new Map()}
-        pastureCapacityMap={new Map()}
-        houseDisplay={{ animalType: null, animalCount: 0 }}
-        stableDisplayMap={new Map()}
-        isReorgActive={false}
-        reorgRemaining={null}
-        hasReorgOverflow={false}
-        animalReorg={null}
-        pendingFenceSet={new Set()}
-        existingFenceSet={new Set()}
-        fenceSelectableSet={new Set()}
-        toggleRoomTile={() => {}}
-        toggleStableTile={() => {}}
-        toggleFarmHand={() => {}}
-        togglePlowTile={() => {}}
-        updateSowSelection={() => {}}
-        toggleFenceEdge={() => {}}
-        adjustReorgAnimal={() => {}}
-        confirmAnimalReorg={() => {}}
-        cancelAnimalDiscardPrompt={() => {}}
-        setViewPlayerId={() => {}}
-        isSelectingMinor={false}
-        isSelectingOccupation={false}
-        isSelectingImprovementAny={false}
-        selectableMinorIds={new Set()}
-        selectableOccupationIds={new Set()}
-        cardAvailability={{}}
-        futureCardResources={{}}
-        resolveChoice={() => {}}
-        isInteractive={true}
-        {...({
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: '1-1', type: 'tile', tileRow: 0, tileCol: 0 }],
+          sowRemaining: { grain: 0, vegetable: 0, wood: 2, stone: 0 },
           extraSowTargets: [
             {
               key: '-1-68',
@@ -1252,7 +1217,7 @@ describe('FarmBoard', () => {
               sourceCard: 'E068_CherryOrchard',
             },
           ],
-        } as any)}
+        })}
       />,
     )
 
@@ -1269,7 +1234,6 @@ describe('FarmBoard', () => {
           farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
           sowRemaining: { grain: 1, vegetable: 0, wood: 0, stone: 0 },
           sowSelectableMap: new Map([['0-0', ['grain']]]),
-          updateSowSelection: () => {},
         })}
       />,
     )
@@ -1287,74 +1251,9 @@ describe('FarmBoard', () => {
       },
     }
 
-    const commonProps = {
-      locale: 'en' as const,
-      players: [player],
-      currentPlayer: player,
-      displayPlayer: player,
-      devMode: false,
-      currentStartPlayerId: '',
-      nextStartPlayerId: '',
-      playedCards: ['minor:C022_BasketChair'],
-      farmCells: [],
-      roomPositions: new Set<string>(),
-      fieldPositions: new Set<string>(),
-      fieldMap: new Map(),
-      stablePositions: new Set<string>(),
-      pendingRoomSet: new Set<string>(),
-      pendingStableSet: new Set<string>(),
-      roomSelectableSet: new Set<string>(),
-      stableSelectableSet: new Set<string>(),
-      farmHandSelectableSet: new Set<string>(),
-      pendingFarmHandKey: null,
-      builtSpecialStableKeys: new Set<string>(),
-      maxStableSelections: 0,
-      plowSelectableSet: new Set<string>(),
-      pendingPlowTile: null,
-      positionSelectableSet: new Set<string>(),
-      pendingPositionSelections: new Set<string>(),
-      togglePositionSelection: () => {},
-      pendingSowSelections: {},
-      sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
-      sowSelectableMap: new Map(),
-      pastureTiles: new Map(),
-      pastureDisplayMap: new Map(),
-      pastureCapacityMap: new Map(),
-      houseDisplay: { animalType: null, animalCount: 0 },
-      stableDisplayMap: new Map(),
-      isReorgActive: false,
-      reorgRemaining: null,
-      hasReorgOverflow: false,
-      animalReorg: null,
-      pendingFenceSet: new Set<string>(),
-      existingFenceSet: new Set<string>(),
-      fenceSelectableSet: new Set<string>(),
-      toggleRoomTile: () => {},
-      toggleStableTile: () => {},
-      toggleFarmHand: () => {},
-      togglePlowTile: () => {},
-      updateSowSelection: () => {},
-      toggleFenceEdge: () => {},
-      adjustReorgAnimal: () => {},
-      confirmAnimalReorg: () => {},
-      cancelAnimalDiscardPrompt: () => {},
-      setViewPlayerId: () => {},
-      isSelectingMinor: false,
-      isSelectingOccupation: false,
-      isSelectingImprovementAny: false,
-      selectableMinorIds: new Set<string>(),
-      selectableOccupationIds: new Set<string>(),
-      cardAvailability: {},
-      futureCardResources: {},
-      resolveChoice: () => {},
-      isInteractive: true,
-    }
-
-    const extraProps = { extraSowTargets: [] }
-
     // With heldWorkerId — overlay must be present
     const htmlWith = renderToStaticMarkup(
-      <FarmBoard {...(commonProps as any)} {...(extraProps as any)} />,
+      <FarmBoard {...createFarmBoardProps(player, { playedCards: ['minor:C022_BasketChair'] })} />,
     )
     expect(htmlWith).toContain('data-testid="played-card-held-worker-C022_BasketChair"')
 
@@ -1366,7 +1265,7 @@ describe('FarmBoard', () => {
       },
     }
     const htmlWithout = renderToStaticMarkup(
-      <FarmBoard {...({ ...commonProps, displayPlayer: playerNoWorker } as any)} {...(extraProps as any)} />,
+      <FarmBoard {...createFarmBoardProps(playerNoWorker, { playedCards: ['minor:C022_BasketChair'] })} />,
     )
     expect(htmlWithout).not.toContain('data-testid="played-card-held-worker-C022_BasketChair"')
   })
@@ -1377,70 +1276,13 @@ describe('FarmBoard', () => {
 
     const html = renderToStaticMarkup(
       <FarmBoard
-        locale="en"
-        players={[player]}
-        currentPlayer={player}
-        displayPlayer={player}
-        devMode={false}
-        currentStartPlayerId=""
-        nextStartPlayerId=""
-        playedCards={[]}
-        farmCells={[
-          { key: 'fh-1', type: 'fence-h', fenceId: edgeId } as never,
-        ]}
-        roomPositions={new Set()}
-        fieldPositions={new Set()}
-        fieldMap={new Map()}
-        stablePositions={new Set()}
-        pendingRoomSet={new Set()}
-        pendingStableSet={new Set()}
-        roomSelectableSet={new Set()}
-        stableSelectableSet={new Set()}
-        farmHandSelectableSet={new Set()}
-        pendingFarmHandKey={null}
-        builtSpecialStableKeys={new Set()}
-        maxStableSelections={0}
-        plowSelectableSet={new Set()}
-        pendingPlowTile={null}
-        positionSelectableSet={new Set()}
-        pendingPositionSelections={new Set()}
-        togglePositionSelection={() => {}}
-        pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
-        sowSelectableMap={new Map()}
-        pastureTiles={new Map()}
-        pastureDisplayMap={new Map()}
-        pastureCapacityMap={new Map()}
-        houseDisplay={{ animalType: null, animalCount: 0 }}
-        stableDisplayMap={new Map()}
-        isReorgActive={false}
-        reorgRemaining={null}
-        hasReorgOverflow={false}
-        animalReorg={null}
-        pendingFenceSet={new Set()}
-        pendingPalisadeSet={new Set([edgeId])}
-        existingFenceSet={new Set()}
-        fenceSelectableSet={new Set([edgeId])}
-        toggleRoomTile={() => {}}
-        toggleStableTile={() => {}}
-        toggleFarmHand={() => {}}
-        togglePlowTile={() => {}}
-        updateSowSelection={() => {}}
-        toggleFenceEdge={() => {}}
-        adjustReorgAnimal={() => {}}
-        confirmAnimalReorg={() => {}}
-        cancelAnimalDiscardPrompt={() => {}}
-        setViewPlayerId={() => {}}
-        isSelectingMinor={false}
-        isSelectingOccupation={false}
-        isSelectingImprovementAny={false}
-        selectableMinorIds={new Set()}
-        selectableOccupationIds={new Set()}
-        cardAvailability={{}}
-        futureCardResources={{}}
-        resolveChoice={() => {}}
-        isInteractive={true}
-        {...({ extraSowTargets: [] } as any)}
+        {...createFarmBoardProps(player, {
+          farmCells: [
+            { key: 'fh-1', type: 'fence-h', fenceId: edgeId },
+          ],
+          pendingPalisadeSet: new Set([edgeId]),
+          fenceSelectableSet: new Set([edgeId]),
+        })}
       />,
     )
 
@@ -1458,67 +1300,9 @@ describe('FarmBoard', () => {
 
     const html = renderToStaticMarkup(
       <FarmBoard
-        locale="en"
-        players={[player]}
-        currentPlayer={player}
-        displayPlayer={player}
-        devMode={false}
-        currentStartPlayerId=""
-        nextStartPlayerId=""
-        playedCards={[]}
-        farmCells={[{ key: '1-1', type: 'tile', tileRow: 0, tileCol: 0 }]}
-        roomPositions={new Set()}
-        fieldPositions={new Set()}
-        fieldMap={new Map()}
-        stablePositions={new Set()}
-        pendingRoomSet={new Set()}
-        pendingStableSet={new Set()}
-        roomSelectableSet={new Set()}
-        stableSelectableSet={new Set()}
-        farmHandSelectableSet={new Set()}
-        pendingFarmHandKey={null}
-        builtSpecialStableKeys={new Set()}
-        maxStableSelections={0}
-        plowSelectableSet={new Set()}
-        pendingPlowTile={null}
-        positionSelectableSet={new Set()}
-        pendingPositionSelections={new Set()}
-        togglePositionSelection={() => {}}
-        pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 2 }}
-        sowSelectableMap={new Map()}
-        pastureTiles={new Map()}
-        pastureDisplayMap={new Map()}
-        pastureCapacityMap={new Map()}
-        houseDisplay={{ animalType: null, animalCount: 0 }}
-        stableDisplayMap={new Map()}
-        isReorgActive={false}
-        reorgRemaining={null}
-        hasReorgOverflow={false}
-        animalReorg={null}
-        pendingFenceSet={new Set()}
-        existingFenceSet={new Set()}
-        fenceSelectableSet={new Set()}
-        toggleRoomTile={() => {}}
-        toggleStableTile={() => {}}
-        toggleFarmHand={() => {}}
-        togglePlowTile={() => {}}
-        updateSowSelection={() => {}}
-        toggleFenceEdge={() => {}}
-        adjustReorgAnimal={() => {}}
-        confirmAnimalReorg={() => {}}
-        cancelAnimalDiscardPrompt={() => {}}
-        setViewPlayerId={() => {}}
-        isSelectingMinor={false}
-        isSelectingOccupation={false}
-        isSelectingImprovementAny={false}
-        selectableMinorIds={new Set()}
-        selectableOccupationIds={new Set()}
-        cardAvailability={{}}
-        futureCardResources={{}}
-        resolveChoice={() => {}}
-        isInteractive={true}
-        {...({
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: '1-1', type: 'tile', tileRow: 0, tileCol: 0 }],
+          sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 2 },
           extraSowTargets: [
             {
               key: '-80-0',
@@ -1528,7 +1312,7 @@ describe('FarmBoard', () => {
               groupKey: 'E080_RockGarden',
             },
           ],
-        } as any)}
+        })}
       />,
     )
 
@@ -1562,67 +1346,9 @@ describe('FarmBoard', () => {
 
     const html = renderToStaticMarkup(
       <FarmBoard
-        locale="en"
-        players={[player]}
-        currentPlayer={player}
-        displayPlayer={player}
-        devMode={false}
-        currentStartPlayerId=""
-        nextStartPlayerId=""
-        playedCards={['minor:D075_WoodField']}
-        farmCells={[]}
-        roomPositions={new Set()}
-        fieldPositions={new Set()}
-        fieldMap={new Map()}
-        stablePositions={new Set()}
-        pendingRoomSet={new Set()}
-        pendingStableSet={new Set()}
-        roomSelectableSet={new Set()}
-        stableSelectableSet={new Set()}
-        farmHandSelectableSet={new Set()}
-        pendingFarmHandKey={null}
-        builtSpecialStableKeys={new Set()}
-        maxStableSelections={0}
-        plowSelectableSet={new Set()}
-        pendingPlowTile={null}
-        positionSelectableSet={new Set()}
-        pendingPositionSelections={new Set()}
-        togglePositionSelection={() => {}}
-        pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
-        sowSelectableMap={new Map()}
-        pastureTiles={new Map()}
-        pastureDisplayMap={new Map()}
-        pastureCapacityMap={new Map()}
-        houseDisplay={{ animalType: null, animalCount: 0 }}
-        stableDisplayMap={new Map()}
-        isReorgActive={false}
-        reorgRemaining={null}
-        hasReorgOverflow={false}
-        animalReorg={null}
-        pendingFenceSet={new Set()}
-        existingFenceSet={new Set()}
-        fenceSelectableSet={new Set()}
-        toggleRoomTile={() => {}}
-        toggleStableTile={() => {}}
-        toggleFarmHand={() => {}}
-        togglePlowTile={() => {}}
-        updateSowSelection={() => {}}
-        toggleFenceEdge={() => {}}
-        adjustReorgAnimal={() => {}}
-        confirmAnimalReorg={() => {}}
-        cancelAnimalDiscardPrompt={() => {}}
-        setViewPlayerId={() => {}}
-        isSelectingMinor={false}
-        isSelectingOccupation={false}
-        isSelectingImprovementAny={false}
-        selectableMinorIds={new Set()}
-        selectableOccupationIds={new Set()}
-        cardAvailability={{}}
-        futureCardResources={{}}
-        resolveChoice={() => {}}
-        isInteractive={true}
-        {...({ extraSowTargets: [] } as any)}
+        {...createFarmBoardProps(player, {
+          playedCards: ['minor:D075_WoodField'],
+        })}
       />,
     )
 
@@ -1700,69 +1426,11 @@ const renderWithOccSelection = (
 
   return renderToStaticMarkup(
     <FarmBoard
-      locale="en"
-      players={[displayPlayer]}
-      currentPlayer={displayPlayer}
-      displayPlayer={displayPlayer}
-      devMode={false}
-      currentStartPlayerId=""
-      nextStartPlayerId=""
-      playedCards={[]}
-      farmCells={[]}
-      roomPositions={new Set()}
-      fieldPositions={new Set()}
-      fieldMap={new Map()}
-      stablePositions={new Set()}
-      pendingRoomSet={new Set()}
-      pendingStableSet={new Set()}
-      roomSelectableSet={new Set()}
-      stableSelectableSet={new Set()}
-      farmHandSelectableSet={new Set()}
-      pendingFarmHandKey={null}
-        builtSpecialStableKeys={new Set()}
-      maxStableSelections={0}
-      plowSelectableSet={new Set()}
-      pendingPlowTile={null}
-      positionSelectableSet={new Set()}
-      pendingPositionSelections={new Set()}
-      togglePositionSelection={() => {}}
-      pendingSowSelections={{}}
-      sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
-      sowSelectableMap={new Map()}
-      pastureTiles={new Map()}
-      pastureDisplayMap={new Map()}
-      pastureCapacityMap={new Map()}
-      houseDisplay={{ animalType: null, animalCount: 0 }}
-      stableDisplayMap={new Map()}
-      isReorgActive={false}
-      reorgRemaining={null}
-      hasReorgOverflow={false}
-      animalReorg={null}
-      pendingFenceSet={new Set()}
-      existingFenceSet={new Set()}
-      fenceSelectableSet={new Set()}
-      toggleRoomTile={() => {}}
-      toggleStableTile={() => {}}
-      toggleFarmHand={() => {}}
-      togglePlowTile={() => {}}
-      updateSowSelection={() => {}}
-      toggleFenceEdge={() => {}}
-      adjustReorgAnimal={() => {}}
-      confirmAnimalReorg={() => {}}
-      cancelAnimalDiscardPrompt={() => {}}
-      setViewPlayerId={() => {}}
-      isSelectingMinor={false}
-      isSelectingOccupation={false}
-      isSelectingImprovementAny={false}
-      selectableMinorIds={new Set()}
-      selectableOccupationIds={new Set()}
-      cardAvailability={{}}
-      futureCardResources={{}}
-      resolveChoice={() => {}}
-      isInteractive={true}
-      occupationHandSelection={occupationHandSelection}
-      onConfirmOccupationHandSelection={overrides.onConfirmOccupationHandSelection}
-      {...({ extraSowTargets: [] } as any)}
+      {...createFarmBoardProps(displayPlayer, {
+        occupationHandSelection,
+      }, {
+        onConfirmOccupationHandSelection: overrides.onConfirmOccupationHandSelection,
+      })}
     />,
   )
 }

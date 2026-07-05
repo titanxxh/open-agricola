@@ -2,15 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
-import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
-import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
+import type { AnimalReorgState } from '../types/ui'
 import {
-  getFarmyardBounds,
-  getFarmyardTileKeySet,
-  getAdjacentTilesForEdge,
   isFarmyardBorderEdge,
   positionKey,
 } from '../../shared/domain/farm'
@@ -40,6 +36,7 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
+import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
@@ -62,6 +59,9 @@ import {
   buildCompactScoreRows,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
+  buildSelectableMajorIds,
+  buildSelectableMinorIds,
+  buildSelectableOccupationIds,
   buildReplayFeedback,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
@@ -71,15 +71,16 @@ import {
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
   devResourceKeysForState,
-  getCurrentlySelectableRoomKeys,
+  getPendingMoorSpecialActionChoice,
+  getPendingMoorSpecialActionTileChoice,
+  getPendingMoorSpecialActionTileKeys,
+  hasPendingMoorSpecialActionChoice,
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
   mergePublicEventCardPassAnimations,
   mergePublicEventHighlights,
   mergePublicEventResourceAnimations,
-  pendingMoorSpecialActionKey,
-  pendingMoorSpecialActionTileKey,
   playerIdFromWsStatus,
   removePublicEventCardPassAnimations,
   removePublicEventHighlights,
@@ -91,11 +92,6 @@ import {
 } from './game-container-helpers'
 import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
-  buildBorrowedPlayedCardDisplays,
-  buildCardDisplayMap,
-  buildFarmCardDisplayMap,
-  buildPastureDisplayMap,
-  buildStableDisplayMap,
   computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
   wouldExceedExclusiveCardZoneLimit,
@@ -194,9 +190,6 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
     ? playerIndex
     : undefined
 }
-
-const isOffBoardSowTile = (tile: FarmTilePosition) =>
-  tile.row < 0 || tile.row > 2 || tile.col < 0 || tile.col > 4
 
 const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
@@ -733,9 +726,7 @@ export const GameContainerApi = () => {
   const canTakeSpecialAction = useCallback((card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const key = pendingMoorSpecialActionKey(card.id, actionId)
-      return pendingMoorSpecialActionChoices.byCardAction.has(key) ||
-        (pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key)?.size ?? 0) > 0
+      return hasPendingMoorSpecialActionChoice(pendingMoorSpecialActionChoices, card.id, actionId)
     }
     if (interaction.stateId !== 'idle') return false
     return canTakeVisibleMoorSpecialAction(state, currentPlayer, card, actionId)
@@ -744,9 +735,7 @@ export const GameContainerApi = () => {
   const takeImmediateSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
     if (!state || !isInteractive) return
     if (interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const option = pendingMoorSpecialActionChoices.byCardAction.get(
-        pendingMoorSpecialActionKey(cardId, actionId),
-      )
+      const option = getPendingMoorSpecialActionChoice(pendingMoorSpecialActionChoices, cardId, actionId)
       if (!option) return
       void transport.resolveChoice(interaction.playerIndex, option.value).catch((e) => {
         console.error('resolveChoice error', e)
@@ -1101,8 +1090,6 @@ export const GameContainerApi = () => {
     if (space) takeAction(space)
   }, [seasonActions, takeAction])
 
-  const playedCards = displayPlayer ? getPlayedCardKeys(displayPlayer) : []
-
   const isSelectingFences = pendingChoice?.promptKey === 'ui.interactionFenceSelect'
   const isSelectingStables = pendingChoice?.promptKey === 'ui.interactionStableSelect'
   const isSelectingRooms = pendingChoice?.promptKey === 'ui.interactionRoomSelect'
@@ -1114,27 +1101,15 @@ export const GameContainerApi = () => {
   const pendingChoiceOptions = pendingChoice?.options
   const selectableMinorIds =
     pendingChoiceOptions && isSelectingMinor
-      ? new Set(
-          pendingChoiceOptions
-            .map((option) =>
-              option.value.startsWith('minor:') ? option.value.slice('minor:'.length) : option.value,
-            )
-            .filter((value) => !value.startsWith('major:')),
-        )
+      ? buildSelectableMinorIds(pendingChoiceOptions)
       : new Set<string>()
   const selectableOccupationIds =
     pendingChoiceOptions && isSelectingOccupation
-      ? new Set(pendingChoiceOptions.map((option) => option.value))
+      ? buildSelectableOccupationIds(pendingChoiceOptions)
       : new Set<string>()
   const selectableMajorIds =
     pendingChoiceOptions && isSelectingImprovementAny
-      ? new Set(
-          pendingChoiceOptions
-            .map((option) =>
-              option.value.startsWith('major:') ? option.value.slice('major:'.length) : option.value,
-            )
-            .filter((value) => availableMajorImprovements?.includes(value)),
-        )
+      ? buildSelectableMajorIds(pendingChoiceOptions, availableMajorImprovements)
       : new Set<string>()
 
   const isBakeExchange =
@@ -1376,15 +1351,7 @@ export const GameContainerApi = () => {
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, transport, isInteractive, runInteractionSubmitCommand])
 
-  const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
-  const fieldMap = useMemo(() => {
-    const map = new Map<string, { stacks: CropStack[] }>()
-    ;(displayPlayer?.fields ?? []).forEach((f) => { map.set(positionKey({ row: f.row, col: f.col }), { stacks: f.stacks }) })
-    return map
-  }, [displayPlayer?.fields])
-  const stablePositions = useMemo(() => new Set((displayPlayer?.stableTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.stableTiles])
-  const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
   const displayPublicEventNotifications = useMemo(
@@ -1521,126 +1488,70 @@ export const GameContainerApi = () => {
   const sowErrorText: string | null = sowError
     ? t(locale, farmCommitErrorMessageKey('sow', sowError))
     : null
-  const farmGrid = useMemo(() => {
-    if (!displayPlayer) return { cells: [], columns: 11 }
-    const bounds = { ...getFarmyardBounds(displayPlayer) }
-    const tileKeys = new Set(getFarmyardTileKeySet(displayPlayer))
-    const pendingSelectionTiles =
-      interaction.stateId === 'wait' &&
-      selectionInteraction?.kind === 'farm-position' &&
-      state?.players[interaction.playerIndex]?.id === displayPlayer.id
-        ? selectionInteraction.selectablePositions
-        : []
-    pendingSelectionTiles.forEach((tile) => {
-      tileKeys.add(positionKey(tile))
-      bounds.minRow = Math.min(bounds.minRow, tile.row)
-      bounds.maxRow = Math.max(bounds.maxRow, tile.row)
-      bounds.minCol = Math.min(bounds.minCol, tile.col)
-      bounds.maxCol = Math.max(bounds.maxCol, tile.col)
-    })
-    const rows = (bounds.maxRow - bounds.minRow + 1) * 2 + 1
-    const cols = (bounds.maxCol - bounds.minCol + 1) * 2 + 1
-    const cells: { key: string; type: 'tile' | 'post' | 'fence-h' | 'fence-v' | 'void'; tileRow?: number; tileCol?: number; fenceId?: string }[] = []
-    const hasAdjacentTileForPost = (boundaryRow: number, boundaryCol: number) =>
-      [
-        { row: boundaryRow - 1, col: boundaryCol - 1 },
-        { row: boundaryRow - 1, col: boundaryCol },
-        { row: boundaryRow, col: boundaryCol - 1 },
-        { row: boundaryRow, col: boundaryCol },
-      ].some((tile) => tileKeys.has(positionKey(tile)))
-    const hasAdjacentTileForEdge = (edgeId: string) =>
-      getAdjacentTilesForEdge(edgeId).some((tile) => tileKeys.has(positionKey(tile)))
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-      const isTile = row % 2 === 1 && col % 2 === 1
-      const isPost = row % 2 === 0 && col % 2 === 0
-      const isFenceH = row % 2 === 0 && col % 2 === 1
-      const isFenceV = row % 2 === 1 && col % 2 === 0
-      const tileRow = isTile ? bounds.minRow + (row - 1) / 2 : undefined
-      const tileCol = isTile ? bounds.minCol + (col - 1) / 2 : undefined
-      const boundaryRow = bounds.minRow + row / 2
-      const boundaryCol = bounds.minCol + col / 2
-      const fenceId = isFenceH
-        ? `H-${boundaryRow}-${bounds.minCol + (col - 1) / 2}`
-        : isFenceV
-          ? `V-${bounds.minRow + (row - 1) / 2}-${boundaryCol}`
-          : undefined
-      const type =
-        isTile
-          ? tileKeys.has(positionKey({ row: tileRow!, col: tileCol! })) ? 'tile' : 'void'
-          : isFenceH || isFenceV
-            ? fenceId && hasAdjacentTileForEdge(fenceId)
-              ? isFenceH ? 'fence-h' : 'fence-v'
-              : 'void'
-            : isPost && hasAdjacentTileForPost(boundaryRow, boundaryCol)
-              ? 'post'
-              : 'void'
-      cells.push({
-        key: `${row}-${col}`,
-        type,
-        tileRow,
-        tileCol,
-        fenceId,
-      })
+  const specialTerrainSelectableSet = useMemo(() => {
+    if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
+    if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
+    if (pendingMoorSpecialActionChoices.isActive) {
+      if (!isInteractive || interaction.stateId !== 'wait') return new Set<string>()
+      if (displayPlayer.id !== activePlayer?.id) return new Set<string>()
+      return getPendingMoorSpecialActionTileKeys(
+        pendingMoorSpecialActionChoices,
+        selectedSpecialAction.cardId,
+        selectedSpecialAction.actionId,
+      )
     }
-    return { cells, columns: cols }
-  }, [displayPlayer, interaction, selectionInteraction, state?.players])
-  const farmCells = farmGrid.cells
-  const farmGridColumns = farmGrid.columns
-
-  const pastureTiles = useMemo(() => {
-    const map = new Map<string, { pastureId: string; isCorner: boolean }>()
-    ;(displayPlayer?.pastures ?? []).forEach((pasture) => {
-      if (!pasture.tiles || pasture.tiles.length === 0) return
-      let corner = pasture.tiles[0]
-      pasture.tiles.forEach((tile) => {
-        if (tile.row > corner.row || (tile.row === corner.row && tile.col > corner.col)) corner = tile
-      })
-      const cornerKey = positionKey(corner)
-      pasture.tiles.forEach((tile) => {
-        map.set(positionKey(tile), { pastureId: pasture.id, isCorner: positionKey(tile) === cornerKey })
-      })
-    })
-    return map
-  }, [displayPlayer?.pastures])
-  const pastureDisplayMap = useMemo(() => {
-    return buildPastureDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const pastureCapacityMap = useMemo(() => {
-    const map = new Map<string, number>()
-    ;(displayPlayer?.pastures ?? []).forEach((p) => {
-      if (p.tiles.length > 0) {
-        map.set(p.id, pastureCapacities[displayPlayer?.id ?? '']?.[p.id] ?? 0)
-      }
-    })
-    return map
-  }, [displayPlayer?.pastures, displayPlayer?.id, pastureCapacities])
+    if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
+    if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
+    const targetKind = selectedSpecialAction.actionId === 'cut-peat' ? 'moor' : 'forest'
+    return new Set(
+      (displayPlayer.farmTerrain ?? [])
+        .filter((tile) => tile.kind === targetKind)
+        .map((tile) => positionKey(tile)),
+    )
+  }, [activePlayer?.id, currentPlayer, displayPlayer, interaction.stateId, isInteractive, pendingMoorSpecialActionChoices, selectedSpecialAction, state])
+  const farmBoardProjection = useMemo(
+    () => buildFarmBoardProjection({
+      displayPlayer,
+      interaction,
+      farmInteraction,
+      selectionInteraction,
+      players: state?.players,
+      state,
+      pastureCapacities,
+      animalReorg,
+      pendingAnimalReorg,
+      pendingRoomTiles,
+      pendingStableTiles,
+      pendingFarmHand,
+      extraPositionSelectableSet: specialTerrainSelectableSet,
+    }),
+    [
+      displayPlayer,
+      interaction,
+      farmInteraction,
+      selectionInteraction,
+      state,
+      pastureCapacities,
+      animalReorg,
+      pendingAnimalReorg,
+      pendingRoomTiles,
+      pendingStableTiles,
+      pendingFarmHand,
+      specialTerrainSelectableSet,
+    ],
+  )
+  const actionBoardProjection = useMemo(
+    () => buildActionBoardProjection({
+      locale,
+      players: state?.players ?? [],
+      baseActions,
+      roundSlots,
+      currentRound: state?.round ?? 1,
+    }),
+    [baseActions, locale, roundSlots, state?.players, state?.round],
+  )
+  const { reorgRemaining } = farmBoardProjection
   const isReorgActive = !!animalReorg
-
-  const houseDisplay = useMemo(() => {
-    if (isReorgActive && animalReorg) {
-      const zone = animalReorg.zones.find((entry) => entry.zoneType === 'house')
-      return {
-        animalType: zone?.animalType ?? null,
-        animalCount: zone?.animalCount ?? 0,
-      }
-    }
-    return { 
-      animalType: displayPlayer?.houseAnimalType ?? null,
-      animalCount: displayPlayer?.houseAnimalCount ?? 0 
-    }
-  }, [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount, isReorgActive, animalReorg])
-  const stableDisplayMap = useMemo(() => {
-    return buildStableDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const cardDisplayMap = useMemo(() => {
-    return buildCardDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
-  const borrowedPlayedCardDisplays = useMemo(() => {
-    return buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
-  }, [state, displayPlayer, animalReorg])
-  const farmCardDisplayMap = useMemo(() => {
-    return buildFarmCardDisplayMap(displayPlayer, animalReorg)
-  }, [displayPlayer, animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
@@ -1661,13 +1572,6 @@ export const GameContainerApi = () => {
     if (!reorgAvailable) return false
     return REORG_ANIMAL_TYPES.some((animal) => reorgTotals[animal] > reorgAvailable[animal])
   }, [reorgAvailable, reorgTotals])
-  const reorgRemaining = useMemo(() => {
-    if (!reorgAvailable) return null
-    return REORG_ANIMAL_TYPES.reduce((acc, animal) => {
-      acc[animal] = Math.max(0, reorgAvailable[animal] - reorgTotals[animal])
-      return acc
-    }, emptyAnimalTotals())
-  }, [reorgAvailable, reorgTotals])
   const confirmAnimalReorg = useCallback(() => {
     if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {
       setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: true } : prev)
@@ -1675,104 +1579,6 @@ export const GameContainerApi = () => {
     }
     resolveChoice('confirm')
   }, [animalReorg, reorgRemaining, resolveChoice])
-  const roomSelectableSet = useMemo(
-    () => {
-      if (farmInteraction?.farmType !== 'room') return new Set<string>()
-      return getCurrentlySelectableRoomKeys(
-        farmInteraction.selectableTiles,
-        roomPositions,
-        new Set(pendingRoomTiles.map((tile) => positionKey(tile))),
-      )
-    },
-    [farmInteraction, pendingRoomTiles, roomPositions],
-  )
-  const stableSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'stable'
-          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const farmHandSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'stable'
-          ? (farmInteraction.farmHandPositions ?? []).map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const builtSpecialStableKeys = useMemo(
-    () =>
-      new Set(
-        (displayPlayer?.specialStables ?? []).map((entry) => positionKey(entry.position)),
-      ),
-    [displayPlayer?.specialStables],
-  )
-  const fenceSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'fence'
-          ? farmInteraction.selectableEdges
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const positionSelectableSet = useMemo(
-    () =>
-      new Set(
-        selectionInteraction?.kind === 'farm-position'
-          ? selectionInteraction.selectablePositions.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [selectionInteraction],
-  )
-  const specialTerrainSelectableSet = useMemo(() => {
-    if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
-    if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
-    const key = pendingMoorSpecialActionKey(selectedSpecialAction.cardId, selectedSpecialAction.actionId)
-    if (pendingMoorSpecialActionChoices.isActive) {
-      if (!isInteractive || interaction.stateId !== 'wait') return new Set<string>()
-      if (displayPlayer.id !== activePlayer?.id) return new Set<string>()
-      return new Set(pendingMoorSpecialActionChoices.selectableTileKeysByCardAction.get(key) ?? [])
-    }
-    if (!isInteractive || interaction.stateId !== 'idle') return new Set<string>()
-    if (displayPlayer.id !== currentPlayer.id) return new Set<string>()
-    const targetKind = selectedSpecialAction.actionId === 'cut-peat' ? 'moor' : 'forest'
-    return new Set(
-      (displayPlayer.farmTerrain ?? [])
-        .filter((tile) => tile.kind === targetKind)
-        .map((tile) => positionKey(tile)),
-    )
-  }, [activePlayer?.id, currentPlayer, displayPlayer, interaction.stateId, isInteractive, pendingMoorSpecialActionChoices, selectedSpecialAction, state])
-  const combinedPositionSelectableSet = useMemo(
-    () => new Set([...positionSelectableSet, ...specialTerrainSelectableSet]),
-    [positionSelectableSet, specialTerrainSelectableSet],
-  )
-  const { sowSelectableMap, extraSowTargets } = useMemo(() => {
-    const map = new Map<string, PendingSowCrop[]>()
-    const extraTargets: ExtraSowTarget[] = []
-    if (farmInteraction?.farmType !== 'sow') {
-      return { sowSelectableMap: map, extraSowTargets: extraTargets }
-    }
-    farmInteraction.selectableFields.forEach((entry) => {
-      const key = positionKey(entry.tile)
-      if (isOffBoardSowTile(entry.tile)) {
-        extraTargets.push({
-          key,
-          tile: entry.tile,
-          allowedCrops: entry.allowedCrops,
-          sourceCard: entry.sourceCard,
-          groupKey: entry.groupKey,
-        })
-        return
-      }
-      map.set(key, entry.allowedCrops)
-    })
-    return { sowSelectableMap: map, extraSowTargets: extraTargets }
-  }, [farmInteraction])
   const groupKeyByTile = useMemo(() => {
     const map = new Map<string, string | undefined>()
     if (farmInteraction?.farmType === 'sow') {
@@ -1794,12 +1600,11 @@ export const GameContainerApi = () => {
     updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
     if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
-      const option = pendingMoorSpecialActionChoices.byCardActionTile.get(
-        pendingMoorSpecialActionTileKey(
-          selectedSpecialAction.cardId,
-          selectedSpecialAction.actionId,
-          positionKey(tile),
-        ),
+      const option = getPendingMoorSpecialActionTileChoice(
+        pendingMoorSpecialActionChoices,
+        selectedSpecialAction.cardId,
+        selectedSpecialAction.actionId,
+        tile,
       )
       if (!option) return
       void transport.resolveChoice(interaction.playerIndex, option.value).catch((e) => {
@@ -2226,6 +2031,62 @@ export const GameContainerApi = () => {
     )
   }
 
+  const farmBoardView = {
+    ...farmBoardProjection,
+    locale,
+    activePlayerId: activePlayer?.id,
+    currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
+    nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
+    fieldPositions,
+    maxStableSelections,
+    plowSelectableSet,
+    pendingPlowTile,
+    pendingPositionSelections,
+    pendingSowSelections,
+    sowRemaining,
+    isReorgActive,
+    hasReorgOverflow,
+    animalReorg,
+    pendingFenceSet,
+    pendingFenceSourceMap: isBorrowedFenceSelection ? pendingFenceSources : undefined,
+    pendingPalisadeSet,
+    fencePlacementMode: isBorrowedFenceSelection ? 'fence' as const : fencePlacementMode,
+    isSelectingMinor,
+    isSelectingOccupation,
+    isSelectingImprovementAny,
+    selectableMinorIds,
+    selectableOccupationIds,
+    cardAvailability,
+    futureCardResources,
+    devMode,
+    isInteractive,
+    occupationHandSelection: occupationHandInteraction ?? undefined,
+    highlightedFarmTileKeys,
+    highlightedFenceEdgeIds,
+  }
+  const farmBoardActions = {
+    toggleRoomTile: wrappedToggleRoom,
+    toggleStableTile: wrappedToggleStable,
+    toggleFarmHand: wrappedToggleFarmHand,
+    togglePlowTile: wrappedTogglePlow,
+    updateSowSelection: wrappedUpdateSow,
+    togglePositionSelection: wrappedTogglePositionSelection,
+    toggleFenceEdge: wrappedToggleFenceEdge,
+    adjustReorgAnimal,
+    confirmAnimalReorg,
+    cancelAnimalDiscardPrompt,
+    setViewPlayerId: setViewPlayerIdSafe,
+    resolveChoice,
+    onConfirmOccupationHandSelection: (ids: string[]) => {
+      if (!isInteractive) return
+      const submitCommand = buildInteractionSubmitCommand(interaction, {
+        value: 'confirm',
+        occupationCardIds: ids,
+      })
+      runInteractionSubmitCommand(submitCommand)
+    },
+  }
+
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {notificationStack}
@@ -2613,7 +2474,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
           </section>
           {state.enableThroughTheSeasons && state.throughTheSeasons ? (
             <section className="board-panel board-seasons">
@@ -2664,46 +2525,11 @@ export const GameContainerApi = () => {
             onChange={setViewPlayerIdSafe}
           />
           <section className="board-panel board-farm">
-            <PlayerFarmPanel locale={locale} state={state} viewedPlayerId={displayPlayer.id} devMode={devMode}
-              activePlayerId={activePlayer?.id}
-              currentStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-              nextStartPlayerId={state.players.find((p) => p.startPlayer)?.id ?? ''}
-              playedCards={playedCards} farmCells={farmCells} farmGridColumns={farmGridColumns} roomPositions={roomPositions} fieldPositions={fieldPositions}
-              fieldMap={fieldMap} stablePositions={stablePositions}
-              pendingRoomSet={new Set(pendingRoomTiles.map((tp) => positionKey(tp)))}
-              pendingStableSet={new Set(pendingStableTiles.map((tp) => positionKey(tp)))}
-              roomSelectableSet={roomSelectableSet} stableSelectableSet={stableSelectableSet}
-              farmHandSelectableSet={farmHandSelectableSet}
-              pendingFarmHandKey={pendingFarmHand ? positionKey(pendingFarmHand) : null}
-              builtSpecialStableKeys={builtSpecialStableKeys}
-              maxStableSelections={maxStableSelections} plowSelectableSet={plowSelectableSet} pendingPlowTile={pendingPlowTile}
-              positionSelectableSet={combinedPositionSelectableSet} pendingPositionSelections={pendingPositionSelections} togglePositionSelection={wrappedTogglePositionSelection}
-              pendingSowSelections={pendingSowSelections} sowRemaining={sowRemaining} sowSelectableMap={sowSelectableMap} extraSowTargets={extraSowTargets} pastureTiles={pastureTiles}
-              pastureDisplayMap={pastureDisplayMap} pastureCapacityMap={pastureCapacityMap} houseDisplay={houseDisplay}
-              stableDisplayMap={stableDisplayMap} cardDisplayMap={cardDisplayMap} farmCardDisplayMap={farmCardDisplayMap} borrowedPlayedCardDisplays={borrowedPlayedCardDisplays} isReorgActive={isReorgActive} reorgRemaining={reorgRemaining}
-              hasReorgOverflow={hasReorgOverflow} animalReorg={animalReorg} pendingFenceSet={pendingFenceSet} pendingFenceSourceMap={isBorrowedFenceSelection ? pendingFenceSources : undefined} pendingPalisadeSet={pendingPalisadeSet}
-              existingFenceSet={existingFenceSet} fenceSelectableSet={fenceSelectableSet}
-              fencePlacementMode={isBorrowedFenceSelection ? 'fence' : fencePlacementMode}
-              toggleRoomTile={wrappedToggleRoom} toggleStableTile={wrappedToggleStable}
-              toggleFarmHand={wrappedToggleFarmHand}
-              togglePlowTile={wrappedTogglePlow} updateSowSelection={wrappedUpdateSow}
-              toggleFenceEdge={wrappedToggleFenceEdge} adjustReorgAnimal={adjustReorgAnimal}
-              confirmAnimalReorg={confirmAnimalReorg} cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-              setViewPlayerId={setViewPlayerIdSafe} isSelectingMinor={isSelectingMinor} isSelectingOccupation={isSelectingOccupation}
-              isSelectingImprovementAny={isSelectingImprovementAny} selectableMinorIds={selectableMinorIds}
-              selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
-              isInteractive={isInteractive}
-              occupationHandSelection={occupationHandInteraction ?? undefined}
-              highlightedFarmTileKeys={highlightedFarmTileKeys}
-              highlightedFenceEdgeIds={highlightedFenceEdgeIds}
-              onConfirmOccupationHandSelection={(ids) => {
-                if (!isInteractive) return
-                const submitCommand = buildInteractionSubmitCommand(interaction, {
-                  value: 'confirm',
-                  occupationCardIds: ids,
-                })
-                runInteractionSubmitCommand(submitCommand)
-              }}
+            <PlayerFarmPanel
+              state={state}
+              viewedPlayerId={displayPlayer.id}
+              view={farmBoardView}
+              actions={farmBoardActions}
             />
           </section>
         </div>

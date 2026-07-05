@@ -37,6 +37,7 @@ import {
   enforceSelectedTargetMandatory,
   findActionNode,
   normalizeFollowUpAction,
+  pendingCursorFromEnvelope,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
@@ -823,7 +824,8 @@ export function engineResolveChoice(
     ? int.tree.findNodeById(int.pendingNodeIdRef.value)
     : null
   const pendingEnvelope = pendingEnvelopeFromHostNode(pendingHost)
-  const actionId = pendingEnvelope?.pendingActionId
+  const pendingCursor = pendingCursorFromEnvelope(pendingEnvelope)
+  const actionId = pendingCursor?.pendingActionId
     ?? (pendingHost instanceof ActionNode ? pendingHost.actionId : null)
   if (!actionId) {
     return { type: 'ok' }
@@ -838,7 +840,7 @@ export function engineResolveChoice(
   }
   const executionContext = buildChoiceExecutionContext(
     context,
-    pendingEnvelope?.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1],
+    pendingCursor?.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1],
   )
   executionContext.params = {
     ...(executionContext.params ?? {}),
@@ -995,13 +997,13 @@ export function engineResolveChoice(
       choice,
     )
     deferredHostNode.deferredHostResultTargetNodeId =
-      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId
+      pendingCursor?.internalHostNodeId ?? pendingHost.internalHostNodeId
     deferredHostNode.deferredHostResultKey =
-      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey
-    const insertAnchor = pendingEnvelope?.ownerNodeId ?? pendingHost.id
+      pendingCursor?.internalResultKey ?? pendingHost.internalResultKey
+    const insertAnchor = pendingCursor?.ownerNodeId ?? pendingHost.id
     pendingHost.resolve(result)
-    if (pendingEnvelope?.ownerNodeId) {
-      const ownerNode = int.tree.findNodeById(pendingEnvelope.ownerNodeId)
+    if (pendingCursor?.ownerNodeId) {
+      const ownerNode = int.tree.findNodeById(pendingCursor.ownerNodeId)
       if (ownerNode instanceof XorNode) resolveXorIfSelectedBranchComplete(ownerNode)
     }
     int.pendingNodeIdRef.value = null
@@ -1015,16 +1017,16 @@ export function engineResolveChoice(
     pendingHost &&
     pendingEnvelope
   ) {
-    const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
+    const contextSnapshot = pendingCursor?.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
       targetNode: pendingHost,
-      hostNodeId: pendingEnvelope.hostNodeId,
+      hostNodeId: pendingCursor?.hostNodeId ?? null,
       request: pendingEnvelope.request,
       promptKey: pendingEnvelope.promptKey,
       promptParams: pendingEnvelope.promptParams,
       choiceOptions: pendingEnvelopeChoices(pendingEnvelope),
       actionId: committedActionId,
-      ownerNodeId: pendingEnvelope.ownerNodeId ?? null,
+      ownerNodeId: pendingCursor?.ownerNodeId ?? null,
       preserveOwner: true,
       params: contextSnapshot?.params,
       costs: contextSnapshot?.costs,
@@ -1058,7 +1060,7 @@ export function engineResolveChoice(
       promptParams: result.promptParams,
       choiceOptions: requestOptions,
       actionId: committedActionId,
-      ownerNodeId: pendingEnvelope?.ownerNodeId ?? null,
+      ownerNodeId: pendingCursor?.ownerNodeId ?? null,
       preserveOwner: true,
       params: executionContext.params,
       costs: executionContext.costs,
@@ -1073,7 +1075,7 @@ export function engineResolveChoice(
     if (pendingHost instanceof ActionNode) copyInternalMetadataToPending(pendingHost, pendingEnvelope ?? undefined)
     return result
   }
-  const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
+  const insertionTargetId = pendingCursor?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const eventReadContext = pendingEventReadContext(completedEvents)
   const triggerSnapshot = result.type === 'ok'
     ? createTriggerSnapshot(context.state)
@@ -1180,13 +1182,13 @@ export function engineResolveChoice(
   if (pendingHost instanceof ActionNode) {
     recordInternalResult(
       int,
-      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId,
-      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey,
+      pendingCursor?.internalHostNodeId ?? pendingHost.internalHostNodeId,
+      pendingCursor?.internalResultKey ?? pendingHost.internalResultKey,
       result,
     )
     pendingHost.resolve(result)
   }
-  const ownerNodeIdToResolve = pendingEnvelope?.ownerNodeId ?? null
+  const ownerNodeIdToResolve = pendingCursor?.ownerNodeId ?? null
   if (ownerNodeIdToResolve) {
     const ownerNode = int.tree.findNodeById(ownerNodeIdToResolve)
     if (ownerNode instanceof XorNode) {

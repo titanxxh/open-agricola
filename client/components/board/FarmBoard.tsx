@@ -11,10 +11,6 @@ import type {
 } from '../../../shared/contract/types'
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
-import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
-import { readAllPublicCardMarkers } from '../../../shared/cards/helpers/public-card-markers'
-import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
-import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import type { ParentCardId } from '../../../shared/parents'
 import {
   getPlayerPanelSupplySummary,
@@ -30,10 +26,6 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
-import {
-  M084_BOG_PONY_ID,
-  readBogPonyLyingHorseCountFromExtraData,
-} from '../../../shared/cards/M/M084_BogPony-state'
 
 type AnimalType = AnimalKey
 const ANIMAL_CONTROL_TYPES: readonly AnimalType[] = ALL_ANIMAL_KEYS
@@ -61,13 +53,33 @@ type FarmTerrainMarker = {
   workerId?: string
   sourceCard?: string
 }
+type PublicCardMarkerDisplay = {
+  id: string
+  label: string
+  sourceCardId: string
+  score?: number
+  cardId: string
+}
+type ParentCardDisplay = {
+  id: ParentCardId
+  infobox?: string
+  completedTier?: 1 | 2 | 3
+}
+type PlayedCardDisplay = {
+  cardId: string
+  rawId: string
+  cardType: CardType
+  infobox?: string
+  displayCounters: Record<string, number>
+  resourceStats?: CardResourceStats
+  stack: string[]
+  cardStacks: CropStack[] | null
+  heldWorkerId?: string
+  m084LyingHorses: number
+}
 
-const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
 const PARENT_CARD_PREVIEW_WIDTH = 320
 const PARENT_CARD_PREVIEW_HEIGHT = Math.round((PARENT_CARD_PREVIEW_WIDTH * 560) / 735)
-
-const parentFatherCompletedTier = (value: unknown): 1 | 2 | 3 | undefined =>
-  value === 1 || value === 2 || value === 3 ? value : undefined
 
 const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
   WC: ['wood', 'clay'],
@@ -369,30 +381,13 @@ const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
 const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
   color ? BGA_FENCE_COLORS[color] : undefined
 
-const isFarmTerrainMarker = (value: unknown): value is FarmTerrainMarker => {
-  if (!value || typeof value !== 'object') return false
-  const marker = value as Partial<FarmTerrainMarker>
-  return Number.isInteger(marker.row) && Number.isInteger(marker.col) && typeof marker.kind === 'string'
-}
-
-const readFarmTerrainMarkers = (player: PlayerState): FarmTerrainMarker[] =>
-  Object.entries(player.cardStates ?? {}).flatMap(([cardId, state]) => {
-    const raw = state.extraData?.farmTerrainMarkers
-    if (!Array.isArray(raw)) return []
-    return raw.filter(isFarmTerrainMarker).map((marker) => ({
-      ...marker,
-      sourceCard: typeof marker.sourceCard === 'string' ? marker.sourceCard : cardId,
-      workerId: typeof marker.workerId === 'string' ? marker.workerId : undefined,
-    }))
-  })
-
 const canCardZoneAcceptAnimal = (display: CardAnimalDisplay, animalType: AnimalType) => {
   if (display.allowedAnimalTypes && !display.allowedAnimalTypes.includes(animalType)) return false
   if (display.allowedAnimalType && display.allowedAnimalType !== animalType) return false
   return true
 }
 
-export type FarmBoardProps = {
+export type FarmBoardView = {
   locale: Locale
   players: PlayerState[]
   currentPlayer: PlayerState
@@ -402,7 +397,7 @@ export type FarmBoardProps = {
   devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
-  playedCards: string[]
+  playedCards?: string[]
   farmCells: FarmCell[]
   farmGridColumns?: number
   roomPositions: Set<string>
@@ -421,7 +416,6 @@ export type FarmBoardProps = {
   pendingPlowTile: FarmTilePosition | null
   positionSelectableSet: Set<string>
   pendingPositionSelections: Set<string>
-  togglePositionSelection: (tile: FarmTilePosition) => void
   pendingSowSelections: Record<string, PendingSowCrop>
   sowRemaining: Record<PendingSowCrop, number>
   sowSelectableMap: Map<string, PendingSowCrop[]>
@@ -440,6 +434,11 @@ export type FarmBoardProps = {
   cardDisplayMap?: Map<string, CardAnimalDisplay>
   farmCardDisplayMap?: Map<string, CardAnimalDisplay>
   borrowedPlayedCardDisplays?: BorrowedPlayedCardDisplay[]
+  lockedTileKeys?: Set<string>
+  publicCardMarkers?: PublicCardMarkerDisplay[]
+  farmTerrainMarkerMap?: Map<string, FarmTerrainMarker[]>
+  parentCardDisplays?: ParentCardDisplay[]
+  playedCardDisplays?: PlayedCardDisplay[]
   isReorgActive: boolean
   reorgRemaining: Record<AnimalType, number> | null
   hasReorgOverflow: boolean
@@ -450,20 +449,6 @@ export type FarmBoardProps = {
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
   fencePlacementMode?: 'fence' | 'palisade'
-  toggleRoomTile: (tile: FarmTilePosition) => void
-  toggleStableTile: (tile: FarmTilePosition) => void
-  toggleFarmHand: (tile: FarmTilePosition) => void
-  togglePlowTile: (tile: FarmTilePosition) => void
-  updateSowSelection: (tile: FarmTilePosition, value: string) => void
-  toggleFenceEdge: (edgeId: string) => void
-  adjustReorgAnimal: (
-    zoneId: string,
-    animalType: AnimalType,
-    delta: number,
-  ) => void
-  confirmAnimalReorg: () => void
-  cancelAnimalDiscardPrompt: () => void
-  setViewPlayerId: (value: string) => void
   isSelectingMinor: boolean
   isSelectingOccupation: boolean
   isSelectingImprovementAny: boolean
@@ -479,7 +464,6 @@ export type FarmBoardProps = {
       resources: Partial<Resource>
     }[]
   >
-  resolveChoice: (value: string) => void
   isInteractive: boolean
   occupationHandSelection?: {
     kind: 'occupation-hand'
@@ -487,10 +471,34 @@ export type FarmBoardProps = {
     minSelections: number
     maxSelections: number
   }
-  onConfirmOccupationHandSelection?: (cardIds: string[]) => void
   infirmaryWorkerCount?: number
   highlightedFarmTileKeys?: ReadonlySet<string>
   highlightedFenceEdgeIds?: ReadonlySet<string>
+}
+
+export type FarmBoardActions = {
+  togglePositionSelection: (tile: FarmTilePosition) => void
+  toggleRoomTile: (tile: FarmTilePosition) => void
+  toggleStableTile: (tile: FarmTilePosition) => void
+  toggleFarmHand: (tile: FarmTilePosition) => void
+  togglePlowTile: (tile: FarmTilePosition) => void
+  updateSowSelection: (tile: FarmTilePosition, value: string) => void
+  toggleFenceEdge: (edgeId: string) => void
+  adjustReorgAnimal: (
+    zoneId: string,
+    animalType: AnimalType,
+    delta: number,
+  ) => void
+  confirmAnimalReorg: () => void
+  cancelAnimalDiscardPrompt: () => void
+  setViewPlayerId: (value: string) => void
+  resolveChoice: (value: string) => void
+  onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+}
+
+export type FarmBoardProps = {
+  view: FarmBoardView
+  actions: FarmBoardActions
 }
 
 type TooltipPosition = {
@@ -747,79 +755,86 @@ const ParentCardTile = ({
   )
 }
 
-export const FarmBoard = ({
-  locale,
-  players,
-  currentPlayer,
-  displayPlayer,
-  activePlayerId,
-  playerPanelSummary,
-  currentStartPlayerId,
-  nextStartPlayerId,
-  playedCards,
-  farmCells,
-  farmGridColumns = 11,
-  roomPositions,
-  fieldPositions,
-  fieldMap,
-  stablePositions,
-  pendingRoomSet,
-  pendingStableSet,
-  roomSelectableSet,
-  stableSelectableSet,
-  farmHandSelectableSet,
-  pendingFarmHandKey,
-  builtSpecialStableKeys,
-  maxStableSelections,
-  plowSelectableSet,
-  pendingPlowTile,
-  positionSelectableSet,
-  pendingPositionSelections,
-  togglePositionSelection,
-  pendingSowSelections,
-  sowRemaining,
-  sowSelectableMap,
-  extraSowTargets,
-  pastureTiles,
-  pastureDisplayMap,
-  pastureCapacityMap,
-  houseDisplay,
-  stableDisplayMap,
-  cardDisplayMap = new Map(),
-  farmCardDisplayMap = new Map(),
-  borrowedPlayedCardDisplays = [],
-  isReorgActive,
-  reorgRemaining,
-  pendingFenceSet,
-  pendingFenceSourceMap,
-  pendingPalisadeSet,
-  existingFenceSet,
-  fenceSelectableSet,
-  fencePlacementMode,
-  toggleRoomTile,
-  toggleStableTile,
-  toggleFarmHand,
-  togglePlowTile,
-  updateSowSelection,
-  toggleFenceEdge,
-  adjustReorgAnimal,
-  setViewPlayerId,
-  isSelectingMinor,
-  isSelectingOccupation,
-  isSelectingImprovementAny,
-  selectableMinorIds,
-  selectableOccupationIds,
-  cardAvailability,
-  futureCardResources,
-  resolveChoice,
-  devMode,
-  isInteractive,
-  occupationHandSelection,
-  onConfirmOccupationHandSelection,
-  infirmaryWorkerCount,
-  highlightedFarmTileKeys = new Set<string>(),
-  highlightedFenceEdgeIds = new Set<string>(),
-}: FarmBoardProps) => {
+export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
+  const {
+    locale,
+    players,
+    currentPlayer,
+    displayPlayer,
+    activePlayerId,
+    playerPanelSummary,
+    currentStartPlayerId,
+    nextStartPlayerId,
+    farmCells,
+    farmGridColumns = 11,
+    roomPositions,
+    fieldPositions,
+    fieldMap,
+    stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    farmHandSelectableSet,
+    pendingFarmHandKey,
+    builtSpecialStableKeys,
+    maxStableSelections,
+    plowSelectableSet,
+    pendingPlowTile,
+    positionSelectableSet,
+    pendingPositionSelections,
+    pendingSowSelections,
+    sowRemaining,
+    sowSelectableMap,
+    extraSowTargets,
+    pastureTiles,
+    pastureDisplayMap,
+    pastureCapacityMap,
+    houseDisplay,
+    stableDisplayMap,
+    cardDisplayMap = new Map(),
+    farmCardDisplayMap = new Map(),
+    borrowedPlayedCardDisplays = [],
+    lockedTileKeys = new Set<string>(),
+    publicCardMarkers = [],
+    farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>(),
+    parentCardDisplays = [],
+    playedCardDisplays = [],
+    isReorgActive,
+    reorgRemaining,
+    pendingFenceSet,
+    pendingFenceSourceMap,
+    pendingPalisadeSet,
+    existingFenceSet,
+    fenceSelectableSet,
+    fencePlacementMode,
+    isSelectingMinor,
+    isSelectingOccupation,
+    isSelectingImprovementAny,
+    selectableMinorIds,
+    selectableOccupationIds,
+    cardAvailability,
+    futureCardResources,
+    devMode,
+    isInteractive,
+    occupationHandSelection,
+    infirmaryWorkerCount,
+    highlightedFarmTileKeys = new Set<string>(),
+    highlightedFenceEdgeIds = new Set<string>(),
+  } = view
+  const {
+    togglePositionSelection,
+    toggleRoomTile,
+    toggleStableTile,
+    toggleFarmHand,
+    togglePlowTile,
+    updateSowSelection,
+    toggleFenceEdge,
+    adjustReorgAnimal,
+    setViewPlayerId,
+    resolveChoice,
+    onConfirmOccupationHandSelection,
+  } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
@@ -877,13 +892,6 @@ export const FarmBoard = ({
       return next
     })
   }
-  const lockedTileKeys = collectLockedFarmTileKeys(displayPlayer)
-  const publicCardMarkers = readAllPublicCardMarkers(displayPlayer)
-  const farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>()
-  readFarmTerrainMarkers(displayPlayer).forEach((marker) => {
-    const key = `${marker.row}-${marker.col}`
-    farmTerrainMarkerMap.set(key, [...(farmTerrainMarkerMap.get(key) ?? []), marker])
-  })
   const houseLabelKey = (() => {
     if (displayPlayer.roomTiles.length === 0) return null
     let target = displayPlayer.roomTiles[0]
@@ -1599,97 +1607,49 @@ export const FarmBoard = ({
     ) : null}
     <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
-      {displayPlayer.parentCards?.mother || displayPlayer.parentCards?.father ? (
+      {parentCardDisplays.length > 0 ? (
         <div className="parent-cards-row">
-          {displayPlayer.parentCards?.mother ? (
+          {parentCardDisplays.map((card) => (
             <ParentCardTile
+              key={card.id}
               locale={locale}
-              id={displayPlayer.parentCards.mother}
-              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.mother]?.infobox}
+              id={card.id}
+              infobox={card.infobox}
+              completedTier={card.completedTier}
               devMode={devMode}
             />
-          ) : null}
-          {displayPlayer.parentCards?.father ? (
-            <ParentCardTile
-              locale={locale}
-              id={displayPlayer.parentCards.father}
-              infobox={displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.infobox}
-              completedTier={parentFatherCompletedTier(
-                displayPlayer.cardStates?.[displayPlayer.parentCards.father]?.extraData?.fatherCompletedTier,
-              )}
-              devMode={devMode}
-            />
-          ) : null}
+          ))}
         </div>
       ) : null}
       <div className="played-row">
-        {playedCards.map((cardId, index) => {
-          const [kind, rawId] = cardId.includes(':')
-            ? cardId.split(':')
-            : ['', cardId]
-          const isMinor = kind === 'minor'
-          const isOccupation = kind === 'occupation'
-          const cardType: CardType = isOccupation ? 'occupation' : isMinor ? 'minor' : 'major'
+        {playedCardDisplays.map((card, index) => {
+          const { rawId, cardType } = card
           const futureEntries = futureCardResources[rawId] ?? []
-          const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
-          const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
-          const resourceStats = readCardResourceStats(displayPlayer, rawId)
-          const rawExtraData = displayPlayer.cardStates?.[rawId]?.extraData
-          const c146Pairs = rawId === C146_WORKSHOP_ASSISTANT_ID && Array.isArray(rawExtraData?.pairs)
-            ? rawExtraData.pairs.filter((pair): pair is string => typeof pair === 'string')
-            : null
-          const cardStack = c146Pairs ?? displayPlayer.cardStates?.[rawId]?.stack ?? []
-          const rawCardCrop = displayPlayer.cardStates?.[rawId]?.extraData?.cardCrop as
-            | { crop: 'grain' | 'vegetable' | 'wood'; remaining: number }
-            | undefined
-          const rawStacks = displayPlayer.cardStates?.[rawId]?.extraData?.stacks as
-            | { kind: 'grain' | 'vegetable' | 'wood' | 'stone'; remaining: number }[]
-            | undefined
-          const rawCardFieldStacks = displayPlayer.cardStates?.[rawId]?.extraData?.cardFieldStacks as
-            | { crop: 'grain' | 'vegetable' | 'wood' | 'stone'; remaining: number }[]
-            | undefined
-          const cardStacks: CropStack[] | null =
-            rawCardFieldStacks && rawCardFieldStacks.length > 0
-              ? rawCardFieldStacks.map((s) => ({ kind: s.crop, remaining: s.remaining }))
-              : rawStacks && rawStacks.length > 0
-                ? rawStacks.map((s) => ({ kind: s.kind, remaining: s.remaining }))
-              : rawCardCrop && rawCardCrop.remaining > 0
-                ? [{ kind: rawCardCrop.crop, remaining: rawCardCrop.remaining }]
-                : null
-          const internalKeys = new Set(['usedRound'])
-          const displayCounters = Object.fromEntries(
-            Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
-          )
-          const heldWorkerId = getWorkerHeldOnCard(displayPlayer, rawId)
           const cardDisplay = cardDisplayMap.get(rawId)
-          const m084LyingHorses =
-            rawId === M084_BOG_PONY_ID
-              ? readBogPonyLyingHorseCountFromExtraData(displayPlayer.cardStates?.[rawId]?.extraData)
-              : 0
 
           return (
-            <div key={`played-${index}`} className="played-card-slot">
+            <div key={`played-${card.cardId}-${index}`} className="played-card-slot">
               <PlayedCardStats
                 locale={locale}
                 rawId={rawId}
                 cardType={cardType}
-                cardInfobox={cardInfobox}
+                cardInfobox={card.infobox}
                 devMode={devMode}
                 futureEntries={futureEntries}
-                displayCounters={displayCounters}
-                resourceStats={resourceStats}
-                stack={cardStack}
-                cardStacks={cardStacks}
-                heldWorkerId={heldWorkerId}
+                displayCounters={card.displayCounters}
+                resourceStats={card.resourceStats}
+                stack={card.stack}
+                cardStacks={card.cardStacks}
+                heldWorkerId={card.heldWorkerId}
                 playerColor={displayPlayer.color}
               />
-              {m084LyingHorses > 0 ? (
+              {card.m084LyingHorses > 0 ? (
                 <div
                   className="played-card-readonly-animals"
-                  aria-label={`Bog Pony lying horses: ${m084LyingHorses}`}
+                  aria-label={`Bog Pony lying horses: ${card.m084LyingHorses}`}
                 >
                   <span className="res-icon res-icon-horse" aria-hidden="true" />
-                  <span>{m084LyingHorses}</span>
+                  <span>{card.m084LyingHorses}</span>
                 </div>
               ) : null}
               {cardDisplay
