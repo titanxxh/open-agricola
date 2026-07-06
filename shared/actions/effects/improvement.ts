@@ -1,23 +1,12 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChild, InternalActionChildren, PlayerState } from '../../contract/types'
-import type { EventSink } from '../../contract/events'
-import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { CardPurchasePayment } from '../payment'
 import type { CardPurchasePreview } from '../payment'
-import { returnCardToBoard } from '../../cards/helpers/return-card'
-import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
-import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
-import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import { activateCardEffect } from './internal/activate-card-effect'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { buildInternalPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
-import {
-  cardEffectHandChangedEvent,
-  readPrivateHandChangeSourceCard,
-} from '../../session/private-hand-events'
 import {
   buildMajorImprovementOptions,
   buildMinorImprovementOptions,
@@ -25,13 +14,15 @@ import {
   canAffordInjectedImprovement,
   getMajorImprovementPreviewCostDetailed,
   getMinorImprovementPreviewCostDetailed,
-  getPositiveResourceLog,
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
   isBlockedByMajorImprovementActionGate,
   parseImprovementChoice,
-  type ResolvedMinorImprovement,
 } from '../helpers/improvement-helpers'
+import {
+  commitImprovementPurchaseLifecycle,
+  finalizeDirectImprovementPurchaseLifecycle,
+} from '../helpers/improvement-purchase-lifecycle'
 
 // Re-export Playable predicates so existing external callers (game-core.ts,
 // session tests) keep importing from `actions/effects/improvement`.
@@ -57,7 +48,6 @@ export function readImprovementTypes(ctx?: {
 }
 
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
-type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
 type ImprovementCommitData = {
   improvementId: string
   kind: 'major' | 'minor'
@@ -95,180 +85,6 @@ const readTrueAction = (
     actionContext?.trueAction === false)
     ? false
     : undefined
-
-const attachImprovementPayment = (
-  result: SuccessfulImprovementResult,
-  improvementId: string,
-  resourcesPaid: NonNullable<PaymentInfo['resourcesPaid']>,
-  returnedCardId?: string,
-): SuccessfulImprovementResult => {
-  result.extraData = {
-    ...(result.extraData ?? {}),
-    improvementPayment: {
-      improvementId,
-      resourcesPaid: getPositiveResourceLog(resourcesPaid) ?? {},
-      ...(returnedCardId ? { returnedCardId } : {}),
-    },
-  }
-  return result
-}
-
-const applyMajorImprovementPurchase = (
-  state: GameState,
-  player: PlayerState,
-  improvementId: string,
-  returnedMajorId?: string,
-): void => {
-  if (returnedMajorId) {
-    returnCardToBoard(player, returnedMajorId, state)
-  }
-
-  if (!player.improvements.includes(improvementId)) {
-    player.improvements.push(improvementId)
-  }
-  incMajorBuilt(player)
-  takeMajorImprovementFromSupply(state, improvementId)
-}
-
-type ApplyMinorResult =
-  | { passing: true; nextPlayer: PlayerState }
-  | { passing: false }
-
-const applyMinorImprovementPurchase = (
-  state: GameState,
-  player: PlayerState,
-  improvement: ResolvedMinorImprovement,
-  returnedCardId?: string,
-): ApplyMinorResult => {
-  if (returnedCardId) {
-    returnCardToBoard(player, returnedCardId, state)
-  }
-
-  player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
-  if (improvement.passing === true) {
-    const idx = state.players.findIndex((p) => p.id === player.id)
-    const nextPlayer = state.players[(idx + 1) % state.players.length]
-    nextPlayer.minorHand = nextPlayer.minorHand ?? []
-    if (!nextPlayer.minorHand.includes(improvement.id)) {
-      nextPlayer.minorHand.push(improvement.id)
-    }
-    return { passing: true, nextPlayer }
-  }
-
-  if (!player.minorPlayed.includes(improvement.id)) {
-    player.minorPlayed.push(improvement.id)
-  }
-  incMinorBuilt(player)
-  recordDraftPlayed(player, improvement.id, state.round)
-
-  // D25 multi-identity: providesOccupation → also count as an occupation.
-  if (improvement.providesOccupation) {
-    player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
-    if (!player.extraOccupationsFromCards.includes(improvement.id)) {
-      player.extraOccupationsFromCards.push(improvement.id)
-      incOccupationBuilt(player)
-    }
-  }
-
-  getCardModifiers(improvement.id).forEach((modifier) => {
-    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
-      player.activeModifiers.push(modifier)
-    }
-  })
-  return { passing: false }
-}
-
-const commitImprovementPurchase = (
-  state: GameState,
-  player: PlayerState,
-  improvementId: string,
-  kind: 'major' | 'minor',
-  paymentInfo: PaymentInfo,
-  actionContext?: Record<string, unknown>,
-  emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void,
-  eventSink?: EventSink,
-): SuccessfulImprovementResult => {
-  const costResources = paymentInfo.resourcesPaid ?? {}
-  const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
-  let passResult: ApplyMinorResult | null = null
-  if (kind === 'major') {
-    applyMajorImprovementPurchase(state, player, improvementId, paymentInfo.returnedCardId)
-  } else {
-    const improvement = getMinorImprovement(improvementId)
-    if (!improvement) return { type: 'ok' }
-    passResult = applyMinorImprovementPurchase(state, player, improvement, paymentInfo.returnedCardId)
-  }
-  const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, improvementId)
-  if (wasMinorInHand && handChangeSourceCard) {
-    emitPrivateEvent?.(cardEffectHandChangedEvent(
-      player.id,
-      [improvementId],
-      'minor',
-      handChangeSourceCard,
-    ))
-  }
-  if (passResult && passResult.passing) {
-    eventSink?.emit<'card.passed'>({
-      type: 'card.passed',
-      cardId: improvementId,
-      fromPlayerId: player.id,
-      toPlayerId: passResult.nextPlayer.id,
-      sourceActionId: 'improvement',
-      sourceCardId: improvementId,
-    })
-  } else {
-    eventSink?.emit<'card.played'>({
-      type: 'card.played',
-      cardId: improvementId,
-      cardType: kind,
-      sourceActionId: 'improvement',
-      sourceCardId: improvementId,
-    })
-  }
-  return attachImprovementPayment({ type: 'ok' }, improvementId, costResources, paymentInfo.returnedCardId)
-}
-
-const finalizeMajorImprovementPurchase = (
-  state: GameState,
-  player: PlayerState,
-  improvementId: string,
-  paymentInfo: PaymentInfo,
-  costResources: NonNullable<PaymentInfo['resourcesPaid']>,
-  returnedMajorId?: string,
-): ActionExecutionResult => {
-  applyMajorImprovementPurchase(state, player, improvementId, returnedMajorId)
-
-  const activation = activateCardEffect(state, player, improvementId, 'onBuy', paymentInfo)
-  const result: SuccessfulImprovementResult =
-    activation.type === 'flow' ? activation : { type: 'ok' }
-
-  return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
-}
-
-const finalizeMinorImprovementPurchase = (
-  state: GameState,
-  player: PlayerState,
-  improvement: ResolvedMinorImprovement,
-  paymentInfo: PaymentInfo,
-  costResources: NonNullable<PaymentInfo['resourcesPaid']>,
-  returnedCardId?: string,
-): ActionExecutionResult => {
-  applyMinorImprovementPurchase(state, player, improvement, returnedCardId)
-
-  const activation = activateCardEffect(state, player, improvement.id, 'onBuy', paymentInfo)
-  if (activation.type === 'flow') {
-    return attachImprovementPayment(
-      activation,
-      improvement.id,
-      costResources,
-      returnedCardId,
-    )
-  }
-
-  return attachImprovementPayment({
-    type: 'ok',
-  }, improvement.id, costResources, returnedCardId)
-}
 
 const readImprovementCommitData = (
   result: Extract<ActionExecutionResult, { type: 'ok' }>,
@@ -359,14 +175,13 @@ const playMajorImprovement = (
     return resolvedPayment
   }
   const paymentInfo = resolvedPayment.paymentInfo
-  return finalizeMajorImprovementPurchase(
+  return finalizeDirectImprovementPurchaseLifecycle({
     state,
     player,
-    improvement.id,
+    kind: 'major',
+    improvementId: improvement.id,
     paymentInfo,
-    paymentInfo.resourcesPaid,
-    paymentInfo.returnedCardId,
-  )
+  })
 }
 
 export const playMinorImprovement = (
@@ -395,7 +210,6 @@ export const playMinorImprovement = (
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) {
     return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
-  const targetImprovement: ResolvedMinorImprovement = improvement
   const previewCost = getMinorImprovementPreviewCostDetailed(
     state,
     player,
@@ -419,14 +233,13 @@ export const playMinorImprovement = (
     return resolvedPayment
   }
   const paymentInfo = resolvedPayment.paymentInfo
-  return finalizeMinorImprovementPurchase(
+  return finalizeDirectImprovementPurchaseLifecycle({
     state,
     player,
-    targetImprovement,
+    kind: 'minor',
+    improvementId: improvement.id,
     paymentInfo,
-    paymentInfo.resourcesPaid,
-    paymentInfo.returnedCardId,
-  )
+  })
 }
 
 export const playImprovement = (
@@ -660,15 +473,15 @@ export const improvementAction: ActionDefinition = {
     if (!data) return result
     const paymentInfo = paymentInfoFromPayResult(internalResults.payment)
     if (!paymentInfo) return result
-    return commitImprovementPurchase(
+    return commitImprovementPurchaseLifecycle({
       state,
       player,
-      data.improvementId,
-      data.kind,
+      improvementId: data.improvementId,
+      kind: data.kind,
       paymentInfo,
-      data.actionContext,
+      actionContext: data.actionContext,
       emitPrivateEvent,
       eventSink,
-    ) as Extract<ActionExecutionResult, { type: 'ok' }>
+    }) as Extract<ActionExecutionResult, { type: 'ok' }>
   },
 }
