@@ -18,8 +18,6 @@ import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shar
 import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
 import { useFarmSelection } from '../hooks/useFarmSelection'
-import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
-import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { SeasonsBoard } from '../components/board/SeasonsBoard'
@@ -44,15 +42,7 @@ import { PublicEventCardPassAnimation } from '../components/effects/PublicEventC
 import { DraftOverlay } from './draft/DraftOverlay'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
-import {
-  buildBakeExchangeInfo,
-  buildBakeBulkChoice,
-  hasSelectedBakeGrain,
-} from './bake-exchange-ui'
-import {
-  buildAnytimeExchangeBulkChoice,
-  buildAnytimeExchangeOptions,
-} from './anytime-exchange-ui'
+import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
 import {
   buildCompactScoreRows,
@@ -371,9 +361,6 @@ export const GameContainerApi = () => {
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
-  const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
-  const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
-  const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -711,43 +698,6 @@ export const GameContainerApi = () => {
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, runInteractionSubmitCommand])
 
-  const updateBakeExchangeCount = (id: string, delta: number) => {
-    if (!bakeExchangePlayer) return
-    setBakeExchangeCounts((prev) => {
-      const current = prev[id] ?? 0
-      const maxUse = bakeExchangeInfo[id]?.max ?? 0
-      const totalSelected = bakeExchangeOptionIds.reduce(
-        (sum, optionId) => sum + (prev[optionId] ?? 0),
-        0,
-      )
-      const availableGrain = bakeExchangePlayer.resources.grain
-      const remaining = Math.max(0, availableGrain - totalSelected)
-      const limit = Math.min(maxUse, current + remaining)
-      const nextValue = Math.max(0, Math.min(current + delta, limit))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }
-
-  const confirmBakeExchange = () => {
-    if (!pendingChoice || !isBakeExchange) return
-    const choice = buildBakeBulkChoice(activeBakeExchangeCounts)
-    if (!choice) return
-    resolveChoice(choice)
-  }
-
-  const confirmAnytimeExchange = () => {
-    if (!pendingChoice || !isAnytimeExchange) return
-    const choice = buildAnytimeExchangeBulkChoice(activeAnytimeExchangeCounts, anytimeExchangeOptions)
-    if (!choice) return
-    resolveChoice(choice)
-  }
-
-  const cancelAnytimeExchange = () => {
-    if (!pendingChoice || !isAnytimeExchange) return
-    resolveChoice('cancel')
-  }
-
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
     const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'confirm' })
@@ -918,46 +868,6 @@ export const GameContainerApi = () => {
     displayPlayerId: displayPlayer?.id ?? '',
   })
 
-  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
-    applySnapshot(payload)
-    applySnapshotPublicEventCancellations(payload)
-    if (
-      payload.interaction.stateId === 'wait' &&
-      payload.interaction.request.kind === 'animal-reorg'
-    ) {
-      setAnimalReorg({
-        zones: payload.interaction.request.zones,
-        confirmDiscard: false,
-      })
-    } else {
-      setAnimalReorg(null)
-    }
-    if (payload.ok) {
-      setSelectedSpecialAction(null)
-      setPendingFenceEdges([])
-      setPendingFenceSources({})
-      setSelectedFenceSourcePlayerId(null)
-      setFenceError(null)
-      setPendingRoomTiles([])
-      setRoomError(null)
-      setPendingStableTiles([])
-      setPendingFarmHand(null)
-      setStableError(null)
-      setPendingPlowTile(null)
-      setPlowError(null)
-      setPendingSowSelections({})
-      setSowError(null)
-      setPendingPositionSelections(new Set())
-    }
-  }, [applySnapshot, applySnapshotPublicEventCancellations, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
-
-  useEffect(() => {
-    if (!isReady) return
-    const unsub = transport.onSnapshot(handleSnapshot)
-    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-    return unsub
-  }, [transport, handleSnapshot, isReady])
-
   useEffect(() => {
     if (!isReplayPlaying) return
     const timer = window.setTimeout(() => {
@@ -1017,12 +927,6 @@ export const GameContainerApi = () => {
       ? buildSelectableMajorIds(pendingChoiceOptions, availableMajorImprovements)
       : new Set<string>()
 
-  const isBakeExchange =
-    pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
-  const bakeExchangeSourceIds = isBakeExchange
-    ? (pendingChoiceOptions ?? []).map((option) => option.value)
-    : []
-  const bakeExchangeInfo = buildBakeExchangeInfo(bakeExchangeSourceIds, getCardMeta)
   const cardLabel = useCallback((id: string) => {
     const improvementName = t(locale, `improvements.${id}.name`)
     if (improvementName !== `improvements.${id}.name`) {
@@ -1031,206 +935,96 @@ export const GameContainerApi = () => {
     return getCardMeta(id)?.name ?? id
   }, [locale])
 
-  const bakeExchangePlayer =
-    isBakeExchange && pendingChoice && state
-      ? state.players[pendingChoice.playerIndex]
-      : null
-  const bakeExchangeOptions = isBakeExchange
-    ? (pendingChoiceOptions ?? []).filter(
-        (option) => !!bakeExchangeInfo[option.value],
-      )
-    : []
-  const bakeExchangeOptionIds = bakeExchangeOptions.map((option) => option.value)
-  const activeBakeExchangeCounts = (() => {
-    const counts: Record<string, number> = {}
-    bakeExchangeOptionIds.forEach((value) => {
-      counts[value] = bakeExchangeCounts[value] ?? 0
-    })
-    return counts
-  })()
+  const exchangeDraft = useExchangeDraftPresentation({
+    state,
+    pendingChoice,
+    interactionPresentationPlan,
+    locale,
+    cardLabel,
+    getCardMeta,
+  })
+  const resetExchangeDraft = exchangeDraft.reset
+  const isBakeExchange = exchangeDraft.bake.isActive
+  const bakeExchangeInfo = exchangeDraft.bake.info
+  const bakeExchangeOptions = exchangeDraft.bake.options
+  const activeBakeExchangeCounts = exchangeDraft.bake.counts
+  const hasBakeSelection = exchangeDraft.bake.hasSelection
+  const summaryResources = exchangeDraft.bake.summary
+  const hasBakeSummary = exchangeDraft.bake.hasSummary
+  const updateBakeExchangeCount = exchangeDraft.bake.updateCount
+  const resetBakeExchangeCounts = exchangeDraft.bake.reset
+  const isAnytimeExchange = exchangeDraft.anytime.isActive
+  const anytimeExchangeOptions = exchangeDraft.anytime.options
+  const activeAnytimeExchangeCounts = exchangeDraft.anytime.counts
+  const anytimeExchangeSummary = exchangeDraft.anytime.summary
+  const hasAnytimeExchangeSelection = exchangeDraft.anytime.hasSelection
+  const hasAnytimeExchangeSummary = exchangeDraft.anytime.hasSummary
+  const updateAnytimeExchangeCount = exchangeDraft.anytime.updateCount
+  const isHarvestFeedExchange = exchangeDraft.harvestFeed.isActive
+  const harvestFeedOptions = exchangeDraft.harvestFeed.options
+  const activeHarvestFeedCounts = exchangeDraft.harvestFeed.counts
+  const updateHarvestFeedCount = exchangeDraft.harvestFeed.updateCount
+  const resetHarvestFeedCounts = exchangeDraft.harvestFeed.reset
+  const harvestFeedSelections = exchangeDraft.harvestFeed.selections
+  const harvestFeedConvertedFood = exchangeDraft.harvestFeed.convertedFood
+  const harvestFeedBegging = exchangeDraft.harvestFeed.begging
+  const harvestFeedSummary = exchangeDraft.harvestFeed.summary
+  const hasHarvestFeedSummary = exchangeDraft.harvestFeed.hasSummary
+  const bakeExchangeChoice = exchangeDraft.bake.choice
+  const anytimeExchangeChoice = exchangeDraft.anytime.choice
+  const confirmBakeExchange = useCallback(() => {
+    if (!pendingChoice || !isBakeExchange || !bakeExchangeChoice) return
+    resolveChoice(bakeExchangeChoice)
+  }, [bakeExchangeChoice, isBakeExchange, pendingChoice, resolveChoice])
+  const confirmAnytimeExchange = useCallback(() => {
+    if (!pendingChoice || !isAnytimeExchange || !anytimeExchangeChoice) return
+    resolveChoice(anytimeExchangeChoice)
+  }, [anytimeExchangeChoice, isAnytimeExchange, pendingChoice, resolveChoice])
+  const cancelAnytimeExchange = useCallback(() => {
+    if (!pendingChoice || !isAnytimeExchange) return
+    resolveChoice('cancel')
+  }, [isAnytimeExchange, pendingChoice, resolveChoice])
 
-  const bakeTotalGrain = Object.values(activeBakeExchangeCounts).reduce(
-    (sum, value) => sum + value,
-    0,
-  )
-  const bakeTotalFood = Object.entries(activeBakeExchangeCounts).reduce(
-    (sum, [id, count]) =>
-      sum + (bakeExchangeInfo[id]?.food ?? 0) * count,
-    0,
-  )
-  const hasBakeSelection = hasSelectedBakeGrain(activeBakeExchangeCounts)
-  const baseFood = bakeExchangePlayer?.resources.food ?? 0
-  const baseGrain = bakeExchangePlayer?.resources.grain ?? 0
-  const summaryResources = {
-    ...emptyResources,
-    food: baseFood + bakeTotalFood,
-    grain: Math.max(0, baseGrain - bakeTotalGrain),
-  }
-  const hasBakeSummary =
-    summaryResources.food > 0 || summaryResources.grain > 0
-
-  const isAnytimeExchange =
-    pendingChoice?.promptKey === 'ui.interactionExchangeChoice'
-  const anytimeExchangePlayer =
-    isAnytimeExchange && pendingChoice && state
-      ? state.players[pendingChoice.playerIndex] ?? null
-      : null
-  const anytimeExchangeOptions =
-    isAnytimeExchange && pendingChoice && anytimeExchangePlayer
-      ? buildAnytimeExchangeOptions(
-          anytimeExchangePlayer,
-          pendingChoice.options,
-          cardLabel,
-          getCardMeta,
-        )
-      : []
-  const anytimeExchangeOptionIds = anytimeExchangeOptions.map((option) => option.id)
-  const activeAnytimeExchangeCounts = (() => {
-    const counts: Record<string, number> = {}
-    anytimeExchangeOptionIds.forEach((id) => {
-      counts[id] = anytimeExchangeCounts[id] ?? 0
-    })
-    return counts
-  })()
-  const updateAnytimeExchangeCount = (id: string, delta: number) => {
-    setAnytimeExchangeCounts((prev) => {
-      const currentCounts: Record<string, number> = {}
-      anytimeExchangeOptionIds.forEach((optionId) => {
-        currentCounts[optionId] = prev[optionId] ?? 0
+  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+    applySnapshot(payload)
+    applySnapshotPublicEventCancellations(payload)
+    if (
+      payload.interaction.stateId === 'wait' &&
+      payload.interaction.request.kind === 'animal-reorg'
+    ) {
+      setAnimalReorg({
+        zones: payload.interaction.request.zones,
+        confirmDiscard: false,
       })
-      const current = currentCounts[id] ?? 0
-      const option = anytimeExchangeOptions.find((entry) => entry.id === id)
-      if (!option || !anytimeExchangePlayer || option.tradeIndex === undefined) return prev
-      const max = Math.min(
-        option.maxTimes,
-        computeHarvestFeedCounterMax(
-          option,
-          anytimeExchangeOptions,
-          currentCounts,
-          anytimeExchangePlayer.resources,
-        ),
-      )
-      const nextValue = Math.max(0, Math.min(current + delta, max))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }
-  const anytimeExchangeSelections = anytimeExchangeOptions
-    .map((option) => ({
-      count: activeAnytimeExchangeCounts[option.id] ?? 0,
-      from: option.from,
-      to: option.to,
-    }))
-    .filter((entry) => entry.count > 0)
-  const anytimeExchangeSummary = (() => {
-    const resources = { ...emptyResources }
-    anytimeExchangeSelections.forEach((entry) => {
-      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-      Object.entries(entry.to ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-    })
-    return resources
-  })()
-  const hasAnytimeExchangeSelection = Object.values(activeAnytimeExchangeCounts).some((value) => value > 0)
-  const hasAnytimeExchangeSummary = Object.values(anytimeExchangeSummary).some((value) => value > 0)
+    } else {
+      setAnimalReorg(null)
+    }
+    if (payload.ok) {
+      setSelectedSpecialAction(null)
+      setPendingFenceEdges([])
+      setPendingFenceSources({})
+      setSelectedFenceSourcePlayerId(null)
+      setFenceError(null)
+      setPendingRoomTiles([])
+      setRoomError(null)
+      setPendingStableTiles([])
+      setPendingFarmHand(null)
+      setStableError(null)
+      setPendingPlowTile(null)
+      setPlowError(null)
+      setPendingSowSelections({})
+      setSowError(null)
+      setPendingPositionSelections(new Set())
+      resetExchangeDraft()
+    }
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
-  const isHarvestFeedExchange = interactionPresentationPlan.kind === 'harvest-feed'
-  const harvestFeedPlayer =
-    isHarvestFeedExchange && state && interactionPresentationPlan.kind === 'harvest-feed'
-      ? state.players[interactionPresentationPlan.playerIndex] ?? null
-      : null
-  const harvestFeedOptions = useMemo(
-    () =>
-      harvestFeedPlayer
-        ? buildHarvestFeedOptions(harvestFeedPlayer, locale, cardLabel)
-        : [],
-    [harvestFeedPlayer, locale, cardLabel],
-  )
-  const harvestFeedOptionIds = useMemo(
-    () => harvestFeedOptions.map((option) => option.id),
-    [harvestFeedOptions],
-  )
-  const activeHarvestFeedCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    harvestFeedOptionIds.forEach((id) => {
-      counts[id] = harvestFeedCounts[id] ?? 0
-    })
-    return counts
-  }, [harvestFeedCounts, harvestFeedOptionIds])
-
-  const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
-    setHarvestFeedCounts((prev) => {
-      const currentCounts: Record<string, number> = {}
-      harvestFeedOptionIds.forEach((optionId) => {
-        currentCounts[optionId] = prev[optionId] ?? 0
-      })
-      const current = currentCounts[id] ?? 0
-      const option = harvestFeedOptions.find((entry) => entry.id === id)
-      if (!option || !harvestFeedPlayer) return prev
-      const max = computeHarvestFeedCounterMax(
-        option,
-        harvestFeedOptions,
-        currentCounts,
-        harvestFeedPlayer.resources,
-      )
-      const nextValue = Math.max(0, Math.min(current + delta, max))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }, [harvestFeedOptionIds, harvestFeedOptions, harvestFeedPlayer])
-
-  const resetHarvestFeedCounts = useCallback(() => {
-    const nextCounts: Record<string, number> = {}
-    harvestFeedOptionIds.forEach((id) => {
-      nextCounts[id] = 0
-    })
-    setHarvestFeedCounts(nextCounts)
-  }, [harvestFeedOptionIds])
-
-  const harvestFeedSelections = useMemo(
-    () =>
-      harvestFeedOptions
-        .map((option) => ({
-          count: activeHarvestFeedCounts[option.id] ?? 0,
-          sourceName: option.sourceName,
-          sourceId: option.sourceId,
-          exchangeIndex: option.exchangeIndex,
-          from: option.from,
-          to: option.to,
-        }))
-        .filter((entry) => entry.count > 0),
-    [activeHarvestFeedCounts, harvestFeedOptions],
-  )
-  const harvestFeedConvertedFood = useMemo(
-    () =>
-      harvestFeedSelections.reduce(
-        (sum, entry) => sum + entry.count * ((entry.to.food as number) ?? 0),
-        0,
-      ),
-    [harvestFeedSelections],
-  )
-  const harvestFeedBegging = Math.max(
-    0,
-    (harvestPending?.remaining ?? 0) - harvestFeedConvertedFood,
-  )
-  const harvestFeedSummary = useMemo(() => {
-    const resources = { ...emptyResources }
-    resources.food = (harvestPending?.foodUsed ?? 0) + harvestFeedConvertedFood
-    harvestFeedSelections.forEach((entry) => {
-      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-    })
-    resources.begging = harvestFeedBegging
-    return resources
-  }, [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed])
-  const hasHarvestFeedSummary = Object.values(harvestFeedSummary).some((value) => value > 0)
+  useEffect(() => {
+    if (!isReady) return
+    const unsub = transport.onSnapshot(handleSnapshot)
+    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
+    return unsub
+  }, [transport, handleSnapshot, isReady])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (interactionPresentationPlan.kind !== 'harvest-feed') return
@@ -1321,14 +1115,6 @@ export const GameContainerApi = () => {
     () => (farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0),
     [farmInteraction],
   )
-
-  const resetBakeExchangeCounts = () => {
-    const nextCounts: Record<string, number> = {}
-    bakeExchangeOptionIds.forEach((id) => {
-      nextCounts[id] = 0
-    })
-    setBakeExchangeCounts(nextCounts)
-  }
 
   const maxStableSelections = useMemo(
     () => (farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0),
@@ -2003,14 +1789,7 @@ export const GameContainerApi = () => {
               <div className="exchange-options">
                 {harvestFeedOptions.map((option) => {
                   const current = activeHarvestFeedCounts[option.id] ?? 0
-                  const limit = harvestFeedPlayer
-                    ? computeHarvestFeedCounterMax(
-                        option,
-                        harvestFeedOptions,
-                        activeHarvestFeedCounts,
-                        harvestFeedPlayer.resources,
-                      )
-                    : 0
+                  const limit = exchangeDraft.harvestFeed.limitById[option.id] ?? 0
                   const canAdd = current < limit
                   const canSubtract = current > 0
                   const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
@@ -2117,17 +1896,7 @@ export const GameContainerApi = () => {
               <div className="exchange-options">
                 {anytimeExchangeOptions.map((option) => {
                   const current = activeAnytimeExchangeCounts[option.id] ?? 0
-                  const limit = option.tradeIndex === undefined || !anytimeExchangePlayer
-                    ? 0
-                    : Math.min(
-                        option.maxTimes,
-                        computeHarvestFeedCounterMax(
-                          option,
-                          anytimeExchangeOptions,
-                          activeAnytimeExchangeCounts,
-                          anytimeExchangePlayer.resources,
-                        ),
-                      )
+                  const limit = exchangeDraft.anytime.limitById[option.id] ?? 0
                   const canAdd = current < limit
                   const canSubtract = current > 0
                   const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
@@ -2233,11 +2002,8 @@ export const GameContainerApi = () => {
                     max: 0,
                   }
                   const current = activeBakeExchangeCounts[option.value] ?? 0
-                  const availableGrain = bakeExchangePlayer?.resources.grain ?? 0
-                  const remaining = Math.max(0, availableGrain - bakeTotalGrain)
-                  const limit = Math.min(info.max, current + remaining)
-                  const canAdd =
-                    availableGrain > bakeTotalGrain && current < limit
+                  const limit = exchangeDraft.bake.limitById[option.value] ?? 0
+                  const canAdd = current < limit
                   const canSubtract = current > 0
                   const rateText = Number.isFinite(info.max)
                     ? t(locale, 'ui.bakeBreadRateLimited', {
