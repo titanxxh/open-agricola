@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, MajorSupplyStack } from '../../contract/types'
 import {
   createMajorImprovementSupply,
+  filterAvailableMajorImprovementIds,
+  getAvailableMajorImprovementIds,
+  isMajorImprovementAvailable,
   moveMajorImprovementToSupplyTop,
   returnMajorImprovementToSupply,
   sixPlayerDuplicateMajorImprovementIds,
@@ -66,6 +69,37 @@ const readStack = (
 }
 
 describe('major improvement supply helper', () => {
+  it('queries visible major improvements through stack-aware supply', () => {
+    const state = createFarmersOfTheMoorSupplyState()
+
+    expect(getAvailableMajorImprovementIds(state)).toContain('Major_StoneOven')
+    expect(isMajorImprovementAvailable(state, 'Major_StoneOven')).toBe(true)
+    expect(isMajorImprovementAvailable(state, 'Major_Moor_TiledOven')).toBe(false)
+    expect(filterAvailableMajorImprovementIds(state, ['Major_StoneOven', 'Major_Moor_TiledOven']))
+      .toEqual(['Major_StoneOven'])
+
+    moveMajorImprovementToSupplyTop(state, 'Major_Moor_TiledOven')
+
+    expect(getAvailableMajorImprovementIds(state)).toContain('Major_Moor_TiledOven')
+    expect(isMajorImprovementAvailable(state, 'Major_StoneOven')).toBe(false)
+    expect(isMajorImprovementAvailable(state, 'Major_Moor_TiledOven')).toBe(true)
+    expect(filterAvailableMajorImprovementIds(state, ['Major_StoneOven', 'Major_Moor_TiledOven']))
+      .toEqual(['Major_Moor_TiledOven'])
+  })
+
+  it('queries flat compatibility supply when no stack supply exists', () => {
+    const state = {
+      availableMajorImprovements: ['Major_Well'],
+      majorImprovementSupply: undefined,
+    }
+
+    expect(getAvailableMajorImprovementIds(state)).toEqual(['Major_Well'])
+    expect(isMajorImprovementAvailable(state, 'Major_Well')).toBe(true)
+    expect(isMajorImprovementAvailable(state, 'Major_Well2')).toBe(false)
+    expect(filterAvailableMajorImprovementIds(state, ['Major_Well', 'Major_Well2']))
+      .toEqual(['Major_Well'])
+  })
+
   it('creates the Farmers of the Moor twelve-stack major supply instead of six-player duplicates', () => {
     const supply = createMajorImprovementSupply(6, { enableFarmersOfTheMoor: true })!
 

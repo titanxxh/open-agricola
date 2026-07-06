@@ -30,7 +30,11 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
-import { moveMajorImprovementToSupplyTop, swapMajorImprovementWithSupply } from '../../cards/major/supply'
+import {
+  isMajorImprovementAvailable,
+  moveMajorImprovementToSupplyTop,
+  swapMajorImprovementWithSupply,
+} from '../../cards/major/supply'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { consumePendingExtraTurns } from '../../cards/card-effects'
@@ -300,9 +304,7 @@ export const specialEffectAction: ActionDefinition = {
       case 'swap-improvement-with-board': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const playerIndex = target.improvements.indexOf(p.from)
-        const board = state.availableMajorImprovements ?? []
-        const boardIndex = board.indexOf(p.to)
-        if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
+        if (playerIndex < 0 || !isMajorImprovementAvailable(state, p.to)) return { type: 'ok' }
         if (target.improvements.includes(p.to)) return { type: 'ok' }
         target.improvements[playerIndex] = p.to
         swapMajorImprovementWithSupply(state, p.from, p.to)
