@@ -79,6 +79,25 @@ export const useFarmSelectionDraftPresentation = ({
   players = [],
 }: FarmSelectionDraftPresentationInput) => {
   const farmDraft = useFarmSelection()
+  const {
+    fencePlacementMode,
+    setFencePlacementMode,
+    setFenceError,
+    setPendingFarmHand,
+    setPendingFenceEdges,
+    setPendingFenceSources,
+    setPendingPalisadeEdges,
+    setPendingPlowTile,
+    setPendingPositionSelections,
+    setPendingRoomTiles,
+    setPendingSowSelections,
+    setPendingStableTiles,
+    setPlowError,
+    setRoomError,
+    setSelectedFenceSourcePlayerId,
+    setSowError,
+    setStableError,
+  } = farmDraft
   const farmInteraction = farmInteractionFromPlan(interactionPresentationPlan)
   const selectionInteraction = selectionInteractionFromPlan(interactionPresentationPlan)
   const borrowedFenceSource =
@@ -86,10 +105,10 @@ export const useFarmSelectionDraftPresentation = ({
   const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'
 
   useEffect(() => {
-    if (isBorrowedFenceSelection && farmDraft.fencePlacementMode === 'palisade') {
-      farmDraft.setFencePlacementMode('fence')
+    if (isBorrowedFenceSelection && fencePlacementMode === 'palisade') {
+      setFencePlacementMode('fence')
     }
-  }, [farmDraft, isBorrowedFenceSelection])
+  }, [fencePlacementMode, isBorrowedFenceSelection, setFencePlacementMode])
 
   const maxRoomSelections =
     farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0
@@ -265,52 +284,68 @@ export const useFarmSelectionDraftPresentation = ({
 
   const setCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     if (farmType === 'fence') {
-      farmDraft.setFenceError({ code: error ?? 'UNKNOWN', edges: [], newEdges: [] })
+      setFenceError({ code: error ?? 'UNKNOWN', edges: [], newEdges: [] })
       return
     }
     if (farmType === 'room') {
-      farmDraft.setRoomError(error ?? 'UNKNOWN')
+      setRoomError(error ?? 'UNKNOWN')
       return
     }
     if (farmType === 'stable') {
-      farmDraft.setStableError(error ?? 'UNKNOWN')
+      setStableError(error ?? 'UNKNOWN')
       return
     }
     if (farmType === 'plow') {
-      farmDraft.setPlowError(error ?? 'UNKNOWN')
+      setPlowError(error ?? 'UNKNOWN')
       return
     }
-    farmDraft.setSowError(error ?? 'UNKNOWN')
-  }, [farmDraft])
+    setSowError(error ?? 'UNKNOWN')
+  }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
 
   const setSubmitError = useCallback((
     farmType: FarmCommitType,
     error: string | FenceSubmitError,
   ) => {
     if (farmType === 'fence' && typeof error !== 'string') {
-      farmDraft.setFenceError(error)
+      setFenceError(error)
       return
     }
     setCommitError(farmType, typeof error === 'string' ? error : error.code)
-  }, [farmDraft, setCommitError])
+  }, [setCommitError, setFenceError])
 
   const reset = useCallback(() => {
-    farmDraft.setPendingFenceEdges([])
-    farmDraft.setPendingPalisadeEdges([])
-    farmDraft.setPendingFenceSources({})
-    farmDraft.setSelectedFenceSourcePlayerId(null)
-    farmDraft.setFenceError(null)
-    farmDraft.setPendingRoomTiles([])
-    farmDraft.setRoomError(null)
-    farmDraft.setPendingStableTiles([])
-    farmDraft.setPendingFarmHand(null)
-    farmDraft.setStableError(null)
-    farmDraft.setPendingPlowTile(null)
-    farmDraft.setPlowError(null)
-    farmDraft.setPendingSowSelections({})
-    farmDraft.setSowError(null)
-    farmDraft.setPendingPositionSelections(new Set())
-  }, [farmDraft])
+    setPendingFenceEdges([])
+    setPendingPalisadeEdges([])
+    setPendingFenceSources({})
+    setSelectedFenceSourcePlayerId(null)
+    setFenceError(null)
+    setPendingRoomTiles([])
+    setRoomError(null)
+    setPendingStableTiles([])
+    setPendingFarmHand(null)
+    setStableError(null)
+    setPendingPlowTile(null)
+    setPlowError(null)
+    setPendingSowSelections({})
+    setSowError(null)
+    setPendingPositionSelections(new Set())
+  }, [
+    setFenceError,
+    setPendingFarmHand,
+    setPendingFenceEdges,
+    setPendingFenceSources,
+    setPendingPalisadeEdges,
+    setPendingPlowTile,
+    setPendingPositionSelections,
+    setPendingRoomTiles,
+    setPendingSowSelections,
+    setPendingStableTiles,
+    setPlowError,
+    setRoomError,
+    setSelectedFenceSourcePlayerId,
+    setSowError,
+    setStableError,
+  ])
 
   const controls = useMemo(() => ({
     toggleFenceEdge: (edgeId: string) =>
