@@ -163,7 +163,7 @@ import {
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
-import { clearAllLinkedSpaceBlocks, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
+import { clearAllLinkedSpaceBlocks, findActionSpaceById, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import {
   canEnterSpace,
@@ -1307,7 +1307,7 @@ export class GameCore {
 
   private getSpaceById(spaceId: string | null): ActionSpace | null {
     if (!spaceId) return null
-    return this.state.actionSpaces.find((item) => item.id === spaceId)
+    return findActionSpaceById(this.state, spaceId)
       ?? (isMoorSpecialActionId(spaceId) ? createMoorSpecialActionSpace(spaceId) : null)
       ?? (spaceId.startsWith(SUBFLOW_SPACE_PREFIX) || spaceId.startsWith('__stage:')
         ? this.createSyntheticSpace(spaceId)
@@ -4623,7 +4623,7 @@ export class GameCore {
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
     runCardEffectHook(this.state, player, cardId, 'onBuy')
     this.syncDynamicActionSpaces()
-    const dynamicSpace = this.state.actionSpaces.find(space => space.id === cardId)
+    const dynamicSpace = findActionSpaceById(this.state, cardId)
     if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {
       this.registry.register(dynamicSpace)
     }
@@ -4631,7 +4631,7 @@ export class GameCore {
   }
 
   devSetSpaceTaken(spaceId: string, playerId: string | null): SessionResponse {
-    const space = this.state.actionSpaces.find((s) => s.id === spaceId)
+    const space = findActionSpaceById(this.state, spaceId)
     if (!space) return this.respond(false, 'space not found')
     if (!playerId) {
       space.takenBy = []

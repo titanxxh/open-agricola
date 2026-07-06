@@ -27,7 +27,7 @@ import {
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
 import { findFirstNewborn } from '../../domain/player'
-import { removeWorkerRef } from '../../domain/space'
+import { findActionSpaceById, removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import {
@@ -597,7 +597,7 @@ export const specialEffectAction: ActionDefinition = {
         const accumulationTarget = readAccumulationTarget(p)
         const resources = resourceAmount(p.resource, p.amount)
         if (accumulationTarget.kind === 'actionSpace') {
-          const targetSpace = state.actionSpaces.find((space) => space.id === accumulationTarget.spaceId)
+          const targetSpace = findActionSpaceById(state, accumulationTarget.spaceId)
           if (!targetSpace?.resources) {
             return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
@@ -659,8 +659,8 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'move-resource-between-spaces': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
-        const from = state.actionSpaces.find((s) => s.id === p.fromSpaceId)
-        const to = state.actionSpaces.find((s) => s.id === p.toSpaceId)
+        const from = findActionSpaceById(state, p.fromSpaceId)
+        const to = findActionSpaceById(state, p.toSpaceId)
         if (!from?.resources || !to?.resources) {
           return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }

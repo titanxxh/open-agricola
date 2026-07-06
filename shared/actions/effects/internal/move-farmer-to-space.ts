@@ -3,6 +3,9 @@ import {
   addLinkedSpaceBlocks,
   addWorkerRef,
   clearLinkedSpaceBlocksForWorker,
+  filterActionSpacesByIds,
+  findActionSpaceById,
+  findActionSpaceByWorker,
   removeWorkerRef,
 } from '../../../domain/space'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'
@@ -33,7 +36,8 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
   execute: ({ state, player, params, sourceCard, actionContext }) => {
     const excludeId = params?.excludeSpaceId as string | undefined
     const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
-    const spaces = state.actionSpaces.filter((s) => isSelectableSpace(s, excludeId, allowed))
+    const spaces = filterActionSpacesByIds(state, allowed.map((entry) => entry.spaceId))
+      .filter((s) => isSelectableSpace(s, excludeId, allowed))
     if (spaces.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
       type: 'request',
@@ -45,7 +49,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ state, player, space, params, sourceCard, actionContext, eventSink }, choice) => {
-    const targetSpace = state.actionSpaces.find((s) => s.id === choice)
+    const targetSpace = findActionSpaceById(state, choice)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const excludeId = params?.excludeSpaceId as string | undefined
     const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext, ignoreWorkerAvailability: true })
@@ -54,10 +58,10 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     }
 
     const sourceSpace = (excludeId
-      ? state.actionSpaces.find((s) => s.id === excludeId)
+      ? findActionSpaceById(state, excludeId)
       : space.takenBy.some((worker) => worker.playerId === player.id)
         ? space
-        : state.actionSpaces.find((s) => s.takenBy.some((worker) => worker.playerId === player.id)))
+        : findActionSpaceByWorker(state, player.id))
     if (!sourceSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const movedWorker = removeWorkerRef(sourceSpace, player.id)
     if (!movedWorker) return { type: 'fail', errorKey: 'log.actionFail' }

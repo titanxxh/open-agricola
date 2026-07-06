@@ -1,4 +1,5 @@
 import type { GameState } from '../../contract/types'
+import { findActionSpaceById, hasActionSpace } from '../../domain/space'
 
 export type RoundActionSlot = {
   roundNumber: number
@@ -169,9 +170,8 @@ const getBoardActionItems = (
   const playerCount = getBoardPlayerCount(state)
   const leftOffset = getBoardOffset(playerCount)
   const positions = getBasePositions(playerCount)
-  const presentActionIds = new Set(state.actionSpaces.map((space) => space.id))
   const items: BoardActionItem[] = Object.entries(positions)
-    .filter(([spaceId]) => presentActionIds.has(spaceId))
+    .filter(([spaceId]) => hasActionSpace(state, spaceId))
     .map(([id, pos]) => ({ id, pos }))
   for (let index = 0; index < state.roundActionOrder.length; index += 1) {
     const actionId = state.roundActionOrder[index]
@@ -179,7 +179,7 @@ const getBoardActionItems = (
     const pos = ROUND_POS[roundNumber]
     if (!pos || roundNumber > state.round) continue
     items.push({
-      id: actionId && presentActionIds.has(actionId) ? actionId : null,
+      id: actionId && hasActionSpace(state, actionId) ? actionId : null,
       pos: {
         top: pos.top,
         left: pos.left + leftOffset,
@@ -257,6 +257,6 @@ export const isRoundSpaceOccupied = (
 ): boolean => {
   const actionId = getRoundSpaceActionId(state, roundNumber)
   if (!actionId) return false
-  const space = state.actionSpaces.find((candidate) => candidate.id === actionId)
+  const space = findActionSpaceById(state, actionId)
   return (space?.takenBy.length ?? 0) > 0
 }

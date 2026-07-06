@@ -7,7 +7,7 @@ import type {
 import type { EventSink } from '../../contract/events'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
 import { activateSmallestInactive, familySize, hasInactiveWorkerInSupply } from '../../domain/player'
-import { addWorkerRef } from '../../domain/space'
+import { addWorkerRef, findActionSpaceById } from '../../domain/space'
 import { holdWorkerOnCard } from '../../cards/helpers/card-held-workers'
 
 const effectiveRooms = (player: PlayerState) =>
@@ -22,7 +22,7 @@ const growFamilyCore = (
 ): ActionExecutionResult => {
   const newborn = activateSmallestInactive(player)
   if (!newborn) return { type: 'fail', errorKey: 'log.familyFull' }
-  const fgSpace = state.actionSpaces.find((s) => s.id === fgSpaceId)
+  const fgSpace = findActionSpaceById(state, fgSpaceId)
   if (options.holdNewbornOnCard) {
     holdWorkerOnCard(player, options.holdNewbornOnCard, newborn.id)
   } else if (fgSpace) {
