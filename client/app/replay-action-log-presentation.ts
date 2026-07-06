@@ -2,7 +2,7 @@ import type { GameEvent, PublicEventArchivePacket } from '../../shared/contract/
 import type { LogEntry } from '../../shared/contract/types'
 import type { Locale } from '../../shared/i18n'
 import { buildActionLogTimelineRows, type ActionLogTimelineBucket } from './action-log-timeline'
-import { buildReplayFeedback, type ReplayFeedback } from './game-container-helpers'
+import { buildReplayFeedback, type ReplayFeedback } from './public-event-cue-presentation'
 import {
   buildReplayTimeline,
   filterReplayTimeline,

@@ -55,7 +55,6 @@ import {
 } from './anytime-exchange-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
-  applyPublicEventCancellationSnapshot,
   buildCompactScoreRows,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
@@ -67,23 +66,14 @@ import {
   enableFarmersOfTheMoorFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
-  filterPublicFarmHighlightsForPlayer,
-  filterPublicFenceHighlightsForPlayer,
   devResourceKeysForState,
   getPendingMoorSpecialActionChoice,
   getPendingMoorSpecialActionTileChoice,
   getPendingMoorSpecialActionTileKeys,
   hasPendingMoorSpecialActionChoice,
-  hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
-  mergePublicEventCardPassAnimations,
-  mergePublicEventHighlights,
-  mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
-  removePublicEventCardPassAnimations,
-  removePublicEventHighlights,
-  removePublicEventResourceAnimations,
   shouldShowDevPanel,
   splitBoardActionSpaces,
   type FarmCommitType,
@@ -100,13 +90,8 @@ import {
 } from './private-event-notifications'
 import {
   buildEventNotificationStackItems,
-  collectNewPublicEventFeedback,
-  emptyPublicEventHighlightTargets,
-  type PublicEventHighlightTargets,
-  type PublicEventNotification,
-  type PublicEventCardPassAnimation as PublicEventCardPassAnimationCue,
-  type PublicEventResourceAnimation,
 } from './public-event-notifications'
+import { usePublicEventCuePresentation } from './public-event-cue-presentation'
 import {
   buildReplayActionLogPresentation,
   type ReplayTimelineEntry,
@@ -375,18 +360,8 @@ export const GameContainerApi = () => {
     useGameSync()
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
-  const publicEventNotificationBatchSeqRef = useRef(0)
-  const publicEventNotificationTimersRef = useRef<number[]>([])
-  const publicEventHighlightTimersRef = useRef<number[]>([])
-  const publicEventResourceAnimationTimersRef = useRef<number[]>([])
-  const publicEventCardPassAnimationTimersRef = useRef<number[]>([])
-  const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
-  const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
-  const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
-  const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
-  const [publicEventCardPassAnimations, setPublicEventCardPassAnimations] = useState<PublicEventCardPassAnimationCue[]>([])
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
   const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
@@ -420,25 +395,6 @@ export const GameContainerApi = () => {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
 
-  const clearPublicEventFeedbackTimers = useCallback(() => {
-    publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventNotificationTimersRef.current = []
-    publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventHighlightTimersRef.current = []
-    publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventResourceAnimationTimersRef.current = []
-    publicEventCardPassAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventCardPassAnimationTimersRef.current = []
-  }, [])
-
-  const clearPublicEventFeedback = useCallback(() => {
-    clearPublicEventFeedbackTimers()
-    setPublicEventNotifications([])
-    setPublicEventHighlights(emptyPublicEventHighlightTargets())
-    setPublicEventResourceAnimations([])
-    setPublicEventCardPassAnimations([])
-  }, [clearPublicEventFeedbackTimers])
-
   const clearReplayCue = useCallback(() => {
     setSelectedReplayKey(null)
   }, [])
@@ -446,8 +402,7 @@ export const GameContainerApi = () => {
   useEffect(() => () => {
     privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     privateEventNotificationTimersRef.current = []
-    clearPublicEventFeedbackTimers()
-  }, [clearPublicEventFeedbackTimers])
+  }, [])
 
   useEffect(() => {
     if (privateEvents.length === 0) return
@@ -470,65 +425,6 @@ export const GameContainerApi = () => {
     })
   }, [privateEvents, locale])
 
-  useEffect(() => {
-    if (!state) return
-    const events = state.events ?? []
-    publicEventNotificationBatchSeqRef.current += 1
-    const batch = collectNewPublicEventFeedback(
-      events,
-      lastSeenPublicEventSeqRef.current,
-      locale,
-      `public-batch-${publicEventNotificationBatchSeqRef.current}`,
-    )
-    lastSeenPublicEventSeqRef.current = batch.nextCursor
-    if (hasPublicEventHighlights(batch.highlights)) {
-      setPublicEventHighlights((current) => mergePublicEventHighlights(current, batch.highlights))
-      const timer = window.setTimeout(() => {
-        setPublicEventHighlights((current) => removePublicEventHighlights(current, batch.highlights))
-        publicEventHighlightTimersRef.current = publicEventHighlightTimersRef.current.filter((entry) => entry !== timer)
-      }, 3200)
-      publicEventHighlightTimersRef.current.push(timer)
-    }
-    if (batch.resourceAnimations.length > 0) {
-      setPublicEventResourceAnimations((current) =>
-        mergePublicEventResourceAnimations(current, batch.resourceAnimations).slice(0, 12),
-      )
-      const timer = window.setTimeout(() => {
-        setPublicEventResourceAnimations((current) =>
-          removePublicEventResourceAnimations(current, batch.resourceAnimations),
-        )
-        publicEventResourceAnimationTimersRef.current =
-          publicEventResourceAnimationTimersRef.current.filter((entry) => entry !== timer)
-      }, 1400)
-      publicEventResourceAnimationTimersRef.current.push(timer)
-    }
-    if (batch.cardPassAnimations.length > 0) {
-      setPublicEventCardPassAnimations((current) =>
-        mergePublicEventCardPassAnimations(current, batch.cardPassAnimations).slice(0, 12),
-      )
-      const timer = window.setTimeout(() => {
-        setPublicEventCardPassAnimations((current) =>
-          removePublicEventCardPassAnimations(current, batch.cardPassAnimations),
-        )
-        publicEventCardPassAnimationTimersRef.current =
-          publicEventCardPassAnimationTimersRef.current.filter((entry) => entry !== timer)
-      }, 1400)
-      publicEventCardPassAnimationTimersRef.current.push(timer)
-    }
-    if (batch.notifications.length > 0) {
-      setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
-      batch.notifications.forEach((notification) => {
-        const timer = window.setTimeout(() => {
-          setPublicEventNotifications((current) =>
-            current.filter((entry) => entry.id !== notification.id),
-          )
-          publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
-        }, 4500)
-        publicEventNotificationTimersRef.current.push(timer)
-      })
-    }
-  }, [state, locale])
-
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
     pendingFenceSources, setPendingFenceSources,
@@ -548,51 +444,6 @@ export const GameContainerApi = () => {
     pendingPositionSelections, setPendingPositionSelections,
     togglePositionSelection: togglePositionSelectionInternal,
   } = useFarmSelection()
-
-  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
-    applySnapshot(payload)
-    applyPublicEventCancellationSnapshot(payload, {
-      clearPublicEventFeedback,
-      setLastSeenPublicEventSeq: (seq) => {
-        lastSeenPublicEventSeqRef.current = seq
-      },
-    })
-    if (
-      payload.interaction.stateId === 'wait' &&
-      payload.interaction.request.kind === 'animal-reorg'
-    ) {
-      setAnimalReorg({
-        zones: payload.interaction.request.zones,
-        confirmDiscard: false,
-      })
-    } else {
-      setAnimalReorg(null)
-    }
-    if (payload.ok) {
-      setSelectedSpecialAction(null)
-      setPendingFenceEdges([])
-      setPendingFenceSources({})
-      setSelectedFenceSourcePlayerId(null)
-      setFenceError(null)
-      setPendingRoomTiles([])
-      setRoomError(null)
-      setPendingStableTiles([])
-      setPendingFarmHand(null)
-      setStableError(null)
-      setPendingPlowTile(null)
-      setPlowError(null)
-      setPendingSowSelections({})
-      setSowError(null)
-      setPendingPositionSelections(new Set())
-    }
-  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
-
-  useEffect(() => {
-    if (!isReady) return
-    const unsub = transport.onSnapshot(handleSnapshot)
-    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-    return unsub
-  }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const defaultDevPlayerId = viewPlayerId ?? currentPlayer?.id ?? ''
@@ -1052,6 +903,61 @@ export const GameContainerApi = () => {
     setIsReplayPlaying((current) => !current)
   }, [])
 
+  const {
+    applySnapshotPublicEventCancellations,
+    displayPublicEventNotifications,
+    displayPublicEventResourceAnimations,
+    displayPublicEventCardPassAnimations,
+    highlightedActionIds,
+    highlightedFarmTileKeys,
+    highlightedFenceEdgeIds,
+  } = usePublicEventCuePresentation({
+    state,
+    locale,
+    replayFeedback,
+    displayPlayerId: displayPlayer?.id ?? '',
+  })
+
+  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+    applySnapshot(payload)
+    applySnapshotPublicEventCancellations(payload)
+    if (
+      payload.interaction.stateId === 'wait' &&
+      payload.interaction.request.kind === 'animal-reorg'
+    ) {
+      setAnimalReorg({
+        zones: payload.interaction.request.zones,
+        confirmDiscard: false,
+      })
+    } else {
+      setAnimalReorg(null)
+    }
+    if (payload.ok) {
+      setSelectedSpecialAction(null)
+      setPendingFenceEdges([])
+      setPendingFenceSources({})
+      setSelectedFenceSourcePlayerId(null)
+      setFenceError(null)
+      setPendingRoomTiles([])
+      setRoomError(null)
+      setPendingStableTiles([])
+      setPendingFarmHand(null)
+      setStableError(null)
+      setPendingPlowTile(null)
+      setPlowError(null)
+      setPendingSowSelections({})
+      setSowError(null)
+      setPendingPositionSelections(new Set())
+    }
+  }, [applySnapshot, applySnapshotPublicEventCancellations, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+
+  useEffect(() => {
+    if (!isReady) return
+    const unsub = transport.onSnapshot(handleSnapshot)
+    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
+    return unsub
+  }, [transport, handleSnapshot, isReady])
+
   useEffect(() => {
     if (!isReplayPlaying) return
     const timer = window.setTimeout(() => {
@@ -1353,40 +1259,6 @@ export const GameContainerApi = () => {
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
-  const displayPublicEventNotifications = useMemo(
-    () => [...replayFeedback.notifications, ...publicEventNotifications].slice(0, 4),
-    [publicEventNotifications, replayFeedback.notifications],
-  )
-  const displayPublicEventHighlights = useMemo(
-    () => mergePublicEventHighlights(publicEventHighlights, replayFeedback.highlights),
-    [publicEventHighlights, replayFeedback.highlights],
-  )
-  const displayPublicEventResourceAnimations = useMemo(
-    () => mergePublicEventResourceAnimations(
-      publicEventResourceAnimations,
-      replayFeedback.resourceAnimations,
-    ).slice(0, 12),
-    [publicEventResourceAnimations, replayFeedback.resourceAnimations],
-  )
-  const displayPublicEventCardPassAnimations = useMemo(
-    () => mergePublicEventCardPassAnimations(
-      publicEventCardPassAnimations,
-      replayFeedback.cardPassAnimations,
-    ).slice(0, 12),
-    [publicEventCardPassAnimations, replayFeedback.cardPassAnimations],
-  )
-  const highlightedActionIds = useMemo(
-    () => new Set(displayPublicEventHighlights.actionIds),
-    [displayPublicEventHighlights.actionIds],
-  )
-  const highlightedFarmTileKeys = useMemo(
-    () => filterPublicFarmHighlightsForPlayer(displayPublicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, displayPublicEventHighlights.farmTiles],
-  )
-  const highlightedFenceEdgeIds = useMemo(
-    () => filterPublicFenceHighlightsForPlayer(displayPublicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, displayPublicEventHighlights.fenceEdges],
-  )
 
   const farmInteraction =
     interactionPresentationPlan.kind === 'farm-fence-selection' ||
