@@ -289,7 +289,11 @@ export const deriveInteractionState = ({
           promptKey,
           promptParams,
           sourceCard,
-          request: { kind: 'selection', selection },
+          request: {
+            kind: 'selection',
+            selection,
+            ...(choiceOptions.length > 0 ? { options: choiceOptions } : {}),
+          },
           allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }

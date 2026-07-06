@@ -953,6 +953,7 @@ export type InteractionRequest =
   | {
       kind: 'selection'
       selection: InteractionSelection
+      options?: ActionChoiceOption[]
     }
   | {
       kind: 'card-draft'
