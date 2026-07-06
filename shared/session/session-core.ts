@@ -110,8 +110,8 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
-import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
+import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
@@ -301,12 +301,6 @@ type SowSelectionPayload = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
-const stageReactionHooks = new Set<StageResumeState['hook']>([
-  'onStartHarvestFieldPhase',
-  'onHarvestFieldPhase',
-  'onEndHarvestFieldPhase',
-])
-
 type FutureMeepleActionKey = 'field' | 'stable' | 'forest' | 'moor'
 
 const futureMeepleActionCount = (
@@ -350,46 +344,6 @@ type HistoryEntry = {
   actionStart: boolean
   undoBoundary?: boolean
 }
-
-type StageResumeState = {
-  hook:
-    | 'onBeforeHarvest'
-    | 'onAfterReap'
-    | 'afterHarvestReapReaction'
-    | 'onHarvest'
-    | 'onEndHarvest'
-    | 'onAfterHarvest'
-    | 'onBeforeStartOfTurn'
-    | 'onRoundStart'
-    | 'onStartHarvestFeedingPhase'
-    | 'onEndTurn'
-    | 'onReturnHome'
-    | 'onStartReturnHome'
-    | 'onAfterRoundEnd'
-    | 'onRoundEnd'
-    | 'onBeforeEndGame'
-    | 'onStartHarvest'
-    | 'onStartHarvestFieldPhase'
-    | 'onHarvestFieldPhase'
-    | 'onEndHarvestFieldPhase'
-    | 'onHarvestFeedingPhase'
-    | 'onEndHarvestFeedingPhase'
-    | 'onBeforeReturnHome'
-    | 'onAllWorkersPlaced'
-    | 'onBreedPhase'
-    | 'futureMeepleActions'
-    | 'onReorganizeComplete'
-  playerIndex: number
-  cardIndex: number
-  extra?: {
-    trigger?: import('../actions/effects/reorganize').ReorganizeTrigger
-    originPlayerIndex?: number | null
-    triggerActionId?: string | null
-    resumeAfterCardId?: string | null
-  }
-}
-
-type StageCardEffectHook = Extract<StageResumeState['hook'], FlowCardEffectHook>
 
 export type SessionResponse = {
   ok: boolean
@@ -519,7 +473,6 @@ export class GameCore {
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
-  private pendingStageSwitchFromPlayerIndex: number | null = null
   private actionResultDetailsSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
     gains: {},
     costs: {},
@@ -737,6 +690,7 @@ export class GameCore {
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
   private engineLog: LogStore
+  private stageDispatch: StageDispatch
   private sessionCardContext: SessionCardContext | null = null
   private readonly parentSelectionSeed: number | undefined
   private readonly registerCustomCardImpl: (data: CustomCardData) => void
@@ -760,6 +714,54 @@ export class GameCore {
     registerThroughTheSeasonsHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
+    this.stageDispatch = new StageDispatch({
+      getState: () => this.state,
+      createFlowEngine: (flow, ownerPlayerIndex) => this.createFlowEngine(flow, ownerPlayerIndex),
+      pushEngineFrame: (frame) => this.pushEngineFrame(frame),
+      popEngineFrame: () => this.popEngineFrame(),
+      driveEngineSteps: () => this.runEngineSteps(),
+      withDeferredPrivateEventDrain: (fn) => {
+        this.deferPrivateEventDrainDepth += 1
+        try {
+          fn()
+        } finally {
+          this.deferPrivateEventDrainDepth -= 1
+        }
+      },
+    }, {
+      onBeforeHarvest: (stageResume) => { this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex) },
+      onAfterReap: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      afterHarvestReapReaction: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onHarvest: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeStartOfTurn: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
+      onRoundStart: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
+      futureMeepleActions: () => { this.continueAfterFutureMeepleActions() },
+      onStartHarvestFeedingPhase: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onEndTurn: (stageResume) => {
+        this.continueEndTurnHooks(
+          stageResume.playerIndex,
+          stageResume.cardIndex,
+          stageResume.extra?.triggerActionId ?? null,
+        )
+      },
+      onBeforeReturnHome: (stageResume) => { this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onReturnHome: (stageResume) => { this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onStartReturnHome: (stageResume) => { this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onAfterRoundEnd: (stageResume) => { this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra) },
+      onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex) },
+      onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
+      onEndHarvestFieldPhase: (stageResume) => { this.continueEndFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
+      onHarvestFeedingPhase: (stageResume) => { this.continueHarvestFeeding(stageResume.playerIndex, stageResume.cardIndex) },
+      onEndHarvestFeedingPhase: (stageResume) => { this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex) },
+      onRoundEnd: (stageResume) => { this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onAllWorkersPlaced: (stageResume) => { this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      onBreedPhase: () => { this.continueEndHarvestEffects() },
+      onReorganizeComplete: (stageResume) => { this.continueAfterSubFlow(stageResume) },
+    })
 
     // Build or accept a per-session card registry, then publish it as the
     // active registry for legacy helper/test injection. Official entries are
@@ -1306,19 +1308,6 @@ export class GameCore {
       ?? (spaceId.startsWith(SUBFLOW_SPACE_PREFIX) || spaceId.startsWith('__stage:')
         ? this.createSyntheticSpace(spaceId)
         : null)
-  }
-
-  private getPlayerEffectCardIds(player: PlayerState) {
-    return [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
-  }
-
-  /** Return hand card IDs whose registered effect declares `handHooks` containing `hook`. */
-  private getPlayerHandEffectCardIds(player: PlayerState, hook: FlowCardEffectHook) {
-    const handCards = [...player.occupationHand, ...player.minorHand]
-    return handCards.filter(id => {
-      const effect = getCardEffect(id)
-      return effect?.handHooks?.includes(hook)
-    })
   }
 
   private getActiveInteractionContext() {
@@ -2607,242 +2596,6 @@ export class GameCore {
       })
   }
 
-  private startStageFlow(
-    flow: ActionFlow,
-    hook: StageResumeState['hook'],
-    playerIndex: number,
-    nextCardIndex: number,
-    resumePlayerIndex = playerIndex,
-    extra?: StageResumeState['extra'],
-  ) {
-    const stageSwitchFromPlayerIndex = this.pendingStageSwitchFromPlayerIndex
-    this.pendingStageSwitchFromPlayerIndex = null
-    const deferredPlayerSwitch = stageSwitchFromPlayerIndex !== null && stageSwitchFromPlayerIndex !== playerIndex
-      ? { fromPlayerIndex: stageSwitchFromPlayerIndex, toPlayerIndex: playerIndex }
-      : null
-    this.engineStack.push({
-      engine: this.createFlowEngine(flow, playerIndex),
-      source: { kind: 'flow', flow },
-      spaceId: `__stage:${hook}`,
-      ownerPlayerIndex: playerIndex,
-      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex, ...(extra ? { extra } : {}) },
-      deferredPlayerSwitch,
-      reason: 'stage-hook',
-    })
-    this.runEngineSteps()
-  }
-
-  private continueStageHook(
-    hook: StageCardEffectHook,
-    playerIndex = 0,
-    cardIndex = 0,
-    extra?: StageResumeState['extra'],
-  ) {
-    if (cardIndex === 0 && stageReactionHooks.has(hook)) {
-      return this.continueStageReactionHook(hook, playerIndex)
-    }
-    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const player = this.state.players[currentPlayerIndex]
-      if (!player) continue
-      const cards = [
-        ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook),
-      ]
-      const startCardIndex = currentPlayerIndex === playerIndex
-        ? this.resolveStageStartCardIndex(cards, cardIndex, extra?.resumeAfterCardId)
-        : 0
-      for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
-        const cardId = cards[currentCardIndex]
-        if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
-        if (!flow) continue
-        this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1, currentPlayerIndex, {
-          resumeAfterCardId: cardId,
-        })
-        return true
-      }
-    }
-    return false
-  }
-
-  private resolveStageStartCardIndex(
-    cards: string[],
-    cardIndex: number,
-    resumeAfterCardId?: string | null,
-  ) {
-    if (!resumeAfterCardId) return cardIndex
-    const liveIndex = cards.indexOf(resumeAfterCardId)
-    if (liveIndex >= 0) return liveIndex + 1
-    return Math.max(0, cardIndex - 1)
-  }
-
-  private buildStageEffectActivationFlow(
-    cardId: string,
-    hook: StageCardEffectHook,
-    ownerPlayerId: string,
-    targetPlayerId: string,
-    mandatory = true,
-    actionContext: Record<string, unknown> = {},
-  ): ActionFlow {
-    const context = {
-      ownerPlayerId,
-      targetPlayerId,
-      stageHook: hook,
-      mandatory,
-      ...actionContext,
-    }
-    return {
-      type: 'leaf',
-      actionId: 'activate-card-effect',
-      params: {
-        cardId,
-        hook,
-        ...context,
-      },
-      actionContext: context,
-      sourceCard: cardId,
-      targetPlayerId,
-      optional: mandatory ? undefined : true,
-    }
-  }
-
-  private collectOwnStageReactionActivationFlows(
-    hook: StageCardEffectHook,
-    player: PlayerState,
-  ): ActionFlow[] {
-    const children: ActionFlow[] = []
-    const cards = [
-      ...this.getPlayerEffectCardIds(player),
-      ...this.getPlayerHandEffectCardIds(player, hook),
-    ]
-    for (const cardId of cards) {
-      const effect = getCardEffect(cardId)
-      if (!effect?.[hook]) continue
-      children.push(this.buildStageEffectActivationFlow(cardId, hook, player.id, player.id))
-    }
-    return children
-  }
-
-  private continueStageReactionHook(
-    hook: StageCardEffectHook,
-    playerIndex = 0,
-  ) {
-    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const player = this.state.players[currentPlayerIndex]
-      if (!player) continue
-      const children = this.collectOwnStageReactionActivationFlows(hook, player)
-      if (children.length === 0) continue
-      const flow = children.length === 1
-        ? children[0]!
-        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
-      this.startStageFlow(
-        flow,
-        hook,
-        currentPlayerIndex,
-        0,
-        currentPlayerIndex + 1,
-      )
-      return true
-    }
-    return false
-  }
-
-  private buildBeforeEndGameActivationFlow(
-    cardId: string,
-    ownerPlayerId: string,
-    targetPlayerId: string,
-    scope: BeforeEndGameScope,
-    mandatory: boolean,
-  ): ActionFlow {
-    return this.buildStageEffectActivationFlow(cardId, 'onBeforeEndGame', ownerPlayerId, targetPlayerId, mandatory, {
-      ownerPlayerId,
-      targetPlayerId,
-      beforeEndGameScope: scope,
-      beforeEndGameMandatory: mandatory,
-    })
-  }
-
-  private collectBeforeEndGameActivationFlows(targetPlayerIndex: number) {
-    const targetPlayer = this.state.players[targetPlayerIndex]
-    const children: ActionFlow[] = []
-    if (!targetPlayer) return children
-
-    for (const ownerPlayer of this.state.players) {
-      const playedCards = this.getPlayerEffectCardIds(ownerPlayer)
-      for (const cardId of playedCards) {
-        const effect = getCardEffect(cardId)
-        if (!effect?.onBeforeEndGame) continue
-        const scope = effect.beforeEndGameScope ?? 'owner'
-        if (scope === 'owner' && ownerPlayer.id !== targetPlayer.id) continue
-        const flow = this.buildBeforeEndGameActivationFlow(
-          cardId,
-          ownerPlayer.id,
-          targetPlayer.id,
-          scope,
-          effect.beforeEndGameMandatory !== false,
-        )
-        children.push(flow)
-      }
-    }
-
-    const handCards = this.getPlayerHandEffectCardIds(targetPlayer, 'onBeforeEndGame')
-    for (const cardId of handCards) {
-      const effect = getCardEffect(cardId)
-      if (!effect?.onBeforeEndGame) continue
-      const flow = this.buildBeforeEndGameActivationFlow(
-        cardId,
-        targetPlayer.id,
-        targetPlayer.id,
-        'owner',
-        effect.beforeEndGameMandatory !== false,
-      )
-      children.push(flow)
-    }
-
-    return children
-  }
-
-  private continueBeforeEndGamePlayerDispatch(playerIndex = 0) {
-    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
-      const children = this.collectBeforeEndGameActivationFlows(currentPlayerIndex)
-      if (children.length === 0) continue
-      const flow = children.length === 1
-        ? children[0]!
-        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
-      this.startStageFlow(
-        flow,
-        'onBeforeEndGame',
-        currentPlayerIndex,
-        0,
-        currentPlayerIndex + 1,
-      )
-      return true
-    }
-    return false
-  }
-
-  private continueSinglePlayerStageHook(
-    hook: StageCardEffectHook,
-    playerIndex: number,
-    cardIndex = 0,
-    extra?: StageResumeState['extra'],
-  ) {
-    const player = this.state.players[playerIndex]
-    if (!player) return false
-    const cards = this.getPlayerEffectCardIds(player)
-    for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
-      const cardId = cards[currentCardIndex]
-      if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
-        triggerActionId: extra?.triggerActionId ?? undefined,
-      })
-      if (!flow) continue
-      this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1, playerIndex, extra)
-      return true
-    }
-    return false
-  }
-
   /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
   private finishCompletedActionTurn(playerIndex: number): SessionResponse {
     return roundPhase.finishCompletedActionTurn(this, playerIndex)
@@ -2858,21 +2611,21 @@ export class GameCore {
     triggerActionId?: string | null,
   ): SessionResponse {
     const extra = triggerActionId ? { triggerActionId } : undefined
-    if (this.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex, extra)) {
+    if (this.stageDispatch.continueSinglePlayerStageHook('onEndTurn', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
     return this.finishCompletedActionTurn(playerIndex)
   }
 
   private continueHarvestFromBeforeHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueFromStartHarvest()
   }
 
   private continueFromStartHarvest(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.continueStageHook('onStartHarvest', playerIndex, cardIndex, extra)) {
+    if (this.stageDispatch.continueStageHook('onStartHarvest', playerIndex, cardIndex, extra)) {
       return this.respond()
     }
     return this.continueHarvestFieldStart()
@@ -2901,14 +2654,14 @@ export class GameCore {
         }
       })
     }
-    if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueHarvestFieldPhase()
   }
 
   private continueHarvestFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onHarvestFieldPhase', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueHarvestReap()
@@ -2977,21 +2730,21 @@ export class GameCore {
       }
     })
     if (reactionChildren.length > 0) {
-      this.startStageFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0, 0)
+      this.stageDispatch.startFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0, 0)
       return this.respond()
     }
     return this.continueAfterReapEffects()
   }
 
   private continueAfterReapEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onAfterReap', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onAfterReap', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueEndFieldPhase()
   }
 
   private continueEndFieldPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     this.state.roundPhase = 'harvest'
@@ -2999,7 +2752,7 @@ export class GameCore {
   }
 
   private continueHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onHarvest', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
 
@@ -3008,14 +2761,14 @@ export class GameCore {
       type: 'harvest.phaseStarted',
       harvestPhase: 'feeding',
     }])
-    if (this.continueStageHook('onStartHarvestFeedingPhase')) {
+    if (this.stageDispatch.continueStageHook('onStartHarvestFeedingPhase')) {
       return this.respond()
     }
     return this.continueHarvestFeeding()
   }
 
   private continueHarvestFeeding(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.executeFeedingLogic()
@@ -3090,14 +2843,14 @@ export class GameCore {
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onEndHarvest', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onEndHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueAfterHarvestEffects()
   }
 
   private continueAfterHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
     delete this.state.harvestReapSummary
@@ -3149,7 +2902,7 @@ export class GameCore {
   }
 
   private continueBeforeStartOfTurn(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
       return this.respond()
     }
     this.state.players.forEach((player) => {
@@ -3218,7 +2971,7 @@ export class GameCore {
     ])
     this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
     if (futureMeepleActionFlow) {
-      this.startStageFlow(
+      this.stageDispatch.startFlow(
         futureMeepleActionFlow.flow,
         'futureMeepleActions',
         futureMeepleActionFlow.playerIndex,
@@ -3231,7 +2984,7 @@ export class GameCore {
   }
 
   private continueAfterFutureMeepleActions(): SessionResponse {
-    if (this.continueStageHook('onRoundStart')) {
+    if (this.stageDispatch.continueStageHook('onRoundStart')) {
       return this.respond()
     }
     const startIdx = this.state.players.findIndex((player) => player.startPlayer)
@@ -3257,7 +3010,7 @@ export class GameCore {
       this.dispatchFutureMeepleResolvedListeners(committedEvents)
     }
     if (futureMeepleActionFlow) {
-      this.startStageFlow(
+      this.stageDispatch.startFlow(
         futureMeepleActionFlow.flow,
         'futureMeepleActions',
         futureMeepleActionFlow.playerIndex,
@@ -3288,92 +3041,6 @@ export class GameCore {
     return roundPhase.continueAfterReorganizeRoundEnd(this, playerIndex, originPlayerIndex, triggerActionId)
   }
 
-  private resumeStageFlow(stageResume: StageResumeState) {
-    switch (stageResume.hook) {
-      case 'onBeforeHarvest':
-        this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onAfterReap':
-        this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'afterHarvestReapReaction':
-        this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onHarvest':
-        this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onEndHarvest':
-        this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onAfterHarvest':
-        this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onBeforeStartOfTurn':
-        this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onRoundStart':
-        this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'futureMeepleActions':
-        this.continueAfterFutureMeepleActions()
-        return
-      case 'onStartHarvestFeedingPhase':
-        this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onEndTurn':
-        this.continueEndTurnHooks(
-          stageResume.playerIndex,
-          stageResume.cardIndex,
-          stageResume.extra?.triggerActionId ?? null,
-        )
-        return
-      case 'onBeforeReturnHome':
-        this.continueBeforeReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onReturnHome':
-        this.continueReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onStartReturnHome':
-        this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onAfterRoundEnd':
-        this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onBeforeEndGame':
-        this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onStartHarvest':
-        this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra)
-        return
-      case 'onStartHarvestFieldPhase':
-        this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onHarvestFieldPhase':
-        this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onEndHarvestFieldPhase':
-        this.continueEndFieldPhase(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onHarvestFeedingPhase':
-        this.continueHarvestFeeding(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onEndHarvestFeedingPhase':
-        this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onRoundEnd':
-        this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onAllWorkersPlaced':
-        this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
-        return
-      case 'onBreedPhase':
-        this.continueEndHarvestEffects()
-        return
-      case 'onReorganizeComplete':
-        return this.continueAfterSubFlow(stageResume)
-    }
-  }
-
   /**
    * Umbrella resume entry-point for sub-flow frames that complete via stage
    * resume. Today only `onReorganizeComplete` flows through here — it
@@ -3381,8 +3048,7 @@ export class GameCore {
    * helpers based on `extra.trigger`. Future sub-flows (feed, confirm) will
    * register their own switch arms here as Task 9 introduces them.
    *
-   * For non-reorganize hooks, callers continue to use `resumeStageFlow`
-   * directly (those branches are not stack-aware sub-flows yet).
+   * Non-reorganize hooks are resumed by StageDispatch.
    */
   private continueAfterSubFlow(stageResume: StageResumeState) {
     if (stageResume.hook === 'onReorganizeComplete') {
@@ -3419,9 +3085,7 @@ export class GameCore {
         stageResume.extra?.triggerActionId ?? null,
       )
     }
-    // Fall-through: delegate to the stage flow resolver for hooks
-    // that have not (yet) been migrated to the sub-flow umbrella model.
-    this.resumeStageFlow(stageResume)
+    this.stageDispatch.resume(stageResume)
   }
 
   private effectiveOwnerIndexForFrame(
@@ -3537,23 +3201,8 @@ export class GameCore {
           return
         }
         const isActionEngine = frame.source.kind === 'action'
-        const stageResume = (frame.stageResume ?? null) as StageResumeState | null
         const ownerIdx = frame.ownerPlayerIndex
-        if (stageResume) {
-          this.engineStack.pop()
-          this.pendingStageSwitchFromPlayerIndex = ownerIdx
-          try {
-            this.deferPrivateEventDrainDepth += 1
-            try {
-              this.resumeStageFlow(stageResume)
-            } finally {
-              this.deferPrivateEventDrainDepth -= 1
-            }
-          } finally {
-            this.pendingStageSwitchFromPlayerIndex = null
-          }
-          return
-        }
+        if (this.stageDispatch.completeFrameIfStage(frame)) return
         if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
           // The frame's engine/source were replaced in-place; loop again with
           // the same frame.
@@ -3786,8 +3435,8 @@ export class GameCore {
         frame.engine.flushEventTransaction({ state: this.state, player, space })
         this.flushEngineLog()
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
-        // top. When it completes, resumeStageFlow's onReorganizeComplete
-        // branch detects the parent frame and calls runEngineSteps again.
+        // top. When it completes, StageDispatch resumes onReorganizeComplete
+        // and calls back into the reorganize continuation.
         this.startReorganizeSubFlow(pIdx, 'anytime')
         return
       }
@@ -4466,7 +4115,7 @@ export class GameCore {
   }
 
   private continueAllWorkersPlacedHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.performRoundEnd()
@@ -4476,21 +4125,21 @@ export class GameCore {
   performRoundEnd(): SessionResponse { return roundPhase.performRoundEnd(this) }
 
   private continueBeforeReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueStartReturnHomeHooks()
   }
 
   private continueStartReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onStartReturnHome', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onStartReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueReturnHomeHooks()
   }
 
   private continueReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
     const returnedWorkers = this.state.actionSpaces.flatMap((space) =>
@@ -4537,7 +4186,7 @@ export class GameCore {
   private startBreedPhase(): SessionResponse { return harvestPhase.startBreedPhase(this) }
 
   private continueAfterFeedingPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onEndHarvestFeedingPhase', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onEndHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     const harvestOrder = this.getHarvestPlayerIndices()
@@ -4558,7 +4207,7 @@ export class GameCore {
       .map((entry) => entry.index)
     const flow = this.buildHarvestBreedFlow(breedOrder)
     if (flow) {
-      this.startStageFlow(flow, 'onBreedPhase', 0, 0)
+      this.stageDispatch.startFlow(flow, 'onBreedPhase', 0, 0)
       return this.respond()
     }
     return this.continueEndHarvestEffects()
@@ -4583,14 +4232,14 @@ export class GameCore {
   private finalizeRound(): SessionResponse { return roundPhase.finalizeRound(this) }
 
   private continueRoundEndHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onRoundEnd', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueAfterRoundEnd()
   }
 
   private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
+    if (this.stageDispatch.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
     }
     this.state.players.forEach((p) => {
@@ -4607,7 +4256,7 @@ export class GameCore {
   }
 
   private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (cardIndex === 0 && this.continueBeforeEndGamePlayerDispatch(playerIndex)) {
+    if (cardIndex === 0 && this.stageDispatch.continueBeforeEndGamePlayerDispatch(playerIndex)) {
       return this.respond()
     }
     if (!this.state.gameOver) {
