@@ -46,7 +46,7 @@ const completeFirstPlow = (
   resp: ReturnType<GameSession['takeAction']> | ReturnType<GameSession['resolveChoice']>,
 ) => {
   if (resp.interaction.stateId !== 'wait') throw new Error('expected farm-select')
-  const tile = resp.interaction.farm.selectableTiles[0]
+  const tile = resp.interaction.request.farm.selectableTiles[0]
   expect(tile).toBeDefined()
   return session.commitSelectionChoice(playerIndex, { tile })
 }
@@ -66,7 +66,7 @@ const playMinor = (session: GameSession, playerIndex: number, cardId: string) =>
     return resp
   }
   if (resp.interaction.stateId !== 'wait') throw new Error('expected minor choice')
-  const option = resp.interaction.options?.find(
+  const option = resp.interaction.request.options?.find(
     (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
@@ -79,7 +79,7 @@ const playMajor = (session: GameSession, playerIndex: number, cardId: string) =>
   let resp = session.takeAction(playerIndex, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-  const option = resp.interaction.options?.find(
+  const option = resp.interaction.request.options?.find(
     (candidate: ActionChoiceOption) => candidate.value === cardId,
   )
   expect(option).toBeDefined()
@@ -120,7 +120,7 @@ describe('5+ stored-food cashout occupations', () => {
     expect(storedFood(session, 'C172_FieldCounter')).toBe(1)
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional extra plow')
-    const extraPlow = resp.interaction.options?.find(
+    const extraPlow = resp.interaction.request.options?.find(
       (option: ActionChoiceOption) => option.value !== '__skip__',
     )
     expect(extraPlow).toBeDefined()

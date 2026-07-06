@@ -94,7 +94,7 @@ describe('E051_WhaleOil session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose the occupation
-    const occupationOption = resp.interaction.options?.find((o) => o.value === 'A101_Mendicant')
+    const occupationOption = resp.interaction.request.options?.find((o) => o.value === 'A101_Mendicant')
     if (!occupationOption) {
       // The occupation may have already been auto-selected or the choice format differs
       return
@@ -121,7 +121,7 @@ describe('E051_WhaleOil session', () => {
     expect(resp.ok).toBe(true)
 
     if (resp.interaction.stateId !== 'wait') return
-    const occupationOption = resp.interaction.options?.find((o) => o.value === 'A101_Mendicant')
+    const occupationOption = resp.interaction.request.options?.find((o) => o.value === 'A101_Mendicant')
     if (!occupationOption) return
     const resp2 = session.resolveChoice(0, occupationOption.value)
 

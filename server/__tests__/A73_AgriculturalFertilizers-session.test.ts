@@ -58,8 +58,8 @@ describe('A073_AgriculturalFertilizers session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
-    expect(resp.interaction.options?.some((o) => o.labelKey === 'ui.interactionOptionalSkip')).toBe(true)
+    expect(resp.interaction.request.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+    expect(resp.interaction.request.options?.some((o) => o.labelKey === 'ui.interactionOptionalSkip')).toBe(true)
   })
 
   it('does NOT grant sow after fencing only 1 tile', () => {
@@ -103,10 +103,10 @@ describe('A073_AgriculturalFertilizers session', () => {
     // The pending is the stable selection
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    if (resp.interaction.farm.farmType !== 'stable') return
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const tiles = resp.interaction.farm.selectableTiles
+    const tiles = resp.interaction.request.farm.selectableTiles
     expect(tiles.length).toBeGreaterThanOrEqual(2)
     const [s1, s2] = tiles
 
@@ -116,7 +116,7 @@ describe('A073_AgriculturalFertilizers session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+    expect(resp.interaction.request.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
   })
 
   it('cannot play A73 without at least 1 pasture (prerequisite)', () => {
@@ -145,7 +145,7 @@ describe('A073_AgriculturalFertilizers session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // A73 should not be in the playable options (no pasture)
-    const a73Option = resp.interaction.options?.find(
+    const a73Option = resp.interaction.request.options?.find(
       (option) => option.value === CARD_ID,
     )
     expect(a73Option).toBeUndefined()

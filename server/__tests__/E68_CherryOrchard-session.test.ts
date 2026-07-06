@@ -154,11 +154,11 @@ describe('E068_CherryOrchard session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    if (resp.interaction.stateId !== 'wait' || resp.interaction.farm.farmType !== 'sow') {
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.farm.farmType !== 'sow') {
       throw new Error('expected sow interaction')
     }
 
-    expect(resp.interaction.farm.selectableFields).toContainEqual({
+    expect(resp.interaction.request.farm.selectableFields).toContainEqual({
       tile: VIRTUAL_TILE,
       allowedCrops: ['wood'],
       sourceCard: CARD_ID,

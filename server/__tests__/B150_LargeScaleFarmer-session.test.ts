@@ -60,20 +60,20 @@ describe('B150_LargeScaleFarmer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Pick Fireplace1 (costs 2 clay) — player has 10 clay
-    const fireplace = resp.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
+    const fireplace = resp.interaction.request.options?.find((o) => o.value === 'Major_Fireplace1')
     expect(fireplace).toBeDefined()
     resp = session.resolveChoice(0, fireplace!.value)
     // Potentially there's a payment sub-choice; keep draining valid options
     // until we reach the B150 optional chain.
     let safety = 10
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+      const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
       if (hasSkip) {
         // This is likely the B150 optional; stop here.
         break
       }
       // Pick the first non-skip option
-      const first = resp.interaction.options[0]
+      const first = resp.interaction.request.options[0]
       if (!first) break
       resp = session.resolveChoice(0, first.value)
     }
@@ -91,12 +91,12 @@ describe('B150_LargeScaleFarmer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Pick stables (simpler — 1 wood per stable)
-    const stables = resp.interaction.options?.find((o) => o.labelKey?.includes('stables') || o.value === 'stables')
+    const stables = resp.interaction.request.options?.find((o) => o.labelKey?.includes('stables') || o.value === 'stables')
     if (stables) {
       resp = session.resolveChoice(0, stables.value)
     } else {
       // Alternative: just use the first available option
-      resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+      resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     }
     // Navigate through any sub-interactions until we hit the B150 optional (has __skip__).
     let safety = 15
@@ -104,7 +104,7 @@ describe('B150_LargeScaleFarmer session', () => {
     while (safety-- > 0) {
       if (resp.interaction.stateId === 'wait') {
         if (resp.interaction.request.kind === 'farm-select') {
-          const farm = resp.interaction.farm
+          const farm = resp.interaction.request.farm
           if (farm.farmType === 'plow') {
             const tile = farm.selectableTiles[0]
             if (!tile) throw new Error('expected selectable plow tile')
@@ -129,23 +129,23 @@ describe('B150_LargeScaleFarmer session', () => {
           }
           continue
         }
-        const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+        const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
         if (hasSkip) {
           foundOptional = true
           break
         }
-        const done = resp.interaction.options?.find((o) => o.value === '__done__')
+        const done = resp.interaction.request.options?.find((o) => o.value === '__done__')
         if (done) {
           resp = session.resolveChoice(0, done.value)
         } else {
-          resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
         }
       } else {
         break
       }
     }
     if (foundOptional && resp.interaction.stateId === 'wait') {
-      const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
+      const accept = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
       if (accept) {
         resp = session.resolveChoice(0, accept.value)
         // Food should be paid (3 -> 2)

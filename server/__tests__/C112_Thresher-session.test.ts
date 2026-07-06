@@ -47,7 +47,7 @@ describe('C112_Thresher session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Should have skip option and exchange option
-    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -64,7 +64,7 @@ describe('C112_Thresher session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Accept the exchange (not skip)
-    const exchangeOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const exchangeOption = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     if (!exchangeOption) return
     resp = session.resolveChoice(0, exchangeOption.value)
     expect(resp.ok).toBe(true)
@@ -85,11 +85,11 @@ describe('C112_Thresher session', () => {
     // becomes a choice (or confirmNextPlayer if both inner actions are
     // undoable). We assert the before-hook's skip option isn't present.
     if (resp.interaction.stateId === 'wait') {
-      const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+      const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
       // No before-hook skip token specifically — but any skip would be a
       // false positive only if it carried Thresher labelling. We tolerate
       // any non-Thresher choice here.
-      expect(hasSkip || resp.interaction.options?.length > 0).toBe(true)
+      expect(hasSkip || resp.interaction.request.options?.length > 0).toBe(true)
     }
   })
 
@@ -108,7 +108,7 @@ describe('C112_Thresher session', () => {
     // The before-hook should fire for farmland too
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -119,7 +119,7 @@ describe('C112_Thresher session', () => {
     // The before-hook should fire for cultivation too
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -153,7 +153,7 @@ describe('C112_Thresher session', () => {
     if (resp.interaction.stateId !== 'wait') return
     // The first prompt should be Thresher's pay-1-food → 1-grain offer
     // (its before-hook + an optional skip).
-    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 

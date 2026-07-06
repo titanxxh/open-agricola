@@ -85,8 +85,8 @@ describe('B072_LoveforAgriculture session', () => {
       expect(resp.interaction.stateId).toBe('wait')
 
       // The interaction should include the pasture tile as sowable
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
-        const pastureField = resp.interaction.farm.selectableFields.find(
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow') {
+        const pastureField = resp.interaction.request.farm.selectableFields.find(
           (f) => f.tile.row === 2 && f.tile.col === 2,
         )
         expect(pastureField).toBeDefined()
@@ -230,9 +230,9 @@ describe('B072_LoveforAgriculture session', () => {
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
       // Should only show the pasture tile as sowable
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
-        expect(resp.interaction.farm.selectableFields.length).toBe(1)
-        expect(resp.interaction.farm.selectableFields[0].tile).toEqual({ row: 2, col: 2 })
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow') {
+        expect(resp.interaction.request.farm.selectableFields.length).toBe(1)
+        expect(resp.interaction.request.farm.selectableFields[0].tile).toEqual({ row: 2, col: 2 })
       }
     })
 
@@ -478,10 +478,10 @@ describe('B072_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow') {
         // Should only show the field, not the pasture
-        expect(resp.interaction.farm.selectableFields.length).toBe(1)
-        expect(resp.interaction.farm.selectableFields[0].tile).toEqual({ row: 0, col: 0 })
+        expect(resp.interaction.request.farm.selectableFields.length).toBe(1)
+        expect(resp.interaction.request.farm.selectableFields[0].tile).toEqual({ row: 0, col: 0 })
       }
     })
   })

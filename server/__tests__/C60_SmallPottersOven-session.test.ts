@@ -65,7 +65,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const c60Option = resp.interaction.options?.find(
+    const c60Option = resp.interaction.request.options?.find(
       (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
@@ -112,7 +112,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const c60Option = resp.interaction.options?.find(
+    const c60Option = resp.interaction.request.options?.find(
       (option) => option.value === 'C060_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()
@@ -122,12 +122,12 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenReturn')
-    expect(resp.interaction.options?.map((option) => option.labelKey)).toEqual([
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toEqual([
       'improvements.Major_ClayOven.name',
       'improvements.Major_StoneOven.name',
     ])
 
-    const returnStone = resp.interaction.options?.find(
+    const returnStone = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'improvements.Major_StoneOven.name',
     )
     expect(returnStone).toBeDefined()
@@ -151,7 +151,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -191,7 +191,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -199,7 +199,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseImprovement')
-    const stoneOption = resp.interaction.options?.find(
+    const stoneOption = resp.interaction.request.options?.find(
       (option) => option.value === 'Major_StoneOven',
     )
     expect(stoneOption).toBeDefined()
@@ -231,7 +231,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp.state.players[0]!.resources.grain = 0
@@ -257,7 +257,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -289,7 +289,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -299,7 +299,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
-    const ovenBakeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const ovenBakeOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(ovenBakeOption).toBeDefined()
 
     resp = session.resolveChoice(0, ovenBakeOption!.value)
@@ -341,7 +341,7 @@ describe('C060_SmallPottersOven server session', () => {
     }
 
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.request.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
   })
 
   it('allows C60 to create the oven source before D66 creates grain', () => {
@@ -357,7 +357,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -369,7 +369,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
-    const ovenBakeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const ovenBakeOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(ovenBakeOption).toBeDefined()
 
     resp = session.resolveChoice(0, ovenBakeOption!.value)
@@ -378,12 +378,12 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.request.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
 
     resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === 'D066_PotterCeramics') {
-      const d66Option = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      const d66Option = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
       expect(d66Option).toBeDefined()
       resp = session.resolveChoice(0, d66Option!.value)
     }
@@ -407,7 +407,7 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
-    const buildOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     resp = session.resolveChoice(0, buildOption!.value)
@@ -417,7 +417,7 @@ describe('C060_SmallPottersOven server session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
-    const ovenBakeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const ovenBakeOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(ovenBakeOption).toBeDefined()
 
     resp = session.resolveChoice(0, ovenBakeOption!.value)
@@ -425,8 +425,8 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).toBe(true)
-    expect(resp.interaction.options?.find((option) => option.value === 'STUB_BeforeBakeGainClay')?.disabled).not.toBe(true)
+    expect(resp.interaction.request.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).toBe(true)
+    expect(resp.interaction.request.options?.find((option) => option.value === 'STUB_BeforeBakeGainClay')?.disabled).not.toBe(true)
 
     resp = session.resolveChoice(0, 'STUB_BeforeBakeGainClay')
     expect(resp.ok).toBe(true)
@@ -434,12 +434,12 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
+    expect(resp.interaction.request.options?.find((option) => option.value === 'D066_PotterCeramics')?.disabled).not.toBe(true)
 
     resp = session.resolveChoice(0, 'D066_PotterCeramics')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.sourceCard === 'D066_PotterCeramics') {
-      const d66Option = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      const d66Option = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
       expect(d66Option).toBeDefined()
       resp = session.resolveChoice(0, d66Option!.value)
     }

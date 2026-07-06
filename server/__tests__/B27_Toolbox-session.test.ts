@@ -48,7 +48,7 @@ describe('B27 Toolbox session', () => {
     let safety = 30
     let reachedBuyMajor = false
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       if (promptKey === 'ui.interactionToolboxImprovement') {
         reachedBuyMajor = true
@@ -64,8 +64,8 @@ describe('B27 Toolbox session', () => {
       }
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (B27 needs a real construct to trigger onEndTurn).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
-        const tile = resp.interaction.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'room') {
+        const tile = resp.interaction.request.farm.selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
@@ -103,7 +103,7 @@ describe('B27 Toolbox session', () => {
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
       const promptKey = resp.interaction.promptKey
       if (resp.interaction.request.kind === 'select-trigger') {
-        const opts = resp.interaction.options ?? []
+        const opts = resp.interaction.request.options ?? []
         expect(opts.find(o => o.sourceCard === CARD_ID)).toBeDefined()
         expect(opts.find(o => o.sourceCard === CUBBYHOLE_ID)).toBeDefined()
         const toolbox = opts.find(o => o.sourceCard === CARD_ID)!
@@ -113,12 +113,12 @@ describe('B27 Toolbox session', () => {
         sawGroupedTrigger = true
         break
       }
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.farm.farmType === 'room') {
-        const tile = resp.interaction.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.request.farm.farmType === 'room') {
+        const tile = resp.interaction.request.farm.selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
       const doneOpt = opts.find(o => o.value === '__done__')
       const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
@@ -176,13 +176,13 @@ describe('B27 Toolbox session', () => {
       const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
-        const tile = resp.interaction.farm.selectableTiles[0]!
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'room') {
+        const tile = resp.interaction.request.farm.selectableTiles[0]!
         resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
       if (resp.interaction.request.kind !== 'choice') break
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       // 优先选 construct（如果有）以确保修房触发 setFlag；
       // 修房完成后 OR 会有 __done__，优先选它结束 OR 进入 B150/B27 prompt。
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))

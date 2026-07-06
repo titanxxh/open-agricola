@@ -73,16 +73,16 @@ describe('D071_Changeover session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional sow prompt')
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.options?.map((o) => o.value)).toContain('__skip__')
+    expect(resp.interaction.request.options?.map((o) => o.value)).toContain('__skip__')
 
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
     expect(resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.map((option) => option.value)
+      ? resp.interaction.request.options?.map((option) => option.value)
       : [],
     ).toEqual(['confirm'])
 

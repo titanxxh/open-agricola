@@ -27,10 +27,10 @@ const reqKind = (r: SessionResponse): string | undefined =>
 
 /** Active interaction option values (choice prompts expose them as `options`). */
 const optValues = (r: SessionResponse): string[] =>
-  r.interaction.stateId === 'wait' ? (r.interaction.options ?? []).map((o) => o.value) : []
+  r.interaction.stateId === 'wait' ? (r.interaction.request.options ?? []).map((o) => o.value) : []
 
 const optLabels = (r: SessionResponse): (string | undefined)[] =>
-  r.interaction.stateId === 'wait' ? (r.interaction.options ?? []).map((o) => o.labelKey) : []
+  r.interaction.stateId === 'wait' ? (r.interaction.request.options ?? []).map((o) => o.labelKey) : []
 
 /**
  * XOR branch value by position: branch 0 = use, branch 1 = forfeit. OA
@@ -39,7 +39,7 @@ const optLabels = (r: SessionResponse): (string | undefined)[] =>
  * handle a test should use.
  */
 const branchValue = (r: SessionResponse, index: number): string => {
-  const opts = r.interaction.stateId === 'wait' ? (r.interaction.options ?? []) : []
+  const opts = r.interaction.stateId === 'wait' ? (r.interaction.request.options ?? []) : []
   const found = opts[index]
   if (!found) throw new Error(`no XOR branch at index ${index}; got ${JSON.stringify(opts)}`)
   return found.value

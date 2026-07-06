@@ -130,7 +130,7 @@ describe('CardEffect.resolveChoice hook', () => {
     expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
 
     // Resolve the XOR choice → our resolveChoice handler should fire
-    const xorOption = resp.interaction.options[0]
+    const xorOption = resp.interaction.request.options[0]
     expect(xorOption).toBeDefined()
     resp = session.resolveChoice(0, xorOption!.value)
     expect(resp.ok).toBe(true)
@@ -165,7 +165,7 @@ describe('CardEffect.resolveChoice hook', () => {
     expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
 
     const foodBefore = resp.state.players[0]!.resources.food
-    const xorOption = resp.interaction.options[0]
+    const xorOption = resp.interaction.request.options[0]
     expect(xorOption).toBeDefined()
 
     // resolveChoice fires our handler, which inserts a gain-food flow.
@@ -213,7 +213,7 @@ describe('CardEffect.resolveChoice hook', () => {
     expect(resp.interaction.playerIndex).toBe(1)
     expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
 
-    const xorOption = resp.interaction.options[0]
+    const xorOption = resp.interaction.request.options[0]
     expect(xorOption).toBeDefined()
 
     resp = session.resolveChoice(1, xorOption!.value)

@@ -55,7 +55,7 @@ describe('A156_Buyer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       // Find the non-skip option (accept)
-      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
@@ -129,7 +129,7 @@ describe('A156_Buyer session', () => {
     // Accept the optional exchange
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }

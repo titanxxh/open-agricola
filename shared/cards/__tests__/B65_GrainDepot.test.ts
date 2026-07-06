@@ -54,15 +54,15 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+      const option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
 
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThan(1)
+    expect(resp.interaction.request.options?.length).toBeGreaterThan(1)
 
-    const clayPayment = resp.interaction.options?.find((o) =>
+    const clayPayment = resp.interaction.request.options?.find((o) =>
       o.value === `pay:improvement:minor:${CARD_ID}:1`,
     )
     expect(clayPayment).toBeDefined()
@@ -141,13 +141,13 @@ describe('B65 Grain Depot', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+      const option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
 
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const freePayment = resp.interaction.options?.find((o) =>
+    const freePayment = resp.interaction.request.options?.find((o) =>
       isZeroPayment(o.labelParams.resourcesPaid as Record<string, number> | undefined),
     )
     expect(freePayment).toBeDefined()

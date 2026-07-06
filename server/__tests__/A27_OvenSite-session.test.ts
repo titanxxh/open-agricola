@@ -43,7 +43,7 @@ describe('A027_OvenSite session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return resp
-    const improvementOption = resp.interaction.options?.find(
+    const improvementOption = resp.interaction.request.options?.find(
       (o) => o.value.startsWith('action-improvement-'),
     )
     if (improvementOption) {
@@ -53,7 +53,7 @@ describe('A027_OvenSite session', () => {
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') return resp
     }
-    const a27Option = resp.interaction.options?.find(
+    const a27Option = resp.interaction.request.options?.find(
       (o) => o.value === CARD_ID,
     )
     expect(a27Option).toBeDefined()
@@ -79,7 +79,7 @@ describe('A027_OvenSite session', () => {
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const skip = options.find((o) => o.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(0, skip.value)
@@ -107,7 +107,7 @@ describe('A027_OvenSite session', () => {
     let clayOvenBought = false
     while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const clayOven = options.find(
         (o) => o.value === 'Major_ClayOven',
       )
@@ -146,7 +146,7 @@ describe('A027_OvenSite session', () => {
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const clayOven = options.find(
         (o) => o.value === 'Major_ClayOven',
       )
@@ -166,7 +166,7 @@ describe('A027_OvenSite session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe('Major_ClayOven')
-    expect(resp.interaction.options?.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
+    expect(resp.interaction.request.options?.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
   })
 
   describe('prerequisite "Both Fireplace and Cooking Hearth"', () => {

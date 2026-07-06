@@ -29,7 +29,10 @@ describe('B176 Village Idiot', () => {
     const resp = session.takeAction(0, 'lessons-56-variable')
 
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    const options = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice'
+      ? resp.interaction.request.options
+      : []
+    expect(options.some((option) => option.value === CARD_ID)).toBe(false)
   })
 
   it('blocks later ordinary occupation choices after it is played', () => {
@@ -43,7 +46,10 @@ describe('B176 Village Idiot', () => {
 
     const resp = session.takeAction(0, 'lessons-56-variable')
 
-    expect(resp.interaction.options?.some((option) => option.value === 'A174_MasterHora') ?? false).toBe(false)
+    const options = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice'
+      ? resp.interaction.request.options
+      : []
+    expect(options.some((option) => option.value === 'A174_MasterHora')).toBe(false)
     expect(resp.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
     expect(resp.state.players[0]!.occupationHand).toContain('A174_MasterHora')
   })
@@ -82,7 +88,10 @@ describe('B176 Village Idiot', () => {
 
     const resp = session.takeAction(0, 'minor-improvement')
 
-    expect(resp.interaction.options?.some((option) => option.value === 'D025_WitchesDanceFloor') ?? false).toBe(false)
+    const options = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice'
+      ? resp.interaction.request.options
+      : []
+    expect(options.some((option) => option.value === 'D025_WitchesDanceFloor')).toBe(false)
     expect(resp.state.players[0]!.minorHand).toContain('D025_WitchesDanceFloor')
     expect(resp.state.players[0]!.extraOccupationsFromCards).toEqual([])
   })

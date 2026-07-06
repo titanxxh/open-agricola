@@ -44,7 +44,7 @@ const enterImprovementChoice = (session: GameSession) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.options?.find((o) => o.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((o) => o.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -55,7 +55,7 @@ const enterImprovementChoice = (session: GameSession) => {
 const playA4 = (session: GameSession) => {
   const resp = enterImprovementChoice(session)
   if (resp.interaction.stateId !== 'wait') return resp
-  const a4Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+  const a4Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
   expect(a4Option).toBeDefined()
   return session.resolveChoice(0, a4Option!.value)
 }
@@ -84,9 +84,9 @@ describe('A004_Baseboards session — altCosts', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
 
-    const grainOption = resp.interaction.options?.find((o) => {
+    const grainOption = resp.interaction.request.options?.find((o) => {
       const params = o.labelParams as Record<string, unknown> | undefined
       const paid = params?.resourcesPaid as Record<string, number> | undefined
       return !!paid && (paid.grain ?? 0) === 1 && !paid.food
@@ -103,7 +103,7 @@ describe('A004_Baseboards session — altCosts', () => {
     const resp = enterImprovementChoice(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const a4Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+    const a4Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
     expect(a4Option).toBeUndefined()
   })
 })

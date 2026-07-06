@@ -32,8 +32,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
   })
@@ -52,8 +52,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-      expect(resp.interaction.fromPlayerIndex).toBe(1)
-      expect(resp.interaction.toPlayerIndex).toBe(0)
+      expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.request.toPlayerIndex).toBe(0)
     }
 
     resp = confirmPlayerSwitch(session)
@@ -66,8 +66,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
@@ -80,8 +80,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-      expect(resp.interaction.fromPlayerIndex).toBe(1)
-      expect(resp.interaction.toPlayerIndex).toBe(0)
+      expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.request.toPlayerIndex).toBe(0)
     }
 
     resp = confirmPlayerSwitch(session)
@@ -89,7 +89,7 @@ describe('A150_Stagehand session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // One-step XOR: fence, stables, construct, skip
-    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.request.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(3)
 
     // Choose construct (find it by label)
@@ -98,10 +98,10 @@ describe('A150_Stagehand session', () => {
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
     // BGA: Stagehand's construct does not cap room count (unlike A128/D128).
-    expect(resp.interaction.farm.maxSelections).toBeGreaterThan(1)
+    expect(resp.interaction.request.farm.maxSelections).toBeGreaterThan(1)
 
     // Build a room
     resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
@@ -111,8 +111,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')

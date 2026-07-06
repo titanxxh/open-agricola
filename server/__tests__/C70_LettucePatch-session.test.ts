@@ -62,8 +62,8 @@ describe('C070_LettucePatch session', () => {
       expect(resp.interaction.stateId).toBe('wait')
 
       // The interaction should include the virtual tile as sowable
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
-        const cardField = resp.interaction.farm.selectableFields.find(
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow') {
+        const cardField = resp.interaction.request.farm.selectableFields.find(
           (f) => f.tile.row === -1 && f.tile.col === 3070,
         )
         expect(cardField).toBeDefined()

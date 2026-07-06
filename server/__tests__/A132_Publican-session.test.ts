@@ -54,7 +54,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice (sow/bake-bread), pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.options?.find(
+      const sowOption = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -69,7 +69,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
@@ -108,7 +108,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice, pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.options?.find(
+      const sowOption = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -164,7 +164,7 @@ describe('A132_Publican session', () => {
 
     // If it's a choice, pick sow
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.interaction.options?.find(
+      const sowOption = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {

@@ -92,7 +92,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect((nested.interaction as { promptKey?: string }).promptKey)
       .not.toMatch(/^ui\.interactionExchange/)
 
-    const subOptions = (nested.interaction as { options?: Array<{ value: string }> }).options ?? []
+    const subOptions = (nested.interaction as { request?: { options?: Array<{ value: string }> } }).request?.options ?? []
     const subDone = session.resolveChoice(0, subOptions[0]!.value)
     expect(subDone.ok).toBe(true)
 
@@ -122,7 +122,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected farm-expansion prompt')
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeDefined()
@@ -131,10 +131,10 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected stable prompt')
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    if (resp.interaction.farm.farmType !== 'stable') throw new Error('expected stable prompt')
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable prompt')
 
-    const stable = resp.interaction.farm.selectableTiles[0]!
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
 

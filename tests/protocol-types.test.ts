@@ -75,7 +75,7 @@ describe('shared protocol types', () => {
       {
         kind: 'selection',
         selection: {
-          selectionType: 'farm-position',
+          kind: 'farm-position',
           selectablePositions: [],
           maxSelections: 1,
         },

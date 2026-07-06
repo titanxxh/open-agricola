@@ -67,9 +67,9 @@ describe('Interaction State Adapter', () => {
       stateId: 'wait',
       playerIndex: 0,
       request: { kind: 'confirm-next-player', nextPlayerIndex: 1 },
-      nextPlayerIndex: 1,
       allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
       anytimeActions: [],
     })
+    expect(interaction).not.toHaveProperty('nextPlayerIndex')
   })
 })

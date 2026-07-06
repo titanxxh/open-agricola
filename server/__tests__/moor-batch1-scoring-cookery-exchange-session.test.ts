@@ -63,7 +63,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   resp = session.resolveChoice(0, option!.value)
   expect(resp.ok).toBe(true)
@@ -168,7 +168,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     let resp = playMinor(session, 'M030_FarmAnimalMarket')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)

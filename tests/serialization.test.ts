@@ -153,7 +153,7 @@ describe('shared/session/serialization', () => {
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') return
 
-      const constructOption = resp.interaction.options?.find(
+      const constructOption = resp.interaction.request.options?.find(
         (option) => option.labelKey === 'actions.construct.name',
       )
       expect(constructOption).toBeDefined()
@@ -162,7 +162,7 @@ describe('shared/session/serialization', () => {
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') return
-      const farm = resp.interaction.farm
+      const farm = resp.interaction.request.farm
       expect(farm).toBeDefined()
       if (!farm) return
       expect(farm.farmType).toBe('room')

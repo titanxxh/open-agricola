@@ -69,7 +69,7 @@ const playB3 = (session: GameSession) => {
   // meeting-place offers a choice of available minor improvements
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -77,7 +77,7 @@ const playB3 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
   expect(cardOption).toBeDefined()
   // Choose to play B003_Moonshine
   return session.resolveChoice(0, cardOption!.value)
@@ -101,7 +101,7 @@ describe('B003_Moonshine session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
     // Options must include exactly 'play' and 'pass'
-    const optionValues = resp.interaction.options?.map((o) => o.value).sort()
+    const optionValues = resp.interaction.request.options?.map((o) => o.value).sort()
     expect(optionValues).toEqual(['pass', 'play'])
 
     // The random pick should be cached in cardStates
@@ -181,7 +181,7 @@ describe('B003_Moonshine session', () => {
     expect(b3Resp.interaction.stateId).toBe('wait')
     if (b3Resp.interaction.stateId !== 'wait') return
 
-    const playOption = b3Resp.interaction.options?.find((o) => o.value === 'play')
+    const playOption = b3Resp.interaction.request.options?.find((o) => o.value === 'play')
     expect(playOption).toBeDefined()
     expect(playOption?.disabled).toBe(true)
 

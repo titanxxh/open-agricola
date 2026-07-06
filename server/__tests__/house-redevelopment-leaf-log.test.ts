@@ -35,9 +35,9 @@ describe('house-redevelopment leaf-flush logging', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
 
-    const playImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const playImprovement = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(playImprovement).toBeDefined()
 
     const resp2 = session.resolveChoice(0, playImprovement!.value)
@@ -46,7 +46,7 @@ describe('house-redevelopment leaf-flush logging', () => {
     if (resp2.interaction.stateId !== 'wait') return
 
     expect(resp2.interaction.promptKey).toBe('ui.interactionChooseImprovement')
-    expect(resp2.interaction.options?.map((option) => option.value)).toEqual(
+    expect(resp2.interaction.request.options?.map((option) => option.value)).toEqual(
       expect.arrayContaining(['Major_Fireplace1', 'A055_JunkRoom']),
     )
   })

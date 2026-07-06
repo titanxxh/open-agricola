@@ -62,7 +62,7 @@ describe('harvest session flow', () => {
       throw new Error('expected harvestFeed pending')
     }
     expect(resp.interaction.playerIndex).toBe(1)
-    expect(resp.interaction.remaining).toBe(2)
+    expect(resp.interaction.request.remaining).toBe(2)
 
     resp = session.resolveChoice(1, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 1, sourceName: '基础转化' },
@@ -236,7 +236,7 @@ describe('harvest session flow', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.remaining).toBe(2)
+    expect(resp.interaction.request.remaining).toBe(2)
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 2, sourceName: 'Basic conversion' },

@@ -18,7 +18,7 @@ const chooseFirstOption = (session: GameSession, playerIndex: number) => {
   if (interaction.stateId !== 'wait') {
     throw new Error('expected pending choice')
   }
-  const options = interaction.options ?? []
+  const options = interaction.request.options ?? []
   return session.resolveChoice(playerIndex, options[0]!.value)
 }
 
@@ -270,7 +270,7 @@ describe('stage hook flows', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.farm.farmType : undefined)
       .toBe('sow')
 
     resp = session.commitSelectionChoice(0, {
@@ -346,10 +346,10 @@ describe('stage hook flows', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.farm.farmType : undefined)
       .toBe('sow')
-    expect(resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
-      ? resp.interaction.farm.maxSelections
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow'
+      ? resp.interaction.request.farm.maxSelections
       : undefined).toBe(2)
 
     resp = session.commitSelectionChoice(0, {
@@ -414,8 +414,8 @@ describe('stage hook flows', () => {
 
     resp = chooseFirstOption(session, 0)
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
-      ? resp.interaction.farm.maxSelections
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow'
+      ? resp.interaction.request.farm.maxSelections
       : undefined).toBe(1)
 
     // Sowing within the 1-newborn cap succeeds. (Note: PR 3 unified the sow

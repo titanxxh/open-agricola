@@ -51,7 +51,7 @@ describe('stable payment session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeDefined()
@@ -60,10 +60,10 @@ describe('stable payment session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    if (resp.interaction.farm.farmType !== 'stable') return
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const stables = resp.interaction.farm.selectableTiles.slice(0, 1)
+    const stables = resp.interaction.request.farm.selectableTiles.slice(0, 1)
     expect(stables).toHaveLength(1)
     resp = session.commitSelectionChoice(0, { stables })
     expect(resp.ok).toBe(true)
@@ -71,7 +71,7 @@ describe('stable payment session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
-    const stoneOption = resp.interaction.options?.find(
+    const stoneOption = resp.interaction.request.options?.find(
       (option) => typeof option.labelParams === 'object' && option.labelParams?.resourcesPaid?.stone === 2,
     )
     expect(stoneOption).toBeDefined()
@@ -109,7 +109,7 @@ describe('stable payment session', () => {
 
     const resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    const options = resp.interaction.stateId === 'wait' ? resp.interaction.options ?? [] : []
+    const options = resp.interaction.stateId === 'wait' ? resp.interaction.request.options ?? [] : []
     expect(options.some((option) => option.labelKey === 'actions.stables.name')).toBe(false)
   })
 
@@ -121,7 +121,7 @@ describe('stable payment session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeDefined()
@@ -130,7 +130,7 @@ describe('stable payment session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
 
     // Engine path: empty stables triggers stablesAction.resolveChoice fail.
     // Surfaces as ok=false; pending is cleared and no stable is placed.
@@ -148,7 +148,7 @@ describe('stable payment session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeDefined()
@@ -157,7 +157,7 @@ describe('stable payment session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
 
     const workersAfterTake = workersAvailable(resp.state, resp.state.players[0]!)
     const undoStepResp = session.undoStep()
@@ -165,8 +165,8 @@ describe('stable payment session', () => {
     expect(undoStepResp.interaction.stateId).toBe('wait')
     expect(undoStepResp.interaction.stateId).toBe('wait')
     if (undoStepResp.interaction.stateId !== 'wait') return
-    expect(undoStepResp.interaction.options?.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
-    expect(undoStepResp.interaction.options?.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
+    expect(undoStepResp.interaction.request.options?.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
+    expect(undoStepResp.interaction.request.options?.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
     expect(workersAvailable(undoStepResp.state, undoStepResp.state.players[0]!)).toBe(workersAfterTake)
     expect(
       undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy[0]?.playerId,
@@ -197,7 +197,7 @@ describe('stable payment session', () => {
     expect(resp.interaction.promptKey).toBe('ui.interactionStableSelect')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
 
     const undoResp = session.undoStep()
     expect(undoResp.ok).toBe(true)

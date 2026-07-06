@@ -75,8 +75,8 @@ const playOccupation = (
       continue
     }
     if (resp.interaction.request.kind !== 'choice') break
-    const option = resp.interaction.options?.find((entry) => entry.value === occupationId)
-      ?? resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+    const option = resp.interaction.request.options?.find((entry) => entry.value === occupationId)
+      ?? resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
     if (!option) break
     resp = session.resolveChoice(playerIndex, option.value)
     expect(resp.ok).toBe(true)

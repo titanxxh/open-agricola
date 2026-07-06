@@ -83,12 +83,12 @@ describe('A053_Claypipe session flow', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') return
-    const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
     expect(improvementOption).toBeDefined()
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'A053_Claypipe')
+      const claypipeOption = resp.interaction.request.options?.find((option) => option.value === 'A053_Claypipe')
       if (claypipeOption) {
         resp = session.resolveChoice(0, claypipeOption.value)
         expect(resp.ok).toBe(true)

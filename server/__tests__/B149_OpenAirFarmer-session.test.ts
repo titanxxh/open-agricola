@@ -153,7 +153,7 @@ const expectFarmSelect = (
   expect(resp.interaction.sourceCard).toBe(CARD_ID)
   expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
   expect(resp.interaction.request.kind).toBe('farm-select')
-  expect(resp.interaction.farm?.farmType).toBe('fence')
+  expect(resp.interaction.request.farm?.farmType).toBe('fence')
   if (expected) {
     expect(resp.interaction).toEqual(expected)
   }
@@ -163,7 +163,7 @@ const playB149ToFencing = (session: GameSession) => {
   let resp = session.takeAction(0, 'lessons')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
-    const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+    const option = resp.interaction.request.options?.find((entry) => entry.value === CARD_ID)
     if (option) {
       resp = session.resolveChoice(0, option.value)
     }
@@ -327,7 +327,7 @@ describe('B149 Open Air Farmer session', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+      const option = resp.interaction.request.options?.find((entry) => entry.value === CARD_ID)
       if (option) {
         resp = session.resolveChoice(0, option.value)
       }

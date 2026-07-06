@@ -34,7 +34,7 @@ const drainHarvest = (session: GameSession) => {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
     } else if (resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
       if (!next) break
       resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)
@@ -125,7 +125,7 @@ describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Accept (non-__skip__) — there should be exactly one accept option.
-    const accept = resp.interaction.options!.find((o) => o.value !== '__skip__')!
+    const accept = resp.interaction.request.options!.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
 
     // Drain remaining feed/reorg prompts to finish the harvest cycle.
@@ -156,7 +156,7 @@ describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const skip = resp.interaction.options!.find((o) => o.value === '__skip__')!
+    const skip = resp.interaction.request.options!.find((o) => o.value === '__skip__')!
     resp = session.resolveChoice(0, skip.value)
 
     resp = drainHarvest(session)
@@ -202,7 +202,7 @@ describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Decline — confirm reap still fires (no stale-flag skip).
-    const skip = resp.interaction.options!.find((o) => o.value === '__skip__')!
+    const skip = resp.interaction.request.options!.find((o) => o.value === '__skip__')!
     resp = session.resolveChoice(0, skip.value)
     resp = drainHarvest(session)
 
@@ -224,7 +224,7 @@ describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
     // E58 prompt for P1 first (start player).
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options!.find((o) => o.value !== '__skip__')!
+    const accept = resp.interaction.request.options!.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
     resp = drainHarvest(session)
 

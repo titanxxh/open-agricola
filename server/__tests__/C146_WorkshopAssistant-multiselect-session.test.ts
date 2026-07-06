@@ -73,7 +73,7 @@ const driveOpponentRenovationToC146 = (
       continue
     }
     if (resp.interaction.sourceCard === CARD_ID) return resp
-    const options = resp.interaction.options ?? []
+    const options = resp.interaction.request.options ?? []
     const skip = options.find((option) => option.value === '__skip__')
     if (skip) {
       resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
@@ -287,7 +287,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     if (resp.interaction.sourceCard !== CARD_ID) {
-      expect(resp.interaction.options?.some((option) => option.value === CARD_ID)).toBe(true)
+      expect(resp.interaction.request.options?.some((option) => option.value === CARD_ID)).toBe(true)
       resp = session.resolveChoice(0, CARD_ID)
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') return
@@ -321,7 +321,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.options?.some((option) => option.value !== '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value !== '__skip__')).toBe(true)
   })
 
   it('accepting a single stored pair moves resources through standard card gain semantics', () => {
@@ -330,7 +330,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     const beforeWood = beforeOwner.resources.wood
     const beforeClay = beforeOwner.resources.clay
     const resp = driveOpponentRenovationToC146(session)
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     const taken = session.resolveChoice(0, accept!.value)
@@ -384,7 +384,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
         continue
       }
       if (resp.interaction.sourceCard === CARD_ID) break
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const skip = options.find((option) => option.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
@@ -399,7 +399,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -407,8 +407,8 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
   })
 
   it('opponent farm-redevelopment renovation also lets owner take one stored pair', () => {
@@ -475,7 +475,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     const beforeWood = beforeOwner.resources.wood
     const beforeClay = beforeOwner.resources.clay
     const resp = driveOpponentRenovationToC146(session)
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     session.resolveChoice(0, accept!.value)
     const liveOwner = session.getState().state.players[0]!

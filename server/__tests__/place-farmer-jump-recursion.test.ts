@@ -25,7 +25,7 @@ const commitFirstFarmSelect = (
   resp: ReturnType<GameSession['takeAction']>,
 ): ReturnType<GameSession['takeAction']> | null => {
   if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') return null
-  const farm = resp.interaction.farm
+  const farm = resp.interaction.request.farm
   if (farm.farmType === 'plow') {
     const tile = farm.selectableTiles[0]
     if (!tile) throw new Error('expected selectable plow tile')
@@ -62,7 +62,7 @@ describe('A→A self-jump recursion guard', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     let safety = 30
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       // accept any non-skip option (drives Swagman accept on first prompt; afterwards
       // skips remaining optional follow-ups; mandatory choices fall through to first opt)
       const skip = opts.find(o => o.value === '__skip__')
@@ -107,7 +107,7 @@ describe('A→A self-jump recursion guard', () => {
     let resp = session.takeAction(0, 'grain-seeds')
     let safety = 30
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const skip = opts.find(o => o.value === '__skip__')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
       const farmResp = commitFirstFarmSelect(session, resp)
@@ -144,7 +144,7 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
     let safety = 25
     let majorPromptSeen = false
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       if (opts.some(o => /^Major_/.test(o.value))) {
         majorPromptSeen = true
         // skip without buying (the parity assertion is just that the prompt surfaced)

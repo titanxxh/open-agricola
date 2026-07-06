@@ -43,7 +43,7 @@ const completeGrainUtilizationSow = (session: GameSession) => {
   if (resp.interaction.stateId !== 'wait') return resp
 
   if (resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
-    const sowOption = resp.interaction.options?.find((option) => option.value === 'sow')
+    const sowOption = resp.interaction.request.options?.find((option) => option.value === 'sow')
     expect(sowOption).toBeDefined()
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
@@ -76,7 +76,7 @@ describe('D101_SugarBaker session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(d101AcceptOption(resp.interaction.options)).toBeDefined()
+    expect(d101AcceptOption(resp.interaction.request.options)).toBeDefined()
 
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
@@ -95,7 +95,7 @@ describe('D101_SugarBaker session', () => {
     let resp = completeGrainUtilizationSow(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = d101AcceptOption(resp.interaction.options)
+    const accept = d101AcceptOption(resp.interaction.request.options)
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -111,6 +111,6 @@ describe('D101_SugarBaker session', () => {
     const resp = completeGrainUtilizationSow(session)
     if (resp.interaction.stateId !== 'wait') return
 
-    expect(d101AcceptOption(resp.interaction.options)).toBeUndefined()
+    expect(d101AcceptOption(resp.interaction.request.options)).toBeUndefined()
   })
 })

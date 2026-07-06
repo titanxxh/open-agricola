@@ -112,7 +112,7 @@ describe('B016_MiningHammer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const improvement = resp.interaction.options?.find(
+    const improvement = resp.interaction.request.options?.find(
       (option) => option.value === 'action-improvement-1',
     )
     expect(improvement).toBeDefined()
@@ -164,7 +164,7 @@ describe('B016_MiningHammer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.sourceCard === 'B016_MiningHammer' && option.value !== '__skip__',
     )
     expect(stableOption).toBeDefined()
@@ -174,9 +174,9 @@ describe('B016_MiningHammer session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionStableSelect')
     expect(resp.interaction.sourceCard).toBe('B016_MiningHammer')
-    expect(resp.interaction.farm?.maxSelections).toBe(1)
+    expect(resp.interaction.request.farm?.maxSelections).toBe(1)
 
-    const tile = resp.interaction.farm?.selectableTiles[0]
+    const tile = resp.interaction.request.farm?.selectableTiles[0]
     expect(tile).toBeDefined()
     resp = session.commitSelectionChoice(0, {
       stables: [{ row: tile!.row, col: tile!.col }],
@@ -236,7 +236,7 @@ describe('A129_Swagman session', () => {
         safety--
         continue
       }
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
       // Swagman's inner optional jump choice is recognised by sourceCard.
       // The single-option mandatory select-trigger may have been auto-resolved
@@ -261,7 +261,7 @@ describe('A129_Swagman session', () => {
         break
       }
       if (resp.interaction.request.kind === 'farm-select') {
-        const farm = resp.interaction.farm
+        const farm = resp.interaction.request.farm
         if (farm.farmType === 'plow') {
           const tile = farm.selectableTiles[0]
           if (!tile) throw new Error('expected selectable plow tile')
@@ -394,7 +394,7 @@ describe('A082_WorkCertificate session', () => {
         safety--
         continue
       }
-      const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const skipOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
         foundChoice = true
         resp = session.resolveChoice(0, '__skip__')
@@ -427,7 +427,7 @@ describe('A082_WorkCertificate session', () => {
         safety--
         continue
       }
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const woodOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (woodOpt) {
         resp = session.resolveChoice(0, woodOpt.value)
@@ -489,7 +489,7 @@ describe('A082_WorkCertificate session', () => {
         safety--
         continue
       }
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const takeOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (takeOpt) {
         resp = session.resolveChoice(0, takeOpt.value)

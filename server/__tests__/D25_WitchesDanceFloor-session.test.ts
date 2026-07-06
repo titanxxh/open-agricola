@@ -332,7 +332,7 @@ describe('D025_WitchesDanceFloor session', () => {
 
       // Step 2: choose Major_CookingHearth1
       const cookingHearthOption = resp.interaction.stateId === 'wait'
-        ? resp.interaction.options?.find((o) => o.value === 'Major_CookingHearth1')
+        ? resp.interaction.request.options?.find((o) => o.value === 'Major_CookingHearth1')
         : undefined
       expect(cookingHearthOption).toBeDefined()
       resp = session.resolveChoice(0, cookingHearthOption!.value)
@@ -342,9 +342,9 @@ describe('D025_WitchesDanceFloor session', () => {
       let maxSteps = 10
       while (resp.interaction.stateId === 'wait' && maxSteps-- > 0) {
         // Prefer the D25 return option if present, otherwise pick the first option
-        const d25Option = resp.interaction.options?.find((o) => o.value.includes(CARD_ID))
-        const skipOption = resp.interaction.options?.find((o) => o.value === '__skip__')
-        const choiceValue = d25Option?.value ?? skipOption?.value ?? resp.interaction.options?.[0]?.value
+        const d25Option = resp.interaction.request.options?.find((o) => o.value.includes(CARD_ID))
+        const skipOption = resp.interaction.request.options?.find((o) => o.value === '__skip__')
+        const choiceValue = d25Option?.value ?? skipOption?.value ?? resp.interaction.request.options?.[0]?.value
         if (!choiceValue) break
         resp = session.resolveChoice(0, choiceValue)
       }

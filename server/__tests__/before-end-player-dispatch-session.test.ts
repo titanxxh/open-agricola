@@ -89,7 +89,7 @@ describe('Before-End Player Dispatch session', () => {
 
     let resp = session.invokeAfterRoundEnd()
     expectSharedTrigger(resp, 0)
-    expect(resp.interaction.options).toContainEqual({
+    expect(resp.interaction.request.options).toContainEqual({
       value: OWNER_CARD,
       labelKey: `cards.${OWNER_CARD}.name`,
       sourceCard: OWNER_CARD,
@@ -128,7 +128,7 @@ describe('Before-End Player Dispatch session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    expect(resp.interaction.options).toContainEqual({
+    expect(resp.interaction.request.options).toContainEqual({
       value: PREVIEW_CARD,
       labelKey: `cards.${PREVIEW_CARD}.name`,
       sourceCard: PREVIEW_CARD,

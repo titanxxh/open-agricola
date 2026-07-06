@@ -172,14 +172,14 @@ describe('D103_CanalBoatman session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
 
     const player = resp.state.players[0]!
     expect(workersAvailable(resp.state, player)).toBe(0)
@@ -198,14 +198,14 @@ describe('D103_CanalBoatman session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
 
     expect(getRoundPlacementOrder(resp.state.players[0]!)).toHaveLength(2)
   })
@@ -243,14 +243,14 @@ describe('D103_CanalBoatman session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
 
     const nextState = session.getState().state
     nextState.currentPlayerIndex = 0
@@ -264,7 +264,7 @@ describe('D103_CanalBoatman session', () => {
       // request (e.g. confirm-next-player after the optional flow auto-skipped).
       // Treat that case as "no GodlySpouse option" — exactly what the test
       // wants to prove.
-      const hasGodlySpouseOption = (resp.interaction.options ?? []).some(
+      const hasGodlySpouseOption = (resp.interaction.request.options ?? []).some(
         (option) => option.labelKey === 'ui.interactionGodlySpouseUse',
       )
       expect(hasGodlySpouseOption).toBe(false)

@@ -38,7 +38,7 @@ describe('A170 Hayward', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected fence selection')
-    expect(resp.interaction.farm.farmType).toBe('fence')
+    expect(resp.interaction.request.farm.farmType).toBe('fence')
 
     resp = session.commitSelectionChoice(0, {
       edges: fenceEdgesForTile(1, 1),

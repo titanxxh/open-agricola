@@ -98,7 +98,7 @@ describe('Through the Seasons Winter rules', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected plow prompt')
     expect(resp.interaction.request.kind).toBe('farm-select')
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { tile })

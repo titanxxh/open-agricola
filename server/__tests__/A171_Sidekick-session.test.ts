@@ -73,7 +73,7 @@ const setup = (options: {
 
 const acceptOption = (resp: ReturnType<GameSession['getState']>) =>
   resp.interaction.stateId === 'wait'
-    ? resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    ? resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     : undefined
 
 describe('A171 Sidekick session', () => {
@@ -204,12 +204,12 @@ describe('A171 Sidekick session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const buyerOption = resp.interaction.options?.find((option) =>
+    const buyerOption = resp.interaction.request.options?.find((option) =>
       option.sourceCard === 'A156_Buyer' && option.value !== '__skip__',
     )
     expect(buyerOption).toBeDefined()

@@ -37,7 +37,7 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
     } else if (resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
       if (!next) break
       resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)

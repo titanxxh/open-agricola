@@ -94,7 +94,7 @@ const acceptFirstNonSkip = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }

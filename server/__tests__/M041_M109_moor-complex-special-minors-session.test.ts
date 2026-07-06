@@ -89,7 +89,10 @@ const acceptOptional = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  if (resp.interaction.request.kind === 'animal-reorg') {
+    return session.resolveChoice(resp.interaction.playerIndex ?? 0, 'confirm', resp.interaction.request.zones)
+  }
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }
@@ -101,7 +104,7 @@ const plowFirstTile = (
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
-  const tile = resp.interaction.farm?.selectableTiles[0]
+  const tile = resp.interaction.request.farm?.selectableTiles[0]
   expect(tile).toBeDefined()
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, { tile })
 }
@@ -114,7 +117,7 @@ const sowFirstField = (
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-  const field = resp.interaction.farm?.selectableFields[0]
+  const field = resp.interaction.request.farm?.selectableFields[0]
   expect(field).toBeDefined()
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, {
     crops: [{ row: field!.tile.row, col: field!.tile.col, crop }],
@@ -162,7 +165,7 @@ describe('Moor complex special-action minors', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected special card choice')
     const marketCard = findSpecialCard(free.session, 'cut-peat')
-    const marketOption = resp.interaction.options?.find((option) => option.value === `card:${marketCard.id}`)
+    const marketOption = resp.interaction.request.options?.find((option) => option.value === `card:${marketCard.id}`)
     expect(marketOption).toBeDefined()
     resp = free.session.resolveChoice(0, marketOption!.value)
     expect(marketCard.location).toEqual({ kind: 'playerFaceUp', playerId: free.player.id })
@@ -179,7 +182,7 @@ describe('Moor complex special-action minors', () => {
     resp = acceptOptional(paid.session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected special card choice')
-    const borrowedOption = resp.interaction.options?.find((option) => option.value === `card:${borrowed.id}`)
+    const borrowedOption = resp.interaction.request.options?.find((option) => option.value === `card:${borrowed.id}`)
     expect(borrowedOption).toBeDefined()
     resp = paid.session.resolveChoice(0, borrowedOption!.value)
     const updatedBorrowed = paid.session.state.farmersOfTheMoor!.specialActionCards.find((card) => card.id === borrowed.id)!
@@ -198,7 +201,7 @@ describe('Moor complex special-action minors', () => {
     resp = acceptOptional(session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Tool Shed choice')
-    const slashOption = resp.interaction.options?.find((option) => option.value.includes('slash-and-burn'))
+    const slashOption = resp.interaction.request.options?.find((option) => option.value.includes('slash-and-burn'))
     expect(slashOption).toBeDefined()
     resp = session.resolveChoice(0, slashOption!.value)
 
@@ -224,7 +227,7 @@ describe('Moor complex special-action minors', () => {
     let resp = takeSpecial(session, 'cut-peat', { row: MOOR_A.row, col: MOOR_A.col })
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M058_PeatFertilizer')
     resp = acceptOptional(session, resp)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm?.selectableFields : undefined)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.farm?.selectableFields : undefined)
       .toHaveLength(2)
     resp = sowFirstField(session, resp)
     expect(resp.state.players[0]!.resources.grain).toBe(1)
@@ -249,7 +252,7 @@ describe('Moor complex special-action minors', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('M059_NaturesFertilizer')
     resp = acceptOptional(session, resp)
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-    expect(resp.interaction.farm?.selectableFields.map((field) => field.tile)).toEqual([
+    expect(resp.interaction.request.farm?.selectableFields.map((field) => field.tile)).toEqual([
       { row: FOREST_A.row, col: FOREST_A.col },
     ])
 

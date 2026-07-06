@@ -43,7 +43,7 @@ const chooseByLabel = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
-  const option = resp.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = resp.interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -54,7 +54,7 @@ const expectChoiceLabelValue = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
-  const option = resp.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = resp.interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   return option!.value
 }
@@ -74,7 +74,7 @@ const choosePaymentByResources = (
   expected: Record<string, number>,
 ) => {
   expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-  const option = resp.interaction.options?.find((candidate) => hasPaidResources(candidate, expected))
+  const option = resp.interaction.request.options?.find((candidate) => hasPaidResources(candidate, expected))
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
@@ -101,7 +101,7 @@ describe('Through the Seasons Autumn rules', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected remaining Thanksgiving choice')
-    expect(resp.interaction.options?.some((option) => option.value === '__done__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__done__')).toBe(true)
     resp = session.resolveChoice(0, '__done__')
 
     expect(resp.ok).toBe(true)
@@ -148,9 +148,9 @@ describe('Through the Seasons Autumn rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected payment choice')
-    expect(resp.interaction.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
-    expect(resp.interaction.options?.some((option) => hasPaidResources(option, { wood: 1, stone: 2 }))).toBe(true)
-    expect(resp.interaction.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 1 }))).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
+    expect(resp.interaction.request.options?.some((option) => hasPaidResources(option, { wood: 1, stone: 2 }))).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 1 }))).toBe(true)
 
     resp = choosePaymentByResources(session, resp, { wood: 1, stone: 2 })
 

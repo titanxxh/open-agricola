@@ -55,7 +55,7 @@ const chooseByLabel = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
-  const option = resp.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = resp.interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -72,7 +72,7 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Farmer\'s Market choice')
-    expect(resp.interaction.options?.map((option) => option.labelKey)).toEqual(
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toEqual(
       expect.arrayContaining([
         'actions.plow.name',
         'actions.season-summer-farmers-market.option-bread-or-sell',
@@ -88,7 +88,7 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected bake-or-sell choice')
-    expect(resp.interaction.options?.map((option) => option.labelKey)).toEqual(
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toEqual(
       expect.arrayContaining([
         'actions.bake-bread.name',
         'actions.season-summer-farmers-market.option-sell-grain',
@@ -122,15 +122,15 @@ describe('Through the Seasons Summer rules', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected plow prompt')
-    expect(resp.interaction.farm.farmType).toBe('plow')
-    const tile = resp.interaction.farm.selectableTiles[0]!
+    expect(resp.interaction.request.farm.farmType).toBe('plow')
+    const tile = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { tile })
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.fields).toContainEqual({ ...tile, stacks: [] })
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected remaining Farmer\'s Market choice')
-    expect(resp.interaction.options?.some((option) => option.labelKey === 'ui.interactionFlowDone')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.labelKey === 'ui.interactionFlowDone')).toBe(true)
 
     resp = chooseByLabel(
       session,
@@ -158,10 +158,10 @@ describe('Through the Seasons Summer rules', () => {
     expect(noGrainResp.ok).toBe(true)
     expect(noGrainResp.interaction.stateId).toBe('wait')
     if (noGrainResp.interaction.stateId !== 'wait') throw new Error('expected Farmer\'s Market choice')
-    expect(noGrainResp.interaction.options?.map((option) => option.labelKey)).not.toContain(
+    expect(noGrainResp.interaction.request.options?.map((option) => option.labelKey)).not.toContain(
       'actions.season-summer-farmers-market.option-sell-grain',
     )
-    expect(noGrainResp.interaction.options?.map((option) => option.labelKey)).not.toContain(
+    expect(noGrainResp.interaction.request.options?.map((option) => option.labelKey)).not.toContain(
       'actions.season-summer-farmers-market.option-bread-or-sell',
     )
   })
@@ -194,7 +194,7 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Farmer\'s Market choice')
-    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionFreshmanOccupation')
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionFreshmanOccupation')
 
     resp = chooseByLabel(session, resp, 'ui.interactionFreshmanOccupation')
 
@@ -258,8 +258,8 @@ describe('Through the Seasons Summer rules', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected room prompt')
-    expect(resp.interaction.farm.farmType).toBe('room')
-    const rooms = resp.interaction.farm.selectableTiles.slice(0, 2)
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    const rooms = resp.interaction.request.farm.selectableTiles.slice(0, 2)
     expect(rooms).toHaveLength(2)
     resp = session.commitSelectionChoice(0, { rooms })
 
@@ -268,10 +268,10 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected stable prompt')
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    expect(resp.interaction.farm.maxSelections).toBe(2)
-    expect('farmHandPositions' in resp.interaction.farm).toBe(false)
-    const stables = resp.interaction.farm.selectableTiles.slice(0, 2)
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    expect(resp.interaction.request.farm.maxSelections).toBe(2)
+    expect('farmHandPositions' in resp.interaction.request.farm).toBe(false)
+    const stables = resp.interaction.request.farm.selectableTiles.slice(0, 2)
     expect(stables).toHaveLength(2)
     resp = session.commitSelectionChoice(0, { stables })
 
@@ -291,12 +291,12 @@ describe('Through the Seasons Summer rules', () => {
     resp = chooseByLabel(session, resp, 'actions.construct.name')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected room prompt')
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional stable prompt')
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)

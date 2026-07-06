@@ -39,7 +39,7 @@ const enterImprovementChoice = (session: GameSession) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.options?.find((o) => o.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((o) => o.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -52,7 +52,7 @@ const playD83 = (session: GameSession) => {
   if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
   if (resp.interaction.stateId !== 'wait') return resp
   if (resp.interaction.promptKey === 'prompt.selectPayment') return resp
-  const d83Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+  const d83Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
   expect(d83Option).toBeDefined()
   return session.resolveChoice(0, d83Option!.value)
 }
@@ -78,14 +78,14 @@ describe('D083_Pigswill session — altCosts', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('food=1, grain=0 → not buyable', () => {
     const session = setup({ food: 1, grain: 0 })
     const resp = enterImprovementChoice(session)
     if (resp.interaction.stateId !== 'wait') return
-    const d83Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
+    const d83Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
     expect(d83Option).toBeUndefined()
   })
 })

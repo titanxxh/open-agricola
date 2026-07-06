@@ -50,9 +50,9 @@ describe('B155 ArtTeacher onBuy listener', () => {
         continue
       }
       if (resp.interaction.request.kind !== 'choice') break
-      const matched = resp.interaction.options?.find((o) => o.value === CARD_ID)
+      const matched = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
       const next = matched?.value
-        ?? resp.interaction.options?.find((o) => o.value !== '__skip__')?.value
+        ?? resp.interaction.request.options?.find((o) => o.value !== '__skip__')?.value
       if (!next) break
       resp = session.resolveChoice(0, next)
     }
@@ -109,12 +109,12 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const paidOptions = resp.interaction.options?.map((option) =>
+    const paidOptions = resp.interaction.request.options?.map((option) =>
       option.labelParams?.resourcesPaid as Record<string, number> | undefined,
     ) ?? []
     expect(paidOptions.some((paid) => (paid?.food ?? 0) === 1)).toBe(true)
     expect(paidOptions.some((paid) => (paid?.[TP_PAYMENT_RESOURCE] ?? 0) === 1)).toBe(true)
-    const tpPaymentOption = resp.interaction.options?.find((option) =>
+    const tpPaymentOption = resp.interaction.request.options?.find((option) =>
       ((option.labelParams?.resourcesPaid as Record<string, number> | undefined)?.[TP_PAYMENT_RESOURCE] ?? 0) === 1,
     )
     expect(tpPaymentOption?.labelParams?.sourceCards).toEqual([CARD_ID])
@@ -126,7 +126,7 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     const wait = session.takeAction(0, 'lessons')
     expect(wait.ok).toBe(true)
     expect(wait.interaction.stateId).toBe('wait')
-    const option = wait.interaction.options?.find((entry) =>
+    const option = wait.interaction.request.options?.find((entry) =>
       ((entry.labelParams?.resourcesPaid as Record<string, number> | undefined)?.[TP_PAYMENT_RESOURCE] ?? 0) === 1,
     )
     expect(option).toBeDefined()
@@ -151,7 +151,7 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     const wait = session.takeAction(0, 'lessons')
     expect(wait.ok).toBe(true)
     expect(wait.interaction.stateId).toBe('wait')
-    const option = wait.interaction.options?.find((entry) =>
+    const option = wait.interaction.request.options?.find((entry) =>
       ((entry.labelParams?.resourcesPaid as Record<string, number> | undefined)?.food ?? 0) === 1,
     )
     expect(option).toBeDefined()

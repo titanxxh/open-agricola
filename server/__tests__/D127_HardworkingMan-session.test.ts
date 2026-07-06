@@ -103,16 +103,16 @@ describe('D127_HardworkingMan session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected OR choice')
-    const dayLaborerOption = resp.interaction.options?.find((o) =>
+    const dayLaborerOption = resp.interaction.request.options?.find((o) =>
       typeof o.labelKey === 'string' && o.labelKey.includes('day-laborer'),
-    ) ?? resp.interaction.options[0]
+    ) ?? resp.interaction.request.options[0]
     resp = session.resolveChoice(0, dayLaborerOption!.value)
     expect(resp.ok).toBe(true)
 
     // After day-laborer leaf executed, OR re-prompts (still has choice for next branch / __done__)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.some((o) => o.value === '__done__')).toBe(true)
+    expect(resp.interaction.request.options?.some((o) => o.value === '__done__')).toBe(true)
 
     resp = session.resolveChoice(0, '__done__')
     expect(resp.ok).toBe(true)

@@ -61,7 +61,7 @@ describe('harvest reaction flow', () => {
   ) => {
     if (resp.interaction.stateId !== 'wait') return resp
     if (resp.interaction.request.kind !== 'select-trigger') return resp
-    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.sourceCard === cardId)
+    const option = resp.interaction.request.options?.find((entry: ActionChoiceOption) => entry.sourceCard === cardId)
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
@@ -72,7 +72,7 @@ describe('harvest reaction flow', () => {
   ) => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-    const option = resp.interaction.options?.find((entry: ActionChoiceOption) => entry.value !== '__skip__')
+    const option = resp.interaction.request.options?.find((entry: ActionChoiceOption) => entry.value !== '__skip__')
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex, option!.value)
   }
@@ -129,12 +129,12 @@ describe('harvest reaction flow', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
-    expect(resp.interaction.options).toContainEqual({
+    expect(resp.interaction.request.options).toContainEqual({
       value: expect.any(String),
       labelKey: 'cards.B050_ButterChurn.name',
       sourceCard: 'B050_ButterChurn',
     })
-    expect(resp.interaction.options).toContainEqual({
+    expect(resp.interaction.request.options).toContainEqual({
       value: expect.any(String),
       labelKey: 'cards.C098_CubeCutter.name',
       sourceCard: 'C098_CubeCutter',
@@ -158,15 +158,15 @@ describe('harvest reaction flow', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger-select')
-    expect(resp.interaction.options?.some((option) => option.sourceCard === 'B050_ButterChurn')).toBe(true)
-    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(false)
+    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'B050_ButterChurn')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(false)
 
     resp = resolveCardTrigger(session, resp, 'B050_ButterChurn')
 
     expect(resp.state.players[0]!.resources.food).toBe(1)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected second trigger-select')
-    expect(resp.interaction.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'C098_CubeCutter')).toBe(true)
 
     resp = resolveCardTrigger(session, resp, 'C098_CubeCutter')
     resp = acceptOptional(session, resp)
@@ -194,7 +194,7 @@ describe('harvest reaction flow', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.sourceCard).toBe('D072_StableManure')
-    expect(resp.interaction.selection?.kind).toBe('farm-position')
+    expect(resp.interaction.request.selection?.kind).toBe('farm-position')
   })
 
   it('keeps Grain Thief harvest field selection interactive', () => {
@@ -213,7 +213,7 @@ describe('harvest reaction flow', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.sourceCard).toBe('E112_GrainThief')
-    expect(resp.interaction.selection?.kind).toBe('farm-position')
+    expect(resp.interaction.request.selection?.kind).toBe('farm-position')
   })
 
   it('keeps reap reaction bonus VP on each reacting owner during multiplayer harvest', () => {

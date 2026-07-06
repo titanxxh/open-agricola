@@ -117,7 +117,7 @@ const buildMajor = (session: GameSession, id: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
-    const option = resp.interaction.options?.find(
+    const option = resp.interaction.request.options?.find(
       (candidate: ActionChoiceOption) => candidate.value === id,
     )
     expect(option).toBeDefined()
@@ -130,7 +130,7 @@ const buildMajor = (session: GameSession, id: string) => {
 const choosePaymentReturningCard = (session: GameSession, cardId: string) => {
   let resp = session.getState()
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.find((candidate) =>
+    const option = resp.interaction.request.options?.find((candidate) =>
       JSON.stringify(candidate).includes(cardId),
     )
     expect(option).toBeDefined()
@@ -193,7 +193,7 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).not.toContain('Major_Moor_HorseSlaughterhouse1')
+    expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('Major_Moor_HorseSlaughterhouse1')
 
     resp = session.resolveChoice(0, 'Major_Fireplace1')
     expect(resp.ok).toBe(true)
@@ -204,7 +204,7 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_HorseSlaughterhouse1')
+    expect(resp.interaction.request.options?.map((option) => option.value)).toContain('Major_Moor_HorseSlaughterhouse1')
   })
 
   it('offers Farmers of the Moor-only top stack majors for purchase', () => {
@@ -214,8 +214,8 @@ describe('major improvement supply stacks', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_PeatCharcoalKiln')
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Moor_ForestersLodge')
+    expect(resp.interaction.request.options?.map((option) => option.value)).toContain('Major_Moor_PeatCharcoalKiln')
+    expect(resp.interaction.request.options?.map((option) => option.value)).toContain('Major_Moor_ForestersLodge')
   })
 
   it('returns a Cooking Hearth to its Farmers of the Moor stack when buying Cookhouse as an upgrade', () => {
@@ -253,7 +253,7 @@ describe('major improvement supply stacks', () => {
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const acceptOption = resp.interaction.options?.find(
+    const acceptOption = resp.interaction.request.options?.find(
       (candidate: ActionChoiceOption) => candidate.value !== '__skip__',
     )
     expect(acceptOption).toBeDefined()

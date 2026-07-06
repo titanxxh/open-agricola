@@ -48,14 +48,14 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     expect(resp.state.players[0]!.houseType).toBe('wood')
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.reed).toBe(1)
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
 
     // Confirm both options are present.
     type PaymentLabel = {
       resourcesPaid?: Record<string, number>
       sourceCards?: string[]
     }
-    const labels = resp.interaction.options?.map(
+    const labels = resp.interaction.request.options?.map(
       (opt) => opt.labelParams as PaymentLabel | undefined,
     )
     const direct = labels.find(

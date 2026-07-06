@@ -78,7 +78,7 @@ const choiceByPaidWood = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait interaction')
-  const option = resp.interaction.options.find((entry) =>
+  const option = resp.interaction.request.options.find((entry) =>
     descriptionPaysWood(entry.descriptionPreview, woodPaid))
   expect(option).toBeDefined()
   if (!option) throw new Error(`missing option paying ${woodPaid} wood`)
@@ -121,7 +121,7 @@ describe('B042_ForestInn session', () => {
     expect(resp.state.players[1]!.resources.wood).toBe(7)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options.map((option) => option.labelKey)).toEqual([
+    expect(resp.interaction.request.options.map((option) => option.labelKey)).toEqual([
       'actions.pay.name',
       'actions.pay.name',
     ])

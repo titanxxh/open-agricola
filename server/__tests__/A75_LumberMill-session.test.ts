@@ -49,7 +49,7 @@ describe('A075_LumberMill session', () => {
     expect(resp.ok).toBe(true)
 
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const printed = options.find((entry) =>
         (entry.labelParams?.resourcesPaid as Record<string, number>)?.wood === 2,
       )

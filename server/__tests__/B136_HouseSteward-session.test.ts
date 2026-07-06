@@ -28,7 +28,7 @@ const playOccupation = (session: GameSession) => {
   const resp = session.takeAction(0, 'lessons')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
-    const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+    const option = resp.interaction.request.options?.find((entry) => entry.value === CARD_ID)
     expect(option).toBeDefined()
     return session.resolveChoice(0, option!.value)
   }

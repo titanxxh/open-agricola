@@ -29,7 +29,7 @@ const takeFarmlandAndPlowBaseField = (session: GameSession) => {
   expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : null)
     .toBe('farm-select')
   expect(resp.interaction.stateId === 'wait'
-    ? resp.interaction.options?.map((option) => option.value)
+    ? resp.interaction.request.options?.map((option) => option.value)
     : [],
   ).toEqual(['confirm'])
 
@@ -46,7 +46,7 @@ describe('action cancel BGA parity session regressions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('__skip__')
+    expect(resp.interaction.request.options?.map((option) => option.value)).toContain('__skip__')
 
     const skipped = session.resolveChoice(0, '__skip__')
     expect(skipped.ok).toBe(true)
@@ -59,7 +59,7 @@ describe('action cancel BGA parity session regressions', () => {
     const session = setupB19()
     const resp = takeFarmlandAndPlowBaseField(session)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional prompt')
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     const accepted = session.resolveChoice(0, accept!.value)
@@ -67,7 +67,7 @@ describe('action cancel BGA parity session regressions', () => {
     expect(accepted.interaction.stateId === 'wait' ? accepted.interaction.request.kind : null)
       .toBe('farm-select')
     expect(accepted.interaction.stateId === 'wait'
-      ? accepted.interaction.options?.map((option) => option.value)
+      ? accepted.interaction.request.options?.map((option) => option.value)
       : [],
     ).toEqual(['confirm'])
 

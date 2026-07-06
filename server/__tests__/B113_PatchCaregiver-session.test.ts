@@ -57,8 +57,8 @@ describe('B113 PatchCaregiver — cardField bug fix (4 crops)', () => {
       const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
-        const cardField = resp.interaction.farm.selectableFields.find(
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow') {
+        const cardField = resp.interaction.request.farm.selectableFields.find(
           (f) => f.tile.row === -1 && f.tile.col === VIRTUAL_COL,
         )
         expect(cardField).toBeDefined()

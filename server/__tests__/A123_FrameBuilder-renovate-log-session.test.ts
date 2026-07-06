@@ -51,7 +51,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
         continue
       }
       // Skip the optional improvement-any leaf if we're prompted for it.
-      const skip = resp.interaction.options?.find(
+      const skip = resp.interaction.request.options?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {
@@ -112,7 +112,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
         resp = session.resolveChoice(0, 'clay')
         continue
       }
-      const skip = resp.interaction.options?.find(
+      const skip = resp.interaction.request.options?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {

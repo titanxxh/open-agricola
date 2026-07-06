@@ -108,7 +108,7 @@ describe('C025_SteamMachine session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
+    expect(resp.interaction.request.options?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
@@ -123,13 +123,13 @@ describe('C025_SteamMachine session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
 
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
-      expect(resp.interaction.options?.map((option) => option.value)).not.toContain('cancel')
+      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('cancel')
       resp = session.resolveChoice(0, 'Major_Fireplace1')
     }
 
@@ -159,7 +159,7 @@ describe('C025_SteamMachine session', () => {
     let resp = takeForest(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {

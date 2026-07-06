@@ -17,7 +17,7 @@ const prepare = (playerCount: 5 | 6 = 5) => {
 const chooseFirst = (session: GameSession, playerIndex = 0) => {
   const interaction = session.getState().interaction
   if (interaction.stateId !== 'wait') throw new Error(`expected wait, got ${interaction.stateId}`)
-  const option = interaction.options?.[0]
+  const option = interaction.request.options?.[0]
   if (!option) throw new Error('missing option')
   return session.resolveChoice(playerIndex, option.value)
 }
@@ -27,7 +27,7 @@ const chooseFirstUntilDone = (
   resp: SessionResponse,
   playerIndex = 0,
 ) => {
-  while (resp.interaction.stateId === 'wait' && resp.interaction.options?.[0]) {
+  while (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.[0]) {
     resp = chooseFirst(session, playerIndex)
   }
   return resp
@@ -120,7 +120,7 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'animal-market-56')
     expect(resp.ok).toBe(true)
-    const sheepOption = resp.interaction.options?.find(
+    const sheepOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.animal-market-56.option-sheep',
     )
     expect(sheepOption).toBeTruthy()
@@ -136,7 +136,7 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'animal-market-56')
     expect(resp.ok).toBe(true)
-    const boarOption = resp.interaction.options?.find(
+    const boarOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.animal-market-56.option-boar',
     )
     expect(boarOption).toBeTruthy()
@@ -151,7 +151,7 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'animal-market-56')
     expect(resp.ok).toBe(true)
-    const cattleOption = resp.interaction.options?.find(
+    const cattleOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.animal-market-56.option-cattle',
     )
     expect(cattleOption).toBeTruthy()
@@ -170,16 +170,16 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'farm-supplies-6')
     expect(resp.ok).toBe(true)
-    const plowOption = resp.interaction.options?.find((option) =>
+    const plowOption = resp.interaction.request.options?.find((option) =>
       JSON.stringify(option.descriptionPreview).includes('actions.plow.name'),
     )
     expect(plowOption).toBeTruthy()
     resp = session.resolveChoice(0, plowOption!.value)
-    expect(resp.interaction.farm?.farmType).toBe('plow')
-    const tile = resp.interaction.farm?.selectableTiles?.[0]
+    expect(resp.interaction.request.farm?.farmType).toBe('plow')
+    const tile = resp.interaction.request.farm?.selectableTiles?.[0]
     expect(tile).toBeTruthy()
     resp = session.commitSelectionChoice(0, { tile })
-    const grainOption = resp.interaction.options?.find((option) =>
+    const grainOption = resp.interaction.request.options?.find((option) =>
       JSON.stringify(option.effectPreview).includes('"grain":1'),
     )
     expect(grainOption).toBeTruthy()
@@ -220,8 +220,8 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'side-job-6')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.farm?.farmType).toBe('stable')
-    const stable = resp.interaction.farm?.selectableTiles?.[0]
+    expect(resp.interaction.request.farm?.farmType).toBe('stable')
+    const stable = resp.interaction.request.farm?.selectableTiles?.[0]
     expect(stable).toBeTruthy()
     resp = session.commitSelectionChoice(0, { stables: [stable!] })
 
@@ -257,16 +257,16 @@ describe('5/6 expansion action spaces', () => {
 
     let resp = session.takeAction(0, 'side-job-6')
     expect(resp.ok).toBe(true)
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeTruthy()
     resp = session.resolveChoice(0, stableOption!.value)
-    expect(resp.interaction.farm?.farmType).toBe('stable')
-    const stable = resp.interaction.farm?.selectableTiles?.[0]
+    expect(resp.interaction.request.farm?.farmType).toBe('stable')
+    const stable = resp.interaction.request.farm?.selectableTiles?.[0]
     expect(stable).toBeTruthy()
     resp = session.commitSelectionChoice(0, { stables: [stable!] })
-    const bakeOption = resp.interaction.options?.find(
+    const bakeOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.side-job-6.option-bake',
     )
     expect(bakeOption).toBeTruthy()
@@ -288,8 +288,8 @@ describe('5/6 expansion action spaces', () => {
     const resp = session.takeAction(0, 'house-building-56')
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.farm?.farmType).toBe('room')
-    expect(resp.interaction.farm?.farmType).not.toBe('stable')
+    expect(resp.interaction.request.farm?.farmType).toBe('room')
+    expect(resp.interaction.request.farm?.farmType).not.toBe('stable')
   })
 
   it('improvement-6 is minor-only before round 5 and major/minor from round 5', () => {
@@ -310,6 +310,6 @@ describe('5/6 expansion action spaces', () => {
     const resp = late.takeAction(0, 'improvement-6')
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.options?.some((option) => option.value.startsWith('Major_'))).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value.startsWith('Major_'))).toBe(true)
   })
 })

@@ -225,7 +225,7 @@ const playA3 = (session: GameSession) => {
   expect(mpResp.ok).toBe(true)
   expect(mpResp.interaction.stateId).toBe('wait')
   if (mpResp.interaction.stateId !== 'wait') return mpResp
-  const improvementOption = mpResp.interaction.options?.find(
+  const improvementOption = mpResp.interaction.request.options?.find(
     (option) => option.value.startsWith('action-improvement-'),
   )
   let cardPrompt = mpResp
@@ -235,10 +235,10 @@ const playA3 = (session: GameSession) => {
   }
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
-  if (cardPrompt.interaction.selection?.kind === 'occupation-hand') {
+  if (cardPrompt.interaction.request.selection?.kind === 'occupation-hand') {
     return cardPrompt
   }
-  const cardOption = cardPrompt.interaction.options?.find(
+  const cardOption = cardPrompt.interaction.request.options?.find(
     (option) => option.value === SESSION_CARD_ID,
   )
   expect(cardOption).toBeDefined()
@@ -260,12 +260,12 @@ describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
 
     const interaction = resp.interaction as Extract<InteractionState, { stateId: 'wait' }>
     // kind must be occupation-hand
-    expect(interaction.selection?.kind).toBe('occupation-hand')
+    expect(interaction.request.selection?.kind).toBe('occupation-hand')
     // selectableCards must be the player's full occupation hand in order
-    expect(interaction.selection?.selectableCards).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
+    expect(interaction.request.selection?.selectableCards).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     // min and max must both be 3
-    expect(interaction.selection?.minSelections).toBe(3)
-    expect(interaction.selection?.maxSelections).toBe(3)
+    expect(interaction.request.selection?.minSelections).toBe(3)
+    expect(interaction.request.selection?.maxSelections).toBe(3)
 
     // pending.sourceCard must be A3
     expect(resp.interaction.stateId).toBe('wait')
@@ -403,7 +403,7 @@ describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
       return
     }
 
-    const improvementOption = mpResp.interaction.options?.find(o => o.value.startsWith('action-improvement-'))
+    const improvementOption = mpResp.interaction.request.options?.find(o => o.value.startsWith('action-improvement-'))
     const cardPrompt = improvementOption
       ? session.resolveChoice(0, improvementOption.value)
       : mpResp
@@ -412,7 +412,7 @@ describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
       return
     }
 
-    const a3Option = cardPrompt.interaction.options?.find(o => o.value === SESSION_CARD_ID)
+    const a3Option = cardPrompt.interaction.request.options?.find(o => o.value === SESSION_CARD_ID)
     if (!a3Option) {
       // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
       return

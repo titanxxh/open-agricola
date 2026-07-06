@@ -30,12 +30,12 @@ describe('A055_JunkRoom session log dedupe', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') return
-    const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
     expect(improvementOption).toBeDefined()
     resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const bucksawOption = resp.interaction.options?.find((option) => option.value === 'A037_Bucksaw')
+      const bucksawOption = resp.interaction.request.options?.find((option) => option.value === 'A037_Bucksaw')
       if (bucksawOption) {
         resp = session.resolveChoice(0, bucksawOption.value)
         expect(resp.ok).toBe(true)

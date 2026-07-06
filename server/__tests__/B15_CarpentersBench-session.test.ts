@@ -119,7 +119,7 @@ describe('B015_CarpentersBench session', () => {
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
-    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -164,7 +164,7 @@ describe('B015_CarpentersBench session', () => {
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected B15 optional prompt')
-    const accept = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)

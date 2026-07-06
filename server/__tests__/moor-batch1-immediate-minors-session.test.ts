@@ -98,7 +98,7 @@ const playMinor = (session: GameSession, cardId: string, expectGain = true) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   resp = session.resolveChoice(0, option!.value)
   expect(resp.ok).toBe(true)

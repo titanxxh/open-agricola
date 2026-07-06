@@ -60,14 +60,14 @@ const playPassingMinor = (session: GameSession, cardId: string) => {
   expect(action.ok).toBe(true)
   expect(action.interaction.stateId).toBe('wait')
   if (action.interaction.stateId !== 'wait') return action
-  const actionOption = action.interaction.options?.find((entry) => entry.value.startsWith('action-improvement-'))
+  const actionOption = action.interaction.request.options?.find((entry) => entry.value.startsWith('action-improvement-'))
   expect(actionOption).toBeDefined()
   const cardPrompt = session.resolveChoice(0, actionOption!.value)
   expect(cardPrompt.ok).toBe(true)
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
   if (cardPrompt.interaction.sourceCard === cardId) return cardPrompt
-  const cardOption = cardPrompt.interaction.options?.find((entry) => entry.value === cardId)
+  const cardOption = cardPrompt.interaction.request.options?.find((entry) => entry.value === cardId)
   expect(cardOption).toBeDefined()
   const played = session.resolveChoice(0, cardOption!.value)
   expect(played.ok).toBe(true)
@@ -103,7 +103,7 @@ const playOccupation = (session: GameSession, cardId: string) => {
   expect(action.ok).toBe(true)
   if (action.interaction.stateId !== 'wait') return action
   if (action.interaction.sourceCard === cardId) return action
-  const option = action.interaction.options?.find((entry) => entry.value === cardId)
+  const option = action.interaction.request.options?.find((entry) => entry.value === cardId)
   expect(option).toBeDefined()
   const played = session.resolveChoice(0, option!.value)
   expect(played.ok).toBe(true)
@@ -195,7 +195,7 @@ const chooseByLabel = (
 ) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = response.interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   const next = session.resolveChoice(0, option!.value)
   expect(next.ok).toBe(true)
@@ -208,7 +208,7 @@ const chooseCardIfPrompted = (
   cardId: string,
 ) => {
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.options?.find((entry) => entry.value === cardId)
+  const option = response.interaction.request.options?.find((entry) => entry.value === cardId)
   if (!option) return response
   const next = session.resolveChoice(0, option.value)
   expect(next.ok).toBe(true)
@@ -267,7 +267,7 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('choice')
-    const buildOption = played.interaction.options?.find((option) => option.value !== '__skip__')
+    const buildOption = played.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(buildOption).toBeDefined()
 
     const prompt = session.resolveChoice(0, buildOption!.value)
@@ -295,7 +295,7 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('farm-select')
-    expect(played.interaction.farm.farmType).toBe('fence')
+    expect(played.interaction.request.farm.farmType).toBe('fence')
 
     const fenced = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
@@ -337,7 +337,7 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('farm-select')
-    expect(played.interaction.farm.farmType).toBe('fence')
+    expect(played.interaction.request.farm.farmType).toBe('fence')
 
     const cancel = session.commitSelectionChoice(0, { cancel: true })
     expect(cancel.ok).toBe(false)
@@ -366,7 +366,7 @@ describe('formatCost card session regressions', () => {
     const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
-    expect(played.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(false)
+    expect(played.interaction.request.options?.some((entry) => entry.value === '__skip__')).toBe(false)
 
     const skipped = session.resolveChoice(0, '__skip__')
     expect(skipped.ok).toBe(false)
@@ -383,7 +383,7 @@ describe('formatCost card session regressions', () => {
     const action = session.takeAction(0, 'lessons-4')
     expect(action.ok).toBe(true)
     if (action.interaction.stateId === 'wait') {
-      expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
+      expect(action.interaction.request.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
     }
     expect(action.state.players[0]!.occupationPlayed).not.toContain('B093_Confidant')
     expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B093_Confidant')).toBe(false)
@@ -415,7 +415,7 @@ describe('formatCost card session regressions', () => {
     const action = session.takeAction(0, 'lessons-4')
     expect(action.ok).toBe(true)
     if (action.interaction.stateId === 'wait') {
-      expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
+      expect(action.interaction.request.options?.some((entry) => entry.value === 'B093_Confidant') ?? false).toBe(false)
     }
     expect(action.state.players[0]!.occupationPlayed).not.toContain('B093_Confidant')
     expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B093_Confidant')).toBe(false)
@@ -434,7 +434,7 @@ describe('formatCost card session regressions', () => {
     expect(action.ok).toBe(true)
     expect(action.interaction.stateId).toBe('wait')
     if (action.interaction.stateId !== 'wait') return
-    expect(action.interaction.options?.some((entry) => entry.value === 'B093_Confidant')).toBe(true)
+    expect(action.interaction.request.options?.some((entry) => entry.value === 'B093_Confidant')).toBe(true)
 
     let response = session.resolveChoice(0, 'B093_Confidant')
     expect(response.ok).toBe(true)
@@ -442,7 +442,7 @@ describe('formatCost card session regressions', () => {
       response.interaction.stateId === 'wait' &&
       response.interaction.promptKey === 'prompt.selectPayment'
     ) {
-      const paymentOptions = response.interaction.options ?? []
+      const paymentOptions = response.interaction.request.options ?? []
       const foodPayment = paymentOptions.find((option) => {
         const resourcesPaid = (
           (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
@@ -464,9 +464,9 @@ describe('formatCost card session regressions', () => {
     }
 
     let scheduled = response
-    if (response.interaction.stateId === 'wait' && response.interaction.options) {
-      expect(response.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(false)
-      const schedule = response.interaction.options?.[0]
+    if (response.interaction.stateId === 'wait' && response.interaction.request.options) {
+      expect(response.interaction.request.options?.some((entry) => entry.value === '__skip__')).toBe(false)
+      const schedule = response.interaction.request.options?.[0]
       expect(schedule).toBeDefined()
       scheduled = session.resolveChoice(0, schedule!.value)
       expect(scheduled.ok).toBe(true)
@@ -486,7 +486,7 @@ describe('formatCost card session regressions', () => {
     const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
-    const schedule = played.interaction.options?.[0]
+    const schedule = played.interaction.request.options?.[0]
     expect(schedule).toBeDefined()
 
     const scheduled = session.resolveChoice(0, schedule!.value)
@@ -506,9 +506,9 @@ describe('formatCost card session regressions', () => {
     expect(roundStarted.state.players[0]!.resources.food).toBe(foodAfterScheduling + 1)
     expect(roundStarted.interaction.stateId).toBe('wait')
     if (roundStarted.interaction.stateId !== 'wait') return
-    expect(roundStarted.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(true)
+    expect(roundStarted.interaction.request.options?.some((entry) => entry.value === '__skip__')).toBe(true)
     expect(
-      roundStarted.interaction.options?.some((entry) =>
+      roundStarted.interaction.request.options?.some((entry) =>
         entry.labelKey === 'actions.sow.name' ||
         entry.labelKey === 'actions.fencing.name'),
     ).toBe(true)
@@ -529,7 +529,7 @@ describe('formatCost card session regressions', () => {
     const played = playOccupation(session, 'B093_Confidant')
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
-    const schedule = played.interaction.options?.[0]
+    const schedule = played.interaction.request.options?.[0]
     expect(schedule).toBeDefined()
 
     const scheduled = session.resolveChoice(0, schedule!.value)
@@ -545,9 +545,9 @@ describe('formatCost card session regressions', () => {
     expect(roundStarted.ok).toBe(true)
     expect(roundStarted.interaction.stateId).toBe('wait')
     if (roundStarted.interaction.stateId !== 'wait') return
-    expect(roundStarted.interaction.options?.some((entry) => entry.labelKey === 'actions.fencing.name')).toBe(true)
+    expect(roundStarted.interaction.request.options?.some((entry) => entry.labelKey === 'actions.fencing.name')).toBe(true)
 
-    const fenceOption = roundStarted.interaction.options?.find((entry) => entry.labelKey === 'actions.fencing.name')
+    const fenceOption = roundStarted.interaction.request.options?.find((entry) => entry.labelKey === 'actions.fencing.name')
     expect(fenceOption).toBeDefined()
     const fencePrompt = session.resolveChoice(0, fenceOption!.value)
     expect(fencePrompt.ok).toBe(true)
@@ -577,7 +577,7 @@ describe('formatCost card session regressions', () => {
     expect(acceptedOccupationBranch.interaction.stateId).toBe('wait')
     if (acceptedOccupationBranch.interaction.stateId !== 'wait') return
     expect(acceptedOccupationBranch.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
-    expect(acceptedOccupationBranch.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+    expect(acceptedOccupationBranch.interaction.request.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
 
     const acceptedStable = chooseByLabel(session, acceptedOccupationBranch, 'actions.stables.name')
     expect(acceptedStable.interaction.stateId).toBe('wait')
@@ -607,7 +607,7 @@ describe('formatCost card session regressions', () => {
     expect(skipped.ok).toBe(true)
     expect(skipped.interaction.stateId).toBe('wait')
     if (skipped.interaction.stateId !== 'wait') return
-    expect(skipped.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+    expect(skipped.interaction.request.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 
   it('E089_Stallwright still triggers when E097_Beneficiary bonus plays a minor improvement', () => {
@@ -619,7 +619,7 @@ describe('formatCost card session regressions', () => {
     expect(playedMinor.state.players[0]!.minorPlayed).toContain('B082_ValueAssets')
     expect(playedMinor.interaction.stateId).toBe('wait')
     if (playedMinor.interaction.stateId !== 'wait') return
-    expect(playedMinor.interaction.options?.some((entry) => entry.value === '__done__')).toBe(true)
+    expect(playedMinor.interaction.request.options?.some((entry) => entry.value === '__done__')).toBe(true)
 
     const completedBonus = resolveTriggerIfPresent(
       session,
@@ -629,7 +629,7 @@ describe('formatCost card session regressions', () => {
     expect(completedBonus.ok).toBe(true)
     expect(completedBonus.interaction.stateId).toBe('wait')
     if (completedBonus.interaction.stateId !== 'wait') return
-    expect(completedBonus.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+    expect(completedBonus.interaction.request.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 
   it('D042_EducationBonus uses the original occupation trigger count across Beneficiary extra occupation', () => {

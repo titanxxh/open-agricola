@@ -119,6 +119,8 @@ import {
 import {
   buildInteractionPresentationPlan,
   buildInteractionSubmitCommand,
+  interactionChoiceOptions,
+  isDomainWaitInteraction,
   type InteractionSubmitCommand,
 } from './interaction-presentation'
 
@@ -564,7 +566,7 @@ export const GameContainerApi = () => {
       payload.interaction.request.kind === 'animal-reorg'
     ) {
       setAnimalReorg({
-        zones: payload.interaction.zones ?? [],
+        zones: payload.interaction.request.zones,
         confirmDiscard: false,
       })
     } else {
@@ -618,7 +620,7 @@ export const GameContainerApi = () => {
     : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const activePlayer =
     interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
-      ? state?.players[interaction.fromPlayerIndex ?? 0] ?? currentPlayer
+      ? state?.players[interaction.request.fromPlayerIndex] ?? currentPlayer
       : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
         ? state?.players[interaction.playerIndex] ?? currentPlayer
         : currentPlayer
@@ -656,8 +658,8 @@ export const GameContainerApi = () => {
 
   const placeFarmerChoiceBySpaceId = useMemo(
     () =>
-      interaction.stateId === 'wait'
-        ? buildPlaceFarmerChoiceMap(interaction.promptKey, interaction.options)
+      isDomainWaitInteraction(interaction)
+        ? buildPlaceFarmerChoiceMap(interaction.promptKey, interactionChoiceOptions(interaction))
         : new Map(),
     [interaction],
   )
@@ -839,9 +841,14 @@ export const GameContainerApi = () => {
       sowSelections: pendingSowSelections,
       animalReorgZones: animalReorg?.zones,
     })
-    const farmType = interaction.stateId === 'wait' && interaction.farm
-      ? interaction.farm.farmType
-      : undefined
+    const farmType =
+      interactionPresentationPlan.kind === 'farm-fence-selection' ||
+      interactionPresentationPlan.kind === 'farm-room-selection' ||
+      interactionPresentationPlan.kind === 'farm-stable-selection' ||
+      interactionPresentationPlan.kind === 'farm-plow-selection' ||
+      interactionPresentationPlan.kind === 'farm-sow-selection'
+        ? interactionPresentationPlan.farm.farmType
+        : undefined
     if (runInteractionSubmitCommand(submitCommand, farmType)) {
       return
     }
