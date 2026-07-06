@@ -3,21 +3,15 @@ import {
   readCardExtraData,
 } from '../helpers/card-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
+import { hasNoUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 
 const CARD_ID = 'B132_EstateMaster'
-const FARM_TOTAL = 15
 
-const isFarmSaturated = (player: PlayerState): boolean => {
-  const used = new Set<string>()
-  player.roomTiles.forEach((t) => used.add(`${t.row},${t.col}`))
-  player.fields.forEach((f) => used.add(`${f.row},${f.col}`))
-  player.stableTiles.forEach((t) => used.add(`${t.row},${t.col}`))
-  player.pastures.flatMap((p) => p.tiles).forEach((t) => used.add(`${t.row},${t.col}`))
-  return used.size >= FARM_TOTAL
-}
+const isFarmSaturated = (player: PlayerState): boolean =>
+  hasNoUnusedFarmyardSpaces(player)
 
 const isSaturatedFlagged = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, 'saturated') === true

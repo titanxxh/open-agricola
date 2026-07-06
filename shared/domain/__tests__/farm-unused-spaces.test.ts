@@ -7,6 +7,10 @@ import {
   parsePositionKey,
   positionKey,
 } from '../farm'
+import {
+  countUnusedFarmyardSpaces as countCanonicalUnusedFarmyardSpaces,
+  getUsedFarmyardTileKeys as getCanonicalUsedFarmyardTileKeys,
+} from '../farmyard-usage'
 import type { FarmTilePosition, PlayerState, Resource } from '../../contract/types'
 
 const emptyResources = (): Resource => ({
@@ -54,6 +58,12 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
 })
 
 const tileKey = ({ row, col }: FarmTilePosition) => `${row}-${col}`
+const singleTileFence = ({ row, col }: FarmTilePosition) => [
+  `H-${row}-${col}`,
+  `H-${row + 1}-${col}`,
+  `V-${row}-${col}`,
+  `V-${row}-${col + 1}`,
+].map((edge) => ({ edge, type: 'fence' as const }))
 
 describe('farm unused space helpers', () => {
   it('round-trips off-board tile keys with negative coordinates', () => {
@@ -89,6 +99,28 @@ describe('farm unused space helpers', () => {
       '2-3',
     ])
     expect(countUnusedFarmyardSpaces(player)).toBe(10)
+  })
+
+  it('routes farm usage helpers through canonical derived-pasture semantics', () => {
+    const player = createPlayer({
+      fenceSegments: singleTileFence({ row: 2, col: 4 }),
+      pastures: [
+        {
+          id: 'derived-pasture',
+          size: 1,
+          tiles: [],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+
+    expect(Array.from(getUsedFarmyardTileKeys(player)).sort()).toEqual(
+      Array.from(getCanonicalUsedFarmyardTileKeys(player)).sort(),
+    )
+    expect(countUnusedFarmyardSpaces(player)).toBe(countCanonicalUnusedFarmyardSpaces(player))
+    expect(countUnusedFarmyardSpaces(player)).toBe(12)
   })
 
   it('reports a fully occupied farmyard as having no unused spaces', () => {

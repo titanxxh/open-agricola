@@ -296,6 +296,7 @@ describe('listener purity wave 2b/c', () => {
     const p = player('A073_AgriculturalFertilizers', {
       roomTiles: [{ row: 0, col: 0 }],
       fields: [{ row: 0, col: 1, stacks: [] }],
+      farmTerrain: [{ row: 0, col: 2, kind: 'forest' }],
     })
     const game = state([p])
     const before = stateSnapshot(game)
@@ -308,7 +309,7 @@ describe('listener purity wave 2b/c', () => {
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: 'A073_AgriculturalFertilizers',
-      params: { kind: 'set-extra-data', key: 'spacesBefore' },
+      params: { kind: 'set-extra-data', key: 'spacesBefore', value: 3 },
     })
   })
 
