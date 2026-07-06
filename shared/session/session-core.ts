@@ -15,7 +15,6 @@ import type {
   GameState,
   InteractionCommand,
   InteractionFarmSelection,
-  InteractionRequest,
   InteractionSelection,
   InteractionState,
   ParentSelectionSubmission,
@@ -112,6 +111,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
+import { deriveInteractionState } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
@@ -1630,267 +1630,22 @@ export class GameCore {
     }))
   }
 
-  /**
-   * Derive the client-facing `InteractionState` from the current engine
-   * stack. Pending prompts are read through `PendingEnvelope`; the envelope
-   * adapter keeps host details hidden
-   * hidden from production session reads.
-   */
   private buildInteraction(): InteractionState {
-    if (this.state.gameOver) {
-      return {
-        stateId: 'gameover',
-        winners: this.computeWinnerIds(),
-        scores: this.computeScoreSummary(),
-        allowedCommands: [],
-        anytimeActions: [],
-      }
-    }
-    const frame = this.engineStack.current()
-    const view = this.engineStack.peekPendingView()
-    const cursor = this.engineStack.peekPendingCursor()
-    const pendingHost = this.engineStack.peekPendingHost()
-
-    if (!frame || !view || !cursor) {
-      const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
-      const baseCommands: InteractionCommand[] = hasPendingOrdinaryCardDrawChoice(this.state)
-        ? ['undoStep', 'undoAction']
-        : anytimeActions.length > 0
-          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
-          : ['takeAction', 'undoStep', 'undoAction']
-      return {
-        stateId: 'idle',
-        allowedCommands: this.filterUndoCommands(baseCommands),
-        anytimeActions,
-      }
-    }
-
-    const playerIndex = this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
-    const spaceId = frame.spaceId
-    const promptKey = view.promptKey
-    const promptParams = view.promptParams
-    const request: InteractionRequest = view.request
-    const choiceOptions = view.choices ?? []
-    const sourceCard = view.sourceCard ?? choicesSourceCard(choiceOptions)
-    const costOverride = view.costOverride
-    const player = this.state.players[playerIndex]
-
-    const policy = this.computeAnytimePolicySnapshot()
-    const anytimeEntries = policy.allowed ? this.buildAnytimeEntries() : []
-    const includeAnytimeCmd = policy.allowed && anytimeEntries.length > 0
-    const buildCmds = (
-      base: ReadonlyArray<InteractionCommand>,
-    ): InteractionCommand[] => {
-      const commands: InteractionCommand[] = includeAnytimeCmd ? [...base, 'takeAnytimeAction'] : [...base]
-      return this.filterUndoCommands(commands)
-    }
-    const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
-
-    switch (request.kind) {
-      case 'animal-reorg':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          zones: player ? this.buildAnimalReorgZones(player) : [],
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'confirm-next-player':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          nextPlayerIndex: request.nextPlayerIndex,
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'confirm-player-switch':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          fromPlayerIndex: request.fromPlayerIndex,
-          toPlayerIndex: request.toPlayerIndex,
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'feed':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          remaining: request.remaining,
-          foodUsed: request.foodUsed,
-          feedQueue: request.feedQueue,
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'heating':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'farm-select':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          farm: request.farm,
-          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'resource-quantity-select':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'resource-batch-exchange-select':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'select-trigger':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'card-draft':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          allowedCommands: buildCmds(['undoStep', 'undoAction']),
-          anytimeActions: anytimeDescriptors,
-        }
-      case 'engine-blocked':
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
-          promptParams,
-          sourceCard,
-          request,
-          options: [],
-          allowedCommands: this.filterUndoCommands(['undoStep', 'undoAction']),
-          anytimeActions: [],
-        }
-      case 'choice':
-      default: {
-        const selectionKind = this.isSelectionPromptKey(promptKey)
-        if (pendingHost && selectionKind && player) {
-          return {
-            stateId: 'wait',
-            playerIndex,
-            spaceId,
-            promptKey,
-            promptParams,
-            sourceCard,
-            request,
-            options: choiceOptions,
-            costOverride,
-            selection: this.buildSelectionInteractionFromNode(player),
-            allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
-            anytimeActions: anytimeDescriptors,
-          }
-        }
-        const farm = pendingHost && player ? this.buildFarmInteractionFromNode(promptKey, player) : null
-        const allowedCommands: InteractionCommand[] = farm
-          ? buildCmds(['commitSelection', 'undoStep', 'undoAction'])
-          : buildCmds(['resolveChoice', 'undoStep', 'undoAction'])
-        if (farm) {
-          return {
-            stateId: 'wait',
-            playerIndex,
-            spaceId,
-            promptKey,
-            promptParams,
-            sourceCard,
-            request,
-            options: choiceOptions,
-            costOverride,
-            farm,
-            allowedCommands,
-            anytimeActions: anytimeDescriptors,
-          }
-        }
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          allowedCommands,
-          anytimeActions: anytimeDescriptors,
-        }
-      }
-    }
+    return deriveInteractionState({
+      state: this.state,
+      engineStack: this.engineStack,
+      getAnytimeEntries: () => this.buildAnytimeEntries(),
+      getAnytimePolicy: () => this.computeAnytimePolicySnapshot(),
+      filterUndoCommands: (commands) => this.filterUndoCommands(commands),
+      winnerIds: () => this.computeWinnerIds(),
+      scoreSummary: () => this.computeScoreSummary(),
+      effectiveOwnerIndexForFrame: (frame, nodeId, pending) =>
+        this.effectiveOwnerIndexForFrame(frame, nodeId, pending),
+      animalReorgZones: (player) => this.buildAnimalReorgZones(player),
+      isSelectionPrompt: (promptKey) => !!this.isSelectionPromptKey(promptKey),
+      buildSelectionInteraction: (player) => this.buildSelectionInteractionFromNode(player),
+      buildFarmInteraction: (promptKey, player) => this.buildFarmInteractionFromNode(promptKey, player),
+    })
   }
 
   private computeWinnerIds(): string[] {
