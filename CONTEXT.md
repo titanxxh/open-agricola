@@ -136,6 +136,10 @@ _Avoid_: 在 effect 文件里堆叠多卡特例
 棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
 _Avoid_: ActionDefinition、ActionNode
 
+**Action Space Query**:
+领域层读取公开行动格的统一查询边界，覆盖按 id 查找、存在判断、按 id 集合保持棋盘顺序过滤、按 worker 定位所在行动格等共享语义。
+_Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推断
+
 **Season Action Space（季节行动格）**:
 Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。
 _Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space

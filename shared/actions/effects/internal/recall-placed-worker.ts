@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionSpace } from '../../../contract/types'
 import { getRoundPlacementDetails } from '../../../cards/helpers/round-placement'
-import { clearLinkedSpaceBlocksForWorker, removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
+import { clearLinkedSpaceBlocksForWorker, findActionSpaceById, removeWorkerRef, spaceHasPlayer } from '../../../domain/space'
 import { holdWorkerOnCard } from '../../../cards/helpers/card-held-workers'
 import { recallWorkerById } from '../../../cards/helpers/recall-worker'
 import { setCardFlag } from '../../../cards/helpers/card-state'
@@ -133,9 +133,8 @@ export const recallPlacedWorkerAction: ActionDefinition = {
   },
   resolveChoice: ({ state, player, params, sourceCard }, choice) => {
     const p = (params as RecallPlacedWorkerParams | undefined) ?? {}
-    const target = state.actionSpaces.find(
-      (space) => space.id === choice && spaceHasPlayer(space, player.id),
-    )
+    const target = findActionSpaceById(state, choice)
+    if (target && !spaceHasPlayer(target, player.id)) return { type: 'fail', errorKey: 'log.actionFail' }
     if (!target) return { type: 'fail', errorKey: 'log.actionFail' }
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find((e) => e.spaceId === target.id)

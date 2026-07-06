@@ -1,6 +1,6 @@
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContextInput } from '../../cards/card-listeners'
-import { canSpaceAcceptWorker, isSpaceBlocked } from '../../domain/space'
+import { canSpaceAcceptWorker, filterActionSpacesByIds, findActionSpaceById, isSpaceBlocked } from '../../domain/space'
 import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
@@ -65,7 +65,7 @@ const canExecutePlacementSpace = (
     space,
     sourceCard: contextOverrides.sourceCard,
     actionContext: contextOverrides.actionContext,
-    resolveAction: (actionId) => state.actionSpaces.find((candidate) => candidate.id === actionId),
+    resolveAction: (actionId) => findActionSpaceById(state, actionId),
   })
 
 export function computeAllowedPlacementSpaces(
@@ -83,10 +83,10 @@ export function computeAllowedPlacementSpaces(
     })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
-  const baseOptions = base.map((entry) => {
-    const space = state.actionSpaces.find((s) => s.id === entry.spaceId)!
-    return { value: entry.spaceId, labelKey: space.nameKey }
-  })
+  const baseOptions = filterActionSpacesByIds(state, base.map((entry) => entry.spaceId)).map((space) => ({
+    value: space.id,
+    labelKey: space.nameKey,
+  }))
   const result = contextOverrides.result ?? {
     type: 'request' as const,
     request: { kind: 'choice' as const, options: baseOptions },
@@ -124,7 +124,7 @@ export function computeAllowedPlacementSpaces(
     for (const opt of result.extraOptions ?? []) {
       if (!opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) continue
       const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
-      const space = state.actionSpaces.find(s => s.id === spaceId)
+      const space = findActionSpaceById(state, spaceId)
       if (!space) continue
       if (!canEnterSpace(space, player, state)) continue
       if (isSpaceBlocked(space)) continue

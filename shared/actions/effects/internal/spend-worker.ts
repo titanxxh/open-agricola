@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionSpace, GameState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
-import { addWorkerRef } from '../../../domain/space'
+import { addWorkerRef, findActionSpaceById } from '../../../domain/space'
 
 const emptyResources = () => ({
   wood: 0,
@@ -19,7 +19,7 @@ const emptyResources = () => ({
 
 const ensureCardPseudoSpace = (state: GameState, cardId: string): ActionSpace => {
   const spaceId = `card-worker:${cardId}`
-  const existing = state.actionSpaces.find((s) => s.id === spaceId)
+  const existing = findActionSpaceById(state, spaceId)
   if (existing) return existing
   const space: ActionSpace = {
     id: spaceId,

@@ -7,7 +7,14 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addLinkedSpaceBlocks, addWorkerRef, clearLinkedSpaceBlocksForWorker, removeWorkerRef } from '../../domain/space'
+import {
+  addLinkedSpaceBlocks,
+  addWorkerRef,
+  clearLinkedSpaceBlocksForWorker,
+  findActionSpaceById,
+  findActionSpaceByWorker,
+  removeWorkerRef,
+} from '../../domain/space'
 import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/player'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
@@ -60,9 +67,7 @@ const placeTemporarySupplyWorker = (
   space: ActionSpace,
   workerId: string,
 ): ActionExecutionResult & { workerId?: string } => {
-  const alreadyPlaced = state.actionSpaces.some((candidate) =>
-    candidate.takenBy.some((worker) => worker.playerId === player.id && worker.workerId === workerId),
-  )
+  const alreadyPlaced = findActionSpaceByWorker(state, player.id, workerId) !== undefined
   if (alreadyPlaced) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   addWorkerRef(space, player.id, workerId)
   addLinkedSpaceBlocks(state, space, player.id, workerId)
@@ -123,14 +128,12 @@ export const placeFarmerAction: ActionDefinition = {
 
       let fromSpace: ActionSpace | undefined
       if (!isWorkerless) {
-        fromSpace = state.actionSpaces.find(s =>
-          s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
-        )
+        fromSpace = findActionSpaceByWorker(state, player.id, workerId)
         if (!fromSpace) {
           return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
       }
-      const targetSpace = state.actionSpaces.find(s => s.id === targetSpaceId)
+      const targetSpace = findActionSpaceById(state, targetSpaceId)
       if (!targetSpace) {
         return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       }
@@ -255,7 +258,7 @@ export const placeFarmerAction: ActionDefinition = {
     }
     if (allowed.length === 0) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const options = allowed.map((a) => {
-      const space = state.actionSpaces.find((s) => s.id === a.spaceId)!
+      const space = findActionSpaceById(state, a.spaceId)!
       return {
         value: a.allowOccupied ? `${OCCUPIED_SPACE_CHOICE_PREFIX}${a.spaceId}` : a.spaceId,
         labelKey: a.option?.labelKey ?? space.nameKey,
@@ -278,7 +281,7 @@ export const placeFarmerAction: ActionDefinition = {
     const targetSpaceId = allowOccupied
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
       : choice
-    const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
+    const targetSpace = findActionSpaceById(state, targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
     const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)

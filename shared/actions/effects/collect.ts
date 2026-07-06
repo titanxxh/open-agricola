@@ -2,6 +2,7 @@ import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../..
 import type { EventSink } from '../../contract/events'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addResourcesFromBoard } from '../../session/stats'
+import { findActionSpaceById } from '../../domain/space'
 
 const COLLECTABLE_RESOURCES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
 type CollectableResource = (typeof COLLECTABLE_RESOURCES)[number]
@@ -62,7 +63,7 @@ export const collectAction: ActionDefinition = {
     if (spaceIdHint) {
       targetSpace = spaceIdHint === space?.id
         ? space
-        : state.actionSpaces.find((s) => s.id === spaceIdHint)
+        : findActionSpaceById(state, spaceIdHint)
       if (!targetSpace) {
         return { type: 'fail', errorKey: 'log.collectNoSpace' }
       }
