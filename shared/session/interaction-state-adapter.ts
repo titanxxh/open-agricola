@@ -10,6 +10,7 @@ import type {
   PlayerState,
   GameState,
 } from '../contract/types'
+import type { ClientInteractionState } from '../contract/protocol/game'
 import type { EngineFrame, EngineStack } from '../engine'
 import type { PendingView } from '../engine/types'
 import type { AnytimePolicy } from './anytime-policy'
@@ -53,6 +54,40 @@ const requestWithChoices = (request: InteractionRequest, choices: ActionChoiceOp
   if (request.kind === 'select-trigger') return { ...request, options: choices }
   if (request.kind === 'farm-select') return { ...request, options: choices }
   return request
+}
+
+export const interactionRecipientPlayerId = (
+  interaction: InteractionState,
+  playerIds: readonly string[],
+): string | null =>
+  interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+    ? playerIds[interaction.playerIndex] ?? null
+    : null
+
+export const redactInteractionForViewer = (
+  interaction: InteractionState,
+  playerIds: readonly string[],
+  viewerPlayerId: string | null,
+): ClientInteractionState => {
+  if (interaction.stateId !== 'wait') return interaction
+  const recipient = interactionRecipientPlayerId(interaction, playerIds)
+  if (recipient !== null && recipient === viewerPlayerId) return interaction
+  if (recipient === null) return interaction
+  return {
+    stateId: 'wait',
+    playerIndex: interaction.playerIndex,
+    sourceCard: interaction.sourceCard,
+    promptKey: interaction.promptKey,
+    request: {
+      kind: 'private-prompt',
+      playerIndex: interaction.playerIndex,
+      promptKind: interaction.request.kind,
+      sourceCard: interaction.sourceCard,
+      promptKey: interaction.promptKey,
+    },
+    allowedCommands: [],
+    anytimeActions: [],
+  }
 }
 
 export const deriveInteractionState = ({

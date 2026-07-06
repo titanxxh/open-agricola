@@ -19,10 +19,8 @@ import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
-import {
-  filterInteractionForViewer,
-  privateEventsForViewer,
-} from '../shared/session/interaction-privacy.ts'
+import { privateEventsForViewer } from '../shared/session/interaction-privacy.ts'
+import { redactInteractionForViewer } from '../shared/session/interaction-state-adapter.ts'
 import { corsHeaders } from './http-origin.ts'
 
 /**
@@ -232,7 +230,7 @@ const respondWith = (
         : serializeState(resp.state, ctx),
     interaction:
       viewerPlayerId != null
-        ? filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId)
+        ? redactInteractionForViewer(resp.interaction, playerIds, viewerPlayerId)
         : resp.interaction,
     cardAvailability:
       viewerPlayerId === null || viewerPlayerId === currentPlayerId
