@@ -495,6 +495,9 @@ export const GameContainerApi = () => {
   const farmInteraction = farmSelectionDraft.farmInteraction
   const selectionInteraction = farmSelectionDraft.selectionInteraction
   const occupationHandInteraction = farmSelectionDraft.occupationHandInteraction
+  const setFarmDraftCommitError = farmSelectionDraft.setCommitError
+  const setFarmDraftSubmitError = farmSelectionDraft.setSubmitError
+  const resetFarmSelectionDraft = farmSelectionDraft.reset
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -572,15 +575,15 @@ export const GameContainerApi = () => {
   }, [interaction, isInteractive, pendingMoorSpecialActionChoices, state, transport])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
-    farmSelectionDraft.setCommitError(farmType, error)
-  }, [farmSelectionDraft])
+    setFarmDraftCommitError(farmType, error)
+  }, [setFarmDraftCommitError])
 
   const setLocalFarmSubmitError = useCallback((
     farmType: FarmCommitType,
     error: string | { code: string; edges: string[]; newEdges: string[] },
   ) => {
-    farmSelectionDraft.setSubmitError(farmType, error)
-  }, [farmSelectionDraft])
+    setFarmDraftSubmitError(farmType, error)
+  }, [setFarmDraftSubmitError])
 
   const runInteractionSubmitCommand = useCallback((
     submitCommand: InteractionSubmitCommand,
@@ -960,10 +963,10 @@ export const GameContainerApi = () => {
     }
     if (payload.ok) {
       setSelectedSpecialAction(null)
-      farmSelectionDraft.reset()
+      resetFarmSelectionDraft()
       resetExchangeDraft()
     }
-  }, [applySnapshot, applySnapshotPublicEventCancellations, farmSelectionDraft, resetExchangeDraft])
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft])
 
   useEffect(() => {
     if (!isReady) return
