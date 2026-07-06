@@ -168,6 +168,7 @@ describe('useExchangeDraftPresentation', () => {
     act(() => result.current.reset())
     expect(result.current.bake.counts).toEqual({})
     expect(result.current.anytime.counts).toEqual({})
-    expect(Object.values(result.current.harvestFeed.counts)).toEqual([0, 0])
+    expect(result.current.harvestFeed.counts['__basic__-ex0']).toBe(0)
+    expect(Object.values(result.current.harvestFeed.counts).every((count) => count === 0)).toBe(true)
   })
 })
