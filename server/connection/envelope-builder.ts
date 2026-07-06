@@ -8,10 +8,8 @@ import type {
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
-import {
-  filterInteractionForViewer,
-  privateEventsForViewer,
-} from '../../shared/session/interaction-privacy.ts'
+import { privateEventsForViewer } from '../../shared/session/interaction-privacy.ts'
+import { redactInteractionForViewer } from '../../shared/session/interaction-state-adapter.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -44,7 +42,7 @@ const buildPayload = (args: Args): GameSyncPayload => {
   )
   const payload: GameSyncPayload = {
     state,
-    interaction: filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),
+    interaction: redactInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,
     historyLength: resp.historyLength,

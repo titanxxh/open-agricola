@@ -12,7 +12,10 @@ import {
 } from '../../engine'
 import type { EngineFrame } from '../../engine'
 import { createInitialState } from '../state-bootstrap'
-import { deriveInteractionState } from '../interaction-state-adapter'
+import {
+  deriveInteractionState,
+  redactInteractionForViewer,
+} from '../interaction-state-adapter'
 
 const pendingStack = (): EngineStack => {
   const root = new ActionNode('interaction:confirm-next-player-1', INTERACTION_ONLY_ACTION_ID)
@@ -71,5 +74,40 @@ describe('Interaction State Adapter', () => {
       anytimeActions: [],
     })
     expect(interaction).not.toHaveProperty('nextPlayerIndex')
+  })
+
+  it('redacts another player wait interaction for viewer payloads', () => {
+    const interaction = {
+      stateId: 'wait',
+      playerIndex: 0,
+      sourceCard: 'E078_SleightofHand',
+      promptKey: 'ui.interactionResourceBatchExchange',
+      request: {
+        kind: 'resource-batch-exchange-select',
+        cardId: 'E078_SleightofHand',
+        discardAvailableByResource: { wood: 1 },
+        receiveResources: ['food'],
+        maxTotal: 1,
+      },
+      allowedCommands: ['commitSelection'],
+      anytimeActions: [],
+    } as const
+
+    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], 'p1')).toEqual(interaction)
+    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], 'p2')).toEqual({
+      stateId: 'wait',
+      playerIndex: 0,
+      sourceCard: 'E078_SleightofHand',
+      promptKey: 'ui.interactionResourceBatchExchange',
+      request: {
+        kind: 'private-prompt',
+        playerIndex: 0,
+        promptKind: 'resource-batch-exchange-select',
+        sourceCard: 'E078_SleightofHand',
+        promptKey: 'ui.interactionResourceBatchExchange',
+      },
+      allowedCommands: [],
+      anytimeActions: [],
+    })
   })
 })

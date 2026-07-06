@@ -1,41 +1,8 @@
 import type { InteractionState } from '../contract/types'
-import type { ClientInteractionState, PrivateGameEvent } from '../contract/protocol/game'
+import type { PrivateGameEvent } from '../contract/protocol/game'
+import { interactionRecipientPlayerId } from './interaction-state-adapter'
 
 const PRIVATE_EVENT_PROMPT_KINDS = new Set(['resource-batch-exchange-select'])
-
-const targetPlayerId = (
-  interaction: InteractionState,
-  playerIds: readonly string[],
-): string | null =>
-  interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
-    ? playerIds[interaction.playerIndex] ?? null
-    : null
-
-export const filterInteractionForViewer = (
-  interaction: InteractionState,
-  playerIds: readonly string[],
-  viewerPlayerId: string | null,
-): ClientInteractionState => {
-  if (interaction.stateId !== 'wait') return interaction
-  const recipient = targetPlayerId(interaction, playerIds)
-  if (recipient !== null && recipient === viewerPlayerId) return interaction
-  if (recipient === null) return interaction
-  return {
-    stateId: 'wait',
-    playerIndex: interaction.playerIndex,
-    sourceCard: interaction.sourceCard,
-    promptKey: interaction.promptKey,
-    request: {
-      kind: 'private-prompt',
-      playerIndex: interaction.playerIndex,
-      promptKind: interaction.request.kind,
-      sourceCard: interaction.sourceCard,
-      promptKey: interaction.promptKey,
-    },
-    allowedCommands: [],
-    anytimeActions: [],
-  }
-}
 
 export const privateEventsForViewer = (
   interaction: InteractionState,
@@ -46,7 +13,7 @@ export const privateEventsForViewer = (
   if (viewerPlayerId === null) return []
   const events: PrivateGameEvent[] = []
   if (interaction.stateId === 'wait' && PRIVATE_EVENT_PROMPT_KINDS.has(interaction.request.kind)) {
-    const recipient = targetPlayerId(interaction, playerIds)
+    const recipient = interactionRecipientPlayerId(interaction, playerIds)
     if (recipient !== null && recipient === viewerPlayerId) {
       events.push({
         schemaVersion: 1,
