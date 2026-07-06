@@ -187,6 +187,7 @@ export const interactionChoiceOptions = (interaction: WaitInteraction): ActionCh
   if (interaction.request.kind === 'choice') return interaction.request.options
   if (interaction.request.kind === 'select-trigger') return interaction.request.options
   if (interaction.request.kind === 'farm-select') return interaction.request.options ?? []
+  if (interaction.request.kind === 'selection') return interaction.request.options ?? []
   return []
 }
 
