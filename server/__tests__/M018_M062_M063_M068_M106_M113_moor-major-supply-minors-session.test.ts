@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { Scoring } from '../../shared/domain'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { getMajorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
@@ -179,6 +180,25 @@ describe('Moor major-supply and upgrade minors', () => {
 
     resp.state.players[0]!.resources = fullResources()
     expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
+  })
+
+  it('M062 does not offer hidden Tiled Oven before it is moved to the supply top', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed.push('M062_HearthBrush')
+    player.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
+    writeCardExtraData(player, 'M062_HearthBrush', 'playedRound', 4)
+
+    const flow = runCardEffectHook(
+      session.state,
+      player,
+      'M062_HearthBrush',
+      'onEndTurn',
+      undefined,
+      { triggerActionId: 'place-farmer' },
+    )
+
+    expect(flow).toBeNull()
   })
 
   it('M063 moves up Village Church and scores Church plus Village Church', () => {

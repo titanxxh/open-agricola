@@ -130,7 +130,11 @@ import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from 
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
-import { returnMajorImprovementToSupply, takeMajorImprovementFromSupply } from '../cards/major/supply.ts'
+import {
+  getAvailableMajorImprovementIds,
+  returnMajorImprovementToSupply,
+  takeMajorImprovementFromSupply,
+} from '../cards/major/supply.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
@@ -3359,7 +3363,7 @@ export class GameCore {
           !isBlockedByMajorImprovementActionGate(improvement, ['major', 'minor']))
     })
 
-    this.state.availableMajorImprovements.forEach((improvementId) => {
+    getAvailableMajorImprovementIds(this.state).forEach((improvementId) => {
       result[`major:${improvementId}`] =
         canUseImprovementAny &&
         isMajorImprovementPlayable(

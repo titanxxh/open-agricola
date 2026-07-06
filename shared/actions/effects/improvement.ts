@@ -6,6 +6,7 @@ import { getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
+import { isMajorImprovementAvailable } from '../../cards/major/supply'
 import { buildInternalPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
 import {
   buildMajorImprovementOptions,
@@ -150,7 +151,7 @@ const playMajorImprovement = (
   if (!improvement) {
     return { type: 'fail', errorKey: 'log.improvementFail' }
   }
-  if (!state.availableMajorImprovements.includes(improvement.id)) {
+  if (!isMajorImprovementAvailable(state, improvement.id)) {
     return { type: 'fail', errorKey: 'log.improvementFail' }
   }
 
@@ -371,7 +372,7 @@ export const improvementAction: ActionDefinition = {
     const allowedMinor = types.includes('minor')
     const isMinorOnly = types.length === 1 && types[0] === 'minor'
     if (allowedMajor &&
-      buildMajorImprovementOptions(state.availableMajorImprovements, state, player, context?.sourceCard).length > 0) {
+      buildMajorImprovementOptions(state, player, context?.sourceCard).length > 0) {
       return true
     }
     if (allowedMinor) {
@@ -400,7 +401,7 @@ export const improvementAction: ActionDefinition = {
       ? (params as { allowedPurchases?: string[] }).allowedPurchases
       : undefined
     const majorOpts = types.includes('major')
-      ? buildMajorImprovementOptions(state.availableMajorImprovements, state, player, actionCardId, allowedPurchases)
+      ? buildMajorImprovementOptions(state, player, actionCardId, allowedPurchases)
       : []
     const baseMinor = types.includes('minor')
       ? (isMinorOnly

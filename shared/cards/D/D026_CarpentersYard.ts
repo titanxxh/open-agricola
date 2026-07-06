@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { isMajorImprovementAvailable } from '../major/supply'
 
 const CARD_ID = 'D026_CarpentersYard'
 const ALLOWED_CARDS = ['Major_Well', 'Major_Joinery']
@@ -17,7 +18,7 @@ const afterImprovementListener: CardListenerRegistration = {
     if (!playedCardId || !ALLOWED_CARDS.includes(playedCardId)) return
 
     const otherCard = playedCardId === 'Major_Well' ? 'Major_Joinery' : 'Major_Well'
-    if (!context.state.availableMajorImprovements.includes(otherCard)) return
+    if (!isMajorImprovementAvailable(context.state, otherCard)) return
 
     return {
       flow: {

@@ -9,6 +9,7 @@ import {
 } from '../../actions/effects/improvement'
 import type { ActionDefinition, GameState, PlayerState } from '../../contract/types'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
+import { getAvailableMajorImprovementIds } from '../major/supply'
 
 const canPlayOccupationWithFood = (spaceId: string, food: number) =>
   (state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0], player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1]) =>
@@ -270,7 +271,7 @@ const canPlayImprovement56 = (state: GameState, player: PlayerState) => {
   const canMinor = types.includes('minor') &&
     player.minorHand.some((id) => isMinorImprovementPlayable(state, player, id, 'improvement', undefined, types))
   const canMajor = types.includes('major') &&
-    state.availableMajorImprovements.some((id) => isMajorImprovementPlayable(state, player, id))
+    getAvailableMajorImprovementIds(state).some((id) => isMajorImprovementPlayable(state, player, id))
   return canMinor || canMajor
 }
 

@@ -5,6 +5,7 @@ import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { filterAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'
 /**
@@ -29,9 +30,7 @@ const choiceCandidateListener: CardListenerRegistration = {
     const types = readImprovementTypes(ctx)
     if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
-    const available = ctx.state.availableMajorImprovements ?? []
-    const extraOptions: ActionChoiceOption[] = D131_BOTTOM_ROW_MAJORS
-      .filter((id) => available.includes(id))
+    const extraOptions: ActionChoiceOption[] = filterAvailableMajorImprovementIds(ctx.state, D131_BOTTOM_ROW_MAJORS)
       .map((id) => ({
         value: id,
         labelKey: `improvements.${id}.name`,

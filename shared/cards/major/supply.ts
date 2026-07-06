@@ -64,6 +64,8 @@ type MajorSupplyVariantInput = {
   enableFarmersOfTheMoor?: boolean
 }
 
+type MajorSupplyState = Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>
+
 type MajorSupplyVariant = {
   id: string
   matches: (input: MajorSupplyVariantInput) => boolean
@@ -170,15 +172,34 @@ export const getVisibleMajorImprovementIds = (
   return supply.map((stack) => stack.visibleId).filter((id): id is string => !!id)
 }
 
+export const getAvailableMajorImprovementIds = (
+  state: MajorSupplyState,
+): string[] =>
+  getVisibleMajorImprovementIds(state.majorImprovementSupply) ??
+  [...state.availableMajorImprovements]
+
+export const isMajorImprovementAvailable = (
+  state: MajorSupplyState,
+  cardId: string,
+): boolean => getAvailableMajorImprovementIds(state).includes(cardId)
+
+export const filterAvailableMajorImprovementIds = (
+  state: MajorSupplyState,
+  cardIds: readonly string[],
+): string[] => {
+  const available = new Set(getAvailableMajorImprovementIds(state))
+  return cardIds.filter((cardId) => available.has(cardId))
+}
+
 export const syncAvailableMajorImprovementsFromSupply = (
-  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  state: MajorSupplyState,
 ): void => {
   const visible = getVisibleMajorImprovementIds(state.majorImprovementSupply)
   if (visible) state.availableMajorImprovements = visible
 }
 
 export const takeMajorImprovementFromSupply = (
-  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  state: MajorSupplyState,
   cardId: string,
 ): void => {
   if (!state.majorImprovementSupply) {
@@ -195,7 +216,7 @@ export const takeMajorImprovementFromSupply = (
 }
 
 export const returnMajorImprovementToSupply = (
-  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  state: MajorSupplyState,
   cardId: string,
 ): void => {
   if (!state.majorImprovementSupply) {
@@ -220,7 +241,7 @@ export const returnMajorImprovementToSupply = (
 }
 
 export const moveMajorImprovementToSupplyTop = (
-  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  state: MajorSupplyState,
   cardId: string,
 ): void => {
   if (!state.majorImprovementSupply) return
@@ -238,7 +259,7 @@ export const moveMajorImprovementToSupplyTop = (
 }
 
 export const swapMajorImprovementWithSupply = (
-  state: Pick<GameState, 'availableMajorImprovements' | 'majorImprovementSupply'>,
+  state: MajorSupplyState,
   fromCardId: string,
   toCardId: string,
 ): void => {

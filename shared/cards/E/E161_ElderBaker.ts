@@ -5,6 +5,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { readImprovementTypes } from '../../actions/effects/improvement'
+import { isMajorImprovementAvailable } from '../major/supply'
 
 const CARD_ID = 'E161_ElderBaker'
 
@@ -27,8 +28,7 @@ const stoneOvenCandidateListener: CardListenerRegistration = {
       : readImprovementTypes(ctx)
     if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
-    const available = ctx.state.availableMajorImprovements ?? []
-    if (!available.includes(STONE_OVEN_ID)) return
+    if (!isMajorImprovementAvailable(ctx.state, STONE_OVEN_ID)) return
     const extraOptions: ActionChoiceOption[] = [
       {
         value: STONE_OVEN_ID,

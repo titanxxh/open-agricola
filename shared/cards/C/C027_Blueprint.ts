@@ -5,6 +5,7 @@ import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { PaymentSolver } from '../../actions/payment'
+import { filterAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'C027_Blueprint'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
@@ -42,9 +43,7 @@ const choiceCandidateListener: CardListenerRegistration = {
     if (ctx.actionContext?.trueAction === false) return
     if (ctx.sourceCard) return
     if (!ctx.player.minorPlayed.includes(CARD_ID)) return
-    const available = ctx.state.availableMajorImprovements ?? []
-    const extraOptions: ActionChoiceOption[] = ALLOWED_MAJORS
-      .filter((id) => available.includes(id))
+    const extraOptions: ActionChoiceOption[] = filterAvailableMajorImprovementIds(ctx.state, ALLOWED_MAJORS)
       .map((id) => ({
         value: id,
         labelKey: `improvements.${id}.name`,
