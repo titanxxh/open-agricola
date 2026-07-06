@@ -1,11 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import {
-  filterPublicEventCancellationsForPlayer,
-  serializeState,
-  serializeStateForPlayer,
-} from '../shared/session/serialization.ts'
-import {
   playerBoard,
   type SowSelection,
   normalizePlayerFarm,
@@ -19,9 +14,8 @@ import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
-import { privateEventsForViewer } from '../shared/session/interaction-privacy.ts'
-import { redactInteractionForViewer } from '../shared/session/interaction-state-adapter.ts'
 import { corsHeaders } from './http-origin.ts'
+import { buildGameSyncPayload } from './game/sync-payload.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -212,38 +206,12 @@ const respondWith = (
   session: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
-  const ctx = { engineStack: session.getEngineStack() }
-  const playerIds = resp.state.players.map((player) => player.id)
-  const currentPlayerId = resp.state.players[resp.state.currentPlayerIndex]?.id ?? null
-  const privateEvents = viewerPlayerId === null
-    ? []
-    : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
-  const publicEventCancellations = viewerPlayerId === null
-    ? resp.publicEventCancellations
-    : filterPublicEventCancellationsForPlayer(resp.state, viewerPlayerId, ctx, resp.publicEventCancellations)
-  const { privateEvents: _privateEvents, publicEventCancellations: _publicEventCancellations, ...publicResp } = resp
-  const result: Record<string, unknown> = {
-    ...publicResp,
-    state:
-      viewerPlayerId != null
-        ? serializeStateForPlayer(resp.state, viewerPlayerId, ctx)
-        : serializeState(resp.state, ctx),
-    interaction:
-      viewerPlayerId != null
-        ? redactInteractionForViewer(resp.interaction, playerIds, viewerPlayerId)
-        : resp.interaction,
-    cardAvailability:
-      viewerPlayerId === null || viewerPlayerId === currentPlayerId
-        ? resp.cardAvailability
-        : undefined,
-  }
-  if (privateEvents.length > 0) result.privateEvents = privateEvents
-  if (publicEventCancellations?.length) result.publicEventCancellations = publicEventCancellations
-  // Include custom card definitions so the frontend can register them
-  // in its card registry — custom cards render identically to built-in cards.
-  const defs = session.getCustomCardDefs()
-  if (defs.length > 0) result.customCardDefs = defs
-  return result
+  return buildGameSyncPayload({
+    session,
+    resp,
+    viewerPlayerId,
+    mode: viewerPlayerId === null ? 'debug' : 'viewer',
+  })
 }
 
 export const handleGameRoute = async (
