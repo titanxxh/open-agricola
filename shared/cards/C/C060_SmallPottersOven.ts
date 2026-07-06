@@ -8,6 +8,7 @@ import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { returnCardToBoard } from '../helpers/return-card'
 import type { CardImpl } from '../registry'
+import { isMajorImprovementAvailable } from '../major/supply'
 
 const CARD_ID = 'C060_SmallPottersOven'
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
@@ -28,7 +29,7 @@ const getAvailableOvenChoices = (context: CardListenerContext) => {
   const playerIdx = context.state.players.indexOf(context.player)
   const ctx: PaymentCtx = { actionId: CARD_ID, costType: 'none' }
   return OVEN_IDS.filter((id) => {
-    if (!context.state.availableMajorImprovements.includes(id)) return false
+    if (!isMajorImprovementAvailable(context.state, id)) return false
     const effect = getMajorCard(id)
     if (!effect?.cost) return false
     return PaymentSolver.canAfford(context.state, playerIdx, effect.cost, ctx)

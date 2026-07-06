@@ -4,6 +4,7 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { Scoring } from '../../shared/domain'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getMajorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
+import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import type { ActionChoiceOption, GameState } from '../../shared/contract/types'
 
 const findCardFor = (
@@ -38,7 +39,7 @@ const prepareMajorPurchaseSession = (
   setWorkersAtHome(session.state, player, 2)
   session.state.currentPlayerIndex = 0
   session.state.round = 3
-  session.state.availableMajorImprovements = [cardId]
+  moveMajorImprovementToSupplyTop(session.state, cardId)
   return session
 }
 
