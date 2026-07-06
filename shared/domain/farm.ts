@@ -1,5 +1,8 @@
 import type { FarmTilePosition, FarmyardExtension, Field, PlayerState } from '../contract/types'
-import { getBlockedFarmyardSpaceKeys } from './farmyard-space-states'
+import {
+  countUnusedFarmyardSpaces as countCanonicalUnusedFarmyardSpaces,
+  getUsedFarmyardTileKeys as getCanonicalUsedFarmyardTileKeys,
+} from './farmyard-usage'
 
 export const FARM_ROWS = 3
 export const FARM_COLS = 5
@@ -171,23 +174,11 @@ export const getFarmyardEdgeIds = (player?: FarmyardGeometrySource): string[] =>
   return Array.from(edgeIds)
 }
 
-export const getUsedFarmyardTileKeys = (player: PlayerState) => {
-  const used = new Set<string>()
-  player.roomTiles.forEach((tile) => used.add(positionKey(tile)))
-  player.farmTerrain?.forEach((tile) => used.add(positionKey(tile)))
-  player.fields.forEach((field) =>
-    used.add(positionKey({ row: field.row, col: field.col })),
-  )
-  player.stableTiles.forEach((tile) => used.add(positionKey(tile)))
-  player.pastures.forEach((pasture) =>
-    pasture.tiles.forEach((tile) => used.add(positionKey(tile))),
-  )
-  getBlockedFarmyardSpaceKeys(player).forEach((key) => used.add(key))
-  return used
-}
+export const getUsedFarmyardTileKeys = (player: PlayerState) =>
+  getCanonicalUsedFarmyardTileKeys(player)
 
 export const countUnusedFarmyardSpaces = (player: PlayerState) =>
-  getFarmyardTileCount(player) - getUsedFarmyardTileKeys(player).size
+  countCanonicalUnusedFarmyardSpaces(player)
 
 export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
   countUnusedFarmyardSpaces(player) === 0

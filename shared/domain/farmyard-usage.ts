@@ -37,3 +37,6 @@ export const getUsedFarmyardTileKeys = (player: PlayerState) => {
 
 export const countUnusedFarmyardSpaces = (player: PlayerState) =>
   getFarmyardTileCount(player) - getUsedFarmyardTileKeys(player).size
+
+export const hasNoUnusedFarmyardSpaces = (player: PlayerState) =>
+  countUnusedFarmyardSpaces(player) === 0
