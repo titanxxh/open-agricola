@@ -46,6 +46,34 @@ const pendingStack = (): EngineStack => {
   return stack
 }
 
+const selectionPendingStack = (): EngineStack => {
+  const root = new ActionNode('interaction:selection-1', INTERACTION_ONLY_ACTION_ID)
+  root.setPending({
+    hostNodeId: root.id,
+    pendingActionId: INTERACTION_ONLY_ACTION_ID,
+    request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }] },
+    choices: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
+    promptKey: 'ui.interactionSelection',
+  })
+  const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
+  const stack = new EngineStack()
+  stack.push({
+    engine: new Engine({
+      tree: new EngineTree(root),
+      registry: new ActionRegistry(),
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    }),
+    source: { kind: 'flow', flow },
+    ownerPlayerIndex: 0,
+    spaceId: '__selection',
+    stageResume: null,
+    deferredPlayerSwitch: null,
+    reason: 'selection',
+  })
+  return stack
+}
+
 describe('Interaction State Adapter', () => {
   it('derives a public wait from EngineStack without caller-owned cursor reads', () => {
     const state = createInitialState(1)
@@ -109,5 +137,33 @@ describe('Interaction State Adapter', () => {
       allowedCommands: [],
       anytimeActions: [],
     })
+  })
+
+  it('keeps pending choice options on selection waits', () => {
+    const state = createInitialState(1)
+    const interaction = deriveInteractionState({
+      state,
+      engineStack: selectionPendingStack(),
+      getAnytimeEntries: () => [],
+      getAnytimePolicy: () => ({ allowed: false, reason: 'selection-window' }),
+      filterUndoCommands: (commands: readonly InteractionCommand[]) => [...commands],
+      winnerIds: () => [],
+      scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
+      animalReorgZones: () => [],
+      isSelectionPrompt: () => true,
+      buildSelectionInteraction: () => ({
+        kind: 'farm-position',
+        selectablePositions: [{ row: 0, col: 0 }],
+        maxSelections: 1,
+      }),
+      buildFarmInteraction: () => null,
+    })
+
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId !== 'wait') return
+    expect(interaction.request.kind).toBe('selection')
+    if (interaction.request.kind !== 'selection') return
+    expect(interaction.request.options?.map((entry) => entry.value)).toEqual(['confirm'])
   })
 })

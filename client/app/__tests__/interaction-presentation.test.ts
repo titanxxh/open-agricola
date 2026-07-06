@@ -42,6 +42,7 @@ const waitSelection = (): InteractionState => ({
       selectablePositions: [{ row: 0, col: 0 }],
       maxSelections: 1,
     },
+    options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
   },
   allowedCommands: ['commitSelection', 'undoStep'],
   anytimeActions: [],
@@ -288,6 +289,7 @@ describe('Interaction Presentation', () => {
     expect(plan.kind).toBe('position-selection')
     if (plan.kind !== 'position-selection') return
     expect(plan.selection.selectablePositions).toEqual([{ row: 0, col: 0 }])
+    expect(plan.pendingChoice.options.map((entry) => entry.value)).toEqual(['confirm'])
   })
 
   it('routes every in-scope wait request kind to an explicit presentation plan', () => {
