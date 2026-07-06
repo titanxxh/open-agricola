@@ -62,7 +62,6 @@ import {
   buildSelectableMajorIds,
   buildSelectableMinorIds,
   buildSelectableOccupationIds,
-  buildReplayFeedback,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
   enableFarmersOfTheMoorFromQuery,
@@ -90,7 +89,6 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
-import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
   computeReorgAvailableAnimals,
   shouldShowAnimalDiscardPrompt,
@@ -110,12 +108,10 @@ import {
   type PublicEventResourceAnimation,
 } from './public-event-notifications'
 import {
-  buildReplayTimeline,
-  filterReplayTimeline,
-  summarizeReplayTimeline,
+  buildReplayActionLogPresentation,
   type ReplayTimelineEntry,
   type ReplayTimelineFilter,
-} from './replay-timeline'
+} from './replay-action-log-presentation'
 import {
   buildInteractionPresentationPlan,
   buildInteractionSubmitCommand,
@@ -1007,38 +1003,34 @@ export const GameContainerApi = () => {
     if (!state) return {}
     return Object.fromEntries(state.players.map((player) => [player.id, player.name ?? player.id]))
   }, [state])
-  const replayTimeline = useMemo(
-    () => buildReplayTimeline({
+  const {
+    timelineBuckets: actionLogTimelineBuckets,
+    replaySummary,
+    replayStepEntries,
+    replayFeedback,
+  } = useMemo(
+    () => buildReplayActionLogPresentation({
       events: state?.events ?? [],
       publicEventArchive: state?.publicEventArchive ?? [],
-    }),
-    [state?.events, state?.publicEventArchive],
-  )
-  const replaySummary = useMemo(() => summarizeReplayTimeline(replayTimeline), [replayTimeline])
-  const replayStepEntries = useMemo(
-    () => filterReplayTimeline(replayTimeline, replayFilter).filter((entry) => entry.replayable),
-    [replayFilter, replayTimeline],
-  )
-  const actionLogTimelineBuckets = useMemo(
-    () => buildActionLogTimelineRows({
-      entries: replayTimeline,
       stateLog: state?.log ?? [],
       currentRound: state?.round ?? 1,
       locale,
       playerNames,
       actionNames,
+      replayFilter,
+      selectedReplayKey,
     }),
-    [actionNames, locale, playerNames, replayTimeline, state?.log, state?.round],
-  )
-  const selectedReplayEntry = useMemo(
-    () => selectedReplayKey
-      ? replayTimeline.find((entry) => entry.key === selectedReplayKey) ?? null
-      : null,
-    [replayTimeline, selectedReplayKey],
-  )
-  const replayFeedback = useMemo(
-    () => buildReplayFeedback(selectedReplayEntry, locale),
-    [locale, selectedReplayEntry],
+    [
+      actionNames,
+      locale,
+      playerNames,
+      replayFilter,
+      selectedReplayKey,
+      state?.events,
+      state?.log,
+      state?.publicEventArchive,
+      state?.round,
+    ],
   )
   const handleSelectReplayEntry = useCallback((entry: ReplayTimelineEntry) => {
     setSelectedReplayKey(entry.key)
