@@ -80,6 +80,10 @@ _Avoid_: 未类型化 pending blob
 前端把服务端 `InteractionState` 映射为具体交互展示面和提交动作的边界。它只消费服务端交互真相，不做规则裁定。
 _Avoid_: 后端规则裁定、Pending Envelope、DOM 状态推断
 
+**Interaction State Adapter**:
+会话层把 `GameState`、`EngineStack`、`Pending Envelope` 和 viewer redaction 派生成前端可见 `ClientInteractionState` 的适配模块。它隐藏引擎恢复 cursor、host node metadata 和旧兼容字段；前端只读取 `InteractionState.stateId` 与 `wait.request.kind` 下的结构化数据。
+_Avoid_: 在前端或测试里读取 Pending Envelope metadata、在 `InteractionState.wait` 顶层复制 `request` 字段
+
 **Pending Envelope**:
 引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
 _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
