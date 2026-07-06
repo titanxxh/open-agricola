@@ -21,6 +21,7 @@ import type {
 } from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
 import { payResources, paySupplyTokens } from './affordability'
+import { findActionSpaceById } from '../../../domain/space'
 
 const providerAmountPaid = (
   solution: PaymentSolution,
@@ -43,7 +44,7 @@ export const canConsumePaymentResourceProviders = (
       return false
     }
     if (provider.consume.type === 'actionSpace') {
-      const space = state.actionSpaces.find((entry) => entry.id === provider.consume.spaceId)
+      const space = findActionSpaceById(state, provider.consume.spaceId)
       if ((space?.resources?.[provider.consume.resource] ?? 0) < amount) return false
     }
   }
@@ -61,7 +62,7 @@ const consumePaymentResourceProviders = (
     const amount = providerAmountPaid(solution, provider)
     if (amount <= 0) continue
     if (provider.consume.type === 'actionSpace') {
-      const space = state?.actionSpaces.find((entry) => entry.id === provider.consume.spaceId)
+      const space = state ? findActionSpaceById(state, provider.consume.spaceId) : undefined
       if (!space?.resources) return false
       space.resources[provider.consume.resource] =
         (space.resources[provider.consume.resource] ?? 0) - amount
@@ -114,7 +115,7 @@ export const applyTradeSideEffect = (
   if (times <= 0) return
   switch (eff.type) {
     case 'drainSpace': {
-      const space = state.actionSpaces.find((s) => s.id === eff.spaceId)
+      const space = findActionSpaceById(state, eff.spaceId)
       if (!space?.resources) return
       const cur = space.resources[eff.resource] ?? 0
       space.resources[eff.resource] = Math.max(0, cur - times)

@@ -13,7 +13,7 @@
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
-import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
+import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
 import {
   createMoorSpecialActionSpace,
   validateMoorSpecialAction,
@@ -133,7 +133,7 @@ export const takeAction = (
   if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
   const player = state.players[playerIndex]
   if (!player) return core.emitResponse(false, 'no workers available')
-  const space = state.actionSpaces.find((s) => s.id === spaceId)
+  const space = findActionSpaceById(state, spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
   if (isSpaceBlocked(space)) return core.emitResponse(false, 'space unavailable')
   if (!canUseExclusiveSpace(space, player, state)) {

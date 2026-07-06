@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { executeCardListener, getMatchingListeners, listenerOwnerOptions, type MatchedCardListener } from '../../../cards/card-listeners'
-import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
+import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { incPlacedFarmers } from '../../../session/stats'
 import { canEnterSpace } from '../../helpers/placement-availability'
@@ -93,7 +93,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
   execute: ({ state, player, params, sourceCard, actionContext, eventSink }) => {
     const targetSpaceId = typeof params?.spaceId === 'string' ? params.spaceId : undefined
     if (!targetSpaceId) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
-    const targetSpace = state.actionSpaces.find((space) => space.id === targetSpaceId)
+    const targetSpace = findActionSpaceById(state, targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
     const allowOccupied = params?.allowOccupied === true
