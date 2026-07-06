@@ -22,7 +22,7 @@ const choosePaymentByResources = (
   expected: Record<string, number>,
 ) => {
   expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-  const option = resp.interaction.options?.find((candidate) => hasPaidResources(candidate, expected))
+  const option = resp.interaction.request.options?.find((candidate) => hasPaidResources(candidate, expected))
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }

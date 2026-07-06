@@ -64,7 +64,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
 
-  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -72,7 +72,7 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   if (resp.interaction.sourceCard !== minorId) {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return resp
-    const minorOption = resp.interaction.options?.find((option) => option.value === minorId)
+    const minorOption = resp.interaction.request.options?.find((option) => option.value === minorId)
     expect(minorOption).toBeDefined()
     resp = session.resolveChoice(0, minorOption!.value)
   }
@@ -158,7 +158,7 @@ describe('D074_RoyalWood session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     if (resp.interaction.stateId !== 'wait') return
-    const joineryOption = resp.interaction.options?.find((option) => option.value === 'Major_Joinery')
+    const joineryOption = resp.interaction.request.options?.find((option) => option.value === 'Major_Joinery')
     expect(joineryOption).toBeDefined()
     resp = session.resolveChoice(0, joineryOption!.value)
     expect(resp.ok).toBe(true)
@@ -187,7 +187,7 @@ describe('D074_RoyalWood session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.interaction.options?.find(
+    const constructOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.construct.name',
     )
     expect(constructOption).toBeDefined()
@@ -196,10 +196,10 @@ describe('D074_RoyalWood session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
@@ -234,7 +234,7 @@ describe('D074_RoyalWood session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const stableOption = resp.interaction.options?.find(
+    const stableOption = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'actions.stables.name',
     )
     expect(stableOption).toBeDefined()
@@ -243,10 +243,10 @@ describe('D074_RoyalWood session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    if (resp.interaction.farm.farmType !== 'stable') return
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const stable = resp.interaction.farm.selectableTiles[0]!
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)

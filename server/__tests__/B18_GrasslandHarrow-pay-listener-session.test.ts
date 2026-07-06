@@ -240,7 +240,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
     if (improvementOption) {
       resp = session.resolveChoice(0, improvementOption.value)
       expect(resp.ok).toBe(true)
@@ -251,7 +251,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       } else {
         expect(resp.interaction.stateId).toBe('wait')
         if (resp.interaction.stateId !== 'wait') return
-        const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
+        const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
         expect(cardOption).toBeDefined()
         resp = session.resolveChoice(0, cardOption!.value)
       }

@@ -51,7 +51,7 @@ const chooseMinor = (
 ) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.options?.find((entry) => entry.value === cardId)
+  const option = response.interaction.request.options?.find((entry) => entry.value === cardId)
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
 }
@@ -66,7 +66,7 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select', () => {
@@ -96,7 +96,7 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     resp = chooseMinor(session, resp, 'B081_Handcart')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + D117 candidate + clay-base', () => {
@@ -108,20 +108,20 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(3)
-    const getPaid = (o: typeof resp.interaction.options[number]) =>
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(3)
+    const getPaid = (o: typeof resp.interaction.request.options[number]) =>
       (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
         | Record<string, number>
         | undefined
-    const woodBase = resp.interaction.options?.find((o) => {
+    const woodBase = resp.interaction.request.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.interaction.options?.find((o) => {
+    const woodTrade = resp.interaction.request.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })
-    const clayBase = resp.interaction.options?.find((o) => {
+    const clayBase = resp.interaction.request.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 2 && (paid.food ?? 0) === 0
     })
@@ -139,16 +139,16 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     resp = chooseMinor(session, resp, 'B043_Chophouse')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
-    const getPaid = (o: typeof resp.interaction.options[number]) =>
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
+    const getPaid = (o: typeof resp.interaction.request.options[number]) =>
       (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
         | Record<string, number>
         | undefined
-    const woodBase = resp.interaction.options?.find((o) => {
+    const woodBase = resp.interaction.request.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.interaction.options?.find((o) => {
+    const woodTrade = resp.interaction.request.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })

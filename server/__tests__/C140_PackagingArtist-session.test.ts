@@ -270,7 +270,7 @@ describe('C140_PackagingArtist session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const options = resp.interaction.options ?? []
+    const options = resp.interaction.request.options ?? []
     const bakeAlternative = options.find((o) => o.sourceCard === CARD_ID)
     expect(bakeAlternative).toBeDefined()
     expect(bakeAlternative!.labelKey).toBe('actions.bake-bread.name')
@@ -284,7 +284,7 @@ describe('C140_PackagingArtist session', () => {
     expect(resp1.interaction.stateId).toBe('wait')
     if (resp1.interaction.stateId !== 'wait') return
 
-    const bake = resp1.interaction.options?.find((o) => o.sourceCard === CARD_ID)
+    const bake = resp1.interaction.request.options?.find((o) => o.sourceCard === CARD_ID)
     expect(bake).toBeDefined()
     const resp2 = session.resolveChoice(0, bake!.value)
     expect(resp2.ok).toBe(true)
@@ -292,7 +292,7 @@ describe('C140_PackagingArtist session', () => {
     if (resp2.interaction.stateId !== 'wait') return
 
     // bake-bread pending exposes Fireplace1 rate option.
-    const rateOpt = resp2.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
+    const rateOpt = resp2.interaction.request.options?.find((o) => o.value === 'Major_Fireplace1')
     expect(rateOpt).toBeDefined()
     const resp3 = session.resolveChoice(0, rateOpt!.value)
     expect(resp3.ok).toBe(true)

@@ -73,7 +73,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const interaction = session.getState().interaction
     expect(interaction.stateId).toBe('wait')
     if (interaction.stateId === 'wait') {
-      expect(interaction.options?.map((option) => option.value)).toEqual(['envelope-choice'])
+      expect(interaction.request.options?.map((option) => option.value)).toEqual(['envelope-choice'])
     }
   })
 
@@ -136,7 +136,6 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     expect(interaction.stateId).toBe('wait')
     if (interaction.stateId === 'wait') {
       expect(interaction.sourceCard).toBe('Public_Source')
-      expect(interaction.costOverride).toEqual({ wood: 2 })
       expect(JSON.stringify(interaction)).not.toContain('hostNodeId')
       expect(JSON.stringify(interaction)).not.toContain('ownerNodeId')
       expect(JSON.stringify(interaction)).not.toContain('contextSnapshot')
@@ -192,7 +191,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const request: InteractionRequest = {
       kind: 'selection',
       selection: {
-        selectionType: 'farm-position',
+        kind: 'farm-position',
         selectablePositions: [{ row: 1, col: 1 }, { row: 1, col: 2 }],
         minSelections: 1,
         maxSelections: 2,
@@ -224,7 +223,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const request: InteractionRequest = {
       kind: 'selection',
       selection: {
-        selectionType: 'occupation-hand',
+        kind: 'occupation-hand',
         selectableCards: ['A001_TestOcc', 'A002_TestOcc'],
         minSelections: 1,
         maxSelections: 1,
@@ -319,7 +318,6 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     if (restoredInteraction.stateId === 'wait') {
       expect(restoredInteraction.allowedCommands).toEqual([])
       expect(restoredInteraction.anytimeActions).toEqual([])
-      expect(restoredInteraction.options).toEqual([])
       expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)
     }
   })

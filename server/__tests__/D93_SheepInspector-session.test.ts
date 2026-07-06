@@ -254,7 +254,7 @@ describe('D093_SheepInspector end-to-end via GameSession', () => {
 
     // Should now be at the optional-seq prompt (choice with skip / accept).
     expect(resp.interaction.stateId).toBe('wait')
-    const options = resp.interaction.options ?? []
+    const options = resp.interaction.request.options ?? []
     const acceptOption = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
@@ -264,7 +264,7 @@ describe('D093_SheepInspector end-to-end via GameSession', () => {
     // `forest` is a candidate (excluding the just-placed `day-laborer`), so the
     // helper auto-resolves. But if it pops a choice for recall, resolve it.
     if (resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const forestOption = opts.find((o: ActionChoiceOption) => String(o.value) === 'forest')
       expect(forestOption).toBeDefined()
       resp = session.resolveChoice(0, forestOption!.value)

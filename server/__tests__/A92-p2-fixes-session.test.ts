@@ -32,7 +32,7 @@ const reqKind = (r: SessionResponse): string | undefined =>
   r.interaction.stateId === 'wait' ? r.interaction.request.kind : undefined
 
 const branchValue = (r: SessionResponse, index: number): string => {
-  const opts = r.interaction.stateId === 'wait' ? (r.interaction.options ?? []) : []
+  const opts = r.interaction.stateId === 'wait' ? (r.interaction.request.options ?? []) : []
   const found = opts[index]
   if (!found) throw new Error(`no XOR branch at index ${index}; got ${JSON.stringify(opts)}`)
   return found.value
@@ -363,7 +363,7 @@ describe('A92 P2 fixes', () => {
       expect(readActionSnapshotToken(used.state.players[0]!)).not.toBeUndefined()
 
       // Resolve the placement onto a real space (use the prompt's own options).
-      const placeVal = used.interaction.stateId === 'wait' ? used.interaction.options![0]!.value : ''
+      const placeVal = used.interaction.stateId === 'wait' ? used.interaction.request.options![0]!.value : ''
       const placed = session.resolveChoice(0, placeVal)
       expect(placed.ok).toBe(true)
     })
@@ -420,7 +420,7 @@ describe('A92 P2 fixes', () => {
         const used = session.resolveChoice(0, branchValue(offer, 0))
         expect(used.ok).toBe(true)
         expect(used.interaction.stateId).toBe('wait')
-        expect(used.interaction.options?.map((option) => option.value)).toContain(
+        expect(used.interaction.request.options?.map((option) => option.value)).toContain(
           `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`,
         )
 

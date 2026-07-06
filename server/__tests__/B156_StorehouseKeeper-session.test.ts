@@ -35,7 +35,7 @@ describe('B156_StorehouseKeeper session', () => {
     // Resolve the clay/grain XOR by choosing clay
     let safety = 10
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const clayOpt = opts.find((o: ActionChoiceOption) =>
         JSON.stringify(o).toLowerCase().includes('clay'),
       )

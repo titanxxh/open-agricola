@@ -82,7 +82,7 @@ describe('disabled option in pending choice', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Get the first option (wood) and mutate it to be disabled
-    const firstOption = resp.interaction.options[0]!
+    const firstOption = resp.interaction.request.options[0]!
     expect(firstOption).toBeDefined()
 
     // S2 Task 8: composite-node emit metadata now lives on the node itself
@@ -105,8 +105,8 @@ describe('disabled option in pending choice', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const firstOption = resp.interaction.options[0]!
-    const secondOption = resp.interaction.options[1]!
+    const firstOption = resp.interaction.request.options[0]!
+    const secondOption = resp.interaction.request.options[1]!
     expect(firstOption).toBeDefined()
     expect(secondOption).toBeDefined()
 

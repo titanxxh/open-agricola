@@ -367,7 +367,7 @@ export function autoAdvanceRoundEnd(
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       continue
     }
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
       const pi = resp.interaction.playerIndex

@@ -260,7 +260,7 @@ describe('D027_Retraining listeners', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const acceptOption = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
 
     const accepted = session.resolveChoice(0, acceptOption!.value)

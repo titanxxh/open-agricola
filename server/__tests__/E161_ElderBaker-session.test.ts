@@ -133,7 +133,7 @@ describe('E161_ElderBaker session integration', () => {
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const values = (resp.interaction.options ?? []).map((o) => o.value)
+    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     expect(values).toContain(STONE_OVEN_ID)
   })
 
@@ -146,14 +146,14 @@ describe('E161_ElderBaker session integration', () => {
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const stoneOvenOption = resp.interaction.options?.find((o) => o.value === STONE_OVEN_ID)
+    const stoneOvenOption = resp.interaction.request.options?.find((o) => o.value === STONE_OVEN_ID)
     expect(stoneOvenOption).toBeDefined()
     resp = session.resolveChoice(0, stoneOvenOption!.value)
 
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 20) {
       steps++
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const next =
         opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel') ?? opts[0]
       if (!next) break
@@ -171,7 +171,7 @@ describe('E161_ElderBaker session integration', () => {
 
     const resp = enterMinorChoice(session)
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
-    const values = (resp.interaction.options ?? []).map((o) => o.value)
+    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     expect(values).not.toContain(STONE_OVEN_ID)
   })
 })

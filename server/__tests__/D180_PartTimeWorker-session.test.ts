@@ -35,7 +35,7 @@ const setup = (cards: string[], forestResources: Partial<Resource>) => {
 const optionFrom = (resp: ReturnType<GameSession['getState']>, sourceCard: string) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return undefined
-  return resp.interaction.options?.find((option: ActionChoiceOption) =>
+  return resp.interaction.request.options?.find((option: ActionChoiceOption) =>
     option.sourceCard === sourceCard && option.value !== '__skip__',
   )
 }

@@ -42,13 +42,13 @@ describe('E030_ChildsToy session', () => {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.stateId === 'wait') {
-        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const skipOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.request.options[0]!.value)
         }
       } else {
         break
@@ -91,13 +91,13 @@ describe('E030_ChildsToy session', () => {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.stateId === 'wait') {
-        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const skipOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.request.options[0]!.value)
         }
       } else {
         break
@@ -142,13 +142,13 @@ describe('E030_ChildsToy session', () => {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.stateId === 'wait') {
-        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const skipOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.request.options[0]!.value)
         }
       } else {
         break
@@ -187,13 +187,13 @@ describe('E030_ChildsToy session', () => {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.stateId === 'wait') {
-        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const skipOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.request.options[0]!.value)
         }
       } else {
         break

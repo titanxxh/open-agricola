@@ -173,7 +173,7 @@ describe('A072_CalciumFertilizers session', () => {
     // The optional minor-improvement step is auto-skipped, going to confirmNextPlayer.
     if (resp.interaction.stateId === 'wait') {
       // If a choice is somehow presented, A72 should NOT be in the options
-      const a72Option = resp.interaction.options?.find(
+      const a72Option = resp.interaction.request.options?.find(
         (option) => option.value === CARD_ID,
       )
       expect(a72Option).toBeUndefined()

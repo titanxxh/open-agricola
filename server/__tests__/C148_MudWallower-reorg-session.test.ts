@@ -62,7 +62,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionAnimalReorg')
     const zones = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg'
-      ? resp.interaction.zones
+      ? resp.interaction.request.zones
       : []
     expect(zones).toEqual(expect.arrayContaining([
       expect.objectContaining({

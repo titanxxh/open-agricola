@@ -57,7 +57,7 @@ describe('C115_Sower session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
-    const fireplace = resp.interaction.options?.find(
+    const fireplace = resp.interaction.request.options?.find(
       (option) => option.value === 'Major_Fireplace1',
     )
     expect(fireplace).toBeDefined()
@@ -91,7 +91,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-next-player')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.nextPlayerIndex).toBe(1)
+    expect(resp.interaction.request.nextPlayerIndex).toBe(1)
     expect(getCardStack(resp.state.players[0]!, 'C115_Sower')).toEqual(['reed'])
 
     const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
@@ -103,7 +103,7 @@ describe('C115_Sower session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const sowOption = resp.interaction.options?.[1]
+    const sowOption = resp.interaction.request.options?.[1]
     expect(sowOption).toBeDefined()
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
@@ -111,7 +111,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
 
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -128,7 +128,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-next-player')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.nextPlayerIndex).toBe(1)
+    expect(resp.interaction.request.nextPlayerIndex).toBe(1)
   })
 
   it('playing a minor improvement does not add reed to card', () => {
@@ -185,7 +185,7 @@ describe('C115_Sower session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const sowOption = resp.interaction.options?.[1]
+    const sowOption = resp.interaction.request.options?.[1]
     expect(sowOption).toBeDefined()
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
@@ -193,7 +193,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
 
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -238,7 +238,7 @@ describe('C115_Sower session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const optionA = resp.interaction.options[0]!
+    const optionA = resp.interaction.request.options[0]!
     const resp2 = session.resolveChoice(0, optionA.value)
     expect(resp2.ok).toBe(true)
 
@@ -272,7 +272,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose Option B (second option — sow)
-    const optionB = resp.interaction.options[1]!
+    const optionB = resp.interaction.request.options[1]!
     expect(optionB.descriptionPreview).toMatchObject({
       kind: 'group',
       separator: ', ',
@@ -288,7 +288,7 @@ describe('C115_Sower session', () => {
     expect(resp2.interaction.stateId).toBe('wait')
     if (resp2.interaction.stateId !== 'wait') return
     expect(resp2.interaction.promptKey).toBe('ui.interactionOptionalAction')
-    resp = session.resolveChoice(0, resp2.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp2.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -333,7 +333,7 @@ describe('C115_Sower session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const optionB = resp.interaction.options[1]!
+    const optionB = resp.interaction.request.options[1]!
     expect(collectDescriptionLabelKeys(optionB.descriptionPreview)).toEqual([
       'actions.pop-card-stack.name',
       'actions.pay.name',
@@ -368,7 +368,7 @@ describe('C115_Sower session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     let updatedPlayer = resp.state.players[0]!
@@ -381,7 +381,7 @@ describe('C115_Sower session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     updatedPlayer = resp.state.players[0]!
@@ -394,7 +394,7 @@ describe('C115_Sower session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     updatedPlayer = resp.state.players[0]!

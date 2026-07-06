@@ -98,7 +98,11 @@ describe('D156_RetailDealer session', () => {
     // Advance turn again
     resp = confirmNextPlayer(session)
     resp = session.takeAction(1, 'farmland')
-    const tile = resp.interaction?.farm?.selectableTiles?.[0]
+    const tile = resp.interaction.stateId === 'wait'
+      && resp.interaction.request.kind === 'farm-select'
+      && resp.interaction.request.farm.farmType === 'plow'
+      ? resp.interaction.request.farm.selectableTiles[0]
+      : undefined
     if (tile) resp = session.commitSelectionChoice(1, { tile })
     resp = confirmNextPlayer(session)
 

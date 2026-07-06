@@ -60,7 +60,7 @@ describe('fence payment session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('fence')
+    expect(resp.interaction.request.farm.farmType).toBe('fence')
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
@@ -71,7 +71,7 @@ describe('fence payment session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
-    const stoneOption = resp.interaction.options?.find(
+    const stoneOption = resp.interaction.request.options?.find(
       (option) => typeof option.labelParams === 'object' && option.labelParams?.resourcesPaid?.stone === 2,
     )
     expect(stoneOption).toBeDefined()
@@ -132,7 +132,7 @@ describe('fence payment session', () => {
 
     // Pick any offered option — correctness of the post-resume application
     // (palisade placed, not dropped) is what we assert.
-    const option = resp.interaction.options[0]
+    const option = resp.interaction.request.options[0]
     expect(option).toBeDefined()
 
     resp = session.resolveChoice(0, option!.value)

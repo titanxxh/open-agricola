@@ -85,7 +85,7 @@ const selectE112Trigger = (session: GameSession, resp: ReturnType<GameSession['p
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected trigger choice')
   if (resp.interaction.request.kind !== 'select-trigger') return resp
-  const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === CARD_ID)
+  const option = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -93,7 +93,7 @@ const selectE112Trigger = (session: GameSession, resp: ReturnType<GameSession['p
 const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-  const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -101,7 +101,7 @@ const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['perf
 const skipOptional = (session: GameSession, resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-  const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+  const option = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -110,7 +110,7 @@ const expectE112Selection = (resp: ReturnType<GameSession['performRoundEnd']>) =
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected E112 selection')
   expect(resp.interaction.sourceCard).toBe(CARD_ID)
-  expect(resp.interaction.selection?.kind).toBe('farm-position')
+  expect(resp.interaction.request.selection?.kind).toBe('farm-position')
 }
 
 describe('E112_GrainThief harvest timing', () => {

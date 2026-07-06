@@ -90,15 +90,15 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
         }
       } else if (resp.interaction.request.kind === 'animal-reorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.request.kind === 'confirm-next-player') {
         resp = confirmNextPlayer(session)
       } else {
-        const skip = resp.interaction.options?.find((o) => o.value === '__skip__')
+        const skip = resp.interaction.request.options?.find((o) => o.value === '__skip__')
         if (skip) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options![0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.request.options![0]!.value)
         }
       }
     }
@@ -142,14 +142,14 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
       if (resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       } else if (resp.interaction.request.kind === 'animal-reorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.request.zones)
       } else if (resp.interaction.request.kind === 'confirm-next-player') {
         resp = confirmNextPlayer(session)
       } else {
-        const skip = resp.interaction.options?.find((o) => o.value === '__skip__')
+        const skip = resp.interaction.request.options?.find((o) => o.value === '__skip__')
         resp = session.resolveChoice(
           resp.interaction.playerIndex ?? 0,
-          skip ? '__skip__' : resp.interaction.options![0]!.value,
+          skip ? '__skip__' : resp.interaction.request.options![0]!.value,
         )
       }
     }

@@ -37,7 +37,7 @@ describe('bake-bread session pending recovery', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-    expect(resp.interaction.options?.map((option) => option.value)).toEqual([
+    expect(resp.interaction.request.options?.map((option) => option.value)).toEqual([
       'Major_Fireplace1',
       'Major_ClayOven',
     ])
@@ -48,7 +48,7 @@ describe('bake-bread session pending recovery', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-    expect(resp.interaction.options?.map((option) => option.value)).toEqual([
+    expect(resp.interaction.request.options?.map((option) => option.value)).toEqual([
       'Major_Fireplace1',
       'Major_ClayOven',
     ])

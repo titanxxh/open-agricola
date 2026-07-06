@@ -21,7 +21,8 @@ const setup = () => {
 
 const findA174Option = (resp: ReturnType<GameSession['takeAction']>) => {
   if (resp.interaction.stateId !== 'wait') return undefined
-  return resp.interaction.options?.find((option) =>
+  if (resp.interaction.request.kind !== 'choice') return undefined
+  return resp.interaction.request.options?.find((option) =>
     JSON.stringify(option.effectPreview).includes('"vegetable":1'),
   )
 }
@@ -147,7 +148,6 @@ describe('A174 Master Hora', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected engine-blocked')
     expect(resp.interaction.request.kind).toBe('engine-blocked')
-    expect(resp.interaction.options).toEqual([])
     expect(resp.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
   })
 })

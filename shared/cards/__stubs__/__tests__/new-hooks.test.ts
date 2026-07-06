@@ -63,7 +63,7 @@ function resolveSourceCardChoice(
   sourceCard: string,
 ) {
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((o) => o.sourceCard === sourceCard && o.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((o) => o.sourceCard === sourceCard && o.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }
@@ -181,20 +181,20 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0], cardIds[0]])
+    expect(resp.interaction.request.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[0], cardIds[0]])
 
     let p1Resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(p1Resp.interaction.fromPlayerIndex).toBe(0)
-    expect(p1Resp.interaction.toPlayerIndex).toBe(1)
+    expect(p1Resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(p1Resp.interaction.request.toPlayerIndex).toBe(1)
 
     p1Resp = confirmPlayerSwitch(session)
     expect(p1Resp.interaction.stateId).toBe('wait')
     if (p1Resp.interaction.stateId !== 'wait') return
     expect(p1Resp.interaction.playerIndex).toBe(1)
-    expect(p1Resp.interaction.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1], cardIds[1]])
+    expect(p1Resp.interaction.request.options?.filter((option) => option.value !== '__pass__').map((option) => option.sourceCard)).toEqual([cardIds[1], cardIds[1]])
   })
 
   it('harvest field parallel choices resume the stage once after out-of-order resolution', () => {

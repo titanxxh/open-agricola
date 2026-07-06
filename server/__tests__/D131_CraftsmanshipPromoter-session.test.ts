@@ -147,7 +147,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    const values = (resp.interaction.options ?? []).map((o) => o.value)
+    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     expect(values).toContain('Major_Pottery')
     expect(values).toContain('Major_Joinery')
     expect(values).toContain('Major_Basket')
@@ -161,7 +161,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const potteryOption = resp.interaction.options?.find((option) => option.value === 'Major_Pottery')
+    const potteryOption = resp.interaction.request.options?.find((option) => option.value === 'Major_Pottery')
     expect(potteryOption).toBeDefined()
     resp = session.resolveChoice(0, potteryOption!.value)
 
@@ -170,7 +170,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 20) {
       steps++
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       // Pick the first non-skip / non-cancel option to keep advancing.
       const next =
         opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel') ?? opts[0]
@@ -185,7 +185,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     const session = setup({ playD131: false })
     const resp = enterMinorChoice(session)
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
-    const values = (resp.interaction.options ?? []).map((o) => o.value)
+    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     for (const v of values) {
       expect(v.startsWith('Major_')).toBe(false)
     }
@@ -198,7 +198,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     })
     const resp = enterMinorChoice(session)
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
-    const values = (resp.interaction.options ?? []).map((o) => o.value)
+    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     // All bottom-row majors require either clay or stone — none should
     // remain when the player has zero of either resource.
     for (const v of values) {

@@ -64,7 +64,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     })
     expect(payload.interaction.stateId).toBe('wait')
     if (payload.interaction.stateId === 'wait') {
-      expect(payload.interaction.options?.length).toBe(2)
+      expect(payload.interaction.request.options?.length).toBe(2)
       expect(payload.interaction.spaceId).toBe('grain-utilization')
     }
   })

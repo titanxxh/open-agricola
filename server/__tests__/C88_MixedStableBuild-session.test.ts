@@ -41,7 +41,7 @@ const enterStableSelect = (session: GameSession) => {
   let resp = session.takeAction(0, 'farm-expansion')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const stableOption = resp.interaction.options?.find(
+  const stableOption = resp.interaction.request.options?.find(
     (option) => option.labelKey === 'actions.stables.name',
   )
   expect(stableOption).toBeDefined()

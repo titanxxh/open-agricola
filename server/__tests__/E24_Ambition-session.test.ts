@@ -40,7 +40,7 @@ describe('E024_Ambition session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const enterImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const enterImprovement = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(enterImprovement).toBeDefined()
 
     resp = session.resolveChoice(0, enterImprovement!.value)
@@ -49,7 +49,7 @@ describe('E024_Ambition session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     if (resp.interaction.promptKey === 'ui.interactionFlowSelect') {
-      const replacedImprovement = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID)
+      const replacedImprovement = resp.interaction.request.options?.find((option) => option.sourceCard === CARD_ID)
       expect(replacedImprovement).toBeDefined()
       resp = session.resolveChoice(0, replacedImprovement!.value)
       expect(resp.ok).toBe(true)
@@ -70,7 +70,7 @@ describe('E024_Ambition session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const enterImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const enterImprovement = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(enterImprovement).toBeDefined()
   })
 })

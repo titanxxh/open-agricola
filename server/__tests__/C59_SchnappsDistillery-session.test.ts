@@ -39,7 +39,7 @@ describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => 
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.remaining).toBe(2)
+    expect(resp.interaction.request.remaining).toBe(2)
 
     // Client sends 2 vegetable conversions for C59 (max=1). Server must cap.
     resp = session.resolveChoice(0, 'confirm', { selections: [

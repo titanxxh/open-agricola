@@ -81,7 +81,7 @@ describe('C018_RollOverPlow session', () => {
     expect(f.stacks[0]?.remaining ?? 0).toBe(0)
 
     // Commit the plow choice
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)

@@ -50,7 +50,7 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       break
     }
     if (resp.interaction.request.kind !== 'choice') break
-    const next = resp.interaction.options?.[0]?.value
+    const next = resp.interaction.request.options?.[0]?.value
     if (!next) break
     const playerIdx = resp.interaction.playerIndex ?? 0
     resp = session.resolveChoice(playerIdx, next)
@@ -66,7 +66,7 @@ describe('C168_AnimalCatcher session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('choosing animals gives sheep, boar, cattle and costs food', () => {
@@ -78,7 +78,7 @@ describe('C168_AnimalCatcher session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose alternative (first option = animal path)
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     resp = drainPending(session, resp)
@@ -98,7 +98,7 @@ describe('C168_AnimalCatcher session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose original gain (last option)
-    const lastOption = resp.interaction.options[resp.interaction.options?.length - 1]!
+    const lastOption = resp.interaction.request.options[resp.interaction.request.options?.length - 1]!
     resp = session.resolveChoice(0, lastOption.value)
     expect(resp.ok).toBe(true)
 
@@ -117,7 +117,7 @@ describe('C168_AnimalCatcher session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose alternative (first option)
-    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     resp = drainPending(session, resp)

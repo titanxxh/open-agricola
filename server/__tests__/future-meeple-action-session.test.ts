@@ -32,7 +32,7 @@ describe('future meeple round-start actions', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionOptionalAction')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -71,7 +71,7 @@ describe('future meeple round-start actions', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionOptionalAction')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future stable choice')
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -79,7 +79,7 @@ describe('future meeple round-start actions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionStableSelect')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.maxSelections : undefined)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.farm.maxSelections : undefined)
       .toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(player.resources.wood)
   })
@@ -111,13 +111,13 @@ describe('future meeple round-start actions', () => {
     session.loadState(state)
     let resp = session.performRoundEnd()
     if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected plow selection')
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { tile })

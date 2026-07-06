@@ -45,8 +45,8 @@ describe('anytime — composite pending policy/UI consistency', () => {
     }
     expect(interaction.stateId).toBe('wait')
     expect(interaction.promptKey).toBeTruthy()
-    expect(interaction.options).toBeTruthy()
-    expect((interaction.options ?? []).length).toBeGreaterThan(0)
+    expect(interaction.request.options).toBeTruthy()
+    expect((interaction.request.options ?? []).length).toBeGreaterThan(0)
 
     // Server-side view from listAnytimeEntries (used by takeAnytimeAction policy check)
     const serverEntries = (session as unknown as {

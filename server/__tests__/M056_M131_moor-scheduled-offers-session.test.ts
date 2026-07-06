@@ -67,7 +67,7 @@ const setup = (cardId: string, round = 1, initialResources: Partial<Resource> = 
 const chooseFirstPayment = (session: GameSession, response: SessionResponse) => {
   let resp = response
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const payment = resp.interaction.options?.[0]
+    const payment = resp.interaction.request.options?.[0]
     expect(payment).toBeDefined()
     resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, payment!.value)
     expect(resp.ok).toBe(true)
@@ -85,7 +85,7 @@ const playMinor = (
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
 
-  const improvementOption = resp.interaction.options?.find((option) =>
+  const improvementOption = resp.interaction.request.options?.find((option) =>
     option.value.startsWith('action-improvement-')
   )
   if (improvementOption) {
@@ -107,7 +107,7 @@ const playMinor = (
 
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === cardId)
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
@@ -142,7 +142,7 @@ const chooseM131Animals = (
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
   expect(response.interaction.sourceCard).toBe(M131)
-  const option = response.interaction.options?.find((entry) =>
+  const option = response.interaction.request.options?.find((entry) =>
     entry.value === `animals:${animals.join(',')}`
   )
   expect(option).toBeDefined()
@@ -166,8 +166,8 @@ describe('M056/M131 scheduled offers', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe(M056)
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
-    const cutPeat = resp.interaction.options?.find((option) =>
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    const cutPeat = resp.interaction.request.options?.find((option) =>
       option.value.includes(':cut-peat:') && option.value.includes(':2:0')
     )
     expect(cutPeat).toBeDefined()
@@ -239,7 +239,7 @@ describe('M056/M131 scheduled offers', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe(M131)
-    const buySheep = resp.interaction.options?.find((option) => option.value === 'buy:sheep')
+    const buySheep = resp.interaction.request.options?.find((option) => option.value === 'buy:sheep')
     expect(buySheep).toBeDefined()
 
     resp = session.resolveChoice(0, buySheep!.value)

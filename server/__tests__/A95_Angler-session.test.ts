@@ -74,7 +74,7 @@ describe('A095_Angler session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.options?.some((option) =>
+    expect(resp.interaction.request.options?.some((option) =>
       option.value !== '__skip__' && option.sourceCard === CARD_ID,
     )).toBe(true)
   })

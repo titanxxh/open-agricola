@@ -85,7 +85,7 @@ const choosePaymentByResources = (
   expected: Record<string, number>,
 ) => {
   expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-  const option = resp.interaction.options?.find((candidate) =>
+  const option = resp.interaction.request.options?.find((candidate) =>
     hasPaidResources(candidate, expected),
   )
   expect(option).toBeDefined()
@@ -151,15 +151,15 @@ describe('Farmers of the Moor compatibility regressions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('Major_Joinery')
+    expect(resp.interaction.request.options?.map((option: ActionChoiceOption) => option.value)).toContain('Major_Joinery')
 
     resp = session.resolveChoice(0, 'Major_Joinery')
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected payment choice')
-    expect(resp.interaction.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
-    expect(resp.interaction.options?.some((option) => hasPaidResources(option, { wood: 1, stone: 2 }))).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => hasPaidResources(option, { wood: 2, stone: 2 }))).toBe(false)
+    expect(resp.interaction.request.options?.some((option) => hasPaidResources(option, { wood: 1, stone: 2 }))).toBe(true)
 
     resp = choosePaymentByResources(session, resp, { wood: 1, stone: 2 })
 

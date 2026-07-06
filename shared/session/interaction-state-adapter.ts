@@ -5,6 +5,7 @@ import type {
   InteractionCommand,
   InteractionFarmSelection,
   InteractionSelection,
+  InteractionRequest,
   InteractionState,
   PlayerState,
   GameState,
@@ -44,6 +45,14 @@ const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined =>
     .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0)
   const unique = [...new Set(sourceCards)]
   return unique.length === 1 && sourceCards.length === choices.length ? unique[0] : undefined
+}
+
+const requestWithChoices = (request: InteractionRequest, choices: ActionChoiceOption[]): InteractionRequest => {
+  if (choices.length === 0) return request
+  if (request.kind === 'choice') return { ...request, options: choices }
+  if (request.kind === 'select-trigger') return { ...request, options: choices }
+  if (request.kind === 'farm-select') return { ...request, options: choices }
+  return request
 }
 
 export const deriveInteractionState = ({
@@ -96,7 +105,6 @@ export const deriveInteractionState = ({
   const request = view.request
   const choiceOptions = view.choices ?? []
   const sourceCard = view.sourceCard ?? choicesSourceCard(choiceOptions)
-  const costOverride = view.costOverride
   const player = state.players[playerIndex]
 
   const policy = getAnytimePolicy()
@@ -119,9 +127,10 @@ export const deriveInteractionState = ({
         promptKey,
         promptParams,
         sourceCard,
-        request,
-        options: choiceOptions,
-        zones: player ? animalReorgZones(player) : [],
+        request: {
+          ...request,
+          zones: player ? animalReorgZones(player) : request.zones,
+        },
         allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -134,7 +143,6 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        nextPlayerIndex: request.nextPlayerIndex,
         allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -147,8 +155,6 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        fromPlayerIndex: request.fromPlayerIndex,
-        toPlayerIndex: request.toPlayerIndex,
         allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -161,9 +167,6 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        remaining: request.remaining,
-        foodUsed: request.foodUsed,
-        feedQueue: request.feedQueue,
         allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -187,10 +190,7 @@ export const deriveInteractionState = ({
         promptKey,
         promptParams,
         sourceCard,
-        request,
-        options: choiceOptions,
-        costOverride,
-        farm: request.farm,
+        request: requestWithChoices(request, choiceOptions),
         allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -204,8 +204,6 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        options: choiceOptions,
-        costOverride,
         allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -217,8 +215,7 @@ export const deriveInteractionState = ({
         promptKey,
         promptParams,
         sourceCard,
-        request,
-        options: choiceOptions,
+        request: requestWithChoices(request, choiceOptions),
         allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -231,7 +228,6 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        options: choiceOptions,
         allowedCommands: buildCmds(['undoStep', 'undoAction']),
         anytimeActions: anytimeDescriptors,
       }
@@ -244,13 +240,13 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        options: [],
         allowedCommands: filterUndoCommands(['undoStep', 'undoAction']),
         anytimeActions: [],
       }
     case 'choice':
     default: {
       if (pendingHost && isSelectionPrompt(promptKey) && player) {
+        const selection = buildSelectionInteraction(player)
         return {
           stateId: 'wait',
           playerIndex,
@@ -258,10 +254,7 @@ export const deriveInteractionState = ({
           promptKey,
           promptParams,
           sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          selection: buildSelectionInteraction(player),
+          request: { kind: 'selection', selection },
           allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
@@ -275,30 +268,29 @@ export const deriveInteractionState = ({
           stateId: 'wait',
           playerIndex,
           spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request,
-          options: choiceOptions,
-          costOverride,
-          farm,
-          allowedCommands,
-          anytimeActions: anytimeDescriptors,
-        }
+            promptKey,
+            promptParams,
+            sourceCard,
+            request: {
+              kind: 'farm-select',
+              farm,
+              ...(choiceOptions.length > 0 ? { options: choiceOptions } : {}),
+            },
+            allowedCommands,
+            anytimeActions: anytimeDescriptors,
+          }
       }
       return {
         stateId: 'wait',
         playerIndex,
         spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        options: choiceOptions,
-        costOverride,
-        allowedCommands,
-        anytimeActions: anytimeDescriptors,
-      }
+          promptKey,
+          promptParams,
+          sourceCard,
+          request: requestWithChoices(request, choiceOptions),
+          allowedCommands,
+          anytimeActions: anytimeDescriptors,
+        }
     }
   }
 }

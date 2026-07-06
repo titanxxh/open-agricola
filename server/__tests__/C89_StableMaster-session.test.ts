@@ -181,7 +181,7 @@ describe('C089_StableMaster session', () => {
     expect(action.ok).toBe(true)
     expect(action.interaction.stateId).toBe('wait')
     if (action.interaction.stateId !== 'wait') return
-    const stableOption = action.interaction.options?.find((entry) => entry.labelKey === 'actions.stables.name')
+    const stableOption = action.interaction.request.options?.find((entry) => entry.labelKey === 'actions.stables.name')
     expect(stableOption).toBeDefined()
 
     const prompt = session.resolveChoice(0, stableOption!.value)

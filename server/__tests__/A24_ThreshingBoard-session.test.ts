@@ -33,7 +33,7 @@ const completeFarmland = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected farmland tile selection')
-  const tile = resp.interaction.farm.selectableTiles[0]
+  const tile = resp.interaction.request.farm.selectableTiles[0]
   expect(tile).toBeDefined()
   resp = session.commitSelectionChoice(0, { tile })
   expect(resp.ok).toBe(true)
@@ -48,7 +48,7 @@ describe('A024_ThreshingBoard session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
+    expect(resp.interaction.request.options?.map((option: ActionChoiceOption) => option.value)).toContain('__skip__')
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.ok).toBe(true)
@@ -63,13 +63,13 @@ describe('A024_ThreshingBoard session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
 
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
-      expect(resp.interaction.options?.map((option) => option.value)).not.toContain('cancel')
+      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('cancel')
       resp = session.resolveChoice(0, 'Major_Fireplace1')
     }
 

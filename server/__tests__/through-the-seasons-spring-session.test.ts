@@ -60,7 +60,7 @@ const chooseByLabel = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
-  const option = resp.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = resp.interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex, option!.value)
 }
@@ -86,7 +86,7 @@ describe('Through the Seasons Spring rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice prompt')
-    expect(resp.interaction.options?.map((option) => option.labelKey)).toEqual(
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toEqual(
       expect.arrayContaining([
         'actions.breed.name',
         'actions.sow.name',
@@ -154,7 +154,7 @@ describe('Through the Seasons Spring rules', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected sow prompt')
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-    expect(resp.interaction.farm.farmType).toBe('sow')
+    expect(resp.interaction.request.farm.farmType).toBe('sow')
 
     resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],

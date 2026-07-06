@@ -79,7 +79,7 @@ const enterMinorPrompt = (
 ) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  const improvementOption = response.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = response.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
   expect(improvementOption).toBeDefined()
   const cardPrompt = session.resolveChoice(playerIndex, improvementOption!.value)
   expect(cardPrompt.ok).toBe(true)
@@ -103,7 +103,7 @@ const buyMinor = (
   }
   expect(cardPrompt.interaction.stateId).toBe('wait')
   if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
-  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === cardId)
+  const cardOption = cardPrompt.interaction.request.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   return session.resolveChoice(playerIndex, cardOption!.value)
 }
@@ -254,7 +254,7 @@ describe('Moor action listener minors', () => {
     expect(prompt.ok).toBe(true)
     expect(prompt.state.players[0]!.minorHand).toContain('M103_ForestKindergarten')
     expect(prompt.state.players[0]!.minorPlayed).not.toContain('M103_ForestKindergarten')
-    expect((prompt.interaction.options ?? []).some((option) => option.value === 'M103_ForestKindergarten')).toBe(false)
+    expect((prompt.interaction.request.options ?? []).some((option) => option.value === 'M103_ForestKindergarten')).toBe(false)
   })
 
   it('M103 Forest Kindergarten gives food after Family Growth with room', () => {

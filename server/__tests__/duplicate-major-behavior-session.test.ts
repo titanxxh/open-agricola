@@ -41,7 +41,7 @@ const buyMajor = (session: GameSession, id: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
-    const option = resp.interaction.options?.find(
+    const option = resp.interaction.request.options?.find(
       (candidate: ActionChoiceOption) => candidate.value === id,
     )
     expect(option).toBeDefined()
@@ -83,7 +83,7 @@ describe('duplicate six-player major behavior', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe('Major_ClayOven2')
-    expect(resp.interaction.options?.find((option) => option.value !== '__skip__')?.sourceCard)
+    expect(resp.interaction.request.options?.find((option) => option.value !== '__skip__')?.sourceCard)
       .toBe('Major_ClayOven2')
   })
 
@@ -97,7 +97,7 @@ describe('duplicate six-player major behavior', () => {
     let resp = buyMajor(session, 'Major_CookingHearth1')
 
     if (resp.interaction.stateId === 'wait') {
-      const returnFireplace3 = resp.interaction.options?.find((option) =>
+      const returnFireplace3 = resp.interaction.request.options?.find((option) =>
         JSON.stringify(option).includes('Major_Fireplace3'),
       )
       expect(returnFireplace3).toBeDefined()

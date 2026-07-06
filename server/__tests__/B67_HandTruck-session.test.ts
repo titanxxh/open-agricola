@@ -30,7 +30,7 @@ describe('B067_HandTruck session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -50,7 +50,7 @@ describe('B067_HandTruck session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
 
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)

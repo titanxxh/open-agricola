@@ -115,13 +115,13 @@ describe('A106_SlurrySpreader session', () => {
         resp = session.resolveChoice(
           resp.interaction.playerIndex,
           'confirm',
-          { zones: resp.interaction.zones } as unknown as Record<string, unknown>,
+          { zones: resp.interaction.request.zones } as unknown as Record<string, unknown>,
         )
         continue
       }
 
       if (resp.interaction.stateId === 'wait') {
-        const options = resp.interaction.options ?? []
+        const options = resp.interaction.request.options ?? []
         const skipOption = options.find((option) => option.value === '__skip__')
         const choiceValue = skipOption?.value ?? options[0]!.value
         resp = session.resolveChoice(resp.interaction.playerIndex, choiceValue)

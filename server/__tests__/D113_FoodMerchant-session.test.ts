@@ -123,8 +123,9 @@ describe('D113_FoodMerchant session', () => {
     let sawChoice = false
     autoAdvanceRoundEnd(session, {
       onChoice: (intx, sess) => {
+        if (intx.request.kind !== 'choice') return undefined
         sawChoice = true
-        const choice = intx.options?.find((option) => option.value !== '__skip__')?.value
+        const choice = intx.request.options.find((option) => option.value !== '__skip__')?.value
         return sess.resolveChoice(intx.playerIndex, choice ?? '__skip__')
       },
     })

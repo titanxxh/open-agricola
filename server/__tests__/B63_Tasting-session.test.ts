@@ -55,7 +55,7 @@ describe('B063_Tasting session', () => {
     // Accept Tasting exchange if presented
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.request.kind !== 'choice') break
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
         o.value?.startsWith?.('pay') ||
@@ -93,7 +93,7 @@ describe('B063_Tasting session', () => {
     expect(resp.interaction.request.kind).toBe('choice')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
-    const exchangeOption = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const exchangeOption = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(exchangeOption).toBeDefined()
     resp = session.resolveChoice(0, exchangeOption!.value)
     expect(resp.ok).toBe(true)
@@ -104,7 +104,7 @@ describe('B063_Tasting session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('choice')
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseOccupation')
-    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('A093_BedMaker')
+    expect(resp.interaction.request.options?.map((option: ActionChoiceOption) => option.value)).toContain('A093_BedMaker')
 
     resp = session.resolveChoice(0, 'A093_BedMaker')
     expect(resp.ok).toBe(true)
@@ -120,7 +120,7 @@ describe('B063_Tasting session', () => {
     let safety = 30
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.request.kind !== 'choice') break
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
       const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       if (skipOpt) {

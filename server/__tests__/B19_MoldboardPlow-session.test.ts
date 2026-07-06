@@ -42,7 +42,7 @@ describe('B019_MoldboardPlow session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     // Complete the farmland plow
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     expect(tile1).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
@@ -50,7 +50,7 @@ describe('B019_MoldboardPlow session', () => {
     // After farmland plow, B19 after-hook offers optional extra plow
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
 
     // Accept the optional plow from card
@@ -59,7 +59,7 @@ describe('B019_MoldboardPlow session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(2)
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     expect(tile2).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
@@ -78,7 +78,7 @@ describe('B019_MoldboardPlow session', () => {
     let resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
 
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
@@ -104,7 +104,7 @@ describe('B019_MoldboardPlow session', () => {
     let resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
 
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
 
@@ -117,11 +117,11 @@ describe('B019_MoldboardPlow session', () => {
 
     // First farmland action — use 1 field from card
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
