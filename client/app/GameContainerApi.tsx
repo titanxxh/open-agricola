@@ -3,9 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
-import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import { t } from '../../shared/i18n'
-import type { AnimalReorgState } from '../types/ui'
 import {
   positionKey,
 } from '../../shared/domain/farm'
@@ -40,6 +38,7 @@ import { PublicEventCardPassAnimation } from '../components/effects/PublicEventC
 import { DraftOverlay } from './draft/DraftOverlay'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
+import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
@@ -68,11 +67,6 @@ import {
   type WsStatus,
 } from './game-container-helpers'
 import {
-  computeReorgAvailableAnimals,
-  shouldShowAnimalDiscardPrompt,
-  wouldExceedExclusiveCardZoneLimit,
-} from './hooks/use-animal-reorg-flow'
-import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
 } from './private-event-notifications'
@@ -94,50 +88,7 @@ import {
 } from './interaction-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
-type ReorgAnimalType = AnimalKey
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
-
-const REORG_ANIMAL_TYPES: ReorgAnimalType[] = [...ALL_ANIMAL_KEYS]
-
-const emptyAnimalTotals = () => ({ sheep: 0, boar: 0, cattle: 0, horse: 0 })
-
-const compactAnimalCounts = (counts: Record<ReorgAnimalType, number>) => {
-  const compact: Partial<Record<ReorgAnimalType, number>> = {}
-  for (const type of REORG_ANIMAL_TYPES) {
-    if (counts[type] > 0) compact[type] = counts[type]
-  }
-  return compact
-}
-
-const animalCountsTotal = (counts: Partial<Record<ReorgAnimalType, number>>) =>
-  REORG_ANIMAL_TYPES.reduce((sum, type) => sum + Math.max(0, counts[type] ?? 0), 0)
-
-const singleAnimalType = (counts: Partial<Record<ReorgAnimalType, number>>) => {
-  const occupied = REORG_ANIMAL_TYPES.filter((type) => (counts[type] ?? 0) > 0)
-  return occupied.length === 1 ? occupied[0]! : null
-}
-
-const zoneAnimalCounts = (zone: AnimalReorgState['zones'][number]) => {
-  const counts = emptyAnimalTotals()
-  for (const type of REORG_ANIMAL_TYPES) {
-    counts[type] = Math.max(0, Math.floor(zone.animalCounts?.[type] ?? 0))
-  }
-  if (animalCountsTotal(counts) > 0) return counts
-  if (zone.animalType) counts[zone.animalType] = Math.max(0, Math.floor(zone.animalCount ?? 0))
-  return counts
-}
-
-const cardZoneAllowsMixedAnimals = (zone: AnimalReorgState['zones'][number]) =>
-  zone.zoneType === 'card' && zone.allowedAnimalType === null
-
-const addAnimalCounts = (
-  target: Record<ReorgAnimalType, number>,
-  counts: Partial<Record<ReorgAnimalType, number>>,
-) => {
-  for (const type of REORG_ANIMAL_TYPES) {
-    target[type] += counts[type] ?? 0
-  }
-}
 
 const httpTransportSingleton = new HttpGameTransport()
 
@@ -357,7 +308,6 @@ export const GameContainerApi = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
-  const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
@@ -498,6 +448,32 @@ export const GameContainerApi = () => {
   const setFarmDraftCommitError = farmSelectionDraft.setCommitError
   const setFarmDraftSubmitError = farmSelectionDraft.setSubmitError
   const resetFarmSelectionDraft = farmSelectionDraft.reset
+  const pendingAnimalReorg = useMemo(
+    () =>
+      interactionPresentationPlan.kind === 'animal-reorg'
+        ? {
+            playerIndex: interactionPresentationPlan.playerIndex,
+            spaceId: interactionPresentationPlan.spaceId,
+          }
+        : null,
+    [interactionPresentationPlan],
+  )
+  const animalReorgDraft = useAnimalReorgDraftPresentation({
+    state,
+    pendingAnimalReorg,
+  })
+  const {
+    animalReorg,
+    isActive: isReorgActive,
+    hasReorgOverflow,
+    submitDraft: animalReorgSubmitDraft,
+    syncFromInteraction: syncAnimalReorgFromInteraction,
+    controls: {
+      adjustAnimal: adjustReorgAnimal,
+      confirm: confirmAnimalReorgDraft,
+      cancelDiscardPrompt: cancelAnimalDiscardPrompt,
+    },
+  } = animalReorgDraft
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -635,7 +611,7 @@ export const GameContainerApi = () => {
     const submitCommand = buildInteractionSubmitCommand(interaction, {
       value,
       ...farmSelectionDraft.submitDraft,
-      animalReorgZones: animalReorg?.zones,
+      ...animalReorgSubmitDraft,
     })
     const farmType =
       interactionPresentationPlan.kind === 'farm-fence-selection' ||
@@ -658,7 +634,7 @@ export const GameContainerApi = () => {
     void transport
       .resolveChoice(interactionPresentationPlan.pendingChoice.playerIndex, value)
       .catch((e) => console.error(e))
-  }, [interaction, interactionPresentationPlan, currentPlayer, animalReorg, farmSelectionDraft.submitDraft, transport, isInteractive, runInteractionSubmitCommand])
+  }, [interaction, interactionPresentationPlan, currentPlayer, animalReorgSubmitDraft, farmSelectionDraft.submitDraft, transport, isInteractive, runInteractionSubmitCommand])
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
@@ -707,16 +683,6 @@ export const GameContainerApi = () => {
           toPlayerIndex: interactionPresentationPlan.toPlayerIndex,
         }
       : null
-  const pendingAnimalReorg = useMemo(
-    () =>
-      interactionPresentationPlan.kind === 'animal-reorg'
-        ? {
-            playerIndex: interactionPresentationPlan.playerIndex,
-            spaceId: interactionPresentationPlan.spaceId,
-          }
-        : null,
-    [interactionPresentationPlan],
-  )
   const harvestPending = useMemo(
     () =>
       interactionPresentationPlan.kind === 'harvest-feed' && state
@@ -950,23 +916,13 @@ export const GameContainerApi = () => {
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
     applySnapshot(payload)
     applySnapshotPublicEventCancellations(payload)
-    if (
-      payload.interaction.stateId === 'wait' &&
-      payload.interaction.request.kind === 'animal-reorg'
-    ) {
-      setAnimalReorg({
-        zones: payload.interaction.request.zones,
-        confirmDiscard: false,
-      })
-    } else {
-      setAnimalReorg(null)
-    }
+    syncAnimalReorgFromInteraction(payload.interaction)
     if (payload.ok) {
       setSelectedSpecialAction(null)
       resetFarmSelectionDraft()
       resetExchangeDraft()
     }
-  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft])
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
 
   useEffect(() => {
     if (!isReady) return
@@ -1059,34 +1015,10 @@ export const GameContainerApi = () => {
     [baseActions, locale, roundSlots, state?.players, state?.round],
   )
   const { reorgRemaining } = farmBoardProjection
-  const isReorgActive = !!animalReorg
 
-  const reorgAvailable = useMemo(() => {
-    if (!state) return null
-    const playerIndex = pendingAnimalReorg?.playerIndex ?? state.currentPlayerIndex
-    const player = state.players[playerIndex]
-    if (!player) return null
-    return computeReorgAvailableAnimals(player)
-  }, [pendingAnimalReorg, state])
-  const reorgTotals = useMemo(() => {
-    if (!animalReorg) return emptyAnimalTotals()
-    return animalReorg.zones.reduce((acc, z) => {
-      addAnimalCounts(acc, zoneAnimalCounts(z))
-      return acc
-    }, emptyAnimalTotals())
-  }, [animalReorg])
-  void [reorgAvailable, reorgTotals]
-  const hasReorgOverflow = useMemo(() => {
-    if (!reorgAvailable) return false
-    return REORG_ANIMAL_TYPES.some((animal) => reorgTotals[animal] > reorgAvailable[animal])
-  }, [reorgAvailable, reorgTotals])
   const confirmAnimalReorg = useCallback(() => {
-    if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {
-      setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: true } : prev)
-      return
-    }
-    resolveChoice('confirm')
-  }, [animalReorg, reorgRemaining, resolveChoice])
+    confirmAnimalReorgDraft(reorgRemaining, resolveChoice)
+  }, [confirmAnimalReorgDraft, reorgRemaining, resolveChoice])
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
     if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
       const option = getPendingMoorSpecialActionTileChoice(
@@ -1118,110 +1050,6 @@ export const GameContainerApi = () => {
     setViewPlayerId(value)
   }, [])
 
-  const adjustReorgAnimal = (zoneId: string, animalType: ReorgAnimalType, delta: number) => {
-    setAnimalReorg((prev) => {
-      if (!prev || !pendingAnimalReorg || !state) return prev
-      const player = state.players[pendingAnimalReorg.playerIndex]
-      if (!player) return prev
-      
-      let capacity = 0
-      const current = prev.zones.find((zone) => zone.id === zoneId)
-      if (!current) return prev
-      capacity = current.capacity
-
-      const totals = prev.zones.reduce(
-        (acc, zone) => {
-          addAnimalCounts(acc, zoneAnimalCounts(zone))
-          return acc
-        },
-        emptyAnimalTotals(),
-      )
-
-      const available = computeReorgAvailableAnimals(player)
-
-      if (delta > 0) {
-        if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
-        const baseTotals = { ...totals }
-        const currentCounts = zoneAnimalCounts(current)
-        addAnimalCounts(baseTotals, {
-          sheep: -currentCounts.sheep,
-          boar: -currentCounts.boar,
-          cattle: -currentCounts.cattle,
-          horse: -(currentCounts.horse ?? 0),
-        })
-        const remaining = available[animalType] - baseTotals[animalType]
-        if (remaining <= 0) return prev
-
-        if (cardZoneAllowsMixedAnimals(current)) {
-          const nextCounts = { ...currentCounts }
-          if (animalCountsTotal(nextCounts) >= capacity) return prev
-          nextCounts[animalType] += 1
-          const nextTotal = animalCountsTotal(nextCounts)
-          const zones = prev.zones.map((zone) => {
-            if (zone.id !== zoneId) return zone
-            return {
-              ...zone,
-              animalCounts: compactAnimalCounts(nextCounts),
-              animalType: singleAnimalType(nextCounts),
-              animalCount: nextTotal,
-            }
-          })
-          return { ...prev, zones, confirmDiscard: false }
-        }
-
-        const nextCount =
-          current.animalType === animalType
-            ? Math.min(capacity, current.animalCount + 1)
-            : Math.min(capacity, 1)
-
-        if (nextCount <= 0) return prev
-
-        const zones = prev.zones.map((zone) => {
-          if (zone.id !== zoneId) return zone
-          const { animalCounts: _animalCounts, ...rest } = zone
-          return {
-            ...rest,
-            animalType,
-            animalCount: nextCount,
-          }
-        })
-        return { ...prev, zones, confirmDiscard: false }
-      }
-
-      if (cardZoneAllowsMixedAnimals(current)) {
-        const currentCounts = zoneAnimalCounts(current)
-        if (currentCounts[animalType] <= 0) return prev
-        const nextCounts = { ...currentCounts, [animalType]: currentCounts[animalType] - 1 }
-        const nextTotal = animalCountsTotal(nextCounts)
-        const zones = prev.zones.map((zone) => {
-          if (zone.id !== zoneId) return zone
-          return {
-            ...zone,
-            animalCounts: compactAnimalCounts(nextCounts),
-            animalType: singleAnimalType(nextCounts),
-            animalCount: nextTotal,
-          }
-        })
-        return { ...prev, zones, confirmDiscard: false }
-      }
-
-      if (current.animalType !== animalType || current.animalCount <= 0) {
-        return prev
-      }
-      const nextCount = Math.max(0, current.animalCount - 1)
-      const zones = prev.zones.map((zone) => {
-        if (zone.id !== zoneId) return zone
-        const { animalCounts: _animalCounts, ...rest } = zone
-        return {
-          ...rest,
-          animalType: nextCount > 0 ? animalType : null,
-          animalCount: nextCount,
-        }
-      })
-      return { ...prev, zones, confirmDiscard: false }
-    })
-  }
-  const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
   const futureCardResources = useMemo(() => {
     if (!state) return {}
     const rec: Record<string, { playerId: string; name: string; color: PlayerState['color']; resources: Partial<Resource> }[]> = {}
