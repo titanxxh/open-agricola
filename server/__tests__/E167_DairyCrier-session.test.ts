@@ -44,7 +44,36 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       break
     }
     const playerIdx = resp.interaction.playerIndex ?? 0
-    resp = session.resolveChoice(playerIdx, resp.interaction.options![0]!.value)
+    if (resp.interaction.request.kind === 'animal-reorg') {
+      const player = resp.state.players[playerIdx]
+      const zones = resp.interaction.request.zones.map((zone) =>
+        zone.zoneType === 'house' && (player?.resources.cattle ?? 0) > 0
+          ? { ...zone, animalType: 'cattle' as const, animalCount: 1 }
+          : { ...zone, animalType: null, animalCount: 0 },
+      )
+      resp = session.resolveChoice(playerIdx, 'confirm', zones)
+      continue
+    }
+    if (resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(playerIdx, 'confirm', { selections: [] })
+      continue
+    }
+    if (resp.interaction.request.kind === 'confirm-next-player') {
+      resp = session.resolveChoice(resp.interaction.request.nextPlayerIndex, 'confirm')
+      continue
+    }
+    if (resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = session.resolveChoice(resp.interaction.request.toPlayerIndex, 'confirm')
+      continue
+    }
+    const options = resp.interaction.request.kind === 'choice' || resp.interaction.request.kind === 'select-trigger'
+      ? resp.interaction.request.options
+      : []
+    const option = options.find((entry) =>
+      'effectPreview' in entry && entry.effectPreview?.resourcesGained?.food === 2,
+    ) ?? options[0]
+    if (!option) break
+    resp = session.resolveChoice(playerIdx, option.value)
   }
   return resp
 }
@@ -62,7 +91,9 @@ describe('E167_DairyCrier session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose E167_DairyCrier from the occupation options
-    const cardOption = resp.interaction.options?.find((o) => o.value === CARD_ID)
+    const cardOption = resp.interaction.request.kind === 'choice'
+      ? resp.interaction.request.options.find((o) => o.value === CARD_ID)
+      : undefined
     expect(cardOption).toBeDefined()
     resp = session.resolveChoice(0, CARD_ID)
     expect(resp.ok).toBe(true)

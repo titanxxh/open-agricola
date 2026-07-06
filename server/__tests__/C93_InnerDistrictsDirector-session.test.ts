@@ -193,13 +193,13 @@ describe('C093_InnerDistrictsDirector', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     if (resp.interaction.request.kind === 'select-trigger') {
-      const trigger = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      const trigger = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
       expect(trigger).toBeDefined()
       resp = session.resolveChoice(0, trigger!.value)
     }
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('__skip__')
+    expect(resp.interaction.request.options?.map((option) => option.value)).toContain('__skip__')
 
     resp = session.resolveChoice(0, '__skip__')
 

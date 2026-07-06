@@ -213,7 +213,7 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    const horseExchange = resp.interaction.options?.find((option) =>
+    const horseExchange = resp.interaction.request.options?.find((option) =>
       option.effectPreview?.kind === 'resourceExchange' &&
       option.effectPreview.resourcesPaid.horse === 1
     )
@@ -248,7 +248,7 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('choice')
-    const option = resp.interaction.options?.find((entry) => entry.value === 'E060_WorkingGloves')
+    const option = resp.interaction.request.options?.find((entry) => entry.value === 'E060_WorkingGloves')
     expect(option).toBeDefined()
 
     resp = session.resolveChoice(0, option!.value)
@@ -282,7 +282,7 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('choice')
-    const option = resp.interaction.options?.find((entry) => entry.value === 'Major_Fireplace1')
+    const option = resp.interaction.request.options?.find((entry) => entry.value === 'Major_Fireplace1')
     expect(option).toBeDefined()
 
     resp = session.resolveChoice(0, option!.value)

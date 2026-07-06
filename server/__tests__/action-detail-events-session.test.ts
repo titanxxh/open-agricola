@@ -173,7 +173,7 @@ describe('action detail events', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.selection?.kind).toBe('farm-position')
+    expect(resp.interaction.request.selection?.kind).toBe('farm-position')
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.moved',

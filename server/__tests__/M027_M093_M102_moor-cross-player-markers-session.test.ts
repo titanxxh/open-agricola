@@ -68,7 +68,7 @@ const setup = (playerCount = 3) => {
 const chooseFirstPayment = (session: GameSession, response: SessionResponse) => {
   if (response.interaction.stateId !== 'wait') return response
   if (response.interaction.promptKey !== 'prompt.selectPayment') return response
-  const option = response.interaction.options?.[0]
+  const option = response.interaction.request.options?.[0]
   expect(option).toBeDefined()
   return session.resolveChoice(response.interaction.playerIndex ?? 0, option!.value)
 }
@@ -86,7 +86,7 @@ const driveMinorPurchase = (
       resp = paid
       continue
     }
-    const options = resp.interaction.options ?? []
+    const options = resp.interaction.request.options ?? []
     const improvement = options.find((option) => option.value.startsWith('action-improvement-'))
     if (improvement) {
       resp = session.resolveChoice(playerIndex, improvement.value)

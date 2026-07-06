@@ -30,7 +30,7 @@ const findOption = (
   predicate: (option: { value: string; labelKey: string; sourceCard?: string; effectPreview?: unknown; descriptionPreview?: unknown }) => boolean,
 ) => {
   if (resp.interaction.stateId !== 'wait') return undefined
-  return resp.interaction.options?.find(predicate)
+  return resp.interaction.request.options?.find(predicate)
 }
 
 const resolveAnimalReorgs = (

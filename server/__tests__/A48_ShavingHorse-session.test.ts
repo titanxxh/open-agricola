@@ -94,7 +94,7 @@ const resolveShavingHorseTriggerIfPresent = (
 ) => {
   if (resp.interaction.stateId !== 'wait') return resp
   if (resp.interaction.request.kind !== 'select-trigger') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+  const option = resp.interaction.request.options?.find((entry) => entry.value === CARD_ID)
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }
@@ -133,13 +133,13 @@ describe('A048_ShavingHorse session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options).toHaveLength(2)
+    expect(resp.interaction.request.options).toHaveLength(2)
     // player resources not yet charged
     expect(resp.state.players[0]!.resources.wood).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(0)
 
     // Accept (first option is the action node; '__skip__' is the decline option)
-    const acceptOption = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
+    const acceptOption = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
     const resp2 = session.resolveChoice(0, acceptOption.value)
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.wood).toBe(4)
@@ -247,7 +247,7 @@ describe('A048_ShavingHorse session', () => {
       .toBe('ui.interactionOptionalAction')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
       .toBe(CARD_ID)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.options : [])
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.options : [])
       .toHaveLength(2)
   })
 })

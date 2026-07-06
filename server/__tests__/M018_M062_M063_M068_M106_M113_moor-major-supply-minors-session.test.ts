@@ -68,7 +68,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   resp = session.resolveChoice(0, option!.value)
   expect(resp.ok).toBe(true)
@@ -78,7 +78,7 @@ const playMinor = (session: GameSession, cardId: string) => {
 const choosePaymentIfNeeded = (session: GameSession, playerIndex = 0) => {
   let resp = session.getState()
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.[0]
+    const option = resp.interaction.request.options?.[0]
     expect(option).toBeDefined()
     resp = session.resolveChoice(playerIndex, option!.value)
     expect(resp.ok).toBe(true)
@@ -106,7 +106,7 @@ describe('Moor major-supply and upgrade minors', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const values = resp.interaction.options?.map((option) => option.value) ?? []
+    const values = resp.interaction.request.options?.map((option) => option.value) ?? []
     expect(values).toContain('Major_Joinery')
     expect(values).not.toContain('Major_Moor_FurnitureStall')
 
@@ -129,7 +129,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const resp = playMinor(session, 'M018_RegisterOfCraftsmen')
 
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('Major_Joinery')
+      expect(resp.interaction.request.options?.map((option) => option.value) ?? []).not.toContain('Major_Joinery')
     }
     expect(resp.state.players[0]!.improvements).not.toContain('Major_Joinery')
   })
@@ -240,7 +240,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const resp = session.takeAction(0, 'meeting-place')
 
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('M068_Church')
+      expect(resp.interaction.request.options?.map((option) => option.value) ?? []).not.toContain('M068_Church')
     }
     expect(resp.state.players[0]!.minorPlayed).not.toContain('M068_Church')
     expect(resp.state.players[0]!.resources.food).toBe(0)

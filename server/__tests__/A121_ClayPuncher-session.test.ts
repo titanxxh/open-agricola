@@ -75,7 +75,7 @@ describe('A121_ClayPuncher session', () => {
     // lessons action prompts for occupation choice
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
+      const option = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }
@@ -103,7 +103,7 @@ describe('A121_ClayPuncher session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
+      const option = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === 'A093_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

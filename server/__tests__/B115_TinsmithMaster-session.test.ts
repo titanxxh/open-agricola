@@ -156,13 +156,13 @@ describe('B115_TinsmithMaster session', () => {
     const acceptSelection = (session: GameSession, resp: ReturnType<GameSession['resolveChoice']>) => {
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-      const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+      const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
       expect(accept).toBeDefined()
       resp = session.resolveChoice(0, accept!.value)
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
       expect(resp.interaction.sourceCard).toBe(CARD_ID)
-      expect(resp.interaction.selection?.kind).toBe('farm-position')
+      expect(resp.interaction.request.selection?.kind).toBe('farm-position')
       return resp
     }
 
@@ -186,7 +186,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(resp.ok).toBe(true)
 
       resp = acceptSelection(session, resp)
-      expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
+      expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
       resp = selectPositions(session, [{ row: 0, col: 0 }])
       expect(resp.ok).toBe(true)
 
@@ -257,7 +257,7 @@ describe('B115_TinsmithMaster session', () => {
 
       while (resp.interaction.stateId === 'wait') {
         if (resp.interaction.request.kind !== 'choice') break
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options?.[0]?.value ?? 'ok')
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.request.options?.[0]?.value ?? 'ok')
       }
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
@@ -287,7 +287,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(resp.ok).toBe(true)
 
       resp = acceptSelection(session, resp)
-      expect(resp.interaction.selection?.selectablePositions).toEqual([
+      expect(resp.interaction.request.selection?.selectablePositions).toEqual([
         { row: 0, col: 0 },
         { row: 0, col: 1 },
       ])
@@ -319,7 +319,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(resp.ok).toBe(true)
 
       resp = acceptSelection(session, resp)
-      expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
+      expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
       resp = selectPositions(session, [{ row: 0, col: 1 }])
       expect(resp.ok).toBe(false)
       expect(resp.error).toBe('invalid selection position')

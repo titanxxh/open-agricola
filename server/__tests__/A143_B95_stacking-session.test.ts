@@ -49,14 +49,14 @@ describe('A143 + B95 stacking', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
+      const basket = resp.interaction.request.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
       if (resp.interaction.request.kind !== 'choice') break
-      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
+      const next = resp.interaction.request.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
     }
@@ -71,14 +71,14 @@ describe('A143 + B95 stacking', () => {
     const session = setup(2) // no extra rooms, B95 no-op
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const basket = resp.interaction.options?.find((o) => o.value === 'Major_Basket')
+      const basket = resp.interaction.request.options?.find((o) => o.value === 'Major_Basket')
       if (basket) resp = session.resolveChoice(0, basket.value)
     }
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
       if (resp.interaction.request.kind !== 'choice') break
-      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
+      const next = resp.interaction.request.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
     }

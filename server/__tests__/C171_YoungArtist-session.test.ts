@@ -47,7 +47,7 @@ const resolveMinorIfPrompt = (
   cardId: string,
 ) => {
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value === cardId)
+  const option = resp.interaction.request.options?.find((entry) => entry.value === cardId)
   if (!option) return resp
   return session.resolveChoice(resp.interaction.playerIndex, option.value)
 }
@@ -59,7 +59,7 @@ describe('C171_YoungArtist', () => {
     let resp = session.performRoundEnd()
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Young Artist choice')
-    expect(JSON.stringify(resp.interaction.options)).not.toContain('actions.improvement.name')
+    expect(JSON.stringify(resp.interaction.request.options)).not.toContain('actions.improvement.name')
     resp = resolveNonSkipChoice(session, resp)
 
     const owner = resp.state.players[0]!
@@ -100,7 +100,7 @@ describe('C171_YoungArtist', () => {
     let resp = session.performRoundEnd()
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Young Artist choice')
-    expect(JSON.stringify(resp.interaction.options)).not.toContain('draw-ordinary-cards')
+    expect(JSON.stringify(resp.interaction.request.options)).not.toContain('draw-ordinary-cards')
 
     resp = resolveNonSkipChoice(session, resp)
     resp = resolveMinorIfPrompt(session, resp, MINOR_ID)

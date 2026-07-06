@@ -105,7 +105,7 @@ const waitOptions = (resp: ReturnType<GameSession['getState']>): ActionChoiceOpt
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return []
   expect(resp.interaction.request.kind).toBe('choice')
-  return resp.interaction.options ?? []
+  return resp.interaction.request.options ?? []
 }
 
 const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {

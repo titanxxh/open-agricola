@@ -57,12 +57,12 @@ describe('stage hook player switch undo boundary', () => {
     let resp = session.invokeBeforeReturnHomeHooks()
     expectStageChoice(resp, 0)
 
-    resp = session.resolveChoice(0, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expectStageChoice(resp, 1)

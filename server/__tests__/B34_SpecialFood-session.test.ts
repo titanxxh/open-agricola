@@ -171,7 +171,7 @@ describe('B034_SpecialFood action-space provenance', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 

@@ -42,8 +42,9 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
-    const values = (resp.interaction.options ?? []).map((o) => o.value).sort()
-    expect(values).toEqual(['confirm'])
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    if (resp.interaction.request.kind !== 'animal-reorg') return
+    expect(resp.interaction.request.zones.length).toBeGreaterThan(0)
   })
 
   it('active animal-reorg interaction zones include hosted Night Pasture metadata', () => {
@@ -63,7 +64,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     const zoneId = `card:${NIGHT_PASTURE}:owner:${owner.id}:animalOwner:${guest.id}`
-    expect(resp.interaction.zones.find((zone) => zone.id === zoneId)).toMatchObject({
+    expect(resp.interaction.request.zones.find((zone) => zone.id === zoneId)).toMatchObject({
       id: zoneId,
       cardId: NIGHT_PASTURE,
       ownerPlayerId: owner.id,
@@ -142,7 +143,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'pig-market')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    const hasCancel = (resp.interaction.options ?? []).some((o) => o.value === 'cancel')
+    const hasCancel = (resp.interaction.request.options ?? []).some((o) => o.value === 'cancel')
     expect(hasCancel).toBe(false)
   })
 })

@@ -95,7 +95,7 @@ const resolveMinorFromPrompt = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -103,7 +103,7 @@ const resolveMinorFromPrompt = (
     if (resp.interaction.stateId !== 'wait') return resp
   }
   if (resp.interaction.sourceCard === cardId) return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === cardId)
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === cardId)
   expect(cardOption).toBeDefined()
   return session.resolveChoice(0, cardOption!.value)
 }
@@ -319,12 +319,12 @@ describe('card effect hand notification events', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
-      const hasMinorChoice = resp.interaction.options?.some(
+      const hasMinorChoice = resp.interaction.request.options?.some(
         (option) => option.value.startsWith('action-improvement-') || option.value === A006_MINOR_ID,
       )
       if (hasMinorChoice) {
@@ -352,7 +352,7 @@ describe('card effect hand notification events', () => {
     let resp = lessonsSession.takeAction(0, 'lessons')
     if (
       resp.interaction.stateId === 'wait' &&
-      resp.interaction.options?.some((option) => option.value === TEST_OCCUPATION_ID)
+      resp.interaction.request.options?.some((option) => option.value === TEST_OCCUPATION_ID)
     ) {
       resp = lessonsSession.resolveChoice(0, TEST_OCCUPATION_ID)
     }
@@ -368,11 +368,11 @@ describe('card effect hand notification events', () => {
     resp = minorSession.takeAction(0, 'meeting-place')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = minorSession.resolveChoice(0, accept!.value)
     if (resp.interaction.stateId === 'wait') {
-      const hasMinorChoice = resp.interaction.options?.some(
+      const hasMinorChoice = resp.interaction.request.options?.some(
         (option) => option.value.startsWith('action-improvement-') || option.value === A006_MINOR_ID,
       )
       if (hasMinorChoice) {

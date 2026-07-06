@@ -59,7 +59,7 @@ describe('B026_AgrarianFences session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Should have more options than just normal sow/bake
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('without enough wood for fencing and no seeds, grain-utilization with card still works with bake', () => {
@@ -83,7 +83,7 @@ describe('B026_AgrarianFences session', () => {
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
     // Cultivation should not have fence options — B26 only affects grain-utilization
-    const optionValues = resp.interaction.options?.map((o) => o.value)
+    const optionValues = resp.interaction.request.options?.map((o) => o.value)
     const hasFenceOption = optionValues.some((v) => v.includes('fence'))
     expect(hasFenceOption).toBe(false)
   })

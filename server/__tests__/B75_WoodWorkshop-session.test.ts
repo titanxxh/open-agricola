@@ -90,7 +90,7 @@ describe('B075_WoodWorkshop session', () => {
     expect(wait.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(wait.interaction.sourceCard).toBe(A48)
 
-    const exchange = wait.interaction.options?.find((option) => option.value !== '__skip__')
+    const exchange = wait.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(exchange).toBeDefined()
     resp = session.resolveChoice(0, exchange!.value)
     expect(resp.ok).toBe(true)

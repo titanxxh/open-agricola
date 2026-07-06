@@ -44,7 +44,7 @@ const prepareMajorPurchaseSession = (
 
 const choosePaymentIfNeeded = (session: GameSession, resp: ReturnType<GameSession['takeAction']>) => {
   if (resp.interaction.stateId !== 'wait' || resp.interaction.promptKey !== 'prompt.selectPayment') return resp
-  const option = resp.interaction.options?.[0]
+  const option = resp.interaction.request.options?.[0]
   expect(option).toBeDefined()
   const next = session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
   expect(next.ok).toBe(true)
@@ -55,7 +55,7 @@ const buyMajor = (session: GameSession, cardId: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseImprovement') {
-    const option = resp.interaction.options?.find(
+    const option = resp.interaction.request.options?.find(
       (candidate: ActionChoiceOption) => candidate.value === cardId,
     )
     expect(option).toBeDefined()
@@ -180,8 +180,8 @@ describe('Farmers of the Moor remaining major improvements', () => {
 
     const blocked = blockedSession.takeAction(0, 'major-improvement')
 
-    if (blocked.ok && blocked.interaction.stateId === 'wait' && blocked.interaction.options) {
-      expect(blocked.interaction.options?.map((option) => option.value)).not.toContain('Major_Fireplace1')
+    if (blocked.ok && blocked.interaction.stateId === 'wait' && blocked.interaction.request.options) {
+      expect(blocked.interaction.request.options?.map((option) => option.value)).not.toContain('Major_Fireplace1')
     } else {
       expect(blockedSession.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
       expect(blockedSession.state.players[0]!.resources.clay).toBe(1)

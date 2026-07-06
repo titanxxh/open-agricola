@@ -22,7 +22,7 @@ export const resolveTriggerIfPresent = (
   if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'select-trigger') {
     return resp
   }
-  const option = resp.interaction.options?.find((candidate) =>
+  const option = resp.interaction.request.options?.find((candidate) =>
     candidate.value === sourceCard || candidate.sourceCard === sourceCard,
   )
   expect(option).toBeDefined()
@@ -36,7 +36,7 @@ export const resolveNonSkipChoice = (
 ): SessionResponse => {
   const wait = expectWait(resp)
   expect(wait.interaction.request.kind).toBe('choice')
-  const option = wait.interaction.options?.find((candidate) => candidate.value !== '__skip__')
+  const option = wait.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(wait.interaction.playerIndex, option!.value)
 }
@@ -47,7 +47,7 @@ export const resolveSkipChoice = (
 ): SessionResponse => {
   const wait = expectWait(resp)
   expect(wait.interaction.request.kind).toBe('choice')
-  const option = wait.interaction.options?.find((candidate) => candidate.value === '__skip__')
+  const option = wait.interaction.request.options?.find((candidate) => candidate.value === '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(wait.interaction.playerIndex, option!.value)
 }

@@ -301,7 +301,7 @@ describe('farm interaction builders', () => {
     expect(pending.interaction.stateId).toBe('wait')
     if (pending.interaction.stateId !== 'wait') return
     expect(pending.interaction.request.kind).toBe('farm-select')
-    expect(pending.interaction.options?.map((option) => option.value)).toEqual(['confirm'])
+    expect(pending.interaction.request.options?.map((option) => option.value)).toEqual(['confirm'])
 
     const rejected = session.commitSelectionChoice(0, { cancel: true })
 

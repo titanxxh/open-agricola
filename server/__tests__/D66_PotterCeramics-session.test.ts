@@ -51,14 +51,14 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
-    const d66 = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const d66 = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(d66).toBeDefined()
     resp = session.resolveChoice(0, d66!.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       expect(resp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-      expect(resp.interaction.options?.map((option) => option.value)).toContain('Major_Fireplace1')
+      expect(resp.interaction.request.options?.map((option) => option.value)).toContain('Major_Fireplace1')
       resp = session.resolveChoice(0, 'Major_Fireplace1')
     }
     expect(resp.ok).toBe(true)
@@ -73,7 +73,7 @@ describe('D066_PotterCeramics session', () => {
 
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSelectTrigger') {
-      expect(resp.interaction.options?.map((option) => option.value)).not.toContain(CARD_ID)
+      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain(CARD_ID)
     }
   })
 
@@ -95,7 +95,7 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionGrainUtilizationChoice')
-    const bakeReplacement = resp.interaction.options?.find((option) =>
+    const bakeReplacement = resp.interaction.request.options?.find((option) =>
       String(option.value).includes('bake-bread'),
     )
     expect(bakeReplacement).toBeDefined()
@@ -105,7 +105,7 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionFlowSelect')
-    const bakeAndFence = resp.interaction.options?.find(
+    const bakeAndFence = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'ui.interactionAgrarianFencesBakeAndFence',
     )
     expect(bakeAndFence).toBeDefined()

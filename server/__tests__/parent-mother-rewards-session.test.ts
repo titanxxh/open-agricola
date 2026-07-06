@@ -102,7 +102,7 @@ describe('Parent Cards mother rewards', () => {
     expect(optional.interaction.stateId === 'wait' ? optional.interaction.promptKey : undefined)
       .toBe('ui.interactionOptionalAction')
     if (optional.interaction.stateId !== 'wait') throw new Error('expected optional future action')
-    const accept = optional.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = optional.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     const prompt = session.resolveChoice(0, accept!.value)
@@ -110,9 +110,9 @@ describe('Parent Cards mother rewards', () => {
     expect(prompt.interaction.stateId).toBe('wait')
     if (prompt.interaction.stateId !== 'wait') throw new Error('expected farm-select')
     expect(prompt.interaction.request.kind).toBe('farm-select')
-    expect(prompt.interaction.farm.farmType).toBe('plow')
+    expect(prompt.interaction.request.farm.farmType).toBe('plow')
 
-    const [field] = prompt.interaction.farm.selectableTiles
+    const [field] = prompt.interaction.request.farm.selectableTiles
     const built = session.commitSelectionChoice(0, { tile: field })
 
     expect(built.ok).toBe(true)
@@ -145,7 +145,7 @@ describe('Parent Cards mother rewards', () => {
     expect(optional.interaction.stateId === 'wait' ? optional.interaction.promptKey : undefined)
       .toBe('ui.interactionOptionalAction')
     if (optional.interaction.stateId !== 'wait') throw new Error('expected optional future action')
-    const accept = optional.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = optional.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     const prompt = session.resolveChoice(0, accept!.value)
@@ -153,9 +153,9 @@ describe('Parent Cards mother rewards', () => {
     expect(prompt.interaction.stateId).toBe('wait')
     if (prompt.interaction.stateId !== 'wait') throw new Error('expected farm-select')
     expect(prompt.interaction.request.kind).toBe('farm-select')
-    expect(prompt.interaction.farm.farmType).toBe('stable')
+    expect(prompt.interaction.request.farm.farmType).toBe('stable')
 
-    const [stable] = prompt.interaction.farm.selectableTiles
+    const [stable] = prompt.interaction.request.farm.selectableTiles
     const built = session.commitSelectionChoice(0, { stables: [stable] })
 
     expect(built.ok).toBe(true)

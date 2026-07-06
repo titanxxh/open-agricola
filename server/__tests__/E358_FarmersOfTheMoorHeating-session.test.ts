@@ -110,12 +110,12 @@ const prepareMajorPurchaseSession = (cardId: string) => {
 const buyMajor = (session: GameSession, cardId: string) => {
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
-  if (resp.interaction.stateId === 'wait' && resp.interaction.options?.some((option) => option.value === cardId)) {
+  if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === cardId)) {
     resp = session.resolveChoice(0, cardId)
     expect(resp.ok).toBe(true)
   }
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.[0]
+    const option = resp.interaction.request.options?.[0]
     expect(option).toBeDefined()
     resp = session.resolveChoice(0, option!.value)
     expect(resp.ok).toBe(true)
@@ -136,7 +136,7 @@ const resetMajorActionForPlayer0 = (session: GameSession) => {
 
 const chooseFirstPayment = (session: GameSession, resp: ReturnType<GameSession['takeAction']>) => {
   if (resp.interaction.stateId !== 'wait' || resp.interaction.promptKey !== 'prompt.selectPayment') return resp
-  const option = resp.interaction.options?.[0]
+  const option = resp.interaction.request.options?.[0]
   expect(option).toBeDefined()
   const next = session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
   expect(next.ok).toBe(true)
@@ -187,7 +187,7 @@ const exchangeOnce = (
   expect(session.takeAction(0, 'farmland').ok).toBe(true)
   let resp = session.takeAnytimeAction(0, 'exchange')
   expect(resp.ok).toBe(true)
-  const option = resp.interaction.options?.find((candidate: ActionChoiceOption) => {
+  const option = resp.interaction.request.options?.find((candidate: ActionChoiceOption) => {
     const preview = candidate.effectPreview
     if (preview?.kind !== 'resourceExchange') return false
     return Object.entries(paid).every(([key, value]) => preview.resourcesPaid?.[key as keyof typeof sessionResourceShape] === value) &&
@@ -598,7 +598,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const m085Option = resp.interaction.options?.find((option) => option.value === 'M085_OvenInstallation')
+    const m085Option = resp.interaction.request.options?.find((option) => option.value === 'M085_OvenInstallation')
     expect(m085Option).toBeDefined()
 
     resp = session.resolveChoice(0, m085Option!.value)
@@ -627,14 +627,14 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const peatHutOption = resp.interaction.options?.find((option) => option.sourceCard === 'M032_PeatHut')
+    const peatHutOption = resp.interaction.request.options?.find((option) => option.sourceCard === 'M032_PeatHut')
     expect(peatHutOption).toBeDefined()
     resp = session.resolveChoice(0, peatHutOption!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm?.farmType).toBe('room')
-    const room = resp.interaction.farm?.selectableTiles[0]
+    expect(resp.interaction.request.farm?.farmType).toBe('room')
+    const room = resp.interaction.request.farm?.selectableTiles[0]
     expect(room).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { rooms: [room!] })
@@ -664,7 +664,7 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const resp = session.takeAction(0, 'house-redevelopment')
 
     if (resp.interaction.stateId === 'wait') {
-      expect((resp.interaction.options ?? []).some((option) => option.sourceCard === 'M032_PeatHut')).toBe(false)
+      expect((resp.interaction.request.options ?? []).some((option) => option.sourceCard === 'M032_PeatHut')).toBe(false)
     }
     expect(session.state.players[0]!.minorPlayed).toContain('M032_PeatHut')
   })

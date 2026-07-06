@@ -39,8 +39,8 @@ describe('E095_Miller session', () => {
     // Should trigger a player switch to the Miller owner
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
   })
 
   it('miller can bake bread when opponent uses grain-seeds', () => {
@@ -56,13 +56,13 @@ describe('E095_Miller session', () => {
     expect(resp.interaction.playerIndex).toBe(0)
 
     // Optional choice — pick to activate bake bread
-    const activateOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const activateOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
     // Bake bread flow: first pick which improvement to bake with
     while (resp.interaction.stateId === 'wait') {
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const cancelOption = options.find((o: ActionChoiceOption) => o.value === 'cancel')
       const fireplaceOption = options.find(
         (o: ActionChoiceOption) => o.value === 'Major_Fireplace1',
@@ -113,8 +113,8 @@ describe('E095_Miller session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
@@ -171,7 +171,7 @@ describe('E095_Miller session', () => {
     // Choose Miller from occupation choices
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const millerOption = resp.interaction.options?.find(
+    const millerOption = resp.interaction.request.options?.find(
       (o: ActionChoiceOption) => o.value === 'E095_Miller',
     )
     expect(millerOption).toBeDefined()
@@ -180,7 +180,7 @@ describe('E095_Miller session', () => {
     // After playing the occupation, should get an optional improvement choice
     // (the onBuy flow). It may present as a choice with __skip__ option.
     if (resp.interaction.stateId === 'wait') {
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const hasSkip = options.some((o: ActionChoiceOption) => o.value === '__skip__')
       if (hasSkip) {
         // Verify the optional nature
@@ -220,7 +220,7 @@ describe('E095_Miller session', () => {
     // Choose Miller
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const millerOption = resp.interaction.options?.find(
+    const millerOption = resp.interaction.request.options?.find(
       (o: ActionChoiceOption) => o.value === 'E095_Miller',
     )
     expect(millerOption).toBeDefined()
@@ -231,7 +231,7 @@ describe('E095_Miller session', () => {
     let step = 0
     while (resp.interaction.stateId === 'wait' && step < maxSteps) {
       step++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       // Find fireplace option
       const fireplaceOption = options.find(
         (o: ActionChoiceOption) => o.value === 'Major_Fireplace1',

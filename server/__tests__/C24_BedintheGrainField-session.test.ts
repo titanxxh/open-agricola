@@ -37,7 +37,7 @@ const setupHarvest = (options: { rooms: number; ready?: boolean } = { rooms: 3, 
 const expectC24Prompt = (resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected C24 optional prompt')
-  const options = resp.interaction.options ?? []
+  const options = resp.interaction.request.options ?? []
   const skip = options.find((option: ActionChoiceOption) => option.value === '__skip__')
   const accept = options.find((option: ActionChoiceOption) => option.value !== '__skip__')
   expect(skip).toBeDefined()
@@ -76,7 +76,7 @@ describe('C024_BedintheGrainField session', () => {
     const resp = session.performRoundEnd()
 
     const player = resp.state.players[0]!
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.options?.some((option) => option.value === '__skip__') : false).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.options?.some((option) => option.value === '__skip__') : false).toBe(false)
     expect(familySize(player)).toBe(2)
     expect(readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')).toBe(false)
   })
@@ -87,7 +87,7 @@ describe('C024_BedintheGrainField session', () => {
     const resp = session.performRoundEnd()
 
     const player = resp.state.players[0]!
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.options?.some((option) => option.value === '__skip__') : false).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.options?.some((option) => option.value === '__skip__') : false).toBe(false)
     expect(familySize(player)).toBe(2)
     expect(readCardExtraData<boolean>(player, CARD_ID, 'nextHarvestReady')).toBe(false)
   })

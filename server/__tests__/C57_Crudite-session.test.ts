@@ -111,14 +111,14 @@ const skipOptional = (session: GameSession, resp: ReturnType<GameSession['perfor
 const expectC57Selection = (resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected C57 selection')
-  expect(resp.interaction.selection?.kind).toBe('farm-position')
-  expect(resp.interaction.selection?.minSelections).toBe(1)
-  return resp.interaction.selection?.selectablePositions ?? []
+  expect(resp.interaction.request.selection?.kind).toBe('farm-position')
+  expect(resp.interaction.request.selection?.minSelections).toBe(1)
+  return resp.interaction.request.selection?.selectablePositions ?? []
 }
 
 const hasC57Selection = (resp: ReturnType<GameSession['performRoundEnd']>) =>
   resp.interaction.stateId === 'wait'
-  && resp.interaction.selection?.kind === 'farm-position'
+  && resp.interaction.request.selection?.kind === 'farm-position'
   && resp.interaction.sourceCard === CARD_ID
 
 const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>

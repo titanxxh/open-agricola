@@ -46,7 +46,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
       resp.interaction.stateId === 'wait' &&
       resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice'
     ) {
-      const sowOption = resp.interaction.options?.find(
+      const sowOption = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) =>
           o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
@@ -68,7 +68,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
       resp = advancePastPlayerSwitches(session, resp)
     }
 
-    const acceptOption = resp.interaction.options?.find(
+    const acceptOption = resp.interaction.request.options?.find(
       (o: ActionChoiceOption) => o.value !== '__skip__',
     )
     expect(acceptOption).toBeDefined()

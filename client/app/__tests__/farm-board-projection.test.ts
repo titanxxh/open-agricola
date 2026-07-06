@@ -160,15 +160,10 @@ describe('buildFarmBoardProjection', () => {
       request: {
         kind: 'selection',
         selection: {
-          selectionType: 'farm-position',
+          kind: 'farm-position',
           selectablePositions: [{ row: -2, col: 5 }],
           maxSelections: 1,
         },
-      },
-      selection: {
-        kind: 'farm-position',
-        selectablePositions: [{ row: -2, col: 5 }],
-        maxSelections: 1,
       },
       allowedCommands: ['commitSelection'],
       anytimeActions: [],
@@ -177,7 +172,7 @@ describe('buildFarmBoardProjection', () => {
     const projection = buildFarmBoardProjection({
       displayPlayer: player,
       interaction,
-      selectionInteraction: interaction.selection,
+      selectionInteraction: interaction.request.selection,
       players: [player],
     })
 
@@ -200,15 +195,10 @@ describe('buildFarmBoardProjection', () => {
       request: {
         kind: 'selection',
         selection: {
-          selectionType: 'farm-position',
+          kind: 'farm-position',
           selectablePositions: [{ row: -2, col: 5 }],
           maxSelections: 1,
         },
-      },
-      selection: {
-        kind: 'farm-position',
-        selectablePositions: [{ row: -2, col: 5 }],
-        maxSelections: 1,
       },
       allowedCommands: ['commitSelection'],
       anytimeActions: [],
@@ -217,7 +207,7 @@ describe('buildFarmBoardProjection', () => {
     const projection = buildFarmBoardProjection({
       displayPlayer,
       interaction,
-      selectionInteraction: interaction.selection,
+      selectionInteraction: interaction.request.selection,
       players: [activePlayer, displayPlayer],
     })
 

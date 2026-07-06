@@ -76,8 +76,8 @@ describe('D075_WoodField session', () => {
     if (!resp.ok || resp.interaction.stateId !== 'wait') {
       throw new Error('expected sow interaction')
     }
-    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
-    expect(resp.interaction.farm.selectableFields).toContainEqual({
+    if (resp.interaction.request.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    expect(resp.interaction.request.farm.selectableFields).toContainEqual({
       tile: { row: ROW, col: COL_BASE },
       allowedCrops: ['wood'],
       sourceCard: CARD_ID,
@@ -111,11 +111,11 @@ describe('D075_WoodField session', () => {
     if (!resp.ok || resp.interaction.stateId !== 'wait') {
       throw new Error('expected sow interaction')
     }
-    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
-    const slot0 = resp.interaction.farm.selectableFields.find(
+    if (resp.interaction.request.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    const slot0 = resp.interaction.request.farm.selectableFields.find(
       (f) => f.tile.row === ROW && f.tile.col === COL_BASE,
     )
-    const slot1 = resp.interaction.farm.selectableFields.find(
+    const slot1 = resp.interaction.request.farm.selectableFields.find(
       (f) => f.tile.row === ROW && f.tile.col === COL_BASE + 1,
     )
     expect(slot0).toBeDefined()

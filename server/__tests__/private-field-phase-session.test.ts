@@ -59,7 +59,7 @@ const buyFestivalPlanning = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   const accept = resp.interaction.stateId === 'wait'
-    ? resp.interaction.options?.find((option) => option.value !== '__skip__')?.value
+    ? resp.interaction.request.options?.find((option) => option.value !== '__skip__')?.value
     : undefined
   expect(accept).toBeDefined()
 
@@ -67,7 +67,7 @@ const buyFestivalPlanning = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   expect(resp.interaction.stateId === 'wait'
-    ? resp.interaction.options?.some((option) => option.value === 'C072_FestivalPlanning')
+    ? resp.interaction.request.options?.some((option) => option.value === 'C072_FestivalPlanning')
     : false).toBe(true)
 
   return session.resolveChoice(0, 'C072_FestivalPlanning')
@@ -89,7 +89,7 @@ describe('Private Field Phase session flow', () => {
     expect(player.resources.begging).toBe(0)
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.some((option) => option.value === '__skip__')
+      ? resp.interaction.request.options?.some((option) => option.value === '__skip__')
       : false).toBe(true)
   })
 })

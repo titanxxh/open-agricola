@@ -192,8 +192,8 @@ describe('pending choice types + undo regression', () => {
       expect(resp.state.players[0]!.resources.grain).toBe(1)
       expect(resp.interaction.stateId).toBe('wait')
       expect(
-        resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
-          ? resp.interaction.farm.selectableFields
+        resp.interaction.stateId === 'wait' && resp.interaction.request.farm.farmType === 'sow'
+          ? resp.interaction.request.farm.selectableFields
           : [],
       ).toContainEqual({
         tile: { row: 0, col: 0 },
@@ -238,7 +238,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
-        expect(resp.interaction.nextPlayerIndex).toBe(1)
+        expect(resp.interaction.request.nextPlayerIndex).toBe(1)
       }
     })
 
@@ -269,7 +269,7 @@ describe('pending choice types + undo regression', () => {
       if (resp.interaction.stateId === 'wait') {
         expect(resp.interaction.playerIndex).toBe(0)
         expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
-        expect(resp.interaction.options?.length).toBeGreaterThan(0)
+        expect(resp.interaction.request.options?.length).toBeGreaterThan(0)
       }
     })
 
@@ -315,7 +315,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.interaction.stateId).toBe('wait')
       if (resp.interaction.stateId !== 'wait') return
 
-      expect(resp.interaction.farm.farmType).toBe('plow')
+      expect(resp.interaction.request.farm.farmType).toBe('plow')
       // bake-bread is NOT an anytime action — only exchange-type actions are
       expect(resp.interaction.anytimeActions.some((action) => action.id === 'bake-bread')).toBe(false)
     })

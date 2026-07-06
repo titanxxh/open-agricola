@@ -65,7 +65,7 @@ describe('C067_MineralFeeder session', () => {
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)

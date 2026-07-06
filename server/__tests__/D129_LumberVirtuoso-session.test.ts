@@ -44,7 +44,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     // Should have __skip__ option (optional) and real options
-    const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    const skipOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
     expect(skipOption).toBeDefined()
   })
 
@@ -86,7 +86,7 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // One-step XOR: stables / construct / skip
-    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.request.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose first option (stables)
@@ -111,7 +111,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.request.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose second option (construct)
@@ -132,7 +132,7 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Should present the optional choice
-    const activateOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const activateOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
   })
 
@@ -143,7 +143,7 @@ describe('D129_LumberVirtuoso session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Activate the optional flow
-    const activateOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const activateOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
@@ -169,17 +169,17 @@ function drainHarvest(session: GameSession, resp: SessionResponse): SessionRespo
     } else if (current.interaction.stateId === 'wait' && current.interaction.stateId === 'wait' ? current.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       current = session.resolveChoice(
         current.interaction.playerIndex, 'confirm',
-        current.interaction.zones,
+        current.interaction.request.zones,
       )
     } else if (current.interaction.stateId === 'wait') {
       // Skip any remaining choices
-      const skipOpt = current.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const skipOpt = current.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
         current = session.resolveChoice(current.interaction.playerIndex ?? 0, '__skip__')
       } else {
         current = session.resolveChoice(
           current.interaction.playerIndex ?? 0,
-          current.interaction.options[0]!.value,
+          current.interaction.request.options[0]!.value,
         )
       }
     } else {

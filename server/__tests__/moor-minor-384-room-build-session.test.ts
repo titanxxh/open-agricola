@@ -71,14 +71,14 @@ const expectWait = (resp: SessionResponse) => {
 
 const chooseByLabel = (resp: SessionResponse, labelKey: string) => {
   const interaction = expectWait(resp)
-  const option = interaction.options?.find((entry) => entry.labelKey === labelKey)
+  const option = interaction.request.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   return option!
 }
 
 const chooseNonSkip = (resp: SessionResponse) => {
   const interaction = expectWait(resp)
-  const option = interaction.options?.find((entry: ActionChoiceOption) => entry.value !== '__skip__')
+  const option = interaction.request.options?.find((entry: ActionChoiceOption) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   return option!
 }
@@ -92,22 +92,22 @@ const chooseConstructIfOffered = (session: GameSession, resp: SessionResponse) =
 const selectRooms = (session: GameSession, resp: SessionResponse, count: number) => {
   const interaction = expectWait(resp)
   expect(interaction.request.kind).toBe('farm-select')
-  expect(interaction.farm.farmType).toBe('room')
-  if (interaction.farm.farmType !== 'room') throw new Error('expected room farm')
-  expect(interaction.farm.maxSelections).toBeGreaterThanOrEqual(count)
+  expect(interaction.request.farm.farmType).toBe('room')
+  if (interaction.request.farm.farmType !== 'room') throw new Error('expected room farm')
+  expect(interaction.request.farm.maxSelections).toBeGreaterThanOrEqual(count)
   return session.commitSelectionChoice(interaction.playerIndex, {
-    rooms: interaction.farm.selectableTiles.slice(0, count),
+    rooms: interaction.request.farm.selectableTiles.slice(0, count),
   })
 }
 
 const selectStables = (session: GameSession, resp: SessionResponse, count: number) => {
   const interaction = expectWait(resp)
   expect(interaction.request.kind).toBe('farm-select')
-  expect(interaction.farm.farmType).toBe('stable')
-  if (interaction.farm.farmType !== 'stable') throw new Error('expected stable farm')
-  expect(interaction.farm.maxSelections).toBeGreaterThanOrEqual(count)
+  expect(interaction.request.farm.farmType).toBe('stable')
+  if (interaction.request.farm.farmType !== 'stable') throw new Error('expected stable farm')
+  expect(interaction.request.farm.maxSelections).toBeGreaterThanOrEqual(count)
   return session.commitSelectionChoice(interaction.playerIndex, {
-    stables: interaction.farm.selectableTiles.slice(0, count),
+    stables: interaction.request.farm.selectableTiles.slice(0, count),
   })
 }
 

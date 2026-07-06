@@ -32,8 +32,8 @@ const chooseFirstNonSkipOption = (session: GameSession, playerIndex: number) => 
   const resp = session.getState()
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  expect(resp.interaction.options).toBeDefined()
-  const option = resp.interaction.options.find((entry) => entry.value !== '__skip__')
+  expect(resp.interaction.request.options).toBeDefined()
+  const option = resp.interaction.request.options.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(playerIndex, option!.value)
 }
@@ -197,8 +197,8 @@ const completeFirstPlowSelection = (session: GameSession, playerIndex = 0) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
   expect(resp.interaction.request.kind).toBe('farm-select')
-  expect(resp.interaction.farm?.farmType).toBe('plow')
-  const tile = resp.interaction.farm?.selectableTiles[0]
+  expect(resp.interaction.request.farm?.farmType).toBe('plow')
+  const tile = resp.interaction.request.farm?.selectableTiles[0]
   expect(tile).toBeTruthy()
   return session.commitSelectionChoice(playerIndex, { tile })
 }
@@ -460,8 +460,8 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    const rooms = resp.interaction.farm.selectableTiles.slice(0, 2)
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    const rooms = resp.interaction.request.farm.selectableTiles.slice(0, 2)
     expect(rooms).toHaveLength(2)
 
     resp = session.commitSelectionChoice(1, { rooms })
@@ -484,7 +484,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const room = resp.interaction.farm.selectableTiles[0]
+    const room = resp.interaction.request.farm.selectableTiles[0]
     expect(room).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { rooms: [room] })
@@ -514,7 +514,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('fence')
+    expect(resp.interaction.request.farm.farmType).toBe('fence')
 
     resp = session.commitSelectionChoice(0, {
       edges: [
@@ -544,7 +544,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
     expect(resp.ok).toBe(true)
@@ -565,7 +565,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
     expect(resp.ok).toBe(true)
@@ -753,13 +753,13 @@ describe('Agricola 5-6 simple occupation cards', () => {
 
     let resp = session.takeAction(0, 'farm-supplies-6')
     expect(resp.ok).toBe(true)
-    const plowOption = resp.interaction.options?.find((option) =>
+    const plowOption = resp.interaction.request.options?.find((option) =>
       JSON.stringify(option.descriptionPreview).includes('actions.plow.name'),
     )
     expect(plowOption).toBeTruthy()
     resp = session.resolveChoice(0, plowOption!.value)
     resp = completeFirstPlowSelection(session)
-    const grainOption = resp.interaction.options?.find((option) =>
+    const grainOption = resp.interaction.request.options?.find((option) =>
       JSON.stringify(option.effectPreview).includes('"grain":1'),
     )
     expect(grainOption).toBeTruthy()
@@ -992,7 +992,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const options = resp.interaction.options?.filter((option) => option.sourceCard === 'C178_OnSiteReverend')
+    const options = resp.interaction.request.options?.filter((option) => option.sourceCard === 'C178_OnSiteReverend')
     expect(options).toHaveLength(4)
 
     resp = session.resolveChoice(0, options![3]!.value)
@@ -1048,7 +1048,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(false)
+      expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
       resp = chooseFirstNonSkipOption(session, 0)
       expect(resp.ok).toBe(true)
     }

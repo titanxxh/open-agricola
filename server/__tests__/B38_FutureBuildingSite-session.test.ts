@@ -97,7 +97,7 @@ describe('B38 FutureBuildingSite — session', () => {
     // (accept-execute / __skip__). Because B38 is the only playable minor in the
     // player's hand, `minor-improvement.execute` short-circuits the per-card
     // choice and B38's onBuy runs immediately.
-    const acceptMinor = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const acceptMinor = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(acceptMinor).toBeDefined()
     resp = session.resolveChoice(0, acceptMinor!.value)
     expect(resp.ok).toBe(true)
@@ -122,7 +122,7 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Locked tile (0,0) should NOT be in selectable tiles
-    const selectableTiles = resp.interaction.farm.selectableTiles
+    const selectableTiles = resp.interaction.request.farm.selectableTiles
     const lockedKeys = new Set(DEFAULT_LOCKED.map(positionKey))
     const selectableKeys = new Set(selectableTiles.map(positionKey))
     for (const lk of lockedKeys) {
@@ -145,7 +145,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // (0,1) is free and not locked
     const tile = { row: 0, col: 1 }
-    const selectableTiles = resp.interaction.farm.selectableTiles
+    const selectableTiles = resp.interaction.request.farm.selectableTiles
     const selectableKeys = new Set(selectableTiles.map(positionKey))
     expect(selectableKeys.has(positionKey(tile))).toBe(true)
 
@@ -161,7 +161,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const roomOpt = resp.interaction.options?.find((o: ActionChoiceOption) =>
+    const roomOpt = resp.interaction.request.options?.find((o: ActionChoiceOption) =>
       o.labelKey === 'actions.construct.name',
     )
     expect(roomOpt).toBeUndefined()
@@ -175,7 +175,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Select stable building (option value is `seq-stables-<n>`)
     if (resp.interaction.stateId === 'wait') {
-      const stableOpt = resp.interaction.options?.find(
+      const stableOpt = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.stables.name',
       )
       if (stableOpt) {
@@ -185,7 +185,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Locked tiles should not be in selectable tiles for stable
     if (resp.interaction?.farm?.selectableTiles) {
-      const selectableKeys = new Set(resp.interaction.farm.selectableTiles.map(positionKey))
+      const selectableKeys = new Set(resp.interaction.request.farm.selectableTiles.map(positionKey))
       for (const lt of DEFAULT_LOCKED) {
         expect(selectableKeys.has(positionKey(lt))).toBe(false)
       }

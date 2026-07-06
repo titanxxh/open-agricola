@@ -75,7 +75,7 @@ describe('E021_SheepRug session', () => {
     // buyable target and resolves silently, so the engine lands directly
     // on the confirm-next-player wait.
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      const skipOption = resp.interaction.options?.find((option) => option.value === '__skip__')
+      const skipOption = resp.interaction.request.options?.find((option) => option.value === '__skip__')
       expect(skipOption).toBeDefined()
       resp = session.resolveChoice(0, skipOption!.value)
       expect(resp.ok).toBe(true)

@@ -128,7 +128,7 @@ const buyC1 = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
   if (improvementOption) {
     resp = session.resolveChoice(0, improvementOption.value)
     expect(resp.ok).toBe(true)
@@ -136,7 +136,7 @@ const buyC1 = (session: GameSession) => {
   if (resp.interaction.sourceCard === CARD_ID) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
   if (!cardOption) return resp
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
@@ -155,10 +155,10 @@ const expectFarmSelect = (
   expect(resp.interaction.sourceCard).toBe(CARD_ID)
   expect(resp.interaction.promptKey).toBe('ui.interactionFenceSelect')
   expect(resp.interaction.request.kind).toBe('farm-select')
-  expect(resp.interaction.options).toEqual([
+  expect(resp.interaction.request.options).toEqual([
     { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
   ])
-  expect(resp.interaction.farm?.farmType).toBe('fence')
+  expect(resp.interaction.request.farm?.farmType).toBe('fence')
   if (expected) {
     expect(resp.interaction).toEqual(expected)
   }

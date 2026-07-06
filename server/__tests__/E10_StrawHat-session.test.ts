@@ -62,9 +62,9 @@ describe('E010_StrawHat session', () => {
     let resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected StrawHat choice')
-    expect(resp.interaction.options?.some(option => option.value === '__skip__')).toBe(false)
+    expect(resp.interaction.request.options?.some(option => option.value === '__skip__')).toBe(false)
 
-    resp = session.resolveChoice(0, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(beforeFood + 1)
@@ -77,11 +77,11 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected StrawHat choice')
 
-    resp = session.resolveChoice(0, resp.interaction.options![1]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options![1]!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected move target choice')
 
-    const lessonsOption = resp.interaction.options?.find(option => option.value === 'lessons')
+    const lessonsOption = resp.interaction.request.options?.find(option => option.value === 'lessons')
     expect(lessonsOption).toBeDefined()
     resp = session.resolveChoice(0, lessonsOption!.value)
 
@@ -135,7 +135,7 @@ describe('E010_StrawHat session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected A92 choice')
     expect(hasPendingExtraTurn(resp.state, resp.state.players[0]!)).toBe(true)
 
-    resp = session.resolveChoice(0, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.request.options![0]!.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlaceFarmerExtra')
     expect(newbornCount(resp.state.players[0]!)).toBe(0)
@@ -145,7 +145,7 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlowSelect')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected plow selection')
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { tile })
@@ -156,11 +156,11 @@ describe('E010_StrawHat session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFlowSelect')
     expect(resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.map((option) => option.sourceCard)
+      ? resp.interaction.request.options?.map((option) => option.sourceCard)
       : []).toEqual([CARD_ID, CARD_ID])
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected E10 choice')
-    const move = resp.interaction.options!.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')!
+    const move = resp.interaction.request.options!.find((option) => option.labelKey === 'actions.move-farmer-to-space.name')!
     resp = session.resolveChoice(0, move.value)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionMoveFarmerToSpace')

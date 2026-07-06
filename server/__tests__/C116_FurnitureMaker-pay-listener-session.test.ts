@@ -50,8 +50,8 @@ const playLessons = (
     }
     if (resp.interaction.request.kind !== 'choice') break
     const opt =
-      resp.interaction.options?.find((o) => o.value === occupationId)
-      ?? resp.interaction.options?.[0]
+      resp.interaction.request.options?.find((o) => o.value === occupationId)
+      ?? resp.interaction.request.options?.[0]
     if (!opt) break
     resp = session.resolveChoice(0, opt.value)
   }

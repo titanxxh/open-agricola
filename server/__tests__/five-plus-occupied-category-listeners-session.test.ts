@@ -39,7 +39,7 @@ const findOptionWithPreview = (resp: ReturnType<GameSession['takeAction']>, text
     options?: Array<{ value: string; effectPreview?: unknown }>
     request?: { options?: Array<{ value: string; effectPreview?: unknown }> }
   }
-  const options = interaction.options ?? interaction.request?.options ?? []
+  const options = interaction.request.options ?? interaction.request?.options ?? []
   return options.find((option) => JSON.stringify(option.effectPreview).includes(text))
 }
 

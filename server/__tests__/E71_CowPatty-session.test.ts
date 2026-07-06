@@ -52,13 +52,13 @@ describe('E071_CowPatty session', () => {
   const acceptSelection = (session: GameSession, resp: ReturnType<GameSession['resolveChoice']>) => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-    const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.selection?.kind).toBe('farm-position')
+    expect(resp.interaction.request.selection?.kind).toBe('farm-position')
     return resp
   }
 
@@ -92,7 +92,7 @@ describe('E071_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     resp = acceptSelection(session, resp)
-    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
     resp = selectPositions(session, [{ row: 0, col: 2 }])
     expect(resp.ok).toBe(true)
 
@@ -160,7 +160,7 @@ describe('E071_CowPatty session', () => {
     {
       let safety = 16
       while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
+        const next = resp.interaction.request.options?.[0]?.value
         if (!next) break
         resp = session.resolveChoice(resp.interaction.playerIndex, next)
       }
@@ -200,7 +200,7 @@ describe('E071_CowPatty session', () => {
     {
       let safety = 16
       while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
+        const next = resp.interaction.request.options?.[0]?.value
         if (!next) break
         resp = session.resolveChoice(resp.interaction.playerIndex, next)
       }
@@ -229,7 +229,7 @@ describe('E071_CowPatty session', () => {
     {
       let safety = 16
       while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
+        const next = resp.interaction.request.options?.[0]?.value
         if (!next) break
         resp = session.resolveChoice(resp.interaction.playerIndex, next)
       }
@@ -308,7 +308,7 @@ describe('E071_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     resp = acceptSelection(session, resp)
-    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
     resp = selectPositions(session, [{ row: 0, col: 2 }])
     expect(resp.ok).toBe(true)
 
@@ -355,7 +355,7 @@ describe('E071_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     resp = acceptSelection(session, resp)
-    expect(resp.interaction.selection?.selectablePositions).toEqual([
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([
       { row: 0, col: 2 },
       { row: 0, col: 4 },
     ])
@@ -397,7 +397,7 @@ describe('E071_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     resp = acceptSelection(session, resp)
-    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
     resp = selectPositions(session, [{ row: 0, col: 4 }])
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('invalid selection position')

@@ -185,15 +185,16 @@ describe('A058_AsparagusKnife session', () => {
 
     autoAdvanceRoundEnd(session, {
       onChoice: (intx, sess) => {
-        const skipOption = intx.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-        const acceptOption = intx.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        const options = intx.request.kind === 'choice' ? intx.request.options : []
+        const skipOption = options.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const acceptOption = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (skipOption && acceptOption) {
           return sess.resolveChoice(intx.playerIndex, acceptOption.value)
         }
-        if (intx.promptKey === 'ui.interactionSelection') {
+        if (intx.request.kind === 'selection') {
           return sess.commitSelectionChoice(intx.playerIndex, { positions: [{ row: 0, col: 0 }] })
         }
-        return sess.resolveChoice(intx.playerIndex, intx.options?.[0]?.value ?? 'ok')
+        return undefined
       },
     })
 
@@ -218,11 +219,12 @@ describe('A058_AsparagusKnife session', () => {
 
     autoAdvanceRoundEnd(session, {
       onChoice: (intx, sess) => {
-        const skipOption = intx.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const options = intx.request.kind === 'choice' ? intx.request.options : []
+        const skipOption = options.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOption) {
           return sess.resolveChoice(intx.playerIndex, skipOption.value)
         }
-        return sess.resolveChoice(intx.playerIndex, intx.options?.[0]?.value ?? 'ok')
+        return undefined
       },
     })
 

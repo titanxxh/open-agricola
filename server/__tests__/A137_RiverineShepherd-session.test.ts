@@ -66,7 +66,7 @@ describe('A137_RiverineShepherd session', () => {
     const p = resp.state.players[0]!
     if (resp.interaction.stateId === 'wait') {
       // Accept the optional reed
-      const acceptOption = resp.interaction.options?.find(
+      const acceptOption = resp.interaction.request.options?.find(
         (o) => o.value !== '__skip__',
       )
       if (acceptOption) {
@@ -100,7 +100,7 @@ describe('A137_RiverineShepherd session', () => {
     const p = resp.state.players[0]!
     if (resp.interaction.stateId === 'wait') {
       // Accept the optional sheep
-      const acceptOption = resp.interaction.options?.find(
+      const acceptOption = resp.interaction.request.options?.find(
         (o) => o.value !== '__skip__',
       )
       if (acceptOption) {

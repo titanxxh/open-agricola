@@ -26,7 +26,7 @@ const chooseA128RoomPayment = (
   // the sourced discount is the single option and the payment auto-resolves
   // straight into the next wait state.
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const paymentOption = resp.interaction.options?.find((option: ActionChoiceOption) =>
+    const paymentOption = resp.interaction.request.options?.find((option: ActionChoiceOption) =>
       optionSourceCards(option).includes(CARD_ID),
     )
     expect(paymentOption).toBeDefined()
@@ -64,8 +64,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
     // The listener fires on `after place-farmer` for the opponent's owner —
     // the owner's per-card stats now record `used` immediately. The acting
     // player (players[1]) is not the listener owner, so their copy stays empty.
@@ -83,8 +83,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-      expect(resp.interaction.fromPlayerIndex).toBe(1)
-      expect(resp.interaction.toPlayerIndex).toBe(0)
+      expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.request.toPlayerIndex).toBe(0)
     }
 
     resp = confirmPlayerSwitch(session)
@@ -96,8 +96,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
@@ -110,8 +110,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-      expect(resp.interaction.fromPlayerIndex).toBe(1)
-      expect(resp.interaction.toPlayerIndex).toBe(0)
+      expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.request.toPlayerIndex).toBe(0)
     }
 
     resp = confirmPlayerSwitch(session)
@@ -119,18 +119,18 @@ describe('A128_RiparianBuilder session', () => {
 
     // Choose to construct
     const constructOption = resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      ? resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       : undefined
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
     // maxSelections=1 enforces the room cap on the engine path; an oversized
     // attempt fails (engine clears pending), so we directly build a single
     // room — the structural cap is already asserted via maxSelections above.
-    expect(resp.interaction.farm.maxSelections).toBe(1)
+    expect(resp.interaction.request.farm.maxSelections).toBe(1)
 
     // Build a room
     resp = chooseA128RoomPayment(
@@ -145,8 +145,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
@@ -162,15 +162,15 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = chooseA128RoomPayment(
       session,
       0,
@@ -198,15 +198,15 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = chooseA128RoomPayment(
       session,
       0,
@@ -232,7 +232,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
@@ -267,7 +267,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
-    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
@@ -277,11 +277,11 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
-    expect(resp.interaction.farm.maxSelections).toBe(1)
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.maxSelections).toBe(1)
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -290,8 +290,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.options?.length ?? 0).toBeGreaterThanOrEqual(2)
-    expect(resp.interaction.options?.some((option: ActionChoiceOption) =>
+    expect(resp.interaction.request.options?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.some((option: ActionChoiceOption) =>
       optionSourceCards(option).includes(CARD_ID),
     )).toBe(true)
   })
@@ -306,20 +306,20 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    let constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    let constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
 
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
+    expect(resp.interaction.request.farm.farmType).toBe('room')
 
     resp = session.undoStep()
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionRiparianBuilderConstruct')
 
-    constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    constructOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
 
     resp = session.resolveChoice(0, constructOption!.value)
@@ -327,6 +327,6 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('farm-select')
-    expect(resp.interaction.farm.farmType).toBe('room')
+    expect(resp.interaction.request.farm.farmType).toBe('room')
   })
 })
