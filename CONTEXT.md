@@ -88,6 +88,10 @@ _Avoid_: Payment Pipeline、规则执行、真实资源变更
 Interaction Presentation 的一种本地草稿展示，覆盖 fence、room、stable、plow、sow 和 farm-position 选择的前端暂存、错误展示、提交 draft 和 snapshot 后重置。它只管理尚未提交的本地选择，不做农场合法性裁定。
 _Avoid_: Farm Board Projection、Moor Special Action tile routing、后端规则验证、真实 GameState 写入
 
+**Animal Reorg Draft Presentation**:
+Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
+_Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入
+
 **Interaction State Adapter**:
 会话层把 `GameState`、`EngineStack`、`Pending Envelope` 和 viewer redaction 派生成前端可见 `ClientInteractionState` 的适配模块。它隐藏引擎恢复 cursor、host node metadata 和旧兼容字段；前端只读取 `InteractionState.stateId` 与 `wait.request.kind` 下的结构化数据。
 _Avoid_: 在前端或测试里读取 Pending Envelope metadata、在 `InteractionState.wait` 顶层复制 `request` 字段
