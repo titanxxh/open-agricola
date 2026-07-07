@@ -2,6 +2,30 @@ import type { GameState, PlayerState, Worker } from '../contract/types'
 import { getCardHeldWorkerIds } from '../cards/helpers/card-held-workers'
 import { findActionSpaceById, findActionSpaceByWorker } from './space'
 
+export type PlayerQueryState = Pick<GameState, 'players'>
+
+export const findPlayerById = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): PlayerState | undefined =>
+  typeof playerId === 'string'
+    ? state.players.find((player) => player.id === playerId)
+    : undefined
+
+export const findPlayerIndexById = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): number =>
+  typeof playerId === 'string'
+    ? state.players.findIndex((player) => player.id === playerId)
+    : -1
+
+export const hasPlayer = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): boolean =>
+  findPlayerById(state, playerId) !== undefined
+
 export const getPlayedCardKeys = (
   p: Pick<PlayerState, 'improvements' | 'minorPlayed' | 'occupationPlayed'>,
 ): string[] => [

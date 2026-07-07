@@ -36,6 +36,10 @@ _Avoid_: Farmers
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
 
+**Player Lookup Query**:
+领域层把 `playerId` 解析为 `PlayerState` 或 `playerIndex` 的统一查询边界；规则、session 和 effect 代码通过它读取玩家身份映射。
+_Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
+
 **Room**:
 多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
 _Avoid_: PlayerState

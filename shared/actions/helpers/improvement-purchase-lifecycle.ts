@@ -12,6 +12,7 @@ import {
   readPrivateHandChangeSourceCard,
 } from '../../session/private-hand-events'
 import { getPositiveResourceLog, type ResolvedMinorImprovement } from './improvement-helpers'
+import { findPlayerIndexById } from '../../domain/player'
 
 export type ImprovementPurchaseKind = 'major' | 'minor'
 
@@ -83,7 +84,7 @@ const applyMinorImprovementPurchase = (
 
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
   if (improvement.passing === true) {
-    const idx = state.players.findIndex((p) => p.id === player.id)
+    const idx = findPlayerIndexById(state, player.id)
     const nextPlayer = state.players[(idx + 1) % state.players.length]
     nextPlayer.minorHand = nextPlayer.minorHand ?? []
     if (!nextPlayer.minorHand.includes(improvement.id)) {

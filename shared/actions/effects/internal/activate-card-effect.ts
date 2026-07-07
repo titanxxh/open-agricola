@@ -2,11 +2,7 @@ import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } 
 import { flowCardEffectHooks, runCardEffectHook } from '../../../cards/card-effects'
 import type { FlowCardEffectHook, PaymentInfo } from '../../../cards/card-effects'
 import type { ActionHookResult } from '../../hooks'
-
-const playerById = (state: GameState, playerId: unknown) =>
-  typeof playerId === 'string'
-    ? state.players.find((candidate) => candidate.id === playerId)
-    : undefined
+import { findPlayerById } from '../../../domain/player'
 
 const effectPlayerForHook = (
   state: GameState,
@@ -14,10 +10,10 @@ const effectPlayerForHook = (
   hook: FlowCardEffectHook,
   params?: Record<string, unknown>,
 ) => {
-  const targetPlayer = playerById(state, params?.targetPlayerId)
+  const targetPlayer = findPlayerById(state, params?.targetPlayerId)
   if (targetPlayer) return targetPlayer
   if (hook !== 'onBeforeEndGame') return player
-  return playerById(state, params?.targetPlayerId) ?? player
+  return player
 }
 
 const jsonSnapshot = (state: GameState, player: PlayerState): string =>
