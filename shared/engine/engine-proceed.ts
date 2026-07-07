@@ -59,6 +59,8 @@ import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
+import { findActionSpaceById } from '../domain/space'
+import { findPlayerById } from '../domain/player'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -74,7 +76,7 @@ const resolveExecutionSpace = (
 ): ActionSpace => {
   const targetSpaceId = actionContext?.targetSpaceId
   if (typeof targetSpaceId !== 'string') return fallback
-  return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
+  return findActionSpaceById(state, targetSpaceId) ?? fallback
 }
 
 const triggerSelectContextSnapshot = (context: EngineContext): InteractionContextSnapshot => ({
@@ -591,11 +593,11 @@ const executeActivateCardAction = (
   }
   const triggerPlayer =
     (triggerPlayerId
-      ? context.state.players.find((player) => player.id === triggerPlayerId)
+      ? findPlayerById(context.state, triggerPlayerId)
       : null) ?? context.player
   const effectPlayer =
     (ownerPlayerId
-      ? context.state.players.find((player) => player.id === ownerPlayerId)
+      ? findPlayerById(context.state, ownerPlayerId)
       : null) ?? triggerPlayer
   const eventActionContext = params.event.actionContext && typeof params.event.actionContext === 'object'
     ? params.event.actionContext as Record<string, unknown>
