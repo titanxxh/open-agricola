@@ -2,23 +2,21 @@ import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { AnimalKey } from '../../../shared/contract/animals'
-import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
 import { formatAnimalCounts } from '../../utils/format'
 import type {
   ActionChoiceOption,
-  AnytimeAction,
   ChoiceDescriptionPreview,
   ChoiceEffectPreview,
   PaymentResourceMap,
-  PlayerState,
   Resource,
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
+import type { InteractionBarActions, InteractionBarModel } from '../../app/interaction-bar-presentation'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: PaymentResourceMap
@@ -26,25 +24,7 @@ type ResourceExchangeLabelParams = {
   bonusVp?: number
 }
 
-type BorrowedFenceSourceControls = {
-  donors: {
-    playerId: string
-    name: string
-    color: PlayerState['color']
-    cap: number
-    allocated: number
-  }[]
-  selectedPlayerId: string | null
-  onSelect: (playerId: string) => void
-  hasMissingSources: boolean
-}
-
-type HeatingPending = {
-  playerName: string
-  required: number
-  maxFuelPayable: number
-  maxWoodConvertibleToFuel: number
-}
+type HeatingPending = NonNullable<InteractionBarModel['pending']['heating']>
 
 const emptyAnimalCounts: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0, horse: 0 }
 const animalCountOrder: AnimalKey[] = ['sheep', 'boar', 'cattle', 'horse']
@@ -503,141 +483,70 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
 }
 
 type Props = {
-  pendingAnimalReorg: PendingAnimalReorg | null
-  pendingChoice: PendingChoice | null
-  pendingEngineBlocked: {
-    promptKey?: string
-    promptParams?: Record<string, unknown>
-  } | null
-  pendingNextPlayerIndex: number | null
-  pendingPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
-  locale: Locale
-  playerNames: string[]
-  pendingRoomTilesLength: number
-  maxRoomSelections: number
-  pendingFenceEdgesLength?: number
-  pendingStableTilesLength: number
-  maxStableSelections: number
-  pendingFarmHandSelected?: boolean
-  pendingSowSelectionsLength?: number
-  pendingPositionSelectionsLength: number
-  maxPositionSelections: number
-  hasPendingPlowSelection: boolean
-  fenceErrorText: string
-  roomErrorText: string
-  stableErrorText: string
-  plowErrorText: string
-  sowErrorText: string
-  isSelectingFences: boolean
-  isSelectingRooms: boolean
-  isSelectingStables: boolean
-  isSelectingPlow: boolean
-  isSelectingSow: boolean
-  isInteractive: boolean
-  resolveChoice: (value: string) => void
-  confirmNextPlayer: () => void
-  confirmPlayerSwitch: () => void
-  harvestFeedPlayerName: string | null
-  confirmHarvestFeed: () => void
-  heatingPending?: HeatingPending | null
-  confirmHeating?: (payload: { fuelUsed: number; woodToFuel: number }) => void
-  onUndo: () => void
-  onUndoAction: () => void
-  canUndoStep: boolean
-  canUndoAction: boolean
-  onShowScoring: () => void
-  historyLength: number
-  hasActionStartSnapshot: boolean
-  anytimeActions: AnytimeAction[]
-  takeAnytimeAction: (actionId: string) => void
-  suppressChoiceOptions?: boolean
-  canBuildPalisades?: boolean
-  fencePlacementMode?: 'fence' | 'palisade'
-  setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
-  borrowedFenceSources?: BorrowedFenceSourceControls
-  animalReorg?: AnimalReorgState | null
-  reorgRemaining?: Record<AnimalKey, number> | null
-  hasReorgOverflow?: boolean
-  confirmAnimalReorg?: () => void
-  cancelAnimalDiscardPrompt?: () => void
-  resourceQuantitySelect?: {
-    availableByResource: Partial<Record<keyof Resource, number>>
-    promptKey?: string
-    requireAtLeastOne?: boolean
-    onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
-    onCancel: () => void
-  } | null
-  resourceBatchExchangeSelect?: {
-    discardAvailableByResource: Partial<Record<keyof Resource, number>>
-    receiveResources: readonly (keyof Resource)[]
-    maxTotal: number
-    promptKey?: string
-    onConfirm: (payload: {
-      discard: Partial<Record<keyof Resource, number>>
-      receive: Partial<Record<keyof Resource, number>>
-    }) => void
-    onCancel: () => void
-  } | null
+  model: InteractionBarModel
+  actions: InteractionBarActions
 }
 
 export const InteractionBar = ({
-  pendingAnimalReorg,
-  pendingChoice,
-  pendingEngineBlocked,
-  pendingNextPlayerIndex,
-  pendingPlayerSwitch,
-  locale,
-  playerNames,
-  pendingRoomTilesLength,
-  maxRoomSelections,
-  pendingFenceEdgesLength = 0,
-  pendingStableTilesLength,
-  maxStableSelections,
-  pendingFarmHandSelected = false,
-  pendingSowSelectionsLength,
-  pendingPositionSelectionsLength,
-  maxPositionSelections,
-  hasPendingPlowSelection,
-  fenceErrorText,
-  roomErrorText,
-  stableErrorText,
-  plowErrorText,
-  sowErrorText,
-  isSelectingFences,
-  isSelectingRooms,
-  isSelectingStables,
-  isSelectingPlow,
-  isSelectingSow,
-  isInteractive,
-  resolveChoice,
-  confirmNextPlayer,
-  confirmPlayerSwitch,
-  harvestFeedPlayerName,
-  confirmHarvestFeed,
-  heatingPending = null,
-  confirmHeating = () => {},
-  onUndo,
-  onUndoAction,
-  canUndoStep,
-  canUndoAction,
-  onShowScoring,
-  historyLength,
-  hasActionStartSnapshot,
-  anytimeActions,
-  takeAnytimeAction,
-  suppressChoiceOptions = false,
-  canBuildPalisades = false,
-  fencePlacementMode = 'fence',
-  setFencePlacementMode,
-  borrowedFenceSources,
-  animalReorg = null,
-  reorgRemaining = null,
-  hasReorgOverflow = false,
-  confirmAnimalReorg = () => {},
-  cancelAnimalDiscardPrompt = () => {},
-  resourceQuantitySelect = null,
-  resourceBatchExchangeSelect = null,
+  model,
+  actions,
 }: Props) => {
+  const { locale, playerNames, isInteractive } = model
+  const pendingAnimalReorg = model.pending.animalReorg
+  const pendingChoice = model.pending.choice
+  const pendingEngineBlocked = model.pending.engineBlocked
+  const pendingNextPlayerIndex = model.pending.nextPlayerIndex
+  const pendingPlayerSwitch = model.pending.playerSwitch
+  const harvestFeedPlayerName = model.pending.harvestFeedPlayerName
+  const heatingPending = model.pending.heating
+  const resourceQuantitySelect = model.pending.resourceQuantitySelect
+  const resourceBatchExchangeSelect = model.pending.resourceBatchExchangeSelect
+  const suppressChoiceOptions = model.pending.suppressChoiceOptions
+  const pendingRoomTilesLength = model.farm.pendingRoomTilesLength
+  const maxRoomSelections = model.farm.maxRoomSelections
+  const pendingFenceEdgesLength = model.farm.pendingFenceEdgesLength
+  const pendingStableTilesLength = model.farm.pendingStableTilesLength
+  const maxStableSelections = model.farm.maxStableSelections
+  const pendingFarmHandSelected = model.farm.pendingFarmHandSelected
+  const pendingSowSelectionsLength = model.farm.pendingSowSelectionsLength
+  const pendingPositionSelectionsLength = model.farm.pendingPositionSelectionsLength
+  const maxPositionSelections = model.farm.maxPositionSelections
+  const hasPendingPlowSelection = model.farm.hasPendingPlowSelection
+  const fenceErrorText = model.farm.errors.fence
+  const roomErrorText = model.farm.errors.room
+  const stableErrorText = model.farm.errors.stable
+  const plowErrorText = model.farm.errors.plow
+  const sowErrorText = model.farm.errors.sow
+  const isSelectingFences = model.farm.selecting.fences
+  const isSelectingRooms = model.farm.selecting.rooms
+  const isSelectingStables = model.farm.selecting.stables
+  const isSelectingPlow = model.farm.selecting.plow
+  const isSelectingSow = model.farm.selecting.sow
+  const canBuildPalisades = model.farm.fence.canBuildPalisades
+  const fencePlacementMode = model.farm.fence.placementMode
+  const setFencePlacementMode = model.farm.fence.setPlacementMode
+  const borrowedFenceSources = model.farm.fence.borrowedSources
+  const animalReorg = model.animalReorg.state
+  const reorgRemaining = model.animalReorg.remaining
+  const hasReorgOverflow = model.animalReorg.hasOverflow
+  const canUndoStep = model.controls.canUndoStep
+  const canUndoAction = model.controls.canUndoAction
+  const historyLength = model.controls.historyLength
+  const hasActionStartSnapshot = model.controls.hasActionStartSnapshot
+  const anytimeActions = model.controls.anytimeActions
+  const {
+    resolveChoice,
+    confirmNextPlayer,
+    confirmPlayerSwitch,
+    confirmHarvestFeed,
+    confirmHeating,
+    undoStep: onUndo,
+    undoAction: onUndoAction,
+    showScoring: onShowScoring,
+    takeAnytimeAction,
+    confirmAnimalReorg,
+    cancelAnimalDiscardPrompt,
+  } = actions
   const isFarmSelectionPrompt =
     pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
     pendingChoice?.promptKey === 'ui.interactionRoomSelect' ||
