@@ -15,6 +15,7 @@ import type {
   GameState,
   InteractionCommand,
   InteractionFarmSelection,
+  InteractionRequest,
   InteractionSelection,
   InteractionState,
   ParentSelectionSubmission,
@@ -111,7 +112,10 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
-import { deriveInteractionState } from './interaction-state-adapter.ts'
+import {
+  deriveInteractionState,
+  type PendingInteractionProjectionInput,
+} from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
@@ -1629,6 +1633,29 @@ export class GameCore {
     }))
   }
 
+  private projectPendingInteractionRequest({
+    request,
+    player,
+    promptKey,
+    hasPendingHost,
+  }: PendingInteractionProjectionInput): InteractionRequest {
+    if (request.kind === 'animal-reorg') {
+      return {
+        ...request,
+        zones: player ? this.buildAnimalReorgZones(player) : request.zones,
+      }
+    }
+    if (request.kind !== 'choice' || !hasPendingHost || !player) return request
+    if (this.isSelectionPromptKey(promptKey)) {
+      return {
+        kind: 'selection',
+        selection: this.buildSelectionInteractionFromNode(player),
+      }
+    }
+    const farm = this.buildFarmInteractionFromNode(promptKey, player)
+    return farm ? { kind: 'farm-select', farm } : request
+  }
+
   private buildInteraction(): InteractionState {
     return deriveInteractionState({
       state: this.state,
@@ -1640,10 +1667,7 @@ export class GameCore {
       scoreSummary: () => this.computeScoreSummary(),
       effectiveOwnerIndexForFrame: (frame, nodeId, pending) =>
         this.effectiveOwnerIndexForFrame(frame, nodeId, pending),
-      animalReorgZones: (player) => this.buildAnimalReorgZones(player),
-      isSelectionPrompt: (promptKey) => !!this.isSelectionPromptKey(promptKey),
-      buildSelectionInteraction: (player) => this.buildSelectionInteractionFromNode(player),
-      buildFarmInteraction: (promptKey, player) => this.buildFarmInteractionFromNode(promptKey, player),
+      projectPendingRequest: (input) => this.projectPendingInteractionRequest(input),
     })
   }
 

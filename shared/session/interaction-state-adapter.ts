@@ -1,10 +1,7 @@
 import type {
   ActionChoiceOption,
   AnytimeAction,
-  InteractionAnimalReorgZone,
   InteractionCommand,
-  InteractionFarmSelection,
-  InteractionSelection,
   InteractionRequest,
   InteractionState,
   PlayerState,
@@ -19,6 +16,17 @@ import { hasPendingOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 type AnytimeEntry = { descriptor: AnytimeAction }
 
+export type PendingInteractionProjectionInput = {
+  request: InteractionRequest
+  player: PlayerState | undefined
+  playerIndex: number
+  promptKey?: string
+  promptParams?: Record<string, unknown>
+  sourceCard?: string
+  choiceOptions: ActionChoiceOption[]
+  hasPendingHost: boolean
+}
+
 export type InteractionStateAdapterInput = {
   state: GameState
   engineStack: EngineStack
@@ -32,13 +40,7 @@ export type InteractionStateAdapterInput = {
     nodeId?: string | null,
     pending?: Pick<PendingView, 'effectiveOwnerPlayerId'> | null,
   ) => number
-  animalReorgZones: (player: PlayerState) => InteractionAnimalReorgZone[]
-  isSelectionPrompt: (promptKey?: string) => boolean
-  buildSelectionInteraction: (player: PlayerState) => InteractionSelection
-  buildFarmInteraction: (
-    promptKey: string | undefined,
-    player: PlayerState,
-  ) => InteractionFarmSelection | null
+  projectPendingRequest: (input: PendingInteractionProjectionInput) => InteractionRequest
 }
 
 const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined => {
@@ -54,6 +56,7 @@ const requestWithChoices = (request: InteractionRequest, choices: ActionChoiceOp
   if (request.kind === 'choice') return { ...request, options: choices }
   if (request.kind === 'select-trigger') return { ...request, options: choices }
   if (request.kind === 'farm-select') return { ...request, options: choices }
+  if (request.kind === 'selection') return { ...request, options: choices }
   return request
 }
 
@@ -100,10 +103,7 @@ export const deriveInteractionState = ({
   winnerIds,
   scoreSummary,
   effectiveOwnerIndexForFrame,
-  animalReorgZones,
-  isSelectionPrompt,
-  buildSelectionInteraction,
-  buildFarmInteraction,
+  projectPendingRequest,
 }: InteractionStateAdapterInput): InteractionState => {
   if (state.gameOver) {
     return {
@@ -142,6 +142,19 @@ export const deriveInteractionState = ({
   const choiceOptions = view.choices ?? []
   const sourceCard = view.sourceCard ?? choicesSourceCard(choiceOptions)
   const player = state.players[playerIndex]
+  const projectedRequest = requestWithChoices(
+    projectPendingRequest({
+      request,
+      player,
+      playerIndex,
+      promptKey,
+      promptParams,
+      sourceCard,
+      choiceOptions,
+      hasPendingHost: !!pendingHost,
+    }),
+    choiceOptions,
+  )
 
   const policy = getAnytimePolicy()
   const anytimeEntries = policy.allowed ? getAnytimeEntries() : []
@@ -155,183 +168,29 @@ export const deriveInteractionState = ({
     }))
   const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
 
-  switch (request.kind) {
-    case 'animal-reorg':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request: {
-          ...request,
-          zones: player ? animalReorgZones(player) : request.zones,
-        },
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'confirm-next-player':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'confirm-player-switch':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'feed':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'heating':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'farm-select':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request: requestWithChoices(request, choiceOptions),
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'resource-quantity-select':
-    case 'resource-batch-exchange-select':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'select-trigger':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request: requestWithChoices(request, choiceOptions),
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'card-draft':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey,
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind),
-        anytimeActions: anytimeDescriptors,
-      }
-    case 'engine-blocked':
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-        promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
-        promptParams,
-        sourceCard,
-        request,
-        allowedCommands: buildWaitCmds(request.kind, { allowAnytime: false }),
-        anytimeActions: [],
-      }
-    case 'choice':
-    default: {
-      if (pendingHost && isSelectionPrompt(promptKey) && player) {
-        const selection = buildSelectionInteraction(player)
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request: {
-            kind: 'selection',
-            selection,
-            ...(choiceOptions.length > 0 ? { options: choiceOptions } : {}),
-          },
-          allowedCommands: buildWaitCmds('selection'),
-          anytimeActions: anytimeDescriptors,
-        }
-      }
-      const farm = pendingHost && player ? buildFarmInteraction(promptKey, player) : null
-      const allowedCommands: InteractionCommand[] = farm
-        ? buildWaitCmds('farm-select')
-        : buildWaitCmds(request.kind)
-      if (farm) {
-        return {
-          stateId: 'wait',
-          playerIndex,
-          spaceId,
-            promptKey,
-            promptParams,
-            sourceCard,
-            request: {
-              kind: 'farm-select',
-              farm,
-              ...(choiceOptions.length > 0 ? { options: choiceOptions } : {}),
-            },
-            allowedCommands,
-            anytimeActions: anytimeDescriptors,
-          }
-      }
-      return {
-        stateId: 'wait',
-        playerIndex,
-        spaceId,
-          promptKey,
-          promptParams,
-          sourceCard,
-          request: requestWithChoices(request, choiceOptions),
-          allowedCommands,
-          anytimeActions: anytimeDescriptors,
-        }
+  if (request.kind === 'engine-blocked') {
+    return {
+      stateId: 'wait',
+      playerIndex,
+      spaceId,
+      promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
+      promptParams,
+      sourceCard,
+      request: projectedRequest,
+      allowedCommands: buildWaitCmds(request.kind, { allowAnytime: false }),
+      anytimeActions: [],
     }
+  }
+
+  return {
+    stateId: 'wait',
+    playerIndex,
+    spaceId,
+    promptKey,
+    promptParams,
+    sourceCard,
+    request: projectedRequest,
+    allowedCommands: buildWaitCmds(projectedRequest.kind),
+    anytimeActions: anytimeDescriptors,
   }
 }
