@@ -176,6 +176,7 @@ import {
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 import { canProjectActionEntry, computeActionEntryAvailability } from './action-entry-query'
+import { interactionSubmitChannel } from './interaction-command-policy'
 import {
   createMoorSpecialActionSpace,
   isMoorSpecialActionId,
@@ -3538,6 +3539,17 @@ export class GameCore {
       ) {
         return this.respond(false, 'use commitSelectionChoice for selection')
       }
+      const submitChannel = interactionSubmitChannel(request.kind)
+      if (submitChannel === 'commitSelection') {
+        if (request.kind === 'farm-select' || request.kind === 'selection') {
+          return this.respond(false, 'use commitSelectionChoice for selection')
+        }
+        return this.respond(false, `use commitSelectionChoice for ${request.kind}`)
+      }
+      if (submitChannel === 'none') {
+        if (request.kind === 'card-draft') return this.respond(false, 'card-draft resolveChoice not supported')
+        if (request.kind === 'engine-blocked') return this.respond(false, 'engine-blocked cannot resolve')
+      }
       switch (request.kind) {
         case 'confirm-next-player':
           return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
@@ -3553,23 +3565,15 @@ export class GameCore {
         case 'animal-reorg':
         case 'choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
-        case 'farm-select':
-        case 'selection':
-          return this.respond(false, 'use commitSelectionChoice for selection')
         case 'select-trigger':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
+        case 'farm-select':
+        case 'selection':
         case 'resource-quantity-select':
-          // B157_Salter-style mixed resource panel. The dedicated commit pathway
-          // is commitSelectionChoice (see Task C1); resolveChoice is rejected
-          // explicitly so future callers cannot silently route through the
-          // typed commit path.
-          return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
         case 'resource-batch-exchange-select':
-          return this.respond(false, 'use commitSelectionChoice for resource-batch-exchange-select')
         case 'card-draft':
-          return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
-          return this.respond(false, 'engine-blocked cannot resolve')
+          return this.respond(false, `unhandled interaction kind: ${request.kind}`)
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)
@@ -4196,14 +4200,22 @@ export class GameCore {
     const frame = this.engineStack.current()
     const envelopeKind = view?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
-    const isFarmSelection = envelopeKind === 'farm-select' || (isPlainChoice && !!this.isFarmPromptKey(view?.promptKey))
-    const isGenericSelection = envelopeKind === 'selection' || (isPlainChoice && !!this.isSelectionPromptKey(view?.promptKey))
-    const isResourceQuantity = envelopeKind === 'resource-quantity-select'
-    const isResourceBatchExchange = envelopeKind === 'resource-batch-exchange-select'
+    const effectiveKind = isPlainChoice && this.isFarmPromptKey(view?.promptKey)
+      ? 'farm-select'
+      : isPlainChoice && this.isSelectionPromptKey(view?.promptKey)
+        ? 'selection'
+        : envelopeKind
+    const isFarmSelection = effectiveKind === 'farm-select'
+    const isGenericSelection = effectiveKind === 'selection'
+    const isResourceQuantity = effectiveKind === 'resource-quantity-select'
+    const isResourceBatchExchange = effectiveKind === 'resource-batch-exchange-select'
+    const acceptsCommitSelection = effectiveKind
+      ? interactionSubmitChannel(effectiveKind) === 'commitSelection'
+      : false
     const pendingPlayerIndex = frame && view && cursor
       ? this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
       : -1
-    if ((!isFarmSelection && !isGenericSelection && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
+    if (!acceptsCommitSelection || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection/resource choice for this player')
     }
     const player = this.state.players[playerIndex]
