@@ -7,6 +7,7 @@ import {
   addResourcesFromBoard,
   addResourcesFromCards,
 } from '../../session/stats'
+import { findPlayerById } from '../../domain/player'
 
 export const gainResources = (
   player: PlayerState,
@@ -98,7 +99,7 @@ export const gainAction: ActionDefinition = {
     if (recipientMode === 'others') {
       recipients = state.players.filter((entry) => entry.id !== player.id)
     } else if (recipientPlayerId) {
-      const target = state.players.find((p) => p.id === recipientPlayerId)
+      const target = findPlayerById(state, recipientPlayerId)
       recipients = target ? [target] : []
     } else {
       recipients = [player]
@@ -106,7 +107,7 @@ export const gainAction: ActionDefinition = {
 
     const paid: Partial<Resource> = {}
     if (payerId) {
-      const payer = state.players.find((p) => p.id === payerId)
+      const payer = findPlayerById(state, payerId)
       if (payer) {
         Object.entries(gained).forEach(([key, amount]) => {
           const k = key as keyof Resource

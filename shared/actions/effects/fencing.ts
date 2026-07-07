@@ -45,6 +45,7 @@ import {
   getOwnOrdinaryFenceReserveCount,
   addConsumedSupplyTokenCount,
 } from '../../domain/supply-tokens'
+import { findPlayerById } from '../../domain/player'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
@@ -215,7 +216,7 @@ const borrowedPolicyWithCurrentCaps = (
   if (!isBorrowedFenceSourcePolicy(policy.sourcePolicy)) return policy
   const donorCaps: Record<string, number> = {}
   for (const [donorId, cap] of Object.entries(policy.sourcePolicy.donorCaps)) {
-    const donor = state.players.find((candidate) => candidate.id === donorId)
+    const donor = findPlayerById(state, donorId)
     donorCaps[donorId] = donor && donor.id !== activePlayer.id
       ? Math.min(cap, getOwnOrdinaryFenceReserveCount(donor))
       : 0
@@ -836,7 +837,7 @@ const finalizeFence = (
     validated.newFenceEdges,
     fenceSources,
   )) {
-    const donor = ctx.state.players.find((candidate) => candidate.id === donorId)
+    const donor = findPlayerById(ctx.state, donorId)
     if (donor) addConsumedSupplyTokenCount(donor, 'fence', count)
   }
   const paidResources = positiveResources(payment.solution.resourcesPaid)

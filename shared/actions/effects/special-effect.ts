@@ -26,7 +26,7 @@ import {
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
-import { findFirstNewborn } from '../../domain/player'
+import { findFirstNewborn, findPlayerById } from '../../domain/player'
 import { findActionSpaceById, removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
@@ -617,7 +617,7 @@ export const specialEffectAction: ActionDefinition = {
         }
         if (accumulationTarget.kind === 'card') {
           const targetPlayer = accumulationTarget.playerId
-            ? state.players.find((entry) => entry.id === accumulationTarget.playerId) ?? target
+            ? findPlayerById(state, accumulationTarget.playerId) ?? target
             : target
           const counters = initCardState(targetPlayer, accumulationTarget.cardId)
           counters[p.resource] = (counters[p.resource] ?? 0) + p.amount

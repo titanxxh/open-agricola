@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Worker } from '../../contract/types'
-import { markAllWorkersUsed } from '../player'
-import { familySize, workersAvailable, newbornCount } from '../player'
 import { holdWorkerOnCard, releaseWorkerFromCard } from '../../cards/helpers/card-held-workers'
 import {
   activateSmallestInactive,
   activeWorkers,
   familySize,
+  findPlayerById,
+  findPlayerIndexById,
   findFirstNewborn,
+  hasPlayer,
   isWorkerOnAnySpace,
   newbornCount,
   smallestAvailableWorker,
@@ -35,6 +36,33 @@ const emptyState = (players: PlayerState[]): GameState => ({
 } as unknown as GameState)
 
 describe('player helpers', () => {
+  it('findPlayerById returns the matching player', () => {
+    const p1 = makePlayer([makeWorker('1')])
+    const p2 = { ...makePlayer([makeWorker('1')]), id: 'p2', name: 'P2' }
+    const state = emptyState([p1, p2])
+
+    expect(findPlayerById(state, 'p2')).toBe(p2)
+    expect(findPlayerById(state, 'missing')).toBeUndefined()
+    expect(findPlayerById(state, null)).toBeUndefined()
+  })
+
+  it('findPlayerIndexById returns the matching player index', () => {
+    const p1 = makePlayer([makeWorker('1')])
+    const p2 = { ...makePlayer([makeWorker('1')]), id: 'p2', name: 'P2' }
+    const state = emptyState([p1, p2])
+
+    expect(findPlayerIndexById(state, 'p1')).toBe(0)
+    expect(findPlayerIndexById(state, 'p2')).toBe(1)
+    expect(findPlayerIndexById(state, 'missing')).toBe(-1)
+  })
+
+  it('hasPlayer checks player presence by id', () => {
+    const state = emptyState([makePlayer([makeWorker('1')])])
+
+    expect(hasPlayer(state, 'p1')).toBe(true)
+    expect(hasPlayer(state, 'p2')).toBe(false)
+  })
+
   it('familySize counts active workers', () => {
     const p = makePlayer([makeWorker('1'), makeWorker('2'), makeWorker('3', false)])
     expect(familySize(p)).toBe(2)

@@ -1,5 +1,6 @@
 import type { ActionDefinition } from '../../contract/types'
 import { incCounter } from '../../cards/__stubs__/helpers'
+import { findPlayerById } from '../../domain/player'
 
 export const bonusVpAction: ActionDefinition = {
   id: 'bonus-vp',
@@ -15,9 +16,7 @@ export const bonusVpAction: ActionDefinition = {
     // Mirror special-effect's targetPlayerId routing: when the card listener
     // owner ≠ actor, accumulate the bonus VP on the owner's cardStates.
     const targetId = (actionContext as { targetPlayerId?: string } | undefined)?.targetPlayerId
-    const target = (typeof targetId === 'string' && targetId
-      ? state.players.find((p) => p.id === targetId)
-      : undefined) ?? player
+    const target = findPlayerById(state, targetId) ?? player
     incCounter(target, sourceCard, 'bonusVp')
     eventSink?.emit<'card.stateChanged'>({
       type: 'card.stateChanged',
