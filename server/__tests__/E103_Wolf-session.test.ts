@@ -21,15 +21,18 @@ const moved = (
 })
 
 const setup = () => {
-  const session = new GameSession()
+  const session = new GameSession(103, undefined, { playerCount: 2 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
+  state.players.forEach((p) => {
+    p.minorHand = ['__test_placeholder__']
+    p.occupationHand = ['__test_placeholder__']
+  })
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
-  player.occupationHand.push(CARD_ID)
+  player.occupationHand = [CARD_ID]
 
   session.loadState(state)
   session.devPlayCard(0, CARD_ID)
@@ -124,9 +127,9 @@ describe('E103_Wolf session', () => {
     player.resources.wood = 0
     player.resources.boar = 0
 
-    // Find a wood accumulation space
-    const woodSpace = state.actionSpaces.find((s) => s.id === 'forest' || s.id === 'copse')
-    if (!woodSpace) return
+    const woodSpace = state.actionSpaces.find((s) => s.id === 'forest')
+    expect(woodSpace).toBeDefined()
+    woodSpace!.resources.wood = 1
 
     state.roundActionOrder = state.roundActionOrder.map(() => null)
     session.loadState(state)
