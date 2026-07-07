@@ -1353,7 +1353,7 @@ export class GameCore {
     actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('room', {
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('room', {
       costOverride,
       actionContext,
     })
@@ -1372,7 +1372,7 @@ export class GameCore {
     const zoneFilter = actionContext?.zoneFilter
     const max = actionContext?.max
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('stable', {
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('stable', {
       costOverride,
       exactCost: this.readExactCost(actionContext),
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
@@ -1386,7 +1386,7 @@ export class GameCore {
     actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('plow', {
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('plow', {
       costOverride,
       exactCost: this.readExactCost(actionContext),
     })
@@ -1395,7 +1395,7 @@ export class GameCore {
   private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
     const actionContext = this.getActionContextFromTopFrame()
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('sow', { actionContext })
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('sow', { actionContext })
   }
 
   /**
@@ -1409,7 +1409,7 @@ export class GameCore {
   ): InteractionFarmSelection {
     const frame = this.engineStack.current()
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('fence', {
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('fence', {
       spaceId: frame?.spaceId ?? '',
     })
   }
@@ -1423,7 +1423,7 @@ export class GameCore {
       return buildOccupationHandSelectionInteraction(player, actionContext)
     }
     const idx = this.state.players.indexOf(player)
-    const interaction = playerBoard(this.state, idx).farmyard.selectableTiles('farm-position', { actionContext })
+    const interaction = playerBoard(this.state, idx).farmInteraction.selectableTiles('farm-position', { actionContext })
     return this.filterSelectionInteractionByEffectValidator(player, interaction, actionContext)
   }
 
@@ -4401,7 +4401,7 @@ export class GameCore {
       }
     }
     const selectionInteraction = playerBoard(this.state, playerIndex)
-      .farmyard
+      .farmInteraction
       .selectableTiles('farm-position', { actionContext: interactionContext })
     const selectablePositions = selectionInteraction.kind === 'farm-position'
       ? selectionInteraction.selectablePositions

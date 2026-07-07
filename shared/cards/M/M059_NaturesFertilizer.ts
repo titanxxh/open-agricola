@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { buildSowFarmInteraction } from '../../domain/farmyard'
+import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'

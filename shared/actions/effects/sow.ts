@@ -7,7 +7,7 @@ import type {
 import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
-import { buildSowFarmInteraction } from '../../domain/farmyard'
+import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
 
 export const getEmptyFields = (player: PlayerState) =>
@@ -63,7 +63,7 @@ const finalizeSow = (
     : undefined
   const idx = ctx.state.players.indexOf(player)
   const board = playerBoard(ctx.state, idx)
-  const extraFields = board.farmyard.permittedExtraSowableFields(ctx.actionContext)
+  const extraFields = board.farmInteraction.permittedExtraSowableFields(ctx.actionContext)
   const extraAllowedCrops = new Map(
     extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
   )
@@ -135,7 +135,7 @@ export const sowAction: ActionDefinition = {
   },
   execute: ({ state, player, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
-    const farm = playerBoard(state, idx).farmyard.selectableTiles('sow', { actionContext })
+    const farm = playerBoard(state, idx).farmInteraction.selectableTiles('sow', { actionContext })
     return {
       type: 'request',
       request: {

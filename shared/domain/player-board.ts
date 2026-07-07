@@ -1,14 +1,15 @@
 import type { GameState, PlayerState } from '../contract/types.ts'
 import type { AnimalKey } from '../contract/animals.ts'
 import { Farmyard } from './farmyard.ts'
+import { FarmInteraction } from './farmyard-interaction.ts'
 import { AnimalZones } from './animal-zones.ts'
 
 type AnimalType = AnimalKey
 
 /**
- * Facade over a single player's board. Composes the `Farmyard` and
- * `AnimalZones` sub-aggregates and exposes a few cross-aggregate
- * convenience queries. Constructed via `playerBoard(state, idx)`.
+ * Facade over a single player's board. Composes the `Farmyard`,
+ * `FarmInteraction`, and `AnimalZones` sub-aggregates and exposes a few
+ * cross-aggregate convenience queries. Constructed via `playerBoard(state, idx)`.
  *
  * Mutation contract: query methods (`hasRoomFor`,
  * `totalAnimalCapacity`, `familySize`) never mutate. The single
@@ -19,6 +20,7 @@ type AnimalType = AnimalKey
  */
 export class PlayerBoard {
   readonly farmyard: Farmyard
+  readonly farmInteraction: FarmInteraction
   readonly animals: AnimalZones
   private readonly player: PlayerState
   private readonly state: GameState
@@ -27,6 +29,7 @@ export class PlayerBoard {
     this.player = player
     this.state = state
     this.farmyard = new Farmyard(player, state)
+    this.farmInteraction = new FarmInteraction(player)
     this.animals = new AnimalZones(player, state)
   }
 

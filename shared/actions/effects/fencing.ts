@@ -927,7 +927,7 @@ export const fenceAction: ActionDefinition = {
     ) {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
-    const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', {
+    const farm = playerBoard(state, idx).farmInteraction.selectableTiles('fence', {
       spaceId: space.id,
       actionContext,
     })

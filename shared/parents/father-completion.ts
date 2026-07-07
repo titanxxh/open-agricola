@@ -2,7 +2,7 @@ import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, Actio
 import { animalKeysForState, type AnimalKey } from '../contract/animals'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
-import { buildSowFarmInteraction } from '../domain/farmyard'
+import { buildSowFarmInteraction } from '../domain/farmyard-interaction'
 import { startOrdinaryCardDrawChoice } from '../session/ordinary-card-draw'
 import { getParentCardDefinition } from './cards'
 import type { FatherParentCardId, FatherRequirement, FatherReward, FatherRewardEffect } from './types'
