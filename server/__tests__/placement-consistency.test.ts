@@ -40,6 +40,8 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
     const entry = allowed.find((a) => a.spaceId === 'urgent-wish-children')
     expect(entry).toBeDefined()
     expect(entry!.allowOccupied).toBe(true)
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
+    expect(session.getAvailableActions(0).map((action) => action.spaceId)).toContain('urgent-wish-children')
 
     // Check takeAction succeeds
     const resp = session.takeAction(0, 'urgent-wish-children')

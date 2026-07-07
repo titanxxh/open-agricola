@@ -163,13 +163,8 @@ import {
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
-import { clearAllLinkedSpaceBlocks, findActionSpaceById, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
-import {
-  canEnterSpace,
-  computeAllowedPlacementSpaces,
-} from '../actions/helpers/placement-availability.ts'
+import { clearAllLinkedSpaceBlocks, findActionSpaceById, removeWorkerRef } from '../domain/space.ts'
 import { buildPlaceTerrainFlow } from '../moor/terrain-flow.ts'
-import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 import {
   computeAnytimePolicy,
   type AnytimePolicy,
@@ -180,6 +175,7 @@ import {
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
+import { canProjectActionEntry, computeActionEntryAvailability } from './action-entry-query'
 import {
   createMoorSpecialActionSpace,
   isMoorSpecialActionId,
@@ -189,7 +185,6 @@ import {
 import type { MoorSpecialActionId } from '../moor/types'
 import {
   applyHeatingPayment,
-  canMoorWorkerEnterSpace,
   computeHeatingRequirement,
   recoverInfirmaryWorkers,
   type HeatingPaymentPayload,
@@ -3236,18 +3231,13 @@ export class GameCore {
   }
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
-    if (!canEnterSpace(space, player, this.state)) return false
-    if (!canMoorWorkerEnterSpace(this.state, player, space.id)) return false
-    if (isSpaceBlocked(space)) return false
-    if (isSpaceOccupied(space)) {
-      const allowed = computeAllowedPlacementSpaces(this.state, player)
-      if (!allowed.some(a => a.spaceId === space.id)) return false
-    }
-    return this.hookDispatcher.applyIsDoable(
-      { state: this.state, player, space, actionId: space.id },
-      space,
-      space.canBeExecutedByPlayer(this.state, player),
-    )
+    return canProjectActionEntry(this.state, player, space, {
+      isActionDoable: (entry, baseDoable) => this.hookDispatcher.applyIsDoable(
+        { state: this.state, player, space: entry, actionId: entry.id },
+        entry,
+        baseDoable,
+      ),
+    })
   }
 
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
@@ -3273,38 +3263,13 @@ export class GameCore {
   private getActionAvailabilityInContext(playerIndex: number): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
-
-    const result: Record<string, boolean> = {}
-
-    for (const space of this.state.actionSpaces) {
-      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space)
-    }
-
-    // Also mark occupied spaces that computeArgs listeners expose as extra options
-    if (canMoorWorkerEnterSpace(this.state, player, 'place-farmer')) {
-      const listenerContext: import('../cards/card-listeners.ts').CardListenerContextInput = {
-        state: this.state,
-        player,
-        space: this.state.actionSpaces[0],
-        actionId: 'place-farmer',
-        phase: 'computeArgs',
-      }
-      const matched = getMatchingListeners(listenerContext)
-      for (const entry of matched) {
-        const r = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
-        if (!r?.extraOptions) continue
-        for (const opt of r.extraOptions) {
-          if (opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) {
-            const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
-            if (!result[spaceId]) {
-              result[spaceId] = true
-            }
-          }
-        }
-      }
-    }
-
-    return result
+    return computeActionEntryAvailability(this.state, player, {
+      isActionDoable: (space, baseDoable) => this.hookDispatcher.applyIsDoable(
+        { state: this.state, player, space, actionId: space.id },
+        space,
+        baseDoable,
+      ),
+    })
   }
 
   getCardAvailability(

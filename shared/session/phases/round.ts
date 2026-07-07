@@ -13,7 +13,7 @@
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
-import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../domain/space.ts'
+import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById } from '../../domain/space.ts'
 import {
   createMoorSpecialActionSpace,
   validateMoorSpecialAction,
@@ -22,10 +22,7 @@ import {
 import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
-import {
-  canUseExclusiveSpace,
-  computeAllowedPlacementSpaces,
-} from '../../actions/helpers/placement-availability.ts'
+import { canEnterActionSpace } from '../action-entry-query.ts'
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
@@ -34,7 +31,6 @@ import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPe
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
-import { isThroughTheSeasonsSeason } from '../../seasons/rules.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -135,28 +131,9 @@ export const takeAction = (
   if (!player) return core.emitResponse(false, 'no workers available')
   const space = findActionSpaceById(state, spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
-  if (isSpaceBlocked(space)) return core.emitResponse(false, 'space unavailable')
-  if (!canUseExclusiveSpace(space, player, state)) {
-    return core.emitResponse(false, 'space unavailable')
-  }
-  if (space.strictCanExecute && !space.canBeExecutedByPlayer(state, player)) {
-    return core.emitResponse(false, 'space unavailable')
-  }
-  if (
-    space.id === 'fencing' &&
-    isThroughTheSeasonsSeason(state, 'spring') &&
-    !space.canBeExecutedByPlayer(state, player)
-  ) {
-    return core.emitResponse(false, 'space unavailable')
-  }
-  if (isSpaceOccupied(space)) {
-    const allowed = computeAllowedPlacementSpaces(state, player)
-    if (!allowed.some(a => a.spaceId === spaceId)) return core.emitResponse(false, 'space unavailable')
-  }
-  // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
-  // opponents with 0 food). `space.canBeExecutedByPlayer` is intentionally
-  // not used here so OR-style fall-through actions keep their existing route.
-  if (core.listenersVetoIsDoableCheck(player, space)) {
+  if (!canEnterActionSpace(state, player, space, {
+    vetoesAction: (entry) => core.listenersVetoIsDoableCheck(player, entry),
+  })) {
     return core.emitResponse(false, 'space unavailable')
   }
   const worker = selectWorkerForMoorAction(state, player, spaceId)
