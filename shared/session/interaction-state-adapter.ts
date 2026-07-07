@@ -14,6 +14,7 @@ import type { ClientInteractionState } from '../contract/protocol/game'
 import type { EngineFrame, EngineStack } from '../engine'
 import type { PendingView } from '../engine/types'
 import type { AnytimePolicy } from './anytime-policy'
+import { waitInteractionCommandsWithUndo } from './interaction-command-policy'
 import { hasPendingOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 type AnytimeEntry = { descriptor: AnytimeAction }
@@ -145,12 +146,13 @@ export const deriveInteractionState = ({
   const policy = getAnytimePolicy()
   const anytimeEntries = policy.allowed ? getAnytimeEntries() : []
   const includeAnytimeCmd = policy.allowed && anytimeEntries.length > 0
-  const buildCmds = (
-    base: ReadonlyArray<InteractionCommand>,
-  ): InteractionCommand[] => {
-    const commands: InteractionCommand[] = includeAnytimeCmd ? [...base, 'takeAnytimeAction'] : [...base]
-    return filterUndoCommands(commands)
-  }
+  const buildWaitCmds = (
+    kind: InteractionRequest['kind'],
+    options: { allowAnytime?: boolean } = {},
+  ): InteractionCommand[] =>
+    filterUndoCommands(waitInteractionCommandsWithUndo(kind, {
+      includeAnytimeAction: (options.allowAnytime ?? true) && includeAnytimeCmd,
+    }))
   const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
 
   switch (request.kind) {
@@ -166,7 +168,7 @@ export const deriveInteractionState = ({
           ...request,
           zones: player ? animalReorgZones(player) : request.zones,
         },
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'confirm-next-player':
@@ -178,7 +180,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'confirm-player-switch':
@@ -190,7 +192,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'feed':
@@ -202,7 +204,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'heating':
@@ -214,7 +216,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'farm-select':
@@ -226,7 +228,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request: requestWithChoices(request, choiceOptions),
-        allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'resource-quantity-select':
@@ -239,7 +241,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'select-trigger':
@@ -251,7 +253,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request: requestWithChoices(request, choiceOptions),
-        allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'card-draft':
@@ -263,7 +265,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: buildCmds(['undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind),
         anytimeActions: anytimeDescriptors,
       }
     case 'engine-blocked':
@@ -275,7 +277,7 @@ export const deriveInteractionState = ({
         promptParams,
         sourceCard,
         request,
-        allowedCommands: filterUndoCommands(['undoStep', 'undoAction']),
+        allowedCommands: buildWaitCmds(request.kind, { allowAnytime: false }),
         anytimeActions: [],
       }
     case 'choice':
@@ -294,14 +296,14 @@ export const deriveInteractionState = ({
             selection,
             ...(choiceOptions.length > 0 ? { options: choiceOptions } : {}),
           },
-          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+          allowedCommands: buildWaitCmds('selection'),
           anytimeActions: anytimeDescriptors,
         }
       }
       const farm = pendingHost && player ? buildFarmInteraction(promptKey, player) : null
       const allowedCommands: InteractionCommand[] = farm
-        ? buildCmds(['commitSelection', 'undoStep', 'undoAction'])
-        : buildCmds(['resolveChoice', 'undoStep', 'undoAction'])
+        ? buildWaitCmds('farm-select')
+        : buildWaitCmds(request.kind)
       if (farm) {
         return {
           stateId: 'wait',
