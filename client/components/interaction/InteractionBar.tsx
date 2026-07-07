@@ -16,7 +16,11 @@ import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
-import type { InteractionBarActions, InteractionBarModel } from '../../app/interaction-bar-presentation'
+import type {
+  InteractionBarActions,
+  InteractionBarModel,
+  InteractionBarText,
+} from '../../app/interaction-bar-presentation'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: PaymentResourceMap
@@ -31,6 +35,11 @@ const animalCountOrder: AnimalKey[] = ['sheep', 'boar', 'cattle', 'horse']
 
 const clampWhole = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)))
+
+const renderInteractionText = (locale: Locale, text: InteractionBarText): string => {
+  if (text.text !== undefined) return text.text
+  return text.key ? t(locale, text.key, text.params) : ''
+}
 
 const AnimalCountLine = ({
   locale,
@@ -58,11 +67,15 @@ const AnimalCountLine = ({
 const HeatingPanel = ({
   locale,
   pending,
+  title,
+  subtitle,
   isInteractive,
   onConfirm,
 }: {
   locale: Locale
   pending: HeatingPending
+  title?: InteractionBarText
+  subtitle?: InteractionBarText
   isInteractive: boolean
   onConfirm: (payload: { fuelUsed: number; woodToFuel: number }) => void
 }) => {
@@ -79,10 +92,10 @@ const HeatingPanel = ({
   return (
     <>
       <div className="interaction-title">
-        {t(locale, 'ui.harvestHeatingTitle')}
+        {title ? renderInteractionText(locale, title) : t(locale, 'ui.harvestHeatingTitle')}
       </div>
       <div className="interaction-subtitle">
-        {t(locale, 'ui.harvestHeatingSubtitle', {
+        {subtitle ? renderInteractionText(locale, subtitle) : t(locale, 'ui.harvestHeatingSubtitle', {
           player: pending.playerName,
           count: pending.required,
         })}
@@ -376,33 +389,6 @@ const renderOptionContent = (
 const isSkipChoiceOption = (option: ActionChoiceOption) =>
   option.value === '__skip__' || option.labelKey === 'ui.interactionOptionalSkip'
 
-const getOptionalActionName = (
-  locale: Locale,
-  option: ActionChoiceOption | undefined,
-): string | null => {
-  if (!option) return null
-  switch (option.effectPreview?.kind) {
-    case 'payment':
-      return translateCardText(locale, 'actions.pay.name')
-    case 'resourceExchange':
-      return t(locale, 'ui.interactionResourceExchange')
-    default:
-      break
-  }
-  if (option.descriptionPreview?.kind === 'action') {
-    return translateCardText(
-      locale,
-      option.descriptionPreview.labelKey,
-      option.descriptionPreview.labelParams as Record<string, string | number> | undefined,
-    )
-  }
-  return translateCardText(
-    locale,
-    option.labelKey,
-    option.labelParams as Record<string, string | number> | undefined,
-  )
-}
-
 const renderChoiceOptionContent = ({
   locale,
   option,
@@ -491,38 +477,12 @@ export const InteractionBar = ({
   model,
   actions,
 }: Props) => {
-  const { locale, playerNames, isInteractive } = model
-  const pendingAnimalReorg = model.pending.animalReorg
-  const pendingChoice = model.pending.choice
-  const pendingEngineBlocked = model.pending.engineBlocked
-  const pendingNextPlayerIndex = model.pending.nextPlayerIndex
-  const pendingPlayerSwitch = model.pending.playerSwitch
-  const harvestFeedPlayerName = model.pending.harvestFeedPlayerName
+  const { locale, isInteractive } = model
+  const body = model.body
+  const choiceModel = model.choice
   const heatingPending = model.pending.heating
   const resourceQuantitySelect = model.pending.resourceQuantitySelect
   const resourceBatchExchangeSelect = model.pending.resourceBatchExchangeSelect
-  const suppressChoiceOptions = model.pending.suppressChoiceOptions
-  const pendingRoomTilesLength = model.farm.pendingRoomTilesLength
-  const maxRoomSelections = model.farm.maxRoomSelections
-  const pendingFenceEdgesLength = model.farm.pendingFenceEdgesLength
-  const pendingStableTilesLength = model.farm.pendingStableTilesLength
-  const maxStableSelections = model.farm.maxStableSelections
-  const pendingFarmHandSelected = model.farm.pendingFarmHandSelected
-  const pendingSowSelectionsLength = model.farm.pendingSowSelectionsLength
-  const pendingPositionSelectionsLength = model.farm.pendingPositionSelectionsLength
-  const maxPositionSelections = model.farm.maxPositionSelections
-  const hasPendingPlowSelection = model.farm.hasPendingPlowSelection
-  const fenceErrorText = model.farm.errors.fence
-  const roomErrorText = model.farm.errors.room
-  const stableErrorText = model.farm.errors.stable
-  const plowErrorText = model.farm.errors.plow
-  const sowErrorText = model.farm.errors.sow
-  const isSelectingFences = model.farm.selecting.fences
-  const isSelectingRooms = model.farm.selecting.rooms
-  const isSelectingStables = model.farm.selecting.stables
-  const isSelectingPlow = model.farm.selecting.plow
-  const isSelectingSow = model.farm.selecting.sow
-  const canBuildPalisades = model.farm.fence.canBuildPalisades
   const fencePlacementMode = model.farm.fence.placementMode
   const setFencePlacementMode = model.farm.fence.setPlacementMode
   const borrowedFenceSources = model.farm.fence.borrowedSources
@@ -547,69 +507,6 @@ export const InteractionBar = ({
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
   } = actions
-  const isFarmSelectionPrompt =
-    pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionRoomSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionStableSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionPlowSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionSowSelect' ||
-    pendingChoice?.promptKey === 'ui.interactionSelection'
-  const visibleOptions =
-    pendingChoice?.promptKey === 'ui.interactionPlowSelect' && hasPendingPlowSelection
-      ? pendingChoice.options.filter((option) => option.value === 'confirm')
-      : isFarmSelectionPrompt
-        ? (pendingChoice?.options ?? []).filter((option) => option.value !== 'cancel')
-        : pendingChoice?.options ?? []
-  const isRoomConfirmDisabled =
-    pendingChoice?.promptKey === 'ui.interactionRoomSelect' &&
-    pendingRoomTilesLength === 0
-  const isStableConfirmDisabled =
-    pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
-    pendingStableTilesLength === 0 &&
-    !pendingFarmHandSelected
-  const isFenceConfirmDisabled =
-    pendingChoice?.promptKey === 'ui.interactionFenceSelect' &&
-    pendingFenceEdgesLength === 0
-  const isSelectionConfirmDisabled =
-    pendingChoice?.promptKey === 'ui.interactionSelection' &&
-    pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
-  const hasBodyContent = !!(
-    pendingAnimalReorg ||
-    resourceBatchExchangeSelect ||
-    resourceQuantitySelect ||
-    heatingPending ||
-    harvestFeedPlayerName ||
-    (pendingEngineBlocked && isInteractive) ||
-    (pendingChoice && isInteractive) ||
-    (pendingPlayerSwitch && isInteractive) ||
-    (pendingNextPlayerIndex !== null && isInteractive) ||
-    !isInteractive
-  )
-  const triggerCardName =
-    pendingChoice?.sourceCard
-      ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
-      : null
-  const promptHintKey =
-    typeof pendingChoice?.promptParams?.hintKey === 'string'
-      ? pendingChoice.promptParams.hintKey
-      : null
-  const isOptionalActionPrompt = pendingChoice?.promptKey === 'ui.interactionOptionalAction'
-  const optionalActionOption = isOptionalActionPrompt
-    ? visibleOptions.find((option) => !isSkipChoiceOption(option))
-    : undefined
-  const optionalActionName = getOptionalActionName(locale, optionalActionOption)
-  const interactionTitle =
-    isOptionalActionPrompt && optionalActionName
-      ? t(locale, 'ui.interactionOptionalActionWithChoice', { action: optionalActionName })
-      : t(
-          locale,
-          pendingChoice?.promptKey ?? 'ui.interactionChooseOne',
-          pendingChoice?.promptParams as Record<string, string | number> | undefined,
-        )
-  const stableSelectedCount = pendingStableTilesLength + (pendingFarmHandSelected ? 1 : 0)
-  const stableMaxLabel = pendingFarmHandSelected
-    ? `${maxStableSelections}+`
-    : maxStableSelections
 
   return (
     <div className="interaction-bar">
@@ -633,15 +530,15 @@ export const InteractionBar = ({
           variant="inline"
         />
       </div>
-      {hasBodyContent ? (
+      {body.kind !== 'none' ? (
         <div className="interaction-bar__body">
-          {pendingAnimalReorg ? (
+          {body.kind === 'animalReorg' ? (
             <>
               <div className="interaction-title">
-                {t(locale, 'ui.interactionReorgAnimalsTitle')}
+                {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-subtitle">
-                {t(locale, 'ui.interactionReorgAnimalsSubtitle')}
+                {body.subtitle ? renderInteractionText(locale, body.subtitle) : null}
               </div>
               <div className="interaction-reorg-panel">
                 <div className="interaction-reorg-title">
@@ -682,7 +579,7 @@ export const InteractionBar = ({
                 )}
               </div>
             </>
-          ) : resourceBatchExchangeSelect ? (
+          ) : body.kind === 'resourceBatchExchangeSelect' && resourceBatchExchangeSelect ? (
             <ResourceBatchExchangePanel
               locale={locale}
               discardAvailableByResource={resourceBatchExchangeSelect.discardAvailableByResource}
@@ -692,7 +589,7 @@ export const InteractionBar = ({
               onConfirm={resourceBatchExchangeSelect.onConfirm}
               onCancel={resourceBatchExchangeSelect.onCancel}
             />
-          ) : resourceQuantitySelect ? (
+          ) : body.kind === 'resourceQuantitySelect' && resourceQuantitySelect ? (
             <ResourceQuantitySelectPanel
               locale={locale}
               availableByResource={resourceQuantitySelect.availableByResource}
@@ -701,21 +598,23 @@ export const InteractionBar = ({
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
             />
-          ) : heatingPending ? (
+          ) : body.kind === 'heating' && heatingPending ? (
             <HeatingPanel
               key={`${heatingPending.playerName}:${heatingPending.required}:${heatingPending.maxFuelPayable}:${heatingPending.maxWoodConvertibleToFuel}`}
               locale={locale}
               pending={heatingPending}
+              title={body.title}
+              subtitle={body.subtitle}
               isInteractive={isInteractive}
               onConfirm={confirmHeating}
             />
-          ) : harvestFeedPlayerName ? (
+          ) : body.kind === 'harvestFeed' ? (
             <>
               <div className="interaction-title">
-                {t(locale, 'ui.harvestFeedTitle')}
+                {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-subtitle">
-                {harvestFeedPlayerName}
+                {body.subtitle ? renderInteractionText(locale, body.subtitle) : null}
               </div>
               <div className="interaction-actions">
                 <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
@@ -723,67 +622,34 @@ export const InteractionBar = ({
                 </button>
               </div>
             </>
-          ) : pendingEngineBlocked && isInteractive ? (
+          ) : body.kind === 'engineBlocked' ? (
             <div className="interaction-title">
-              {t(
-                locale,
-                pendingEngineBlocked.promptKey ?? 'ui.interactionChooseOne',
-                pendingEngineBlocked.promptParams as Record<string, string | number> | undefined,
-              )}
+              {body.title ? renderInteractionText(locale, body.title) : null}
             </div>
-          ) : pendingChoice && isInteractive ? (
+          ) : body.kind === 'choice' && choiceModel ? (
             <>
               <div className="interaction-title">
-                {interactionTitle}
+                {renderInteractionText(locale, choiceModel.title)}
               </div>
-              {triggerCardName ? (
+              {choiceModel.triggerSubtitle ? (
                 <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionTriggeredByCard', { card: triggerCardName })}
+                  {renderInteractionText(locale, choiceModel.triggerSubtitle)}
                 </div>
               ) : null}
-              {promptHintKey ? (
+              {choiceModel.hint ? (
                 <div className="interaction-rule-hint">
-                  {t(locale, promptHintKey)}
+                  {renderInteractionText(locale, choiceModel.hint)}
                 </div>
               ) : null}
-              {pendingChoice.promptKey === 'ui.interactionRoomSelect' ? (
-                <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionRoomSelectSubtitle', {
-                    selected: pendingRoomTilesLength,
-                    max: maxRoomSelections,
-                  })}
+              {choiceModel.subtitles.map((subtitle, index) => (
+                <div
+                  key={`${subtitle.key ?? subtitle.text ?? 'subtitle'}:${index}`}
+                  className={`interaction-subtitle${subtitle.className ? ` ${subtitle.className}` : ''}`}
+                >
+                  {renderInteractionText(locale, subtitle)}
                 </div>
-              ) : null}
-              {pendingChoice.promptKey === 'ui.interactionStableSelect' ? (
-                <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionStableSelectSubtitle', {
-                    selected: stableSelectedCount,
-                    max: stableMaxLabel,
-                  })}
-                </div>
-              ) : null}
-              {pendingChoice.promptKey === 'ui.interactionStableSelect' &&
-              pendingFarmHandSelected ? (
-                <div className="interaction-subtitle interaction-farmhand-hint">
-                  {t(locale, 'ui.interactionFarmHandHint')}
-                </div>
-              ) : null}
-              {pendingChoice.promptKey === 'ui.interactionSowSelect' ? (
-                <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionSowSelectSubtitle', {
-                    selected: pendingSowSelectionsLength ?? 0,
-                  })}
-                </div>
-              ) : null}
-              {pendingChoice.promptKey === 'ui.interactionSelection' ? (
-                <div className="interaction-subtitle">
-                  {t(locale, 'ui.interactionSelectionSubtitle', {
-                    selected: pendingPositionSelectionsLength,
-                    max: maxPositionSelections,
-                  })}
-                </div>
-              ) : null}
-              {isSelectingFences && borrowedFenceSources ? (
+              ))}
+              {choiceModel.borrowedFenceControlsVisible && borrowedFenceSources ? (
                 <div className="borrowed-fence-source-controls">
                   <div className="borrowed-fence-source-title">
                     {t(locale, 'ui.borrowedFenceSourceTitle')}
@@ -817,7 +683,7 @@ export const InteractionBar = ({
                   </div>
                 </div>
               ) : null}
-              {isSelectingFences && canBuildPalisades && setFencePlacementMode && !borrowedFenceSources ? (
+              {choiceModel.fenceModeToggleVisible && setFencePlacementMode ? (
                 <div
                   className="fence-mode-toggle"
                   role="radiogroup"
@@ -843,67 +709,27 @@ export const InteractionBar = ({
                   </button>
                 </div>
               ) : null}
-              {isSelectingFences && fenceErrorText ? (
-                <div className="interaction-error">{fenceErrorText}</div>
-              ) : null}
-              {isSelectingFences && borrowedFenceSources?.hasMissingSources ? (
-                <div className="interaction-error">
-                  {t(locale, 'ui.borrowedFenceSourceMissing')}
+              {choiceModel.errors.map((error, index) => (
+                <div key={`${error.key ?? error.text ?? 'error'}:${index}`} className="interaction-error">
+                  {renderInteractionText(locale, error)}
                 </div>
-              ) : null}
-              {isSelectingRooms && roomErrorText ? (
-                <div className="interaction-error">{roomErrorText}</div>
-              ) : null}
-              {isSelectingStables && stableErrorText ? (
-                <div className="interaction-error">{stableErrorText}</div>
-              ) : null}
-              {isSelectingPlow && plowErrorText ? (
-                <div className="interaction-error">{plowErrorText}</div>
-              ) : null}
-              {isSelectingSow && sowErrorText ? (
-                <div className="interaction-error">{sowErrorText}</div>
-              ) : null}
-              {suppressChoiceOptions ? null : ((pendingChoice.promptParams?.needed as number) ?? 0) > 1 ? (
+              ))}
+              {!choiceModel.showOptions ? null : choiceModel.useCollector ? (
                 <CollectorMultiSelect
                   locale={locale}
-                  options={visibleOptions}
-                  needed={(pendingChoice.promptParams?.needed as number) ?? 6}
+                  options={choiceModel.visibleOptions.map((entry) => entry.option)}
+                  needed={choiceModel.collectorNeeded}
                   resolveChoice={resolveChoice}
                   isInteractive={isInteractive}
                 />
-              ) : pendingChoice.promptKey === 'ui.interactionBakeBreadChoice' ? null : (
+              ) : (
                 <div className="interaction-actions">
-                  {visibleOptions.map((option) => {
-                    const isDisabled =
-                      !!option.disabled ||
-                      !isInteractive ||
-                      (pendingChoice.promptKey === 'ui.interactionRoomSelect' &&
-                        option.value === 'confirm' &&
-                        isRoomConfirmDisabled) ||
-                      (pendingChoice.promptKey === 'ui.interactionFenceSelect' &&
-                        option.value === 'confirm' &&
-                        (isFenceConfirmDisabled || !!borrowedFenceSources?.hasMissingSources)) ||
-                      (pendingChoice.promptKey === 'ui.interactionStableSelect' &&
-                        option.value === 'confirm' &&
-                        isStableConfirmDisabled) ||
-                      (pendingChoice.promptKey === 'ui.interactionPlowSelect' &&
-                        option.value === 'confirm' &&
-                        !hasPendingPlowSelection) ||
-                      (pendingChoice.promptKey === 'ui.interactionSowSelect' &&
-                        option.value === 'confirm' &&
-                        (pendingSowSelectionsLength ?? 0) === 0) ||
-                      (pendingChoice.promptKey === 'ui.interactionSelection' &&
-                        option.value === 'confirm' &&
-                        isSelectionConfirmDisabled)
-                    const disabledTitle =
-                      option.disabled && option.disabledReasonKey
-                        ? t(locale, option.disabledReasonKey)
-                        : undefined
+                  {choiceModel.visibleOptions.map(({ option, disabled, disabledTitleKey }) => {
                     return (
                       <button
                         key={option.value}
-                        disabled={isDisabled}
-                        title={disabledTitle}
+                        disabled={disabled}
+                        title={disabledTitleKey ? t(locale, disabledTitleKey) : undefined}
                         className={option.disabled ? 'choice-option-disabled' : undefined}
                         onClick={() => {
                           if (option.disabled) return
@@ -913,9 +739,9 @@ export const InteractionBar = ({
                         {renderChoiceOptionContent({
                           locale,
                           option,
-                          isOptionalActionPrompt,
-                          optionalActionName,
-                          triggerCardName,
+                          isOptionalActionPrompt: choiceModel.isOptionalActionPrompt,
+                          optionalActionName: choiceModel.optionalActionName,
+                          triggerCardName: choiceModel.triggerCardName,
                         })}
                       </button>
                     )
@@ -923,12 +749,10 @@ export const InteractionBar = ({
                 </div>
               )}
             </>
-          ) : pendingPlayerSwitch && isInteractive ? (
+          ) : body.kind === 'playerSwitch' ? (
             <>
               <div className="interaction-title">
-                {t(locale, 'ui.interactionPlayerSwitchPrompt', {
-                  player: playerNames[pendingPlayerSwitch.toPlayerIndex] ?? `Player ${pendingPlayerSwitch.toPlayerIndex + 1}`,
-                })}
+                {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-actions">
                 <button onClick={confirmPlayerSwitch} disabled={!isInteractive}>
@@ -936,10 +760,10 @@ export const InteractionBar = ({
                 </button>
               </div>
             </>
-          ) : pendingNextPlayerIndex !== null && isInteractive ? (
+          ) : body.kind === 'nextPlayer' ? (
             <>
               <div className="interaction-title">
-                {t(locale, 'ui.interactionConfirmNext')}
+                {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-actions">
                 <button onClick={confirmNextPlayer} disabled={!isInteractive}>
@@ -949,7 +773,7 @@ export const InteractionBar = ({
             </>
           ) : (
             <div className="interaction-title">
-              {t(locale, 'ui.statusWaiting')}
+              {body.title ? renderInteractionText(locale, body.title) : null}
             </div>
           )}
         </div>
