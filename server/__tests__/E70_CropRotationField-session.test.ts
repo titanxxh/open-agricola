@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { buildSowFarmInteraction } from '../../shared/domain/farmyard'
+import { buildSowFarmInteraction } from '../../shared/domain/farmyard-interaction'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E070_CropRotationField'

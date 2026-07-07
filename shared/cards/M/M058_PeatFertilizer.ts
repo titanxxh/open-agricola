@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { buildSowFarmInteraction } from '../../domain/farmyard'
+import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M058_PeatFertilizer'

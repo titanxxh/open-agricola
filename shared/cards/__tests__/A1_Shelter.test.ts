@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildStableFarmInteraction } from '../../domain/farmyard'
+import { buildStableFarmInteraction } from '../../domain/farmyard-interaction'
 import { getCardEffect } from '../card-effects'
 import type { PlayerState, Pasture } from '../../contract/types'
 
