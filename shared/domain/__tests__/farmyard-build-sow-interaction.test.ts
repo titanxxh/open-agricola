@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { buildSowFarmInteraction } from '../farmyard'
+import { buildSowFarmInteraction } from '../farmyard-interaction'
 import { makeBlankPlayer } from './helpers'
 import { CardRegistry } from '../../cards/registry'
 import {

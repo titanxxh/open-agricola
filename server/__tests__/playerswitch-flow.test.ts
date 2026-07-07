@@ -240,7 +240,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.stateId).toBe('wait')
     if (pendingResp.interaction.stateId !== 'wait') return
     expect(pendingResp.interaction.playerIndex).toBe(1)
-    const acceptOption = pendingResp.interaction.options?.find((option) => option.value !== '__skip__')
+    const acceptOption = pendingResp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
 
     const wrongPlayer = session.resolveChoice(0, acceptOption!.value)
@@ -326,15 +326,15 @@ describe('ActionFlow targetPlayerId', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(1)
 
-    const targetOption = resp.interaction.options?.[0]
+    const targetOption = resp.interaction.request.options?.[0]
     expect(targetOption).toBeDefined()
     resp = session.resolveChoice(1, targetOption!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
   })
 
   it('chained target player choices confirm each owner transition and return to the frame owner', () => {
@@ -378,24 +378,24 @@ describe('ActionFlow targetPlayerId', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(1)
 
-    resp = session.resolveChoice(1, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(1, resp.interaction.request.options![0]!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(2)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(2)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(2)
 
-    resp = session.resolveChoice(2, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(2, resp.interaction.request.options![0]!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(2)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(2)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
   })
 
   it('dynamic target flow triggered by the switched player can switch to a third player and back', () => {
@@ -445,36 +445,36 @@ describe('ActionFlow targetPlayerId', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(1)
 
-    const trigger = resp.interaction.options?.find((option) => option.labelKey === 'trigger-p3')
+    const trigger = resp.interaction.request.options?.find((option) => option.labelKey === 'trigger-p3')
     expect(trigger).toBeDefined()
     resp = session.resolveChoice(1, trigger!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(2)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(2)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(2)
 
-    const p3Choice = resp.interaction.options?.find((option) => option.labelKey === 'p3-sheep')
+    const p3Choice = resp.interaction.request.options?.find((option) => option.labelKey === 'p3-sheep')
     expect(p3Choice).toBeDefined()
     resp = session.resolveChoice(2, p3Choice!.value)
     expect(resp.state.players[2]!.resources.sheep).toBe(p3SheepBefore + 1)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(2)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(2)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
   })
 
   it('confirmed target player switch exposes no undo before the target acts', () => {
@@ -545,7 +545,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.stateId).toBe('wait')
     if (pendingResp.interaction.stateId !== 'wait') return
     expect(pendingResp.interaction.playerIndex).toBe(1)
-    const sheepOption = pendingResp.interaction.options?.find((option) => option.labelKey === 'sheep')
+    const sheepOption = pendingResp.interaction.request.options?.find((option) => option.labelKey === 'sheep')
     expect(sheepOption).toBeDefined()
     expect(session.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
 
@@ -582,7 +582,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.stateId).toBe('wait')
     if (pendingResp.interaction.stateId !== 'wait') return
     expect(pendingResp.interaction.playerIndex).toBe(1)
-    expect(pendingResp.interaction.farm).toBeDefined()
+    expect(pendingResp.interaction.request.farm).toBeDefined()
 
     const directCancel = session.commitSelectionChoice(1, { cancel: true })
     expect(directCancel.ok).toBe(false)
@@ -684,7 +684,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.stateId).toBe('wait')
     if (pendingResp.interaction.stateId !== 'wait') return
     expect(pendingResp.interaction.playerIndex).toBe(1)
-    const woodOption = pendingResp.interaction.options?.find((option) => option.labelKey === 'wood')
+    const woodOption = pendingResp.interaction.request.options?.find((option) => option.labelKey === 'wood')
     expect(woodOption).toBeDefined()
 
     const resolved = session.resolveChoice(1, woodOption!.value)

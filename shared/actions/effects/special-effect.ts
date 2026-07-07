@@ -26,11 +26,15 @@ import {
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
-import { findFirstNewborn } from '../../domain/player'
-import { removeWorkerRef } from '../../domain/space'
+import { findFirstNewborn, findPlayerById } from '../../domain/player'
+import { findActionSpaceById, removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
-import { moveMajorImprovementToSupplyTop, swapMajorImprovementWithSupply } from '../../cards/major/supply'
+import {
+  isMajorImprovementAvailable,
+  moveMajorImprovementToSupplyTop,
+  swapMajorImprovementWithSupply,
+} from '../../cards/major/supply'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import { consumePendingExtraTurns } from '../../cards/card-effects'
@@ -300,9 +304,7 @@ export const specialEffectAction: ActionDefinition = {
       case 'swap-improvement-with-board': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const playerIndex = target.improvements.indexOf(p.from)
-        const board = state.availableMajorImprovements ?? []
-        const boardIndex = board.indexOf(p.to)
-        if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
+        if (playerIndex < 0 || !isMajorImprovementAvailable(state, p.to)) return { type: 'ok' }
         if (target.improvements.includes(p.to)) return { type: 'ok' }
         target.improvements[playerIndex] = p.to
         swapMajorImprovementWithSupply(state, p.from, p.to)
@@ -595,7 +597,7 @@ export const specialEffectAction: ActionDefinition = {
         const accumulationTarget = readAccumulationTarget(p)
         const resources = resourceAmount(p.resource, p.amount)
         if (accumulationTarget.kind === 'actionSpace') {
-          const targetSpace = state.actionSpaces.find((space) => space.id === accumulationTarget.spaceId)
+          const targetSpace = findActionSpaceById(state, accumulationTarget.spaceId)
           if (!targetSpace?.resources) {
             return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
@@ -615,7 +617,7 @@ export const specialEffectAction: ActionDefinition = {
         }
         if (accumulationTarget.kind === 'card') {
           const targetPlayer = accumulationTarget.playerId
-            ? state.players.find((entry) => entry.id === accumulationTarget.playerId) ?? target
+            ? findPlayerById(state, accumulationTarget.playerId) ?? target
             : target
           const counters = initCardState(targetPlayer, accumulationTarget.cardId)
           counters[p.resource] = (counters[p.resource] ?? 0) + p.amount
@@ -657,8 +659,8 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'move-resource-between-spaces': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
-        const from = state.actionSpaces.find((s) => s.id === p.fromSpaceId)
-        const to = state.actionSpaces.find((s) => s.id === p.toSpaceId)
+        const from = findActionSpaceById(state, p.fromSpaceId)
+        const to = findActionSpaceById(state, p.toSpaceId)
         if (!from?.resources || !to?.resources) {
           return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }

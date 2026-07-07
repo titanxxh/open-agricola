@@ -54,7 +54,7 @@ describe('A126 MasterWorkman integration', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
-    expect(resp.interaction.options).toEqual([
+    expect(resp.interaction.request.options).toEqual([
       { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
     ])
   })

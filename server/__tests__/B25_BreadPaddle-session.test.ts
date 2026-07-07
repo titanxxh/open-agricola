@@ -63,7 +63,7 @@ describe('B025_BreadPaddle session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Choose the occupation
-    const occOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === occId)
+    const occOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === occId)
     expect(occOption).toBeDefined()
     resp = session.resolveChoice(0, occId)
     expect(resp.ok).toBe(true)
@@ -109,7 +109,7 @@ describe('B025_BreadPaddle session', () => {
     while (resp.interaction.stateId === 'wait' && steps < 6) {
       steps++
       if (resp.interaction.request.kind !== 'choice') break
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const next = options.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)

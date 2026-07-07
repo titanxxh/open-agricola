@@ -48,7 +48,7 @@ describe('D095_SiteManager session', () => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return resp
-    const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
+    const opt = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
     expect(opt).toBeDefined()
     return session.resolveChoice(0, opt!.value)
   }
@@ -65,7 +65,7 @@ describe('D095_SiteManager session', () => {
     let foundFireplace = false
     while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       if (options.some((o) => o.value === 'Major_Fireplace1')) {
         foundFireplace = true
         break
@@ -109,7 +109,7 @@ describe('D095_SiteManager session', () => {
     let bought = false
     while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'Major_Fireplace1',
       )
@@ -172,7 +172,7 @@ describe('D095_SiteManager session', () => {
         sawPaymentPrompt = true
         break
       }
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const joinery = options.find(
         (o) => o.value === 'Major_Joinery',
       )
@@ -189,7 +189,7 @@ describe('D095_SiteManager session', () => {
 
     expect(sawPaymentPrompt).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    const paymentOptions = resp.interaction.options ?? []
+    const paymentOptions = resp.interaction.request.options ?? []
     expect(paymentOptions.length).toBeGreaterThanOrEqual(2)
 
     type PaymentLabel = {
@@ -234,7 +234,7 @@ describe('D095_SiteManager session', () => {
     let bought = false
     while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'Major_Fireplace1',
       )
@@ -286,7 +286,7 @@ describe('D095_SiteManager session', () => {
     let bought = false
     while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'Major_Fireplace1',
       )
@@ -344,7 +344,7 @@ describe('D095_SiteManager session', () => {
     let bought = false
     while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'Major_Fireplace1',
       )

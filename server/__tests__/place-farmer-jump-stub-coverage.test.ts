@@ -18,12 +18,12 @@ const driveAccepts = (
 ): ReturnType<GameSession['takeAction']> => {
   let resp = initialResp
   while (maxIters-- > 0 && resp.interaction.stateId === 'wait') {
-    const opts = resp.interaction.options ?? []
+    const opts = resp.interaction.request.options ?? []
     const skip = opts.find((o) => o.value === '__skip__')
     const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel' && o.value !== 'confirm')
     if (resp.interaction.request.kind === 'farm-select') {
       if (options.stopAtFarmSelect) break
-      const farm = resp.interaction.farm
+      const farm = resp.interaction.request.farm
       if (farm.farmType === 'plow') {
         const tile = farm.selectableTiles[0]
         if (!tile) throw new Error('expected selectable plow tile')

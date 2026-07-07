@@ -1,5 +1,5 @@
 import type { GameState, PlayerState } from '../../contract/types'
-import { clearLinkedSpaceBlocksForWorker, removeWorkerRef } from '../../domain/space'
+import { clearLinkedSpaceBlocksForWorker, findActionSpaceByWorker, removeWorkerRef } from '../../domain/space'
 import { holdWorkerOnCard } from './card-held-workers'
 
 type RecallOptions = {
@@ -27,9 +27,7 @@ export const recallWorkerById = (
   workerId: string,
   options?: RecallOptions,
 ): boolean => {
-  const space = state.actionSpaces.find((s) =>
-    s.takenBy.some((t) => t.playerId === player.id && t.workerId === workerId),
-  )
+  const space = findActionSpaceByWorker(state, player.id, workerId)
   if (!space) return false
   const removed = removeWorkerRef(space, player.id, workerId)
   if (!removed) return false

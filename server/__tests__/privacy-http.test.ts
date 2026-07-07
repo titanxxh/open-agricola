@@ -87,7 +87,7 @@ const setupE78BatchPromptSession = () => {
       return session
     }
     if (resp.interaction.stateId !== 'wait') break
-    const next = resp.interaction.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+    const next = resp.interaction.request.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
     if (!next) break
     resp = session.resolveChoice(resp.interaction.playerIndex, next.value)
   }

@@ -40,32 +40,32 @@ describe('C019_SwingPlow session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     // Complete farmland plow
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // First optional plow from card
     expect(resp.interaction.stateId).toBe('wait')
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
 
     // pop-card-stack runs, then plow tile selection
     expect(resp.interaction.stateId).toBe('wait')
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Second optional plow from card
     expect(resp.interaction.stateId).toBe('wait')
-    const accept2 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept2 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept2).toBeDefined()
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
 
     expect(resp.interaction.stateId).toBe('wait')
-    const tile3 = resp.interaction.farm.selectableTiles[0]
+    const tile3 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile3 })
     expect(resp.ok).toBe(true)
 
@@ -81,13 +81,13 @@ describe('C019_SwingPlow session', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Accept first optional plow
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile2 })
 
     // Skip second optional plow
@@ -106,7 +106,7 @@ describe('C019_SwingPlow session', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Skip first optional plow
@@ -125,14 +125,14 @@ describe('C019_SwingPlow session', () => {
     const session = setup(1) // only 1 field on card
 
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Accept the single optional plow
     expect(resp.interaction.stateId).toBe('wait')
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile2 })
 
     // Should not get another optional choice (stack is now empty)
@@ -146,7 +146,7 @@ describe('C019_SwingPlow session', () => {
     const session = setup(0) // empty stack
 
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // No optional choice

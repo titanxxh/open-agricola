@@ -281,6 +281,8 @@ takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | un
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
 
+`shared/session/interaction-state-adapter.ts` 是 `InteractionState` 的服务端投影边界。`GameCore.buildInteraction()` 只传入当前 `GameState` / `EngineStack`、anytime/undo/score 快照和一个 `projectPendingRequest(PendingInteractionProjectionInput)`；具体 animal-reorg zone、farm-select、selection payload 的构造被收敛在该 projection request builder 后面，不作为多个闭包散落到 adapter 输入。viewer redaction (`redactInteractionForViewer`) 消费已经派生好的 `InteractionState`，不参与 pending/request 派生。
+
 ### 4.7 ActionChoiceOption + previews
 
 ```ts
@@ -966,7 +968,8 @@ listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCard
 ```
 shared/domain/
 ├── player-board.ts    PlayerBoard（playerBoard 工厂）
-├── farmyard.ts        农场布局 / normalizePlayerFarm
+├── farmyard.ts        农场规则校验 / normalizePlayerFarm
+├── farmyard-interaction.ts  farm-select / farm-position 交互 payload 投影
 ├── pasture.ts         围栏验证 / computePasturesFromFences
 ├── animal-zones.ts    动物分区容量与容纳判定（getTotalAnimalCapacity / getPastureCapacity / canAccommodateAnimalTotals）
 ├── animals.ts         动物模型
@@ -976,7 +979,7 @@ shared/domain/
 └── index.ts
 ```
 
-`PlayerBoard(player, state)` 暴露：`countAnimals` / `pasturesWithCapacity` / `emptyFences` / `hasRoomFor` / `canPlow` / `canBuildFence` / `scoringBreakdown`，私有 `invariant_animalsInPastureOrStable`。
+`PlayerBoard(player, state)` 暴露 `farmyard`、`farmInteraction`、`animals` 三个子边界。`farmyard` 只做农场规则校验与查询（如 `canPlow` / `canSow` / `canBuildFence` / `canBuildRoom` / `canBuildStable`）；`farmInteraction` 只把当前玩家农场、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload；`animals` 负责动物分区容量与容纳判定。前端本地 farm draft 只消费服务端给出的 interaction payload，不调用这些规则边界。
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
 

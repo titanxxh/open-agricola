@@ -44,7 +44,7 @@ const acceptB165 = (session: GameSession) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
   expect(resp.interaction.sourceCard).toBe(CARD_ID)
-  expect(resp.interaction.selection?.kind).toBe('farm-position')
+  expect(resp.interaction.request.selection?.kind).toBe('farm-position')
   return resp
 }
 
@@ -59,7 +59,7 @@ describe('B165_GameProvider session', () => {
     const session = setupHarvest()
     let resp = acceptB165(session)
 
-    expect(resp.interaction.selection?.selectablePositions).toEqual([
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([
       { row: 0, col: 0 },
       { row: 0, col: 1 },
       { row: 0, col: 2 },
@@ -116,7 +116,7 @@ describe('B165_GameProvider session', () => {
     ])
     let resp = acceptB165(session)
 
-    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
     resp = selectPositions(session, [{ row: 0, col: 1 }])
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('invalid selection position')

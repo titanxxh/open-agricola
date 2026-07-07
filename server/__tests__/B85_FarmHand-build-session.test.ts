@@ -59,7 +59,7 @@ const enterStableSelect = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const stableOption = resp.interaction.options?.find(
+  const stableOption = resp.interaction.request.options?.find(
     (option) => option.labelKey === 'actions.stables.name',
   )
   expect(stableOption).toBeDefined()
@@ -81,7 +81,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     const resp = enterStableSelect(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const farm = resp.interaction.farm
+    const farm = resp.interaction.request.farm
     expect(farm?.farmType).toBe('stable')
     if (farm?.farmType !== 'stable') return
 
@@ -128,7 +128,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     const resp = enterStableSelect(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const farm = resp.interaction.farm
+    const farm = resp.interaction.request.farm
     expect(farm?.farmType).toBe('stable')
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toBeUndefined()
@@ -202,12 +202,12 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     const resp = enterStableSelect(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const farm = resp.interaction.farm
+    const farm = resp.interaction.request.farm
     expect(farm?.farmType).toBe('stable')
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toEqual([FARM_HAND_TILE])
 
-    const baseSelection = playerBoard(resp.state, 0).farmyard.selectableTiles('stable', {})
+    const baseSelection = playerBoard(resp.state, 0).farmInteraction.selectableTiles('stable', {})
     expect(
       (baseSelection as { farmHandPositions?: unknown }).farmHandPositions,
     ).toBeUndefined()
@@ -318,7 +318,7 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     const resp = enterStableSelect(returnedSession)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const farm = resp.interaction.farm
+    const farm = resp.interaction.request.farm
     expect(farm?.farmType).toBe('stable')
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toBeUndefined()

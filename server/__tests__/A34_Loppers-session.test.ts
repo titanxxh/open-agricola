@@ -232,7 +232,7 @@ describe('A34 Loppers — supply fence payment', () => {
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -294,7 +294,7 @@ describe('A34 Loppers — supply fence payment', () => {
     resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const useAll = resp.interaction.options?.find(
+    const useAll = resp.interaction.request.options?.find(
       (option) => option.labelParams?.count === 4,
     )
     expect(useAll).toBeDefined()
@@ -312,7 +312,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
-      const a34 = resp.interaction.options?.find((option) => option.value === CARD_ID)
+      const a34 = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
       expect(a34?.disabled ?? true).toBe(true)
       resp = passTriggerSelectIfPresent(session, resp)
     }
@@ -339,7 +339,7 @@ describe('A34 Loppers — supply fence payment', () => {
     resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const useAll = resp.interaction.options?.find(
+    const useAll = resp.interaction.request.options?.find(
       (option) => option.labelParams?.count === 4,
     )
     expect(useAll).toBeDefined()
@@ -355,7 +355,7 @@ describe('A34 Loppers — supply fence payment', () => {
     })
     resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
-      const a34 = resp.interaction.options?.find((option) => option.value === CARD_ID)
+      const a34 = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
       expect(a34?.disabled ?? true).toBe(true)
       resp = passTriggerSelectIfPresent(session, resp)
     }

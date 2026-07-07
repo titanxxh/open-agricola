@@ -46,7 +46,7 @@ describe('card flow regressions', () => {
     if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected reclamation plow choice')
     }
-    const skip = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionOptionalSkip')
+    const skip = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionOptionalSkip')
     expect(skip).toBeDefined()
 
     resp = session.resolveChoice(0, skip!.value)
@@ -86,7 +86,7 @@ describe('card flow regressions', () => {
       throw new Error('expected reclamation plow choice')
     }
 
-    const use = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
+    const use = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)
@@ -98,7 +98,7 @@ describe('card flow regressions', () => {
       throw new Error('expected plow farm interaction')
     }
 
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
 
     resp = session.commitSelectionChoice(0, { tile })
@@ -138,7 +138,7 @@ describe('card flow regressions', () => {
     if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected godly spouse choice')
     }
-    const use = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionGodlySpouseUse')
+    const use = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionGodlySpouseUse')
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)

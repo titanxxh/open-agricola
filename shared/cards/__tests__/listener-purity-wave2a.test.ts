@@ -607,6 +607,33 @@ describe('listener purity wave 2a', () => {
     })
   })
 
+  it('B132 EstateMaster saturation respects farmyard extensions', () => {
+    const p = player(B132, {
+      cardStates: { [B132]: { extraData: { saturated: false } } },
+      roomTiles: Array.from({ length: 15 }, (_, index) => ({
+        row: Math.floor(index / 5),
+        col: index % 5,
+      })),
+      farmyardExtensions: [{
+        id: 'extension-1',
+        tiles: [
+          { row: -1, col: 0 },
+          { row: -1, col: 1 },
+        ],
+      }],
+    })
+    const ctx = context(p, { actionId: 'construct', phase: 'immediatelyAfter' })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B132_EstateMaster_impl.listeners,
+      'B132-saturate-after-construct',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'B132 owner')
+    expect(result).toBeUndefined()
+  })
+
   it('B132 EstateMaster reap listener returns bonusVp increment leaf without mutating cardStates', () => {
     const p = player(B132, {
       cardStates: { [B132]: { extraData: { saturated: true }, counters: { bonusVp: 1 } } },

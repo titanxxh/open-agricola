@@ -952,19 +952,8 @@ export type InteractionRequest =
     }
   | {
       kind: 'selection'
-      selection:
-        | {
-            selectionType: 'farm-position'
-            selectablePositions: FarmTilePosition[]
-            minSelections?: number
-            maxSelections: number
-          }
-        | {
-            selectionType: 'occupation-hand'
-            selectableCards: string[]
-            minSelections: number
-            maxSelections: number
-          }
+      selection: InteractionSelection
+      options?: ActionChoiceOption[]
     }
   | {
       kind: 'card-draft'
@@ -1114,20 +1103,6 @@ export type InteractionState =
       promptParams?: Record<string, unknown>
       sourceCard?: string
       request: InteractionRequest
-      // Transitional kind-specific accessor fields (Task 4 → cleaned up in Task 13).
-      // Frontend / tests can read these directly while typed request handlers
-      // replace stateId-specific branching.
-      options?: ActionChoiceOption[]
-      costOverride?: Partial<Resource>
-      farm?: InteractionFarmSelection
-      selection?: InteractionSelection
-      zones?: InteractionAnimalReorgZone[]
-      remaining?: number
-      foodUsed?: number
-      feedQueue?: FeedQueueEntry[]
-      nextPlayerIndex?: number
-      fromPlayerIndex?: number
-      toPlayerIndex?: number
     })
   | (InteractionBase & {
       stateId: 'gameover'

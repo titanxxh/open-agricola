@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isMajorImprovementAvailable } from '../major/supply'
 
 const CARD_ID = 'C095_BasketWeaver'
 const TARGET_MAJOR = 'Major_Basket'
@@ -37,7 +38,7 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!context.state.availableMajorImprovements.includes(TARGET_MAJOR)) return
+    if (!isMajorImprovementAvailable(context.state, TARGET_MAJOR)) return
     return {
       flow: {
         type: 'leaf',

@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isMajorImprovementAvailable } from '../major/supply'
 
 const CARD_ID = 'D027_Retraining'
 /**
@@ -30,11 +31,10 @@ const determineSwap = (
   player: PlayerState,
 ): { from: string; to: string } | null => {
   const playedMajors = new Set(player.improvements)
-  const available = new Set(state.availableMajorImprovements)
-  if (playedMajors.has('Major_Joinery') && available.has('Major_Pottery')) {
+  if (playedMajors.has('Major_Joinery') && isMajorImprovementAvailable(state, 'Major_Pottery')) {
     return { from: 'Major_Joinery', to: 'Major_Pottery' }
   }
-  if (playedMajors.has('Major_Pottery') && available.has('Major_Basket')) {
+  if (playedMajors.has('Major_Pottery') && isMajorImprovementAvailable(state, 'Major_Basket')) {
     return { from: 'Major_Pottery', to: 'Major_Basket' }
   }
   return null

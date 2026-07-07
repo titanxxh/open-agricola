@@ -46,7 +46,7 @@ describe('C095_BasketWeaver session', () => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
+      const opt = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
       expect(opt).toBeDefined()
       return session.resolveChoice(0, opt!.value)
     }
@@ -64,14 +64,14 @@ describe('C095_BasketWeaver session', () => {
     let bought = false
     while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const basket = options.find(
         (o) => o.value === 'Major_Basket',
       )
       if (basket && !bought) {
         resp = session.resolveChoice(0, basket.value)
         expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-        const paymentOptions = resp.interaction.options ?? []
+        const paymentOptions = resp.interaction.request.options ?? []
         expect(paymentOptions.some((option) => hasPaidResources(option, { reed: 2, stone: 2 }))).toBe(true)
         const fixed = paymentOptions.find((option) => hasPaidResources(option, { reed: 1, stone: 1 }))
         expect(fixed?.labelParams.sourceCards).toEqual([CARD_ID])
@@ -107,7 +107,7 @@ describe('C095_BasketWeaver session', () => {
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.interaction.options ?? []
+      const options = resp.interaction.request.options ?? []
       const skip = options.find((o) => o.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(0, skip.value)

@@ -20,7 +20,7 @@ describe('confirm-next-player owner', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-next-player')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.nextPlayerIndex).toBe(1)
+    expect(resp.interaction.request.nextPlayerIndex).toBe(1)
 
     const confirmed = session.resolveChoice(0, 'confirm')
     expect(confirmed.ok).toBe(true)

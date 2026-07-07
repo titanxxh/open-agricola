@@ -37,6 +37,7 @@ import {
 } from './activation-action'
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
+import { findPlayerById, findPlayerIndexById } from '../domain/player'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -282,8 +283,8 @@ export function buildPhaseTrailingNodes(
       ? baseEvent.sourceCard
       : undefined
   const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
-    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
-    const ownerSeatIndex = owner ? state.players.findIndex((p) => p.id === owner.id) : Number.MAX_SAFE_INTEGER
+    const owner = findPlayerById(state, ml.ownerPlayerId)
+    const ownerSeatIndex = owner ? findPlayerIndexById(state, owner.id) : Number.MAX_SAFE_INTEGER
     const ownerOrderIndex = ml.ownerPlayerId === ''
       ? -1
       : ml.ownerPlayerId === effectiveTriggerPlayerId ? 0 : ownerSeatIndex + 1

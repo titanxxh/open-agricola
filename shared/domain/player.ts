@@ -1,5 +1,30 @@
 import type { GameState, PlayerState, Worker } from '../contract/types'
 import { getCardHeldWorkerIds } from '../cards/helpers/card-held-workers'
+import { findActionSpaceById, findActionSpaceByWorker } from './space'
+
+export type PlayerQueryState = Pick<GameState, 'players'>
+
+export const findPlayerById = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): PlayerState | undefined =>
+  typeof playerId === 'string'
+    ? state.players.find((player) => player.id === playerId)
+    : undefined
+
+export const findPlayerIndexById = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): number =>
+  typeof playerId === 'string'
+    ? state.players.findIndex((player) => player.id === playerId)
+    : -1
+
+export const hasPlayer = (
+  state: PlayerQueryState,
+  playerId: unknown,
+): boolean =>
+  findPlayerById(state, playerId) !== undefined
 
 export const getPlayedCardKeys = (
   p: Pick<PlayerState, 'improvements' | 'minorPlayed' | 'occupationPlayed'>,
@@ -32,9 +57,7 @@ export const isWorkerOnAnySpace = (
   playerId: string,
   workerId: string,
 ): boolean =>
-  state.actionSpaces.some(s =>
-    s.takenBy.some(t => t.playerId === playerId && t.workerId === workerId),
-  )
+  findActionSpaceByWorker(state, playerId, workerId) !== undefined
 
 export const workersAtHome = (state: GameState, p: PlayerState): Worker[] => {
   const held = getCardHeldWorkerIds(p)
@@ -69,7 +92,7 @@ export const activateSmallestInactive = (p: PlayerState): Worker | null => {
 const TEST_SINK_SPACE_ID = '__test-worker-sink__'
 
 const ensureTestSink = (state: GameState): import('../contract/types').ActionSpace => {
-  let sink = state.actionSpaces.find(s => s.id === TEST_SINK_SPACE_ID)
+  let sink = findActionSpaceById(state, TEST_SINK_SPACE_ID)
   if (sink) return sink
   sink = {
     id: TEST_SINK_SPACE_ID,
@@ -100,9 +123,7 @@ export const markAllWorkersUsed = (state: GameState, p: PlayerState): void => {
   const sink = ensureTestSink(state)
   for (const w of p.workers ?? []) {
     if (!w.isActive) continue
-    const onAny = state.actionSpaces.some(s =>
-      s.takenBy.some(t => t.playerId === p.id && t.workerId === w.id),
-    )
+    const onAny = findActionSpaceByWorker(state, p.id, w.id) !== undefined
     if (!onAny) {
       sink.takenBy.push({ playerId: p.id, workerId: w.id })
     }
@@ -139,9 +160,7 @@ export const setWorkersAtHome = (
   let placed = 0
   for (const w of active) {
     if (placed >= toPlace) break
-    const already = state.actionSpaces.some(s =>
-      s.takenBy.some(t => t.playerId === p.id && t.workerId === w.id),
-    )
+    const already = findActionSpaceByWorker(state, p.id, w.id) !== undefined
     if (already) continue
     sink.takenBy.push({ playerId: p.id, workerId: w.id })
     placed += 1

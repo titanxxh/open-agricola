@@ -4,7 +4,10 @@ const BASE_DEFAULT_EXCLUDE = defaultExclude.filter(pattern =>
   pattern !== '**/.worktree/**' && pattern !== '.worktree/**')
 const isInsideWorktree = process.cwd().split(/[\\/]/).includes('.worktree')
 
-export const SLOW_INCLUDE = ['server/__tests__/[A-E][0-9]*_*-session.test.ts']
+export const SLOW_INCLUDE = [
+  'server/__tests__/[A-E][0-9]*_*-session.test.ts',
+  'server/__tests__/M[0-9]*_*-session.test.ts',
+]
 export const LLM_GLOB = 'tests/llm-card-gen/**'
 export const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
 export const BASE_EXCLUDE = isInsideWorktree

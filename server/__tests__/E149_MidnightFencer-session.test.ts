@@ -85,14 +85,14 @@ const expectWait = (resp: SessionResponse) => {
 
 const acceptOptional = (session: GameSession, resp: SessionResponse) => {
   const interaction = expectWait(resp)
-  const accept = interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+  const accept = interaction.request.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
   expect(accept).toBeDefined()
   return session.resolveChoice(interaction.playerIndex, accept!.value)
 }
 
 const skipOptional = (session: GameSession, resp: SessionResponse) => {
   const interaction = expectWait(resp)
-  const skip = interaction.options?.find((option: ActionChoiceOption) => option.value === '__skip__')
+  const skip = interaction.request.options?.find((option: ActionChoiceOption) => option.value === '__skip__')
   expect(skip).toBeDefined()
   return session.resolveChoice(interaction.playerIndex, skip!.value)
 }

@@ -15,7 +15,10 @@ type SessionResp = {
   error?: string
   interaction: {
     stateId: string
-    request?: { kind?: string }
+    request?: {
+      kind?: string
+      options?: Array<{ value: string }>
+    }
     playerIndex?: number
     options?: Array<{ value: string }>
     anytimeActions?: Array<{ id: string; sourceCard?: string }>
@@ -56,7 +59,7 @@ export class Driver {
       return this.record(label, confirmPlayerSwitch(this.session) as unknown as SessionResp)
     }
     if (kind === 'choice') {
-      const opts = it.options ?? []
+      const opts = it.request?.options ?? []
       const pick =
         opts.find((o) => o.value === this.ctx.cardId) ??
         opts.find((o) => o.value !== '__skip__') ??

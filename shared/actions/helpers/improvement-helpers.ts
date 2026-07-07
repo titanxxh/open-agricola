@@ -8,7 +8,11 @@ import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { isFireplaceIdentityCard, isMajorCardId } from '../../cards/helpers/card-type'
 import type { ImprovementType } from '../effects/improvement'
 import { getActiveCardRegistry } from '../../cards/active-registry'
-import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
+import {
+  getAvailableMajorImprovementIds,
+  isMajorImprovementAvailable,
+  takeMajorImprovementFromSupply,
+} from '../../cards/major/supply'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 export type { ResolvedMinorImprovement }
@@ -27,7 +31,7 @@ export const canPlayMajor = (
   improvementId: string,
   allowedPurchases?: string[],
 ): boolean => {
-  if (!state.availableMajorImprovements.includes(improvementId)) return false
+  if (!isMajorImprovementAvailable(state, improvementId)) return false
   if (allowedPurchases && !allowedPurchases.includes(improvementId)) return false
   return true
 }
@@ -48,9 +52,8 @@ export const canPlayMinor = (
   return true
 }
 
-export const listAvailableMajors = (state: GameState): string[] => [
-  ...state.availableMajorImprovements,
-]
+export const listAvailableMajors = (state: GameState): string[] =>
+  getAvailableMajorImprovementIds(state)
 
 export const listMinorHand = (player: PlayerState): string[] => [...player.minorHand]
 
@@ -320,9 +323,7 @@ export const isMajorImprovementPlayable = (
   actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) => {
-  if (allowedPurchases && !allowedPurchases.includes(improvementId)) {
-    return false
-  }
+  if (!canPlayMajor(state, improvementId, allowedPurchases)) return false
   return canAffordMajorImprovement(state, player, improvementId, actionCardId)
 }
 
@@ -391,14 +392,13 @@ export const buildPlayableMinorOptions = (
     }))
 
 export const buildMajorImprovementOptions = (
-  available: string[],
   state: GameState,
   player: PlayerState,
   actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) =>
   majorCardDefinitions
-    .filter((improvement) => available.includes(improvement.id))
+    .filter((improvement) => isMajorImprovementAvailable(state, improvement.id))
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )

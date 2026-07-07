@@ -42,12 +42,12 @@ describe('D138_PetLover session', () => {
     // PetLover wraps the collect flow in an XOR, so the player must choose first.
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.options?.length).toBe(2)
+    expect(resp.interaction.request.options?.length).toBe(2)
 
     // Pick the option that does NOT come from PetLover (sourceCard !== CARD_ID).
     const normalOption =
-      resp.interaction.options?.find((opt) => opt.sourceCard !== CARD_ID)
-      ?? resp.interaction.options[resp.interaction.options?.length - 1]!
+      resp.interaction.request.options?.find((opt) => opt.sourceCard !== CARD_ID)
+      ?? resp.interaction.request.options[resp.interaction.request.options?.length - 1]!
     resp = session.resolveChoice(0, normalOption.value)
     expect(resp.ok).toBe(true)
 
@@ -76,8 +76,8 @@ describe('D138_PetLover session', () => {
 
     // Pick the PetLover branch (sourceCard === CARD_ID).
     const petLoverOption =
-      resp.interaction.options?.find((opt) => opt.sourceCard === CARD_ID)
-      ?? resp.interaction.options[0]!
+      resp.interaction.request.options?.find((opt) => opt.sourceCard === CARD_ID)
+      ?? resp.interaction.request.options[0]!
     resp = session.resolveChoice(0, petLoverOption.value)
     expect(resp.ok).toBe(true)
 

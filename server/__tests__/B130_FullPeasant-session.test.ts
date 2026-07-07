@@ -51,10 +51,10 @@ describe('B130_FullPeasant session', () => {
     // B130 after-place-farmer optional chain becomes the first pending choice.
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
     // The non-skip option is the pay-resources leaf for the optional seq
-    const payOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const payOption = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(payOption).toBeDefined()
   })
 
@@ -67,7 +67,7 @@ describe('B130_FullPeasant session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // Accept the B130 chain (non-skip option activates the optional seq)
-    const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
     // Food should be -1 after pay (from 3 to 2)
@@ -103,7 +103,7 @@ describe('B130_FullPeasant session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    const accept = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
+    const accept = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
     expect(resp.state.players[0]!.workers.filter((w) => w.isActive).length).toBe(activeBefore)
   })

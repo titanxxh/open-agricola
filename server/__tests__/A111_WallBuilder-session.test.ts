@@ -30,7 +30,7 @@ describe('A111_WallBuilder session', () => {
     expect(resp.ok).toBe(true)
     // farm-expansion OR between construct & stables with both resources present.
     if (resp.interaction.stateId === 'wait') {
-      const constructOption = resp.interaction.options?.find(
+      const constructOption = resp.interaction.request.options?.find(
         (o) => o.labelKey === 'actions.construct.name',
       )
       expect(constructOption).toBeDefined()
@@ -38,10 +38,10 @@ describe('A111_WallBuilder session', () => {
     }
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('room')
-    if (resp.interaction.farm.farmType !== 'room') return
+    expect(resp.interaction.request.farm.farmType).toBe('room')
+    if (resp.interaction.request.farm.farmType !== 'room') return
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
 
@@ -72,15 +72,15 @@ describe('A111_WallBuilder session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const constructOption = resp.interaction.options?.find(
+      const constructOption = resp.interaction.request.options?.find(
         (o) => o.labelKey === 'actions.construct.name',
       )
       resp = session.resolveChoice(0, constructOption!.value)
     }
     if (resp.interaction.stateId !== 'wait') return
-    if (resp.interaction.farm.farmType !== 'room') return
+    if (resp.interaction.request.farm.farmType !== 'room') return
 
-    const room = resp.interaction.farm.selectableTiles[0]!
+    const room = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)

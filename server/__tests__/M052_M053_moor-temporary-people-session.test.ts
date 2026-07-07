@@ -71,7 +71,7 @@ const setup = (cardId: string) => {
 const chooseFirstPayment = (session: GameSession, response: SessionResponse) => {
   let resp = response
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const payment = resp.interaction.options?.[0]
+    const payment = resp.interaction.request.options?.[0]
     expect(payment).toBeDefined()
     resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, payment!.value)
     expect(resp.ok).toBe(true)
@@ -85,7 +85,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
 
-  const improvementOption = resp.interaction.options?.find((option) =>
+  const improvementOption = resp.interaction.request.options?.find((option) =>
     option.value.startsWith('action-improvement-')
   )
   if (improvementOption) {
@@ -97,7 +97,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   if (!resp.state.players[0]!.minorPlayed.includes(cardId)) {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return resp
-    const cardOption = resp.interaction.options?.find((option) => option.value === cardId)
+    const cardOption = resp.interaction.request.options?.find((option) => option.value === cardId)
     expect(cardOption).toBeDefined()
     resp = session.resolveChoice(0, cardOption!.value)
     expect(resp.ok).toBe(true)
@@ -110,7 +110,7 @@ const acceptOptional = (session: GameSession, response: SessionResponse) => {
   let resp = response
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
   expect(resp.ok).toBe(true)

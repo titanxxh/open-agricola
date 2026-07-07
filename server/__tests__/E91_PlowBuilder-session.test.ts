@@ -74,7 +74,7 @@ describe('E091_PlowBuilder session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     // Commit the plow choice
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
@@ -214,7 +214,7 @@ describe('E091_PlowBuilder session', () => {
     expect(resp.ok).toBe(true)
 
     // Complete the plow
-    const tile = resp.interaction.farm.selectableTiles[0]
+    const tile = resp.interaction.request.farm.selectableTiles[0]
     expect(tile).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)

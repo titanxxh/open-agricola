@@ -138,7 +138,7 @@ const driveRenovation = (session: GameSession, actorIdx: number) => {
   // Walk through any material choices for the renovation.
   let safety = 5
   while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-    const opts = resp.interaction.options ?? []
+    const opts = resp.interaction.request.options ?? []
     // Check if this is the renovation material choice (clay/stone)
     const hasMatChoice = opts.some((o) => o.value === 'clay' || o.value === 'stone')
     if (hasMatChoice) {
@@ -164,7 +164,7 @@ const driveRenovation = (session: GameSession, actorIdx: number) => {
  */
 const skipImprovement = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>) => {
   if (resp.interaction.stateId === 'wait') {
-    const skipOpt = resp.interaction.options?.find((o) => o.value === '__skip__')
+    const skipOpt = resp.interaction.request.options?.find((o) => o.value === '__skip__')
     if (skipOpt) {
       resp = session.resolveChoice(actorIdx, '__skip__')
     }
@@ -182,7 +182,7 @@ const enterImprovementChoice = (
   resp: ReturnType<GameSession['takeAction']>,
 ) => {
   if (resp.interaction.stateId !== 'wait') return resp
-  const enterOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
+  const enterOpt = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
   if (!enterOpt) return resp
   return session.resolveChoice(actorIdx, enterOpt.value)
 }
@@ -193,13 +193,13 @@ const enterImprovementChoice = (
 const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, majorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
   if (resp.interaction.stateId !== 'wait') return resp
-  const opt = resp.interaction.options?.find((o) => o.value === majorId)
+  const opt = resp.interaction.request.options?.find((o) => o.value === majorId)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   // Drain any sub-choices (e.g. fireplace mode selection)
   let safety = 5
   while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-    const opts = resp.interaction.options ?? []
+    const opts = resp.interaction.request.options ?? []
     // Stop if we see the D161 offer (has __skip__ and is for the owner cross-player)
     const hasSkip = opts.some((o) => o.value === '__skip__')
     if (hasSkip && resp.interaction.playerIndex !== actorIdx) break
@@ -219,12 +219,12 @@ const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<Gam
 const buildMinor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, minorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
   if (resp.interaction.stateId !== 'wait') return resp
-  const opt = resp.interaction.options?.find((o) => o.value === minorId)
+  const opt = resp.interaction.request.options?.find((o) => o.value === minorId)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   let safety = 5
   while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-    const opts = resp.interaction.options ?? []
+    const opts = resp.interaction.request.options ?? []
     const hasSkip = opts.some((o) => o.value === '__skip__')
     if (hasSkip && resp.interaction.playerIndex !== actorIdx) break
     const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
@@ -296,7 +296,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe(CARD_ID)
 
     // Accept the offer (non-skip option)
-    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     expect((acceptOpt as any)?.effectPreview).toEqual({
       kind: 'resourceExchange',
@@ -327,7 +327,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -356,7 +356,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -386,7 +386,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -426,7 +426,7 @@ describe('D161_CabbageBuyer session', () => {
         resp = confirmPlayerSwitch(session)
         continue
       }
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       const skipOpt = opts.find((o) => o.value === '__skip__')
       if (skipOpt) {
         resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
@@ -544,7 +544,7 @@ describe('D161_CabbageBuyer session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.playerIndex : -1).toBe(0)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe(CARD_ID)
     const acceptOpt = resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.find((o) => o.value !== '__skip__')
+      ? resp.interaction.request.options?.find((o) => o.value !== '__skip__')
       : undefined
     expect(acceptOpt?.effectPreview).toEqual({
       kind: 'resourceExchange',

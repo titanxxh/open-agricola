@@ -36,31 +36,31 @@ describe('D020_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // First optional plow
     expect(resp.interaction.stateId).toBe('wait')
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
 
     expect(resp.interaction.stateId).toBe('wait')
-    const tile2 = resp.interaction.farm.selectableTiles[0]
+    const tile2 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Second optional plow
     expect(resp.interaction.stateId).toBe('wait')
-    const accept2 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept2 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept2).toBeDefined()
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
 
     expect(resp.interaction.stateId).toBe('wait')
-    const tile3 = resp.interaction.farm.selectableTiles[0]
+    const tile3 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile3 })
     expect(resp.ok).toBe(true)
 
@@ -83,32 +83,32 @@ describe('D020_TurnwrestPlow session', () => {
     // prepends its optional metadata host before cultivation's main OrNode,
     // so the first surfaced choice is the D20 'do/skip' prompt — accept it.
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionOptionalAction') {
-      const acceptStack = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptStack = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptStack).toBeDefined()
       resp = session.resolveChoice(0, acceptStack!.value)
     }
 
     // Now drive the D20-stack plow leaf → farm-select.
     expect(resp.interaction.stateId).toBe('wait')
-    const tile1 = resp.interaction.farm?.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm?.selectableTiles[0]
     expect(tile1).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // After D20 plow, the cultivation OrNode 'plow vs sow' choice surfaces.
     // Walk through sow if offered (decline it).
-    if (resp.interaction.stateId === 'wait' && resp.interaction.options?.some((o: ActionChoiceOption) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((o: ActionChoiceOption) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
       resp = session.resolveChoice(0, '__skip__')
     }
 
     // Cultivation's main plow choice (or another D20 optional plow) surfaces next.
     expect(resp.interaction.stateId).toBe('wait')
-    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     if (accept1) {
       resp = session.resolveChoice(0, accept1!.value)
       expect(resp.ok).toBe(true)
-      if (resp.interaction.stateId === 'wait' && resp.interaction.farm) {
-        const tile2 = resp.interaction.farm.selectableTiles[0]
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.farm) {
+        const tile2 = resp.interaction.request.farm.selectableTiles[0]
         resp = session.commitSelectionChoice(0, { tile: tile2 })
         expect(resp.ok).toBe(true)
       }
@@ -123,7 +123,7 @@ describe('D020_TurnwrestPlow session', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.farm.selectableTiles[0]
+    const tile1 = resp.interaction.request.farm.selectableTiles[0]
     resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Skip optional

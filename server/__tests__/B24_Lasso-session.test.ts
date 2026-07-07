@@ -69,7 +69,7 @@ const waitOptions = (resp: ReturnType<GameSession['getState']>): ActionChoiceOpt
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return []
   expect(resp.interaction.request.kind).toBe('choice')
-  return resp.interaction.options ?? []
+  return resp.interaction.request.options ?? []
 }
 
 const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
@@ -191,7 +191,7 @@ describe('B024_Lasso session', () => {
     expect(resp.ok).toBe(true)
     expect(placedSpaces(session).sort()).toEqual(['forest', 'sheep-market'])
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      expect(resp.interaction.options?.map((option) => option.value)).not.toContain('__skip__')
+      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('__skip__')
     }
   })
 })

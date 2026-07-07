@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { Scoring } from '../../shared/domain'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { getMajorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
@@ -68,7 +69,7 @@ const playMinor = (session: GameSession, cardId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   resp = session.resolveChoice(0, option!.value)
   expect(resp.ok).toBe(true)
@@ -78,7 +79,7 @@ const playMinor = (session: GameSession, cardId: string) => {
 const choosePaymentIfNeeded = (session: GameSession, playerIndex = 0) => {
   let resp = session.getState()
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.[0]
+    const option = resp.interaction.request.options?.[0]
     expect(option).toBeDefined()
     resp = session.resolveChoice(playerIndex, option!.value)
     expect(resp.ok).toBe(true)
@@ -106,7 +107,7 @@ describe('Moor major-supply and upgrade minors', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const values = resp.interaction.options?.map((option) => option.value) ?? []
+    const values = resp.interaction.request.options?.map((option) => option.value) ?? []
     expect(values).toContain('Major_Joinery')
     expect(values).not.toContain('Major_Moor_FurnitureStall')
 
@@ -129,7 +130,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const resp = playMinor(session, 'M018_RegisterOfCraftsmen')
 
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('Major_Joinery')
+      expect(resp.interaction.request.options?.map((option) => option.value) ?? []).not.toContain('Major_Joinery')
     }
     expect(resp.state.players[0]!.improvements).not.toContain('Major_Joinery')
   })
@@ -179,6 +180,25 @@ describe('Moor major-supply and upgrade minors', () => {
 
     resp.state.players[0]!.resources = fullResources()
     expect(runCardEffectHook(resp.state, resp.state.players[0]!, 'M062_HearthBrush', 'onEndTurn')).toBeNull()
+  })
+
+  it('M062 does not offer hidden Tiled Oven before it is moved to the supply top', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed.push('M062_HearthBrush')
+    player.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
+    writeCardExtraData(player, 'M062_HearthBrush', 'playedRound', 4)
+
+    const flow = runCardEffectHook(
+      session.state,
+      player,
+      'M062_HearthBrush',
+      'onEndTurn',
+      undefined,
+      { triggerActionId: 'place-farmer' },
+    )
+
+    expect(flow).toBeNull()
   })
 
   it('M063 moves up Village Church and scores Church plus Village Church', () => {
@@ -240,7 +260,7 @@ describe('Moor major-supply and upgrade minors', () => {
     const resp = session.takeAction(0, 'meeting-place')
 
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.options?.map((option) => option.value) ?? []).not.toContain('M068_Church')
+      expect(resp.interaction.request.options?.map((option) => option.value) ?? []).not.toContain('M068_Church')
     }
     expect(resp.state.players[0]!.minorPlayed).not.toContain('M068_Church')
     expect(resp.state.players[0]!.resources.food).toBe(0)

@@ -51,7 +51,7 @@ describe('E074_AshTrees session flow', () => {
     if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected Ash Trees choice')
     }
-    const useAll = resp.interaction.options?.find(
+    const useAll = resp.interaction.request.options?.find(
       (option) =>
         option.labelKey === 'ui.interactionAshTreesUseCount' &&
         option.labelParams?.count === 4,
@@ -60,7 +60,7 @@ describe('E074_AshTrees session flow', () => {
 
     resp = session.resolveChoice(0, useAll!.value)
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.farm.farmType : undefined)
       .toBe('fence')
 
     resp = session.commitSelectionChoice(0, {
@@ -98,7 +98,7 @@ describe('E074_AshTrees session flow', () => {
 
     // Select "use 3" to reserve freeFences=3
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
-    const useThree = resp.interaction.options?.find(
+    const useThree = resp.interaction.request.options?.find(
       (o) => o.labelParams?.count === 3,
     )
     expect(useThree).toBeDefined()

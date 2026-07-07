@@ -123,7 +123,7 @@ const driveToCompletion = (
   // Then resolve E53 prompt chain
   let safety = 30
   while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-    const opts = (resp.interaction.options ?? []) as { value: string; sourceCard?: string }[]
+    const opts = (resp.interaction.request.options ?? []) as { value: string; sourceCard?: string }[]
     if (acceptE53Trade) {
       // Accept E53 SEQ optional and pick trade
       const e53Trade = opts.find((o) => o.value.startsWith('trade:'))
@@ -166,7 +166,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId === 'wait') {
-      const opts = (resp.interaction.options ?? []) as { sourceCard?: string; value: string }[]
+      const opts = (resp.interaction.request.options ?? []) as { sourceCard?: string; value: string }[]
       const hasE53 = opts.some((o) => o.sourceCard === CARD_ID)
       expect(hasE53).toBe(false)
     }

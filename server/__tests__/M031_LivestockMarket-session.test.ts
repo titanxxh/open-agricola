@@ -147,7 +147,7 @@ const playMinor = (session: GameSession) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const playMinorOption = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const playMinorOption = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(playMinorOption).toBeDefined()
   resp = session.resolveChoice(0, playMinorOption!.value)
   expect(resp.ok).toBe(true)
@@ -208,7 +208,7 @@ describe('M031_LivestockMarket session', () => {
     let resp = playMinor(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const exchangeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    const exchangeOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(exchangeOption).toBeDefined()
 
     resp = session.resolveChoice(0, exchangeOption!.value)
@@ -241,7 +241,7 @@ describe('M031_LivestockMarket session', () => {
     let resp = playMinor(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const exchangeOption = resp.interaction.options?.find((option) => {
+    const exchangeOption = resp.interaction.request.options?.find((option) => {
       const preview = option.effectPreview
       return preview?.kind === 'resourceExchange'
         && preview.resourcesPaid?.sheep === 1
@@ -285,7 +285,7 @@ describe('M031_LivestockMarket session', () => {
     let resp = playMinor(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const exchangeOption = resp.interaction.options?.find((option) => {
+    const exchangeOption = resp.interaction.request.options?.find((option) => {
       const preview = option.effectPreview
       return preview?.kind === 'resourceExchange'
         && preview.resourcesPaid?.sheep === 1

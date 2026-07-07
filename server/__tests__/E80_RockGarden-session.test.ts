@@ -73,8 +73,8 @@ describe('E080_RockGarden session', () => {
     if (!resp.ok || resp.interaction.stateId !== 'wait') {
       throw new Error('expected sow interaction')
     }
-    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
-    expect(resp.interaction.farm.selectableFields).toContainEqual({
+    if (resp.interaction.request.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    expect(resp.interaction.request.farm.selectableFields).toContainEqual({
       tile: { row: ROW, col: COL_BASE },
       allowedCrops: ['stone'],
       sourceCard: CARD_ID,
@@ -106,10 +106,10 @@ describe('E080_RockGarden session', () => {
     if (!resp.ok || resp.interaction.stateId !== 'wait') {
       throw new Error('expected sow interaction')
     }
-    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    if (resp.interaction.request.farm.farmType !== 'sow') throw new Error('expected sow farm')
     const slots = [0, 1, 2].map((slotIdx) =>
-      resp.interaction.farm.farmType === 'sow'
-        ? resp.interaction.farm.selectableFields.find(
+      resp.interaction.request.farm.farmType === 'sow'
+        ? resp.interaction.request.farm.selectableFields.find(
             (f) => f.tile.row === ROW && f.tile.col === COL_BASE + slotIdx,
           )
         : undefined,

@@ -7,7 +7,7 @@ import {
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
-} from '../../shared/domain/farmyard'
+} from '../../shared/domain/farmyard-interaction'
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -301,7 +301,7 @@ describe('farm interaction builders', () => {
     expect(pending.interaction.stateId).toBe('wait')
     if (pending.interaction.stateId !== 'wait') return
     expect(pending.interaction.request.kind).toBe('farm-select')
-    expect(pending.interaction.options?.map((option) => option.value)).toEqual(['confirm'])
+    expect(pending.interaction.request.options?.map((option) => option.value)).toEqual(['confirm'])
 
     const rejected = session.commitSelectionChoice(0, { cancel: true })
 

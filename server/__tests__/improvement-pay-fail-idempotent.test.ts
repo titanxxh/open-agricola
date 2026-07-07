@@ -83,13 +83,13 @@ describe('improvement: pay fail idempotent', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.promptKey !== 'prompt.selectPayment') {
-      const opt = resp.interaction.options?.find((o) => o.value === 'B065_GrainDepot')
+      const opt = resp.interaction.request.options?.find((o) => o.value === 'B065_GrainDepot')
       expect(opt).toBeDefined()
       resp = session.resolveChoice(0, opt!.value)
     }
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
-    const payOption = resp.interaction.options?.find((o) => o.value === 'pay:improvement:minor:B065_GrainDepot:1')
+    const payOption = resp.interaction.request.options?.find((o) => o.value === 'pay:improvement:minor:B065_GrainDepot:1')
     expect(payOption).toBeDefined()
     liveState.players[0]!.resources = {
       ...liveState.players[0]!.resources,

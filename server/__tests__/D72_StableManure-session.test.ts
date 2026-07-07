@@ -14,7 +14,7 @@ describe('D072_StableManure session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     if (resp.interaction.request.kind === 'select-trigger') {
-      const triggerOption = resp.interaction.options?.find(
+      const triggerOption = resp.interaction.request.options?.find(
         (o: ActionChoiceOption) => o.value === 'D072_StableManure',
       )
       expect(triggerOption).toBeDefined()
@@ -24,7 +24,7 @@ describe('D072_StableManure session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
 
-    const acceptOption = resp.interaction.options?.find(
+    const acceptOption = resp.interaction.request.options?.find(
       (o: ActionChoiceOption) => o.value !== '__skip__',
     )
     expect(acceptOption).toBeDefined()

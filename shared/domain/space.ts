@@ -1,5 +1,41 @@
 import type { ActionSpace, BlockedActionSpaceRef, GameState, WorkerRef } from '../contract/types'
 
+export type ActionSpaceQueryState = Pick<GameState, 'actionSpaces'>
+
+export const findActionSpaceById = (
+  state: ActionSpaceQueryState,
+  spaceId: string | null | undefined,
+): ActionSpace | undefined => {
+  if (!spaceId) return undefined
+  return state.actionSpaces.find((space) => space.id === spaceId)
+}
+
+export const hasActionSpace = (
+  state: ActionSpaceQueryState,
+  spaceId: string,
+): boolean =>
+  findActionSpaceById(state, spaceId) !== undefined
+
+export const filterActionSpacesByIds = (
+  state: ActionSpaceQueryState,
+  spaceIds: Iterable<string>,
+): ActionSpace[] => {
+  const wanted = new Set(spaceIds)
+  return state.actionSpaces.filter((space) => wanted.has(space.id))
+}
+
+export const findActionSpaceByWorker = (
+  state: ActionSpaceQueryState,
+  playerId: string,
+  workerId?: string,
+): ActionSpace | undefined =>
+  state.actionSpaces.find((space) =>
+    space.takenBy.some((worker) =>
+      worker.playerId === playerId &&
+      (workerId === undefined || worker.workerId === workerId),
+    ),
+  )
+
 /**
  * Coerce a deserialized or test-fixture `takenBy` into a `WorkerRef[]`.
  *

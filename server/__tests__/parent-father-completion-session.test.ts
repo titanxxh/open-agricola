@@ -148,7 +148,7 @@ describe('Parent father completion session', () => {
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(prompt.ok).toBe(true)
     expect(prompt.interaction.stateId).toBe('wait')
-    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS01:1', 'PS01:2'])
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS01:1', 'PS01:2'])
 
     const completed = session.resolveChoice(0, 'PS01:1')
     const player = completed.state.players[0]!
@@ -184,7 +184,7 @@ describe('Parent father completion session', () => {
     })
 
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
-    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS01:1', 'PS01:2'])
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS01:1', 'PS01:2'])
 
     session.state.players[0]!.fields = session.state.players[0]!.fields.slice(0, 1)
     const stale = session.resolveChoice(0, 'PS01:2')
@@ -218,7 +218,7 @@ describe('Parent father completion session', () => {
 
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(prompt.ok).toBe(true)
-    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS02:1', 'PS02:2'])
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS02:1', 'PS02:2'])
 
     const completed = session.resolveChoice(0, 'PS02:2')
     const player = completed.state.players[0]!
@@ -308,15 +308,15 @@ describe('Parent father completion session', () => {
 
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(prompt.ok).toBe(true)
-    expect(prompt.interaction.options?.map((option) => option.value)).toContain('PS04:2:wood,stone')
-    expect(prompt.interaction.options?.map((option) => option.value)).not.toContain('PS04:2:wood,wood')
-    const rewardLabels = prompt.interaction.options
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toContain('PS04:2:wood,stone')
+    expect(prompt.interaction.request.options?.map((option) => option.value)).not.toContain('PS04:2:wood,wood')
+    const rewardLabels = prompt.interaction.request.options
       ?.filter((option) => option.value.startsWith('PS04:2:'))
       .map((option) => option.labelParams?.reward)
     expect(new Set(rewardLabels).size).toBe(rewardLabels?.length)
-    expect(prompt.interaction.options?.find((option) => option.value === 'PS04:2:wood,stone')?.labelParams?.reward)
+    expect(prompt.interaction.request.options?.find((option) => option.value === 'PS04:2:wood,stone')?.labelParams?.reward)
       .toContain('wood + stone')
-    expect(prompt.interaction.options?.find((option) => option.value === 'PS04:2:wood,stone')?.descriptionPreview)
+    expect(prompt.interaction.request.options?.find((option) => option.value === 'PS04:2:wood,stone')?.descriptionPreview)
       .toMatchObject({
         kind: 'action',
         labelParams: {
@@ -380,7 +380,7 @@ describe('Parent father completion session', () => {
     })
     const tier2Prompt = tier2.takeAnytimeAction(0, ACTION_ID)
     expect(tier2Prompt.ok).toBe(true)
-    expect(tier2Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
+    expect(tier2Prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
 
     const tier3 = setup('PS06', (player) => {
       setPlayedCardCounts(player, { occupations: 3, minors: 3, majors: 2 })
@@ -388,7 +388,7 @@ describe('Parent father completion session', () => {
     })
     const tier3Prompt = tier3.takeAnytimeAction(0, ACTION_ID)
     expect(tier3Prompt.ok).toBe(true)
-    expect(tier3Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2', 'PS06:3'])
+    expect(tier3Prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2', 'PS06:3'])
     const tier3Completed = tier3.resolveChoice(0, 'PS06:3')
     expect(tier3Completed.ok).toBe(true)
     expect(tier3Completed.state.players[0]!.resources.food).toBe(5)
@@ -403,7 +403,7 @@ describe('Parent father completion session', () => {
 
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(prompt.ok).toBe(true)
-    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS06:1', 'PS06:2'])
 
     setPlayedCardCounts(session.state.players[0]!, { occupations: 1, minors: 1, majors: 1 })
     const stale = session.resolveChoice(0, 'PS06:2')
@@ -435,7 +435,7 @@ describe('Parent father completion session', () => {
     expect(countUnusedFarmyardSpaces(tier2.getState().state.players[0]!)).toBe(5)
     const tier2Prompt = tier2.takeAnytimeAction(0, ACTION_ID)
     expect(tier2Prompt.ok).toBe(true)
-    expect(tier2Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2'])
+    expect(tier2Prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2'])
     const tier2Completed = tier2.resolveChoice(0, 'PS08:2')
     expect(tier2Completed.ok).toBe(true)
     expect(tier2Completed.state.players[0]!.resources.grain).toBe(0)
@@ -448,7 +448,7 @@ describe('Parent father completion session', () => {
     expect(countUnusedFarmyardSpaces(tier3.getState().state.players[0]!)).toBe(3)
     const tier3Prompt = tier3.takeAnytimeAction(0, ACTION_ID)
     expect(tier3Prompt.ok).toBe(true)
-    expect(tier3Prompt.interaction.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2', 'PS08:3'])
+    expect(tier3Prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS08:1', 'PS08:2', 'PS08:3'])
     const tier3Completed = tier3.resolveChoice(0, 'PS08:3')
     expect(tier3Completed.ok).toBe(true)
     expect(tier3Completed.state.players[0]!.resources.grain).toBe(1)
@@ -469,13 +469,13 @@ describe('Parent father completion session', () => {
 
     const prompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(prompt.ok).toBe(true)
-    expect(prompt.interaction.options?.map((option) => option.value)).toEqual(['PS07:1', 'PS07:2'])
+    expect(prompt.interaction.request.options?.map((option) => option.value)).toEqual(['PS07:1', 'PS07:2'])
 
     const sowPrompt = session.resolveChoice(0, 'PS07:2')
     expect(sowPrompt.ok).toBe(true)
     expect(sowPrompt.interaction.stateId).toBe('wait')
-    expect(sowPrompt.interaction.farm?.farmType).toBe('sow')
-    expect(sowPrompt.interaction.farm?.maxSelections).toBe(2)
+    expect(sowPrompt.interaction.request.farm?.farmType).toBe('sow')
+    expect(sowPrompt.interaction.request.farm?.maxSelections).toBe(2)
     expect(sowPrompt.state.players[0]!.cardStates.PS07).toBeUndefined()
 
     const empty = session.commitSelectionChoice(0, { crops: [] })
@@ -497,8 +497,8 @@ describe('Parent father completion session', () => {
     expect(session.takeAnytimeAction(0, ACTION_ID).ok).toBe(true)
     const sowPrompt = session.resolveChoice(0, 'PS07:2')
     expect(sowPrompt.ok).toBe(true)
-    const fields = sowPrompt.interaction.farm?.farmType === 'sow'
-      ? sowPrompt.interaction.farm.selectableFields.map((field) => field.tile)
+    const fields = sowPrompt.interaction.request.farm?.farmType === 'sow'
+      ? sowPrompt.interaction.request.farm.selectableFields.map((field) => field.tile)
       : []
     const overMax = session.commitSelectionChoice(0, {
       crops: [
@@ -524,9 +524,9 @@ describe('Parent father completion session', () => {
     const sowPrompt = session.takeAnytimeAction(0, ACTION_ID)
     expect(sowPrompt.ok).toBe(true)
     expect(sowPrompt.interaction.stateId).toBe('wait')
-    expect(sowPrompt.interaction.farm?.farmType).toBe('sow')
-    const field = sowPrompt.interaction.farm?.farmType === 'sow'
-      ? sowPrompt.interaction.farm.selectableFields[0]!.tile
+    expect(sowPrompt.interaction.request.farm?.farmType).toBe('sow')
+    const field = sowPrompt.interaction.request.farm?.farmType === 'sow'
+      ? sowPrompt.interaction.request.farm.selectableFields[0]!.tile
       : { row: 1, col: 0 }
     const completed = session.commitSelectionChoice(0, {
       crops: [{ ...field, crop: 'grain' }],

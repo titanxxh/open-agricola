@@ -36,6 +36,10 @@ _Avoid_: Farmers
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
 
+**Player Lookup Query**:
+领域层把 `playerId` 解析为 `PlayerState` 或 `playerIndex` 的统一查询边界；规则、session 和 effect 代码通过它读取玩家身份映射。
+_Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
+
 **Room**:
 多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
 _Avoid_: PlayerState
@@ -80,6 +84,30 @@ _Avoid_: 未类型化 pending blob
 前端把服务端 `InteractionState` 映射为具体交互展示面和提交动作的边界。它只消费服务端交互真相，不做规则裁定。
 _Avoid_: 后端规则裁定、Pending Envelope、DOM 状态推断
 
+**Exchange Draft Presentation**:
+Interaction Presentation 的一种本地草稿展示，覆盖 bake-bread、anytime exchange 和 harvest-feed 这类资源交换计数器、上限、汇总和提交 payload 派生。它只管理玩家尚未提交的前端草稿，不改变资源兑换规则。
+_Avoid_: Payment Pipeline、规则执行、真实资源变更
+
+**Farm Selection Draft Presentation**:
+Interaction Presentation 的一种本地草稿展示，覆盖 fence、room、stable、plow、sow 和 farm-position 选择的前端暂存、错误展示、提交 draft 和 snapshot 后重置。它只管理尚未提交的本地选择，不做农场合法性裁定。
+_Avoid_: Farm Board Projection、Moor Special Action tile routing、后端规则验证、真实 GameState 写入
+
+**Farm Interaction Projection**:
+后端把 `PlayerState`、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload 的领域投影边界。它只产生当前等待交互可展示、可选择的候选，不负责提交后的规则落子或前端本地 draft。
+_Avoid_: Farmyard 规则校验、Farm Selection Draft Presentation、真实 GameState 写入
+
+**Animal Reorg Draft Presentation**:
+Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
+_Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入
+
+**Interaction State Adapter**:
+会话层把 `GameState`、`EngineStack`、`Pending Envelope` 和 request projection snapshot 派生成前端可见 `InteractionState` 的适配模块；viewer redaction 消费已完成的 `InteractionState`。它隐藏引擎恢复 cursor、host node metadata、具体 farm/selection/animal request builder 和旧兼容字段；前端只读取 `InteractionState.stateId` 与 `wait.request.kind` 下的结构化数据。
+_Avoid_: 在前端或测试里读取 Pending Envelope metadata、把 farm/selection/animal builder 闭包散传进 adapter、在 `InteractionState.wait` 顶层复制 `request` 字段
+
+**Interaction Command Policy**:
+会话层把 `InteractionRequest.kind` 映射到公开 `allowedCommands` 和服务端提交入口的统一策略；它只回答当前等待交互应走 `resolveChoice`、`commitSelection` 还是无直接提交。
+_Avoid_: payload 组装、ActionFlow 执行、前端本地草稿、Pending Envelope cursor
+
 **Pending Envelope**:
 引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
 _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
@@ -104,6 +132,10 @@ _Avoid_: Action Space
 引擎子流程栈，用于 top action、hook、anytime、动物整理、喂食、farm-select、confirm 等嵌套流程的 push / pop / resume。
 _Avoid_: 直接改 pending
 
+**Stage Dispatch**:
+阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
+_Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
+
 **Sub-flow**:
 由阶段、hook、anytime 或系统流程插入的嵌套执行帧，例如 `animal-reorg`、`harvest-feed`、`confirm-next-player`。
 _Avoid_: 顶层游戏状态机
@@ -115,6 +147,14 @@ _Avoid_: 在 effect 文件里堆叠多卡特例
 **Action Space**:
 棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
 _Avoid_: ActionDefinition、ActionNode
+
+**Action Space Query**:
+领域层读取公开行动格的统一查询边界，覆盖按 id 查找、存在判断、按 id 集合保持棋盘顺序过滤、按 worker 定位所在行动格等共享语义。
+_Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推断
+
+**Action Entry Query**:
+会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。
+_Avoid_: Action Space mutation、卡牌购买可用性、RoomPlayer 席位校验、前端本地视角选择
 
 **Season Action Space（季节行动格）**:
 Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。

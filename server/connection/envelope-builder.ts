@@ -1,17 +1,9 @@
 import type { GameSession, SessionResponse } from '../game/authoritative-session.ts'
-import {
-  filterPublicEventCancellationsForPlayer,
-  serializeStateForPlayer,
-} from '../../shared/session/serialization.ts'
 import type {
-  GameSyncPayload,
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
-import {
-  filterInteractionForViewer,
-  privateEventsForViewer,
-} from '../../shared/session/interaction-privacy.ts'
+import { buildGameSyncPayload } from '../game/sync-payload.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -24,43 +16,6 @@ type Args = {
   sync?: 'snapshot'
 }
 
-const buildPayload = (args: Args): GameSyncPayload => {
-  const { resp, room, viewerPlayerId } = args
-  const stateOpts = { engineStack: room.session.getEngineStack() }
-  const state = serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
-  const playerIds = resp.state.players.map((player) => player.id)
-  const currentPlayerId = resp.state.players[resp.state.currentPlayerIndex]?.id ?? null
-  const privateEvents = privateEventsForViewer(
-    resp.interaction,
-    playerIds,
-    viewerPlayerId,
-    resp.privateEvents ?? [],
-  )
-  const publicEventCancellations = filterPublicEventCancellationsForPlayer(
-    resp.state,
-    viewerPlayerId,
-    stateOpts,
-    resp.publicEventCancellations,
-  )
-  const payload: GameSyncPayload = {
-    state,
-    interaction: filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),
-    scores: resp.scores ?? null,
-    pastureCapacities: resp.pastureCapacities,
-    historyLength: resp.historyLength,
-    hasActionStartSnapshot: resp.hasActionStartSnapshot,
-    ok: resp.ok,
-    actionAvailability: resp.actionAvailability,
-    cardAvailability: viewerPlayerId === currentPlayerId ? resp.cardAvailability : undefined,
-    error: resp.error,
-  }
-  if (privateEvents.length > 0) payload.privateEvents = privateEvents
-  if (publicEventCancellations?.length) payload.publicEventCancellations = publicEventCancellations
-  const defs = room.session.getCustomCardDefs()
-  if (defs.length > 0) payload.customCardDefs = defs
-  return payload
-}
-
 export function buildEnvelope(args: Args): StateUpdateEnvelope {
   return {
     type: 'stateUpdate',
@@ -69,7 +24,11 @@ export function buildEnvelope(args: Args): StateUpdateEnvelope {
     sync: args.sync ?? 'snapshot',
     cause: args.cause,
     requestId: args.requestId,
-    payload: buildPayload(args),
+    payload: buildGameSyncPayload({
+      session: args.room.session,
+      resp: args.resp,
+      viewerPlayerId: args.viewerPlayerId,
+    }),
     emittedAt: args.emittedAt,
   }
 }

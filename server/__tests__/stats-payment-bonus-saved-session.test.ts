@@ -50,7 +50,7 @@ describe('payment stats: bonus saved attribution (session)', () => {
         resp = session.resolveChoice(0, 'clay')
         continue
       }
-      const skip = resp.interaction.options?.find(
+      const skip = resp.interaction.request.options?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {

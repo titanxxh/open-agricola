@@ -25,6 +25,7 @@ import {
   getAssignedAnimalsByType,
   subtractAnimalsFromBoard,
 } from '../../domain/animals'
+import { findPlayerById } from '../../domain/player'
 import { notifyAnimalsRemovedFromCardEffects } from '../../cards/card-effects'
 
 export type ReorganizeTrigger =
@@ -113,7 +114,7 @@ const storagePlayerForZone = (
   player: PlayerState,
   zone: AnimalZone,
 ): PlayerState => zone.ownerPlayerId
-  ? state.players.find((candidate) => candidate.id === zone.ownerPlayerId) ?? player
+  ? findPlayerById(state, zone.ownerPlayerId) ?? player
   : player
 
 const animalOwnerIdFromZoneId = (zoneId: string): string | undefined =>

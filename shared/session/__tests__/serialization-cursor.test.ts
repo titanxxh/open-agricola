@@ -304,7 +304,7 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
     expect(interaction.stateId).toBe('wait')
     if (interaction.stateId === 'wait') {
-      expect(interaction.options).toEqual(options)
+      expect(interaction.request.options).toEqual(options)
     }
   })
 
@@ -487,8 +487,8 @@ describe('serialization cursor round-trip', () => {
     if (restoredResp.interaction.stateId === 'wait' && beforeResp.interaction.stateId === 'wait') {
       // Same prompt + same set of choice values across the round-trip.
       expect(restoredResp.interaction.promptKey).toBe(beforeResp.interaction.promptKey)
-      expect(restoredResp.interaction.options?.map((o) => o.value).sort()).toEqual(
-        beforeResp.interaction.options?.map((o) => o.value).sort(),
+      expect(restoredResp.interaction.request.options?.map((o) => o.value).sort()).toEqual(
+        beforeResp.interaction.request.options?.map((o) => o.value).sort(),
       )
     }
 

@@ -16,6 +16,7 @@ import type { FenceSegment, FenceSegmentSource, GameState, PlayerState, Resource
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
+import { findPlayerById } from '../domain/player'
 import {
   emptyResources,
   extendedResourceKeyList,
@@ -164,7 +165,7 @@ export const applyFutureMeeples = (
       remaining.push(entry)
       return
     }
-    const player = state.players.find((item) => item.id === entry.playerId)
+    const player = findPlayerById(state, entry.playerId)
     if (!player) return
     Object.entries(entry.resources).forEach(([key, value]) => {
       const amount = value ?? 0

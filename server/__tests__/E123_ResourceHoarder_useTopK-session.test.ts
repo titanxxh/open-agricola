@@ -397,7 +397,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     }
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    const e123Option = resp.interaction.options?.find((option) => {
+    const e123Option = resp.interaction.request.options?.find((option) => {
       const params = option.labelParams as { sourceCards?: string[] } | undefined
       return params?.sourceCards?.length === 1 && params.sourceCards[0] === CARD_ID
     })

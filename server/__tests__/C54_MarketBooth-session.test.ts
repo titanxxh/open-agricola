@@ -56,7 +56,7 @@ const drainPending = (session: GameSession, accept: boolean) => {
     if (resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     } else {
-      const opts = resp.interaction.options ?? []
+      const opts = resp.interaction.request.options ?? []
       // Optional SEQ surfaces as 2-option choice: [actionNode, __skip__].
       // Accepting picks the non-skip option; declining picks __skip__.
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
@@ -108,7 +108,7 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
   let resp = session.takeAction(0, 'meeting-place')
   let safety = 10
   while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-    const options = resp.interaction.options ?? []
+    const options = resp.interaction.request.options ?? []
     if (options.some((option) => option.value === CARD_ID)) break
     const accept = options.find((option) => option.value !== '__skip__')
     if (!accept) break
@@ -136,7 +136,7 @@ describe('C054_MarketBooth session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+    const accept = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
@@ -151,7 +151,7 @@ describe('C054_MarketBooth session', () => {
   it('cannot be played when stable reserve is exhausted by built, future, FarmHand, and consumed stable tokens', () => {
     const session = setupForPurchase({ noStableReserve: true })
     const resp = takeMeetingPlaceToMinorOptions(session)
-    const options = resp.interaction.stateId === 'wait' ? resp.interaction.options ?? [] : []
+    const options = resp.interaction.stateId === 'wait' ? resp.interaction.request.options ?? [] : []
     expect(options.some((entry) => entry.value === CARD_ID)).toBe(false)
   })
 

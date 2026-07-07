@@ -2,6 +2,7 @@ import type { GameState, PlayerState, Worker } from '../contract/types'
 import type { CardDefinition } from '../contract/cards'
 import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
 import { workersAtHome, smallestAvailableWorker } from '../domain/player'
+import { findActionSpaceById } from '../domain/space'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
 export type HeatingPaymentPayload = {
@@ -158,7 +159,7 @@ export const applyHeatingPayment = (
 }
 
 export const recoverInfirmaryWorkers = (state: GameState): void => {
-  const infirmary = state.actionSpaces.find((space) => space.id === 'moor-infirmary')
+  const infirmary = findActionSpaceById(state, 'moor-infirmary')
   if (!infirmary) return
   for (const player of state.players) {
     const recovering = new Set(

@@ -1,4 +1,5 @@
 import type { GameState } from '../../contract/types'
+import { findActionSpaceById } from '../../domain/space'
 
 /**
  * 某行动格上当前物理存在的"人"数量（含新生儿）。
@@ -10,7 +11,7 @@ import type { GameState } from '../../contract/types'
  * 也解决 B004_WoodPile 的 TODO（"数累积格上有几个人"）。
  */
 export const countPeopleOnSpace = (state: GameState, spaceId: string): number => {
-  const space = state.actionSpaces.find(s => s.id === spaceId)
+  const space = findActionSpaceById(state, spaceId)
   if (!space) return 0
   return space.takenBy.length
 }

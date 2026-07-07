@@ -56,7 +56,7 @@ const setup = (options: {
 const choosePaymentIfNeeded = (session: GameSession, response: SessionResponse) => {
   let resp = response
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.[0]
+    const option = resp.interaction.request.options?.[0]
     expect(option).toBeDefined()
     resp = session.resolveChoice(0, option!.value)
     expect(resp.ok).toBe(true)
@@ -70,7 +70,7 @@ const playM101 = (session: GameSession) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
 
-  const improvementOption = resp.interaction.options?.find((option) =>
+  const improvementOption = resp.interaction.request.options?.find((option) =>
     option.value.startsWith('action-improvement-')
   )
   if (improvementOption) {
@@ -84,7 +84,7 @@ const playM101 = (session: GameSession) => {
 
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.options?.find((option) => option.value === CARD_ID)
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
   expect(cardOption).toBeDefined()
   resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
@@ -93,7 +93,7 @@ const playM101 = (session: GameSession) => {
 
 const resourcesPaid = (response: SessionResponse, resource: keyof Resource, amount: number) =>
   response.interaction.stateId === 'wait'
-    ? response.interaction.options?.find((option) =>
+    ? response.interaction.request.options?.find((option) =>
       option.effectPreview?.kind === 'resourceExchange' &&
       option.effectPreview.resourcesPaid?.[resource] === amount
     )
@@ -109,10 +109,10 @@ const confirmAnimalReorgIfNeeded = (
     return response
   }
   const zones = keepAnimal
-    ? response.interaction.zones.map((zone, index) => index === 0
+    ? response.interaction.request.zones.map((zone, index) => index === 0
       ? { ...zone, animalType: keepAnimal, animalCount: 1 }
       : zone)
-    : response.interaction.zones
+    : response.interaction.request.zones
   const resp = session.resolveChoice(playerIndex, 'confirm', { zones })
   expect(resp.ok).toBe(true)
   return resp
@@ -155,22 +155,22 @@ describe('M101 Butcher\'s Block', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
 
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(0)
-    expect(resp.interaction.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.request.toPlayerIndex).toBe(1)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(1)
-    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(false)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
 
     const boarOption = resourcesPaid(resp, 'boar', 1)
     expect(boarOption).toBeDefined()
@@ -180,8 +180,8 @@ describe('M101 Butcher\'s Block', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.toPlayerIndex).toBe(0)
+    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
 
     resp = confirmPlayerSwitch(session)
     expect(resp.ok).toBe(true)

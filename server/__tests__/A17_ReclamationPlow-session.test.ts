@@ -148,7 +148,7 @@ describe('A017_ReclamationPlow session', () => {
       .not.toBe('ui.interactionReclamationPlow')
 
     if (resp.interaction.stateId === 'wait') {
-      const skip = resp.interaction.options?.find((option) => option.value === '__skip__')
+      const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
       if (skip) resp = session.resolveChoice(0, skip.value)
     }
 

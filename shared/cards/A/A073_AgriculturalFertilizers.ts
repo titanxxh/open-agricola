@@ -2,19 +2,12 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
-import { positionKey } from '../../domain/farm'
-import type { PlayerState } from '../../contract/types'
+import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A073_AgriculturalFertilizers'
-const countUsedSpaces = (player: PlayerState): number => {
-  const occupied = new Set<string>()
-  player.roomTiles.forEach((t) => occupied.add(positionKey(t)))
-  player.fields.forEach((f) => occupied.add(positionKey({ row: f.row, col: f.col })))
-  player.stableTiles.forEach((t) => occupied.add(positionKey(t)))
-  player.pastures.flatMap((p) => p.tiles).forEach((t) => occupied.add(positionKey(t)))
-  return occupied.size
-}
+const countUsedSpaces = (player: CardListenerContext['player']): number =>
+  getUsedFarmyardTileKeys(player).size
 
 const beforeListener: CardListenerRegistration = {
   id: 'A73-agri-fert-before',

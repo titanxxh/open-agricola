@@ -90,7 +90,7 @@ const resolvePaymentIfNeeded = (
   resp: ReturnType<GameSession['resolveChoice']>,
 ) => {
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
-    const option = resp.interaction.options?.[0]
+    const option = resp.interaction.request.options?.[0]
     expect(option).toBeDefined()
     return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
   }
@@ -102,18 +102,18 @@ const playMinor = (session: GameSession, cardId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const improvement = resp.interaction.options?.find((option) =>
+  const improvement = resp.interaction.request.options?.find((option) =>
     option.value.startsWith('action-improvement-'))
   expect(improvement).toBeDefined()
   resp = session.resolveChoice(0, improvement!.value)
   expect(resp.ok).toBe(true)
   resp = resolvePaymentIfNeeded(session, resp)
-  if (resp.interaction.stateId === 'wait' && resp.interaction.selection?.kind === 'farm-position') {
+  if (resp.interaction.stateId === 'wait' && resp.interaction.request.selection?.kind === 'farm-position') {
     return resp
   }
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  const card = resp.interaction.options?.find((option) => option.value === cardId)
+  const card = resp.interaction.request.options?.find((option) => option.value === cardId)
   expect(card).toBeDefined()
   resp = session.resolveChoice(0, card!.value)
   expect(resp.ok).toBe(true)
@@ -127,7 +127,7 @@ const commitPositions = (
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
-  expect(resp.interaction.selection?.kind).toBe('farm-position')
+  expect(resp.interaction.request.selection?.kind).toBe('farm-position')
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, {
     positions: tiles,
   })

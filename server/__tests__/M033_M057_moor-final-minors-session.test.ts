@@ -68,7 +68,7 @@ const driveToM057Offer = (session: GameSession): SessionResponse => {
 const optionFor = (resp: SessionResponse, actionId: string): ActionChoiceOption => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const option = resp.interaction.options?.find((candidate) =>
+  const option = resp.interaction.request.options?.find((candidate) =>
     candidate.labelKey === `moor.specialActions.${actionId}`)
   expect(option).toBeDefined()
   return option!
@@ -78,7 +78,7 @@ const triggerOptionFor = (resp: SessionResponse, sourceCard: string): ActionChoi
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(resp.interaction.request.kind).toBe('select-trigger')
-  const option = resp.interaction.options?.find((candidate) => candidate.sourceCard === sourceCard)
+  const option = resp.interaction.request.options?.find((candidate) => candidate.sourceCard === sourceCard)
   expect(option).toBeDefined()
   return option!
 }
@@ -92,7 +92,7 @@ const a92AnytimeIds = (session: GameSession): string[] =>
 const acceptOptional = (session: GameSession, resp: SessionResponse): SessionResponse => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-  const option = resp.interaction.options?.find((entry) => entry.value !== '__skip__')
+  const option = resp.interaction.request.options?.find((entry) => entry.value !== '__skip__')
   expect(option).toBeDefined()
   return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
 }
@@ -101,7 +101,7 @@ const sowFirstField = (session: GameSession, resp: SessionResponse): SessionResp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
   expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-  const field = resp.interaction.farm?.selectableFields[0]
+  const field = resp.interaction.request.farm?.selectableFields[0]
   expect(field).toBeDefined()
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, {
     crops: [{ row: field!.tile.row, col: field!.tile.col, crop: 'grain' }],
@@ -247,7 +247,7 @@ describe('M057 Taps', () => {
     expect(triggerOptionFor(offer, A092)).toBeDefined()
     expect(a92AnytimeIds(session)).toEqual([])
     expect(offer.interaction.stateId === 'wait'
-      ? offer.interaction.options?.some((option) => option.labelKey === 'moor.specialActions.hiring-fair')
+      ? offer.interaction.request.options?.some((option) => option.labelKey === 'moor.specialActions.hiring-fair')
       : false).toBe(false)
 
     const selectedTaps = session.resolveChoice(0, M057)
@@ -275,7 +275,7 @@ describe('M057 Taps', () => {
     const selectedA92 = session.resolveChoice(0, A092)
     expect(reqKind(selectedA92)).toBe('choice')
     const useBranch = selectedA92.interaction.stateId === 'wait'
-      ? selectedA92.interaction.options?.find((option) => option.labelKey === 'ui.interactionUseAbility')
+      ? selectedA92.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionUseAbility')
       : undefined
     expect(useBranch).toBeDefined()
 
@@ -350,7 +350,7 @@ describe('M057 Taps', () => {
     const offer = driveToM057Offer(session)
     expect(offer.interaction.stateId).toBe('wait')
     if (offer.interaction.stateId !== 'wait') throw new Error('expected wait')
-    const option = offer.interaction.options?.find((entry) =>
+    const option = offer.interaction.request.options?.find((entry) =>
       entry.value.startsWith(`card-action:${card.id}:action:cut-peat`))
     expect(option).toBeDefined()
 
@@ -371,7 +371,7 @@ describe('M057 Taps', () => {
     const offer = driveToM057Offer(session)
     expect(offer.interaction.stateId).toBe('wait')
     if (offer.interaction.stateId !== 'wait') throw new Error('expected wait')
-    const cutPeatOptions = (offer.interaction.options ?? []).filter((option) =>
+    const cutPeatOptions = (offer.interaction.request.options ?? []).filter((option) =>
       option.labelKey === 'moor.specialActions.cut-peat')
 
     expect(cutPeatOptions.length).toBeGreaterThan(1)

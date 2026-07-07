@@ -46,7 +46,7 @@ describe('provenance undo/replay reconstruction', () => {
         break
       }
       if (resp.interaction.stateId !== 'wait') throw new Error('E78 batch prompt not reached')
-      const next = resp.interaction.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+      const next = resp.interaction.request.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
       if (!next) throw new Error('E78 batch prompt not reached')
       resp = session.resolveChoice(resp.interaction.playerIndex, next.value)
     }

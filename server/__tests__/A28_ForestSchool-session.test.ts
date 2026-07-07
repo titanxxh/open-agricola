@@ -81,9 +81,9 @@ describe('A028_ForestSchool session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
 
-    const tradeOption = resp.interaction.options?.find((option) => {
+    const tradeOption = resp.interaction.request.options?.find((option) => {
       const params = option.labelParams as Record<string, unknown> | undefined
       const paid = params?.resourcesPaid as Record<string, number> | undefined
       return !!paid && (paid.wood ?? 0) === 1 && !paid.food

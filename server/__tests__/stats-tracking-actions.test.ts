@@ -87,7 +87,7 @@ describe('PlayerStats action tracking', () => {
     if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected initial farm-expansion choice')
     }
-    const constructOption = resp.interaction.options?.find((o) =>
+    const constructOption = resp.interaction.request.options?.find((o) =>
       typeof o.value === 'string' && o.value.startsWith('seq-construct'),
     )
     if (!constructOption) throw new Error('construct option missing')
@@ -96,10 +96,10 @@ describe('PlayerStats action tracking', () => {
     if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected farmSelect interaction')
     }
-    if (resp.interaction.farm.farmType !== 'room') {
+    if (resp.interaction.request.farm.farmType !== 'room') {
       throw new Error('expected farm type room')
     }
-    const tile = resp.interaction.farm.selectableTiles[0]!
+    const tile = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { rooms: [tile] })
     expect(resp.ok).toBe(true)
     expect(session.getState().state.players[0]!.rooms).toBe(3)
@@ -124,10 +124,10 @@ describe('PlayerStats action tracking', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected occupation choice')
-    const opt = resp.interaction.options?.find((o) => o.value === occId)
+    const opt = resp.interaction.request.options?.find((o) => o.value === occId)
     if (!opt) {
       // fallback: pick first non-skip option
-      const first = resp.interaction.options?.find((o) => o.value !== '__skip__')
+      const first = resp.interaction.request.options?.find((o) => o.value !== '__skip__')
       if (!first) throw new Error('no occupation option found')
       resp = session.resolveChoice(0, first.value)
     } else {
@@ -158,7 +158,7 @@ describe('PlayerStats action tracking', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
-    const opt = resp.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
+    const opt = resp.interaction.request.options?.find((o) => o.value === 'Major_Fireplace1')
     if (!opt) throw new Error('Fireplace1 option missing')
     resp = session.resolveChoice(0, opt.value)
     expect(resp.ok).toBe(true)

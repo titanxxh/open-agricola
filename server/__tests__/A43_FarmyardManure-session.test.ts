@@ -30,10 +30,10 @@ describe('A043_FarmyardManure session', () => {
     // With wood only (no reed), farm-expansion auto-selects stables → farmSelect.
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.farm.farmType).toBe('stable')
-    if (resp.interaction.farm.farmType !== 'stable') return
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const stable = resp.interaction.farm.selectableTiles[0]!
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
 
@@ -56,9 +56,9 @@ describe('A043_FarmyardManure session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    if (resp.interaction.farm.farmType !== 'stable') return
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const [t1, t2] = resp.interaction.farm.selectableTiles
+    const [t1, t2] = resp.interaction.request.farm.selectableTiles
     resp = session.commitSelectionChoice(0, { stables: [t1!, t2!] })
     expect(resp.ok).toBe(true)
 
@@ -81,9 +81,9 @@ describe('A043_FarmyardManure session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    if (resp.interaction.farm.farmType !== 'stable') return
+    if (resp.interaction.request.farm.farmType !== 'stable') return
 
-    const stable = resp.interaction.farm.selectableTiles[0]!
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
     resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)

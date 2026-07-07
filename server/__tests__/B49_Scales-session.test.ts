@@ -62,7 +62,7 @@ const chooseMeetingPlaceMinor = (session: GameSession, cardId: string) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
 
-  const improvement = resp.interaction.options?.find(
+  const improvement = resp.interaction.request.options?.find(
     (option) => option.value === 'action-improvement-1',
   )
   expect(improvement).toBeDefined()
@@ -90,7 +90,7 @@ const finishOptionalPrompts = (
       expect(resp.ok).toBe(true)
       continue
     }
-    const skip = resp.interaction.options?.find(
+    const skip = resp.interaction.request.options?.find(
       (option) => option.value === '__skip__' || option.value === 'skip',
     )
     if (!skip) break

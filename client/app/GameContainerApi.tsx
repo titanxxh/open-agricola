@@ -3,11 +3,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
-import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../shared/contract/animals'
 import { t } from '../../shared/i18n'
-import type { AnimalReorgState } from '../types/ui'
 import {
-  isFarmyardBorderEdge,
   positionKey,
 } from '../../shared/domain/farm'
 import { emptyResources } from '../../shared/contract/state-constants'
@@ -17,9 +14,6 @@ import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
-import { useFarmSelection } from '../hooks/useFarmSelection'
-import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
-import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
 import { SeasonsBoard } from '../components/board/SeasonsBoard'
@@ -44,129 +38,61 @@ import { PublicEventCardPassAnimation } from '../components/effects/PublicEventC
 import { DraftOverlay } from './draft/DraftOverlay'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
-import {
-  buildBakeExchangeInfo,
-  buildBakeBulkChoice,
-  hasSelectedBakeGrain,
-} from './bake-exchange-ui'
-import {
-  buildAnytimeExchangeBulkChoice,
-  buildAnytimeExchangeOptions,
-} from './anytime-exchange-ui'
+import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
+import { useExchangeDraftPresentation } from './exchange-draft-presentation'
+import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
 import {
-  applyPublicEventCancellationSnapshot,
   buildCompactScoreRows,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
   buildSelectableMajorIds,
   buildSelectableMinorIds,
   buildSelectableOccupationIds,
-  buildReplayFeedback,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
   enableFarmersOfTheMoorFromQuery,
   enableThroughTheSeasonsFromQuery,
-  farmCommitErrorMessageKey,
-  filterPublicFarmHighlightsForPlayer,
-  filterPublicFenceHighlightsForPlayer,
   devResourceKeysForState,
   getPendingMoorSpecialActionChoice,
   getPendingMoorSpecialActionTileChoice,
   getPendingMoorSpecialActionTileKeys,
   hasPendingMoorSpecialActionChoice,
-  hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
-  mergePublicEventCardPassAnimations,
-  mergePublicEventHighlights,
-  mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
-  removePublicEventCardPassAnimations,
-  removePublicEventHighlights,
-  removePublicEventResourceAnimations,
   shouldShowDevPanel,
   splitBoardActionSpaces,
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
-import { buildActionLogTimelineRows } from './action-log-timeline'
-import {
-  computeReorgAvailableAnimals,
-  shouldShowAnimalDiscardPrompt,
-  wouldExceedExclusiveCardZoneLimit,
-} from './hooks/use-animal-reorg-flow'
 import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
 } from './private-event-notifications'
 import {
   buildEventNotificationStackItems,
-  collectNewPublicEventFeedback,
-  emptyPublicEventHighlightTargets,
-  type PublicEventHighlightTargets,
-  type PublicEventNotification,
-  type PublicEventCardPassAnimation as PublicEventCardPassAnimationCue,
-  type PublicEventResourceAnimation,
 } from './public-event-notifications'
+import { usePublicEventCuePresentation } from './public-event-cue-presentation'
 import {
-  buildReplayTimeline,
-  filterReplayTimeline,
-  summarizeReplayTimeline,
+  buildReplayActionLogPresentation,
   type ReplayTimelineEntry,
   type ReplayTimelineFilter,
-} from './replay-timeline'
+} from './replay-action-log-presentation'
 import {
   buildInteractionPresentationPlan,
   buildInteractionSubmitCommand,
+  interactionChoiceOptions,
+  isDomainWaitInteraction,
   type InteractionSubmitCommand,
 } from './interaction-presentation'
+import {
+  buildInteractionBarActions,
+  buildInteractionBarModel,
+} from './interaction-bar-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
-type ReorgAnimalType = AnimalKey
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
-
-const REORG_ANIMAL_TYPES: ReorgAnimalType[] = [...ALL_ANIMAL_KEYS]
-
-const emptyAnimalTotals = () => ({ sheep: 0, boar: 0, cattle: 0, horse: 0 })
-
-const compactAnimalCounts = (counts: Record<ReorgAnimalType, number>) => {
-  const compact: Partial<Record<ReorgAnimalType, number>> = {}
-  for (const type of REORG_ANIMAL_TYPES) {
-    if (counts[type] > 0) compact[type] = counts[type]
-  }
-  return compact
-}
-
-const animalCountsTotal = (counts: Partial<Record<ReorgAnimalType, number>>) =>
-  REORG_ANIMAL_TYPES.reduce((sum, type) => sum + Math.max(0, counts[type] ?? 0), 0)
-
-const singleAnimalType = (counts: Partial<Record<ReorgAnimalType, number>>) => {
-  const occupied = REORG_ANIMAL_TYPES.filter((type) => (counts[type] ?? 0) > 0)
-  return occupied.length === 1 ? occupied[0]! : null
-}
-
-const zoneAnimalCounts = (zone: AnimalReorgState['zones'][number]) => {
-  const counts = emptyAnimalTotals()
-  for (const type of REORG_ANIMAL_TYPES) {
-    counts[type] = Math.max(0, Math.floor(zone.animalCounts?.[type] ?? 0))
-  }
-  if (animalCountsTotal(counts) > 0) return counts
-  if (zone.animalType) counts[zone.animalType] = Math.max(0, Math.floor(zone.animalCount ?? 0))
-  return counts
-}
-
-const cardZoneAllowsMixedAnimals = (zone: AnimalReorgState['zones'][number]) =>
-  zone.zoneType === 'card' && zone.allowedAnimalType === null
-
-const addAnimalCounts = (
-  target: Record<ReorgAnimalType, number>,
-  counts: Partial<Record<ReorgAnimalType, number>>,
-) => {
-  for (const type of REORG_ANIMAL_TYPES) {
-    target[type] += counts[type] ?? 0
-  }
-}
 
 const httpTransportSingleton = new HttpGameTransport()
 
@@ -377,18 +303,8 @@ export const GameContainerApi = () => {
     useGameSync()
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
-  const publicEventNotificationBatchSeqRef = useRef(0)
-  const publicEventNotificationTimersRef = useRef<number[]>([])
-  const publicEventHighlightTimersRef = useRef<number[]>([])
-  const publicEventResourceAnimationTimersRef = useRef<number[]>([])
-  const publicEventCardPassAnimationTimersRef = useRef<number[]>([])
-  const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
-  const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
-  const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
-  const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
-  const [publicEventCardPassAnimations, setPublicEventCardPassAnimations] = useState<PublicEventCardPassAnimationCue[]>([])
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
   const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
@@ -396,11 +312,7 @@ export const GameContainerApi = () => {
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
-  const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
-  const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
-  const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
-  const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -422,25 +334,6 @@ export const GameContainerApi = () => {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
 
-  const clearPublicEventFeedbackTimers = useCallback(() => {
-    publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventNotificationTimersRef.current = []
-    publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventHighlightTimersRef.current = []
-    publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventResourceAnimationTimersRef.current = []
-    publicEventCardPassAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    publicEventCardPassAnimationTimersRef.current = []
-  }, [])
-
-  const clearPublicEventFeedback = useCallback(() => {
-    clearPublicEventFeedbackTimers()
-    setPublicEventNotifications([])
-    setPublicEventHighlights(emptyPublicEventHighlightTargets())
-    setPublicEventResourceAnimations([])
-    setPublicEventCardPassAnimations([])
-  }, [clearPublicEventFeedbackTimers])
-
   const clearReplayCue = useCallback(() => {
     setSelectedReplayKey(null)
   }, [])
@@ -448,8 +341,7 @@ export const GameContainerApi = () => {
   useEffect(() => () => {
     privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     privateEventNotificationTimersRef.current = []
-    clearPublicEventFeedbackTimers()
-  }, [clearPublicEventFeedbackTimers])
+  }, [])
 
   useEffect(() => {
     if (privateEvents.length === 0) return
@@ -471,130 +363,6 @@ export const GameContainerApi = () => {
       privateEventNotificationTimersRef.current.push(timer)
     })
   }, [privateEvents, locale])
-
-  useEffect(() => {
-    if (!state) return
-    const events = state.events ?? []
-    publicEventNotificationBatchSeqRef.current += 1
-    const batch = collectNewPublicEventFeedback(
-      events,
-      lastSeenPublicEventSeqRef.current,
-      locale,
-      `public-batch-${publicEventNotificationBatchSeqRef.current}`,
-    )
-    lastSeenPublicEventSeqRef.current = batch.nextCursor
-    if (hasPublicEventHighlights(batch.highlights)) {
-      setPublicEventHighlights((current) => mergePublicEventHighlights(current, batch.highlights))
-      const timer = window.setTimeout(() => {
-        setPublicEventHighlights((current) => removePublicEventHighlights(current, batch.highlights))
-        publicEventHighlightTimersRef.current = publicEventHighlightTimersRef.current.filter((entry) => entry !== timer)
-      }, 3200)
-      publicEventHighlightTimersRef.current.push(timer)
-    }
-    if (batch.resourceAnimations.length > 0) {
-      setPublicEventResourceAnimations((current) =>
-        mergePublicEventResourceAnimations(current, batch.resourceAnimations).slice(0, 12),
-      )
-      const timer = window.setTimeout(() => {
-        setPublicEventResourceAnimations((current) =>
-          removePublicEventResourceAnimations(current, batch.resourceAnimations),
-        )
-        publicEventResourceAnimationTimersRef.current =
-          publicEventResourceAnimationTimersRef.current.filter((entry) => entry !== timer)
-      }, 1400)
-      publicEventResourceAnimationTimersRef.current.push(timer)
-    }
-    if (batch.cardPassAnimations.length > 0) {
-      setPublicEventCardPassAnimations((current) =>
-        mergePublicEventCardPassAnimations(current, batch.cardPassAnimations).slice(0, 12),
-      )
-      const timer = window.setTimeout(() => {
-        setPublicEventCardPassAnimations((current) =>
-          removePublicEventCardPassAnimations(current, batch.cardPassAnimations),
-        )
-        publicEventCardPassAnimationTimersRef.current =
-          publicEventCardPassAnimationTimersRef.current.filter((entry) => entry !== timer)
-      }, 1400)
-      publicEventCardPassAnimationTimersRef.current.push(timer)
-    }
-    if (batch.notifications.length > 0) {
-      setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
-      batch.notifications.forEach((notification) => {
-        const timer = window.setTimeout(() => {
-          setPublicEventNotifications((current) =>
-            current.filter((entry) => entry.id !== notification.id),
-          )
-          publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
-        }, 4500)
-        publicEventNotificationTimersRef.current.push(timer)
-      })
-    }
-  }, [state, locale])
-
-  const {
-    pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
-    pendingFenceSources, setPendingFenceSources,
-    selectedFenceSourcePlayerId, setSelectedFenceSourcePlayerId,
-    fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
-    pendingRoomTiles, setPendingRoomTiles, roomError, setRoomError,
-    pendingStableTiles, setPendingStableTiles, stableError, setStableError,
-    pendingFarmHand, setPendingFarmHand,
-    pendingPlowTile, setPendingPlowTile, plowError, setPlowError,
-    pendingSowSelections, setPendingSowSelections, sowError, setSowError,
-    toggleFenceEdge,
-    toggleRoomTile: toggleRoomTileInternal,
-    toggleStableTile: toggleStableTileInternal,
-    toggleFarmHand: toggleFarmHandInternal,
-    togglePlowTile: togglePlowTileInternal,
-    updateSowSelection: updateSowSelectionInternal,
-    pendingPositionSelections, setPendingPositionSelections,
-    togglePositionSelection: togglePositionSelectionInternal,
-  } = useFarmSelection()
-
-  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
-    applySnapshot(payload)
-    applyPublicEventCancellationSnapshot(payload, {
-      clearPublicEventFeedback,
-      setLastSeenPublicEventSeq: (seq) => {
-        lastSeenPublicEventSeqRef.current = seq
-      },
-    })
-    if (
-      payload.interaction.stateId === 'wait' &&
-      payload.interaction.request.kind === 'animal-reorg'
-    ) {
-      setAnimalReorg({
-        zones: payload.interaction.zones ?? [],
-        confirmDiscard: false,
-      })
-    } else {
-      setAnimalReorg(null)
-    }
-    if (payload.ok) {
-      setSelectedSpecialAction(null)
-      setPendingFenceEdges([])
-      setPendingFenceSources({})
-      setSelectedFenceSourcePlayerId(null)
-      setFenceError(null)
-      setPendingRoomTiles([])
-      setRoomError(null)
-      setPendingStableTiles([])
-      setPendingFarmHand(null)
-      setStableError(null)
-      setPendingPlowTile(null)
-      setPlowError(null)
-      setPendingSowSelections({})
-      setSowError(null)
-      setPendingPositionSelections(new Set())
-    }
-  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setPendingFenceSources, setSelectedFenceSourcePlayerId, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setPendingFarmHand, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
-
-  useEffect(() => {
-    if (!isReady) return
-    const unsub = transport.onSnapshot(handleSnapshot)
-    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-    return unsub
-  }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
   const defaultDevPlayerId = viewPlayerId ?? currentPlayer?.id ?? ''
@@ -618,7 +386,7 @@ export const GameContainerApi = () => {
     : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const activePlayer =
     interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
-      ? state?.players[interaction.fromPlayerIndex ?? 0] ?? currentPlayer
+      ? state?.players[interaction.request.fromPlayerIndex] ?? currentPlayer
       : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
         ? state?.players[interaction.playerIndex] ?? currentPlayer
         : currentPlayer
@@ -656,8 +424,8 @@ export const GameContainerApi = () => {
 
   const placeFarmerChoiceBySpaceId = useMemo(
     () =>
-      interaction.stateId === 'wait'
-        ? buildPlaceFarmerChoiceMap(interaction.promptKey, interaction.options)
+      isDomainWaitInteraction(interaction)
+        ? buildPlaceFarmerChoiceMap(interaction.promptKey, interactionChoiceOptions(interaction))
         : new Map(),
     [interaction],
   )
@@ -672,6 +440,44 @@ export const GameContainerApi = () => {
         : buildPendingMoorSpecialActionChoiceMaps(),
     [interactionPresentationPlan],
   )
+  const farmSelectionDraft = useFarmSelectionDraftPresentation({
+    interactionPresentationPlan,
+    locale,
+    displayPlayer,
+    players: state?.players,
+  })
+  const farmInteraction = farmSelectionDraft.farmInteraction
+  const selectionInteraction = farmSelectionDraft.selectionInteraction
+  const occupationHandInteraction = farmSelectionDraft.occupationHandInteraction
+  const setFarmDraftCommitError = farmSelectionDraft.setCommitError
+  const setFarmDraftSubmitError = farmSelectionDraft.setSubmitError
+  const resetFarmSelectionDraft = farmSelectionDraft.reset
+  const pendingAnimalReorg = useMemo(
+    () =>
+      interactionPresentationPlan.kind === 'animal-reorg'
+        ? {
+            playerIndex: interactionPresentationPlan.playerIndex,
+            spaceId: interactionPresentationPlan.spaceId,
+          }
+        : null,
+    [interactionPresentationPlan],
+  )
+  const animalReorgDraft = useAnimalReorgDraftPresentation({
+    state,
+    pendingAnimalReorg,
+  })
+  const {
+    animalReorg,
+    isActive: isReorgActive,
+    hasReorgOverflow,
+    submitDraft: animalReorgSubmitDraft,
+    syncFromInteraction: syncAnimalReorgFromInteraction,
+    controls: {
+      adjustAnimal: adjustReorgAnimal,
+      confirm: confirmAnimalReorgDraft,
+      cancelDiscardPrompt: cancelAnimalDiscardPrompt,
+    },
+  } = animalReorgDraft
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -749,35 +555,15 @@ export const GameContainerApi = () => {
   }, [interaction, isInteractive, pendingMoorSpecialActionChoices, state, transport])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
-    if (farmType === 'fence') {
-      setFenceError({ code: error ?? 'UNKNOWN', edges: [], newEdges: [] })
-      return
-    }
-    if (farmType === 'room') {
-      setRoomError(error ?? 'UNKNOWN')
-      return
-    }
-    if (farmType === 'stable') {
-      setStableError(error ?? 'UNKNOWN')
-      return
-    }
-    if (farmType === 'plow') {
-      setPlowError(error ?? 'UNKNOWN')
-      return
-    }
-    setSowError(error ?? 'UNKNOWN')
-  }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
+    setFarmDraftCommitError(farmType, error)
+  }, [setFarmDraftCommitError])
 
   const setLocalFarmSubmitError = useCallback((
     farmType: FarmCommitType,
     error: string | { code: string; edges: string[]; newEdges: string[] },
   ) => {
-    if (farmType === 'fence' && typeof error !== 'string') {
-      setFenceError(error)
-      return
-    }
-    setFarmCommitError(farmType, typeof error === 'string' ? error : error.code)
-  }, [setFarmCommitError, setFenceError])
+    setFarmDraftSubmitError(farmType, error)
+  }, [setFarmDraftSubmitError])
 
   const runInteractionSubmitCommand = useCallback((
     submitCommand: InteractionSubmitCommand,
@@ -828,20 +614,17 @@ export const GameContainerApi = () => {
     if (!currentPlayer) return
     const submitCommand = buildInteractionSubmitCommand(interaction, {
       value,
-      positionSelectionKeys: [...pendingPositionSelections],
-      fenceEdges: pendingFenceEdges,
-      palisadeEdges: pendingPalisadeEdges,
-      fenceSources: pendingFenceSources,
-      roomTiles: pendingRoomTiles,
-      stableTiles: pendingStableTiles,
-      farmHand: pendingFarmHand,
-      plowTile: pendingPlowTile,
-      sowSelections: pendingSowSelections,
-      animalReorgZones: animalReorg?.zones,
+      ...farmSelectionDraft.submitDraft,
+      ...animalReorgSubmitDraft,
     })
-    const farmType = interaction.stateId === 'wait' && interaction.farm
-      ? interaction.farm.farmType
-      : undefined
+    const farmType =
+      interactionPresentationPlan.kind === 'farm-fence-selection' ||
+      interactionPresentationPlan.kind === 'farm-room-selection' ||
+      interactionPresentationPlan.kind === 'farm-stable-selection' ||
+      interactionPresentationPlan.kind === 'farm-plow-selection' ||
+      interactionPresentationPlan.kind === 'farm-sow-selection'
+        ? interactionPresentationPlan.farm.farmType
+        : undefined
     if (runInteractionSubmitCommand(submitCommand, farmType)) {
       return
     }
@@ -855,44 +638,7 @@ export const GameContainerApi = () => {
     void transport
       .resolveChoice(interactionPresentationPlan.pendingChoice.playerIndex, value)
       .catch((e) => console.error(e))
-  }, [interaction, interactionPresentationPlan, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingFenceSources, pendingRoomTiles, pendingStableTiles, pendingFarmHand, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, isInteractive, runInteractionSubmitCommand])
-
-  const updateBakeExchangeCount = (id: string, delta: number) => {
-    if (!bakeExchangePlayer) return
-    setBakeExchangeCounts((prev) => {
-      const current = prev[id] ?? 0
-      const maxUse = bakeExchangeInfo[id]?.max ?? 0
-      const totalSelected = bakeExchangeOptionIds.reduce(
-        (sum, optionId) => sum + (prev[optionId] ?? 0),
-        0,
-      )
-      const availableGrain = bakeExchangePlayer.resources.grain
-      const remaining = Math.max(0, availableGrain - totalSelected)
-      const limit = Math.min(maxUse, current + remaining)
-      const nextValue = Math.max(0, Math.min(current + delta, limit))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }
-
-  const confirmBakeExchange = () => {
-    if (!pendingChoice || !isBakeExchange) return
-    const choice = buildBakeBulkChoice(activeBakeExchangeCounts)
-    if (!choice) return
-    resolveChoice(choice)
-  }
-
-  const confirmAnytimeExchange = () => {
-    if (!pendingChoice || !isAnytimeExchange) return
-    const choice = buildAnytimeExchangeBulkChoice(activeAnytimeExchangeCounts, anytimeExchangeOptions)
-    if (!choice) return
-    resolveChoice(choice)
-  }
-
-  const cancelAnytimeExchange = () => {
-    if (!pendingChoice || !isAnytimeExchange) return
-    resolveChoice('cancel')
-  }
+  }, [interaction, interactionPresentationPlan, currentPlayer, animalReorgSubmitDraft, farmSelectionDraft.submitDraft, transport, isInteractive, runInteractionSubmitCommand])
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
@@ -941,16 +687,6 @@ export const GameContainerApi = () => {
           toPlayerIndex: interactionPresentationPlan.toPlayerIndex,
         }
       : null
-  const pendingAnimalReorg = useMemo(
-    () =>
-      interactionPresentationPlan.kind === 'animal-reorg'
-        ? {
-            playerIndex: interactionPresentationPlan.playerIndex,
-            spaceId: interactionPresentationPlan.spaceId,
-          }
-        : null,
-    [interactionPresentationPlan],
-  )
   const harvestPending = useMemo(
     () =>
       interactionPresentationPlan.kind === 'harvest-feed' && state
@@ -1000,38 +736,34 @@ export const GameContainerApi = () => {
     if (!state) return {}
     return Object.fromEntries(state.players.map((player) => [player.id, player.name ?? player.id]))
   }, [state])
-  const replayTimeline = useMemo(
-    () => buildReplayTimeline({
+  const {
+    timelineBuckets: actionLogTimelineBuckets,
+    replaySummary,
+    replayStepEntries,
+    replayFeedback,
+  } = useMemo(
+    () => buildReplayActionLogPresentation({
       events: state?.events ?? [],
       publicEventArchive: state?.publicEventArchive ?? [],
-    }),
-    [state?.events, state?.publicEventArchive],
-  )
-  const replaySummary = useMemo(() => summarizeReplayTimeline(replayTimeline), [replayTimeline])
-  const replayStepEntries = useMemo(
-    () => filterReplayTimeline(replayTimeline, replayFilter).filter((entry) => entry.replayable),
-    [replayFilter, replayTimeline],
-  )
-  const actionLogTimelineBuckets = useMemo(
-    () => buildActionLogTimelineRows({
-      entries: replayTimeline,
       stateLog: state?.log ?? [],
       currentRound: state?.round ?? 1,
       locale,
       playerNames,
       actionNames,
+      replayFilter,
+      selectedReplayKey,
     }),
-    [actionNames, locale, playerNames, replayTimeline, state?.log, state?.round],
-  )
-  const selectedReplayEntry = useMemo(
-    () => selectedReplayKey
-      ? replayTimeline.find((entry) => entry.key === selectedReplayKey) ?? null
-      : null,
-    [replayTimeline, selectedReplayKey],
-  )
-  const replayFeedback = useMemo(
-    () => buildReplayFeedback(selectedReplayEntry, locale),
-    [locale, selectedReplayEntry],
+    [
+      actionNames,
+      locale,
+      playerNames,
+      replayFilter,
+      selectedReplayKey,
+      state?.events,
+      state?.log,
+      state?.publicEventArchive,
+      state?.round,
+    ],
   )
   const handleSelectReplayEntry = useCallback((entry: ReplayTimelineEntry) => {
     setSelectedReplayKey(entry.key)
@@ -1052,6 +784,21 @@ export const GameContainerApi = () => {
   const handleReplayPlayPause = useCallback(() => {
     setIsReplayPlaying((current) => !current)
   }, [])
+
+  const {
+    applySnapshotPublicEventCancellations,
+    displayPublicEventNotifications,
+    displayPublicEventResourceAnimations,
+    displayPublicEventCardPassAnimations,
+    highlightedActionIds,
+    highlightedFarmTileKeys,
+    highlightedFenceEdgeIds,
+  } = usePublicEventCuePresentation({
+    state,
+    locale,
+    replayFeedback,
+    displayPlayerId: displayPlayer?.id ?? '',
+  })
 
   useEffect(() => {
     if (!isReplayPlaying) return
@@ -1112,12 +859,6 @@ export const GameContainerApi = () => {
       ? buildSelectableMajorIds(pendingChoiceOptions, availableMajorImprovements)
       : new Set<string>()
 
-  const isBakeExchange =
-    pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
-  const bakeExchangeSourceIds = isBakeExchange
-    ? (pendingChoiceOptions ?? []).map((option) => option.value)
-    : []
-  const bakeExchangeInfo = buildBakeExchangeInfo(bakeExchangeSourceIds, getCardMeta)
   const cardLabel = useCallback((id: string) => {
     const improvementName = t(locale, `improvements.${id}.name`)
     if (improvementName !== `improvements.${id}.name`) {
@@ -1126,206 +867,73 @@ export const GameContainerApi = () => {
     return getCardMeta(id)?.name ?? id
   }, [locale])
 
-  const bakeExchangePlayer =
-    isBakeExchange && pendingChoice && state
-      ? state.players[pendingChoice.playerIndex]
-      : null
-  const bakeExchangeOptions = isBakeExchange
-    ? (pendingChoiceOptions ?? []).filter(
-        (option) => !!bakeExchangeInfo[option.value],
-      )
-    : []
-  const bakeExchangeOptionIds = bakeExchangeOptions.map((option) => option.value)
-  const activeBakeExchangeCounts = (() => {
-    const counts: Record<string, number> = {}
-    bakeExchangeOptionIds.forEach((value) => {
-      counts[value] = bakeExchangeCounts[value] ?? 0
-    })
-    return counts
-  })()
+  const exchangeDraft = useExchangeDraftPresentation({
+    state,
+    pendingChoice,
+    interactionPresentationPlan,
+    locale,
+    cardLabel,
+    getCardMeta,
+  })
+  const resetExchangeDraft = exchangeDraft.reset
+  const isBakeExchange = exchangeDraft.bake.isActive
+  const bakeExchangeInfo = exchangeDraft.bake.info
+  const bakeExchangeOptions = exchangeDraft.bake.options
+  const activeBakeExchangeCounts = exchangeDraft.bake.counts
+  const hasBakeSelection = exchangeDraft.bake.hasSelection
+  const summaryResources = exchangeDraft.bake.summary
+  const hasBakeSummary = exchangeDraft.bake.hasSummary
+  const updateBakeExchangeCount = exchangeDraft.bake.updateCount
+  const resetBakeExchangeCounts = exchangeDraft.bake.reset
+  const isAnytimeExchange = exchangeDraft.anytime.isActive
+  const anytimeExchangeOptions = exchangeDraft.anytime.options
+  const activeAnytimeExchangeCounts = exchangeDraft.anytime.counts
+  const anytimeExchangeSummary = exchangeDraft.anytime.summary
+  const hasAnytimeExchangeSelection = exchangeDraft.anytime.hasSelection
+  const hasAnytimeExchangeSummary = exchangeDraft.anytime.hasSummary
+  const updateAnytimeExchangeCount = exchangeDraft.anytime.updateCount
+  const isHarvestFeedExchange = exchangeDraft.harvestFeed.isActive
+  const harvestFeedOptions = exchangeDraft.harvestFeed.options
+  const activeHarvestFeedCounts = exchangeDraft.harvestFeed.counts
+  const updateHarvestFeedCount = exchangeDraft.harvestFeed.updateCount
+  const resetHarvestFeedCounts = exchangeDraft.harvestFeed.reset
+  const harvestFeedSelections = exchangeDraft.harvestFeed.selections
+  const harvestFeedConvertedFood = exchangeDraft.harvestFeed.convertedFood
+  const harvestFeedBegging = exchangeDraft.harvestFeed.begging
+  const harvestFeedSummary = exchangeDraft.harvestFeed.summary
+  const hasHarvestFeedSummary = exchangeDraft.harvestFeed.hasSummary
+  const bakeExchangeChoice = exchangeDraft.bake.choice
+  const anytimeExchangeChoice = exchangeDraft.anytime.choice
+  const confirmBakeExchange = useCallback(() => {
+    if (!pendingChoice || !isBakeExchange || !bakeExchangeChoice) return
+    resolveChoice(bakeExchangeChoice)
+  }, [bakeExchangeChoice, isBakeExchange, pendingChoice, resolveChoice])
+  const confirmAnytimeExchange = useCallback(() => {
+    if (!pendingChoice || !isAnytimeExchange || !anytimeExchangeChoice) return
+    resolveChoice(anytimeExchangeChoice)
+  }, [anytimeExchangeChoice, isAnytimeExchange, pendingChoice, resolveChoice])
+  const cancelAnytimeExchange = useCallback(() => {
+    if (!pendingChoice || !isAnytimeExchange) return
+    resolveChoice('cancel')
+  }, [isAnytimeExchange, pendingChoice, resolveChoice])
 
-  const bakeTotalGrain = Object.values(activeBakeExchangeCounts).reduce(
-    (sum, value) => sum + value,
-    0,
-  )
-  const bakeTotalFood = Object.entries(activeBakeExchangeCounts).reduce(
-    (sum, [id, count]) =>
-      sum + (bakeExchangeInfo[id]?.food ?? 0) * count,
-    0,
-  )
-  const hasBakeSelection = hasSelectedBakeGrain(activeBakeExchangeCounts)
-  const baseFood = bakeExchangePlayer?.resources.food ?? 0
-  const baseGrain = bakeExchangePlayer?.resources.grain ?? 0
-  const summaryResources = {
-    ...emptyResources,
-    food: baseFood + bakeTotalFood,
-    grain: Math.max(0, baseGrain - bakeTotalGrain),
-  }
-  const hasBakeSummary =
-    summaryResources.food > 0 || summaryResources.grain > 0
+  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+    applySnapshot(payload)
+    applySnapshotPublicEventCancellations(payload)
+    syncAnimalReorgFromInteraction(payload.interaction)
+    if (payload.ok) {
+      setSelectedSpecialAction(null)
+      resetFarmSelectionDraft()
+      resetExchangeDraft()
+    }
+  }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
 
-  const isAnytimeExchange =
-    pendingChoice?.promptKey === 'ui.interactionExchangeChoice'
-  const anytimeExchangePlayer =
-    isAnytimeExchange && pendingChoice && state
-      ? state.players[pendingChoice.playerIndex] ?? null
-      : null
-  const anytimeExchangeOptions =
-    isAnytimeExchange && pendingChoice && anytimeExchangePlayer
-      ? buildAnytimeExchangeOptions(
-          anytimeExchangePlayer,
-          pendingChoice.options,
-          cardLabel,
-          getCardMeta,
-        )
-      : []
-  const anytimeExchangeOptionIds = anytimeExchangeOptions.map((option) => option.id)
-  const activeAnytimeExchangeCounts = (() => {
-    const counts: Record<string, number> = {}
-    anytimeExchangeOptionIds.forEach((id) => {
-      counts[id] = anytimeExchangeCounts[id] ?? 0
-    })
-    return counts
-  })()
-  const updateAnytimeExchangeCount = (id: string, delta: number) => {
-    setAnytimeExchangeCounts((prev) => {
-      const currentCounts: Record<string, number> = {}
-      anytimeExchangeOptionIds.forEach((optionId) => {
-        currentCounts[optionId] = prev[optionId] ?? 0
-      })
-      const current = currentCounts[id] ?? 0
-      const option = anytimeExchangeOptions.find((entry) => entry.id === id)
-      if (!option || !anytimeExchangePlayer || option.tradeIndex === undefined) return prev
-      const max = Math.min(
-        option.maxTimes,
-        computeHarvestFeedCounterMax(
-          option,
-          anytimeExchangeOptions,
-          currentCounts,
-          anytimeExchangePlayer.resources,
-        ),
-      )
-      const nextValue = Math.max(0, Math.min(current + delta, max))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }
-  const anytimeExchangeSelections = anytimeExchangeOptions
-    .map((option) => ({
-      count: activeAnytimeExchangeCounts[option.id] ?? 0,
-      from: option.from,
-      to: option.to,
-    }))
-    .filter((entry) => entry.count > 0)
-  const anytimeExchangeSummary = (() => {
-    const resources = { ...emptyResources }
-    anytimeExchangeSelections.forEach((entry) => {
-      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-      Object.entries(entry.to ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-    })
-    return resources
-  })()
-  const hasAnytimeExchangeSelection = Object.values(activeAnytimeExchangeCounts).some((value) => value > 0)
-  const hasAnytimeExchangeSummary = Object.values(anytimeExchangeSummary).some((value) => value > 0)
-
-  const isHarvestFeedExchange = interactionPresentationPlan.kind === 'harvest-feed'
-  const harvestFeedPlayer =
-    isHarvestFeedExchange && state && interactionPresentationPlan.kind === 'harvest-feed'
-      ? state.players[interactionPresentationPlan.playerIndex] ?? null
-      : null
-  const harvestFeedOptions = useMemo(
-    () =>
-      harvestFeedPlayer
-        ? buildHarvestFeedOptions(harvestFeedPlayer, locale, cardLabel)
-        : [],
-    [harvestFeedPlayer, locale, cardLabel],
-  )
-  const harvestFeedOptionIds = useMemo(
-    () => harvestFeedOptions.map((option) => option.id),
-    [harvestFeedOptions],
-  )
-  const activeHarvestFeedCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    harvestFeedOptionIds.forEach((id) => {
-      counts[id] = harvestFeedCounts[id] ?? 0
-    })
-    return counts
-  }, [harvestFeedCounts, harvestFeedOptionIds])
-
-  const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
-    setHarvestFeedCounts((prev) => {
-      const currentCounts: Record<string, number> = {}
-      harvestFeedOptionIds.forEach((optionId) => {
-        currentCounts[optionId] = prev[optionId] ?? 0
-      })
-      const current = currentCounts[id] ?? 0
-      const option = harvestFeedOptions.find((entry) => entry.id === id)
-      if (!option || !harvestFeedPlayer) return prev
-      const max = computeHarvestFeedCounterMax(
-        option,
-        harvestFeedOptions,
-        currentCounts,
-        harvestFeedPlayer.resources,
-      )
-      const nextValue = Math.max(0, Math.min(current + delta, max))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }, [harvestFeedOptionIds, harvestFeedOptions, harvestFeedPlayer])
-
-  const resetHarvestFeedCounts = useCallback(() => {
-    const nextCounts: Record<string, number> = {}
-    harvestFeedOptionIds.forEach((id) => {
-      nextCounts[id] = 0
-    })
-    setHarvestFeedCounts(nextCounts)
-  }, [harvestFeedOptionIds])
-
-  const harvestFeedSelections = useMemo(
-    () =>
-      harvestFeedOptions
-        .map((option) => ({
-          count: activeHarvestFeedCounts[option.id] ?? 0,
-          sourceName: option.sourceName,
-          sourceId: option.sourceId,
-          exchangeIndex: option.exchangeIndex,
-          from: option.from,
-          to: option.to,
-        }))
-        .filter((entry) => entry.count > 0),
-    [activeHarvestFeedCounts, harvestFeedOptions],
-  )
-  const harvestFeedConvertedFood = useMemo(
-    () =>
-      harvestFeedSelections.reduce(
-        (sum, entry) => sum + entry.count * ((entry.to.food as number) ?? 0),
-        0,
-      ),
-    [harvestFeedSelections],
-  )
-  const harvestFeedBegging = Math.max(
-    0,
-    (harvestPending?.remaining ?? 0) - harvestFeedConvertedFood,
-  )
-  const harvestFeedSummary = useMemo(() => {
-    const resources = { ...emptyResources }
-    resources.food = (harvestPending?.foodUsed ?? 0) + harvestFeedConvertedFood
-    harvestFeedSelections.forEach((entry) => {
-      Object.entries(entry.from ?? {}).forEach(([k, v]) => {
-        const key = k as keyof Resource
-        resources[key] = (resources[key] ?? 0) + entry.count * ((v as number) ?? 0)
-      })
-    })
-    resources.begging = harvestFeedBegging
-    return resources
-  }, [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed])
-  const hasHarvestFeedSummary = Object.values(harvestFeedSummary).some((value) => value > 0)
+  useEffect(() => {
+    if (!isReady) return
+    const unsub = transport.onSnapshot(handleSnapshot)
+    transport.getState().catch((e) => { console.error("fetchState failed:", e) })
+    return unsub
+  }, [transport, handleSnapshot, isReady])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (interactionPresentationPlan.kind !== 'harvest-feed') return
@@ -1352,142 +960,6 @@ export const GameContainerApi = () => {
   }, [interaction, interactionPresentationPlan, transport, isInteractive, runInteractionSubmitCommand])
 
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
-  const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
-  const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
-  const displayPublicEventNotifications = useMemo(
-    () => [...replayFeedback.notifications, ...publicEventNotifications].slice(0, 4),
-    [publicEventNotifications, replayFeedback.notifications],
-  )
-  const displayPublicEventHighlights = useMemo(
-    () => mergePublicEventHighlights(publicEventHighlights, replayFeedback.highlights),
-    [publicEventHighlights, replayFeedback.highlights],
-  )
-  const displayPublicEventResourceAnimations = useMemo(
-    () => mergePublicEventResourceAnimations(
-      publicEventResourceAnimations,
-      replayFeedback.resourceAnimations,
-    ).slice(0, 12),
-    [publicEventResourceAnimations, replayFeedback.resourceAnimations],
-  )
-  const displayPublicEventCardPassAnimations = useMemo(
-    () => mergePublicEventCardPassAnimations(
-      publicEventCardPassAnimations,
-      replayFeedback.cardPassAnimations,
-    ).slice(0, 12),
-    [publicEventCardPassAnimations, replayFeedback.cardPassAnimations],
-  )
-  const highlightedActionIds = useMemo(
-    () => new Set(displayPublicEventHighlights.actionIds),
-    [displayPublicEventHighlights.actionIds],
-  )
-  const highlightedFarmTileKeys = useMemo(
-    () => filterPublicFarmHighlightsForPlayer(displayPublicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, displayPublicEventHighlights.farmTiles],
-  )
-  const highlightedFenceEdgeIds = useMemo(
-    () => filterPublicFenceHighlightsForPlayer(displayPublicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, displayPublicEventHighlights.fenceEdges],
-  )
-
-  const farmInteraction =
-    interactionPresentationPlan.kind === 'farm-fence-selection' ||
-    interactionPresentationPlan.kind === 'farm-room-selection' ||
-    interactionPresentationPlan.kind === 'farm-stable-selection' ||
-    interactionPresentationPlan.kind === 'farm-plow-selection' ||
-    interactionPresentationPlan.kind === 'farm-sow-selection'
-      ? interactionPresentationPlan.farm
-      : null
-  const selectionInteraction =
-    interactionPresentationPlan.kind === 'position-selection' ||
-    interactionPresentationPlan.kind === 'occupation-hand-selection'
-      ? interactionPresentationPlan.selection
-      : null
-  const borrowedFenceSource =
-    farmInteraction?.farmType === 'fence' ? farmInteraction.fenceSource : undefined
-  const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'
-  const borrowedFenceSourceControls = useMemo(() => {
-    if (!isBorrowedFenceSelection || !borrowedFenceSource || !state) return undefined
-    return {
-      donors: Object.entries(borrowedFenceSource.donorCaps).map(([playerId, cap]) => {
-        const donor = state.players.find((player) => player.id === playerId)
-        return {
-          playerId,
-          name: donor?.name ?? playerId,
-          color: donor?.color ?? 'black',
-          cap,
-          allocated: Object.values(pendingFenceSources).filter((id) => id === playerId).length,
-        }
-      }),
-      selectedPlayerId: selectedFenceSourcePlayerId,
-      onSelect: setSelectedFenceSourcePlayerId,
-      hasMissingSources: pendingFenceEdges.some((edgeId) => !pendingFenceSources[edgeId]),
-    }
-  }, [
-    borrowedFenceSource,
-    isBorrowedFenceSelection,
-    pendingFenceEdges,
-    pendingFenceSources,
-    selectedFenceSourcePlayerId,
-    setSelectedFenceSourcePlayerId,
-    state,
-  ])
-
-  useEffect(() => {
-    if (isBorrowedFenceSelection && fencePlacementMode === 'palisade') {
-      setFencePlacementMode('fence')
-    }
-  }, [fencePlacementMode, isBorrowedFenceSelection, setFencePlacementMode])
-
-  const occupationHandInteraction = useMemo(
-    () =>
-      interactionPresentationPlan.kind === 'occupation-hand-selection'
-        ? interactionPresentationPlan.selection
-        : null,
-    [interactionPresentationPlan],
-  )
-
-  const maxRoomSelections = useMemo(
-    () => (farmInteraction?.farmType === 'room' ? farmInteraction.maxSelections : 0),
-    [farmInteraction],
-  )
-
-  const resetBakeExchangeCounts = () => {
-    const nextCounts: Record<string, number> = {}
-    bakeExchangeOptionIds.forEach((id) => {
-      nextCounts[id] = 0
-    })
-    setBakeExchangeCounts(nextCounts)
-  }
-
-  const maxStableSelections = useMemo(
-    () => (farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0),
-    [farmInteraction],
-  )
-  const maxSowSelections = useMemo(
-    () => (farmInteraction?.farmType === 'sow' ? farmInteraction.maxSelections : undefined),
-    [farmInteraction],
-  )
-  const maxPositionSelections = useMemo(
-    () =>
-      selectionInteraction?.kind === 'farm-position'
-        ? selectionInteraction.maxSelections
-        : 0,
-    [selectionInteraction],
-  )
-  const sowSelectedCount = Object.keys(pendingSowSelections).length
-  const fenceErrorText: string | null = fenceError ? t(locale, `fence.error.${fenceError.code}`) : null
-  const roomErrorText: string | null = roomError
-    ? t(locale, farmCommitErrorMessageKey('room', roomError))
-    : null
-  const stableErrorText: string | null = stableError
-    ? t(locale, farmCommitErrorMessageKey('stable', stableError))
-    : null
-  const plowErrorText: string | null = plowError
-    ? t(locale, farmCommitErrorMessageKey('plow', plowError))
-    : null
-  const sowErrorText: string | null = sowError
-    ? t(locale, farmCommitErrorMessageKey('sow', sowError))
-    : null
   const specialTerrainSelectableSet = useMemo(() => {
     if (!selectedSpecialAction || !state || !currentPlayer || !displayPlayer) return new Set<string>()
     if (!isMoorTerrainAction(selectedSpecialAction.actionId)) return new Set<string>()
@@ -1520,9 +992,7 @@ export const GameContainerApi = () => {
       pastureCapacities,
       animalReorg,
       pendingAnimalReorg,
-      pendingRoomTiles,
-      pendingStableTiles,
-      pendingFarmHand,
+      ...farmSelectionDraft.projectionDraft,
       extraPositionSelectableSet: specialTerrainSelectableSet,
     }),
     [
@@ -1534,9 +1004,7 @@ export const GameContainerApi = () => {
       pastureCapacities,
       animalReorg,
       pendingAnimalReorg,
-      pendingRoomTiles,
-      pendingStableTiles,
-      pendingFarmHand,
+      farmSelectionDraft.projectionDraft,
       specialTerrainSelectableSet,
     ],
   )
@@ -1551,53 +1019,10 @@ export const GameContainerApi = () => {
     [baseActions, locale, roundSlots, state?.players, state?.round],
   )
   const { reorgRemaining } = farmBoardProjection
-  const isReorgActive = !!animalReorg
 
-  const reorgAvailable = useMemo(() => {
-    if (!state) return null
-    const playerIndex = pendingAnimalReorg?.playerIndex ?? state.currentPlayerIndex
-    const player = state.players[playerIndex]
-    if (!player) return null
-    return computeReorgAvailableAnimals(player)
-  }, [pendingAnimalReorg, state])
-  const reorgTotals = useMemo(() => {
-    if (!animalReorg) return emptyAnimalTotals()
-    return animalReorg.zones.reduce((acc, z) => {
-      addAnimalCounts(acc, zoneAnimalCounts(z))
-      return acc
-    }, emptyAnimalTotals())
-  }, [animalReorg])
-  void [reorgAvailable, reorgTotals]
-  const hasReorgOverflow = useMemo(() => {
-    if (!reorgAvailable) return false
-    return REORG_ANIMAL_TYPES.some((animal) => reorgTotals[animal] > reorgAvailable[animal])
-  }, [reorgAvailable, reorgTotals])
   const confirmAnimalReorg = useCallback(() => {
-    if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {
-      setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: true } : prev)
-      return
-    }
-    resolveChoice('confirm')
-  }, [animalReorg, reorgRemaining, resolveChoice])
-  const groupKeyByTile = useMemo(() => {
-    const map = new Map<string, string | undefined>()
-    if (farmInteraction?.farmType === 'sow') {
-      farmInteraction.selectableFields.forEach((entry) => {
-        map.set(positionKey(entry.tile), entry.groupKey)
-      })
-    }
-    return map
-  }, [farmInteraction])
-  const wrappedToggleRoom = (tile: FarmTilePosition) =>
-    toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
-  const wrappedToggleStable = (tile: FarmTilePosition) =>
-    toggleStableTileInternal(tile, maxStableSelections, positionKey)
-  const wrappedToggleFarmHand = (tile: FarmTilePosition) =>
-    toggleFarmHandInternal(tile, positionKey)
-  const wrappedTogglePlow = (tile: FarmTilePosition) =>
-    togglePlowTileInternal(tile, positionKey)
-  const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
-    updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
+    confirmAnimalReorgDraft(reorgRemaining, resolveChoice)
+  }, [confirmAnimalReorgDraft, reorgRemaining, resolveChoice])
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) => {
     if (selectedSpecialAction && state && isInteractive && interaction.stateId === 'wait' && pendingMoorSpecialActionChoices.isActive) {
       const option = getPendingMoorSpecialActionTileChoice(
@@ -1623,141 +1048,12 @@ export const GameContainerApi = () => {
       })
       return
     }
-    togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
+    farmSelectionDraft.controls.togglePositionSelection(tile)
   }
-  const wrappedToggleFenceEdge = (edgeId: string) =>
-    toggleFenceEdge(
-      edgeId,
-      isBorrowedFenceSelection && borrowedFenceSource
-        ? {
-            donorCaps: borrowedFenceSource.donorCaps,
-            isBorderEdge: (candidate) => isFarmyardBorderEdge(displayPlayer ?? undefined, candidate),
-          }
-        : { isBorderEdge: (candidate) => isFarmyardBorderEdge(displayPlayer ?? undefined, candidate) },
-    )
   const setViewPlayerIdSafe = useCallback((value: string) => {
     setViewPlayerId(value)
   }, [])
 
-  const adjustReorgAnimal = (zoneId: string, animalType: ReorgAnimalType, delta: number) => {
-    setAnimalReorg((prev) => {
-      if (!prev || !pendingAnimalReorg || !state) return prev
-      const player = state.players[pendingAnimalReorg.playerIndex]
-      if (!player) return prev
-      
-      let capacity = 0
-      const current = prev.zones.find((zone) => zone.id === zoneId)
-      if (!current) return prev
-      capacity = current.capacity
-
-      const totals = prev.zones.reduce(
-        (acc, zone) => {
-          addAnimalCounts(acc, zoneAnimalCounts(zone))
-          return acc
-        },
-        emptyAnimalTotals(),
-      )
-
-      const available = computeReorgAvailableAnimals(player)
-
-      if (delta > 0) {
-        if (wouldExceedExclusiveCardZoneLimit(prev.zones, zoneId)) return prev
-        const baseTotals = { ...totals }
-        const currentCounts = zoneAnimalCounts(current)
-        addAnimalCounts(baseTotals, {
-          sheep: -currentCounts.sheep,
-          boar: -currentCounts.boar,
-          cattle: -currentCounts.cattle,
-          horse: -(currentCounts.horse ?? 0),
-        })
-        const remaining = available[animalType] - baseTotals[animalType]
-        if (remaining <= 0) return prev
-
-        if (cardZoneAllowsMixedAnimals(current)) {
-          const nextCounts = { ...currentCounts }
-          if (animalCountsTotal(nextCounts) >= capacity) return prev
-          nextCounts[animalType] += 1
-          const nextTotal = animalCountsTotal(nextCounts)
-          const zones = prev.zones.map((zone) => {
-            if (zone.id !== zoneId) return zone
-            return {
-              ...zone,
-              animalCounts: compactAnimalCounts(nextCounts),
-              animalType: singleAnimalType(nextCounts),
-              animalCount: nextTotal,
-            }
-          })
-          return { ...prev, zones, confirmDiscard: false }
-        }
-
-        const nextCount =
-          current.animalType === animalType
-            ? Math.min(capacity, current.animalCount + 1)
-            : Math.min(capacity, 1)
-
-        if (nextCount <= 0) return prev
-
-        const zones = prev.zones.map((zone) => {
-          if (zone.id !== zoneId) return zone
-          const { animalCounts: _animalCounts, ...rest } = zone
-          return {
-            ...rest,
-            animalType,
-            animalCount: nextCount,
-          }
-        })
-        return { ...prev, zones, confirmDiscard: false }
-      }
-
-      if (cardZoneAllowsMixedAnimals(current)) {
-        const currentCounts = zoneAnimalCounts(current)
-        if (currentCounts[animalType] <= 0) return prev
-        const nextCounts = { ...currentCounts, [animalType]: currentCounts[animalType] - 1 }
-        const nextTotal = animalCountsTotal(nextCounts)
-        const zones = prev.zones.map((zone) => {
-          if (zone.id !== zoneId) return zone
-          return {
-            ...zone,
-            animalCounts: compactAnimalCounts(nextCounts),
-            animalType: singleAnimalType(nextCounts),
-            animalCount: nextTotal,
-          }
-        })
-        return { ...prev, zones, confirmDiscard: false }
-      }
-
-      if (current.animalType !== animalType || current.animalCount <= 0) {
-        return prev
-      }
-      const nextCount = Math.max(0, current.animalCount - 1)
-      const zones = prev.zones.map((zone) => {
-        if (zone.id !== zoneId) return zone
-        const { animalCounts: _animalCounts, ...rest } = zone
-        return {
-          ...rest,
-          animalType: nextCount > 0 ? animalType : null,
-          animalCount: nextCount,
-        }
-      })
-      return { ...prev, zones, confirmDiscard: false }
-    })
-  }
-  const cancelAnimalDiscardPrompt = () => { setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: false } : prev) }
-  const plowSelectableSet = useMemo(
-    () =>
-      new Set(
-        farmInteraction?.farmType === 'plow'
-          ? farmInteraction.selectableTiles.map((tile) => positionKey(tile))
-          : [],
-      ),
-    [farmInteraction],
-  )
-  const sowRemaining = useMemo(() => ({
-    grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
-    vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),
-    wood: Math.max(0, (displayPlayer?.resources.wood ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'wood').length),
-    stone: Math.max(0, (displayPlayer?.resources.stone ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'stone').length),
-  }), [displayPlayer?.resources, pendingSowSelections])
   const futureCardResources = useMemo(() => {
     if (!state) return {}
     const rec: Record<string, { playerId: string; name: string; color: PlayerState['color']; resources: Partial<Resource> }[]> = {}
@@ -2033,24 +1329,15 @@ export const GameContainerApi = () => {
 
   const farmBoardView = {
     ...farmBoardProjection,
+    ...farmSelectionDraft.farmBoardDraft,
     locale,
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     fieldPositions,
-    maxStableSelections,
-    plowSelectableSet,
-    pendingPlowTile,
-    pendingPositionSelections,
-    pendingSowSelections,
-    sowRemaining,
     isReorgActive,
     hasReorgOverflow,
     animalReorg,
-    pendingFenceSet,
-    pendingFenceSourceMap: isBorrowedFenceSelection ? pendingFenceSources : undefined,
-    pendingPalisadeSet,
-    fencePlacementMode: isBorrowedFenceSelection ? 'fence' as const : fencePlacementMode,
     isSelectingMinor,
     isSelectingOccupation,
     isSelectingImprovementAny,
@@ -2065,13 +1352,13 @@ export const GameContainerApi = () => {
     highlightedFenceEdgeIds,
   }
   const farmBoardActions = {
-    toggleRoomTile: wrappedToggleRoom,
-    toggleStableTile: wrappedToggleStable,
-    toggleFarmHand: wrappedToggleFarmHand,
-    togglePlowTile: wrappedTogglePlow,
-    updateSowSelection: wrappedUpdateSow,
+    toggleRoomTile: farmSelectionDraft.controls.toggleRoomTile,
+    toggleStableTile: farmSelectionDraft.controls.toggleStableTile,
+    toggleFarmHand: farmSelectionDraft.controls.toggleFarmHand,
+    togglePlowTile: farmSelectionDraft.controls.togglePlowTile,
+    updateSowSelection: farmSelectionDraft.controls.updateSowSelection,
     togglePositionSelection: wrappedTogglePositionSelection,
-    toggleFenceEdge: wrappedToggleFenceEdge,
+    toggleFenceEdge: farmSelectionDraft.controls.toggleFenceEdge,
     adjustReorgAnimal,
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
@@ -2086,6 +1373,126 @@ export const GameContainerApi = () => {
       runInteractionSubmitCommand(submitCommand)
     },
   }
+  const interactionBarResourceQuantitySelect =
+    interactionPresentationPlan.kind === 'resource-quantity-select'
+      ? {
+          availableByResource: interactionPresentationPlan.availableByResource,
+          promptKey: interactionPresentationPlan.promptKey,
+          requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
+          onConfirm: (counts: Partial<Record<keyof Resource, number>>) => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, {
+              value: 'confirm',
+              resourceCounts: counts,
+            })
+            runInteractionSubmitCommand(submitCommand)
+          },
+          onCancel: () => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+            runInteractionSubmitCommand(submitCommand)
+          },
+        }
+      : null
+  const interactionBarResourceBatchExchangeSelect =
+    interactionPresentationPlan.kind === 'resource-batch-exchange-select'
+      ? {
+          discardAvailableByResource: interactionPresentationPlan.discardAvailableByResource,
+          receiveResources: interactionPresentationPlan.receiveResources,
+          maxTotal: interactionPresentationPlan.maxTotal,
+          promptKey: interactionPresentationPlan.promptKey,
+          onConfirm: (payload: {
+            discard: Partial<Record<keyof Resource, number>>
+            receive: Partial<Record<keyof Resource, number>>
+          }) => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, {
+              value: 'confirm',
+              resourceBatchExchange: payload,
+            })
+            runInteractionSubmitCommand(submitCommand)
+          },
+          onCancel: () => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+            runInteractionSubmitCommand(submitCommand)
+          },
+        }
+      : null
+  const interactionBarModel = buildInteractionBarModel({
+    locale,
+    playerNames: state.players.map((p) => p.name ?? `Player ${p.id}`),
+    isInteractive,
+    pending: {
+      animalReorg: pendingAnimalReorg,
+      choice: interactionBarPendingChoice,
+      engineBlocked: pendingEngineBlocked,
+      nextPlayerIndex: pendingNextPlayerIndex,
+      playerSwitch: pendingPlayerSwitch,
+      harvestFeedPlayerName: harvestPending?.playerName ?? null,
+      heating: heatingPending,
+      resourceQuantitySelect: interactionBarResourceQuantitySelect,
+      resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
+      suppressChoiceOptions: suppressPendingChoiceOptions,
+    },
+    farm: {
+      pendingRoomTilesLength: farmSelectionDraft.interactionBarDraft.pendingRoomTilesLength,
+      maxRoomSelections: farmSelectionDraft.interactionBarDraft.maxRoomSelections,
+      pendingFenceEdgesLength: farmSelectionDraft.interactionBarDraft.pendingFenceEdgesLength,
+      pendingStableTilesLength: farmSelectionDraft.interactionBarDraft.pendingStableTilesLength,
+      maxStableSelections: farmSelectionDraft.interactionBarDraft.maxStableSelections,
+      pendingFarmHandSelected: farmSelectionDraft.interactionBarDraft.pendingFarmHandSelected,
+      pendingSowSelectionsLength: farmSelectionDraft.interactionBarDraft.pendingSowSelectionsLength,
+      pendingPositionSelectionsLength: farmSelectionDraft.interactionBarDraft.pendingPositionSelectionsLength,
+      maxPositionSelections: farmSelectionDraft.interactionBarDraft.maxPositionSelections,
+      hasPendingPlowSelection: farmSelectionDraft.interactionBarDraft.hasPendingPlowSelection,
+      errors: {
+        fence: farmSelectionDraft.interactionBarDraft.fenceErrorText ?? '',
+        room: farmSelectionDraft.interactionBarDraft.roomErrorText ?? '',
+        stable: farmSelectionDraft.interactionBarDraft.stableErrorText ?? '',
+        plow: farmSelectionDraft.interactionBarDraft.plowErrorText ?? '',
+        sow: farmSelectionDraft.interactionBarDraft.sowErrorText ?? '',
+      },
+      selecting: {
+        fences: isSelectingFences,
+        rooms: isSelectingRooms,
+        stables: isSelectingStables,
+        plow: isSelectingPlow,
+        sow: isSelectingSow,
+      },
+      fence: {
+        canBuildPalisades: !!currentPlayer && playerCanBuildPalisades(currentPlayer),
+        placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
+        setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
+        borrowedSources: farmSelectionDraft.borrowedFenceSources,
+      },
+    },
+    animalReorg: {
+      state: animalReorg,
+      remaining: reorgRemaining,
+      hasOverflow: hasReorgOverflow,
+    },
+    controls: {
+      canUndoStep,
+      canUndoAction,
+      historyLength,
+      hasActionStartSnapshot,
+      anytimeActions: pendingEngineBlocked ? [] : interaction.anytimeActions,
+    },
+  })
+  const interactionBarActions = buildInteractionBarActions({
+    resolveChoice,
+    confirmNextPlayer,
+    confirmPlayerSwitch,
+    confirmHarvestFeed,
+    confirmHeating,
+    undoStep,
+    undoAction,
+    showScoring,
+    takeAnytimeAction,
+    confirmAnimalReorg,
+    cancelAnimalDiscardPrompt,
+  })
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
@@ -2132,14 +1539,7 @@ export const GameContainerApi = () => {
               <div className="exchange-options">
                 {harvestFeedOptions.map((option) => {
                   const current = activeHarvestFeedCounts[option.id] ?? 0
-                  const limit = harvestFeedPlayer
-                    ? computeHarvestFeedCounterMax(
-                        option,
-                        harvestFeedOptions,
-                        activeHarvestFeedCounts,
-                        harvestFeedPlayer.resources,
-                      )
-                    : 0
+                  const limit = exchangeDraft.harvestFeed.limitById[option.id] ?? 0
                   const canAdd = current < limit
                   const canSubtract = current > 0
                   const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
@@ -2246,17 +1646,7 @@ export const GameContainerApi = () => {
               <div className="exchange-options">
                 {anytimeExchangeOptions.map((option) => {
                   const current = activeAnytimeExchangeCounts[option.id] ?? 0
-                  const limit = option.tradeIndex === undefined || !anytimeExchangePlayer
-                    ? 0
-                    : Math.min(
-                        option.maxTimes,
-                        computeHarvestFeedCounterMax(
-                          option,
-                          anytimeExchangeOptions,
-                          activeAnytimeExchangeCounts,
-                          anytimeExchangePlayer.resources,
-                        ),
-                      )
+                  const limit = exchangeDraft.anytime.limitById[option.id] ?? 0
                   const canAdd = current < limit
                   const canSubtract = current > 0
                   const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
@@ -2362,11 +1752,8 @@ export const GameContainerApi = () => {
                     max: 0,
                   }
                   const current = activeBakeExchangeCounts[option.value] ?? 0
-                  const availableGrain = bakeExchangePlayer?.resources.grain ?? 0
-                  const remaining = Math.max(0, availableGrain - bakeTotalGrain)
-                  const limit = Math.min(info.max, current + remaining)
-                  const canAdd =
-                    availableGrain > bakeTotalGrain && current < limit
+                  const limit = exchangeDraft.bake.limitById[option.value] ?? 0
+                  const canAdd = current < limit
                   const canSubtract = current > 0
                   const rateText = Number.isFinite(info.max)
                     ? t(locale, 'ui.bakeBreadRateLimited', {
@@ -2580,95 +1967,7 @@ export const GameContainerApi = () => {
         </div>
       </div>
 
-      <InteractionBar
-        pendingAnimalReorg={pendingAnimalReorg}
-        pendingChoice={interactionBarPendingChoice}
-        suppressChoiceOptions={suppressPendingChoiceOptions}
-        pendingEngineBlocked={pendingEngineBlocked}
-        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
-        pendingPlayerSwitch={pendingPlayerSwitch}
-        confirmPlayerSwitch={confirmPlayerSwitch}
-        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
-        pendingRoomTilesLength={pendingRoomTiles.length} maxRoomSelections={maxRoomSelections}
-        pendingFenceEdgesLength={pendingFenceEdges.length + pendingPalisadeEdges.length}
-        pendingStableTilesLength={pendingStableTiles.length} maxStableSelections={maxStableSelections}
-        pendingFarmHandSelected={pendingFarmHand !== null}
-        pendingSowSelectionsLength={sowSelectedCount}
-        hasPendingPlowSelection={pendingPlowTile !== null}
-        pendingPositionSelectionsLength={pendingPositionSelections.size} maxPositionSelections={maxPositionSelections}
-        fenceErrorText={fenceErrorText ?? ''} roomErrorText={roomErrorText ?? ''}
-        stableErrorText={stableErrorText ?? ''} plowErrorText={plowErrorText ?? ''} sowErrorText={sowErrorText ?? ''}
-        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
-        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
-        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
-        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
-        heatingPending={heatingPending}
-        confirmHeating={confirmHeating}
-        isInteractive={isInteractive}
-        onUndo={undoStep}
-        onUndoAction={undoAction}
-        canUndoStep={canUndoStep}
-        canUndoAction={canUndoAction}
-        onShowScoring={showScoring}
-        historyLength={historyLength}
-        hasActionStartSnapshot={hasActionStartSnapshot}
-        anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}
-        takeAnytimeAction={takeAnytimeAction}
-        canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
-        fencePlacementMode={fencePlacementMode}
-        setFencePlacementMode={setFencePlacementMode}
-        borrowedFenceSources={borrowedFenceSourceControls}
-        animalReorg={animalReorg}
-        reorgRemaining={reorgRemaining}
-        hasReorgOverflow={hasReorgOverflow}
-        confirmAnimalReorg={confirmAnimalReorg}
-        cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-        resourceQuantitySelect={
-          interactionPresentationPlan.kind === 'resource-quantity-select'
-            ? {
-                availableByResource: interactionPresentationPlan.availableByResource,
-                promptKey: interactionPresentationPlan.promptKey,
-                requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
-                onConfirm: (counts) => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, {
-                    value: 'confirm',
-                    resourceCounts: counts,
-                  })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-                onCancel: () => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-              }
-            : null
-        }
-        resourceBatchExchangeSelect={
-          interactionPresentationPlan.kind === 'resource-batch-exchange-select'
-            ? {
-                discardAvailableByResource: interactionPresentationPlan.discardAvailableByResource,
-                receiveResources: interactionPresentationPlan.receiveResources,
-                maxTotal: interactionPresentationPlan.maxTotal,
-                promptKey: interactionPresentationPlan.promptKey,
-                onConfirm: (payload) => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, {
-                    value: 'confirm',
-                    resourceBatchExchange: payload,
-                  })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-                onCancel: () => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-              }
-            : null
-        }
-      />
+      <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
     </div>
   )
 }
