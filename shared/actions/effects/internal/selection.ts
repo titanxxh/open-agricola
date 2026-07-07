@@ -37,7 +37,7 @@ const validateFarmPositions = (
   const playerIndex = state?.players.indexOf(player) ?? -1
   if (state && playerIndex >= 0) {
     const selectionInteraction = playerBoard(state, playerIndex)
-      .farmyard
+      .farmInteraction
       .selectableTiles('farm-position', { actionContext })
     const selectablePositions = selectionInteraction.kind === 'farm-position'
       ? selectionInteraction.selectablePositions

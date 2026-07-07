@@ -207,7 +207,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toEqual([FARM_HAND_TILE])
 
-    const baseSelection = playerBoard(resp.state, 0).farmyard.selectableTiles('stable', {})
+    const baseSelection = playerBoard(resp.state, 0).farmInteraction.selectableTiles('stable', {})
     expect(
       (baseSelection as { farmHandPositions?: unknown }).farmHandPositions,
     ).toBeUndefined()

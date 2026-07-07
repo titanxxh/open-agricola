@@ -92,6 +92,10 @@ _Avoid_: Payment Pipeline、规则执行、真实资源变更
 Interaction Presentation 的一种本地草稿展示，覆盖 fence、room、stable、plow、sow 和 farm-position 选择的前端暂存、错误展示、提交 draft 和 snapshot 后重置。它只管理尚未提交的本地选择，不做农场合法性裁定。
 _Avoid_: Farm Board Projection、Moor Special Action tile routing、后端规则验证、真实 GameState 写入
 
+**Farm Interaction Projection**:
+后端把 `PlayerState`、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload 的领域投影边界。它只产生当前等待交互可展示、可选择的候选，不负责提交后的规则落子或前端本地 draft。
+_Avoid_: Farmyard 规则校验、Farm Selection Draft Presentation、真实 GameState 写入
+
 **Animal Reorg Draft Presentation**:
 Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
 _Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入

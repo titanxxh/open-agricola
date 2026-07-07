@@ -230,7 +230,7 @@ const buildStableFarmSelection = (
     if (!PaymentSolver.canAffordTypedFlatCost(player, total, 'stables', state)) break
     affordableMax = count
   }
-  const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
+  const farm = playerBoard(state, idx).farmInteraction.selectableTiles('stable', {
     costOverride: readStableCostDelta(actionContext, costs),
     exactCost: PaymentSolver.readExactCost(actionContext),
     zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,

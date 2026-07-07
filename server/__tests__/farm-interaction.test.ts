@@ -7,7 +7,7 @@ import {
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
-} from '../../shared/domain/farmyard'
+} from '../../shared/domain/farmyard-interaction'
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'

@@ -1,12 +1,22 @@
 export { PlayerBoard, playerBoard } from './player-board.ts'
 export {
   Farmyard,
-  type FarmSelectKind,
   type FenceSpec,
   type SowSelection,
   getAllEdgeIds,
   normalizePlayerFarm,
 } from './farmyard.ts'
+export {
+  FarmInteraction,
+  buildFarmPositionSelectionInteraction,
+  buildFenceFarmInteraction,
+  buildPlowFarmInteraction,
+  buildRoomFarmInteraction,
+  buildSowFarmInteraction,
+  buildStableFarmInteraction,
+  getPermittedExtraSowableFields,
+  type FarmSelectKind,
+} from './farmyard-interaction.ts'
 export {
   AnimalZones,
   type AnimalZone,

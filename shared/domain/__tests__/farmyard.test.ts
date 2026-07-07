@@ -24,11 +24,11 @@ describe('Farmyard', () => {
     }
   })
 
-  it("selectableTiles('plow') returns a farm-interaction shape", () => {
+  it("farmInteraction.selectableTiles('plow') returns a farm-interaction shape", () => {
     const session = new GameSession()
     const state = session.getState().state
     const board = playerBoard(state, 0)
-    const interaction = board.farmyard.selectableTiles('plow')
+    const interaction = board.farmInteraction.selectableTiles('plow')
     expect(interaction).toBeDefined()
     expect((interaction as { farmType?: string }).farmType).toBe('plow')
   })
