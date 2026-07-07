@@ -86,6 +86,10 @@ import {
   isDomainWaitInteraction,
   type InteractionSubmitCommand,
 } from './interaction-presentation'
+import {
+  buildInteractionBarActions,
+  buildInteractionBarModel,
+} from './interaction-bar-presentation'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
@@ -1369,6 +1373,126 @@ export const GameContainerApi = () => {
       runInteractionSubmitCommand(submitCommand)
     },
   }
+  const interactionBarResourceQuantitySelect =
+    interactionPresentationPlan.kind === 'resource-quantity-select'
+      ? {
+          availableByResource: interactionPresentationPlan.availableByResource,
+          promptKey: interactionPresentationPlan.promptKey,
+          requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
+          onConfirm: (counts: Partial<Record<keyof Resource, number>>) => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, {
+              value: 'confirm',
+              resourceCounts: counts,
+            })
+            runInteractionSubmitCommand(submitCommand)
+          },
+          onCancel: () => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+            runInteractionSubmitCommand(submitCommand)
+          },
+        }
+      : null
+  const interactionBarResourceBatchExchangeSelect =
+    interactionPresentationPlan.kind === 'resource-batch-exchange-select'
+      ? {
+          discardAvailableByResource: interactionPresentationPlan.discardAvailableByResource,
+          receiveResources: interactionPresentationPlan.receiveResources,
+          maxTotal: interactionPresentationPlan.maxTotal,
+          promptKey: interactionPresentationPlan.promptKey,
+          onConfirm: (payload: {
+            discard: Partial<Record<keyof Resource, number>>
+            receive: Partial<Record<keyof Resource, number>>
+          }) => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, {
+              value: 'confirm',
+              resourceBatchExchange: payload,
+            })
+            runInteractionSubmitCommand(submitCommand)
+          },
+          onCancel: () => {
+            if (!isInteractive) return
+            const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
+            runInteractionSubmitCommand(submitCommand)
+          },
+        }
+      : null
+  const interactionBarModel = buildInteractionBarModel({
+    locale,
+    playerNames: state.players.map((p) => p.name ?? `Player ${p.id}`),
+    isInteractive,
+    pending: {
+      animalReorg: pendingAnimalReorg,
+      choice: interactionBarPendingChoice,
+      engineBlocked: pendingEngineBlocked,
+      nextPlayerIndex: pendingNextPlayerIndex,
+      playerSwitch: pendingPlayerSwitch,
+      harvestFeedPlayerName: harvestPending?.playerName ?? null,
+      heating: heatingPending,
+      resourceQuantitySelect: interactionBarResourceQuantitySelect,
+      resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
+      suppressChoiceOptions: suppressPendingChoiceOptions,
+    },
+    farm: {
+      pendingRoomTilesLength: farmSelectionDraft.interactionBarDraft.pendingRoomTilesLength,
+      maxRoomSelections: farmSelectionDraft.interactionBarDraft.maxRoomSelections,
+      pendingFenceEdgesLength: farmSelectionDraft.interactionBarDraft.pendingFenceEdgesLength,
+      pendingStableTilesLength: farmSelectionDraft.interactionBarDraft.pendingStableTilesLength,
+      maxStableSelections: farmSelectionDraft.interactionBarDraft.maxStableSelections,
+      pendingFarmHandSelected: farmSelectionDraft.interactionBarDraft.pendingFarmHandSelected,
+      pendingSowSelectionsLength: farmSelectionDraft.interactionBarDraft.pendingSowSelectionsLength,
+      pendingPositionSelectionsLength: farmSelectionDraft.interactionBarDraft.pendingPositionSelectionsLength,
+      maxPositionSelections: farmSelectionDraft.interactionBarDraft.maxPositionSelections,
+      hasPendingPlowSelection: farmSelectionDraft.interactionBarDraft.hasPendingPlowSelection,
+      errors: {
+        fence: farmSelectionDraft.interactionBarDraft.fenceErrorText ?? '',
+        room: farmSelectionDraft.interactionBarDraft.roomErrorText ?? '',
+        stable: farmSelectionDraft.interactionBarDraft.stableErrorText ?? '',
+        plow: farmSelectionDraft.interactionBarDraft.plowErrorText ?? '',
+        sow: farmSelectionDraft.interactionBarDraft.sowErrorText ?? '',
+      },
+      selecting: {
+        fences: isSelectingFences,
+        rooms: isSelectingRooms,
+        stables: isSelectingStables,
+        plow: isSelectingPlow,
+        sow: isSelectingSow,
+      },
+      fence: {
+        canBuildPalisades: !!currentPlayer && playerCanBuildPalisades(currentPlayer),
+        placementMode: farmSelectionDraft.interactionBarDraft.fencePlacementMode,
+        setPlacementMode: farmSelectionDraft.controls.setFencePlacementMode,
+        borrowedSources: farmSelectionDraft.borrowedFenceSources,
+      },
+    },
+    animalReorg: {
+      state: animalReorg,
+      remaining: reorgRemaining,
+      hasOverflow: hasReorgOverflow,
+    },
+    controls: {
+      canUndoStep,
+      canUndoAction,
+      historyLength,
+      hasActionStartSnapshot,
+      anytimeActions: pendingEngineBlocked ? [] : interaction.anytimeActions,
+    },
+  })
+  const interactionBarActions = buildInteractionBarActions({
+    resolveChoice,
+    confirmNextPlayer,
+    confirmPlayerSwitch,
+    confirmHarvestFeed,
+    confirmHeating,
+    undoStep,
+    undoAction,
+    showScoring,
+    takeAnytimeAction,
+    confirmAnimalReorg,
+    cancelAnimalDiscardPrompt,
+  })
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
@@ -1843,101 +1967,7 @@ export const GameContainerApi = () => {
         </div>
       </div>
 
-      <InteractionBar
-        pendingAnimalReorg={pendingAnimalReorg}
-        pendingChoice={interactionBarPendingChoice}
-        suppressChoiceOptions={suppressPendingChoiceOptions}
-        pendingEngineBlocked={pendingEngineBlocked}
-        pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
-        pendingPlayerSwitch={pendingPlayerSwitch}
-        confirmPlayerSwitch={confirmPlayerSwitch}
-        playerNames={state.players.map((p) => p.name ?? `Player ${p.id}`)}
-        pendingRoomTilesLength={farmSelectionDraft.interactionBarDraft.pendingRoomTilesLength}
-        maxRoomSelections={farmSelectionDraft.interactionBarDraft.maxRoomSelections}
-        pendingFenceEdgesLength={farmSelectionDraft.interactionBarDraft.pendingFenceEdgesLength}
-        pendingStableTilesLength={farmSelectionDraft.interactionBarDraft.pendingStableTilesLength}
-        maxStableSelections={farmSelectionDraft.interactionBarDraft.maxStableSelections}
-        pendingFarmHandSelected={farmSelectionDraft.interactionBarDraft.pendingFarmHandSelected}
-        pendingSowSelectionsLength={farmSelectionDraft.interactionBarDraft.pendingSowSelectionsLength}
-        hasPendingPlowSelection={farmSelectionDraft.interactionBarDraft.hasPendingPlowSelection}
-        pendingPositionSelectionsLength={farmSelectionDraft.interactionBarDraft.pendingPositionSelectionsLength}
-        maxPositionSelections={farmSelectionDraft.interactionBarDraft.maxPositionSelections}
-        fenceErrorText={farmSelectionDraft.interactionBarDraft.fenceErrorText ?? ''}
-        roomErrorText={farmSelectionDraft.interactionBarDraft.roomErrorText ?? ''}
-        stableErrorText={farmSelectionDraft.interactionBarDraft.stableErrorText ?? ''}
-        plowErrorText={farmSelectionDraft.interactionBarDraft.plowErrorText ?? ''}
-        sowErrorText={farmSelectionDraft.interactionBarDraft.sowErrorText ?? ''}
-        isSelectingFences={isSelectingFences} isSelectingRooms={isSelectingRooms}
-        isSelectingStables={isSelectingStables} isSelectingPlow={isSelectingPlow} isSelectingSow={isSelectingSow}
-        resolveChoice={resolveChoice} confirmNextPlayer={confirmNextPlayer}
-        harvestFeedPlayerName={harvestPending?.playerName ?? null} confirmHarvestFeed={confirmHarvestFeed}
-        heatingPending={heatingPending}
-        confirmHeating={confirmHeating}
-        isInteractive={isInteractive}
-        onUndo={undoStep}
-        onUndoAction={undoAction}
-        canUndoStep={canUndoStep}
-        canUndoAction={canUndoAction}
-        onShowScoring={showScoring}
-        historyLength={historyLength}
-        hasActionStartSnapshot={hasActionStartSnapshot}
-        anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}
-        takeAnytimeAction={takeAnytimeAction}
-        canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
-        fencePlacementMode={farmSelectionDraft.interactionBarDraft.fencePlacementMode}
-        setFencePlacementMode={farmSelectionDraft.controls.setFencePlacementMode}
-        borrowedFenceSources={farmSelectionDraft.borrowedFenceSources}
-        animalReorg={animalReorg}
-        reorgRemaining={reorgRemaining}
-        hasReorgOverflow={hasReorgOverflow}
-        confirmAnimalReorg={confirmAnimalReorg}
-        cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
-        resourceQuantitySelect={
-          interactionPresentationPlan.kind === 'resource-quantity-select'
-            ? {
-                availableByResource: interactionPresentationPlan.availableByResource,
-                promptKey: interactionPresentationPlan.promptKey,
-                requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
-                onConfirm: (counts) => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, {
-                    value: 'confirm',
-                    resourceCounts: counts,
-                  })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-                onCancel: () => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-              }
-            : null
-        }
-        resourceBatchExchangeSelect={
-          interactionPresentationPlan.kind === 'resource-batch-exchange-select'
-            ? {
-                discardAvailableByResource: interactionPresentationPlan.discardAvailableByResource,
-                receiveResources: interactionPresentationPlan.receiveResources,
-                maxTotal: interactionPresentationPlan.maxTotal,
-                promptKey: interactionPresentationPlan.promptKey,
-                onConfirm: (payload) => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, {
-                    value: 'confirm',
-                    resourceBatchExchange: payload,
-                  })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-                onCancel: () => {
-                  if (!isInteractive) return
-                  const submitCommand = buildInteractionSubmitCommand(interaction, { value: 'cancel' })
-                  runInteractionSubmitCommand(submitCommand)
-                },
-              }
-            : null
-        }
-      />
+      <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
     </div>
   )
 }
