@@ -5,13 +5,20 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { AnytimeAction } from '../../../../shared/contract/types'
+import type { Locale } from '../../../../shared/i18n'
 import type { PendingChoice } from '../../../types/ui'
 import {
   __resetCardsManifestCache,
   loadCardsManifest,
   type CardsManifestPayload,
 } from '../../../services/card-meta'
-import { InteractionBar } from '../InteractionBar'
+import {
+  buildInteractionBarActions,
+  buildInteractionBarModel,
+  type InteractionBarActionInput,
+  type InteractionBarPresentationInput,
+} from '../../../app/interaction-bar-presentation'
+import { InteractionBar as InteractionBarView } from '../InteractionBar'
 
 const noop = () => {}
 
@@ -27,6 +34,87 @@ const pendingChoice: PendingChoice = {
   options: [{ value: 'confirm', labelKey: 'ui.interactionConfirmButton' }],
   playerIndex: 0,
   spaceId: 'test-space',
+}
+
+const read = <T,>(props: Record<string, unknown>, key: string, fallback: T): T =>
+  props[key] === undefined ? fallback : props[key] as T
+
+const InteractionBar = (props: Record<string, unknown>) => {
+  const model = buildInteractionBarModel({
+    locale: read<Locale>(props, 'locale', 'en'),
+    playerNames: read<string[]>(props, 'playerNames', []),
+    isInteractive: read<boolean>(props, 'isInteractive', true),
+    pending: {
+      animalReorg: read<InteractionBarPresentationInput['pending']['animalReorg']>(props, 'pendingAnimalReorg', null),
+      choice: read<InteractionBarPresentationInput['pending']['choice']>(props, 'pendingChoice', null),
+      engineBlocked: read<InteractionBarPresentationInput['pending']['engineBlocked']>(props, 'pendingEngineBlocked', null),
+      nextPlayerIndex: read<number | null>(props, 'pendingNextPlayerIndex', null),
+      playerSwitch: read<InteractionBarPresentationInput['pending']['playerSwitch']>(props, 'pendingPlayerSwitch', null),
+      harvestFeedPlayerName: read<string | null>(props, 'harvestFeedPlayerName', null),
+      heating: read<InteractionBarPresentationInput['pending']['heating']>(props, 'heatingPending', null),
+      resourceQuantitySelect: read<InteractionBarPresentationInput['pending']['resourceQuantitySelect']>(props, 'resourceQuantitySelect', null),
+      resourceBatchExchangeSelect: read<InteractionBarPresentationInput['pending']['resourceBatchExchangeSelect']>(props, 'resourceBatchExchangeSelect', null),
+      suppressChoiceOptions: read<boolean>(props, 'suppressChoiceOptions', false),
+    },
+    farm: {
+      pendingRoomTilesLength: read<number>(props, 'pendingRoomTilesLength', 0),
+      maxRoomSelections: read<number>(props, 'maxRoomSelections', 0),
+      pendingFenceEdgesLength: read<number>(props, 'pendingFenceEdgesLength', 0),
+      pendingStableTilesLength: read<number>(props, 'pendingStableTilesLength', 0),
+      maxStableSelections: read<number>(props, 'maxStableSelections', 0),
+      pendingFarmHandSelected: read<boolean>(props, 'pendingFarmHandSelected', false),
+      pendingSowSelectionsLength: read<number>(props, 'pendingSowSelectionsLength', 0),
+      pendingPositionSelectionsLength: read<number>(props, 'pendingPositionSelectionsLength', 0),
+      maxPositionSelections: read<number>(props, 'maxPositionSelections', 0),
+      hasPendingPlowSelection: read<boolean>(props, 'hasPendingPlowSelection', false),
+      errors: {
+        fence: read<string>(props, 'fenceErrorText', ''),
+        room: read<string>(props, 'roomErrorText', ''),
+        stable: read<string>(props, 'stableErrorText', ''),
+        plow: read<string>(props, 'plowErrorText', ''),
+        sow: read<string>(props, 'sowErrorText', ''),
+      },
+      selecting: {
+        fences: read<boolean>(props, 'isSelectingFences', false),
+        rooms: read<boolean>(props, 'isSelectingRooms', false),
+        stables: read<boolean>(props, 'isSelectingStables', false),
+        plow: read<boolean>(props, 'isSelectingPlow', false),
+        sow: read<boolean>(props, 'isSelectingSow', false),
+      },
+      fence: {
+        canBuildPalisades: read<boolean>(props, 'canBuildPalisades', false),
+        placementMode: read<'fence' | 'palisade'>(props, 'fencePlacementMode', 'fence'),
+        setPlacementMode: read<InteractionBarPresentationInput['farm']['fence']['setPlacementMode']>(props, 'setFencePlacementMode', undefined),
+        borrowedSources: read<InteractionBarPresentationInput['farm']['fence']['borrowedSources']>(props, 'borrowedFenceSources', undefined),
+      },
+    },
+    animalReorg: {
+      state: read<InteractionBarPresentationInput['animalReorg']['state']>(props, 'animalReorg', null),
+      remaining: read<InteractionBarPresentationInput['animalReorg']['remaining']>(props, 'reorgRemaining', null),
+      hasOverflow: read<boolean>(props, 'hasReorgOverflow', false),
+    },
+    controls: {
+      canUndoStep: read<boolean>(props, 'canUndoStep', false),
+      canUndoAction: read<boolean>(props, 'canUndoAction', false),
+      historyLength: read<number>(props, 'historyLength', 0),
+      hasActionStartSnapshot: read<boolean>(props, 'hasActionStartSnapshot', false),
+      anytimeActions: read<AnytimeAction[]>(props, 'anytimeActions', []),
+    },
+  })
+  const actions = buildInteractionBarActions({
+    resolveChoice: read<InteractionBarActionInput['resolveChoice']>(props, 'resolveChoice', noop),
+    confirmNextPlayer: read<InteractionBarActionInput['confirmNextPlayer']>(props, 'confirmNextPlayer', noop),
+    confirmPlayerSwitch: read<InteractionBarActionInput['confirmPlayerSwitch']>(props, 'confirmPlayerSwitch', noop),
+    confirmHarvestFeed: read<InteractionBarActionInput['confirmHarvestFeed']>(props, 'confirmHarvestFeed', noop),
+    confirmHeating: read<InteractionBarActionInput['confirmHeating']>(props, 'confirmHeating', noop),
+    undoStep: read<InteractionBarActionInput['undoStep']>(props, 'onUndo', noop),
+    undoAction: read<InteractionBarActionInput['undoAction']>(props, 'onUndoAction', noop),
+    showScoring: read<InteractionBarActionInput['showScoring']>(props, 'onShowScoring', noop),
+    takeAnytimeAction: read<InteractionBarActionInput['takeAnytimeAction']>(props, 'takeAnytimeAction', noop),
+    confirmAnimalReorg: read<InteractionBarActionInput['confirmAnimalReorg']>(props, 'confirmAnimalReorg', noop),
+    cancelAnimalDiscardPrompt: read<InteractionBarActionInput['cancelAnimalDiscardPrompt']>(props, 'cancelAnimalDiscardPrompt', noop),
+  })
+  return <InteractionBarView model={model} actions={actions} />
 }
 
 afterEach(() => {

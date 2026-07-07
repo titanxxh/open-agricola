@@ -4,6 +4,7 @@ import { familySize, markAllWorkersUsed, setWorkersAtHome } from '../../shared/d
 import { Scoring } from '../../shared/domain'
 import { applyHeatingPayment, computeHeatingRequirement } from '../../shared/moor/heating'
 import { getExtraRoomCapacity, runCardEffectHook } from '../../shared/cards/card-effects'
+import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
 const prepareHands = (session: GameSession) => {
@@ -103,7 +104,7 @@ const prepareMajorPurchaseSession = (cardId: string) => {
   setWorkersAtHome(session.state, player, 2)
   session.state.currentPlayerIndex = 0
   session.state.round = 1
-  session.state.availableMajorImprovements = [cardId]
+  moveMajorImprovementToSupplyTop(session.state, cardId)
   return session
 }
 
