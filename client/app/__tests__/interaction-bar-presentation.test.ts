@@ -175,6 +175,51 @@ describe('Interaction Bar Presentation', () => {
     expect(model.choice?.visibleOptions.find((entry) => entry.option.value === 'confirm')?.disabled).toBe(true)
   })
 
+  it('covers farm selection enabled and disabled decisions in the model', () => {
+    const confirm: ActionChoiceOption = { value: 'confirm', labelKey: 'ui.interactionConfirmButton' }
+    const input = baseInput()
+    input.pending.choice = {
+      promptKey: 'ui.interactionRoomSelect',
+      options: [confirm],
+      playerIndex: 0,
+      spaceId: 'space',
+    }
+
+    let model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(true)
+
+    input.farm.pendingRoomTilesLength = 1
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(false)
+
+    input.pending.choice.promptKey = 'ui.interactionStableSelect'
+    input.farm.pendingRoomTilesLength = 0
+    input.farm.pendingStableTilesLength = 0
+    input.farm.pendingFarmHandSelected = false
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(true)
+
+    input.farm.pendingFarmHandSelected = true
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(false)
+
+    input.pending.choice.promptKey = 'ui.interactionSowSelect'
+    input.farm.pendingFarmHandSelected = false
+    input.farm.pendingSowSelectionsLength = 0
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(true)
+
+    input.farm.pendingSowSelectionsLength = 1
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(false)
+
+    input.pending.choice.promptKey = 'ui.interactionSelection'
+    input.pending.choice.promptParams = { minSelections: 1, maxSelections: 2 }
+    input.farm.pendingPositionSelectionsLength = 0
+    model = buildInteractionBarModel(input)
+    expect(model.choice?.visibleOptions[0]?.disabled).toBe(true)
+  })
+
   it('derives choice titles, subtitles, hints, errors, and suppressed option visibility', () => {
     const input = baseInput()
     input.pending.choice = {
@@ -203,5 +248,81 @@ describe('Interaction Bar Presentation', () => {
     input.pending.suppressChoiceOptions = true
     model = buildInteractionBarModel(input)
     expect(model.choice?.showOptions).toBe(false)
+  })
+
+  it('represents non-choice body states and top controls in the model', () => {
+    const input = baseInput()
+    input.controls.canUndoStep = true
+    input.controls.canUndoAction = true
+    input.controls.historyLength = 2
+    input.controls.hasActionStartSnapshot = true
+    input.controls.anytimeActions = [{ id: 'anytime-test', labelKey: 'ui.interactionConfirmSwitch' }]
+    let model = buildInteractionBarModel(input)
+    expect(model.body.kind).toBe('none')
+    expect(model.controls).toMatchObject({
+      canUndoStep: true,
+      canUndoAction: true,
+      historyLength: 2,
+      hasActionStartSnapshot: true,
+    })
+    expect(model.controls.anytimeActions).toHaveLength(1)
+
+    input.pending.animalReorg = { playerIndex: 0, spaceId: 'space' }
+    model = buildInteractionBarModel(input)
+    expect(model.body).toMatchObject({
+      kind: 'animalReorg',
+      title: { key: 'ui.interactionReorgAnimalsTitle' },
+    })
+
+    input.pending.animalReorg = null
+    input.pending.resourceQuantitySelect = {
+      availableByResource: { wood: 1 },
+      onConfirm: noop,
+      onCancel: noop,
+    }
+    model = buildInteractionBarModel(input)
+    expect(model.body.kind).toBe('resourceQuantitySelect')
+
+    input.pending.resourceQuantitySelect = null
+    input.pending.resourceBatchExchangeSelect = {
+      discardAvailableByResource: { wood: 1 },
+      receiveResources: ['food'],
+      maxTotal: 1,
+      onConfirm: noop,
+      onCancel: noop,
+    }
+    model = buildInteractionBarModel(input)
+    expect(model.body.kind).toBe('resourceBatchExchangeSelect')
+
+    input.pending.resourceBatchExchangeSelect = null
+    input.pending.heating = {
+      playerName: 'P1',
+      required: 2,
+      maxFuelPayable: 1,
+      maxWoodConvertibleToFuel: 1,
+    }
+    model = buildInteractionBarModel(input)
+    expect(model.body).toMatchObject({
+      kind: 'heating',
+      title: { key: 'ui.harvestHeatingTitle' },
+      subtitle: { key: 'ui.harvestHeatingSubtitle', params: { player: 'P1', count: 2 } },
+    })
+
+    input.pending.heating = null
+    input.pending.harvestFeedPlayerName = 'P2'
+    model = buildInteractionBarModel(input)
+    expect(model.body).toMatchObject({
+      kind: 'harvestFeed',
+      title: { key: 'ui.harvestFeedTitle' },
+      subtitle: { text: 'P2' },
+    })
+
+    input.pending.harvestFeedPlayerName = null
+    input.isInteractive = false
+    model = buildInteractionBarModel(input)
+    expect(model.body).toMatchObject({
+      kind: 'waiting',
+      title: { key: 'ui.statusWaiting' },
+    })
   })
 })
