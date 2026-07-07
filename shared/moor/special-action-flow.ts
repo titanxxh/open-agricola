@@ -26,6 +26,7 @@ import {
   type MoorSpecialActionPayload,
 } from './special-actions'
 import type { MoorSpecialActionId } from './types'
+import { findPlayerById, findPlayerIndexById } from '../domain/player'
 
 export const MOOR_SPECIAL_ACTION_APPLY_ACTION_ID = 'moor-special-action-apply'
 export const MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID = 'moor-special-action-choice'
@@ -192,9 +193,7 @@ const cardActionChoiceLabelParams = (
   state: GameState,
   choice: CardActionChoice,
 ): Record<string, unknown> => {
-  const owner = choice.cardLocationPlayerId
-    ? state.players.find((candidate) => candidate.id === choice.cardLocationPlayerId)
-    : undefined
+  const owner = findPlayerById(state, choice.cardLocationPlayerId)
   return {
     card: choice.cardId,
     location: choice.cardLocationKind,
@@ -521,7 +520,7 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
   execute: ({ state, player, params, eventSink }) => {
     const parsed = readParams(params)
     if (!parsed) return { type: 'fail', errorKey: 'special action unavailable' }
-    const playerIndex = state.players.findIndex((candidate) => candidate.id === player.id)
+    const playerIndex = findPlayerIndexById(state, player.id)
     if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
 
     const result = applyMoorSpecialAction(

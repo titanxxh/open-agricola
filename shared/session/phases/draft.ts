@@ -15,6 +15,7 @@ import { processSubmit, tryAdvanceRound } from '../../draft/draft-manager.ts'
 import { recordDraftPick } from '../../session/stats.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { PrivateGameEvent } from '../../contract/protocol/game.ts'
+import { findPlayerById } from '../../domain/player.ts'
 
 /**
  * Submit a single player's pick for the current draft round. Validates
@@ -39,7 +40,7 @@ export const submitDraftPick = (
   const submittedRound = sub.draft.round
   const totalRounds = sub.draft.totalRounds
   core.setDraftState(sub.draft)
-  const player = core.state.players.find((p) => p.id === playerId)
+  const player = findPlayerById(core.state, playerId)
   if (player && core.state.draft) {
     const draftTurn = core.state.draft.round
     if (pick.occCardId) recordDraftPick(player, pick.occCardId, draftTurn)

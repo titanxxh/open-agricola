@@ -5,6 +5,7 @@ import type {
   OrdinaryCardType,
   PlayerState,
 } from '../contract/types'
+import { findPlayerById } from '../domain/player'
 
 type StartOrdinaryCardDrawChoiceInput = {
   playerId: string
@@ -35,7 +36,7 @@ export const startOrdinaryCardDrawChoice = (
   state: GameState,
   input: StartOrdinaryCardDrawChoiceInput,
 ): Result<{ choice: OrdinaryCardDrawChoice }> => {
-  const player = state.players.find((entry) => entry.id === input.playerId)
+  const player = findPlayerById(state, input.playerId)
   if (!player) return { ok: false, error: `unknown player ${input.playerId}` }
   if (!Number.isInteger(input.count) || input.count <= 0) {
     return { ok: false, error: 'draw count must be a positive integer' }
@@ -72,7 +73,7 @@ export const resolveOrdinaryCardDrawChoice = (
   if (!choice.candidates.includes(input.keepCardId)) {
     return { ok: false, error: 'kept card is not in draw choice' }
   }
-  const player = state.players.find((entry) => entry.id === input.playerId)
+  const player = findPlayerById(state, input.playerId)
   if (!player) return { ok: false, error: `unknown player ${input.playerId}` }
   const hand = handFor(player, choice.cardType)
   hand.push(input.keepCardId)

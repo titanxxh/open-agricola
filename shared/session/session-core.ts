@@ -124,7 +124,7 @@ import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-fee
 import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize } from '../domain/player.ts'
+import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
@@ -164,7 +164,6 @@ import {
 } from '../actions/effects/fencing.ts'
 import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { clearAllLinkedSpaceBlocks, findActionSpaceById, isSpaceBlocked, isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
-import { smallestAvailableWorker } from '../domain/player.ts'
 import {
   canEnterSpace,
   computeAllowedPlacementSpaces,
@@ -2244,7 +2243,7 @@ export class GameCore {
     }>>()
     for (const entry of this.state.futureMeeples) {
       if (entry.round !== this.state.round) continue
-      const playerIndex = this.state.players.findIndex((player) => player.id === entry.playerId)
+      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
       if (playerIndex === -1) continue
       const player = this.state.players[playerIndex]!
       if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
@@ -2305,7 +2304,7 @@ export class GameCore {
       }
     }
     for (const [playerId, entries] of [...receiveEntriesByPlayer.entries()].reverse()) {
-      const playerIndex = this.state.players.findIndex((player) => player.id === playerId)
+      const playerIndex = findPlayerIndexById(this.state, playerId)
       if (playerIndex === -1) continue
       children.unshift({
         type: 'leaf',
@@ -2330,7 +2329,7 @@ export class GameCore {
     const resource = raw.resource as keyof Resource
     if (!resourceKeyList.includes(resource) && resource !== 'horse' && resource !== 'fuel') return true
     if (typeof raw.amount !== 'number' || !Number.isFinite(raw.amount)) return true
-    const player = this.state.players.find((candidate) => candidate.id === entry.playerId)
+    const player = findPlayerById(this.state, entry.playerId)
     if (!player) return false
     return (player.resources[resource] ?? 0) >= Math.max(0, Math.floor(raw.amount))
   }
@@ -2339,7 +2338,7 @@ export class GameCore {
     return this.state.futureMeeples
       .filter((entry) =>
         entry.round === this.state.round &&
-        this.state.players.some((player) => player.id === entry.playerId),
+        hasPlayer(this.state, entry.playerId),
       )
       .map((entry) => {
         const resources = this.futureMeepleResourceConditionMet(entry) ? entry.resources : {}
@@ -2857,7 +2856,7 @@ export class GameCore {
       pending?.effectiveOwnerPlayerId ??
       (nodeId ? frame.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerId) : frameOwnerId)
     if (!ownerId) return frame.ownerPlayerIndex
-    const ownerIndex = this.state.players.findIndex((player) => player.id === ownerId)
+    const ownerIndex = findPlayerIndexById(this.state, ownerId)
     return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
   }
 
@@ -4637,7 +4636,7 @@ export class GameCore {
       space.takenBy = []
       space.blockedBy = []
     } else {
-      const player = this.state.players.find((p) => p.id === playerId)
+      const player = findPlayerById(this.state, playerId)
       const worker = player ? smallestAvailableWorker(this.state, player) : null
       space.takenBy = [{ playerId, workerId: worker?.id ?? '1' }]
     }
