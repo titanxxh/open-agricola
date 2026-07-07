@@ -144,6 +144,10 @@ _Avoid_: ActionDefinition、ActionNode
 领域层读取公开行动格的统一查询边界，覆盖按 id 查找、存在判断、按 id 集合保持棋盘顺序过滤、按 worker 定位所在行动格等共享语义。
 _Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推断
 
+**Action Entry Query**:
+会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。
+_Avoid_: Action Space mutation、卡牌购买可用性、RoomPlayer 席位校验、前端本地视角选择
+
 **Season Action Space（季节行动格）**:
 Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。
 _Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space
