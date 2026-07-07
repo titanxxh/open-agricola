@@ -281,6 +281,8 @@ takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | un
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
 
+`shared/session/interaction-state-adapter.ts` 是 `InteractionState` 的服务端投影边界。`GameCore.buildInteraction()` 只传入当前 `GameState` / `EngineStack`、anytime/undo/score 快照和一个 `projectPendingRequest(PendingInteractionProjectionInput)`；具体 animal-reorg zone、farm-select、selection payload 的构造被收敛在该 projection request builder 后面，不作为多个闭包散落到 adapter 输入。viewer redaction (`redactInteractionForViewer`) 消费已经派生好的 `InteractionState`，不参与 pending/request 派生。
+
 ### 4.7 ActionChoiceOption + previews
 
 ```ts

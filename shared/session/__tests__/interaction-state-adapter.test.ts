@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionFlow, InteractionCommand } from '../../contract/types'
+import type { ActionFlow, InteractionCommand, InteractionRequest } from '../../contract/types'
 import {
   ActionNode,
   ActionRegistry,
@@ -17,14 +17,17 @@ import {
   redactInteractionForViewer,
 } from '../interaction-state-adapter'
 
-const pendingStack = (): EngineStack => {
+const pendingStack = (
+  request: InteractionRequest = { kind: 'confirm-next-player', nextPlayerIndex: 1 },
+  promptKey = 'ui.confirmNextPlayer',
+): EngineStack => {
   const root = new ActionNode('interaction:confirm-next-player-1', INTERACTION_ONLY_ACTION_ID)
   root.setPending({
     hostNodeId: root.id,
     pendingActionId: INTERACTION_ONLY_ACTION_ID,
-    request: { kind: 'confirm-next-player', nextPlayerIndex: 1 },
+    request,
     choices: [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-    promptKey: 'ui.confirmNextPlayer',
+    promptKey,
     syntheticKind: 'confirm-next-player',
   })
   const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
@@ -86,12 +89,7 @@ describe('Interaction State Adapter', () => {
       winnerIds: () => [],
       scoreSummary: () => [],
       effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
-      animalReorgZones: () => [],
-      isSelectionPrompt: () => false,
-      buildSelectionInteraction: () => {
-        throw new Error('selection interaction should not be built')
-      },
-      buildFarmInteraction: () => null,
+      projectPendingRequest: ({ request }) => request,
     })
 
     expect(interaction).toMatchObject({
@@ -150,14 +148,14 @@ describe('Interaction State Adapter', () => {
       winnerIds: () => [],
       scoreSummary: () => [],
       effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
-      animalReorgZones: () => [],
-      isSelectionPrompt: () => true,
-      buildSelectionInteraction: () => ({
-        kind: 'farm-position',
-        selectablePositions: [{ row: 0, col: 0 }],
-        maxSelections: 1,
+      projectPendingRequest: () => ({
+        kind: 'selection',
+        selection: {
+          kind: 'farm-position',
+          selectablePositions: [{ row: 0, col: 0 }],
+          maxSelections: 1,
+        },
       }),
-      buildFarmInteraction: () => null,
     })
 
     expect(interaction.stateId).toBe('wait')
@@ -165,5 +163,84 @@ describe('Interaction State Adapter', () => {
     expect(interaction.request.kind).toBe('selection')
     if (interaction.request.kind !== 'selection') return
     expect(interaction.request.options?.map((entry) => entry.value)).toEqual(['confirm'])
+  })
+
+  it('uses the projected request kind for wait commands', () => {
+    const state = createInitialState(1)
+    const interaction = deriveInteractionState({
+      state,
+      engineStack: selectionPendingStack(),
+      getAnytimeEntries: () => [],
+      getAnytimePolicy: () => ({ allowed: false, reason: 'selection-window' }),
+      filterUndoCommands: (commands: readonly InteractionCommand[]) => [...commands],
+      winnerIds: () => [],
+      scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
+      projectPendingRequest: () => ({
+        kind: 'farm-select',
+        farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 0 }] },
+      }),
+    })
+
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId !== 'wait') return
+    expect(interaction.request.kind).toBe('farm-select')
+    expect(interaction.allowedCommands).toEqual(['commitSelection', 'undoStep', 'undoAction'])
+  })
+
+  it('suppresses anytime commands on engine-blocked waits', () => {
+    const state = createInitialState(1)
+    const interaction = deriveInteractionState({
+      state,
+      engineStack: pendingStack(
+        { kind: 'engine-blocked', reasonKey: 'ui.blocked' },
+        'ui.originalPrompt',
+      ),
+      getAnytimeEntries: () => [
+        { descriptor: { id: 'anytime-test', labelKey: 'anytime.test', actionId: 'anytime-test' } },
+      ],
+      getAnytimePolicy: () => ({ allowed: true, reason: 'test' }),
+      filterUndoCommands: (commands: readonly InteractionCommand[]) => [...commands],
+      winnerIds: () => [],
+      scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
+      projectPendingRequest: ({ request }) => request,
+    })
+
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId !== 'wait') return
+    expect(interaction.promptKey).toBe('ui.blocked')
+    expect(interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+    expect(interaction.anytimeActions).toEqual([])
+  })
+
+  it('does not offer the anytime command while an ordinary card draw choice is pending', () => {
+    const state = createInitialState(1)
+    state.ordinaryCardDrawChoices['draw-1'] = {
+      id: 'draw-1',
+      playerId: state.players[0]!.id,
+      cardType: 'minor',
+      candidates: ['A001_Test'],
+    }
+    const interaction = deriveInteractionState({
+      state,
+      engineStack: new EngineStack(),
+      getAnytimeEntries: () => [
+        { descriptor: { id: 'anytime-test', labelKey: 'anytime.test', actionId: 'anytime-test' } },
+      ],
+      getAnytimePolicy: () => ({ allowed: true, reason: 'test' }),
+      filterUndoCommands: (commands: readonly InteractionCommand[]) => [...commands],
+      winnerIds: () => [],
+      scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
+      projectPendingRequest: ({ request }) => request,
+    })
+
+    expect(interaction).toMatchObject({
+      stateId: 'idle',
+      allowedCommands: ['undoStep', 'undoAction'],
+    })
+    expect(interaction.stateId === 'idle' ? interaction.anytimeActions.map((entry) => entry.id) : [])
+      .toEqual(['anytime-test'])
   })
 })

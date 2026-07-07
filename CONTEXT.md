@@ -101,8 +101,8 @@ Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的�
 _Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入
 
 **Interaction State Adapter**:
-会话层把 `GameState`、`EngineStack`、`Pending Envelope` 和 viewer redaction 派生成前端可见 `ClientInteractionState` 的适配模块。它隐藏引擎恢复 cursor、host node metadata 和旧兼容字段；前端只读取 `InteractionState.stateId` 与 `wait.request.kind` 下的结构化数据。
-_Avoid_: 在前端或测试里读取 Pending Envelope metadata、在 `InteractionState.wait` 顶层复制 `request` 字段
+会话层把 `GameState`、`EngineStack`、`Pending Envelope` 和 request projection snapshot 派生成前端可见 `InteractionState` 的适配模块；viewer redaction 消费已完成的 `InteractionState`。它隐藏引擎恢复 cursor、host node metadata、具体 farm/selection/animal request builder 和旧兼容字段；前端只读取 `InteractionState.stateId` 与 `wait.request.kind` 下的结构化数据。
+_Avoid_: 在前端或测试里读取 Pending Envelope metadata、把 farm/selection/animal builder 闭包散传进 adapter、在 `InteractionState.wait` 顶层复制 `request` 字段
 
 **Interaction Command Policy**:
 会话层把 `InteractionRequest.kind` 映射到公开 `allowedCommands` 和服务端提交入口的统一策略；它只回答当前等待交互应走 `resolveChoice`、`commitSelection` 还是无直接提交。
