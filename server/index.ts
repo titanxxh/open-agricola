@@ -260,14 +260,14 @@ const server = createServer(async (req, res) => {
       sendJson(res, 400, result)
       return
     }
-    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = getAuthToken(req)
     if (token) logout(token)
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -278,7 +278,7 @@ const server = createServer(async (req, res) => {
       logoutAll(user.id)
       wssCtx?.closeUserConnections(user.id)
     }
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -289,7 +289,7 @@ const server = createServer(async (req, res) => {
     wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
     const result = deleteAccount(user.id)
     wssCtx?.closeUserConnections(user.id)
-    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -409,7 +409,7 @@ const server = createServer(async (req, res) => {
     const existing = findIdentity(provider, body.providerUserId)
     if (existing) {
       const token = createSession(existing.userId)
-      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
       return
     }
 
