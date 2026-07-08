@@ -557,13 +557,7 @@ export const handleConfirmPlayerSwitchResolved = (
   if (top?.reason === 'confirm-player-switch') core.popEngineFrame()
   const parent = core.peekEngineFrame()
   if (parent) {
-    const returnPlayerStack = parent.deferredPlayerSwitch?.returnPlayerStack
-    parent.deferredPlayerSwitch = {
-      fromPlayerIndex,
-      toPlayerIndex,
-      confirmed: true,
-      returnPlayerStack,
-    }
+    core.confirmCurrentDeferredPlayerSwitch(fromPlayerIndex, toPlayerIndex)
   }
   core.driveEngineSteps()
   return core.emitResponse()
