@@ -4,6 +4,7 @@ export const OAUTH_STATE_COOKIE = 'oa_oauth_state'
 
 type CookieOptions = {
   backendOrigin?: string
+  requestOrigin?: string | string[]
 }
 
 function originUrl(raw: string | undefined): URL | null {
@@ -33,6 +34,19 @@ function secureSuffix(options: CookieOptions = {}): string {
   return apiOrigin?.protocol === 'https:' ? '; Secure' : ''
 }
 
+function partitionedSuffix(options: CookieOptions = {}): string {
+  if (process.env.NODE_ENV !== 'production') return ''
+  const requestOrigin = originUrl(Array.isArray(options.requestOrigin) ? options.requestOrigin[0] : options.requestOrigin)
+  const appOrigin = originUrl(process.env.PUBLIC_APP_ORIGIN)
+  const apiOrigin = originUrl(process.env.PUBLIC_API_BASE) ?? originUrl(options.backendOrigin)
+  return requestOrigin?.origin === appOrigin?.origin &&
+    appOrigin?.protocol === 'https:' &&
+    apiOrigin?.protocol === 'https:' &&
+    appOrigin.origin !== apiOrigin.origin
+    ? '; Partitioned'
+    : ''
+}
+
 export function readCookie(header: string | undefined, name: string): string {
   if (!header) return ''
   for (const part of header.split(';')) {
@@ -48,7 +62,7 @@ export function readCookie(header: string | undefined, name: string): string {
 }
 
 export function serializeSessionCookie(token: string, options: CookieOptions = {}): string {
-  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=604800${secureSuffix(options)}`
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=604800${secureSuffix(options)}${partitionedSuffix(options)}`
 }
 
 export function serializeOnboardingCookie(ticket: string, options: CookieOptions = {}): string {
@@ -60,7 +74,7 @@ export function serializeOAuthStateCookie(state: string, options: CookieOptions 
 }
 
 export function clearSessionCookie(options: CookieOptions = {}): string {
-  return `${SESSION_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}`
+  return `${SESSION_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}${partitionedSuffix(options)}`
 }
 
 export function clearOnboardingCookie(options: CookieOptions = {}): string {

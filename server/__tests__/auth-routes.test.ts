@@ -407,11 +407,17 @@ describe('auth routes', () => {
     process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example'
     process.env.PUBLIC_API_BASE = 'https://api.example'
     await createLocalUserForTests('crosscookie', 'password123', 'Cross Cookie')
-    const res = await requestJson('POST', '/api/auth/login', { username: 'crosscookie', password: 'password123' })
+    const res = await requestJson(
+      'POST',
+      '/api/auth/login',
+      { username: 'crosscookie', password: 'password123' },
+      { Origin: 'https://frontend.example' },
+    )
 
     expect(res.status).toBe(200)
     expect(res.headers['Set-Cookie']).toContain('SameSite=None')
     expect(res.headers['Set-Cookie']).toContain('Secure')
+    expect(res.headers['Set-Cookie']).toContain('Partitioned')
   })
 
   it('keeps same-site production cookies on SameSite=Lax', async () => {
@@ -419,11 +425,17 @@ describe('auth routes', () => {
     process.env.PUBLIC_APP_ORIGIN = 'https://app.example'
     process.env.PUBLIC_API_BASE = 'https://app.example'
     await createLocalUserForTests('samecookie', 'password123', 'Same Cookie')
-    const res = await requestJson('POST', '/api/auth/login', { username: 'samecookie', password: 'password123' })
+    const res = await requestJson(
+      'POST',
+      '/api/auth/login',
+      { username: 'samecookie', password: 'password123' },
+      { Origin: 'https://app.example' },
+    )
 
     expect(res.status).toBe(200)
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
     expect(res.headers['Set-Cookie']).toContain('Secure')
+    expect(res.headers['Set-Cookie']).not.toContain('Partitioned')
   })
 
   it('uses request-derived backend origin for cross-site production cookies without PUBLIC_API_BASE', async () => {
@@ -434,12 +446,13 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/login',
       { username: 'reqcookie', password: 'password123' },
-      { Host: 'api.example', 'X-Forwarded-Proto': 'https' },
+      { Host: 'api.example', 'X-Forwarded-Proto': 'https', Origin: 'https://frontend.example' },
     )
 
     expect(res.status).toBe(200)
     expect(res.headers['Set-Cookie']).toContain('SameSite=None')
     expect(res.headers['Set-Cookie']).toContain('Secure')
+    expect(res.headers['Set-Cookie']).toContain('Partitioned')
   })
 
   it('keeps production-env cookies usable on http dev launch origins', async () => {
@@ -450,12 +463,13 @@ describe('auth routes', () => {
       'POST',
       '/api/auth/login',
       { username: 'httpcookie', password: 'password123' },
-      { Host: 'frontend.example:5175', 'X-Forwarded-Proto': 'http' },
+      { Host: 'frontend.example:5175', 'X-Forwarded-Proto': 'http', Origin: 'http://frontend.example:5173' },
     )
 
     expect(res.status).toBe(200)
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
     expect(res.headers['Set-Cookie']).not.toContain('Secure')
+    expect(res.headers['Set-Cookie']).not.toContain('Partitioned')
   })
 
   it('password registration creates an unverified user and sends verification mail', async () => {
@@ -1157,6 +1171,7 @@ describe('auth routes', () => {
 
     expect(callback.status).toBe(302)
     expect(callback.headers['Set-Cookie']).toContain('oa_session=')
+    expect(callback.headers['Set-Cookie']).not.toContain('Partitioned')
   })
 
   it('rejects inviteCode body after intent=login onboarding for an unlinked identity', async () => {

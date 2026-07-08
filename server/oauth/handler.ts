@@ -376,7 +376,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     ...(profile.returnTo ? { returnTo: appRelativeReturnTo(profile.returnTo) } : {}),
   }, {
     'Set-Cookie': [
-      serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
+      serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
       clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),
     ],
   })
