@@ -101,6 +101,15 @@ const createAction = (id: string, nameKey = `actions.${id}.name`): ActionSpace =
   takenBy: [],
 })
 
+const projectedTile = (
+  projection: ReturnType<typeof buildFarmBoardProjection>,
+  tileKey: string,
+) => {
+  const cell = projection.farmCells.find((candidate) => candidate.tileKey === tileKey)
+  expect(cell).toBeDefined()
+  return cell!
+}
+
 type PlayerStateWithSpecialStables = PlayerState & {
   specialStables: { sourceCardId: string; position: FarmTilePosition }[]
 }
@@ -132,20 +141,20 @@ describe('buildFarmBoardProjection', () => {
 
     expect(projection.farmGridColumns).toBe(11)
     expect(projection.farmCells).toHaveLength(99)
-    expect(projection.farmCells).toContainEqual({
+    expect(projection.farmCells).toContainEqual(expect.objectContaining({
       key: '1-1',
       type: 'tile',
       tileRow: -1,
       tileCol: 0,
       fenceId: undefined,
-    })
-    expect(projection.farmCells).toContainEqual({
+    }))
+    expect(projection.farmCells).toContainEqual(expect.objectContaining({
       key: '0-1',
       type: 'fence-h',
       tileRow: undefined,
       tileCol: undefined,
       fenceId: 'H--1-0',
-    })
+    }))
     expect(projection.roomPositions).toEqual(new Set(['2-0']))
     expect(projection.fieldMap.get('0-1')).toEqual({ stacks })
     expect(projection.stablePositions).toEqual(new Set(['-1-0']))
@@ -177,13 +186,13 @@ describe('buildFarmBoardProjection', () => {
     })
 
     expect(projection.farmGridColumns).toBe(13)
-    expect(projection.farmCells).toContainEqual({
+    expect(projection.farmCells).toContainEqual(expect.objectContaining({
       key: '1-11',
       type: 'tile',
       tileRow: -2,
       tileCol: 5,
       fenceId: undefined,
-    })
+    }))
   })
 
   it('does not expand layout for another player farm-position selection', () => {
@@ -309,6 +318,108 @@ describe('buildFarmBoardProjection', () => {
         groupKey: 'forest',
       },
     ])
+  })
+
+  it('projects render-ready tile cells for farm board rendering', () => {
+    const stacks = [{ kind: 'grain' as const, remaining: 2 }]
+    const player = createPlayer({
+      roomTiles: [{ row: 0, col: 0 }],
+      fields: [{ row: 0, col: 1, stacks }],
+      stableTiles: [{ row: 1, col: 0 }],
+      farmTerrain: [{ row: 1, col: 1, kind: 'forest' }],
+      farmyardSpaceStates: [{
+        spaceKey: '1-1',
+        sourceCardId: 'LockCard',
+        kind: 'blocked-farmyard-space',
+        blocksPlacement: true,
+      }],
+      cardStates: {
+        MarkerCard: {
+          extraData: {
+            farmTerrainMarkers: [{ row: 1, col: 1, kind: 'person', workerId: 'worker-1' }],
+          },
+        },
+      },
+    })
+
+    const roomProjection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      farmInteraction: {
+        farmType: 'room',
+        selectableTiles: [{ row: 0, col: 1 }],
+        maxSelections: 1,
+      },
+      selectionInteraction: {
+        kind: 'farm-position',
+        selectablePositions: [{ row: 1, col: 1 }],
+        maxSelections: 1,
+      },
+      players: [player],
+      pendingRoomTiles: [{ row: 0, col: 1 }],
+    })
+
+    expect(projectedTile(roomProjection, '0-0')).toMatchObject({
+      tileKey: '0-0',
+      isRoom: true,
+      isField: false,
+      isStable: false,
+    })
+    expect(projectedTile(roomProjection, '0-1')).toMatchObject({
+      tileKey: '0-1',
+      isField: true,
+      fieldInfo: { stacks },
+      isPendingRoom: true,
+      isRoomSelectable: true,
+    })
+    expect(projectedTile(roomProjection, '1-0')).toMatchObject({
+      tileKey: '1-0',
+      isStable: true,
+    })
+    expect(projectedTile(roomProjection, '1-1')).toMatchObject({
+      tileKey: '1-1',
+      terrain: { row: 1, col: 1, kind: 'forest' },
+      terrainMarkers: [{ row: 1, col: 1, kind: 'person', workerId: 'worker-1', sourceCard: 'MarkerCard' }],
+      isPositionSelectable: true,
+      isLocked: true,
+    })
+
+    const sowProjection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      farmInteraction: {
+        farmType: 'sow',
+        selectableFields: [{ tile: { row: 0, col: 1 }, allowedCrops: ['grain', 'vegetable'] }],
+      },
+      selectionInteraction: null,
+      players: [player],
+    })
+
+    expect(projectedTile(sowProjection, '0-1')).toMatchObject({
+      sowSelectableCrops: ['grain', 'vegetable'],
+    })
+
+    const stableProjection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction: idleInteraction(),
+      farmInteraction: {
+        farmType: 'stable',
+        selectableTiles: [{ row: 1, col: 0 }, { row: 2, col: 2 }],
+        maxSelections: 1,
+      },
+      selectionInteraction: null,
+      players: [player],
+      pendingStableTiles: [{ row: 1, col: 0 }],
+    })
+
+    expect(projectedTile(stableProjection, '1-0')).toMatchObject({
+      isPendingStable: true,
+      isStableSelectable: true,
+    })
+    expect(projectedTile(stableProjection, '2-2')).toMatchObject({
+      isPendingStable: false,
+      isStableSelectable: false,
+    })
   })
 
   it('projects animal displays for farm board props', () => {
