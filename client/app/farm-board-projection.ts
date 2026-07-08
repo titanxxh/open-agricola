@@ -55,6 +55,20 @@ export type FarmBoardProjectionCell = {
   tileRow?: number
   tileCol?: number
   fenceId?: string
+  tileKey?: string
+  isRoom?: boolean
+  isField?: boolean
+  isStable?: boolean
+  fieldInfo?: FarmBoardProjectionFieldInfo
+  terrain?: NonNullable<PlayerState['farmTerrain']>[number]
+  terrainMarkers?: FarmBoardProjectionTerrainMarker[]
+  isPendingRoom?: boolean
+  isPendingStable?: boolean
+  isRoomSelectable?: boolean
+  isStableSelectable?: boolean
+  isPositionSelectable?: boolean
+  sowSelectableCrops?: PendingSowCrop[]
+  isLocked?: boolean
 }
 
 export type FarmBoardProjectionFieldInfo = { stacks: CropStack[] }
@@ -461,6 +475,72 @@ const buildSowSelectionDisplay = (
   return { sowSelectableMap, extraSowTargets }
 }
 
+const buildFarmTerrainMap = (
+  displayPlayer: PlayerState | null | undefined,
+): Map<string, NonNullable<PlayerState['farmTerrain']>[number]> =>
+  new Map((displayPlayer?.farmTerrain ?? []).map((tile) => [positionKey(tile), tile]))
+
+const attachTileRenderState = (
+  farmCells: FarmBoardProjectionCell[],
+  {
+    terrainMap,
+    roomPositions,
+    fieldMap,
+    stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    positionSelectableSet,
+    sowSelectableMap,
+    lockedTileKeys,
+    farmTerrainMarkerMap,
+    farmInteraction,
+  }: {
+    terrainMap: Map<string, NonNullable<PlayerState['farmTerrain']>[number]>
+    roomPositions: Set<string>
+    fieldMap: Map<string, FarmBoardProjectionFieldInfo>
+    stablePositions: Set<string>
+    pendingRoomSet: Set<string>
+    pendingStableSet: Set<string>
+    roomSelectableSet: Set<string>
+    stableSelectableSet: Set<string>
+    positionSelectableSet: Set<string>
+    sowSelectableMap: Map<string, PendingSowCrop[]>
+    lockedTileKeys: Set<string>
+    farmTerrainMarkerMap: Map<string, FarmBoardProjectionTerrainMarker[]>
+    farmInteraction: InteractionFarmSelection | null | undefined
+  },
+): FarmBoardProjectionCell[] => {
+  const maxStableSelections =
+    farmInteraction?.farmType === 'stable' ? farmInteraction.maxSelections : 0
+  const maxStableReached =
+    maxStableSelections > 0 && pendingStableSet.size >= maxStableSelections
+  return farmCells.map((cell) => {
+    if (cell.type !== 'tile' || cell.tileRow === undefined || cell.tileCol === undefined) return cell
+    const tileKey = positionKey({ row: cell.tileRow, col: cell.tileCol })
+    const isPendingStable = pendingStableSet.has(tileKey)
+    return {
+      ...cell,
+      tileKey,
+      isRoom: roomPositions.has(tileKey),
+      isField: fieldMap.has(tileKey),
+      isStable: stablePositions.has(tileKey),
+      fieldInfo: fieldMap.get(tileKey),
+      terrain: terrainMap.get(tileKey),
+      terrainMarkers: farmTerrainMarkerMap.get(tileKey) ?? [],
+      isPendingRoom: pendingRoomSet.has(tileKey),
+      isPendingStable,
+      isRoomSelectable: roomSelectableSet.has(tileKey),
+      isStableSelectable:
+        stableSelectableSet.has(tileKey) && (!maxStableReached || isPendingStable),
+      isPositionSelectable: positionSelectableSet.has(tileKey),
+      sowSelectableCrops: sowSelectableMap.get(tileKey) ?? [],
+      isLocked: lockedTileKeys.has(tileKey),
+    }
+  })
+}
+
 const buildHouseDisplay = (
   displayPlayer: PlayerState | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
@@ -636,6 +716,7 @@ export const buildFarmBoardProjection = ({
   const lockedTileKeys = displayPlayer ? collectLockedFarmTileKeys(displayPlayer) : new Set<string>()
   const publicCardMarkers = displayPlayer ? readAllPublicCardMarkers(displayPlayer) : []
   const farmTerrainMarkerMap = buildFarmTerrainMarkerMap(displayPlayer)
+  const terrainMap = buildFarmTerrainMap(displayPlayer)
   const parentCardDisplays = buildParentCardDisplays(displayPlayer)
   const playedCardDisplays = buildPlayedCardDisplays(displayPlayer)
   if (!displayPlayer) {
@@ -674,8 +755,23 @@ export const buildFarmBoardProjection = ({
     }
   }
   const farmGrid = buildFarmCells(displayPlayer, interaction, selectionInteraction, players)
+  const farmCells = attachTileRenderState(farmGrid.cells, {
+    terrainMap,
+    roomPositions,
+    fieldMap,
+    stablePositions,
+    pendingRoomSet,
+    pendingStableSet,
+    roomSelectableSet,
+    stableSelectableSet,
+    positionSelectableSet,
+    sowSelectableMap,
+    lockedTileKeys,
+    farmTerrainMarkerMap,
+    farmInteraction,
+  })
   return {
-    farmCells: farmGrid.cells,
+    farmCells,
     farmGridColumns: farmGrid.columns,
     roomPositions,
     fieldMap,
