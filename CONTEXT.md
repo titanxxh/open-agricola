@@ -44,6 +44,10 @@ _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选
 多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
 _Avoid_: PlayerState
 
+**Room Persistence Checkpoint**:
+房间层在创建、入座、状态广播、重开、载入和结束时保存或终结房间持久化记录的统一口径。它决定写入完整 `GameState` 还是只更新 room meta，并保持持久化 adapter 只负责存取，不负责业务时机。
+_Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
+
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
 _Avoid_: PlayerState

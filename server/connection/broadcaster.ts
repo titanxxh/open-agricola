@@ -1,11 +1,9 @@
 import type { WebSocket } from 'ws'
 import type { Room } from '../game/room.ts'
-import { toRoomMeta } from '../game/room.ts'
 import type { SessionResponse } from '../game/authoritative-session.ts'
-import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
+import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
-import { serializeState } from '../../shared/session/serialization.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 
 const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): string | null => {
@@ -14,15 +12,12 @@ const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): 
 }
 
 export class Broadcaster {
-  private readonly persistence: RoomPersistence
-  private readonly shouldPersist: (room: Room) => boolean
+  private readonly checkpoint: RoomPersistenceCheckpoint
 
   constructor(deps: {
-    persistence: RoomPersistence
-    shouldPersist?: (room: Room) => boolean
+    checkpoint: RoomPersistenceCheckpoint
   }) {
-    this.persistence = deps.persistence
-    this.shouldPersist = deps.shouldPersist ?? (() => true)
+    this.checkpoint = deps.checkpoint
   }
 
   broadcastState(room: Room, resp: SessionResponse, cause: StateUpdateCause, requestId?: string): void {
@@ -41,15 +36,9 @@ export class Broadcaster {
       })
       seat.ws.send(JSON.stringify(env))
     }
-    if (this.shouldPersist(room)) {
-      this.persistence.save(
-        room.id,
-        serializeState(resp.state, { engineStack: room.session.getEngineStack() }),
-        toRoomMeta(room),
-      )
-    }
+    this.checkpoint.recordState(room, resp.state)
     if ((resp.state as { gameOver?: boolean }).gameOver) {
-      this.persistence.markFinished(room.id, Date.now())
+      this.checkpoint.recordFinished(room.id)
     }
   }
 

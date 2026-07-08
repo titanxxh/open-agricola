@@ -4,6 +4,7 @@ import { GameSession } from '../../game/authoritative-session.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import { isFixedDevRoom } from '../../game/room.ts'
 import type { Room } from '../../game/room.ts'
+import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 
 const makeFakeWs = () => {
   const sent: string[] = []
@@ -30,7 +31,7 @@ const makeRoom = (id: string, playerCount = 2): Room => {
 describe('Broadcaster.broadcastState', () => {
   it('sends one envelope per seated player and bumps version', () => {
     const persistence = new InMemoryRoomPersistence()
-    const b = new Broadcaster({ persistence })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence }) })
     const room = makeRoom('r1')
     const resp = room.session.withCtx(() => room.session.getState())
     b.broadcastState(room, resp, 'action', 'req-1')
@@ -48,7 +49,7 @@ describe('Broadcaster.broadcastState', () => {
   it('persists state on each broadcast (default shouldPersist=true)', () => {
     const persistence = new InMemoryRoomPersistence()
     const saveSpy = vi.spyOn(persistence, 'save')
-    const b = new Broadcaster({ persistence })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence }) })
     const room = makeRoom('r1')
     const resp = room.session.withCtx(() => room.session.getState())
     b.broadcastState(room, resp, 'action')
@@ -59,8 +60,10 @@ describe('Broadcaster.broadcastState', () => {
     const persistence = new InMemoryRoomPersistence()
     const saveSpy = vi.spyOn(persistence, 'save')
     const b = new Broadcaster({
-      persistence,
-      shouldPersist: (room) => isFixedDevRoom(room.id),
+      checkpoint: createRoomPersistenceCheckpoint({
+        persistence,
+        shouldPersist: (room) => isFixedDevRoom(room.id),
+      }),
     })
     const r1 = makeRoom('r1')
     b.broadcastState(r1, r1.session.withCtx(() => r1.session.getState()), 'action')
@@ -73,7 +76,7 @@ describe('Broadcaster.broadcastState', () => {
   it('marks finished when game ends', () => {
     const persistence = new InMemoryRoomPersistence()
     const markSpy = vi.spyOn(persistence, 'markFinished')
-    const b = new Broadcaster({ persistence })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence }) })
     const room = makeRoom('r1')
     const resp = room.session.withCtx(() => room.session.getState())
     ;(resp.state as { gameOver?: boolean }).gameOver = true
@@ -84,7 +87,7 @@ describe('Broadcaster.broadcastState', () => {
 
 describe('Broadcaster.sendStateTo / broadcastEvent / sendTo', () => {
   it('sendStateTo sends a single envelope with cause=reconnect', () => {
-    const b = new Broadcaster({ persistence: new InMemoryRoomPersistence() })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence: new InMemoryRoomPersistence() }) })
     const room = makeRoom('r1')
     const seat = room.players[0]!
     const resp = room.session.withCtx(() => room.session.getState())
@@ -97,7 +100,7 @@ describe('Broadcaster.sendStateTo / broadcastEvent / sendTo', () => {
   })
 
   it('broadcastEvent sends to all open sockets', () => {
-    const b = new Broadcaster({ persistence: new InMemoryRoomPersistence() })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence: new InMemoryRoomPersistence() }) })
     const room = makeRoom('r1')
     b.broadcastEvent(room, { type: 'gameStarted' })
     for (const seat of room.players) {
@@ -107,7 +110,7 @@ describe('Broadcaster.sendStateTo / broadcastEvent / sendTo', () => {
   })
 
   it('sendTo skips closed sockets', () => {
-    const b = new Broadcaster({ persistence: new InMemoryRoomPersistence() })
+    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence: new InMemoryRoomPersistence() }) })
     const ws = makeFakeWs()
     ws.readyState = 3 // CLOSED
     b.sendTo(ws as never, { type: 'gameStarted' })

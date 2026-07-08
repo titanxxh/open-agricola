@@ -1,5 +1,5 @@
 import type { RoomSummary, ServerEvent } from '../../shared/contract/protocol/ws.ts'
-import type { RoomPersistence } from './persistence/room-persistence.ts'
+import type { RoomPersistenceCheckpoint } from './room-persistence-checkpoint.ts'
 import { RoomRegistry } from './room-registry.ts'
 import {
   isFixedDevRoom,
@@ -19,10 +19,10 @@ export type Lobby = {
 
 export function createLobby(deps: {
   registry: RoomRegistry
-  persistence: RoomPersistence
+  checkpoint: RoomPersistenceCheckpoint
   broadcaster: RoomBroadcaster
 }): Lobby {
-  const { registry, persistence, broadcaster } = deps
+  const { registry, checkpoint, broadcaster } = deps
   return {
     getRooms(limit?: number) {
       return summarizeRoomsForLobby(registry.iter(), limit)
@@ -38,7 +38,7 @@ export function createLobby(deps: {
       }
       registry.delete(roomId)
       registry.clearActivity(roomId)
-      persistence.delete(roomId)
+      checkpoint.deleteRoom(roomId)
       return { ok: true }
     },
     endRoomsForUser(userId, affectedRoomIds = []) {
@@ -55,7 +55,7 @@ export function createLobby(deps: {
         }
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        persistence.markFinished(room.id, now)
+        checkpoint.recordFinished(room.id, now)
         endedRoomIds.push(room.id)
       }
       return { endedRoomIds }
