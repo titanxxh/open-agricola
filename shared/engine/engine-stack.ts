@@ -109,6 +109,41 @@ export class EngineStack {
     return this.frames[this.frames.length - 1]
   }
 
+  replaceCurrentFrameEngine(engine: Engine, source: EngineSource): boolean {
+    const frame = this.current()
+    if (!frame) return false
+    frame.engine = engine
+    frame.source = source
+    return true
+  }
+
+  setDeferredPlayerSwitch(deferredPlayerSwitch: NonNullable<EngineFrame['deferredPlayerSwitch']>): boolean {
+    const frame = this.current()
+    if (!frame) return false
+    frame.deferredPlayerSwitch = deferredPlayerSwitch
+    return true
+  }
+
+  clearDeferredPlayerSwitch(): boolean {
+    const frame = this.current()
+    if (!frame) return false
+    frame.deferredPlayerSwitch = null
+    return true
+  }
+
+  confirmDeferredPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): boolean {
+    const frame = this.current()
+    if (!frame) return false
+    const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
+    frame.deferredPlayerSwitch = {
+      fromPlayerIndex,
+      toPlayerIndex,
+      confirmed: true,
+      returnPlayerStack,
+    }
+    return true
+  }
+
   depth(): number {
     return this.frames.length
   }

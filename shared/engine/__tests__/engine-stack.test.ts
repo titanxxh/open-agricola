@@ -80,6 +80,45 @@ describe('EngineStack', () => {
     expect(rebuilt.current()!.ownerPlayerIndex).toBe(1)
     expect(rebuilt.current()!.reason).toBe('reorganize')
   })
+
+  it('replaces the current frame engine and source together', () => {
+    const stack = new EngineStack()
+    const frame = makeFrame()
+    const nextEngine = makeEngine()
+    const nextSource = { kind: 'flow' as const, flow: { type: 'seq' as const, children: [] } }
+    stack.push(frame)
+
+    expect(stack.replaceCurrentFrameEngine(nextEngine, nextSource)).toBe(true)
+    expect(stack.current()!.engine).toBe(nextEngine)
+    expect(stack.current()!.source).toBe(nextSource)
+  })
+
+  it('updates deferred player switch state through named operations', () => {
+    const stack = new EngineStack()
+    stack.push(makeFrame())
+
+    expect(stack.setDeferredPlayerSwitch({
+      fromPlayerIndex: 0,
+      toPlayerIndex: 1,
+      returnPlayerStack: [2],
+    })).toBe(true)
+    expect(stack.current()!.deferredPlayerSwitch).toEqual({
+      fromPlayerIndex: 0,
+      toPlayerIndex: 1,
+      returnPlayerStack: [2],
+    })
+
+    expect(stack.confirmDeferredPlayerSwitch(0, 1)).toBe(true)
+    expect(stack.current()!.deferredPlayerSwitch).toEqual({
+      fromPlayerIndex: 0,
+      toPlayerIndex: 1,
+      confirmed: true,
+      returnPlayerStack: [2],
+    })
+
+    expect(stack.clearDeferredPlayerSwitch()).toBe(true)
+    expect(stack.current()!.deferredPlayerSwitch).toBeNull()
+  })
 })
 
 describe('EngineStack query/write delegation', () => {
