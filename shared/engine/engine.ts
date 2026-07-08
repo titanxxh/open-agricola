@@ -21,6 +21,7 @@ import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
+import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import { EventStore } from '../events/store'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { EngineInternals } from './engine-internals'
@@ -34,6 +35,12 @@ import {
 } from './engine-utils'
 import { engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
+
+type EngineDeps = {
+  registry: ActionRegistry
+  hooks: HookDispatcher
+  log: LogStore
+}
 
 type EngineContext = {
   state: GameState
@@ -254,6 +261,61 @@ export class Engine {
   private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
 
+  static fromRoot(root: EngineNode, deps: EngineDeps): Engine {
+    return new Engine({ tree: new EngineTree(root), ...deps })
+  }
+
+  static fromFlow(flow: ActionFlow, deps: EngineDeps, ownerPlayerId?: string): Engine {
+    const engine = new Engine({
+      tree: new EngineTree(new SequenceNode('flow-root-placeholder', [])),
+      ...deps,
+    })
+    engine.tree.root = buildFlowNode(engine._internals(), flow, ownerPlayerId, undefined, 'session')
+    return engine
+  }
+
+  static fromAction(actionId: string, deps: EngineDeps, ownerPlayerId?: string): Engine {
+    const action = deps.registry.get(actionId)
+    if (action?.flow) return Engine.fromFlow(action.flow, deps, ownerPlayerId)
+    const actionNode = new ActionNode(`action-${actionId}`, actionId)
+    const root = action?.resolveChoice
+      ? new SequenceNode(`seq-${actionId}`, [actionNode])
+      : actionNode
+    return Engine.fromRoot(root, deps)
+  }
+
+  static fromPendingEnvelope(
+    envelope: PendingEnvelope,
+    deps: EngineDeps,
+    ownerPlayerId?: string,
+  ): Engine {
+    const root = new ActionNode(envelope.hostNodeId, INTERACTION_ONLY_ACTION_ID)
+    root.ownerPlayerId = ownerPlayerId
+    root.setPending({
+      ...envelope,
+      hostNodeId: root.id,
+      pendingActionId: INTERACTION_ONLY_ACTION_ID,
+      ownerNodeId: envelope.ownerNodeId ?? null,
+      effectiveOwnerPlayerId: envelope.effectiveOwnerPlayerId ?? ownerPlayerId,
+      syntheticKind: envelope.syntheticKind ?? 'interaction-only',
+    })
+    return Engine.fromRoot(root, deps)
+  }
+
+  static fromBuiltNodes(
+    deps: EngineDeps,
+    build: (internals: EngineInternals) => EngineNode[],
+  ): Engine | null {
+    const staging = new Engine({
+      tree: new EngineTree(new SequenceNode('built-nodes-placeholder', [])),
+      ...deps,
+    })
+    const nodes = build(staging._internals())
+    if (nodes.length === 0) return null
+    const root = nodes.length === 1 ? nodes[0]! : new SequenceNode('built-nodes-seq', nodes)
+    return Engine.fromRoot(root, deps)
+  }
+
   /**
    * S4c PR5 — return a boxed snapshot of the engine's core mutable fields,
    * for use by module-private functions in `engine-utils.ts` /
@@ -363,6 +425,33 @@ export class Engine {
    */
   peekNextUnresolvedNodeId(): string | null {
     return this.tree.nextUnresolved()?.id ?? null
+  }
+
+  peekNextDriverStep(): {
+    nextNodeId: string | null
+    activeActionContext?: Record<string, unknown>
+  } {
+    const nextNode = this.tree.nextUnresolved()
+    return {
+      nextNodeId: nextNode?.id ?? null,
+      ...(nextNode instanceof ActionNode ? { activeActionContext: nextNode.actionContext } : {}),
+    }
+  }
+
+  acknowledgePendingActionRequest(): void {
+    const pendingHost = this.peekPendingHost()
+    if (!(pendingHost instanceof ActionNode)) return
+    pendingHost.clearPending()
+    pendingHost.emittedRequest = undefined
+    pendingHost.resolve({ type: 'ok' })
+  }
+
+  hasPendingHostRequiringExternalResolution(pendingActionCanResolve: boolean): boolean {
+    const pendingHost = this.peekPendingHost()
+    return pendingHost?.getPending() !== null &&
+      !(pendingHost instanceof OrNode) &&
+      !(pendingHost instanceof XorNode) &&
+      !pendingActionCanResolve
   }
 
   flushEventTransaction(context: EngineContext): void {

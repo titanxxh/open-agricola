@@ -651,12 +651,31 @@ export function buildFlowNode(
   flow: ActionFlow,
   ownerPlayerId?: string,
   inheritedOptionId?: string,
+  idStyle: 'flow' | 'session' = 'flow',
 ): EngineNode {
   const optionId = flow.optionId ?? inheritedOptionId
   const nextId = () => `flow-${int.counterRef.value++}`
+  const nextActionId = (actionId: string) =>
+    idStyle === 'session'
+      ? `action-${actionId}-${int.counterRef.value++}`
+      : nextId()
+  const nextSequenceId = (actionId?: string) =>
+    idStyle === 'session'
+      ? actionId
+        ? `seq-${actionId}-${int.counterRef.value++}`
+        : `seq-${int.counterRef.value++}`
+      : nextId()
+  const nextCompositeId = (prefix: 'par' | 'or' | 'xor') =>
+    idStyle === 'session'
+      ? `${prefix}-${int.counterRef.value++}`
+      : nextId()
+  const attachCompositeChoiceLabel = (node: EngineNode, source: ActionFlow): EngineNode =>
+    idStyle === 'session' && !source.optionId
+      ? node
+      : attachChoiceLabel(node, source.choiceLabelKey, source.choiceLabelParams)
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
-    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId, optionId)
+    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId, optionId, idStyle)
     return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
@@ -668,14 +687,14 @@ export function buildFlowNode(
           flow.actionContext,
           flow.sourceCard,
         )
-        return buildFlowNode(int, inner, ownerPlayerId, optionId)
+        return buildFlowNode(int, inner, ownerPlayerId, optionId, idStyle)
       }
       // Fallback: action has no inner flow (plain leaf action like
       // grain-seeds / day-laborer / traveling-players). Drop into the
       // standard ActionNode path below.
     }
     const actionNode = new ActionNode(
-      nextId(),
+      nextActionId(flow.actionId),
       flow.actionId,
       flow.sourceCard,
       flow.params,
@@ -686,24 +705,25 @@ export function buildFlowNode(
     )
     const definition = int.registry.get(flow.actionId)
     if (definition?.resolveChoice && !definition.skipChoiceWrap) {
-      const sequence = new SequenceNode(nextId(), [actionNode])
+      const sequence = new SequenceNode(nextSequenceId(flow.actionId), [actionNode])
       const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
       return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
-  const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId, optionId))
+  const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId, optionId, idStyle))
   if (flow.type === 'seq') {
-    const sequence = new SequenceNode(nextId(), children)
+    const sequence = new SequenceNode(nextSequenceId(), children)
     const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
-    return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+    return attachCompositeChoiceLabel(node, flow)
   }
   if (flow.type === 'parallel') {
-    const parallel = new ParallelNode(nextId(), children)
+    const parallel = new ParallelNode(nextCompositeId('par'), children)
     if (flow.mode === 'trigger-select') {
       parallel.mode = 'trigger-select'
       parallel.resolveAfterSelection = flow.triggerSelectOnce === true
+      parallel.triggerOwnerPlayerId = ownerPlayerId
       parallel.triggerChildren = children.map((child, index) => ({
         nodeId: child.id,
         cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
@@ -712,16 +732,16 @@ export function buildFlowNode(
       }))
     }
     const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
-    return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+    return attachCompositeChoiceLabel(node, flow)
   }
   if (flow.type === 'xor') {
-    const xor = new XorNode(nextId(), children, flow.promptKey)
+    const xor = new XorNode(nextCompositeId('xor'), children, flow.promptKey)
     const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
-    return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+    return attachCompositeChoiceLabel(node, flow)
   }
-  const or = new OrNode(nextId(), children, flow.promptKey)
+  const or = new OrNode(nextCompositeId('or'), children, flow.promptKey)
   const node = flow.optional ? markOptional(or, flow.promptKey) : or
-  return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+  return attachCompositeChoiceLabel(node, flow)
 }
 
 export function buildOwnedFlowNode(
