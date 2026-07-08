@@ -15,7 +15,6 @@ import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
-import { buildGameSyncPayload } from './game/sync-payload.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -206,12 +205,7 @@ const respondWith = (
   session: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
-  return buildGameSyncPayload({
-    session,
-    resp,
-    viewerPlayerId,
-    mode: viewerPlayerId === null ? 'debug' : 'viewer',
-  })
+  return session.buildSyncPayload(resp, viewerPlayerId, viewerPlayerId === null ? 'debug' : 'viewer')
 }
 
 export const handleGameRoute = async (
