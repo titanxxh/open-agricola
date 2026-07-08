@@ -525,12 +525,18 @@ export const handleGameRoute = async (
     let customCardDbIds: string[] = []
     let playerCount = 2
     let deckIds = [...defaultSandboxDeckIds]
+    let enableThroughTheSeasons = false
+    let enableFarmersOfTheMoor = false
+    let allowIncompleteFarmersOfTheMoorMinorDeal = false
     try {
       const body = JSON.parse(await readBody(req)) as {
         seed?: number
         customCardIds?: string[]
         playerCount?: number
         deckIds?: string[]
+        enableThroughTheSeasons?: boolean
+        enableFarmersOfTheMoor?: boolean
+        allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
       }
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
@@ -550,6 +556,9 @@ export const handleGameRoute = async (
           deckIds = Array.from(new Set(nextDecks)) as typeof deckIds
         }
       }
+      enableThroughTheSeasons = body.enableThroughTheSeasons === true
+      enableFarmersOfTheMoor = body.enableFarmersOfTheMoor === true
+      allowIncompleteFarmersOfTheMoorMinorDeal = enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true
     } catch { /* ignore */ }
 
     // Identify the requesting user (optional — allows loading own draft cards)
@@ -602,6 +611,9 @@ export const handleGameRoute = async (
         playerCount,
         deckIds,
         playerNames: [...defaultSandboxPlayerNames].slice(0, playerCount),
+        enableThroughTheSeasons,
+        enableFarmersOfTheMoor,
+        allowIncompleteFarmersOfTheMoorMinorDeal,
       },
     )
     setSessionForRequest(req, sandboxSession)

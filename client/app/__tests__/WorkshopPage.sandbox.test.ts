@@ -1,11 +1,27 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 
-import { SANDBOX_PLAYER_COUNTS, buildSandboxCardIds, readSandboxStartResponse } from '../WorkshopPage'
+import { SANDBOX_PLAYER_COUNTS, buildSandboxCardIds, normalizeSandboxSettings, readSandboxStartResponse } from '../WorkshopPage'
 
 describe('WorkshopPage sandbox launch helpers', () => {
   it('offers sandbox player counts from 2 to 6', () => {
     expect(SANDBOX_PLAYER_COUNTS).toEqual([2, 3, 4, 5, 6])
+  })
+
+  it('keeps six-player and variant settings from the API', () => {
+    expect(normalizeSandboxSettings({
+      player_count: 6,
+      deck_ids: ['A'],
+      enable_through_the_seasons: true,
+      enable_farmers_of_the_moor: true,
+      allow_incomplete_farmers_of_the_moor_minor_deal: true,
+    })).toEqual({
+      player_count: 6,
+      deck_ids: ['A'],
+      enable_through_the_seasons: true,
+      enable_farmers_of_the_moor: true,
+      allow_incomplete_farmers_of_the_moor_minor_deal: true,
+    })
   })
 
   it('includes the newly saved card id when launching before React state refreshes', () => {
