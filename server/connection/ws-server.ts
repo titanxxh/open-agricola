@@ -21,7 +21,7 @@ import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { dispatch } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
-import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
+import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
 
@@ -135,7 +135,8 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
     return
   }
 
-  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
+  const token = cookieTokens.find(candidate => validateSession(candidate)) ?? cookieTokens[0] ?? ''
   const user = validateSession(token)
   const ctx = createConnectionCtx(ws, deps, ALLOW_ANONYMOUS_WS || !!user, user?.id)
   let trackedUserId = user?.id
