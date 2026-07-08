@@ -912,13 +912,6 @@ function AbilityPanel({
     void sendMessages(chatHistory, promptSnapshot)
   }, [streaming, config, messages, sendMessages])
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
   return (
     <div className="ai-ability-panel">
       <div className="ai-ability-panel-header">
@@ -1021,8 +1014,7 @@ function AbilityPanel({
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={locale === 'zh' ? '描述你想要的卡牌效果… (Enter 发送)' : 'Describe the card effect… (Enter to send)'}
+            placeholder={locale === 'zh' ? '描述你想要的卡牌效果…' : 'Describe the card effect…'}
             rows={2}
             disabled={streaming}
           />
