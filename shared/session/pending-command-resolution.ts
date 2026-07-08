@@ -13,9 +13,10 @@ import {
 } from '../engine/pending-validation'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel'
 import { validateSelectionEffect } from '../actions/helpers/selection-effect-registry'
-import { positionKey } from '../domain/farm'
-import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage'
-import { playerBoard } from '../domain'
+import {
+  buildFarmPositionSelectionRequest,
+  validateFarmPositionSelection,
+} from '../domain/farm-position-selection'
 import { interactionSubmitChannel } from './interaction-command-policy'
 
 export type FeedSelection = {
@@ -303,79 +304,31 @@ export const validateOccupationHandCommit = (input: {
 export const validateFarmPositionCommit = (input: {
   state: GameState
   player: PlayerState
-  playerIndex: number
   positions: FarmTilePosition[]
   actionContext: Record<string, unknown> | undefined
   pendingSourceCard: string | undefined
   minSelections: number
   maxSelections: number
 }): Failure | { ok: true; positionStrings: string[] } => {
-  const { positions } = input
-  if (positions.length < input.minSelections) return { ok: false, error: 'not enough selection positions' }
-  if (positions.length > input.maxSelections) return { ok: false, error: 'too many selection positions' }
-
-  const hasExplicitSelectableTiles = Array.isArray(input.actionContext?.selectableTiles)
-  const selectedKeys = new Set<string>()
-  for (const pos of positions) {
-    if (!Number.isInteger(pos.row) || !Number.isInteger(pos.col)) {
-      return { ok: false, error: 'invalid selection position' }
-    }
-    const key = `${pos.row}-${pos.col}`
-    if (selectedKeys.has(key)) return { ok: false, error: 'duplicate selection position' }
-    selectedKeys.add(key)
-    if (!hasExplicitSelectableTiles) {
-      const exists = input.player.fields.some((field) => field.row === pos.row && field.col === pos.col)
-      if (!exists) return { ok: false, error: 'invalid field position' }
-    }
-  }
-
-  const selectionInteraction = playerBoard(input.state, input.playerIndex)
-    .farmInteraction
-    .selectableTiles('farm-position', { actionContext: input.actionContext })
-  const selectablePositions = selectionInteraction.kind === 'farm-position'
-    ? selectionInteraction.selectablePositions
-    : []
-  const selectableKeys = new Set(selectablePositions.map(positionKey))
-  const usedFarmyardTiles = input.actionContext?.terrainMode === 'place'
-    ? getUsedFarmyardTileKeys(input.player)
-    : null
-  for (const pos of positions) {
-    if (!selectableKeys.has(positionKey(pos))) return { ok: false, error: 'invalid selection position' }
-    if (usedFarmyardTiles?.has(positionKey(pos))) return { ok: false, error: 'invalid selection position' }
-  }
-
-  const allowedSelectionCounts = Array.isArray(input.actionContext?.allowedSelectionCounts)
-    ? input.actionContext.allowedSelectionCounts
-        .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
-    : null
-  if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
-    return { ok: false, error: 'invalid selection count' }
-  }
-
-  const validPositionGroups = Array.isArray(input.actionContext?.validPositionGroups)
-    ? input.actionContext.validPositionGroups
-        .filter((group): group is FarmTilePosition[] => Array.isArray(group))
-        .map((group) => group.map(positionKey).sort().join('|'))
-    : null
-  if (validPositionGroups && validPositionGroups.length > 0) {
-    const selectedGroup = positions.map(positionKey).sort().join('|')
-    if (!validPositionGroups.includes(selectedGroup)) {
-      return { ok: false, error: 'invalid selection position' }
-    }
-  }
-
-  const selectionEffect = input.actionContext?.selectionEffect
-  if (typeof selectionEffect === 'string') {
-    const validationError = validateSelectionEffect(selectionEffect, {
-      player: input.player,
-      positions: positions.map(positionKey),
-      cards: [],
-      sourceCard: input.pendingSourceCard,
-      state: input.state,
-      actionContext: input.actionContext,
-    })
-    if (validationError) return { ok: false, error: validationError }
-  }
-
-  return { ok: true, positionStrings: positions.map(positionKey) }
+  const request = buildFarmPositionSelectionRequest(input.player, input.actionContext)
+  return validateFarmPositionSelection({
+    request: {
+      ...request,
+      minSelections: input.minSelections,
+      maxSelections: input.maxSelections,
+    },
+    positions: input.positions,
+    validateEffect: (positionStrings) => {
+      const selectionEffect = input.actionContext?.selectionEffect
+      if (typeof selectionEffect !== 'string') return null
+      return validateSelectionEffect(selectionEffect, {
+        player: input.player,
+        positions: positionStrings,
+        cards: [],
+        sourceCard: input.pendingSourceCard,
+        state: input.state,
+        actionContext: input.actionContext,
+      }) ?? null
+    },
+  })
 }
