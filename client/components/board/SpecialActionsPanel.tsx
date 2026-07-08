@@ -5,6 +5,7 @@ import {
   isMoorTerrainAction,
 } from '../../../shared/moor/special-actions'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
+import { publicAssetUrl } from '../../utils/public-asset-url'
 
 type SelectedSpecialAction = {
   cardId: string
@@ -61,7 +62,7 @@ export function SpecialActionsPanel({
               className={`special-action-card${cardUsable ? '' : ' special-action-card--disabled'}`}
             >
               <div className="special-action-card__image-wrap">
-                <img className="special-action-card__image" src={card.image} alt={cardLabel} />
+                <img className="special-action-card__image" src={publicAssetUrl(card.image)} alt={cardLabel} />
                 <div className={`special-action-card__image-actions action-count-${card.actions.length}`}>
                   {card.actions.map((actionId) => {
                     const label = specialActionLabel(locale, actionId)

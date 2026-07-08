@@ -5,6 +5,7 @@ import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/t
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
 import { getCardMeta } from '../../services/card-meta'
+import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy } from './CardWithCopy'
 import { ResourceText } from './ResourceText'
 
@@ -95,7 +96,7 @@ const getDeckFromId = (cardId: string): string | undefined => {
   return match ? match[1] : undefined
 }
 
-const getPlayer56PortraitUrl = (numbering: string): string => `/assets/player56/${numbering}.png`
+const getPlayer56PortraitUrl = (numbering: string): string => publicAssetUrl(`/assets/player56/${numbering}.png`)
 
 const PLAYER56_PORTRAITS = new Set(
   ['A', 'B', 'C', 'D'].flatMap((deck) =>
@@ -251,7 +252,7 @@ export const PlayerCard = ({
       const moorDisplay = getMoorMajorDisplay(cardId)
       if (moorDisplay?.imageUrl) {
         return {
-          backgroundImage: `url(${moorDisplay.imageUrl})`,
+          backgroundImage: `url(${publicAssetUrl(moorDisplay.imageUrl)})`,
           backgroundSize: 'contain',
           backgroundPosition: 'center',
         }
@@ -287,7 +288,7 @@ export const PlayerCard = ({
     }
     if (cardType === 'minor' && deck === 'M') {
       return {
-        backgroundImage: `url(/assets/moor/minor/${numbering}.png)`,
+        backgroundImage: `url(${publicAssetUrl(`/assets/moor/minor/${numbering}.png`)})`,
       }
     }
     return {
