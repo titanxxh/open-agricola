@@ -45,6 +45,7 @@ describe('buildGameSyncPayload', () => {
       viewerPlayerId: p0.id,
       mode: 'viewer',
     })
+    const sessionPlayer = session.buildSyncPayload(waitResp, p0.id, 'viewer')
 
     expect(spectator.interaction.stateId === 'wait' && spectator.interaction.request.kind).toBe('private-prompt')
     expect(spectator.privateEvents ?? []).toEqual([])
@@ -63,5 +64,6 @@ describe('buildGameSyncPayload', () => {
         sourceCard: 'E078_SleightofHand',
       }),
     ])
+    expect(sessionPlayer).toEqual(player)
   })
 })
