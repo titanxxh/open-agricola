@@ -136,6 +136,10 @@ _Avoid_: Action Space
 引擎子流程栈，用于 top action、hook、anytime、动物整理、喂食、farm-select、confirm 等嵌套流程的 push / pop / resume。
 _Avoid_: 直接改 pending
 
+**Engine Frame Control**:
+`EngineStack` 对当前执行帧的具名控制口径，覆盖替换当前 frame 的 Engine/source、设置或确认 deferred player switch、清空临时 switch 状态。
+_Avoid_: 调用方直接写 EngineFrame 字段、另建一套执行栈
+
 **Stage Dispatch**:
 阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示

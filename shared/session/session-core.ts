@@ -502,6 +502,10 @@ export class GameCore {
   popEngineFrame(): EngineFrame | undefined { return this.engineStack.pop() }
   /** @internal phase access — current top frame (read-only view). */
   peekEngineFrame(): EngineFrame | undefined { return this.engineStack.current() }
+  /** @internal phase access — mark the current frame's deferred player switch as confirmed. */
+  confirmCurrentDeferredPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): boolean {
+    return this.engineStack.confirmDeferredPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+  }
   /** @internal phase access — current pending envelope if any. */
   peekEnginePendingEnvelope(): PendingEnvelope | null { return this.engineStack.peekPendingEnvelope() }
   /** @internal phase access — total stack depth. */
@@ -1007,9 +1011,10 @@ export class GameCore {
     })
     const frame = this.engineStack.current()
     if (!frame) return false
-    frame.engine = newEngine
-    frame.source = { kind: 'flow', flow: { type: 'seq', children: [] } }
-    return true
+    return this.engineStack.replaceCurrentFrameEngine(newEngine, {
+      kind: 'flow',
+      flow: { type: 'seq', children: [] },
+    })
   }
 
   private createFlowEngine(
@@ -2875,10 +2880,10 @@ export class GameCore {
     }
     const stack = frame.deferredPlayerSwitch.returnPlayerStack ?? []
     if (stack[stack.length - 1] === playerIndex) return
-    frame.deferredPlayerSwitch = {
+    this.engineStack.setDeferredPlayerSwitch({
       ...frame.deferredPlayerSwitch,
       returnPlayerStack: [...stack, playerIndex],
-    }
+    })
   }
 
   private currentFrameOwnerPlayerId(defaultPlayerId?: string): string | undefined {
@@ -2920,7 +2925,7 @@ export class GameCore {
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
-        frame.deferredPlayerSwitch = null
+        this.engineStack.clearDeferredPlayerSwitch()
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
         frame.engine.flushEventTransaction({ state: this.state, player, space })
@@ -2935,11 +2940,11 @@ export class GameCore {
         const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
         const returnTarget = this.returnTargetIndexForFrame(frame)
         if (visiblePlayerIndex !== returnTarget.playerIndex) {
-          frame.deferredPlayerSwitch = {
+          this.engineStack.setDeferredPlayerSwitch({
             fromPlayerIndex: visiblePlayerIndex,
             toPlayerIndex: returnTarget.playerIndex,
             returnPlayerStack: returnTarget.returnPlayerStack,
-          }
+          })
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(visiblePlayerIndex, returnTarget.playerIndex)
@@ -3038,11 +3043,11 @@ export class GameCore {
           : frame.deferredPlayerSwitch?.fromPlayerIndex ?? frame.ownerPlayerIndex
         if (choiceOwnerIndex !== visiblePlayerIndex) {
           const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
-          frame.deferredPlayerSwitch = {
+          this.engineStack.setDeferredPlayerSwitch({
             fromPlayerIndex: visiblePlayerIndex,
             toPlayerIndex: choiceOwnerIndex,
             returnPlayerStack,
-          }
+          })
         }
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
