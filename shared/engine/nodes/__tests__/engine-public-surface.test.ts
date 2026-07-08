@@ -27,10 +27,13 @@ describe('Engine surface guard', () => {
     'getEffectiveOwnerPlayerId',
     'flushEventTransaction',
     'peekNextUnresolvedNodeId',
+    'peekNextDriverStep',
     'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',
     'peekPendingHost',
     'setEngineBlockedPending',
+    'acknowledgePendingActionRequest',
+    'hasPendingHostRequiringExternalResolution',
   ]
 
   it('public API matches the S4c target surface (5 methods)', () => {

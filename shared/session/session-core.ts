@@ -44,23 +44,16 @@ import {
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
 import {
-  ActionNode,
   ActionRegistry,
   EngineStack,
   INTERACTION_ONLY_ACTION_ID,
   Engine,
-  EngineTree,
   HookDispatcher,
   LogStore,
-  OrNode,
-  ParallelNode,
-  SequenceNode,
-  XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
 import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
-import { attachChoiceLabel } from '../engine/nodes/interaction-helpers.ts'
-import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
@@ -113,7 +106,7 @@ import {
 } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
+import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
@@ -890,70 +883,12 @@ export class GameCore {
     setupPhase.updatePlayerName(this.state.players[playerIndex], name)
   }
 
-  private buildEngineNode(
-    flow: ActionFlow,
-    counter: { value: number },
-    ownerPlayerId?: string,
-    inheritedOptionId?: string,
-  ): EngineNode {
-    const optionId = flow.optionId ?? inheritedOptionId
-    if (flow.targetPlayerId) {
-      const { targetPlayerId, ...innerFlow } = flow
-      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId, optionId)
-      return stampOwner(scopedNode, targetPlayerId)
+  private engineDeps() {
+    return {
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
     }
-    if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(
-        `action-${flow.actionId}-${counter.value++}`,
-        flow.actionId,
-        flow.sourceCard,
-        flow.params,
-        flow.choiceLabelKey,
-        flow.choiceLabelParams,
-        optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
-      )
-      const def = this.registry.get(flow.actionId)
-      if (def?.resolveChoice && !def.skipChoiceWrap) {
-        const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
-          actionNode,
-        ])
-        const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
-        return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
-      }
-      const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
-      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
-    }
-
-    const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId, optionId))
-    if (flow.type === 'seq') {
-      const seq = new SequenceNode(`seq-${counter.value++}`, children)
-      const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    if (flow.type === 'parallel') {
-      const parallel = new ParallelNode(`par-${counter.value++}`, children)
-      if (flow.mode === 'trigger-select') {
-        parallel.mode = 'trigger-select'
-        parallel.resolveAfterSelection = flow.triggerSelectOnce === true
-        parallel.triggerOwnerPlayerId = ownerPlayerId
-        parallel.triggerChildren = children.map((child, index) => ({
-          nodeId: child.id,
-          cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
-          listenerId: '',
-          mandatory: flow.children[index]?.optional !== true,
-        }))
-      }
-      const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    if (flow.type === 'xor') {
-      const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
-      const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
-    const node = flow.optional ? markOptional(or, flow.promptKey) : or
-    return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
   }
 
   private runPlaceFarmerAfterHooks(
@@ -971,44 +906,22 @@ export class GameCore {
     const matched = getMatchingListeners(context)
     if (matched.length === 0) return false
 
-    // Build a placeholder Engine so buildPhaseTrailingNodes has EngineInternals
-    // (it needs counterRef for unique node ids + tree.insertAfter for nested
-    // PARALLEL inserts). The placeholder root is replaced with the dispatched
-    // nodes below.
-    const placeholderRoot = new SequenceNode('pf-after-root-0', [])
-    const stagingEngine = new Engine({
-      tree: new EngineTree(placeholderRoot),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
-    const internals = stagingEngine._internals()
-
-    const nodes = buildPhaseTrailingNodes(
-      internals,
-      matched,
-      'after',
-      'place-farmer',
-      this.state,
-      {},
-      context.player.id,
-      undefined,
-      undefined,
-      undefined,
-      createTriggerSnapshot(this.state),
+    const newEngine = Engine.fromBuiltNodes(this.engineDeps(), (internals) =>
+      buildPhaseTrailingNodes(
+        internals,
+        matched,
+        'after',
+        'place-farmer',
+        this.state,
+        {},
+        context.player.id,
+        undefined,
+        undefined,
+        undefined,
+        createTriggerSnapshot(this.state),
+      ),
     )
-    if (nodes.length === 0) return false
-
-    // Wrap the dispatched nodes in play order. Listener activation side
-    // effects (incCardUsed, logs, follow-up flows) are handled by
-    // engine-proceed when each internal activation leaf executes.
-    const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
-    const newEngine = new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    if (!newEngine) return false
     const frame = this.engineStack.current()
     if (!frame) return false
     return this.engineStack.replaceCurrentFrameEngine(newEngine, {
@@ -1021,14 +934,8 @@ export class GameCore {
     flow: ActionFlow,
     ownerPlayerIndex = this.activePlayerIndex ?? this.state.currentPlayerIndex,
   ): Engine {
-    const counter = { value: 0 }
     const ownerPlayerId = this.state.players[ownerPlayerIndex]?.id
-    return new Engine({
-      tree: new EngineTree(this.buildEngineNode(flow, counter, ownerPlayerId)),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    return Engine.fromFlow(flow, this.engineDeps(), ownerPlayerId)
   }
 
   private startReorganizeSubFlow(
@@ -1084,7 +991,7 @@ export class GameCore {
 
   /**
    * Synthetic frame factory used by the start*-confirm/start*-feed triggers.
-   * Pushes an `__interaction_only__` leaf flow frame whose root ActionNode
+   * Pushes an `__interaction_only__` leaf flow frame whose root engine node
    * already owns the pending envelope.
    */
   private pushPendingFrame(
@@ -1094,22 +1001,7 @@ export class GameCore {
   ): void {
     const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
     const owner = this.state.players[ownerPlayerIndex]
-    const root = new ActionNode(envelope.hostNodeId, INTERACTION_ONLY_ACTION_ID)
-    root.ownerPlayerId = owner?.id
-    root.setPending({
-      ...envelope,
-      hostNodeId: root.id,
-      pendingActionId: INTERACTION_ONLY_ACTION_ID,
-      ownerNodeId: envelope.ownerNodeId ?? null,
-      effectiveOwnerPlayerId: envelope.effectiveOwnerPlayerId ?? owner?.id,
-      syntheticKind: envelope.syntheticKind ?? 'interaction-only',
-    })
-    const engine = new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    const engine = Engine.fromPendingEnvelope(envelope, this.engineDeps(), owner?.id)
     this.engineStack.push({
       engine,
       source: { kind: 'flow', flow },
@@ -1149,20 +1041,7 @@ export class GameCore {
     actionId: string,
     ownerPlayerIndex = this.state.currentPlayerIndex,
   ): Engine {
-    const action = this.registry.get(actionId)
-    const counter = { value: 0 }
-    const an = new ActionNode(`action-${actionId}`, actionId)
-    const root = action?.flow
-      ? this.buildEngineNode(action.flow, counter, this.state.players[ownerPlayerIndex]?.id)
-      : action?.resolveChoice
-        ? new SequenceNode(`seq-${actionId}`, [an])
-        : an
-    return new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    return Engine.fromAction(actionId, this.engineDeps(), this.state.players[ownerPlayerIndex]?.id)
   }
 
   private createEngineFromSource(
@@ -1804,7 +1683,7 @@ export class GameCore {
    * Whether the current engine-stack state is an engine choice — i.e. the
    * top-of-stack pending envelope has a `choice` / `animal-reorg` /
    * `farm-select` / `selection` request, OR a composite pending
-   * choice from OrNode / XorNode or an optional metadata host. Used by `pushHistory()`
+   * choice from a composite choice node or an optional metadata host. Used by `pushHistory()`
    * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
    * consults via the `canRestorePriorChoice` branch.
    */
@@ -2160,7 +2039,7 @@ export class GameCore {
   }
 
   /**
-   * Mid-flow flush: when a leaf ActionNode inside a SEQ/optional flow finishes,
+   * Mid-flow flush: when a leaf action node inside a SEQ/optional flow finishes,
    * emit a partial `log.actionDetail` for that sub-action and advance the
    * baseline snapshot. Subsequent leaves and the final aggregate then only see
    * the remaining state changes, avoiding duplicate logs.
@@ -2893,11 +2772,7 @@ export class GameCore {
   }
 
   private acknowledgeCurrentActionAnimalReorgRequest(): void {
-    const pendingHost = this.engineStack.peekPendingHost()
-    if (!(pendingHost instanceof ActionNode)) return
-    pendingHost.clearPending()
-    pendingHost.emittedRequest = undefined
-    pendingHost.resolve({ type: 'ok' })
+    this.engineStack.current()?.engine.acknowledgePendingActionRequest()
   }
 
   private runEngineSteps(): void {
@@ -2911,11 +2786,7 @@ export class GameCore {
     if (!this.state.players[frame.ownerPlayerIndex] || !space) return
 
     while (true) {
-      const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
-      const nextNode = nextNodeId
-        ? frame.engine._internals().tree.findNodeById(nextNodeId)
-        : null
-      const activeActionContext = nextNode instanceof ActionNode ? nextNode.actionContext : undefined
+      const { nextNodeId, activeActionContext } = frame.engine.peekNextDriverStep()
       const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
@@ -3065,17 +2936,11 @@ export class GameCore {
           this.flushEngineLog()
           return
         }
-        const pendingHost = this.engineStack.peekPendingHost()
         const pendingActionId = pendingCursor?.pendingActionId
         const pendingActionCanResolve = pendingActionId
           ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
           : false
-        if (
-          pendingHost?.getPending() !== null &&
-          !(pendingHost instanceof OrNode) &&
-          !(pendingHost instanceof XorNode) &&
-          !pendingActionCanResolve
-        ) {
+        if (frame.engine.hasPendingHostRequiringExternalResolution(pendingActionCanResolve)) {
           return
         }
         if (step.choice.options.length === 1) {
