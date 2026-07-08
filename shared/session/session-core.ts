@@ -4292,7 +4292,6 @@ export class GameCore {
     const validation = validateFarmPositionCommit({
       state: this.state,
       player,
-      playerIndex,
       positions,
       actionContext: interactionContext,
       pendingSourceCard,
