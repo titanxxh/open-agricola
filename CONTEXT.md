@@ -60,6 +60,10 @@ _Avoid_: 直接修改 state 的请求
 服务端广播或单播给客户端的同步包，携带 `GameSyncPayload`、`InteractionState`、分数、版本和 cause。当前同步语义是全量 snapshot。
 _Avoid_: 局部 patch
 
+**Game Sync Snapshot**:
+`GameSession` 根据 `SessionResponse` 和 viewer 身份构造的同步视图，统一处理 state 序列化、InteractionState redaction、private events、public cancellation 和自定义卡定义。
+_Avoid_: Connection 层直接拼 engine cursor、viewer redaction 或 private event 过滤
+
 **Snapshot**:
 服务端发出的完整可序列化状态视图。客户端收到后整体替换本地游戏状态。
 _Avoid_: 乐观更新、增量 patch
