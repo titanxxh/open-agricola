@@ -3,10 +3,8 @@ import {
   isFixedDevRoom,
   resolveJoinPlayerIndex,
   resolveJoinRequestPlayerIndex,
-  toRoomMeta,
   type Room,
 } from '../game/room.ts'
-import { serializeState } from '../../shared/session/serialization.ts'
 import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
@@ -207,12 +205,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     : 'Player 1'
   room.players.push({ ws: ctx.ws, playerIndex: 0, name, userId: ctx.currentUserId })
   room.session.updatePlayerName(0, name)
-  ctx.persistence.save(room.id, null, toRoomMeta(room))
-  ctx.persistence.save(
-    room.id,
-    serializeState(room.session.getState().state, { engineStack: room.session.getEngineStack() }),
-    toRoomMeta(room),
-  )
+  ctx.checkpoint.recordCreated(room)
   ctx.broadcaster.sendTo(ctx.ws, { type: 'roomCreated', roomId, playerIndex: 0, maxPlayers })
 }
 
@@ -250,7 +243,7 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
   room.session.updatePlayerName(ctx.currentPlayerIndex, name)
-  ctx.persistence.save(roomId, null, toRoomMeta(room))
+  ctx.checkpoint.recordMeta(room)
   ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
   ctx.broadcaster.broadcastEvent(room, {
     type: 'playerJoined',

@@ -5,16 +5,31 @@ import { Broadcaster } from '../broadcaster.ts'
 import { RoomRegistry } from '../../game/room-registry.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import { createLobby } from '../../game/lobby.ts'
+import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
+import type { GameState } from '../../../shared/contract/types.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
-const newCtx = () => {
+const newDeps = () => {
   const persistence = new InMemoryRoomPersistence()
   const registry = new RoomRegistry()
-  const broadcaster = new Broadcaster({ persistence })
-  const lobby = createLobby({ registry, persistence, broadcaster })
+  const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+  const broadcaster = new Broadcaster({ checkpoint })
+  const lobby = createLobby({ registry, checkpoint, broadcaster })
+  return { persistence, registry, checkpoint, broadcaster, lobby }
+}
+
+const newCtx = (deps = newDeps()) => {
   const ws = fakeWs() as never
-  return createConnectionCtx(ws, { registry, persistence, broadcaster, lobby }, true)
+  return Object.assign(
+    createConnectionCtx(ws, {
+      registry: deps.registry,
+      checkpoint: deps.checkpoint,
+      broadcaster: deps.broadcaster,
+      lobby: deps.lobby,
+    }, true),
+    { persistence: deps.persistence },
+  )
 }
 
 const sentTypesOf = (ctx: ReturnType<typeof newCtx>): string[] => {
@@ -36,6 +51,17 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentPlayerIndex).toBe(0)
     expect(ctx.currentRoom!.players.length).toBe(1)
     expect(sentTypesOf(ctx)).toContain('roomCreated')
+  })
+
+  it('checkpoints created rooms with state and host metadata', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+
+    const snap = ctx.persistence.load(ctx.currentRoom!.id)
+    expect(snap?.serialized).not.toBeNull()
+    expect(snap?.meta.players).toEqual([{ userId: 'u1', playerIndex: 0 }])
   })
 
   it('clamps maxPlayers to [2, 6]', () => {
@@ -82,6 +108,28 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
     expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
+
+  it('checkpoints newGame state through the broadcast path', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(309)
+  })
+
+  it('checkpoints loadGame state through the broadcast path', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const loaded = JSON.parse(JSON.stringify(ctx.currentRoom!.session.getState().state)) as GameState
+    loaded.gameSeed = 777
+
+    dispatch(ctx, { type: 'loadGame', state: loaded })
+
+    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(777)
   })
 
   it('forwards enableThroughTheSeasons into the created room session', () => {
@@ -185,6 +233,22 @@ describe('seat-binding guards', () => {
     const after = sentTypesOf(ctx)
     const newSent = after.slice(before)
     expect(newSent.filter((t) => t === 'error')).toHaveLength(1)
+  })
+
+  it('checkpoints joined seat metadata', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+
+    expect(guest.persistence.load(host.currentRoom!.id)?.meta.players).toEqual([
+      { userId: 'u1', playerIndex: 0 },
+      { userId: 'u2', playerIndex: 1 },
+    ])
   })
 
   it('devSetResources accepts own seat', () => {
