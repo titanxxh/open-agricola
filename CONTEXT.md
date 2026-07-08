@@ -152,6 +152,10 @@ _Avoid_: 直接改 pending
 `EngineStack` 对当前执行帧的具名控制口径，覆盖替换当前 frame 的 Engine/source、设置或确认 deferred player switch、清空临时 switch 状态。
 _Avoid_: 调用方直接写 EngineFrame 字段、另建一套执行栈
 
+**Session Engine Driver**:
+Session 推进当前 `EngineFrame` 时使用的执行口径，负责把下一步节点上下文、blocked pending 设置和当前 action pending 确认这类 engine 内部操作收在 engine 侧。Session 只提供玩家、行动格和状态后果处理，不直接检查 engine node 类或读取 engine 内部 tree。
+_Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、另建一套 EngineStack
+
 **Stage Dispatch**:
 阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
