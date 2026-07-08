@@ -1,81 +1,20 @@
-import type { ActionDefinition, GameState, PlayerState } from '../../../contract/types'
+import type { ActionDefinition, PlayerState } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
-import { playerBoard } from '../../../domain'
-import { getUsedFarmyardTileKeys } from '../../../domain/farmyard-usage'
+import {
+  buildFarmPositionSelectionRequest,
+  validateFarmPositionSelection,
+} from '../../../domain/farm-position-selection'
 import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
   positions: string[],
   actionContext: Record<string, unknown> | undefined,
-  state: GameState | undefined,
   player: PlayerState,
 ) => {
-  const hasSelectionBounds = actionContext?.minSelections !== undefined
-    || actionContext?.maxSelections !== undefined
-    || actionContext?.positionFilter !== undefined
-    || Array.isArray(actionContext?.selectableTiles)
-  if (!hasSelectionBounds) return null
-
-  const minSelections = (actionContext?.minSelections as number | undefined) ?? 1
-  const maxSelections = actionContext?.maxSelections as number | undefined
-  if (positions.length < minSelections) return 'not enough selection positions'
-  if (maxSelections !== undefined && positions.length > maxSelections) {
-    return 'too many selection positions'
-  }
-
-  const selected = new Set<string>()
-  const requireUnusedTerrainTile = actionContext?.terrainMode === 'place'
-  const usedFarmyardTiles = requireUnusedTerrainTile
-    ? getUsedFarmyardTileKeys(player)
-    : null
-  for (const position of positions) {
-    if (selected.has(position)) return 'duplicate selection position'
-    selected.add(position)
-    if (usedFarmyardTiles?.has(position)) return 'invalid selection position'
-  }
-
-  const playerIndex = state?.players.indexOf(player) ?? -1
-  if (state && playerIndex >= 0) {
-    const selectionInteraction = playerBoard(state, playerIndex)
-      .farmInteraction
-      .selectableTiles('farm-position', { actionContext })
-    const selectablePositions = selectionInteraction.kind === 'farm-position'
-      ? selectionInteraction.selectablePositions
-      : []
-    const selectable = new Set(selectablePositions.map((pos) => `${pos.row}-${pos.col}`))
-    for (const position of positions) {
-      if (!selectable.has(position)) return 'invalid selection position'
-    }
-  } else {
-    const selectableTiles = Array.isArray(actionContext?.selectableTiles)
-      ? actionContext.selectableTiles as Array<{ row: number; col: number }>
-      : null
-    if (selectableTiles) {
-      const selectable = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
-      for (const position of positions) {
-        if (!selectable.has(position)) return 'invalid selection position'
-      }
-    }
-  }
-
-  const allowedSelectionCounts = Array.isArray(actionContext?.allowedSelectionCounts)
-    ? actionContext.allowedSelectionCounts
-        .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
-    : null
-  if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
-    return 'invalid selection count'
-  }
-  const validPositionGroups = Array.isArray(actionContext?.validPositionGroups)
-    ? actionContext.validPositionGroups
-        .filter((group): group is Array<{ row: number; col: number }> => Array.isArray(group))
-        .map((group) => group.map((pos) => `${pos.row}-${pos.col}`).sort().join('|'))
-    : null
-  if (validPositionGroups && validPositionGroups.length > 0) {
-    const selectedGroup = [...positions].sort().join('|')
-    if (!validPositionGroups.includes(selectedGroup)) return 'invalid selection position'
-  }
-
-  return null
+  const request = buildFarmPositionSelectionRequest(player, actionContext)
+  if (!request.hasConstraints) return null
+  const validation = validateFarmPositionSelection({ request, positions })
+  return validation.ok ? null : validation.error
 }
 
 const validateOccupationCards = (
@@ -133,7 +72,7 @@ export const selectionAction: ActionDefinition = {
     const cards = Array.isArray(payloadCards) ? payloadCards : []
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     if (kind === 'farm-position') {
-      const validationError = validateFarmPositions(positions, actionContext, state, player)
+      const validationError = validateFarmPositions(positions, actionContext, player)
       if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
     if (kind === 'occupation-hand') {

@@ -104,6 +104,10 @@ _Avoid_: 后端农场规则校验、Farm Selection Draft Presentation、本地�
 后端把 `PlayerState`、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload 的领域投影边界。它只产生当前等待交互可展示、可选择的候选，不负责提交后的规则落子或前端本地 draft。
 _Avoid_: Farmyard 规则校验、Farm Selection Draft Presentation、真实 GameState 写入
 
+**Farm-position Selection**:
+等待交互中玩家选择一个或多个农场坐标的领域选择口径，覆盖可选坐标、最小/最大数量、允许组合、terrain 选择模式和提交期合法性。它描述坐标选择的规则语义，不代表前端本地草稿，也不直接写入 `GameState`。
+_Avoid_: Farm Selection Draft Presentation、Farm Board Render Cell、真实农场落子
+
 **Animal Reorg Draft Presentation**:
 Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
 _Avoid_: Animal Zone Projection、后端容量验证、动物支付、真实 GameState 写入
