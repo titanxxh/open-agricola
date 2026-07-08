@@ -108,6 +108,10 @@ _Avoid_: 在前端或测试里读取 Pending Envelope metadata、把 farm/select
 会话层把 `InteractionRequest.kind` 映射到公开 `allowedCommands` 和服务端提交入口的统一策略；它只回答当前等待交互应走 `resolveChoice`、`commitSelection` 还是无直接提交。
 _Avoid_: payload 组装、ActionFlow 执行、前端本地草稿、Pending Envelope cursor
 
+**Pending Command Resolution**:
+会话层处理玩家提交等待交互的边界，负责根据当前 `InteractionRequest.kind` 路由 `resolveChoice` / `commitSelection`、校验提交玩家、有限选项值和提交 payload，再把合法提交交还给 Engine 或对应会话流程继续执行。
+_Avoid_: 前端草稿状态、Payment Pipeline、重新定义 InteractionState
+
 **Pending Envelope**:
 引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
 _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
