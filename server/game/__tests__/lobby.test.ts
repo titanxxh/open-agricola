@@ -4,6 +4,7 @@ import { createLobby, type RoomBroadcaster } from '../lobby.ts'
 import { RoomRegistry } from '../room-registry.ts'
 import { InMemoryRoomPersistence } from '../persistence/memory-adapter.ts'
 import type { Room } from '../room.ts'
+import { createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.ts'
 
 const fakeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: 'r1',
@@ -24,6 +25,9 @@ const fakeBroadcaster = (): RoomBroadcaster & { calls: ServerEvent[] } => {
   }
 }
 
+const checkpoint = (persistence = new InMemoryRoomPersistence()) =>
+  createRoomPersistenceCheckpoint({ persistence })
+
 describe('lobby.getRooms', () => {
   it('hides empty non-dev rooms but keeps fixed dev rooms', () => {
     const registry = new RoomRegistry()
@@ -34,7 +38,7 @@ describe('lobby.getRooms', () => {
     }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     const summaries = lobby.getRooms()
@@ -52,7 +56,7 @@ describe('lobby.getRooms', () => {
     }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     const summaries = lobby.getRooms()
@@ -65,7 +69,7 @@ describe('lobby.getRooms', () => {
     registry.set(fakeRoom({ id: 'alive', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     const summaries = lobby.getRooms()
@@ -79,7 +83,7 @@ describe('lobby.getRooms', () => {
     registry.set(fakeRoom({ id: 'c', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     const summaries = lobby.getRooms(2)
@@ -103,7 +107,7 @@ describe('lobby.getRooms', () => {
     }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     const summaries = lobby.getRooms()
@@ -118,7 +122,7 @@ describe('lobby.dissolveRoomById', () => {
   it('rejects when room is missing', () => {
     const lobby = createLobby({
       registry: new RoomRegistry(),
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     expect(lobby.dissolveRoomById('nope', 'u1')).toEqual({ ok: false, error: 'room not found' })
@@ -129,7 +133,7 @@ describe('lobby.dissolveRoomById', () => {
     registry.set(fakeRoom({ id: 'r1', createdBy: 'u1' }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     expect(lobby.dissolveRoomById('r1', 'u2')).toEqual({
@@ -143,7 +147,7 @@ describe('lobby.dissolveRoomById', () => {
     registry.set(fakeRoom({ id: 'dev2', createdBy: 'u1' }))
     const lobby = createLobby({
       registry,
-      persistence: new InMemoryRoomPersistence(),
+      checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     expect(lobby.dissolveRoomById('dev2', 'u1').ok).toBe(false)
@@ -167,7 +171,7 @@ describe('lobby.dissolveRoomById', () => {
       players: [{ userId: 'u1', playerIndex: 0 }],
     })
     const broadcaster = fakeBroadcaster()
-    const lobby = createLobby({ registry, persistence, broadcaster })
+    const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
 
     expect(lobby.dissolveRoomById('r1', 'u1')).toEqual({ ok: true })
     expect(broadcaster.calls.find((e) => e.type === 'roomDissolved')).toBeTruthy()
@@ -225,7 +229,7 @@ describe('lobby.endRoomsForUser', () => {
       })
     }
     const broadcaster = fakeBroadcaster()
-    const lobby = createLobby({ registry, persistence, broadcaster })
+    const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
 
     expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: ['owned-room', 'joined-room'] })
     expect(closeCalls.sort()).toEqual(['joined-u1', 'joined-u2', 'owned-u1', 'owned-u2'])
@@ -275,7 +279,7 @@ describe('lobby.endRoomsForUser', () => {
       })
     }
     const broadcaster = fakeBroadcaster()
-    const lobby = createLobby({ registry, persistence, broadcaster })
+    const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
 
     expect(lobby.endRoomsForUser('u1', ['disconnected-joined-room'])).toEqual({ endedRoomIds: ['disconnected-joined-room'] })
     expect(closeCalls).toEqual(['u2'])

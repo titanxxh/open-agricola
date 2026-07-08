@@ -12,11 +12,11 @@ import {
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   snapshotToRoom,
-  toRoomMeta,
   type Room,
 } from '../game/room.ts'
 import { createLobby, type Lobby } from '../game/lobby.ts'
 import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
+import { createRoomPersistenceCheckpoint, type RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { dispatch } from './room-router.ts'
@@ -24,7 +24,6 @@ import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookie, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
-import { serializeState } from '../../shared/session/serialization.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -41,6 +40,7 @@ const ALLOW_ANONYMOUS_WS: boolean = (() => {
 const ensureFixedDevRooms = (
   registry: RoomRegistry,
   persistence: RoomPersistence,
+  checkpoint: RoomPersistenceCheckpoint,
 ): void => {
   if (process.env.NODE_ENV === 'production') return
   const startupOptions = parseFixedDevRoomStartupOptions()
@@ -68,11 +68,7 @@ const ensureFixedDevRooms = (
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
       }
       registry.set(room)
-      persistence.save(
-        room.id,
-        serializeState(room.session.getState().state, { engineStack: room.session.getEngineStack() }),
-        toRoomMeta(room),
-      )
+      checkpoint.recordState(room)
     }
   }
 }
@@ -100,7 +96,7 @@ const restoreRooms = (
 
 const startRoomCleanup = (
   registry: RoomRegistry,
-  persistence: RoomPersistence,
+  checkpoint: RoomPersistenceCheckpoint,
   intervalMs: number = ROOM_CLEANUP_INTERVAL_MS,
 ): NodeJS.Timeout => {
   return setInterval(() => {
@@ -115,7 +111,7 @@ const startRoomCleanup = (
       if (now - lastSeen > emptyRoomTtlMs(room)) {
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        persistence.markFinished(room.id, now)
+        checkpoint.recordFinished(room.id, now)
         console.log(`[ws-server] cleaned up empty room ${room.id}`)
       }
     }
@@ -127,6 +123,7 @@ const startRoomCleanup = (
 type ConnectionDeps = {
   registry: RoomRegistry
   persistence: RoomPersistence
+  checkpoint: RoomPersistenceCheckpoint
   broadcaster: Broadcaster
   lobby: Lobby
   activeUserSockets: Map<string, Set<WebSocket>>
@@ -227,22 +224,24 @@ export function createWsServer(
   },
 ): CreateWsServerResult {
   const registry = new RoomRegistry()
-  const broadcaster = new Broadcaster({
+  const checkpoint = createRoomPersistenceCheckpoint({
     persistence: deps.persistence,
     shouldPersist: deps.shouldPersist,
   })
+  const broadcaster = new Broadcaster({ checkpoint })
   const activeUserSockets = new Map<string, Set<WebSocket>>()
-  const lobby = createLobby({ registry, persistence: deps.persistence, broadcaster })
+  const lobby = createLobby({ registry, checkpoint, broadcaster })
 
-  ensureFixedDevRooms(registry, deps.persistence)
+  ensureFixedDevRooms(registry, deps.persistence, checkpoint)
   restoreRooms(registry, deps.persistence, Date.now())
-  const cleanupTimer = startRoomCleanup(registry, deps.persistence)
+  const cleanupTimer = startRoomCleanup(registry, checkpoint)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
   wss.on('connection', (ws, req) =>
     handleConnection(ws, req, {
       registry,
       persistence: deps.persistence,
+      checkpoint,
       broadcaster,
       lobby,
       activeUserSockets,
