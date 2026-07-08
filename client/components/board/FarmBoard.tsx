@@ -288,15 +288,33 @@ const SowChoiceButtons = ({
   )
 }
 
-type FarmCell = {
+type FieldInfo = { stacks: CropStack[] }
+type FarmTerrainTile = NonNullable<PlayerState['farmTerrain']>[number]
+
+type FarmCellTileRenderState = {
+  tileKey?: string
+  isRoom?: boolean
+  isField?: boolean
+  isStable?: boolean
+  fieldInfo?: FieldInfo
+  terrain?: FarmTerrainTile
+  terrainMarkers?: FarmTerrainMarker[]
+  isPendingRoom?: boolean
+  isPendingStable?: boolean
+  isRoomSelectable?: boolean
+  isStableSelectable?: boolean
+  isPositionSelectable?: boolean
+  sowSelectableCrops?: PendingSowCrop[]
+  isLocked?: boolean
+}
+
+type FarmCell = FarmCellTileRenderState & {
   key: string
   type: 'tile' | 'post' | 'fence-h' | 'fence-v' | 'void'
   tileRow?: number
   tileCol?: number
   fenceId?: string
 }
-
-type FieldInfo = { stacks: CropStack[] }
 
 const humanizeSourceCard = (sourceCard: string) => {
   const displayId = sourceCard.includes('_')
@@ -767,25 +785,14 @@ export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
     nextStartPlayerId,
     farmCells,
     farmGridColumns = 11,
-    roomPositions,
-    fieldPositions,
-    fieldMap,
-    stablePositions,
-    pendingRoomSet,
-    pendingStableSet,
-    roomSelectableSet,
-    stableSelectableSet,
     farmHandSelectableSet,
     pendingFarmHandKey,
     builtSpecialStableKeys,
-    maxStableSelections,
     plowSelectableSet,
     pendingPlowTile,
-    positionSelectableSet,
     pendingPositionSelections,
     pendingSowSelections,
     sowRemaining,
-    sowSelectableMap,
     extraSowTargets,
     pastureTiles,
     pastureDisplayMap,
@@ -795,9 +802,7 @@ export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
     cardDisplayMap = new Map(),
     farmCardDisplayMap = new Map(),
     borrowedPlayedCardDisplays = [],
-    lockedTileKeys = new Set<string>(),
     publicCardMarkers = [],
-    farmTerrainMarkerMap = new Map<string, FarmTerrainMarker[]>(),
     parentCardDisplays = [],
     playedCardDisplays = [],
     isReorgActive,
@@ -1082,14 +1087,12 @@ export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
         if (cell.type === 'tile') {
           const tileRow = cell.tileRow ?? 0
           const tileCol = cell.tileCol ?? 0
-          const tileKey = `${tileRow}-${tileCol}`
-          const isRoom = roomPositions.has(tileKey)
-          const isField = fieldPositions.has(tileKey)
-          const isStable = stablePositions.has(tileKey)
-          const terrain = (displayPlayer.farmTerrain ?? []).find(
-            (tile) => tile.row === tileRow && tile.col === tileCol,
-          )
-          const terrainMarkers = farmTerrainMarkerMap.get(tileKey) ?? []
+          const tileKey = cell.tileKey ?? `${tileRow}-${tileCol}`
+          const isRoom = !!cell.isRoom
+          const isField = !!cell.isField
+          const isStable = !!cell.isStable
+          const terrain = cell.terrain
+          const terrainMarkers = cell.terrainMarkers ?? []
           const terrainLabel =
             terrain?.kind === 'forest'
               ? t(locale, 'ui.tileForest')
@@ -1097,28 +1100,24 @@ export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
                 ? t(locale, 'ui.tileMoor')
                 : null
           const isRoomSelectable =
-            isInteractive && roomSelectableSet.has(tileKey)
-          const isRoomSelected = isInteractive && pendingRoomSet.has(tileKey)
-          const isStableSelected = isInteractive && pendingStableSet.has(tileKey)
-          const maxStableReached = pendingStableSet.size >= maxStableSelections
-          const isStableSelectable =
-            isInteractive &&
-            stableSelectableSet.has(tileKey) &&
-            (!maxStableReached || isStableSelected)
+            isInteractive && !!cell.isRoomSelectable
+          const isRoomSelected = isInteractive && !!cell.isPendingRoom
+          const isStableSelected = isInteractive && !!cell.isPendingStable
+          const isStableSelectable = isInteractive && !!cell.isStableSelectable
           const isPlowSelectable =
             isInteractive && plowSelectableSet.has(tileKey)
           const isPlowSelected =
             isInteractive && pendingPlowTile
             ? `${pendingPlowTile.row}-${pendingPlowTile.col}` === tileKey
             : false
-          const isFieldSelectable = isInteractive && positionSelectableSet.has(tileKey)
+          const isFieldSelectable = isInteractive && !!cell.isPositionSelectable
           const isFieldSelected = isInteractive && pendingPositionSelections.has(tileKey)
           const isTileSelectable =
             isRoomSelectable || isPlowSelectable || isStableSelectable || isFieldSelectable
           const isTileSelected =
             isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
-          const isTileLocked = lockedTileKeys.has(tileKey)
-          const fieldInfo = fieldMap.get(tileKey)
+          const isTileLocked = !!cell.isLocked
+          const fieldInfo = cell.fieldInfo
           const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
           const cropStack =
             fieldInfo && fieldInfo.stacks.length > 0
@@ -1129,7 +1128,7 @@ export const FarmBoard = ({ view, actions }: FarmBoardProps) => {
                   />
                 )
               : null
-          const allowedSowCrops = sowSelectableMap.get(tileKey) ?? []
+          const allowedSowCrops = cell.sowSelectableCrops ?? []
           const isSowSelectable =
             isInteractive && (isEmptyField || !fieldInfo) && allowedSowCrops.length > 0
           const currentSowChoice = isInteractive ? (pendingSowSelections[tileKey] ?? '') : ''

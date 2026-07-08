@@ -209,13 +209,12 @@ describe('FarmBoard', () => {
             { key: '0-1', type: 'fence-h', fenceId: 'H--1-0' },
             { key: '0-2', type: 'post' },
             { key: '1-0', type: 'fence-v', fenceId: 'V--1-0' },
-            { key: '1-1', type: 'tile', tileRow: -1, tileCol: 0 },
+            { key: '1-1', type: 'tile', tileRow: -1, tileCol: 0, tileKey: '-1-0', isPositionSelectable: true },
             { key: '1-2', type: 'fence-v', fenceId: 'V--1-1' },
             { key: '2-0', type: 'post' },
             { key: '2-1', type: 'fence-h', fenceId: 'H-0-0' },
             { key: '2-2', type: 'post' },
           ],
-          positionSelectableSet: new Set(['-1-0']),
         }, {
           togglePositionSelection,
         })}
@@ -239,8 +238,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: '1-1', type: 'tile', tileRow: -1, tileCol: 0 }],
-          positionSelectableSet: new Set(['-1-0']),
+          farmCells: [{ key: '1-1', type: 'tile', tileRow: -1, tileCol: 0, tileKey: '-1-0', isPositionSelectable: true }],
           pendingPositionSelections: new Set(['-1-0']),
         })}
       />,
@@ -278,8 +276,8 @@ describe('FarmBoard', () => {
       <FarmBoard
         {...createFarmBoardProps(player, {
           farmCells: [
-            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
-            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', terrain: { row: 0, col: 0, kind: 'forest' } },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1, tileKey: '0-1', terrain: { row: 0, col: 1, kind: 'moor' } },
           ],
         })}
       />,
@@ -320,8 +318,16 @@ describe('FarmBoard', () => {
 
     const boardOverrides = {
       farmCells: [
-        { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
-        { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
+        {
+          key: 'tile-0-0',
+          type: 'tile',
+          tileRow: 0,
+          tileCol: 0,
+          tileKey: '0-0',
+          terrain: { row: 0, col: 0, kind: 'forest' },
+          terrainMarkers: [{ row: 0, col: 0, kind: 'person', workerId: '3', sourceCard: 'M053_ForestHut' }],
+        },
+        { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1, tileKey: '0-1', terrain: { row: 0, col: 1, kind: 'forest' }, terrainMarkers: [] },
       ],
     }
     const htmlWith = renderToStaticMarkup(
@@ -341,8 +347,14 @@ describe('FarmBoard', () => {
         },
       },
     }
+    const boardOverridesWithoutMarker = {
+      farmCells: [
+        { key: 'tile-0-0', type: 'tile' as const, tileRow: 0, tileCol: 0, tileKey: '0-0', terrain: { row: 0, col: 0, kind: 'forest' as const }, terrainMarkers: [] },
+        { key: 'tile-0-1', type: 'tile' as const, tileRow: 0, tileCol: 1, tileKey: '0-1', terrain: { row: 0, col: 1, kind: 'forest' as const }, terrainMarkers: [] },
+      ],
+    }
     const htmlWithout = renderToStaticMarkup(
-      <FarmBoard {...createFarmBoardProps(playerWithoutMarker, boardOverrides)} />,
+      <FarmBoard {...createFarmBoardProps(playerWithoutMarker, boardOverridesWithoutMarker)} />,
     )
     expect(htmlWithout).not.toContain('farm-terrain-marker-M053_ForestHut')
   })
@@ -386,9 +398,8 @@ describe('FarmBoard', () => {
       <FarmBoard
         {...createFarmBoardProps(player, {
           farmCells: [
-            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isRoom: true },
           ],
-          roomPositions: new Set(['0-0']),
           isReorgActive: true,
           houseDisplay: { animalType: 'horse', animalCount: 1 },
           reorgRemaining: { sheep: 0, boar: 0, cattle: 0, horse: 1 },
@@ -969,12 +980,10 @@ describe('FarmBoard', () => {
       <FarmBoard
         {...createFarmBoardProps(player, {
           farmCells: [
-            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 },
-            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1 },
-            { key: 'tile-0-2', type: 'tile', tileRow: 0, tileCol: 2 },
+            { key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isRoom: true },
+            { key: 'tile-0-1', type: 'tile', tileRow: 0, tileCol: 1, tileKey: '0-1', isField: true },
+            { key: 'tile-0-2', type: 'tile', tileRow: 0, tileCol: 2, tileKey: '0-2' },
           ],
-          roomPositions: new Set(['0-0']),
-          fieldPositions: new Set(['0-1']),
         })}
       />,
     )
@@ -1036,8 +1045,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
-          stablePositions: new Set(['0-0']),
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
         })}
       />,
     )
@@ -1053,8 +1061,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
-          stablePositions: new Set(['0-0']),
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
         })}
       />,
     )
@@ -1068,8 +1075,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
-          stablePositions: new Set(['0-0']),
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
           stableDisplayMap: new Map([['0-0', { animalType: 'sheep', animalCount: 1 }]]),
         })}
       />,
@@ -1085,8 +1091,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
-          stablePositions: new Set(['0-0']),
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStable: true }],
           stableDisplayMap: new Map([['0-0', { animalType: null, animalCount: 0 }]]),
         })}
       />,
@@ -1102,8 +1107,7 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
-          stableSelectableSet: new Set(['0-0']),
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', isStableSelectable: true }],
           maxStableSelections: 1,
         })}
       />,
@@ -1231,9 +1235,8 @@ describe('FarmBoard', () => {
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(player, {
-          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0, tileKey: '0-0', sowSelectableCrops: ['grain'] }],
           sowRemaining: { grain: 1, vegetable: 0, wood: 0, stone: 0 },
-          sowSelectableMap: new Map([['0-0', ['grain']]]),
         })}
       />,
     )
