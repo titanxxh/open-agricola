@@ -52,6 +52,9 @@ db.exec(`
     user_id TEXT PRIMARY KEY REFERENCES users(id),
     player_count INTEGER NOT NULL DEFAULT 2,
     deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+    enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
+    enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
+    allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
   );
   CREATE TABLE workshop_card_versions (
@@ -399,8 +402,11 @@ describe('workshop API', () => {
       const req = mockReq('POST', '/api/workshop/sandbox', {
         workshop_card_ids: [cardDbId],
         settings: {
-          player_count: 4,
+          player_count: 6,
           deck_ids: ['B', 'D'],
+          enable_through_the_seasons: true,
+          enable_farmers_of_the_moor: true,
+          allow_incomplete_farmers_of_the_moor_minor_deal: true,
         },
       }, 'tok-bob')
       const res = mockRes()
@@ -413,8 +419,11 @@ describe('workshop API', () => {
       const data = JSON.parse(getRes.body)
       expect(data.cards).toHaveLength(1)
       expect(data.cards[0].id).toBe(cardDbId)
-      expect(data.settings.player_count).toBe(4)
+      expect(data.settings.player_count).toBe(6)
       expect(data.settings.deck_ids).toEqual(['B', 'D'])
+      expect(data.settings.enable_through_the_seasons).toBe(true)
+      expect(data.settings.enable_farmers_of_the_moor).toBe(true)
+      expect(data.settings.allow_incomplete_farmers_of_the_moor_minor_deal).toBe(true)
     })
   })
 })

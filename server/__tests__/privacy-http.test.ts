@@ -128,6 +128,26 @@ describe('HTTP privacy + seat binding', () => {
       expect(data.state.players.map((player: { id: string }) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
     })
 
+    it('POST /api/game/new-sandbox accepts variant options', async () => {
+      const req = mockReq('POST', '/api/game/new-sandbox', {
+        seed: 42,
+        playerCount: 2,
+        enableThroughTheSeasons: true,
+        enableFarmersOfTheMoor: true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      })
+      const res = mockRes()
+
+      await handleGameRoute(req, res)
+
+      expect(res.statusCode).toBe(200)
+      const data = JSON.parse(res.body)
+      expect(data.state.enableThroughTheSeasons).toBe(true)
+      expect(data.state.throughTheSeasons).toBeTruthy()
+      expect(data.state.enableFarmersOfTheMoor).toBe(true)
+      expect(data.state.farmersOfTheMoor).toBeTruthy()
+    })
+
     it('accepts any playerIndex without seat guard (multi-seat dev flow)', async () => {
       // p1 takes the first free space
       const state0Res = mockRes()
