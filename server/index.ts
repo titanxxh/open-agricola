@@ -30,7 +30,7 @@ import {
   type AuthErrorCode,
   type AuthUser,
 } from './auth.ts'
-import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import { clearSessionCookie, readCookies, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
 import { createInvite, listInvites, revokeInvite } from './invites.ts'
 import {
@@ -103,7 +103,10 @@ function getClientIp(req: IncomingMessage): string {
 }
 
 function getAuthToken(req: IncomingMessage): string {
-  return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
+  const validCookie = cookieTokens.find(token => validateSession(token))
+  const bearer = extractToken(req.headers.authorization)
+  return validCookie || bearer || cookieTokens[0] || ''
 }
 
 function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
@@ -122,7 +125,8 @@ function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | nul
 
 function forwardCookieSessionAsBearer(req: IncomingMessage): void {
   if (req.headers.authorization) return
-  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
+  const token = cookieTokens.find(candidate => validateSession(candidate)) ?? cookieTokens[0] ?? ''
   if (token) req.headers.authorization = `Bearer ${token}`
 }
 

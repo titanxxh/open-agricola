@@ -370,6 +370,21 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain('SameSite=Lax')
   })
 
+  it('authenticates with a valid duplicate session cookie when a stale one is present', async () => {
+    const user = await createLocalUserForTests('duplicatecookie', 'password123', 'Duplicate Cookie')
+    const validToken = createSession(user.id)
+
+    for (const cookie of [
+      `${SESSION_COOKIE}=stale; ${SESSION_COOKIE}=${validToken}`,
+      `${SESSION_COOKIE}=${validToken}; ${SESSION_COOKIE}=stale`,
+    ]) {
+      const res = await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie })
+
+      expect(res.status).toBe(200)
+      expect(res.json).toMatchObject({ ok: true, user: { username: 'duplicatecookie' } })
+    }
+  })
+
   it('delete account requires authentication', async () => {
     const res = await requestJson('DELETE', '/api/auth/account')
 

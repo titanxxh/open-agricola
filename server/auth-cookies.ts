@@ -48,17 +48,21 @@ function partitionedSuffix(options: CookieOptions = {}): string {
 }
 
 export function readCookie(header: string | undefined, name: string): string {
-  if (!header) return ''
+  return readCookies(header, name)[0] ?? ''
+}
+
+export function readCookies(header: string | undefined, name: string): string[] {
+  if (!header) return []
+  const values: string[] = []
   for (const part of header.split(';')) {
     const [rawKey, ...rawValue] = part.trim().split('=')
     if (rawKey !== name) continue
     try {
-      return decodeURIComponent(rawValue.join('='))
+      values.push(decodeURIComponent(rawValue.join('=')))
     } catch {
-      return ''
     }
   }
-  return ''
+  return values
 }
 
 export function serializeSessionCookie(token: string, options: CookieOptions = {}): string {
