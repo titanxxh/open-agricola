@@ -7,7 +7,6 @@ import { t } from '../../shared/i18n'
 import {
   positionKey,
 } from '../../shared/domain/farm'
-import { emptyResources } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -31,7 +30,6 @@ import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
 import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
-import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
@@ -39,6 +37,7 @@ import { DraftOverlay } from './draft/DraftOverlay'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
+import { ExchangeOverlayPresentation } from './exchange-overlay-presentation'
 import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
@@ -877,31 +876,8 @@ export const GameContainerApi = () => {
   })
   const resetExchangeDraft = exchangeDraft.reset
   const isBakeExchange = exchangeDraft.bake.isActive
-  const bakeExchangeInfo = exchangeDraft.bake.info
-  const bakeExchangeOptions = exchangeDraft.bake.options
-  const activeBakeExchangeCounts = exchangeDraft.bake.counts
-  const hasBakeSelection = exchangeDraft.bake.hasSelection
-  const summaryResources = exchangeDraft.bake.summary
-  const hasBakeSummary = exchangeDraft.bake.hasSummary
-  const updateBakeExchangeCount = exchangeDraft.bake.updateCount
-  const resetBakeExchangeCounts = exchangeDraft.bake.reset
   const isAnytimeExchange = exchangeDraft.anytime.isActive
-  const anytimeExchangeOptions = exchangeDraft.anytime.options
-  const activeAnytimeExchangeCounts = exchangeDraft.anytime.counts
-  const anytimeExchangeSummary = exchangeDraft.anytime.summary
-  const hasAnytimeExchangeSelection = exchangeDraft.anytime.hasSelection
-  const hasAnytimeExchangeSummary = exchangeDraft.anytime.hasSummary
-  const updateAnytimeExchangeCount = exchangeDraft.anytime.updateCount
-  const isHarvestFeedExchange = exchangeDraft.harvestFeed.isActive
-  const harvestFeedOptions = exchangeDraft.harvestFeed.options
-  const activeHarvestFeedCounts = exchangeDraft.harvestFeed.counts
-  const updateHarvestFeedCount = exchangeDraft.harvestFeed.updateCount
-  const resetHarvestFeedCounts = exchangeDraft.harvestFeed.reset
   const harvestFeedSelections = exchangeDraft.harvestFeed.selections
-  const harvestFeedConvertedFood = exchangeDraft.harvestFeed.convertedFood
-  const harvestFeedBegging = exchangeDraft.harvestFeed.begging
-  const harvestFeedSummary = exchangeDraft.harvestFeed.summary
-  const hasHarvestFeedSummary = exchangeDraft.harvestFeed.hasSummary
   const bakeExchangeChoice = exchangeDraft.bake.choice
   const anytimeExchangeChoice = exchangeDraft.anytime.choice
   const confirmBakeExchange = useCallback(() => {
@@ -1521,309 +1497,20 @@ export const GameContainerApi = () => {
           }}
         />
       ) : null}
-      {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
-        <div className="exchange-overlay">
-          <div className="exchange-modal">
-            <div className="exchange-header">
-              <div className="exchange-title">
-                {t(locale, 'ui.exchangeCenterTitle')}
-              </div>
-              <div className="exchange-subtitle">
-                {t(locale, 'ui.harvestFeedSubtitle', {
-                  player: harvestPending.playerName,
-                  count: harvestPending.remaining,
-                })}
-              </div>
-            </div>
-            <div className="exchange-content">
-              <div className="exchange-options">
-                {harvestFeedOptions.map((option) => {
-                  const current = activeHarvestFeedCounts[option.id] ?? 0
-                  const limit = exchangeDraft.harvestFeed.limitById[option.id] ?? 0
-                  const canAdd = current < limit
-                  const canSubtract = current > 0
-                  const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
-                  const toResources: Partial<Resource> = { ...emptyResources, ...option.to }
-                  return (
-                    <div
-                      key={option.id}
-                      className="exchange-row"
-                      data-testid={`harvest-feed-option-${option.sourceId}-ex${option.exchangeIndex}`}
-                    >
-                      <div className="exchange-name">{option.sourceName}</div>
-                      <div className="exchange-rate">
-                        <span className="interaction-resource-exchange">
-                          <ResourceLine
-                            locale={locale}
-                            resources={fromResources as Resource}
-                            hideZero
-                          />
-                          <span className="interaction-resource-exchange-arrow" aria-hidden="true">
-                            <span className="res-icon res-icon-arrow" />
-                          </span>
-                          <ResourceLine
-                            locale={locale}
-                            resources={toResources as Resource}
-                            hideZero
-                          />
-                        </span>
-                      </div>
-                      <div className="exchange-steps">
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateHarvestFeedCount(option.id, -1)}
-                          disabled={!canSubtract}
-                        >
-                          -
-                        </button>
-                        <div className="exchange-count">{current}</div>
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateHarvestFeedCount(option.id, 1)}
-                          disabled={!canAdd}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="exchange-footer">
-                <div className="exchange-summary">
-                  <div className="interaction-subtitle">
-                    {t(locale, 'ui.harvestFeedProgress', {
-                      fed: (harvestPending.foodUsed ?? 0) + harvestFeedConvertedFood,
-                      required: (harvestPending.foodUsed ?? 0) + harvestPending.remaining,
-                      begging: harvestFeedBegging,
-                    })}
-                  </div>
-                  {hasHarvestFeedSummary ? (
-                    <ResourceLine
-                      locale={locale}
-                      resources={harvestFeedSummary}
-                      emptyLabel={t(locale, 'ui.noResources')}
-                    />
-                  ) : (
-                    t(locale, 'ui.noResources')
-                  )}
-                </div>
-                <div className="exchange-actions">
-                  <button
-                    type="button"
-                    className="exchange-cancel"
-                    onClick={resetHarvestFeedCounts}
-                  >
-                    {t(locale, 'ui.exchangeReset')}
-                  </button>
-                  <button
-                    type="button"
-                    className="exchange-confirm"
-                    onClick={confirmHarvestFeed}
-                  >
-                    {t(locale, 'ui.interactionConfirmButton')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {isAnytimeExchange && pendingChoice && isInteractive ? (
-        <div className="exchange-overlay">
-          <div className="exchange-modal">
-            <div className="exchange-header">
-              <div className="exchange-title">
-                {t(locale, 'ui.exchangeCenterTitle')}
-              </div>
-              <div className="exchange-subtitle">
-                {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
-              </div>
-            </div>
-            <div className="exchange-content">
-              <div className="exchange-options">
-                {anytimeExchangeOptions.map((option) => {
-                  const current = activeAnytimeExchangeCounts[option.id] ?? 0
-                  const limit = exchangeDraft.anytime.limitById[option.id] ?? 0
-                  const canAdd = current < limit
-                  const canSubtract = current > 0
-                  const fromResources: Partial<Resource> = { ...emptyResources, ...option.from }
-                  const toResources: Partial<Resource> = { ...emptyResources, ...option.to }
-                  return (
-                    <div
-                      key={option.id}
-                      className="exchange-row"
-                      data-testid={`anytime-exchange-option-${option.sourceId}-ex${option.exchangeIndex}`}
-                    >
-                      <div className="exchange-name">{option.sourceName}</div>
-                      <div className="exchange-rate">
-                        <span className="interaction-resource-exchange">
-                          <ResourceLine
-                            locale={locale}
-                            mode="payment"
-                            resources={fromResources as Resource}
-                            hideZero
-                          />
-                          <span className="interaction-resource-exchange-arrow" aria-hidden="true">
-                            <span className="res-icon res-icon-arrow" />
-                          </span>
-                          <ResourceLine
-                            locale={locale}
-                            resources={toResources as Resource}
-                            hideZero
-                          />
-                        </span>
-                      </div>
-                      <div className="exchange-steps">
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateAnytimeExchangeCount(option.id, -1)}
-                          disabled={!canSubtract}
-                        >
-                          -
-                        </button>
-                        <div className="exchange-count">{current}</div>
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateAnytimeExchangeCount(option.id, 1)}
-                          disabled={!canAdd}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="exchange-footer">
-                <div className="exchange-summary">
-                  {hasAnytimeExchangeSummary ? (
-                    <ResourceLine
-                      locale={locale}
-                      resources={anytimeExchangeSummary}
-                      emptyLabel={t(locale, 'ui.noResources')}
-                    />
-                  ) : (
-                    t(locale, 'ui.noResources')
-                  )}
-                </div>
-                <div className="exchange-actions">
-                  <button
-                    type="button"
-                    className="exchange-cancel"
-                    onClick={cancelAnytimeExchange}
-                  >
-                    {t(locale, 'ui.interactionCancel')}
-                  </button>
-                  <button
-                    type="button"
-                    className="exchange-confirm"
-                    onClick={confirmAnytimeExchange}
-                    disabled={!hasAnytimeExchangeSelection}
-                  >
-                    {t(locale, 'ui.interactionConfirmButton')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {isBakeExchange && pendingChoice ? (
-        <div className="exchange-overlay">
-          <div className="exchange-modal">
-            <div className="exchange-header">
-              <div className="exchange-title">
-                {t(locale, 'ui.bakeBreadTitle')}
-              </div>
-              <div className="exchange-subtitle">
-                {t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
-              </div>
-            </div>
-            <div className="exchange-content">
-              <div className="exchange-options">
-                {bakeExchangeOptions.map((option) => {
-                  const info = bakeExchangeInfo[option.value] ?? {
-                    food: 0,
-                    max: 0,
-                  }
-                  const current = activeBakeExchangeCounts[option.value] ?? 0
-                  const limit = exchangeDraft.bake.limitById[option.value] ?? 0
-                  const canAdd = current < limit
-                  const canSubtract = current > 0
-                  const rateText = Number.isFinite(info.max)
-                    ? t(locale, 'ui.bakeBreadRateLimited', {
-                        max: info.max,
-                        food: info.food,
-                      })
-                    : t(locale, 'ui.bakeBreadRate', { food: info.food })
-                  return (
-                    <div key={option.value} className="exchange-row">
-                      <div className="exchange-name">
-                        {cardLabel(option.value)}
-                      </div>
-                      <div className="exchange-rate">{rateText}</div>
-                      <div className="exchange-steps">
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateBakeExchangeCount(option.value, -1)}
-                          disabled={!canSubtract}
-                        >
-                          -
-                        </button>
-                        <div className="exchange-count">{current}</div>
-                        <button
-                          type="button"
-                          className="exchange-step"
-                          onClick={() => updateBakeExchangeCount(option.value, 1)}
-                          disabled={!canAdd}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="exchange-footer">
-                <div className="exchange-summary">
-                {hasBakeSummary ? (
-                  <ResourceLine
-                    locale={locale}
-                    resources={summaryResources}
-                    emptyLabel={t(locale, 'ui.noResources')}
-                  />
-                ) : (
-                  t(locale, 'ui.noResources')
-                )}
-                </div>
-                <div className="exchange-actions">
-                  <button
-                    type="button"
-                    className="exchange-cancel"
-                    onClick={resetBakeExchangeCounts}
-                  >
-                    {t(locale, 'ui.exchangeReset')}
-                  </button>
-                  <button
-                    type="button"
-                    className="exchange-confirm"
-                    onClick={confirmBakeExchange}
-                    disabled={!hasBakeSelection}
-                  >
-                    {t(locale, 'ui.interactionConfirmButton')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ExchangeOverlayPresentation
+        locale={locale}
+        isInteractive={isInteractive}
+        pendingChoice={pendingChoice}
+        harvestPending={harvestPending}
+        draft={exchangeDraft}
+        cardLabel={cardLabel}
+        actions={{
+          confirmBakeExchange,
+          confirmAnytimeExchange,
+          cancelAnytimeExchange,
+          confirmHarvestFeed,
+        }}
+      />
       {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
       {shouldShowDevPanel({ devMode, hasGameView }) ? (
         <DevPanel
