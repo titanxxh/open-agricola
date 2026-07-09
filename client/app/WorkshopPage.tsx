@@ -52,14 +52,20 @@ type Comment = {
   created_at: number
 }
 
-type SandboxSettings = {
+export type SandboxSettings = {
   player_count: number
   deck_ids: string[]
+  enable_through_the_seasons: boolean
+  enable_farmers_of_the_moor: boolean
+  allow_incomplete_farmers_of_the_moor_minor_deal: boolean
 }
 
 const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
   player_count: 2,
   deck_ids: ['A', 'B', 'C', 'D', 'E'],
+  enable_through_the_seasons: false,
+  enable_farmers_of_the_moor: false,
+  allow_incomplete_farmers_of_the_moor_minor_deal: false,
 }
 
 export const SANDBOX_PLAYER_COUNTS = [2, 3, 4, 5, 6] as const
@@ -203,10 +209,10 @@ export function hasZhLocale(cardJson: Record<string, unknown> | null | undefined
   return hasName && hasDesc
 }
 
-function normalizeSandboxSettings(raw: unknown): SandboxSettings {
+export function normalizeSandboxSettings(raw: unknown): SandboxSettings {
   const source = (raw ?? {}) as Partial<SandboxSettings>
   const playerCount = typeof source.player_count === 'number'
-    ? Math.min(4, Math.max(2, Math.floor(source.player_count)))
+    ? Math.min(6, Math.max(2, Math.floor(source.player_count)))
     : DEFAULT_SANDBOX_SETTINGS.player_count
   const deckIds = Array.isArray(source.deck_ids)
     ? source.deck_ids
@@ -214,10 +220,24 @@ function normalizeSandboxSettings(raw: unknown): SandboxSettings {
       .map((deck) => deck.trim().toUpperCase())
       .filter((deck) => DEFAULT_SANDBOX_SETTINGS.deck_ids.includes(deck))
     : []
+  const enableFarmersOfTheMoor = source.enable_farmers_of_the_moor === true
   return {
     player_count: playerCount,
     deck_ids: deckIds.length > 0 ? Array.from(new Set(deckIds)) : [...DEFAULT_SANDBOX_SETTINGS.deck_ids],
+    enable_through_the_seasons: source.enable_through_the_seasons === true,
+    enable_farmers_of_the_moor: enableFarmersOfTheMoor,
+    allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && source.allow_incomplete_farmers_of_the_moor_minor_deal === true,
   }
+}
+
+function sandboxVariantLabels(
+  settings: SandboxSettings,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string[] {
+  const labels: string[] = []
+  if (settings.enable_through_the_seasons) labels.push(t('platform.sandboxVariantThroughTheSeasons'))
+  if (settings.enable_farmers_of_the_moor) labels.push(t('platform.sandboxVariantFarmersOfTheMoor'))
+  return labels
 }
 
 export function buildSandboxCardIds(
@@ -787,6 +807,11 @@ function SandboxResetModal({
   const [selectedIds, setSelectedIds] = useState<string[]>(currentCards.map(card => card.id))
   const [playerCount, setPlayerCount] = useState(currentSettings.player_count)
   const [deckIds, setDeckIds] = useState<string[]>(currentSettings.deck_ids)
+  const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(currentSettings.enable_through_the_seasons)
+  const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(currentSettings.enable_farmers_of_the_moor)
+  const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(
+    currentSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
+  )
   const [publishedSearchInput, setPublishedSearchInput] = useState('')
   const [publishedSearch, setPublishedSearch] = useState('')
   const [loadingMine, setLoadingMine] = useState(false)
@@ -800,6 +825,9 @@ function SandboxResetModal({
   useEffect(() => {
     setPlayerCount(currentSettings.player_count)
     setDeckIds(currentSettings.deck_ids)
+    setEnableThroughTheSeasons(currentSettings.enable_through_the_seasons)
+    setEnableFarmersOfTheMoor(currentSettings.enable_farmers_of_the_moor)
+    setAllowIncompleteFarmersOfTheMoorMinorDeal(currentSettings.allow_incomplete_farmers_of_the_moor_minor_deal)
   }, [currentSettings])
 
   const loadMyCards = useCallback(async () => {
@@ -870,6 +898,9 @@ function SandboxResetModal({
       await onSave(selectedIds, {
         player_count: playerCount,
         deck_ids: deckIds,
+        enable_through_the_seasons: enableThroughTheSeasons,
+        enable_farmers_of_the_moor: enableFarmersOfTheMoor,
+        allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && allowIncompleteFarmersOfTheMoorMinorDeal,
       })
       onClose()
     } finally {
@@ -918,6 +949,40 @@ function SandboxResetModal({
                     {deckId}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div className="ws-sandbox-config-group">
+              <span className="ws-sandbox-config-label">{t('platform.sandboxVariants')}</span>
+              <div className="ws-sandbox-toggle-column">
+                <label className="ws-sandbox-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enableThroughTheSeasons}
+                    onChange={event => setEnableThroughTheSeasons(event.target.checked)}
+                  />
+                  <span>{t('platform.sandboxVariantThroughTheSeasons')}</span>
+                </label>
+                <label className="ws-sandbox-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enableFarmersOfTheMoor}
+                    onChange={event => {
+                      setEnableFarmersOfTheMoor(event.target.checked)
+                      if (!event.target.checked) setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
+                    }}
+                  />
+                  <span>{t('platform.sandboxVariantFarmersOfTheMoor')}</span>
+                </label>
+                {enableFarmersOfTheMoor && (
+                  <label className="ws-sandbox-toggle">
+                    <input
+                      type="checkbox"
+                      checked={allowIncompleteFarmersOfTheMoorMinorDeal}
+                      onChange={event => setAllowIncompleteFarmersOfTheMoorMinorDeal(event.target.checked)}
+                    />
+                    <span>{t('platform.sandboxAllowIncompleteFarmersOfTheMoorMinorDeal')}</span>
+                  </label>
+                )}
               </div>
             </div>
           </div>
@@ -996,6 +1061,9 @@ function SandboxResetModal({
             onClick={() => {
               setPlayerCount(DEFAULT_SANDBOX_SETTINGS.player_count)
               setDeckIds([...DEFAULT_SANDBOX_SETTINGS.deck_ids])
+              setEnableThroughTheSeasons(DEFAULT_SANDBOX_SETTINGS.enable_through_the_seasons)
+              setEnableFarmersOfTheMoor(DEFAULT_SANDBOX_SETTINGS.enable_farmers_of_the_moor)
+              setAllowIncompleteFarmersOfTheMoorMinorDeal(DEFAULT_SANDBOX_SETTINGS.allow_incomplete_farmers_of_the_moor_minor_deal)
             }}
           >
             {t('platform.resetSandboxSettings')}
@@ -1031,6 +1099,7 @@ function SandboxView({
   onOpenReset: () => void
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const variants = sandboxVariantLabels(settings, t)
   return (
     <div className="ws-sandbox">
       <div className="ws-sandbox-header">
@@ -1043,6 +1112,13 @@ function SandboxView({
               decks: settings.deck_ids.join(', '),
             })}
           </p>
+          {variants.length > 0 && (
+            <div className="ws-sandbox-info">
+              {variants.map(label => (
+                <span key={label} className="ws-chip">{label}</span>
+              ))}
+            </div>
+          )}
         </div>
         <button type="button" className="btn-secondary ws-btn-sm" onClick={onOpenReset}>
           {t('platform.resetSandbox')}
@@ -1315,6 +1391,9 @@ export function WorkshopPage() {
           customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
           playerCount: sandboxSettings.player_count,
           deckIds: sandboxSettings.deck_ids,
+          enableThroughTheSeasons: sandboxSettings.enable_through_the_seasons,
+          enableFarmersOfTheMoor: sandboxSettings.enable_farmers_of_the_moor,
+          allowIncompleteFarmersOfTheMoorMinorDeal: sandboxSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
         }),
       })
       const data = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
@@ -1634,6 +1713,9 @@ export function WorkshopPage() {
             </span>
             {sandboxSettings.deck_ids.map(d => (
               <span key={d} className="ws-chip ws-chip-deck">{d}</span>
+            ))}
+            {sandboxVariantLabels(sandboxSettings, t).map(label => (
+              <span key={label} className="ws-chip">{label}</span>
             ))}
             <span className="ws-chip ws-chip-count">
               {sandboxCards.length > 0

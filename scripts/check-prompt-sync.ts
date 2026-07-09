@@ -9,12 +9,17 @@
  * Sources of truth this script reads:
  *   - shared/cards/card-effects.ts        → cardEffectHooks array
  *   - shared/custom-code/sandbox-listener-phases.ts → sandboxListenerPhases array
- *   - server/custom-code/engine.ts → isCardListenerScope
+ *   - shared/custom-code/sandbox-listener-scopes.ts → sandboxListenerScopes array
  *   - shared/custom-code/ast-validator.ts → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
  *
  * Targets it cross-checks against:
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
- *   - client/services/llmPrompts.ts       → table-row substring search
+ *
+ * NOTE: client/services/llmPrompts.ts is no longer cross-checked here — it
+ * renders the hook / phase / scope / actionId tables at runtime from the source-of-truth
+ * arrays + description metadata (shared/custom-code/*-meta, sandbox-*.ts), so
+ * those four tables cannot drift by construction. The runtime render is guarded
+ * by client/services/__tests__/llmPrompts.test.ts (set-equality assertions).
  *
  * If a hook / phase / denylist entry exists in the source but is missing from
  * a target — drift detected. By default this prints a warning; pass --strict
@@ -33,14 +38,13 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
   sandboxListenerPhases: 'shared/custom-code/sandbox-listener-phases.ts',
-  engine: 'server/custom-code/engine.ts',
+  sandboxListenerScopes: 'shared/custom-code/sandbox-listener-scopes.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
   injectedHelpers: 'server/custom-code/injected-helpers.ts',
 }
 
 const TARGETS = {
   sandboxDoc: 'docs/CUSTOM_CARD_SANDBOX.md',
-  llmPrompt: 'client/services/llmPrompts.ts',
 }
 
 type DriftReport = {
@@ -78,17 +82,11 @@ function extractActionHookPhases(): string[] {
   return parseStringArray(m[1])
 }
 
-/**
- * Extract the `isCardListenerScope` whitelist from engine.ts.
- * Looks for `value === 'player' || value === 'opponent' || value === 'any'`.
- */
 function extractListenerScopes(): string[] {
-  const src = readFile(SOURCES.engine)
-  const m = src.match(/isCardListenerScope[\s\S]*?\n\s*\}/m)
-  if (!m) throw new Error(`isCardListenerScope not found in ${SOURCES.engine}`)
-  const scopes = [...m[0].matchAll(/value\s*===\s*'([^']+)'/g)].map(m2 => m2[1])
-  if (scopes.length === 0) throw new Error(`No scopes parsed from isCardListenerScope`)
-  return scopes
+  const src = readFile(SOURCES.sandboxListenerScopes)
+  const m = src.match(/export const sandboxListenerScopes\s*=\s*\[([\s\S]*?)\]\s*as const/)
+  if (!m) throw new Error(`sandboxListenerScopes array not found in ${SOURCES.sandboxListenerScopes}`)
+  return parseStringArray(m[1])
 }
 
 /**
@@ -168,17 +166,6 @@ function extractMarkdownBlock(file: string, blockId: string): string[] | null {
   return [...m[1].matchAll(/^-\s*\\?`([^`\\]+)\\?`/gm)].map(m2 => m2[1])
 }
 
-/**
- * Check that every item in `expected` shows up as a substring (verbatim) in
- * the target file. Used for files (like llmPrompts.ts) that don't carry
- * machine-readable blocks but should still mention every hook / phase name.
- */
-function checkTargetMentions(file: string, expected: string[]): { missing: string[] } {
-  const src = readFile(file)
-  const missing = expected.filter(name => !src.includes(name))
-  return { missing }
-}
-
 // ---------- Main ----------
 
 function diff(blockId: string, target: string, source: string, expected: string[], actual: string[]): DriftReport {
@@ -227,7 +214,7 @@ function main() {
 
   reports.push(...checkBlock('card-effect-hooks', cardEffectHooks, `${SOURCES.cardEffects}:cardEffectHooks`))
   reports.push(...checkBlock('action-hook-phases', actionHookPhases, `${SOURCES.sandboxListenerPhases}:sandboxListenerPhases`))
-  reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.engine}:isCardListenerScope`))
+  reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.sandboxListenerScopes}:sandboxListenerScopes`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
   reports.push(...checkBlock('denied-property-access', deniedPropertyAccess, `${SOURCES.astValidator}:DENIED_PROPERTY_ACCESS`))
   reports.push(...checkBlock('action-ids', [...SANDBOX_ALLOWED_ACTION_IDS], 'shared/custom-code/sandbox-action-ids.ts:SANDBOX_ALLOWED_ACTION_IDS'))
@@ -251,12 +238,6 @@ function main() {
     })
   }
 
-  // For the LLM prompt we only require that every hook + phase name appears
-  // somewhere in the file (substring match). The prompt formats them as
-  // markdown table rows / bullet lists so the exact placement varies.
-  const promptHookCheck = checkTargetMentions(TARGETS.llmPrompt, cardEffectHooks)
-  const promptPhaseCheck = checkTargetMentions(TARGETS.llmPrompt, actionHookPhases)
-
   let driftCount = 0
 
   console.log('=== prompt-sync check ===\n')
@@ -264,7 +245,7 @@ function main() {
   console.log(`Sources:`)
   console.log(`  ${SOURCES.cardEffects}     (cardEffectHooks: ${cardEffectHooks.length})`)
   console.log(`  ${SOURCES.sandboxListenerPhases} (sandboxListenerPhases: ${actionHookPhases.length})`)
-  console.log(`  ${SOURCES.engine}          (scopes: ${listenerScopes.length})`)
+  console.log(`  ${SOURCES.sandboxListenerScopes} (scopes: ${listenerScopes.length})`)
   console.log(`  ${SOURCES.astValidator}    (denied: ${deniedIdentifiers.length} ids + ${deniedPropertyAccess.length} props)`)
   console.log()
 
@@ -280,43 +261,6 @@ function main() {
     }
     if (r.extraInTarget.length > 0) {
       console.log(`      extra in   ${path.basename(r.target)} block: ${r.extraInTarget.join(', ')}`)
-    }
-  }
-
-  console.log()
-  if (promptHookCheck.missing.length > 0) {
-    driftCount++
-    console.log(`  ✗ ${TARGETS.llmPrompt} is missing these hook names entirely:`)
-    console.log(`      ${promptHookCheck.missing.join(', ')}`)
-  } else {
-    console.log(`  ✓ ${TARGETS.llmPrompt} mentions all ${cardEffectHooks.length} hook names`)
-  }
-  if (promptPhaseCheck.missing.length > 0) {
-    driftCount++
-    console.log(`  ✗ ${TARGETS.llmPrompt} is missing these phase names entirely:`)
-    console.log(`      ${promptPhaseCheck.missing.join(', ')}`)
-  } else {
-    console.log(`  ✓ ${TARGETS.llmPrompt} mentions all ${actionHookPhases.length} phase names`)
-  }
-
-  // Unlike hook/phase names (substring match via checkTargetMentions), the
-  // actionId whitelist needs a structured prompt-sync block: only an exact
-  // block diff can catch an *extra* actionId the prompt lists outside the
-  // whitelist — a substring scan would silently miss that drift direction.
-  const promptActionIds = extractMarkdownBlock(TARGETS.llmPrompt, 'action-ids')
-  if (promptActionIds === null) {
-    driftCount++
-    console.log(`  ✗ ${TARGETS.llmPrompt} is missing the prompt-sync:begin id=action-ids block`)
-    console.log(`      expected actionIds: ${[...SANDBOX_ALLOWED_ACTION_IDS].join(', ')}`)
-  } else {
-    const r = diff('action-ids', TARGETS.llmPrompt, 'sandbox-action-ids.ts', [...SANDBOX_ALLOWED_ACTION_IDS], promptActionIds)
-    if (r.missingInTarget.length > 0 || r.extraInTarget.length > 0) {
-      driftCount++
-      console.log(`  ✗ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
-      if (r.missingInTarget.length > 0) console.log(`      missing: ${r.missingInTarget.join(', ')}`)
-      if (r.extraInTarget.length > 0) console.log(`      extra:   ${r.extraInTarget.join(', ')}`)
-    } else {
-      console.log(`  ✓ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
     }
   }
 

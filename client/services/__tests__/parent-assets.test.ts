@@ -14,8 +14,7 @@ describe('resolveParentCardAssetUrls', () => {
     })
   })
 
-  it('uses the Parent Assets base url override for deployed subpaths without using BASE_URL', () => {
-    vi.stubEnv('VITE_PARENT_ASSETS_BASE_URL', '/open-agricola/assets/parents/')
+  it('prefixes default Parent Card assets with the Vite base URL', () => {
     vi.stubEnv('BASE_URL', '/open-agricola/')
 
     expect(resolveParentCardAssetUrls({ front: 'PS12.png', back: 'father' })).toEqual({

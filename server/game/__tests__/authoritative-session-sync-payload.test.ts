@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../authoritative-session.ts'
 import type { SessionResponse } from '../authoritative-session.ts'
-import { buildGameSyncPayload } from '../sync-payload.ts'
 
-describe('buildGameSyncPayload', () => {
+describe('GameSession.buildSyncPayload', () => {
   it('keeps HTTP debug null-viewer payload unfiltered while WS null-viewer payload is a spectator view', () => {
     const session = new GameSession()
     const resp = session.withCtx(() => session.getState())
@@ -27,24 +26,9 @@ describe('buildGameSyncPayload', () => {
       },
     }
 
-    const spectator = buildGameSyncPayload({
-      session,
-      resp: waitResp,
-      viewerPlayerId: null,
-      mode: 'viewer',
-    })
-    const debug = buildGameSyncPayload({
-      session,
-      resp: waitResp,
-      viewerPlayerId: null,
-      mode: 'debug',
-    })
-    const player = buildGameSyncPayload({
-      session,
-      resp: waitResp,
-      viewerPlayerId: p0.id,
-      mode: 'viewer',
-    })
+    const spectator = session.buildSyncPayload(waitResp, null, 'viewer')
+    const debug = session.buildSyncPayload(waitResp, null, 'debug')
+    const player = session.buildSyncPayload(waitResp, p0.id, 'viewer')
 
     expect(spectator.interaction.stateId === 'wait' && spectator.interaction.request.kind).toBe('private-prompt')
     expect(spectator.privateEvents ?? []).toEqual([])
@@ -63,5 +47,6 @@ describe('buildGameSyncPayload', () => {
         sourceCard: 'E078_SleightofHand',
       }),
     ])
+    expect(session.buildSyncPayload(waitResp, p0.id, 'viewer')).toEqual(player)
   })
 })

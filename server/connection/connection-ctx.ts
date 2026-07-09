@@ -1,13 +1,13 @@
 import type { WebSocket } from 'ws'
 import type { Room } from '../game/room.ts'
 import type { RoomRegistry } from '../game/room-registry.ts'
-import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
+import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import type { Broadcaster } from './broadcaster.ts'
 import type { Lobby } from '../game/lobby.ts'
 
 export type ConnectionDeps = {
   registry: RoomRegistry
-  persistence: RoomPersistence
+  checkpoint: RoomPersistenceCheckpoint
   broadcaster: Broadcaster
   lobby: Lobby
 }

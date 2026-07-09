@@ -12,7 +12,7 @@ export interface ExtractedExample {
   sectionTitle: string
   /** Full TS code block including CARD_DEF + CARD_IMPL. */
   code: string
-  /** Inferred from `new MinorImprovement(...)` vs `new Occupation(...)`. */
+  /** Inferred from the `cardType` field in `CARD_DEF = { cardType, meta }`. */
   cardType: 'minor' | 'occupation'
 }
 
@@ -38,7 +38,7 @@ export function extractExamplesFromMarkdown(md: string): ExtractedExample[] {
     const code = fenceMatch[1]!.trim()
     const idMatch = code.match(CARD_ID_RE)
     if (!idMatch) continue
-    const cardType: 'minor' | 'occupation' = code.includes('new Occupation(')
+    const cardType: 'minor' | 'occupation' = /cardType\s*:\s*['"]occupation['"]/.test(code)
       ? 'occupation'
       : 'minor'
     examples.push({

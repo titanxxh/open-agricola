@@ -21,7 +21,6 @@ import type {
   ParentSelectionSubmission,
   PlayerState,
   Resource,
-  ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
   ExactCost,
 } from '../contract/types.ts'
@@ -45,27 +44,16 @@ import {
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
 import {
-  ActionNode,
   ActionRegistry,
   EngineStack,
   INTERACTION_ONLY_ACTION_ID,
   Engine,
-  EngineTree,
   HookDispatcher,
   LogStore,
-  OrNode,
-  ParallelNode,
-  SequenceNode,
-  XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
 import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
-import { attachChoiceLabel } from '../engine/nodes/interaction-helpers.ts'
-import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
-import {
-  isPendingChoiceValueAllowed,
-  pendingEnvelopeChoices,
-} from '../engine/pending-validation.ts'
+import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
@@ -117,9 +105,8 @@ import {
   type PendingInteractionProjectionInput,
 } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
+import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
@@ -180,7 +167,16 @@ import {
 } from '../parents/selection'
 import { hasPendingOrdinaryCardDrawChoice, resolveOrdinaryCardDrawChoice } from './ordinary-card-draw'
 import { canProjectActionEntry, computeActionEntryAvailability } from './action-entry-query'
-import { interactionSubmitChannel } from './interaction-command-policy'
+import {
+  planCommitSelectionSubmission,
+  planResolveChoiceSubmission,
+  validateFarmPositionCommit,
+  validateOccupationHandCommit,
+  validateResourceBatchExchangeCommit,
+  validateResourceQuantityCommit,
+  type FeedSelections,
+  type SelectionCommitPayload,
+} from './pending-command-resolution'
 import {
   createMoorSpecialActionSpace,
   isMoorSpecialActionId,
@@ -194,6 +190,8 @@ import {
   recoverInfirmaryWorkers,
   type HeatingPaymentPayload,
 } from '../moor/heating'
+
+export type { FeedSelection, FeedSelections } from './pending-command-resolution'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -283,50 +281,12 @@ const compactActionDetailParts = (
   }
 }
 
-/**
- * Selection payload sent by the client to resolve a pending `harvestFeed`
- * interaction. Each entry references one row of `card.exchanges[]` via
- * `(sourceId, exchangeIndex)`; `count` is the requested number of times to
- * apply the exchange (subject to per-card `max` capping).
- */
-export type FeedSelection = {
-  count: number
-  sourceName?: string
-  sourceId: string
-  /** Entry-index pointer into card.exchanges[] (D3 unified path). */
-  exchangeIndex: number
-}
-export type FeedSelections = FeedSelection[]
-
-type SowSelectionPayload = {
-  row: number
-  col: number
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
-}
-
 type FutureMeepleActionKey = 'field' | 'stable' | 'forest' | 'moor'
 
 const futureMeepleActionCount = (
   entry: GameState['futureMeeples'][number],
   key: FutureMeepleActionKey,
 ): number => Math.max(0, Math.floor(entry.resources?.[key] ?? 0))
-
-type SelectionCommitPayload = {
-  cancel?: boolean
-  positions?: FarmTilePosition[]
-  cardIds?: string[]
-  resourceCounts?: Partial<Record<keyof Resource, number>>
-  resourceBatchExchange?: ResourceBatchExchangePayload
-  edges?: string[]
-  palisadeEdges?: string[]
-  extraWood?: number
-  fenceSources?: Record<string, string>
-  rooms?: FarmTilePosition[]
-  stables?: FarmTilePosition[]
-  farmHand?: FarmTilePosition
-  tile?: FarmTilePosition
-  crops?: SowSelectionPayload[]
-}
 
 type HistoryEntry = {
   state: GameState
@@ -535,6 +495,10 @@ export class GameCore {
   popEngineFrame(): EngineFrame | undefined { return this.engineStack.pop() }
   /** @internal phase access — current top frame (read-only view). */
   peekEngineFrame(): EngineFrame | undefined { return this.engineStack.current() }
+  /** @internal phase access — mark the current frame's deferred player switch as confirmed. */
+  confirmCurrentDeferredPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): boolean {
+    return this.engineStack.confirmDeferredPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+  }
   /** @internal phase access — current pending envelope if any. */
   peekEnginePendingEnvelope(): PendingEnvelope | null { return this.engineStack.peekPendingEnvelope() }
   /** @internal phase access — total stack depth. */
@@ -919,70 +883,12 @@ export class GameCore {
     setupPhase.updatePlayerName(this.state.players[playerIndex], name)
   }
 
-  private buildEngineNode(
-    flow: ActionFlow,
-    counter: { value: number },
-    ownerPlayerId?: string,
-    inheritedOptionId?: string,
-  ): EngineNode {
-    const optionId = flow.optionId ?? inheritedOptionId
-    if (flow.targetPlayerId) {
-      const { targetPlayerId, ...innerFlow } = flow
-      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId, optionId)
-      return stampOwner(scopedNode, targetPlayerId)
+  private engineDeps() {
+    return {
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
     }
-    if (flow.type === 'leaf') {
-      const actionNode = new ActionNode(
-        `action-${flow.actionId}-${counter.value++}`,
-        flow.actionId,
-        flow.sourceCard,
-        flow.params,
-        flow.choiceLabelKey,
-        flow.choiceLabelParams,
-        optionId ? { ...(flow.actionContext ?? {}), optionId } : flow.actionContext,
-      )
-      const def = this.registry.get(flow.actionId)
-      if (def?.resolveChoice && !def.skipChoiceWrap) {
-        const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
-          actionNode,
-        ])
-        const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
-        return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
-      }
-      const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
-      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
-    }
-
-    const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId, optionId))
-    if (flow.type === 'seq') {
-      const seq = new SequenceNode(`seq-${counter.value++}`, children)
-      const node = flow.optional ? markOptional(seq, flow.promptKey) : seq
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    if (flow.type === 'parallel') {
-      const parallel = new ParallelNode(`par-${counter.value++}`, children)
-      if (flow.mode === 'trigger-select') {
-        parallel.mode = 'trigger-select'
-        parallel.resolveAfterSelection = flow.triggerSelectOnce === true
-        parallel.triggerOwnerPlayerId = ownerPlayerId
-        parallel.triggerChildren = children.map((child, index) => ({
-          nodeId: child.id,
-          cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
-          listenerId: '',
-          mandatory: flow.children[index]?.optional !== true,
-        }))
-      }
-      const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    if (flow.type === 'xor') {
-      const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
-      const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
-      return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
-    }
-    const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
-    const node = flow.optional ? markOptional(or, flow.promptKey) : or
-    return flow.optionId ? attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams) : node
   }
 
   private runPlaceFarmerAfterHooks(
@@ -1000,63 +906,36 @@ export class GameCore {
     const matched = getMatchingListeners(context)
     if (matched.length === 0) return false
 
-    // Build a placeholder Engine so buildPhaseTrailingNodes has EngineInternals
-    // (it needs counterRef for unique node ids + tree.insertAfter for nested
-    // PARALLEL inserts). The placeholder root is replaced with the dispatched
-    // nodes below.
-    const placeholderRoot = new SequenceNode('pf-after-root-0', [])
-    const stagingEngine = new Engine({
-      tree: new EngineTree(placeholderRoot),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
-    const internals = stagingEngine._internals()
-
-    const nodes = buildPhaseTrailingNodes(
-      internals,
-      matched,
-      'after',
-      'place-farmer',
-      this.state,
-      {},
-      context.player.id,
-      undefined,
-      undefined,
-      undefined,
-      createTriggerSnapshot(this.state),
+    const newEngine = Engine.fromBuiltNodes(this.engineDeps(), (internals) =>
+      buildPhaseTrailingNodes(
+        internals,
+        matched,
+        'after',
+        'place-farmer',
+        this.state,
+        {},
+        context.player.id,
+        undefined,
+        undefined,
+        undefined,
+        createTriggerSnapshot(this.state),
+      ),
     )
-    if (nodes.length === 0) return false
-
-    // Wrap the dispatched nodes in play order. Listener activation side
-    // effects (incCardUsed, logs, follow-up flows) are handled by
-    // engine-proceed when each internal activation leaf executes.
-    const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
-    const newEngine = new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    if (!newEngine) return false
     const frame = this.engineStack.current()
     if (!frame) return false
-    frame.engine = newEngine
-    frame.source = { kind: 'flow', flow: { type: 'seq', children: [] } }
-    return true
+    return this.engineStack.replaceCurrentFrameEngine(newEngine, {
+      kind: 'flow',
+      flow: { type: 'seq', children: [] },
+    })
   }
 
   private createFlowEngine(
     flow: ActionFlow,
     ownerPlayerIndex = this.activePlayerIndex ?? this.state.currentPlayerIndex,
   ): Engine {
-    const counter = { value: 0 }
     const ownerPlayerId = this.state.players[ownerPlayerIndex]?.id
-    return new Engine({
-      tree: new EngineTree(this.buildEngineNode(flow, counter, ownerPlayerId)),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    return Engine.fromFlow(flow, this.engineDeps(), ownerPlayerId)
   }
 
   private startReorganizeSubFlow(
@@ -1112,7 +991,7 @@ export class GameCore {
 
   /**
    * Synthetic frame factory used by the start*-confirm/start*-feed triggers.
-   * Pushes an `__interaction_only__` leaf flow frame whose root ActionNode
+   * Pushes an `__interaction_only__` leaf flow frame whose root engine node
    * already owns the pending envelope.
    */
   private pushPendingFrame(
@@ -1122,22 +1001,7 @@ export class GameCore {
   ): void {
     const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
     const owner = this.state.players[ownerPlayerIndex]
-    const root = new ActionNode(envelope.hostNodeId, INTERACTION_ONLY_ACTION_ID)
-    root.ownerPlayerId = owner?.id
-    root.setPending({
-      ...envelope,
-      hostNodeId: root.id,
-      pendingActionId: INTERACTION_ONLY_ACTION_ID,
-      ownerNodeId: envelope.ownerNodeId ?? null,
-      effectiveOwnerPlayerId: envelope.effectiveOwnerPlayerId ?? owner?.id,
-      syntheticKind: envelope.syntheticKind ?? 'interaction-only',
-    })
-    const engine = new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    const engine = Engine.fromPendingEnvelope(envelope, this.engineDeps(), owner?.id)
     this.engineStack.push({
       engine,
       source: { kind: 'flow', flow },
@@ -1177,20 +1041,7 @@ export class GameCore {
     actionId: string,
     ownerPlayerIndex = this.state.currentPlayerIndex,
   ): Engine {
-    const action = this.registry.get(actionId)
-    const counter = { value: 0 }
-    const an = new ActionNode(`action-${actionId}`, actionId)
-    const root = action?.flow
-      ? this.buildEngineNode(action.flow, counter, this.state.players[ownerPlayerIndex]?.id)
-      : action?.resolveChoice
-        ? new SequenceNode(`seq-${actionId}`, [an])
-        : an
-    return new Engine({
-      tree: new EngineTree(root),
-      registry: this.registry,
-      hooks: this.hookDispatcher,
-      log: this.engineLog,
-    })
+    return Engine.fromAction(actionId, this.engineDeps(), this.state.players[ownerPlayerIndex]?.id)
   }
 
   private createEngineFromSource(
@@ -1832,7 +1683,7 @@ export class GameCore {
    * Whether the current engine-stack state is an engine choice — i.e. the
    * top-of-stack pending envelope has a `choice` / `animal-reorg` /
    * `farm-select` / `selection` request, OR a composite pending
-   * choice from OrNode / XorNode or an optional metadata host. Used by `pushHistory()`
+   * choice from a composite choice node or an optional metadata host. Used by `pushHistory()`
    * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
    * consults via the `canRestorePriorChoice` branch.
    */
@@ -2188,7 +2039,7 @@ export class GameCore {
   }
 
   /**
-   * Mid-flow flush: when a leaf ActionNode inside a SEQ/optional flow finishes,
+   * Mid-flow flush: when a leaf action node inside a SEQ/optional flow finishes,
    * emit a partial `log.actionDetail` for that sub-action and advance the
    * baseline snapshot. Subsequent leaves and the final aggregate then only see
    * the remaining state changes, avoiding duplicate logs.
@@ -2908,10 +2759,10 @@ export class GameCore {
     }
     const stack = frame.deferredPlayerSwitch.returnPlayerStack ?? []
     if (stack[stack.length - 1] === playerIndex) return
-    frame.deferredPlayerSwitch = {
+    this.engineStack.setDeferredPlayerSwitch({
       ...frame.deferredPlayerSwitch,
       returnPlayerStack: [...stack, playerIndex],
-    }
+    })
   }
 
   private currentFrameOwnerPlayerId(defaultPlayerId?: string): string | undefined {
@@ -2921,11 +2772,7 @@ export class GameCore {
   }
 
   private acknowledgeCurrentActionAnimalReorgRequest(): void {
-    const pendingHost = this.engineStack.peekPendingHost()
-    if (!(pendingHost instanceof ActionNode)) return
-    pendingHost.clearPending()
-    pendingHost.emittedRequest = undefined
-    pendingHost.resolve({ type: 'ok' })
+    this.engineStack.current()?.engine.acknowledgePendingActionRequest()
   }
 
   private runEngineSteps(): void {
@@ -2939,11 +2786,7 @@ export class GameCore {
     if (!this.state.players[frame.ownerPlayerIndex] || !space) return
 
     while (true) {
-      const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
-      const nextNode = nextNodeId
-        ? frame.engine._internals().tree.findNodeById(nextNodeId)
-        : null
-      const activeActionContext = nextNode instanceof ActionNode ? nextNode.actionContext : undefined
+      const { nextNodeId, activeActionContext } = frame.engine.peekNextDriverStep()
       const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
@@ -2953,7 +2796,7 @@ export class GameCore {
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
-        frame.deferredPlayerSwitch = null
+        this.engineStack.clearDeferredPlayerSwitch()
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
         frame.engine.flushEventTransaction({ state: this.state, player, space })
@@ -2968,11 +2811,11 @@ export class GameCore {
         const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
         const returnTarget = this.returnTargetIndexForFrame(frame)
         if (visiblePlayerIndex !== returnTarget.playerIndex) {
-          frame.deferredPlayerSwitch = {
+          this.engineStack.setDeferredPlayerSwitch({
             fromPlayerIndex: visiblePlayerIndex,
             toPlayerIndex: returnTarget.playerIndex,
             returnPlayerStack: returnTarget.returnPlayerStack,
-          }
+          })
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(visiblePlayerIndex, returnTarget.playerIndex)
@@ -3071,11 +2914,11 @@ export class GameCore {
           : frame.deferredPlayerSwitch?.fromPlayerIndex ?? frame.ownerPlayerIndex
         if (choiceOwnerIndex !== visiblePlayerIndex) {
           const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
-          frame.deferredPlayerSwitch = {
+          this.engineStack.setDeferredPlayerSwitch({
             fromPlayerIndex: visiblePlayerIndex,
             toPlayerIndex: choiceOwnerIndex,
             returnPlayerStack,
-          }
+          })
         }
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
@@ -3093,17 +2936,11 @@ export class GameCore {
           this.flushEngineLog()
           return
         }
-        const pendingHost = this.engineStack.peekPendingHost()
         const pendingActionId = pendingCursor?.pendingActionId
         const pendingActionCanResolve = pendingActionId
           ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
           : false
-        if (
-          pendingHost?.getPending() !== null &&
-          !(pendingHost instanceof OrNode) &&
-          !(pendingHost instanceof XorNode) &&
-          !pendingActionCanResolve
-        ) {
+        if (frame.engine.hasPendingHostRequiringExternalResolution(pendingActionCanResolve)) {
           return
         }
         if (step.choice.options.length === 1) {
@@ -3550,58 +3387,27 @@ export class GameCore {
     const cursor = this.engineStack.peekPendingCursor()
     const request = view?.request
     if (request && envelope && view) {
-      const protectedDirectCancel = isProtectedActionCancel(cursor?.pendingActionId, value)
-      if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
-        const disabled = pendingEnvelopeChoices(envelope)
-          .some((option) => option.value === value && option.disabled === true)
-        if (disabled && String(view.promptKey) === 'cards.B003_Moonshine.choice') return this.respond(false, 'choice disabled')
-        return this.respond(false, 'invalid choice value')
-      }
-      if (
-        request.kind === 'choice' &&
-        (this.isFarmPromptKey(view.promptKey) || this.isSelectionPromptKey(view.promptKey))
-      ) {
-        return this.respond(false, 'use commitSelectionChoice for selection')
-      }
-      const submitChannel = interactionSubmitChannel(request.kind)
-      if (submitChannel === 'commitSelection') {
-        if (request.kind === 'farm-select' || request.kind === 'selection') {
-          return this.respond(false, 'use commitSelectionChoice for selection')
-        }
-        return this.respond(false, `use commitSelectionChoice for ${request.kind}`)
-      }
-      if (submitChannel === 'none') {
-        if (request.kind === 'card-draft') return this.respond(false, 'card-draft resolveChoice not supported')
-        if (request.kind === 'engine-blocked') return this.respond(false, 'engine-blocked cannot resolve')
-      }
-      switch (request.kind) {
+      const plan = planResolveChoiceSubmission({
+        envelope,
+        view,
+        pendingActionId: cursor?.pendingActionId,
+        value,
+        payload,
+        isFarmPrompt: !!this.isFarmPromptKey(view.promptKey),
+        isSelectionPrompt: !!this.isSelectionPromptKey(view.promptKey),
+      })
+      if (!plan.ok) return this.respond(false, plan.error)
+      switch (plan.kind) {
         case 'confirm-next-player':
-          return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
+          return this.handleConfirmNextPlayerResolved(plan.nextPlayerIndex)
         case 'confirm-player-switch':
-          return this.handleConfirmPlayerSwitchResolved(request.fromPlayerIndex, request.toPlayerIndex)
-        case 'feed': {
-          const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
-            ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
-          return this.handleFeedResolved(playerIndex, sels)
-        }
+          return this.handleConfirmPlayerSwitchResolved(plan.fromPlayerIndex, plan.toPlayerIndex)
+        case 'feed':
+          return this.handleFeedResolved(playerIndex, plan.selections)
         case 'heating':
-          return this.handleHeatingResolved(playerIndex, payload as HeatingPaymentPayload | undefined)
-        case 'animal-reorg':
-        case 'choice':
+          return this.handleHeatingResolved(playerIndex, plan.payload as HeatingPaymentPayload | undefined)
+        case 'engine-choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
-        case 'select-trigger':
-          return this.resolveEngineChoice(playerIndex, value, true, payload)
-        case 'farm-select':
-        case 'selection':
-        case 'resource-quantity-select':
-        case 'resource-batch-exchange-select':
-        case 'card-draft':
-        case 'engine-blocked':
-          return this.respond(false, `unhandled interaction kind: ${request.kind}`)
-        default: {
-          const _exhaustive: never = request
-          return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)
-        }
       }
     }
     return this.resolveEngineChoice(playerIndex, value, true, payload)
@@ -4222,34 +4028,23 @@ export class GameCore {
     const view = this.engineStack.peekPendingView()
     const cursor = this.engineStack.peekPendingCursor()
     const frame = this.engineStack.current()
-    const envelopeKind = view?.request.kind
-    const isPlainChoice = envelopeKind === 'choice'
-    const effectiveKind = isPlainChoice && this.isFarmPromptKey(view?.promptKey)
-      ? 'farm-select'
-      : isPlainChoice && this.isSelectionPromptKey(view?.promptKey)
-        ? 'selection'
-        : envelopeKind
-    const isFarmSelection = effectiveKind === 'farm-select'
-    const isGenericSelection = effectiveKind === 'selection'
-    const isResourceQuantity = effectiveKind === 'resource-quantity-select'
-    const isResourceBatchExchange = effectiveKind === 'resource-batch-exchange-select'
-    const acceptsCommitSelection = effectiveKind
-      ? interactionSubmitChannel(effectiveKind) === 'commitSelection'
-      : false
     const pendingPlayerIndex = frame && view && cursor
       ? this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
       : -1
-    if (!acceptsCommitSelection || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection/resource choice for this player')
-    }
+    const plan = planCommitSelectionSubmission({
+      requestKind: view?.request.kind,
+      isFarmPrompt: !!this.isFarmPromptKey(view?.promptKey),
+      isSelectionPrompt: !!this.isSelectionPromptKey(view?.promptKey),
+      pendingPlayerIndex,
+      playerIndex,
+      payload,
+    })
+    if (!plan.ok) return this.respond(false, plan.error)
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
     const pendingSourceCard = this.peekPendingSourceCard()
-    if (payload.cancel === true && (isFarmSelection || isGenericSelection)) {
-      return this.respond(false, 'action cancel is not allowed')
-    }
 
-    if (isFarmSelection) {
+    if (plan.isFarmSelection) {
       return this.resolveFarmSelectionChoice(playerIndex, payload, true)
     }
 
@@ -4257,25 +4052,13 @@ export class GameCore {
     // 与 occupation-hand path `{cards: cardIds}` / farm-position path `{positions: positionStrings}` 风格一致。
     // Generic pre-validation: read availableByResource from envelope, check shape (int, >=0, <= avail)
     // and >=1 total when requireAtLeastOne. Effect-layer bounds remain inside resolveChoice as defense-in-depth.
-    if (isResourceQuantity && envelope && envelope.request.kind === 'resource-quantity-select') {
-      const availableByResource = envelope.request.availableByResource
-      const requireAtLeastOne = envelope.request.requireAtLeastOne ?? false
-      const counts = (payload.resourceCounts ?? {}) as Partial<Record<keyof Resource, number>>
-      let total = 0
-      for (const key of Object.keys(availableByResource) as (keyof Resource)[]) {
-        const v = counts[key] ?? 0
-        const max = availableByResource[key] ?? 0
-        if (!Number.isInteger(v) || v < 0) {
-          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
-        }
-        if (v > max) {
-          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
-        }
-        total += v
-      }
-      if (requireAtLeastOne && total < 1) {
-        return this.respond(false, 'resource-quantity.error.must-pick-at-least-one')
-      }
+    if (plan.isResourceQuantity && envelope && envelope.request.kind === 'resource-quantity-select') {
+      const validation = validateResourceQuantityCommit({
+        request: envelope.request,
+        resourceCounts: payload.resourceCounts,
+      })
+      if (!validation.ok) return this.respond(false, validation.error)
+      const counts = validation.counts
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
       const result = this.engine?.resolveChoice('confirm', {
@@ -4301,42 +4084,13 @@ export class GameCore {
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
-    if (isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
-      const batch = payload.resourceBatchExchange ?? { discard: {}, receive: {} }
-      const discard = batch.discard ?? {}
-      const receive = batch.receive ?? {}
-      const allowedReceive = new Set(envelope.request.receiveResources)
-      let discardTotal = 0
-      let receiveTotal = 0
-      for (const [key, raw] of Object.entries(discard)) {
-        const resourceKey = key as keyof Resource
-        const value = raw ?? 0
-        if (!Number.isInteger(value) || value < 0) {
-          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
-        }
-        const max = envelope.request.discardAvailableByResource[resourceKey] ?? 0
-        if (value > max) {
-          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
-        }
-        discardTotal += value
-      }
-      for (const [key, raw] of Object.entries(receive)) {
-        const resourceKey = key as keyof Resource
-        const value = raw ?? 0
-        if (!allowedReceive.has(resourceKey) || !Number.isInteger(value) || value < 0) {
-          return this.respond(false, `resource-batch.error.invalid-receive-${key}`)
-        }
-        receiveTotal += value
-      }
-      if (discardTotal > envelope.request.maxTotal || receiveTotal > envelope.request.maxTotal) {
-        return this.respond(false, 'resource-batch.error.too-many')
-      }
-      if (discardTotal !== receiveTotal) {
-        return this.respond(false, 'resource-batch.error.total-mismatch')
-      }
-      if ((envelope.request.requireAtLeastOne ?? false) && discardTotal < 1) {
-        return this.respond(false, 'resource-batch.error.must-pick-at-least-one')
-      }
+    if (plan.isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
+      const validation = validateResourceBatchExchangeCommit({
+        request: envelope.request,
+        resourceBatchExchange: payload.resourceBatchExchange,
+      })
+      if (!validation.ok) return this.respond(false, validation.error)
+      const batch = validation.batch
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-batch-exchange')
       const result = this.engine?.resolveChoice('confirm', {
@@ -4368,17 +4122,13 @@ export class GameCore {
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
       const cardIds = payload.cardIds ?? []
-      if (cardIds.length < minSelections) {
-        return this.respond(false, 'not enough card selections')
-      }
-      if (cardIds.length > maxSelections) {
-        return this.respond(false, 'too many card selections')
-      }
-      for (const id of cardIds) {
-        if (!player.occupationHand.includes(id)) {
-          return this.respond(false, `card ${id} not in occupation hand`)
-        }
-      }
+      const validation = validateOccupationHandCommit({
+        player,
+        cardIds,
+        minSelections,
+        maxSelections,
+      })
+      if (!validation.ok) return this.respond(false, validation.error)
       this.pushHistory()
       // S2 Task 7: forward structured payload via engine.resolveChoice's
       // `payload` arg; selection.resolveChoice now reads `payload.cards` first
@@ -4404,83 +4154,22 @@ export class GameCore {
 
     // farm-position (default)
     const positions = payload.positions ?? []
-    if (positions.length < minSelections) {
-      return this.respond(false, 'not enough selection positions')
-    }
-    if (positions.length > maxSelections) {
-      return this.respond(false, 'too many selection positions')
-    }
-    const hasExplicitSelectableTiles = Array.isArray(interactionContext?.selectableTiles)
-    const selectedKeys = new Set<string>()
-    for (const pos of positions) {
-      if (!Number.isInteger(pos.row) || !Number.isInteger(pos.col)) {
-        return this.respond(false, 'invalid selection position')
-      }
-      const key = `${pos.row}-${pos.col}`
-      if (selectedKeys.has(key)) return this.respond(false, 'duplicate selection position')
-      selectedKeys.add(key)
-      if (!hasExplicitSelectableTiles) {
-        const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
-        if (!exists) return this.respond(false, 'invalid field position')
-      }
-    }
-    const selectionInteraction = playerBoard(this.state, playerIndex)
-      .farmInteraction
-      .selectableTiles('farm-position', { actionContext: interactionContext })
-    const selectablePositions = selectionInteraction.kind === 'farm-position'
-      ? selectionInteraction.selectablePositions
-      : []
-    const selectableKeys = new Set(selectablePositions.map(positionKey))
-    const usedFarmyardTiles = interactionContext?.terrainMode === 'place'
-      ? getUsedFarmyardTileKeys(player)
-      : null
-    for (const pos of positions) {
-      if (!selectableKeys.has(positionKey(pos))) {
-        return this.respond(false, 'invalid selection position')
-      }
-      if (usedFarmyardTiles?.has(positionKey(pos))) {
-        return this.respond(false, 'invalid selection position')
-      }
-    }
-    const allowedSelectionCounts = Array.isArray(interactionContext?.allowedSelectionCounts)
-      ? interactionContext.allowedSelectionCounts
-          .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
-      : null
-    if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
-      return this.respond(false, 'invalid selection count')
-    }
-    const validPositionGroups = Array.isArray(interactionContext?.validPositionGroups)
-      ? interactionContext.validPositionGroups
-          .filter((group): group is FarmTilePosition[] => Array.isArray(group))
-          .map((group) => group.map(positionKey).sort().join('|'))
-      : null
-    if (validPositionGroups && validPositionGroups.length > 0) {
-      const selectedGroup = positions.map(positionKey).sort().join('|')
-      if (!validPositionGroups.includes(selectedGroup)) {
-        return this.respond(false, 'invalid selection position')
-      }
-    }
-    const selectionEffect = interactionContext?.selectionEffect
-    if (typeof selectionEffect === 'string') {
-      const validationError = validateSelectionEffect(selectionEffect, {
-        player,
-        positions: positions.map(positionKey),
-        cards: [],
-        sourceCard: pendingSourceCard,
-        state: this.state,
-        actionContext: interactionContext,
-      })
-      if (validationError) {
-        return this.respond(false, validationError)
-      }
-    }
+    const validation = validateFarmPositionCommit({
+      state: this.state,
+      player,
+      positions,
+      actionContext: interactionContext,
+      pendingSourceCard,
+      minSelections,
+      maxSelections,
+    })
+    if (!validation.ok) return this.respond(false, validation.error)
 
     this.pushHistory()
-    const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
     const result = this.engine?.resolveChoice('confirm', {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
-    }, { positions: positionStrings })
+    }, { positions: validation.positionStrings })
     if (result?.type === 'ok') {
       this.recordActionResultDetails(
         result,

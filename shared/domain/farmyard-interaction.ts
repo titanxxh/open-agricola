@@ -19,6 +19,7 @@ import {
   type SowSelection,
 } from './farmyard.ts'
 import { getOrdinaryStableCount } from './stables.ts'
+import { buildFarmPositionSelectionRequest } from './farm-position-selection.ts'
 
 const STABLE_WOOD_COST = 2
 const DEFAULT_NORMAL_FIELD_CROPS = ['grain', 'vegetable'] as const satisfies readonly SowSelection['crop'][]
@@ -286,59 +287,14 @@ export const buildFarmPositionSelectionInteraction = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
 ): InteractionSelection => {
-  const selectableTiles = Array.isArray(actionContext?.selectableTiles)
-    ? actionContext.selectableTiles.flatMap((tile) => {
-        const row = Number((tile as { row?: unknown }).row)
-        const col = Number((tile as { col?: unknown }).col)
-        if (!Number.isFinite(row) || !Number.isFinite(col)) return []
-        return [{ row, col }]
-      })
-    : null
-  const validPositionGroups = Array.isArray(actionContext?.validPositionGroups)
-    ? actionContext.validPositionGroups.flatMap((group) => {
-        if (!Array.isArray(group)) return []
-        const positions = group.flatMap((tile) => {
-          const row = Number((tile as { row?: unknown }).row)
-          const col = Number((tile as { col?: unknown }).col)
-          if (!Number.isFinite(row) || !Number.isFinite(col)) return []
-          return [{ row, col }]
-        })
-        return positions.length > 0 ? [positions] : []
-      })
-    : undefined
-  const filter = actionContext?.positionFilter as string | undefined
-  const maxSelections = (actionContext?.maxSelections as number) ?? 1
-  const minSelections = (actionContext?.minSelections as number) ?? 1
-  const allowedSelectionCounts = Array.isArray(actionContext?.allowedSelectionCounts)
-    ? actionContext.allowedSelectionCounts
-        .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
-    : undefined
-  const selectablePositions: FarmTilePosition[] =
-    selectableTiles ??
-    player.fields
-      .filter((f) => {
-        const top = f.stacks[f.stacks.length - 1]
-        if (!filter) return true
-        if (filter === 'has-vegetable')
-          return top?.kind === 'vegetable' && top.remaining > 0
-        if (filter === 'has-grain')
-          return top?.kind === 'grain' && top.remaining > 0
-        if (filter === 'has-crop') return !!top && top.remaining > 0
-        if (filter === 'has-exactly-1-crop') return !!top && top.remaining === 1
-        if (filter === 'has-2-plus-crops') return !!top && top.remaining >= 2
-        if (filter === 'empty-plowed') return f.stacks.length === 0
-        if (filter === 'empty') return f.stacks.length === 0
-        return !!top && top.remaining > 0
-      })
-      .map((f) => ({ row: f.row, col: f.col }))
-
+  const request = buildFarmPositionSelectionRequest(player, actionContext)
   return {
     kind: 'farm-position',
-    selectablePositions,
-    maxSelections,
-    minSelections,
-    ...(allowedSelectionCounts ? { allowedSelectionCounts } : {}),
-    ...(validPositionGroups ? { validPositionGroups } : {}),
+    selectablePositions: request.selectablePositions,
+    maxSelections: request.maxSelections ?? 1,
+    minSelections: request.minSelections,
+    ...(request.allowedSelectionCounts ? { allowedSelectionCounts: request.allowedSelectionCounts } : {}),
+    ...(request.validPositionGroups ? { validPositionGroups: request.validPositionGroups } : {}),
   }
 }
 

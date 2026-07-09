@@ -2,6 +2,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider } from '../../../contexts/LocaleContext'
 import { AiCardDesigner } from '../AiCardDesigner'
@@ -92,6 +93,25 @@ describe('AiCardDesigner AI config header', () => {
       expect(screen.getByDisplayValue('中世纪木槌')).toBeInTheDocument()
       expect(screen.getByDisplayValue('CUSTOM_MedievalMallet')).toBeInTheDocument()
     })
+  })
+
+  it('keeps Enter as a newline in the ability chat input', async () => {
+    localStorage.setItem(
+      'open-agricola-llm-config',
+      JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
+    )
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner onImport={() => {}} onClose={() => {}} />
+      </LocaleProvider>,
+    )
+
+    const input = screen.getByPlaceholderText('描述你想要的卡牌效果…')
+    await userEvent.type(input, '第一行能力{enter}第二行能力')
+
+    expect(input).toHaveValue('第一行能力\n第二行能力')
+    expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
   })
 
   it('shows a mismatch hint when the saved image-panel provider has no image-capable models', () => {

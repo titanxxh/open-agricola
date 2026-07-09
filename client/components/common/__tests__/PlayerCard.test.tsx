@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
@@ -12,6 +12,10 @@ import { loadCardsManifest } from '../../../services/card-meta'
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   beforeEach(() => {
     clearCustomCardMetadata()
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('marks D060_LargePottery with data-also-counts-as="major"', () => {
@@ -216,6 +220,24 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-numbering="M068"')
     expect(html).toContain('data-deck="M"')
     expect(html).toContain('/assets/moor/minor/M068.png')
+  })
+
+  it('prefixes local public card art with the Vite base URL', () => {
+    vi.stubEnv('BASE_URL', '/open-agricola/')
+
+    const moorMajor = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="Major_Moor_HorseSlaughterhouse1" cardType="major" />,
+    )
+    const moorMinor = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="M068_Church" cardType="minor" />,
+    )
+    const player56 = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
+    )
+
+    expect(moorMajor).toContain('/open-agricola/assets/moor/major/M001.png')
+    expect(moorMinor).toContain('/open-agricola/assets/moor/minor/M068.png')
+    expect(player56).toContain('/open-agricola/assets/player56/A169.png')
   })
 
   it.each([

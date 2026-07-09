@@ -341,6 +341,14 @@ function runMigrations(db: Database.Database): void {
         UPDATE rooms SET allow_incomplete_farmers_of_the_moor_minor_deal = 1 WHERE state_json LIKE '%"enableFarmersOfTheMoor":true%';
       `,
     },
+    {
+      version: 15,
+      sql: `
+        ALTER TABLE sandbox_settings ADD COLUMN enable_through_the_seasons INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE sandbox_settings ADD COLUMN enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE sandbox_settings ADD COLUMN allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

@@ -1099,7 +1099,7 @@ server/custom-code/
 
 ### 11.5 server/workshop.ts + server/workshop-pr/
 
-Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化；`playerCount` / `deckIds` / `customCardIds` 在 `createInitialState()` 统一处理。
+Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化，覆盖 `playerCount`、`deckIds`、Through the Seasons、Farmers of the Moor 和 FoM 小改良不足时是否允许开局；`POST /api/game/new-sandbox` 读取这些配置并把 `playerCount` / `deckIds` / `customCardIds` / variant flags 交给 `createInitialState()` 统一处理。
 
 ### 11.6 数据库
 
@@ -1123,7 +1123,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 - `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
 - `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
 - `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
-- `llmPrompts.ts` —— LLM 辅助生成 / 校验。
+- `llmPrompts.ts` —— Workshop 卡牌设计师 system prompt；hook / phase / scope / actionId 表运行时从 shared 真相源 + 描述元数据（`sandbox-hook-meta.ts` 等）渲染，不再手工镜像。
 
 ### 12.3 同步状态层
 

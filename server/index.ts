@@ -30,7 +30,7 @@ import {
   type AuthErrorCode,
   type AuthUser,
 } from './auth.ts'
-import { clearSessionCookie, readCookie, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
+import { clearSessionCookie, readCookies, serializeOnboardingCookie, serializeSessionCookie, SESSION_COOKIE } from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, isTrustedOrigin } from './http-origin.ts'
 import { createInvite, listInvites, revokeInvite } from './invites.ts'
 import {
@@ -103,7 +103,10 @@ function getClientIp(req: IncomingMessage): string {
 }
 
 function getAuthToken(req: IncomingMessage): string {
-  return readCookie(req.headers.cookie, SESSION_COOKIE) || extractToken(req.headers.authorization)
+  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
+  const validCookie = cookieTokens.find(token => validateSession(token))
+  const bearer = extractToken(req.headers.authorization)
+  return validCookie || bearer || cookieTokens[0] || ''
 }
 
 function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | null {
@@ -122,7 +125,8 @@ function requireAdmin(req: IncomingMessage, res: ServerResponse): AuthUser | nul
 
 function forwardCookieSessionAsBearer(req: IncomingMessage): void {
   if (req.headers.authorization) return
-  const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+  const cookieTokens = readCookies(req.headers.cookie, SESSION_COOKIE)
+  const token = cookieTokens.find(candidate => validateSession(candidate)) ?? cookieTokens[0] ?? ''
   if (token) req.headers.authorization = `Bearer ${token}`
 }
 
@@ -260,14 +264,14 @@ const server = createServer(async (req, res) => {
       sendJson(res, 400, result)
       return
     }
-    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true, user: result.user }, { 'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
   if (req.url === '/api/auth/logout' && req.method === 'POST') {
     const token = getAuthToken(req)
     if (token) logout(token)
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -278,7 +282,7 @@ const server = createServer(async (req, res) => {
       logoutAll(user.id)
       wssCtx?.closeUserConnections(user.id)
     }
-    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -289,7 +293,7 @@ const server = createServer(async (req, res) => {
     wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
     const result = deleteAccount(user.id)
     wssCtx?.closeUserConnections(user.id)
-    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req) }) })
+    sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
 
@@ -409,7 +413,7 @@ const server = createServer(async (req, res) => {
     const existing = findIdentity(provider, body.providerUserId)
     if (existing) {
       const token = createSession(existing.userId)
-      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }) })
+      sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
       return
     }
 

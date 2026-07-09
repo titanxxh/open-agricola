@@ -84,7 +84,18 @@ const serialiseCardForApi = (row: WorkshopCard, extras: Record<string, unknown> 
 type SandboxSettings = {
   player_count: number
   deck_ids: string[]
+  enable_through_the_seasons: boolean
+  enable_farmers_of_the_moor: boolean
+  allow_incomplete_farmers_of_the_moor_minor_deal: boolean
   updated_at?: number
+}
+
+type SandboxSettingsInput = {
+  player_count?: unknown
+  deck_ids?: unknown
+  enable_through_the_seasons?: unknown
+  enable_farmers_of_the_moor?: unknown
+  allow_incomplete_farmers_of_the_moor_minor_deal?: unknown
 }
 
 const SANDBOX_DECK_IDS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -92,7 +103,7 @@ const SANDBOX_DECK_IDS = ['A', 'B', 'C', 'D', 'E'] as const
 const sanitizeSandboxPlayerCount = (value: unknown): number => {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return 2
-  return Math.min(4, Math.max(2, Math.floor(parsed)))
+  return Math.min(6, Math.max(2, Math.floor(parsed)))
 }
 
 const sanitizeSandboxDeckIds = (value: unknown): string[] => {
@@ -106,17 +117,38 @@ const sanitizeSandboxDeckIds = (value: unknown): string[] => {
   return next.length > 0 ? Array.from(new Set(next)) : [...SANDBOX_DECK_IDS]
 }
 
+const sanitizeSandboxSettings = (settings?: SandboxSettingsInput): SandboxSettings => {
+  const enableFarmersOfTheMoor = settings?.enable_farmers_of_the_moor === true
+  return {
+    player_count: sanitizeSandboxPlayerCount(settings?.player_count),
+    deck_ids: sanitizeSandboxDeckIds(settings?.deck_ids),
+    enable_through_the_seasons: settings?.enable_through_the_seasons === true,
+    enable_farmers_of_the_moor: enableFarmersOfTheMoor,
+    allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && settings?.allow_incomplete_farmers_of_the_moor_minor_deal === true,
+  }
+}
+
 const getSandboxSettings = (userId: string): SandboxSettings => {
   const db = getDb()
   const row = db.prepare(`
-    SELECT player_count, deck_ids_json, updated_at
+    SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor, allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
     FROM sandbox_settings
     WHERE user_id = ?
-  `).get(userId) as { player_count: number; deck_ids_json: string; updated_at: number } | undefined
+  `).get(userId) as {
+    player_count: number
+    deck_ids_json: string
+    enable_through_the_seasons: number
+    enable_farmers_of_the_moor: number
+    allow_incomplete_farmers_of_the_moor_minor_deal: number
+    updated_at: number
+  } | undefined
   if (!row) {
     return {
       player_count: 2,
       deck_ids: [...SANDBOX_DECK_IDS],
+      enable_through_the_seasons: false,
+      enable_farmers_of_the_moor: false,
+      allow_incomplete_farmers_of_the_moor_minor_deal: false,
     }
   }
   let rawDeckIds: unknown = []
@@ -125,28 +157,50 @@ const getSandboxSettings = (userId: string): SandboxSettings => {
   } catch {
     rawDeckIds = []
   }
+  const enableFarmersOfTheMoor = row.enable_farmers_of_the_moor === 1
   return {
     player_count: sanitizeSandboxPlayerCount(row.player_count),
     deck_ids: sanitizeSandboxDeckIds(rawDeckIds),
+    enable_through_the_seasons: row.enable_through_the_seasons === 1,
+    enable_farmers_of_the_moor: enableFarmersOfTheMoor,
+    allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
     updated_at: row.updated_at,
   }
 }
 
-const saveSandboxSettings = (userId: string, settings?: { player_count?: unknown; deck_ids?: unknown }): SandboxSettings => {
+const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): SandboxSettings => {
   const next: SandboxSettings = {
-    player_count: sanitizeSandboxPlayerCount(settings?.player_count),
-    deck_ids: sanitizeSandboxDeckIds(settings?.deck_ids),
+    ...sanitizeSandboxSettings(settings),
     updated_at: Date.now(),
   }
   const db = getDb()
   db.prepare(`
-    INSERT INTO sandbox_settings (user_id, player_count, deck_ids_json, updated_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO sandbox_settings (
+      user_id,
+      player_count,
+      deck_ids_json,
+      enable_through_the_seasons,
+      enable_farmers_of_the_moor,
+      allow_incomplete_farmers_of_the_moor_minor_deal,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       player_count = excluded.player_count,
       deck_ids_json = excluded.deck_ids_json,
+      enable_through_the_seasons = excluded.enable_through_the_seasons,
+      enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
+      allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
       updated_at = excluded.updated_at
-  `).run(userId, next.player_count, JSON.stringify(next.deck_ids), next.updated_at)
+  `).run(
+    userId,
+    next.player_count,
+    JSON.stringify(next.deck_ids),
+    next.enable_through_the_seasons ? 1 : 0,
+    next.enable_farmers_of_the_moor ? 1 : 0,
+    next.allow_incomplete_farmers_of_the_moor_minor_deal ? 1 : 0,
+    next.updated_at,
+  )
   return next
 }
 
@@ -550,7 +604,7 @@ export async function handleWorkshopRoute(
     const body = await parseBody<{
       workshop_card_id?: string
       workshop_card_ids?: string[]
-      settings?: { player_count?: unknown; deck_ids?: unknown }
+      settings?: SandboxSettingsInput
     }>(req)
     const MAX_SANDBOX_CARDS = 20
     if (body?.workshop_card_id) {

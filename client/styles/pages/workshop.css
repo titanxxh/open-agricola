@@ -630,6 +630,21 @@
   border-color: var(--color-primary);
   color: #fff;
 }
+.ws-sandbox-toggle-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ws-sandbox-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.ws-sandbox-toggle input {
+  accent-color: var(--color-primary);
+}
 .ws-reset-selection-count {
   flex-shrink: 0;
   font-size: 13px;

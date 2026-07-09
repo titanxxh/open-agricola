@@ -3,7 +3,6 @@ import type {
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
-import { buildGameSyncPayload } from '../game/sync-payload.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -24,11 +23,7 @@ export function buildEnvelope(args: Args): StateUpdateEnvelope {
     sync: args.sync ?? 'snapshot',
     cause: args.cause,
     requestId: args.requestId,
-    payload: buildGameSyncPayload({
-      session: args.room.session,
-      resp: args.resp,
-      viewerPlayerId: args.viewerPlayerId,
-    }),
+    payload: args.room.session.buildSyncPayload(args.resp, args.viewerPlayerId),
     emittedAt: args.emittedAt,
   }
 }

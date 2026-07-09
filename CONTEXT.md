@@ -44,6 +44,10 @@ _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选
 多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
 _Avoid_: PlayerState
 
+**Room Persistence Checkpoint**:
+房间层在创建、入座、状态广播、重开、载入和结束时保存或终结房间持久化记录的统一口径。它决定写入完整 `GameState` 还是只更新 room meta，并保持持久化 adapter 只负责存取，不负责业务时机。
+_Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
+
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
 _Avoid_: PlayerState
@@ -59,6 +63,10 @@ _Avoid_: 直接修改 state 的请求
 **StateUpdateEnvelope**:
 服务端广播或单播给客户端的同步包，携带 `GameSyncPayload`、`InteractionState`、分数、版本和 cause。当前同步语义是全量 snapshot。
 _Avoid_: 局部 patch
+
+**Game Sync Snapshot**:
+`GameSession` 根据 `SessionResponse` 和 viewer 身份构造的同步视图，统一处理 state 序列化、InteractionState redaction、private events、public cancellation 和自定义卡定义。
+_Avoid_: Connection 层直接拼 engine cursor、viewer redaction 或 private event 过滤
 
 **Snapshot**:
 服务端发出的完整可序列化状态视图。客户端收到后整体替换本地游戏状态。
@@ -92,9 +100,17 @@ _Avoid_: Payment Pipeline、规则执行、真实资源变更
 Interaction Presentation 的一种本地草稿展示，覆盖 fence、room、stable、plow、sow 和 farm-position 选择的前端暂存、错误展示、提交 draft 和 snapshot 后重置。它只管理尚未提交的本地选择，不做农场合法性裁定。
 _Avoid_: Farm Board Projection、Moor Special Action tile routing、后端规则验证、真实 GameState 写入
 
+**Farm Board Render Cell**:
+`buildFarmBoardProjection` 输出给 `FarmBoard` 的单格渲染模型，聚合农场 tile 的占用、地形、地形标记、pending/selectable、播种候选和锁定状态。它隐藏 projection 内部的并行 Map/Set 组合细节。
+_Avoid_: 后端农场规则校验、Farm Selection Draft Presentation、本地点击草稿
+
 **Farm Interaction Projection**:
 后端把 `PlayerState`、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload 的领域投影边界。它只产生当前等待交互可展示、可选择的候选，不负责提交后的规则落子或前端本地 draft。
 _Avoid_: Farmyard 规则校验、Farm Selection Draft Presentation、真实 GameState 写入
+
+**Farm-position Selection**:
+等待交互中玩家选择一个或多个农场坐标的领域选择口径，覆盖可选坐标、最小/最大数量、允许组合、terrain 选择模式和提交期合法性。它描述坐标选择的规则语义，不代表前端本地草稿，也不直接写入 `GameState`。
+_Avoid_: Farm Selection Draft Presentation、Farm Board Render Cell、真实农场落子
 
 **Animal Reorg Draft Presentation**:
 Interaction Presentation 的一种本地草稿展示，覆盖 animal-reorg 的动物分配草稿、剩余/溢出展示、丢弃二次确认和提交 draft 派生。它只管理尚未提交的本地动物分配，不做容量合法性或动物规则裁定。
@@ -107,6 +123,10 @@ _Avoid_: 在前端或测试里读取 Pending Envelope metadata、把 farm/select
 **Interaction Command Policy**:
 会话层把 `InteractionRequest.kind` 映射到公开 `allowedCommands` 和服务端提交入口的统一策略；它只回答当前等待交互应走 `resolveChoice`、`commitSelection` 还是无直接提交。
 _Avoid_: payload 组装、ActionFlow 执行、前端本地草稿、Pending Envelope cursor
+
+**Pending Command Resolution**:
+会话层处理玩家提交等待交互的边界，负责根据当前 `InteractionRequest.kind` 路由 `resolveChoice` / `commitSelection`、校验提交玩家、有限选项值和提交 payload，再把合法提交交还给 Engine 或对应会话流程继续执行。
+_Avoid_: 前端草稿状态、Payment Pipeline、重新定义 InteractionState
 
 **Pending Envelope**:
 引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
@@ -131,6 +151,14 @@ _Avoid_: Action Space
 **EngineStack**:
 引擎子流程栈，用于 top action、hook、anytime、动物整理、喂食、farm-select、confirm 等嵌套流程的 push / pop / resume。
 _Avoid_: 直接改 pending
+
+**Engine Frame Control**:
+`EngineStack` 对当前执行帧的具名控制口径，覆盖替换当前 frame 的 Engine/source、设置或确认 deferred player switch、清空临时 switch 状态。
+_Avoid_: 调用方直接写 EngineFrame 字段、另建一套执行栈
+
+**Session Engine Driver**:
+Session 推进当前 `EngineFrame` 时使用的执行口径，负责把下一步节点上下文、blocked pending 设置和当前 action pending 确认这类 engine 内部操作收在 engine 侧。Session 只提供玩家、行动格和状态后果处理，不直接检查 engine node 类或读取 engine 内部 tree。
+_Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、另建一套 EngineStack
 
 **Stage Dispatch**:
 阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
