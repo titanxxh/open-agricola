@@ -1099,7 +1099,7 @@ server/custom-code/
 
 ### 11.5 server/workshop.ts + server/workshop-pr/
 
-Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化；`playerCount` / `deckIds` / `customCardIds` 在 `createInitialState()` 统一处理。
+Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化，覆盖 `playerCount`、`deckIds`、Through the Seasons、Farmers of the Moor 和 FoM 小改良不足时是否允许开局；`POST /api/game/new-sandbox` 读取这些配置并把 `playerCount` / `deckIds` / `customCardIds` / variant flags 交给 `createInitialState()` 统一处理。
 
 ### 11.6 数据库
 

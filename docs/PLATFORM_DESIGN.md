@@ -103,6 +103,17 @@ CREATE TABLE sandbox_cards (
   added_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, workshop_card_id)
 );
+
+-- 沙盒配置（人数、牌组、变体）
+CREATE TABLE sandbox_settings (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  player_count INTEGER NOT NULL DEFAULT 2,
+  deck_ids_json TEXT NOT NULL DEFAULT '["A","B","C","D","E"]',
+  enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
+  enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
+  allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
 ```
 
 ### A2. 认证：服务端 Session Token
