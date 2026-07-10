@@ -6,24 +6,88 @@
  * `server/workshop-pr/code-gen.ts` 把这两个常量转换成一个 Card Source
  * 文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
  *
- * **Single source of truth for sandbox constraints**: docs/CUSTOM_CARD_SANDBOX.md
- *
- * Whenever you add / remove a hook, phase, scope, denied identifier or actionId
- * in this prompt, also update docs/CUSTOM_CARD_SANDBOX.md so the two stay in
- * sync. CI runs `pnpm run check:prompt-sync` which compares both files against
- * the underlying source code:
+ * Hook / phase / scope / actionId 表从共享白名单运行时渲染；
+ * docs/CUSTOM_CARD_SANDBOX.md 的对应标记块由 check:prompt-sync 校验：
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
- *   - server/custom-code/engine.ts (isActionHookPhase, isCardListenerScope)
+ *   - shared/custom-code/sandbox-listener-phases.ts (sandboxListenerPhases)
+ *   - shared/custom-code/sandbox-listener-scopes.ts (sandboxListenerScopes)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
  *   - server/custom-code/injected-helpers.ts (sandbox injections; S9)
  *   - shared/custom-code/sandbox-action-ids.ts (SANDBOX_ALLOWED_ACTION_IDS)
- *
- * The actionId whitelist lives as a prompt-sync block (id=action-ids) inside
- * PROMPT_BODY itself (markdown comments are harmless to the LLM), so
- * check-prompt-sync verifies the exact list the LLM sees.
  */
 
 import communityExamples from '../../docs/community-card-examples.md?raw'
+import { cardEffectHooks } from '../../shared/cards/card-effects'
+import { cardEffectHookMeta } from '../../shared/custom-code/sandbox-hook-meta'
+import { sandboxListenerPhases, sandboxListenerPhaseMeta } from '../../shared/custom-code/sandbox-listener-phases'
+import { sandboxListenerScopes, type SandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes'
+import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta } from '../../shared/custom-code/sandbox-action-ids'
+
+const sandboxListenerScopeDescriptions = {
+  player: '只监听卡主自己的行动',
+  opponent: '只监听对手行动，效果通常给 ownerPlayer',
+  any: '监听任意玩家行动，按 ownerPlayer 判定卡主',
+} satisfies Record<SandboxListenerScope, string>
+
+// --- Schema 表格从真相源运行时渲染 ---
+// 名字白名单由 cardEffectHooks / sandboxListenerPhases / sandboxListenerScopes /
+// SANDBOX_ALLOWED_ACTION_IDS 拥有；描述 map 用 Record 强制配对，故四张表不会漏项。
+const escapePipe = (s: string): string => s.replace(/\|/g, '\\|')
+
+function renderEffectHookTable(): string {
+  const rows: string[] = []
+  for (const hook of cardEffectHooks) {
+    const meta = cardEffectHookMeta[hook]
+    if (meta.table !== 'effect') continue
+    rows.push(`| ${hook} | ${escapePipe(meta.timing)} | ${escapePipe(meta.freq)} |`)
+  }
+  return ['| hook | 触发时机 | 频率 |', '|------|----------|------|', ...rows].join('\n')
+}
+
+function renderAdvancedHookTable(): string {
+  const rows: string[] = []
+  for (const hook of cardEffectHooks) {
+    const meta = cardEffectHookMeta[hook]
+    if (meta.table !== 'advanced') continue
+    rows.push(`| ${hook} | ${escapePipe(meta.signature)} | ${escapePipe(meta.usage)} |`)
+  }
+  // meta 字段（非 hook，不在真相源数组），手写附录
+  const metaRows = [
+    { name: 'handHooks (meta)', sig: 'CardEffectHook[]', use: '声明手牌时也触发的 hook' },
+    { name: 'beforeEndGameScope (meta)', sig: "'owner' | 'allPlayers'", use: '终局前按 target player 分发 onBeforeEndGame' },
+    { name: 'beforeEndGameMandatory (meta)', sig: 'boolean', use: 'select trigger 可用时是否禁用 pass' },
+  ]
+  for (const row of metaRows) {
+    rows.push(`| ${row.name} | ${escapePipe(row.sig)} | ${escapePipe(row.use)} |`)
+  }
+  return ['| hook | 返回值 | 用途 |', '|------|--------|------|', ...rows].join('\n')
+}
+
+function renderPhaseTable(): string {
+  const rows = sandboxListenerPhases.map((phase) => {
+    const meta = sandboxListenerPhaseMeta[phase]
+    return `| ${phase} | ${escapePipe(meta.desc)} | ${escapePipe(meta.usage)} |`
+  })
+  return ['| phase | 说明 | 典型用途 |', '|-------|------|----------|', ...rows].join('\n')
+}
+
+function renderScopeTable(): string {
+  const rows = sandboxListenerScopes.map((scope) =>
+    `| \`${scope}\` | ${escapePipe(sandboxListenerScopeDescriptions[scope])} |`)
+  return ['| scope | 说明 |', '|-------|------|', ...rows].join('\n')
+}
+
+function renderActionIdTable(): string {
+  const rows = SANDBOX_ALLOWED_ACTION_IDS.map((id) => {
+    const meta = sandboxActionIdMeta[id]
+    return `| \`${id}\` | ${escapePipe(meta.desc)} | ${escapePipe(meta.params)} |`
+  })
+  return ['| actionId | 说明 | params 形态 |', '|----------|------|------------|', ...rows].join('\n')
+}
+
+export function renderActionIdList(): string {
+  return SANDBOX_ALLOWED_ACTION_IDS.map((id) => `- \`${id}\` — ${escapePipe(sandboxActionIdMeta[id].desc)}`).join('\n')
+}
 
 const PROMPT_BODY = `\
 你是 Open Agricola 的卡牌设计师助手。根据用户描述，生成符合项目规范的自定义卡牌 TypeScript 代码。
@@ -126,45 +190,15 @@ const CARD_IMPL = {
 
 除特别说明外，每个 hook 签名为 \`(state, player) => ActionFlow | void\`（\`onBuy\` 额外接收 \`paymentInfo\`）。
 
-| hook | 触发时机 | 频率 |
-|------|----------|------|
-| onBuy | 打出此卡时 | 一次 |
-| onBeforeStartOfTurn | 每轮发新行动前 | 每轮 |
-| onBeforePlayerTurn | 玩家个人回合开始前（non-flow skip-control，只可返回 \`{skipTurn:true}\` 跳过本人回合，不返回 ActionFlow） | 每行动 |
-| onRoundStart | 新一轮格子翻开后 | 每轮 |
-| onAllWorkersPlaced | 所有工人放置完成 | 每轮 |
-| contributeExtraTurn | 轮转额外行动（无普通工人但仍持后代时返回 XOR[用, 放弃]） | 每轮转 |
-| onEndTurn | 每名玩家行动结束后 | 每行动 |
-| onBeforeReturnHome / onStartReturnHome / onReturnHome | 工人回家阶段 | 每轮 |
-| onRoundEnd / onAfterRoundEnd | 该轮结束 | 每轮 |
-| onBeforeHarvest / onStartHarvest | 收获开始 | 约每4-5轮 |
-| onStartHarvestFieldPhase / onHarvestFieldPhase / onEndHarvestFieldPhase | 收割田地阶段 | 约每4-5轮 |
-| onAfterReap | 田地收割完成后 | 约每4-5轮 |
-| onStartHarvestFeedingPhase / onHarvestFeedingPhase / onEndHarvestFeedingPhase | 喂食阶段 | 约每4-5轮 |
-| onHarvest / onEndHarvest / onAfterHarvest | 收获各阶段 | 约每4-5轮 |
-| onBeforeEndGame | 终局结算前 | 全局一次 |
+${renderEffectHookTable()}
 
 ## 进阶 hook
 
 这些 hook 签名与普通 hook 不同：
 
-| hook | 返回值 | 用途 |
-|------|--------|------|
-| computeBonusScore | \`(state, player, ctx) => number\` | 终局加分（返回 VP 数，不是 \`{score,label}\`） |
-| computeCostedBonus | \`(state, player, ctx) => BonusScoreLevel[]\` | 终局花资源换 VP（声明 levels；solver 枚举最优组合） |
-| computeSharedPostScore | \`(state, owner, summaries) => Array<{playerId, score}>\` | 跨玩家加分 |
-| computeExtraRoomCapacity | \`number\` | 额外容纳空间 |
-| computeHarvestBreedOrderPriority | \`number\` | Harvest breeding phase 顺序调整，数字越大越晚 |
-| onComputeAnimalZones | 修改 zones 数组 | 动物分区扩展 |
-| onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
-| computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
-| getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
-| getSpecialStablePositions / applySpecialStable | \`(state, player[, position]) => FarmTilePosition[] / boolean\` | Build Stables 特殊 stable（如 B85 的 2×2 中心） |
-| getBuiltSpecialStables | \`(player) => FarmTilePosition[]\` | 当前矗立的特殊 stable（驱动 snapshot specialStables 展示派生） |
-| resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
-| handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
-| beforeEndGameScope (meta) | \`'owner' \| 'allPlayers'\` | 终局前按 target player 分发 onBeforeEndGame |
-| beforeEndGameMandatory (meta) | \`boolean\` | select trigger 可用时是否禁用 pass |
+${renderAdvancedHookTable()}
+
+如果效果是“喂食阶段开始时获得食物，并用于本次喂食”，请用 \`onHarvest\` 返回 \`gainLeaf\`；不要从 \`onStartHarvestFeedingPhase\` 返回 flow。
 
 ## listener 机制
 
@@ -172,24 +206,20 @@ const CARD_IMPL = {
 
 ### 可用 phases
 
-| phase | 说明 | 典型用途 |
-|-------|------|----------|
-| before | 行动执行前 | 提前获得资源 |
-| during | 行动执行中 | 修改行动参数 |
-| immediatelyAfter | 行动刚完成 | 立即追加效果 |
-| after | 行动完全结束 | 最常用，获得额外资源 |
-| computeCosts | 计算费用时 | 费用折扣 |
-| computeArgs | 计算行动参数时 | 调整参数 |
-| computeReplace | 替换行动 | 替换为别的效果 |
-| isDoable | 判断行动可用性 | 让不可用行动变可用 |
-| anytime | 任意时刻 | 全局触发 |
-| computeChoiceCandidates | 计算可选项时 | 修改选项列表 |
+${renderPhaseTable()}
+
+### 可用 scope
+
+${renderScopeTable()}
 
 ⚠️ **anytime listener 禁止设 \`actions\` 字段**：\`phases: ['anytime']\` 的 listener 不绑定具体行动，若设了 \`actions\`（哪怕空数组 \`[]\`），引擎会执行 \`actions.includes(contextActionId)\`，结果永为 false，listener 永远不会触发。正确写法：省略 \`actions\` 字段。
+⚠️ **anytime 的 flow 不要设 \`optional: true\`**：anytime 本身即玩家主动触发（已经是「可选」），若返回的 \`seq\` / \`xor\` 再套 \`optional: true\`，触发后会落进需要二次确认的 pending 而落空——支付与收益一步都不执行。anytime 能力直接返回**非 optional** 的 flow。
 
 ### 可监听的行动（actions）
 
 collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、occupation、place-farmer、wish-children、wish-children-growth、family-growth、bake-bread
+
+如果用户提到具体行动格 ID（如 \`forest\`、\`clay-pit\`、\`reed-bank\`、\`traveling-players\`），通常监听对应行动类型（资源累积格用 \`actions: ['collect']\`），并用 \`context.space?.id\` 精确判断；不要假设 \`context.result.spaceId\` 存在。
 
 ### handler 的 context 字段
 
@@ -282,34 +312,14 @@ return {
 
 leaf 节点的 \`actionId\` **只能**取下表 9 个之一。其它字符串（如旧版的 \`write-card-extra-data\`、\`hold-worker-on-card\` 等）已从引擎删除，不可使用。
 
-| actionId | 说明 | params 形态 |
-|----------|------|------------|
-| \`gain\` | 获得资源 | 资源对象，如 \`{ food: 2, wood: 1 }\` |
-| \`pay\` | 支付资源 | 资源对象，如 \`{ grain: 1 }\` |
-| \`bonus-vp\` | +1 VP（固定，不接受 amount） | \`{}\` |
-| \`bake-bread\` | 烤面包（grain → food） | \`{}\` |
-| \`store-on-card\` | 在本卡 \`cardStates[cardId].counters\` 上存资源 | 资源对象，如 \`{ grain: 6 }\` |
-| \`take-from-card\` | 从本卡 counters 取资源给玩家（不足则失败） | 资源对象，如 \`{ grain: 1 }\` |
-| \`push-to-card-stack\` | 向本卡 \`cardStates[cardId].stack\` 推入一个字符串项 | \`{ item: 'someString' }\` |
-| \`special-effect\` | cardStates mutation 统一入口 | discriminated union，\`{ kind, ... }\`（见下方 kind 说明） |
-| \`future-meeples\` | 预放资源到未来回合 | \`{ __futureMeepleRequest: FutureMeepleRequest }\`（见下方说明） |
+${renderActionIdTable()}
 
 > 多次 +VP 时串多个 \`bonus-vp\` leaf 进 seq；不要尝试 \`{ amount: N }\`。
 > \`store-on-card\` / \`take-from-card\` / \`push-to-card-stack\` 都作用于触发它的卡（\`sourceCard\`），所以 leaf 必须带 \`sourceCard: CARD_ID\`。
 
-下面是 actionId 的**权威白名单**，与引擎 \`SANDBOX_ALLOWED_ACTION_IDS\` 由 \`pnpm run check:prompt-sync\` 自动校验，必须与上表完全一致：
+下面是 actionId 的**权威白名单**（与引擎 \`SANDBOX_ALLOWED_ACTION_IDS\` 同源渲染，必与上表一致）：
 
-<!-- prompt-sync:begin id=action-ids -->
-- \`gain\` — 获得资源，params 形如 { food: 2, wood: 1 }
-- \`pay\` — 支付资源
-- \`bonus-vp\` — +1 VP（固定，不接受 amount）
-- \`bake-bread\` — 烤面包
-- \`store-on-card\` — 在卡上存资源
-- \`take-from-card\` — 从卡上取资源
-- \`push-to-card-stack\` — 向卡牌 stack 推入一项
-- \`special-effect\` — cardStates mutation 统一入口，params 为 discriminated union
-- \`future-meeples\` — 预放资源到未来回合
-<!-- prompt-sync:end id=action-ids -->
+${renderActionIdList()}
 
 ### special-effect 的 kind union
 

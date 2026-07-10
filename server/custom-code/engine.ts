@@ -2,10 +2,10 @@ import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from './compiler.ts'
 import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
-import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
+import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
 import type {
   CustomCodeEffectMetadata,
   CustomCodeEffectInvocation,
@@ -20,9 +20,6 @@ import { HELPERS_INJECTION_SOURCE } from './injected-helpers.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8
-
-const isCardListenerScope = (value: unknown): value is CardListenerScope =>
-  value === 'player' || value === 'opponent' || value === 'any'
 
 /**
  * Run compiled card code in a true V8 isolate (via isolated-vm).
@@ -173,7 +170,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     const listeners = parsed.listeners.map((l) => ({
       ...l,
       phases: l.phases?.filter(isSandboxListenerPhase),
-      scope: isCardListenerScope(l.scope) ? l.scope : undefined,
+      scope: isSandboxListenerScope(l.scope) ? l.scope : undefined,
     }))
 
     const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0

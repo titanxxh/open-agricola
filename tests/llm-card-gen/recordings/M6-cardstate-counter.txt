@@ -1,22 +1,25 @@
 ```typescript
 const CARD_ID = 'CUSTOM_ActionCounter'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Action Counter',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Each time you use the Forest, Clay-Pit or Reed-Bank action space, increment the counter on this card by 1 (for tracking purposes). Other actions do not count.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '行动计数官',
-      desc: ['每当你使用「伐木」、「采土坑」或「芦苇地」行动空间时，在本卡上累计计数 +1（用于回顾触发次数）。其它行动不计数。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Action Counter',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Each time you use the <forest>, <clay-pit> or <reed-bank> action space, increment the counter on this card by 1 (tracking your total triggers). Other actions do not count.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '行动计数官',
+        desc: ['每当你使用「伐木」(forest)、「采土坑」(clay-pit) 或「芦苇地」(reed-bank) 行动空间时，在本卡上累计计数 +1（用于回顾本局触发次数）。其它行动不计数。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   listeners: [
@@ -25,23 +28,17 @@ const CARD_IMPL = {
       actions: ['collect'],
       phases: ['after'],
       handler: (context) => {
-        const spaceId = context.space?.id ?? ''
-        if (
-          spaceId.startsWith('forest') ||
-          spaceId.startsWith('clay-pit') ||
-          spaceId.startsWith('reed-bank')
-        ) {
-          return {
-            flow: {
-              type: 'leaf',
-              actionId: 'special-effect',
-              params: { kind: 'increment-counter', key: 'actionCount', amount: 1 },
-              sourceCard: CARD_ID,
-            },
+        const spaceId = context.space?.id
+        if (!['forest', 'clay-pit', 'reed-bank'].includes(spaceId)) return
+        return {
+          flow: {
+            type: 'leaf',
+            actionId: 'special-effect',
+            params: { kind: 'increment-counter', key: 'actionCount', amount: 1 },
             sourceCard: CARD_ID,
-          }
+          },
+          sourceCard: CARD_ID,
         }
-        return undefined
       },
     },
   ],

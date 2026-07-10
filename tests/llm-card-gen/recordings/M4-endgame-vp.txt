@@ -1,22 +1,25 @@
 ```typescript
-const CARD_ID = 'CUSTOM_CattleHerder'
+const CARD_ID = 'CUSTOM_Cowherd'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Cattle Herder',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['At game end, gain 1 <SCORE> for every 2 <CATTLE> you have (rounded down).'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '牛倌',
-      desc: ['局末计分时，你每 2 头 <CATTLE> 获得 1 <SCORE>（向下取整）。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Cowherd',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['At game end, gain 1 <SCORE> for every 2 <CATTLE> you have (rounded down).'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '牛倌',
+        desc: ['游戏结束时，你每 2 头 <CATTLE> 获得 1 <SCORE>（向下取整）。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {
