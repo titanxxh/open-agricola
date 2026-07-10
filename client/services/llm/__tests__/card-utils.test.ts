@@ -107,3 +107,26 @@ describe('extractCardFromResponse — locales', () => {
     expect(result!.card.desc).toEqual(['Effect text in English.'])
   })
 })
+
+const SAMPLE_LEGACY_CTOR = `\`\`\`typescript
+const CARD_ID = 'CUSTOM_LegacyMinor'
+
+const CARD_DEF = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Legacy Minor',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['Old constructor shape.'],
+  cost: { wood: 1 },
+  vp: 1,
+  implemented: true,
+})
+
+const CARD_IMPL = {}
+\`\`\``
+
+describe('extractCardFromResponse — CARD_DEF shape', () => {
+  it('rejects the legacy constructor shape', () => {
+    expect(extractCardFromResponse(SAMPLE_LEGACY_CTOR)).toBeNull()
+  })
+})

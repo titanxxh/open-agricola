@@ -1,45 +1,45 @@
 ```typescript
-const CARD_ID = 'CUSTOM_M7_WoodToFood'
+const CARD_ID = 'CUSTOM_WoodForFood'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Wood for Food',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['At any time, you may pay 2 <WOOD> to gain 3 <FOOD>. May only be used once per game.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '木材换食物',
-      desc: ['任意时机，你可以支付 2 <WOOD>，获得 3 <FOOD>。整局游戏只能使用一次。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Wood For Food',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['At any time, you may pay 2 <WOOD> to gain 3 <FOOD>. Use this ability only once per game.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '木材换食物',
+        desc: ['任意时机，你可以支付 2 <WOOD>，获得 3 <FOOD>。整局游戏只能使用一次。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   listeners: [
     {
       cardIds: [CARD_ID],
       phases: ['anytime'],
-      scope: 'player',
       handler: (context) => {
-        const player = context.player
-        if (player.cardStates?.[CARD_ID]?.flagged === true) return
-        if ((player.resources?.wood ?? 0) < 2) return
+        const used = context.ownerPlayer?.cardStates?.[CARD_ID]?.flagged ?? false
+        if (used) return
+
+        const wood = context.ownerPlayer?.resources?.wood ?? 0
+        if (wood < 2) return
+
         return {
           flow: {
             type: 'seq',
             children: [
               payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
               gainLeaf(CARD_ID, { food: 3 }),
-              {
-                type: 'leaf',
-                actionId: 'special-effect',
-                params: { kind: 'set-flag', flag: true },
-                sourceCard: CARD_ID,
-              },
+              { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: CARD_ID },
             ],
           },
           sourceCard: CARD_ID,

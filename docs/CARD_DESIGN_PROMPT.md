@@ -2,7 +2,7 @@
 
 > **本文档面向两类受众**：
 > - **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）—— 直接 import 任意 helper / hook。权威参考：`docs/ARCHITECTURE.md` + `docs/card_implementation_status.md` + `shared/cards/card-effects.ts`（`CardEffect` 类型 / `cardEffectHooks` 数组）+ `shared/actions/hooks.ts`（`ActionHookPhase`）。
-> - **自定义卡 / Workshop 作者**（通过 AI Designer 提交 TS 源码）—— 受 `server/custom-code-executor/engine.ts`（isolated-vm 沙盒）+ `server/ast-validator.ts`（AST 白名单）双重约束。**沙盒可用接口的唯一真源是 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md)**——hook / phase / scope / actionId / 禁用标识符的权威清单都在那里，由 `pnpm run check:prompt-sync` 与代码自动比对。本文件下面的"自定义卡沙盒约束"章节是给设计者看的导读，遇到不一致以 SANDBOX.md 为准。LLM 系统提示词以 `client/services/llmPrompts.ts:CARD_DESIGNER_SYSTEM_PROMPT` 为准。
+> - **自定义卡 / Workshop 作者**（通过 AI Designer 提交 TS 源码）—— 受 `server/custom-code/engine.ts`（isolated-vm 沙盒）+ `shared/custom-code/ast-validator.ts`（AST 白名单）双重约束。**沙盒可用接口的唯一真源是 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md)**——hook / phase / scope / actionId / 禁用标识符的权威清单都在那里，由 `pnpm run check:prompt-sync` 与代码自动比对。本文件下面的"自定义卡沙盒约束"章节是给设计者看的导读，遇到不一致以 SANDBOX.md 为准。LLM 系统提示词以 `client/services/llmPrompts.ts:CARD_DESIGNER_SYSTEM_PROMPT` 为准。
 >
 > - 工坊提交流程的 PR 文件清单（display + impl 双文件 + 4 个补丁文件）
 >   详见 [`CUSTOM_CARD_SANDBOX.md` §1.1](./CUSTOM_CARD_SANDBOX.md#11-从-workshop-提交到主仓库-pr-的额外规范化)。
@@ -19,8 +19,8 @@
 
 ## 设计原则
 
-1. **不使用 import/export** — 自定义卡沙盒禁止 import；`registerCardEffect`、`registerCardListener`、`MinorImprovement`、`Occupation` 作为全局注入。**注意**：项目内 helper（`familySize` 等）**不**注入沙盒，只在官方卡 / 测试 / 直接 import 时可用。
-2. **两套扩展机制** — `registerCardEffect`（阶段触发）和 `registerCardListener`（行动触发），覆盖大多数卡牌效果。
+1. **不使用 import/export** — 自定义卡沙盒禁止 import；LLM 输出 `CARD_DEF` + `CARD_IMPL` 双常量。**注意**：项目内 helper（`familySize` 等）**不**注入沙盒，只在官方卡 / 测试 / 直接 import 时可用。
+2. **两套扩展机制** — `CARD_IMPL.effect`（阶段触发）和 `CARD_IMPL.listeners`（行动触发），覆盖大多数卡牌效果。
 3. **动态计算支持** — hook 函数内可读 GameState / PlayerState 字段（沙盒里是 JSON 深拷贝快照，只读字段、无方法）。
 4. **反应顺序由玩家选择** — 多张卡同一时机触发时，返回可重放 ActionFlow，让 `trigger-select` 执行来源卡选择；不要把规则写成依赖卡牌扫描顺序。
 
@@ -28,38 +28,50 @@
 
 ### 1. 输出格式
 
-TypeScript 代码块，**不使用 import/export**：
+TypeScript 代码块，**不使用 import/export**。`CARD_DEF` 只接受下面的对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`。LLM prompt 的 hook、phase、scope、actionId 四张 schema 表由 `client/services/llmPrompts.ts` 从真相源常量自动生成；完整白名单仍以 `CUSTOM_CARD_SANDBOX.md` 为准。
 
 ```typescript
 const CARD_ID = 'CUSTOM_英文驼峰名'
 
-// 效果注册（可选）
-registerCardEffect({ id: CARD_ID, ... })
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'English Card Name',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['English effect description.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: { name: '中文卡名', desc: ['中文效果描述。'] },
+    },
+  },
+}
 
-// 监听器注册（可选）
-registerCardListener({ id: CARD_ID, ... })
-
-// 卡牌定义（必须）
-const card = new MinorImprovement({ ... })
-// 或 new Occupation({ ... })
+const CARD_IMPL = {
+  effect: { id: CARD_ID, onBuy: () => gainLeaf(CARD_ID, { food: 1 }) },
+  listeners: [],
+}
 ```
 
 ### 2. 可用机制清单
 
 | 机制 | 实现方式 | 说明 |
 |------|----------|------|
-| 阶段触发 | `registerCardEffect` + `onReturnHome` 等 | 回家/收获/轮次触发 |
-| 行动触发 | `registerCardListener` + `actions` + `phases` | 每次犁地/建造/收集等触发 |
-| 费用折扣 | `modifiers` 字段 | 静态费用修改 |
-| 动态费用 | `registerCardListener` + `phases: ['computeCosts']` | 动态计算折扣 |
+| 阶段触发 | `CARD_IMPL.effect` + `onReturnHome` 等 | 回家/收获/轮次触发 |
+| 行动触发 | `CARD_IMPL.listeners` + `actions` + `phases` | 每次犁地/建造/收集等触发 |
+| 费用折扣 | listener `computeCosts` 返回 `costs` | 动态计算折扣 |
+| 替代支付 | listener `computeCosts` 返回 `paymentResourceProviders` | 只影响支付选项，不直接改玩家资源 |
 | 动态计算 | hook 内读 `player` / `state` 字段（如家庭成员数 = `player.workers.filter(w=>w.isActive).length`） | 根据游戏状态计算 |
 | 替换行动 | listener + `computeReplace` + `decline: true` | 把某行动替换为其他效果 |
 | 启用行动 | listener + `isDoable` + `doable: true` | 让不可用的行动变可用 |
-| 资源转换 | `modifiers: [{ type: 'trade', ... }]` | 静态资源替换 |
+| 资源转换 | listener `computeCosts` 返回 `trades` / `bonuses` | 支付替换或折扣选项 |
 | 多选一 | ActionFlow `type: 'xor'` | 玩家选择分支 |
-| 额外行动 provider | `registerCardEffect` + `contributeExtraTurn` | 普通工人耗尽后贡献一次额外行动机会；多个 provider 先让玩家选择来源卡 |
+| 额外行动 provider | `CARD_IMPL.effect.contributeExtraTurn` | 普通工人耗尽后贡献一次额外行动机会；多个 provider 先让玩家选择来源卡 |
 
-### 3. registerCardEffect 可用 hook
+### 3. CARD_IMPL.effect 可用 hook
 
 > 实际清单以 `shared/cards/card-effects.ts` 中 `CardEffect` 类型为准。下表覆盖目前最常用项。
 
@@ -98,25 +110,27 @@ harvest field 三个 stage hook、`onBeforeEndGame` 和 action reaction listener
 >
 > C1 Overhaul rebuild 只处理 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 
-### 4. registerCardListener 结构
+### 4. CARD_IMPL.listeners 结构
 
 ```typescript
-registerCardListener({
-  id: 'unique-listener-id',
-  cardIds: [CARD_ID],
-  actions: ['plow', 'sow', 'collect', ...],
-  phases: ['after'],
-  handler: (context) => {
-    // context.player, context.state, context.space 可用
-    return { flow: ..., sourceCard: CARD_ID }
-  }
-})
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['plow'],
+    phases: ['after'],
+    handler: (context) => {
+      return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    },
+  }],
+}
 ```
 
-**可用 phases**（`shared/actions/hooks.ts` 中 `ActionHookPhase`，权威）：
+**可用 phases**：
 
-- 官方卡：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime` / `computeExchanges`
-- 自定义卡沙盒：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`（不含官方内部 `computeExchanges`，详见 §7.4）
+- 官方卡以 `shared/actions/hooks.ts` 的 `ActionHookPhase` 为准，额外包含内部 `computeExchanges`。
+- 自定义卡沙盒以 `shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases` 为准：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`。
+
+**可用 scope**以 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 为准：`player` / `opponent` / `any`。
 
 **可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（可由 ActionFlow 执行；也作为 `dispatchReapListener` 派发给 B132 EstateMaster 等 listener 的 actionId）
 
@@ -125,13 +139,14 @@ registerCardListener({
 | actionId | 说明 | params 示例 |
 |----------|------|--------|
 | `gain` | 获得资源 | `{ food: 2, wood: 1 }` |
-| `pay-resources` | 支付资源 | `{ grain: 1 }` |
+| `pay` | 支付资源 | `{ grain: 1 }` |
 | `bonus-vp` | +1 VP（**固定 +1**，不接受 `amount`；要 N 分把 N 个 leaf 串入 seq） | `{}` |
-| `gain-other-players` | 其他玩家各获得 | `{ food: 1 }` |
 | `bake-bread` | 烤面包 | `{}` |
 | `store-on-card` | 在卡上存放资源（写入 `cardStates[id].counters[resource]`） | `{ grain: 6 }` |
 | `take-from-card` | 从卡上取出资源（从 `counters` 扣除） | `{ grain: 1 }` |
-| `reap` | 收获普通田；私人田地收获通过 `actionContext.trigger.phase='private-field-phase'` 复用它，listener 仍通过 `dispatchReapListener` 收到 crop/amount metadata | `{ actionContext: { trigger: { phase: 'private-field-phase' } } }` |
+| `push-to-card-stack` | 向本卡 stack 推入一项 | `{ item: 'wood' }` |
+| `special-effect` | cardStates mutation 统一入口 | `{ kind: 'set-flag', flag: true }` |
+| `future-meeples` | 预放资源到未来回合 | `{ __futureMeepleRequest: { ... } }` |
 
 ### 6. 可访问的游戏状态
 
@@ -171,13 +186,13 @@ registerCardListener({
 
 自定义卡的 TS 源码经 `validateAndCompileCustomCode`（AST 白名单）→ `compileCardCode` → `extractManifestFromCompiledCode`（hook 白名单提取）→ 入库为 `compiled_code` + `code_manifest` → 由 `registerExecutorBackedCustomCard` 在 isolated-vm 中 per-call 调用。受到以下硬性约束：
 
-#### 7.1 AST 禁用清单（`server/ast-validator.ts`）
+#### 7.1 AST 禁用清单（`shared/custom-code/ast-validator.ts`）
 
 `import` / `export` / 动态 import / `require` / `class` 声明 / `generator` / `with` / `eval` / `Function` / `process` / `globalThis` / `global` / `window` / `document` / `__dirname` / `__filename` / `fetch` / `XMLHttpRequest` / `WebSocket` / `setTimeout` / `setInterval` / `setImmediate` / `clearTimeout` / `clearInterval` / `Deno` / `Bun` / `Proxy` / `Reflect`，以及 `.constructor` / `.__proto__` / `.__defineGetter__` 等原型链字段访问。
 
-#### 7.2 沙盒注入的全局（`server/custom-code-executor/engine.ts`）
+#### 7.2 沙盒注入的全局（`server/custom-code/engine.ts`）
 
-仅有：`registerCardEffect`、`registerCardListener`、`MinorImprovement`（stub，原样返回 def）、`Occupation`（stub）、最小化的 `console.log` / `console.warn`。**没有**任何项目 helper（`familySize` / `workersAvailable` / `initCardState` / `getFenceCount` / `cardCountsAs` 等都拿不到，会抛 ReferenceError）。
+仅有：`MinorImprovement` / `Occupation` stub、最小化的 `console.log` / `console.warn`、`gainLeaf`、`payLeaf`、`spaceHasPlayer`、`positionKey`、`getCardStack`、`readCardExtraData`、`getCardDefinition` stub。**没有**任何项目 helper（`familySize` / `workersAvailable` / `initCardState` / `getFenceCount` / `cardCountsAs` 等都拿不到，会抛 ReferenceError）。
 
 `state` / `player` / `paymentInfo` / `context` 等输入都是 `JSON.parse(JSON.stringify(...))` 后的**纯数据快照**，没有方法。
 
@@ -185,16 +200,20 @@ registerCardListener({
 
 完整列表见 `CUSTOM_CARD_SANDBOX.md §3.1`，并由 `pnpm run check:prompt-sync` 和代码白名单同步。`onBeforePlayerTurn` 是 non-flow skip-control，只返回 `{ skipTurn?: true } | void`。`contributeExtraTurn` 返回本卡 provider flow；多个 provider 同时可用时先进入 provider 来源卡选择。围栏折扣使用 listener `computeCosts` phase（actions: `['fence']`）。
 
-#### 7.4 沙盒识别的 listener phase（`isActionHookPhase` 白名单）
+#### 7.4 沙盒识别的 listener phase（`sandboxListenerPhases` 白名单）
 
 `before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`。
 
-#### 7.5 actionId 注意
+#### 7.5 沙盒识别的 listener scope（`sandboxListenerScopes` 白名单）
+
+`player` / `opponent` / `any`。
+
+#### 7.6 actionId 注意
 
 - `bonus-vp` 固定 +1，不接受 `amount` 参数；要 N 分就把 N 个 leaf 串入 seq。
 - `store-on-card` / `take-from-card` 操作的是 `player.cardStates[CARD_ID].counters[resource]`，读取时也要走 `counters`。
 
-#### 7.6 listener context 的 player 语义
+#### 7.7 listener context 的 player 语义
 
 `scope: 'opponent'` / `scope: 'any'` 的 listener 里，`context.player` 是**触发该行动的玩家**（对手），不是卡主。判定卡主必须用 `context.ownerPlayer`。`scope: 'player'`（默认）时两者相同。
 

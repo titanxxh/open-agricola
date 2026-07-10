@@ -1,22 +1,25 @@
 ```typescript
 const CARD_ID = 'CUSTOM_ThriftyRenovator'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Thrifty Renovator',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['When you renovate your house, the required <REED> is reduced by 1 (minimum 0).'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '节俭翻修家',
-      desc: ['你翻修房屋时，所需 <REED> 减少 1（最少为 0）。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Thrifty Renovator',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['When you renovate your house, the <REED> cost is reduced by 1 (minimum 0).'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '节俭翻修家',
+        desc: ['你翻修房屋时，所需 <REED> 减少 1（最少为 0）。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   listeners: [

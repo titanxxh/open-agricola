@@ -242,7 +242,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 ### C2. 系统提示词设计
 
-**源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。
+**源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。effect / 进阶 hook 表、listener phase 表、listener scope 表、actionId 表**运行时从真相源渲染**（`shared/cards/card-effects.ts` 的 `cardEffectHooks` + `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-listener-scopes.ts` / `sandbox-action-ids.ts`），因此这四张表不会与引擎漂移，无需手工镜像。
 
 **结构：角色定义 + 输出格式 + 关键规则 + CARD_IMPL 结构详解 + effect hook 表 + listener 机制 + ActionFlow 类型 + 可用 helper + 可读 state/player 字段 + 沙盒限制 + 设计平衡参考 + 游戏规则速览 + few-shot 示例**
 
@@ -250,24 +250,27 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 #### 输出格式
 
-LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）：
+LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
 
 ```typescript
 const CARD_ID = 'CUSTOM_英文驼峰名'
 
-const CARD_DEF = new MinorImprovement({   // 或 new Occupation({...})
-  id: CARD_ID,
-  name: 'Card Name',          // 英文，与内置卡风格一致
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: { name: '卡牌中文名', desc: ['中文描述'] },
+const CARD_DEF = {
+  cardType: 'minor',            // 或 'occupation'
+  meta: {
+    id: CARD_ID,
+    name: 'Card Name',          // 英文，与内置卡风格一致
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: { name: '卡牌中文名', desc: ['中文描述'] },
+    },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {
@@ -304,11 +307,13 @@ const CARD_IMPL = {
 
 监听行动触发：可用 `phases` 包括 `before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。
 
+可用 `scope`：`player`、`opponent`、`any`；权威白名单见 `shared/custom-code/sandbox-listener-scopes.ts`。
+
 可监听的 `actions`：`collect`、`gain`、`receive`、`plow`、`sow`、`construct`、`renovate-house`、`fence`、`stables`、`improvement-any`、`minor-improvement`、`occupation`、`place-farmer`、`wish-children`、`family-growth`、`bake-bread`。
 
 #### 可用 actionId（ActionFlow leaf）
 
-`gain`、`pay-resources`、`bonus-vp`、`gain-other-players`、`bake-bread`、`store-on-card`、`take-from-card`、`push-card-stack`、`write-card-extra-data`、`hold-worker-on-card`、`release-worker-from-card`。
+`gain`、`pay`、`bonus-vp`、`bake-bread`、`store-on-card`、`take-from-card`、`push-to-card-stack`、`special-effect`、`future-meeples`（共 9 个；权威白名单见 `shared/custom-code/sandbox-action-ids.ts` 的 `SANDBOX_ALLOWED_ACTION_IDS`）。旧 id（`pay-resources` / `gain-other-players` / `write-card-extra-data` / `hold-worker-on-card` 等）已从引擎删除。
 
 #### 沙盒注入 helper
 

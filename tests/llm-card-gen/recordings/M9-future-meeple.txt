@@ -1,38 +1,43 @@
 ```typescript
-const CARD_ID = 'CUSTOM_OmenBearer'
+const CARD_ID = 'CUSTOM_Omenspeaker'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Omen Bearer',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['When played, place 1 <WOOD> on the next round to be received at the start of that round.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '预兆者',
-      desc: ['打出时，预放 1 <WOOD> 到下一轮，在下一轮开始时获得。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Omenspeaker',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['When played, place 1 <WOOD> in advance; you will receive it at the start of the next round.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '预兆者',
+        desc: ['打出此卡时，预放 1 <WOOD>，在下一轮开始时获得。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => ({
-      type: 'leaf',
-      actionId: 'future-meeples',
-      params: {
-        __futureMeepleRequest: {
-          cardId: CARD_ID,
-          playerId: player.id,
-          entries: [{ round: state.round + 1, resources: { wood: 1 } }],
+    onBuy: (state, player) => {
+      return {
+        type: 'leaf',
+        actionId: 'future-meeples',
+        params: {
+          __futureMeepleRequest: {
+            cardId: CARD_ID,
+            playerId: player.id,
+            entries: [{ round: state.round + 1, resources: { wood: 1 } }],
+          },
         },
-      },
-      sourceCard: CARD_ID,
-    }),
+        sourceCard: CARD_ID,
+      }
+    },
   },
 }
 ```
