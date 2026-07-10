@@ -4,14 +4,14 @@
 
 > **谁该读这个文件**：
 >
-> - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 必须与本文件一致
+> - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 运行时从源码真相源 + 描述元数据渲染 hook / phase / scope / actionId 表；hook / phase / actionId 描述分别维护在 `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-action-ids.ts`，scope 描述维护在 prompt 文件的穷尽 map
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
-> 1. 同步修改 `client/services/llmPrompts.ts` 的 hook / phase / actionId 列表（CI `pnpm run check:prompt-sync` 会兜底）
+> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；`CARD_DESIGNER_SYSTEM_PROMPT` 运行时渲染，**不再手工同步 prompt**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
 > 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 引用本文件而不是各自维护一份
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/game/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
@@ -149,9 +149,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ---
 
-## 3. 沙盒识别的 hook / phase 白名单
+## 3. 沙盒识别的 hook / phase / scope 白名单
 
-> **机器可校验段落（CI 会扫）**：本节的两个列表通过下面的标记块与 `shared/cards/card-effects.ts` 的 `cardEffectHooks` 数组、`server/custom-code/engine.ts` 的 `isActionHookPhase` 函数进行同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
+> **机器可校验段落（CI 会扫）**：本节的三个列表通过下面的标记块与 `shared/cards/card-effects.ts` 的 `cardEffectHooks`、`shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases`、`shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
 
 ### 3.1 `CARD_IMPL.effect` 可用 hook
 
@@ -283,7 +283,7 @@ return {
 
 ### 3.4 `scope` 取值
 
-`isCardListenerScope` 限制：
+`sandboxListenerScopes` 限制：
 
 
 
@@ -578,16 +578,19 @@ return {
 const CARD_ID = 'CUSTOM_MyCard'
 
 // 卡牌定义（必须）
-const CARD_DEF = new MinorImprovement({
-  id: CARD_ID,
-  name: '卡牌名',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['效果描述'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-})
+const CARD_DEF = {
+  cardType: 'minor',            // 或 'occupation'
+  meta: {
+    id: CARD_ID,
+    name: '卡牌名',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['效果描述'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+  },
+}
 
 // 卡牌实现（可选，无效果卡可省略）
 const CARD_IMPL = {
@@ -640,16 +643,16 @@ const CARD_IMPL = {
 
 ### 9.1 修改本文件 → 谁会自动同步
 
-- `**client/services/llmPrompts.ts`**：必须人工同步对应段落，CI `pnpm run check:prompt-sync` 会校验 §3.1 / §3.2 / §3.3 / §5.1 / §5.2 这五个 `prompt-sync` 标记块与 `llmPrompts.ts` 字符串、`shared/cards/card-effects.ts` 的 `cardEffectHooks`、`server/custom-code/engine.ts` 的 `isActionHookPhase` / `isCardListenerScope`、`shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 一致。
+- `**client/services/llmPrompts.ts`**：**不再手工同步**——它运行时从源码真相源（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`）和描述元数据渲染 hook / phase / scope / actionId 表，由 `client/services/__tests__/llmPrompts.test.ts` 集合断言守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。
 - `**docs/CARD_DESIGN_PROMPT.md**`：手工同步引用本文件即可（避免重复列表）。
 - `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
-### 9.2 修改 hook / phase / denylist 代码 → 必须更新本文件
+### 9.2 修改 hook / phase / scope / denylist 代码 → 必须更新本文件
 
 - 在 `shared/cards/card-effects.ts` 的 `cardEffectHooks` 数组增删一项 → 改本文件 §3.1 同名 `prompt-sync` 块
-- 在 `server/custom-code/engine.ts` 的 `isActionHookPhase` 增删 phase → 改本文件 §3.2
-- 在 `server/custom-code/engine.ts` 的 `isCardListenerScope` 增删 scope → 改本文件 §3.3
+- 在 `shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases` 增删 phase → 改本文件 §3.2
+- 在 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 增删 scope → 改本文件 §3.4
 - 在 `shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 增删项 → 改本文件 §5.1 / §5.2
 
 CI 会拦下漏改的情况。
