@@ -151,7 +151,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ## 3. 沙盒识别的 hook / phase 白名单
 
-> **机器可校验段落（CI 会扫）**：本节的两个列表通过下面的标记块与 `shared/cards/card-effects.ts` 的 `cardEffectHooks` 数组、`server/custom-code/engine.ts` 的 `isActionHookPhase` 函数进行同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
+> **机器可校验段落（CI 会扫）**：本节的列表通过下面的标记块与 `shared/cards/card-effects.ts` 的 `cardEffectHooks`、`shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases`、`shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 进行同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
 
 ### 3.1 `CARD_IMPL.effect` 可用 hook
 
@@ -546,6 +546,12 @@ return {
 ### 6.1 `special-effect` `params.kind` 沙盒可用子集
 
 ```ts
+// player.cardStates[sourceCard].counters[key] += amount
+{ kind: 'increment-counter', key: 'uses', amount: 1 }
+
+// 设置 player.cardStates[sourceCard].counters[key]
+{ kind: 'set-counter', key: 'uses', value: 0 }
+
 // 设/清除 player.cardStates[sourceCard].flagged
 { kind: 'set-flag', flag: true }
 { kind: 'set-flag', flag: false }
@@ -578,16 +584,25 @@ return {
 const CARD_ID = 'CUSTOM_MyCard'
 
 // 卡牌定义（必须）
-const CARD_DEF = new MinorImprovement({
-  id: CARD_ID,
-  name: '卡牌名',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['效果描述'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-})
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Card Name',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect description.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '卡牌名',
+        desc: ['效果描述。'],
+      },
+    },
+  },
+}
 
 // 卡牌实现（可选，无效果卡可省略）
 const CARD_IMPL = {
@@ -620,6 +635,7 @@ const CARD_IMPL = {
 - `CARD_IMPL.effect` 的键必须在 §3.1 白名单中
 - `CARD_IMPL.listeners[].phases` 的值必须在 §3.2 白名单中
 - 不使用 `import` / `export` / `registerCardEffect` / `registerCardListener`
+- LLM prompt 只推荐对象字面量 `CARD_DEF = { cardType, meta }`；旧的 `new MinorImprovement(...)` / `new Occupation(...)` stub 仍可兼容运行，但不应再作为新输出格式
 
 ---
 
@@ -640,7 +656,7 @@ const CARD_IMPL = {
 
 ### 9.1 修改本文件 → 谁会自动同步
 
-- `**client/services/llmPrompts.ts`**：必须人工同步对应段落，CI `pnpm run check:prompt-sync` 会校验 §3.1 / §3.2 / §3.3 / §5.1 / §5.2 这五个 `prompt-sync` 标记块与 `llmPrompts.ts` 字符串、`shared/cards/card-effects.ts` 的 `cardEffectHooks`、`server/custom-code/engine.ts` 的 `isActionHookPhase` / `isCardListenerScope`、`shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 一致。
+- `**client/services/llmPrompts.ts`**：schema 段从 `cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS` 自动生成；CI `pnpm run check:prompt-sync` 会校验生成后的 `CARD_DESIGNER_SYSTEM_PROMPT` 与这些真相源一致。
 - `**docs/CARD_DESIGN_PROMPT.md**`：手工同步引用本文件即可（避免重复列表）。
 - `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
@@ -648,8 +664,8 @@ const CARD_IMPL = {
 ### 9.2 修改 hook / phase / denylist 代码 → 必须更新本文件
 
 - 在 `shared/cards/card-effects.ts` 的 `cardEffectHooks` 数组增删一项 → 改本文件 §3.1 同名 `prompt-sync` 块
-- 在 `server/custom-code/engine.ts` 的 `isActionHookPhase` 增删 phase → 改本文件 §3.2
-- 在 `server/custom-code/engine.ts` 的 `isCardListenerScope` 增删 scope → 改本文件 §3.3
+- 在 `shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases` 增删 phase → 改本文件 §3.2
+- 在 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 增删 scope → 改本文件 §3.4
 - 在 `shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 增删项 → 改本文件 §5.1 / §5.2
 
 CI 会拦下漏改的情况。

@@ -1,22 +1,25 @@
 ```typescript
 const CARD_ID = 'CUSTOM_OmenBearer'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Omen Bearer',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['When played, place 1 <WOOD> on the next round to be received at the start of that round.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '预兆者',
-      desc: ['打出时，预放 1 <WOOD> 到下一轮，在下一轮开始时获得。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Omen Bearer',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['When played, place 1 <WOOD> on the next round. At the start of that round, receive it.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '预兆者',
+        desc: ['打出此卡时，预放 1 <WOOD>，在下一轮开始时获得。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {

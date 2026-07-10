@@ -1,48 +1,46 @@
 ```typescript
 const CARD_ID = 'CUSTOM_TravelingTeacher'
-const TRAVELING_PLAYERS = 'traveling-players'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Traveling Teacher',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Each time you pay an occupation cost, you may use food from the Traveling Players accumulation space. Remove that food from the action space when paid.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '巡游教师',
-      desc: ['每次你支付职业费用时，可以使用 Traveling Players 行动格上累积的 food 来支付，并从该行动格移除对应 food。'],
-    },
-  },
-})
-
-const CARD_IMPL = {
-  listeners: [
-    {
-      cardIds: [CARD_ID],
-      actions: ['occupation'],
-      phases: ['computeCosts'],
-      handler: (context) => {
-        const tp = context.state.actionSpaces.find((space) => space.id === TRAVELING_PLAYERS)
-        const food = tp && tp.resources ? tp.resources.food || 0 : 0
-        if (food <= 0) return null
-        return {
-          paymentResourceProviders: [
-            {
-              key: `${CARD_ID}:traveling-players-food`,
-              sourceCard: CARD_ID,
-              available: food,
-              covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
-              consume: { type: 'actionSpace', spaceId: TRAVELING_PLAYERS, resource: 'food' },
-            },
-          ],
-          sourceCard: CARD_ID,
-        }
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Traveling Teacher',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['You may use food on Traveling Players to pay occupation costs.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '巡游教师',
+        desc: ['你可以用 Traveling Players 行动格上的食物支付职业费用。'],
       },
     },
-  ],
+  },
+}
+
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['occupation'],
+    phases: ['computeCosts'],
+    handler: (context) => {
+      const space = context.state.actionSpaces.find((s) => s.id === 'traveling-players')
+      const food = space?.resources?.food ?? 0
+      if (food <= 0) return
+      return {
+        paymentResourceProviders: [{
+          key: `${CARD_ID}:traveling-players-food`,
+          sourceCard: CARD_ID,
+          available: food,
+          covers: [{ resource: 'food', costAmount: 1, paymentAmount: 1 }],
+          consume: { type: 'actionSpace', spaceId: 'traveling-players', resource: 'food' },
+        }],
+        sourceCard: CARD_ID,
+      }
+    },
+  }],
 }
 ```

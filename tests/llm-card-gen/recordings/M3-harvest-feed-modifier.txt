@@ -1,29 +1,30 @@
 ```typescript
-const CARD_ID = 'CUSTOM_M3_HarvestHelper'
+const CARD_ID = 'CUSTOM_HarvestHelper'
 
-const CARD_DEF = new Occupation({
-  id: CARD_ID,
-  name: 'Harvest Helper',
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['At the start of each Harvest feeding phase, you gain 1 <FOOD> that can be used for this feeding.'],
-  cost: {},
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: {
-      name: '收获助手',
-      desc: ['每次收获的喂养阶段开始时，你获得 1 <FOOD>，可用于本次喂养。'],
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Harvest Helper',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['At the start of each Harvest feeding phase, gain 1 <FOOD> (for this feeding).'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '收获助手',
+        desc: ['每次收获的喂养阶段开始时，获得 1 <FOOD>（用于本次喂养）。'],
+      },
     },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
-    onHarvest: (_state, _player) => {
-      return gainLeaf(CARD_ID, { food: 1 })
-    },
+    onHarvest: () => gainLeaf(CARD_ID, { food: 1 }),
   },
 }
 ```

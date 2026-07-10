@@ -244,7 +244,13 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 **源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。
 
-**结构：角色定义 + 输出格式 + 关键规则 + CARD_IMPL 结构详解 + effect hook 表 + listener 机制 + ActionFlow 类型 + 可用 helper + 可读 state/player 字段 + 沙盒限制 + 设计平衡参考 + 游戏规则速览 + few-shot 示例**
+**结构：角色定义 + 输出格式 + 自动生成的沙盒 schema + 设计平衡参考 + 游戏规则速览 + 少量 canonical few-shot 示例**
+
+Schema 段由 `client/services/llmPrompts.ts` 从真相源常量生成：
+- `shared/cards/card-effects.ts` → `cardEffectHooks`
+- `shared/custom-code/sandbox-listener-phases.ts` → `sandboxListenerPhases`
+- `shared/custom-code/sandbox-listener-scopes.ts` → `sandboxListenerScopes`
+- `shared/custom-code/sandbox-action-ids.ts` → `SANDBOX_ALLOWED_ACTION_IDS`
 
 ---
 
@@ -255,19 +261,22 @@ LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `C
 ```typescript
 const CARD_ID = 'CUSTOM_英文驼峰名'
 
-const CARD_DEF = new MinorImprovement({   // 或 new Occupation({...})
-  id: CARD_ID,
-  name: 'Card Name',          // 英文，与内置卡风格一致
-  deck: 'CUSTOM',
-  number: 0,
-  desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
-  cost: { wood: 1 },
-  vp: 0,
-  implemented: true,
-  locales: {
-    zh: { name: '卡牌中文名', desc: ['中文描述'] },
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Card Name',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
+    cost: { wood: 1 },
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: { name: '卡牌中文名', desc: ['中文描述'] },
+    },
   },
-})
+}
 
 const CARD_IMPL = {
   effect: {
@@ -308,7 +317,7 @@ const CARD_IMPL = {
 
 #### 可用 actionId（ActionFlow leaf）
 
-`gain`、`pay-resources`、`bonus-vp`、`gain-other-players`、`bake-bread`、`store-on-card`、`take-from-card`、`push-card-stack`、`write-card-extra-data`、`hold-worker-on-card`、`release-worker-from-card`。
+`gain`、`pay`、`bonus-vp`、`bake-bread`、`store-on-card`、`take-from-card`、`push-to-card-stack`、`special-effect`、`future-meeples`。
 
 #### 沙盒注入 helper
 
@@ -320,7 +329,7 @@ const CARD_IMPL = {
 
 #### few-shot 示例来源
 
-系统提示词末尾附加 `docs/community-card-examples.md`（原始 Markdown 通过 Vite `?raw` 导入），作为 few-shot 示例库随提示词一起发送给 LLM。
+系统提示词内置少量 canonical few-shot 示例，覆盖静态卡、`onBuy`、listener、`computeCosts`、card state counter、`anytime`、`paymentResourceProviders`。`docs/community-card-examples.md` 不再整段拼入 system prompt。
 
 ### C3. 多轮对话设计
 
