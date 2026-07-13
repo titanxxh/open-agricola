@@ -32,7 +32,7 @@ import type {
   WorkerPlacedEvent,
 } from '../contract/events'
 import type { ActionDetailParts } from '../contract/protocol/game'
-import type { LogEntry, Resource } from '../contract/types'
+import type { FutureMeepleResourceMap, LogEntry, Resource } from '../contract/types'
 
 export type EventLogMapperContext = {
   playerNames: Record<string, string>
@@ -46,10 +46,17 @@ export type LogPresentationConsumedEventReason =
   | 'renovationPayment'
   | 'stablePayment'
 
+export type LogPresentationSuppressedEventReason = 'futureResourceReceive'
+
 export type LogPresentationConsumedEvent = {
   consumedEventRef: LogPresentationEventRef
   consumerEventRef: LogPresentationEventRef
   reason: LogPresentationConsumedEventReason
+}
+
+export type LogPresentationSuppressedEvent = {
+  suppressedEventRef: LogPresentationEventRef
+  reason: LogPresentationSuppressedEventReason
 }
 
 export type LogPresentationRowIdentity = {
@@ -67,6 +74,7 @@ export type LogPresentationRow = {
 export type LogPresentationPlan = {
   rows: LogPresentationRow[]
   consumedEvents: LogPresentationConsumedEvent[]
+  suppressedEvents: LogPresentationSuppressedEvent[]
 }
 
 const eventRef = (event: GameEvent): LogPresentationEventRef => ({
@@ -141,6 +149,7 @@ const BUILT_IN_LEAF_ACTION_NAMES: Record<string, string> = {
   construct: 'actions.construct.name',
   fence: 'actions.fencing.name',
   plow: 'actions.plow.name',
+  receive: 'actions.receive.name',
   'renovate-house': 'actions.renovate-house.name',
   stables: 'actions.stables.name',
 }
@@ -425,6 +434,24 @@ const mapFutureMeepleResolved = (
   },
 })
 
+const futureMeepleActionResourceKeys = [
+  'field',
+  'stable',
+  'forest',
+  'moor',
+] as const satisfies readonly Exclude<keyof FutureMeepleResourceMap, keyof Resource>[]
+
+const isPureResourceFutureMeepleResolution = (
+  event: FutureMeepleResolvedEvent,
+): boolean => {
+  if (event.roomType) return false
+  const resources = Object.entries(event.resources ?? {})
+    .filter(([, amount]) => typeof amount === 'number' && amount > 0)
+  return resources.length > 0 &&
+    resources.every(([resource]) =>
+      !futureMeepleActionResourceKeys.some((actionResource) => actionResource === resource))
+}
+
 const mapCardResourcePairsStored = (
   event: CardResourcePairsStoredEvent,
   ctx: EventLogMapperContext,
@@ -705,6 +732,7 @@ export const buildLogPresentationPlan = (
 ): LogPresentationPlan => {
   const consumedPaymentSeqs = new Set<number>()
   const consumedEvents: LogPresentationConsumedEvent[] = []
+  const suppressedEvents: LogPresentationSuppressedEvent[] = []
   const consumePayment = (
     consumerEvent: GameEvent,
     payment: ResourcePaidEvent,
@@ -872,6 +900,13 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'futureMeeple.resolved') {
+        if (isPureResourceFutureMeepleResolution(event)) {
+          suppressedEvents.push({
+            suppressedEventRef: eventRef(event),
+            reason: 'futureResourceReceive',
+          })
+          return []
+        }
         return presentationRows(event, [mapFutureMeepleResolved(event, ctx)])
       }
 
@@ -1061,7 +1096,7 @@ export const buildLogPresentationPlan = (
       return []
     })
 
-  return { rows, consumedEvents }
+  return { rows, consumedEvents, suppressedEvents }
 }
 
 export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] =>

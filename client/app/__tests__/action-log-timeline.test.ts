@@ -301,6 +301,174 @@ describe('buildActionLogTimelineRows', () => {
     })
   })
 
+  it('suppresses pure resource future resolution across archive packets', () => {
+    const resolved = {
+      schemaVersion: 1,
+      id: 'evt-future',
+      seq: 4,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceCardId: 'PR11',
+      type: 'futureMeeple.resolved',
+      playerId: 'p2',
+      cardId: 'PR11',
+      resources: { food: 1 },
+    } satisfies GameEvent
+    const received = {
+      schemaVersion: 1,
+      id: 'evt-received',
+      seq: 5,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceActionId: 'receive',
+      sourceCardId: 'PR11',
+      type: 'resource.moved',
+      resources: { food: 1 },
+      from: { kind: 'roundCard', round: 3 },
+      to: { kind: 'player', playerId: 'p2' },
+      reason: 'receive',
+    } satisfies GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(resolved, 1),
+        replayEntryForEvent(received, 2),
+      ],
+      stateLog: [
+        {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Player 2',
+            action: 'actions.receive.name',
+            detailParts: { gains: { food: 1 } },
+          },
+        },
+      ],
+      currentRound: 3,
+      locale: 'en',
+      playerNames: { p2: 'Player 2' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.logEntry?.key).toBe('log.actionDetail')
+    expect(rows[0]?.logEntry?.params?.action).toBe('actions.receive.name')
+  })
+
+  it('keeps future resolution when it has a standalone room effect', () => {
+    const resolved = {
+      schemaVersion: 1,
+      id: 'evt-future-room',
+      seq: 4,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceCardId: 'B157_Salter',
+      type: 'futureMeeple.resolved',
+      playerId: 'p2',
+      cardId: 'B157_Salter',
+      resources: { food: 2 },
+      roomType: 'clay',
+    } satisfies GameEvent
+    const received = {
+      schemaVersion: 1,
+      id: 'evt-received-room',
+      seq: 5,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceActionId: 'receive',
+      sourceCardId: 'B157_Salter',
+      type: 'resource.moved',
+      resources: { food: 2 },
+      from: { kind: 'roundCard', round: 3 },
+      to: { kind: 'player', playerId: 'p2' },
+      reason: 'receive',
+    } satisfies GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        replayEntryForEvent(resolved, 1),
+        replayEntryForEvent(received, 2),
+      ],
+      stateLog: [],
+      currentRound: 3,
+      locale: 'en',
+      playerNames: { p2: 'Player 2' },
+    })
+
+    expect(buckets.flatMap((bucket) => bucket.rows).map((row) => row.logEntry?.key)).toEqual([
+      'log.actionDetail',
+      'log.futureMeepleResolved',
+    ])
+  })
+
+  it('suppresses canceled pure resource resolution but keeps its canceled receive row', () => {
+    const resolved = {
+      schemaVersion: 1,
+      id: 'evt-canceled-future',
+      seq: 4,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceCardId: 'PR11',
+      type: 'futureMeeple.resolved',
+      playerId: 'p2',
+      cardId: 'PR11',
+      resources: { food: 1 },
+    } satisfies GameEvent
+    const received = {
+      schemaVersion: 1,
+      id: 'evt-canceled-received',
+      seq: 5,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p2',
+      sourceActionId: 'receive',
+      sourceCardId: 'PR11',
+      type: 'resource.moved',
+      resources: { food: 1 },
+      from: { kind: 'roundCard', round: 3 },
+      to: { kind: 'player', playerId: 'p2' },
+      reason: 'receive',
+    } satisfies GameEvent
+
+    const buckets = buildActionLogTimelineRows({
+      entries: [
+        {
+          ...replayEntryForEvent(resolved, 1),
+          status: 'canceled',
+          payloadSource: 'canceledArchive',
+        },
+        {
+          ...replayEntryForEvent(received, 2),
+          status: 'canceled',
+          payloadSource: 'canceledArchive',
+        },
+      ],
+      stateLog: [],
+      currentRound: 3,
+      locale: 'en',
+      playerNames: { p2: 'Player 2' },
+    })
+
+    const rows = buckets.flatMap((bucket) => bucket.rows)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      logEntry: { key: 'log.actionDetail' },
+      status: 'canceled',
+      strikethrough: true,
+    })
+  })
+
   it('dedupes internal leaf action logs from replay events', () => {
     const renovated: GameEvent = {
       schemaVersion: 1,
