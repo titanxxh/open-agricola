@@ -83,6 +83,40 @@ describe('fixed dev room startup persistence', () => {
       else process.env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL = previousIncomplete
     }
   })
+
+  it('preserves restored direct Parent Card mode when startup has no override', () => {
+    const previousParents = process.env.DEV_ENABLE_PARENT_CARDS
+    const previousDraftParents = process.env.DEV_DRAFT_PARENTS
+    const persistence = new InMemoryRoomPersistence()
+
+    try {
+      process.env.DEV_ENABLE_PARENT_CARDS = 'true'
+      process.env.DEV_DRAFT_PARENTS = 'false'
+      const first = createWsServer(createServer(), { persistence })
+      try {
+        expect(first.registry.get('dev2')?.draftParents).toBe(false)
+        expect(persistence.load('dev2')?.meta.draftParents).toBe(false)
+      } finally {
+        clearInterval(first.cleanupTimer)
+        first.wss.close()
+      }
+
+      delete process.env.DEV_ENABLE_PARENT_CARDS
+      delete process.env.DEV_DRAFT_PARENTS
+      const restored = createWsServer(createServer(), { persistence })
+      try {
+        expect(restored.registry.get('dev2')?.draftParents).toBe(false)
+      } finally {
+        clearInterval(restored.cleanupTimer)
+        restored.wss.close()
+      }
+    } finally {
+      if (previousParents === undefined) delete process.env.DEV_ENABLE_PARENT_CARDS
+      else process.env.DEV_ENABLE_PARENT_CARDS = previousParents
+      if (previousDraftParents === undefined) delete process.env.DEV_DRAFT_PARENTS
+      else process.env.DEV_DRAFT_PARENTS = previousDraftParents
+    }
+  })
 })
 
 const waitForOpen = async (ws: WebSocket): Promise<void> => {
