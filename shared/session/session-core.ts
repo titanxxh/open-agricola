@@ -895,7 +895,13 @@ export class GameCore {
 
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
-    setupPhase.updatePlayerName(this.state.players[playerIndex], name)
+    const player = this.state.players[playerIndex]
+    const previousName = player?.name
+    setupPhase.updatePlayerName(player, name)
+    if (!previousName || !player || previousName === player.name) return
+    for (const entry of this.state.log) {
+      if (entry.params?.player === previousName) entry.params.player = player.name
+    }
   }
 
   private engineDeps() {
