@@ -29,21 +29,15 @@ a:focus-visible,
   color: var(--color-text);
   background: transparent;
   padding: var(--app-edge-padding);
+  padding-bottom: calc(
+    var(--app-edge-padding) + var(--interaction-bar-height, 0px) + env(safe-area-inset-bottom)
+  );
   box-sizing: border-box;
   overflow-x: hidden;
-}
-/* Padding when interaction bar is visible (fixed bottom) */
-.app {
-  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-max-height));
 }
 @keyframes pulse-badge {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.75; }
-}
-@media (max-width: 1100px) {
-  .app {
-      padding: var(--app-edge-padding);
-    }
 }
 @media (min-width: 1600px) {
   .app {
