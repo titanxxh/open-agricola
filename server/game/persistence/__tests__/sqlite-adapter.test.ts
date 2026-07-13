@@ -30,6 +30,7 @@ const setupDb = () => {
       version INTEGER NOT NULL DEFAULT 0,
       custom_card_ids TEXT NOT NULL DEFAULT '[]',
       enable_parent_cards INTEGER NOT NULL DEFAULT 0,
+      draft_parents INTEGER,
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
@@ -123,6 +124,7 @@ describe('SqliteRoomPersistence', () => {
     const meta: RoomMeta = {
       ...META,
       enableParentCards: true,
+      draftParents: false,
       enableThroughTheSeasons: true,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
@@ -132,6 +134,7 @@ describe('SqliteRoomPersistence', () => {
 
     expect(p.load('r1')?.meta).toMatchObject({
       enableParentCards: true,
+      draftParents: false,
       enableThroughTheSeasons: true,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,

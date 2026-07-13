@@ -3,6 +3,7 @@ import { GameSession } from '../authoritative-session.ts'
 import type { Room } from '../room.ts'
 import { InMemoryRoomPersistence } from '../persistence/memory-adapter.ts'
 import { createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.ts'
+import { snapshotToRoom } from '../room.ts'
 
 const room = (id = 'r1'): Room => {
   const session = new GameSession()
@@ -28,6 +29,7 @@ describe('Room Persistence Checkpoint', () => {
     const save = vi.spyOn(persistence, 'save')
     const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const r = room()
+    r.draftParents = false
 
     checkpoint.recordCreated(r)
     expect(save).toHaveBeenNthCalledWith(1, 'r1', null, expect.objectContaining({ status: 'waiting' }))
@@ -37,6 +39,8 @@ describe('Room Persistence Checkpoint', () => {
     checkpoint.recordMeta(r)
     expect(persistence.load('r1')?.serialized).not.toBeNull()
     expect(persistence.load('r1')?.meta.status).toBe('playing')
+    expect(persistence.load('r1')?.meta.draftParents).toBe(false)
+    expect(snapshotToRoom(persistence.load('r1')!).draftParents).toBe(false)
 
     checkpoint.recordState(r, r.session.getState().state)
     expect(save).toHaveBeenLastCalledWith('r1', expect.objectContaining({ players: expect.any(Array) }), expect.objectContaining({ status: 'playing' }))
