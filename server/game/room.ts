@@ -23,6 +23,7 @@ export type Room = {
   createdBy?: string
   customCardDbIds?: string[]
   enableParentCards?: boolean
+  draftParents?: boolean
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean

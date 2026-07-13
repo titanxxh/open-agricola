@@ -195,6 +195,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     createdBy: ctx.currentUserId,
     customCardDbIds,
     enableParentCards,
+    draftParents,
     enableThroughTheSeasons,
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -359,6 +360,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       {
         playerCount: room.maxPlayers,
         enableParentCards,
+        ...(room.draftParents === false ? { draftParents: false } : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,

@@ -794,6 +794,13 @@ export class GameCore {
       })
     }
     this.syncDynamicActionSpaces()
+    if (
+      (stateOrSeed === undefined || typeof stateOrSeed === 'number') &&
+      this.state.phase === 'playing' &&
+      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
+    ) {
+      this.continueCurrentFutureMeepleActions()
+    }
   }
 
   /**
