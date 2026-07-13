@@ -7,6 +7,7 @@ export type RoomMeta = {
   maxPlayers: number
   customCardDbIds: string[]
   enableParentCards?: boolean
+  draftParents?: boolean
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean

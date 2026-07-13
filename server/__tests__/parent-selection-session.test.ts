@@ -34,6 +34,35 @@ describe('Parent Card selection setup', () => {
     expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
   })
 
+  it('resolves round-one direct-deal rewards after simultaneous draft finalizes', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    expect(session.state.phase).toBe('draft')
+    expect(session.state.players[0].parentCards.mother).toBe('PR10')
+    expect(session.state.players[0].resources.wood).toBe(0)
+
+    while (session.state.phase === 'draft') {
+      for (const player of session.state.players) {
+        const pool = session.state.draft!.pools[player.id]
+        expect(session.submitDraftPick(player.id, {
+          occCardId: pool.occ[0],
+          minorCardId: pool.minor[0],
+        }).ok).toBe(true)
+      }
+    }
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.players[0].resources.wood).toBe(1)
+    expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
+  })
+
   it('starts a simultaneous parent-selection phase with private 2+2 candidates when enabled', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,

@@ -17,6 +17,7 @@ type RoomRow = {
   version: number
   custom_card_ids: string | null
   enable_parent_cards: number
+  draft_parents: number | null
   enable_through_the_seasons: number
   enable_farmers_of_the_moor: number
   allow_incomplete_farmers_of_the_moor_minor_deal: number
@@ -47,7 +48,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
     try {
       const row = this.db.prepare(
         `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
-                enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+                enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
                 allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
          FROM rooms WHERE id = ?`,
       ).get(id) as RoomRow | undefined
@@ -63,6 +64,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
           maxPlayers: row.max_players,
           customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
           enableParentCards: row.enable_parent_cards === 1,
+          draftParents: row.draft_parents === null ? undefined : row.draft_parents === 1,
           enableThroughTheSeasons: row.enable_through_the_seasons === 1,
           enableFarmersOfTheMoor: row.enable_farmers_of_the_moor === 1,
           allowIncompleteFarmersOfTheMoorMinorDeal: row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
@@ -83,6 +85,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const stateJson = serialized === null ? null : JSON.stringify(serialized)
       const customCardIdsJson = JSON.stringify(meta.customCardDbIds)
       const enableParentCards = meta.enableParentCards === true ? 1 : 0
+      const draftParents = typeof meta.draftParents === 'boolean' ? (meta.draftParents ? 1 : 0) : null
       const enableThroughTheSeasons = meta.enableThroughTheSeasons === true ? 1 : 0
       const enableFarmersOfTheMoor = meta.enableFarmersOfTheMoor === true ? 1 : 0
       const allowIncompleteFarmersOfTheMoorMinorDeal = meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0
@@ -91,7 +94,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         if (serialized === null) {
           this.db.prepare(
             `UPDATE rooms
-             SET status = ?, custom_card_ids = ?, enable_parent_cards = ?, enable_through_the_seasons = ?,
+             SET status = ?, custom_card_ids = ?, enable_parent_cards = ?, draft_parents = ?, enable_through_the_seasons = ?,
                  enable_farmers_of_the_moor = ?, allow_incomplete_farmers_of_the_moor_minor_deal = ?,
                  version = version + 1, updated_at = ?
              WHERE id = ?`,
@@ -99,6 +102,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
             meta.status,
             customCardIdsJson,
             enableParentCards,
+            draftParents,
             enableThroughTheSeasons,
             enableFarmersOfTheMoor,
             allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -108,7 +112,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         } else {
           this.db.prepare(
             `UPDATE rooms
-             SET state_json = ?, status = ?, custom_card_ids = ?, enable_parent_cards = ?,
+             SET state_json = ?, status = ?, custom_card_ids = ?, enable_parent_cards = ?, draft_parents = ?,
                  enable_through_the_seasons = ?, enable_farmers_of_the_moor = ?,
                  allow_incomplete_farmers_of_the_moor_minor_deal = ?, version = version + 1,
                  updated_at = ?
@@ -118,6 +122,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
             meta.status,
             customCardIdsJson,
             enableParentCards,
+            draftParents,
             enableThroughTheSeasons,
             enableFarmersOfTheMoor,
             allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -129,9 +134,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
         this.db.prepare(
           `INSERT INTO rooms (
              id, created_by, state_json, max_players, status, version, custom_card_ids,
-             enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+             enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
              allow_incomplete_farmers_of_the_moor_minor_deal, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           id,
           meta.createdBy,
@@ -140,6 +145,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
           meta.status,
           customCardIdsJson,
           enableParentCards,
+          draftParents,
           enableThroughTheSeasons,
           enableFarmersOfTheMoor,
           allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -185,7 +191,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const placeholders = excludeIds.length > 0 ? excludeIds.map(() => '?').join(', ') : "''"
       const rows = this.db.prepare(
         `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
-                enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+                enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
                 allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
          FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
       ).all(...excludeIds) as RoomRow[]

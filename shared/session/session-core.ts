@@ -638,6 +638,12 @@ export class GameCore {
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    if (
+      this.state.phase === 'playing' &&
+      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
+    ) {
+      this.continueCurrentFutureMeepleActions()
+    }
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
