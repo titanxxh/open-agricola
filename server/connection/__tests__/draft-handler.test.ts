@@ -99,6 +99,18 @@ describe('GameSession — room-level draft wiring', () => {
     }
   })
 
+  it('deals parent cards directly when draftParents is false', () => {
+    const session = new GameSession(undefined, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+    })
+    const { state } = session.getState()
+    expect(state.phase).toBe('playing')
+    expect(state.parentSelection).toBeNull()
+    expect(state.players.every((player) => player.parentCards.mother && player.parentCards.father)).toBe(true)
+  })
+
   it('round-trips the seeded draft state through serializeState / rehydrateState', () => {
     // Mimics the "server restarted before the second player joined" case:
     // we persist the initial state immediately on room creation (see

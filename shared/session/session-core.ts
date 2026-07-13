@@ -162,6 +162,7 @@ import {
   type AnytimePolicyInput,
 } from './anytime-policy'
 import {
+  ensureParentMotherScheduleLogs,
   startParentSelectionIfNeeded,
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
@@ -633,6 +634,7 @@ export class GameCore {
   applyDraftFinalize(): void {
     this.state = finalizeDraft(this.state)
     startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
+    ensureParentMotherScheduleLogs(this.state)
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)

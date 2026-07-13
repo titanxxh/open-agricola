@@ -45,6 +45,7 @@ export type FixedDevRoomStartupOptions = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  draftParents?: boolean
   draftMode?: 'simultaneous'
   draftPoolSize?: number
 }
@@ -68,6 +69,9 @@ export const parseFixedDevRoomStartupOptions = (
   ) {
     options.allowIncompleteFarmersOfTheMoorMinorDeal = true
   }
+  if (env.DEV_DRAFT_PARENTS === 'false' || env.DEV_DRAFT_PARENTS === '0') {
+    options.draftParents = false
+  }
   if (env.DEV_DRAFT_MODE === 'simultaneous') {
     const rawPoolSize = Number(env.DEV_DRAFT_POOL_SIZE)
     options.draftMode = 'simultaneous'
@@ -87,6 +91,7 @@ export const buildFixedDevRoomInitialStateOptions = (
   ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
   ...(startupOptions.enableFarmersOfTheMoor ? { enableFarmersOfTheMoor: true } : {}),
   ...(startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal ? { allowIncompleteFarmersOfTheMoorMinorDeal: true } : {}),
+  ...(startupOptions.draftParents === false ? { draftParents: false } : {}),
   ...(startupOptions.draftMode === 'simultaneous'
     ? {
         draftMode: 'simultaneous' as const,
