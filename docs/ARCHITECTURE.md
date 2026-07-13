@@ -187,7 +187,10 @@ Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入
 ```ts
 type ClientCommand = (
   | { type: 'auth'; token }
-  | { type: 'createRoom'; maxPlayers?, name?, customCardIds?, enableCommunityDeck?, draftMode?, draftPoolSize? }
+  | { type: 'createRoom'; maxPlayers?, name?, customCardIds?, enableCommunityDeck?,
+      enableParentCards?, draftParents?, enableThroughTheSeasons?,
+      enableFarmersOfTheMoor?, allowIncompleteFarmersOfTheMoorMinorDeal?,
+      draftMode?, draftPoolSize? }
   | { type: 'joinRoom'; roomId; requestedPlayerIndex?; name? }
   | { type: 'dissolveRoom' }
   | { type: 'getState' }
@@ -210,6 +213,7 @@ type ClientCommand = (
 
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。
+- `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
 
