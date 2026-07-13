@@ -306,7 +306,7 @@ type ActionChoiceOption = {
 
 ### 4.8 LogEntry
 
-`LogEntry { key, params }` —— 结构化 i18n key + 渲染参数。前端按 locale 渲染。
+`LogEntry { key, params, playerId? }` —— 结构化 i18n key + 渲染参数。前端按 locale 渲染；新局 bootstrap 日志可携带稳定 `playerId`，WS 应用席位显示名时按身份刷新缓存，不按可能重复的显示文本匹配。
 
 ---
 

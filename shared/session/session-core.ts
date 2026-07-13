@@ -675,6 +675,7 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
+    const isFreshState = stateOrSeed === undefined || typeof stateOrSeed === 'number'
     this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
@@ -801,12 +802,13 @@ export class GameCore {
     }
     this.syncDynamicActionSpaces()
     if (
-      (stateOrSeed === undefined || typeof stateOrSeed === 'number') &&
+      isFreshState &&
       this.state.phase === 'playing' &&
       this.state.futureMeeples.some((entry) => entry.round === this.state.round)
     ) {
       this.continueCurrentFutureMeepleActions()
     }
+    if (isFreshState) this.bindInitialLogPlayerIds()
   }
 
   /**
@@ -900,7 +902,20 @@ export class GameCore {
     setupPhase.updatePlayerName(player, name)
     if (!previousName || !player || previousName === player.name) return
     for (const entry of this.state.log) {
-      if (entry.params?.player === previousName) entry.params.player = player.name
+      if (entry.playerId === player.id && entry.params) entry.params.player = player.name
+    }
+  }
+
+  private bindInitialLogPlayerIds(): void {
+    const playerIdsByName = new Map<string, string | null>()
+    for (const player of this.state.players) {
+      playerIdsByName.set(player.name, playerIdsByName.has(player.name) ? null : player.id)
+    }
+    for (const entry of this.state.log) {
+      const playerName = entry.params?.player
+      if (typeof playerName !== 'string') continue
+      const playerId = playerIdsByName.get(playerName)
+      if (playerId) entry.playerId = playerId
     }
   }
 
