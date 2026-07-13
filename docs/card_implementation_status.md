@@ -171,7 +171,7 @@ OA 没有照抄 notification-as-rule-source，而是建了一个比 `GameState.l
 - **Public events**（`shared/contract/events.ts`）：50 种事件类型，覆盖 resource / farm / worker / action / card / futureMeeple / parent / 生命周期（round / work / returnHome / harvest / game）。统一 `GameEventBase`（`schemaVersion` / `id` / `seq` / `round` / `phase` / `type` / actor / target / source / `trigger`），经 `EventSink.emit` / `emitMany` 写入。
 - **Private events**（`shared/contract/private-events.ts`）：`private.promptShown` / `private.handChanged` / `private.draftUpdated` 三种，带 `recipientPlayerId` 做 per-viewer masking——非目标玩家看到 redaction，draft picks 被遮蔽。
 - **Mapping policy**（`shared/events/event-mapping-policy.ts`）：每个事件类型声明四个消费通道（log / notification / highlight / resourceAnimation）和 replay 归类（`replayable` / `metadataOnly`），通道可带条件。
-- **Log mapper**（`shared/events/log-mapper.ts`）：`eventsToLogEntries()` 把 `GameEvent[]` 批量转 `LogEntry[]`。
+- **Log mapper**（`shared/events/log-mapper.ts`）：`eventsToLogEntries()` 把 `GameEvent[]` 批量转 `LogEntry[]`；`buildLogPresentationPlan()` 统一产出 visible rows、consumed event refs 和 suppressed event refs。纯资源 future meeple 结算由后续 Receive 入账日志代表，不再重复生成结算行。
 - **Archive packet**（`shared/events/archive.ts`）：`publicEvents.committed` 持久化已提交事件序列；`publicEvents.canceled` 在 undoStep / undoAction 时记录被撤销事件的完整副本和 seq 窗口。
 
 ### 卡牌判定

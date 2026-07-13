@@ -69,6 +69,121 @@ describe('eventsToLogEntries', () => {
     )
   })
 
+  it('suppresses pure resource future meeple resolution delegated to receive', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'future-resource',
+      seq: 1,
+      round: 3,
+      phase: 'preWork',
+      type: 'futureMeeple.resolved',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceCardId: 'PR11',
+      playerId: 'p1',
+      cardId: 'PR11',
+      resources: { food: 1 },
+    } satisfies GameEvent
+
+    const plan = buildLogPresentationPlan([event], { playerNames: { p1: 'Alice' } })
+
+    expect(plan.rows).toEqual([])
+    expect(plan.suppressedEvents).toEqual([
+      {
+        suppressedEventRef: {
+          id: 'future-resource',
+          seq: 1,
+          type: 'futureMeeple.resolved',
+        },
+        reason: 'futureResourceReceive',
+      },
+    ])
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([])
+  })
+
+  it('keeps future meeple resolution with a standalone effect', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'future-room',
+      seq: 1,
+      round: 3,
+      phase: 'preWork',
+      type: 'futureMeeple.resolved',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceCardId: 'B157_Salter',
+      playerId: 'p1',
+      cardId: 'B157_Salter',
+      resources: { food: 2 },
+      roomType: 'clay',
+    } satisfies GameEvent
+
+    const plan = buildLogPresentationPlan([event], { playerNames: { p1: 'Alice' } })
+
+    expect(plan.rows).toHaveLength(1)
+    expect(plan.rows[0]?.logEntry.key).toBe('log.futureMeepleResolved')
+    expect(plan.suppressedEvents).toEqual([])
+  })
+
+  it.each([
+    ['field', { field: 1 }],
+    ['stable', { stable: 1 }],
+    ['forest mixed with food', { food: 1, forest: 1 }],
+    ['moor', { moor: 1 }],
+    ['no resource gain', {}],
+  ] as const)('keeps future meeple resolution with %s', (_label, resources) => {
+    const event: GameEvent = {
+      schemaVersion: 1,
+      id: 'future-standalone',
+      seq: 1,
+      round: 3,
+      phase: 'preWork',
+      type: 'futureMeeple.resolved',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceCardId: 'PR02',
+      playerId: 'p1',
+      cardId: 'PR02',
+      resources,
+    }
+
+    const plan = buildLogPresentationPlan([event], { playerNames: { p1: 'Alice' } })
+
+    expect(plan.rows).toHaveLength(1)
+    expect(plan.rows[0]?.logEntry.key).toBe('log.futureMeepleResolved')
+    expect(plan.suppressedEvents).toEqual([])
+  })
+
+  it('uses the canonical name key for the internal receive action', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'received',
+      seq: 1,
+      round: 3,
+      phase: 'preWork',
+      type: 'resource.moved',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'receive',
+      sourceCardId: 'PR11',
+      resources: { food: 1 },
+      from: { kind: 'roundCard', round: 3 },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'receive',
+    } satisfies GameEvent
+
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'actions.receive.name',
+          detailParts: { gains: { food: 1 } },
+        },
+      },
+    ])
+  })
+
   it('uses legacy state log dedupe params for presentation row identity', () => {
     const events = [
       {

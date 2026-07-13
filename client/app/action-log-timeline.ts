@@ -90,6 +90,7 @@ const presentationEventRefKey = (ref: LogPresentationEventRef): string =>
 type ContextualLogEntries = {
   map: Map<string, LogPresentationRow>
   consumedEventKeys: Set<string>
+  suppressedEventKeys: Set<string>
 }
 
 const buildContextualLogEntryMapForGroup = (
@@ -113,7 +114,12 @@ const buildContextualLogEntryMapForGroup = (
     const entry = entryByRef.get(presentationEventRefKey(consumed.consumedEventRef))
     if (entry) consumedEventKeys.add(entry.key)
   })
-  return { map, consumedEventKeys }
+  const suppressedEventKeys = new Set<string>()
+  plan.suppressedEvents.forEach((suppressed) => {
+    const entry = entryByRef.get(presentationEventRefKey(suppressed.suppressedEventRef))
+    if (entry) suppressedEventKeys.add(entry.key)
+  })
+  return { map, consumedEventKeys, suppressedEventKeys }
 }
 
 const buildContextualLogEntryMap = (
@@ -122,6 +128,7 @@ const buildContextualLogEntryMap = (
 ): ContextualLogEntries => {
   const map = new Map<string, LogPresentationRow>()
   const consumedEventKeys = new Set<string>()
+  const suppressedEventKeys = new Set<string>()
   const groups = new Map<number, ReplayTimelineEntry[]>()
   entries
     .filter((entry) => !!entry.event)
@@ -132,9 +139,10 @@ const buildContextualLogEntryMap = (
     const group = buildContextualLogEntryMapForGroup(groupEntries, context)
     group.map.forEach((logEntry, key) => map.set(key, logEntry))
     group.consumedEventKeys.forEach((key) => consumedEventKeys.add(key))
+    group.suppressedEventKeys.forEach((key) => suppressedEventKeys.add(key))
   })
 
-  return { map, consumedEventKeys }
+  return { map, consumedEventKeys, suppressedEventKeys }
 }
 
 const visibleReplayDerivedLogCounts = (
@@ -221,12 +229,13 @@ export const buildActionLogTimelineRows = ({
   actionNames,
 }: BuildActionLogTimelineRowsInput): ActionLogTimelineBucket[] => {
   const mapperContext = { playerNames, actionNames }
-  const { map: contextualLogEntries, consumedEventKeys } =
+  const { map: contextualLogEntries, consumedEventKeys, suppressedEventKeys } =
     buildContextualLogEntryMap(entries, mapperContext)
   const eventRows: ActionLogTimelineRow[] = [...entries]
     .sort((left, right) =>
       right.packetSeq - left.packetSeq || right.packetLocalIndex - left.packetLocalIndex)
     .flatMap((entry): ActionLogTimelineRow[] => {
+      if (suppressedEventKeys.has(entry.key)) return []
       if (entry.event && consumedEventKeys.has(entry.key)) return []
       const { logEntry, label } = eventLabel(
         entry,
