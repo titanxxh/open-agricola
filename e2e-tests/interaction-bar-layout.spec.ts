@@ -18,12 +18,23 @@ const expectPageMarginAboveInteractionBar = async (page: Page) => {
   await expect.poll(() => bottomGap(page)).toBeLessThanOrEqual(8)
 }
 
+const interactionContentBottomGap = (page: Page) => page.evaluate(() => {
+  const content = document.querySelector('.interaction-bar__top')
+  if (!content) throw new Error('Interaction bar content is not ready')
+  return window.innerHeight - content.getBoundingClientRect().bottom
+})
+
 test.describe('Interaction bar layout', () => {
   test.use({ viewport: { width: 768, height: 1024 } })
 
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem('open-agricola-locale-v2', 'en')
+      const applySafeArea = () => {
+        document.documentElement.style.setProperty('--safe-area-inset-bottom', '34px')
+      }
+      if (document.documentElement) applySafeArea()
+      else document.addEventListener('readystatechange', applySafeArea, { once: true })
     })
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await page.getByRole('button', { name: 'Reset' }).click()
@@ -47,6 +58,11 @@ test.describe('Interaction bar layout', () => {
     await page.getByRole('button', { name: 'Confirm switch' }).click()
     await expect(page.locator('.interaction-bar__body')).toBeHidden()
 
+    await expectPageMarginAboveInteractionBar(page)
+  })
+
+  test('keeps controls above the bottom safe area without adding a gap above the bar', async ({ page }) => {
+    await expect.poll(() => interactionContentBottomGap(page)).toBeGreaterThanOrEqual(34)
     await expectPageMarginAboveInteractionBar(page)
   })
 })
