@@ -49,7 +49,7 @@ const ensureFixedDevRooms = (
     const snap = persistence.load(id)
     if (snap) {
       const room = snapshotToRoom(snap)
-      room.draftParents = startupOptions.draftParents
+      room.draftParents = startupOptions.draftParents ?? room.draftParents
       registry.set(room)
     } else {
       const session = new GameSession(
