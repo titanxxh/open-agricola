@@ -140,7 +140,7 @@ describe('handleCreateRoom', () => {
     dispatch(host, {
       type: 'createRoom',
       maxPlayers: 2,
-      name: 'Alice',
+      name: 'PlayerB',
       enableParentCards: true,
       draftParents: false,
     } as never)
@@ -156,7 +156,7 @@ describe('handleCreateRoom', () => {
     const loggedPlayerNames = host.currentRoom!.session.state.log
       .map((entry) => entry.params?.player)
       .filter((player): player is string => typeof player === 'string')
-    expect(new Set(loggedPlayerNames)).toEqual(new Set(['Alice', 'Bob']))
+    expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
   })
 
   it('checkpoints newGame state through the broadcast path', () => {
