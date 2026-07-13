@@ -78,6 +78,177 @@ describe('canSubmitParentSelection', () => {
 })
 
 describe('ParentSelectionOverlay', () => {
+  test('preserves the active parent selection flow in English', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          {
+            id: 'p1',
+            occupationHand: ['A102_Grocer'],
+            minorHand: ['B034_SpecialFood'],
+          },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'en',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('dialog', { name: 'Parent Cards selection' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Parent Cards' })).toBeInTheDocument()
+    expect(screen.getByText('Choose 1 mother and 1 father.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Mother' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Father' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm parents' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Already drafted' })).toBeInTheDocument()
+  })
+
+  test('preserves the submitted parent selection state in English', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection({
+          submissions: {
+            p1: { mother: 'PR01', father: 'PS01' },
+            p2: null,
+          },
+        }),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'en',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByText('Waiting for other players (1/2)...')).toBeInTheDocument()
+    expect(screen.getByText('Parent Cards selection submitted.')).toBeInTheDocument()
+  })
+
+  test('preserves the private candidate waiting state in English', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection({
+          candidates: {
+            p1: { mother: ['?', '?'] as never, father: ['?', '?'] as never },
+            p2: { mother: ['?', '?'] as never, father: ['?', '?'] as never },
+          },
+        }),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'en',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByText('Waiting for your private Parent Cards candidates.')).toBeInTheDocument()
+  })
+
+  test('localizes the active parent selection flow in Chinese', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'zh',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('dialog', { name: '父母卡选择' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '父母卡' })).toBeInTheDocument()
+    expect(screen.getByText('选择 1 张母亲卡和 1 张父亲卡。')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '母亲' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '父亲' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '确认父母卡' })).toBeInTheDocument()
+  })
+
+  test('passes the Chinese locale to parent card choices', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'zh',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('img', { name: '母亲 PR01' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '父亲 PS01' })).toBeInTheDocument()
+  })
+
+  test('localizes the submitted parent selection state in Chinese', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection({
+          submissions: {
+            p1: { mother: 'PR01', father: 'PS01' },
+            p2: null,
+          },
+        }),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'zh',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByText('等待其他玩家（1/2）…')).toBeInTheDocument()
+    expect(screen.getByText('已提交父母卡选择。')).toBeInTheDocument()
+  })
+
+  test('localizes the private candidate waiting state in Chinese', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection({
+          candidates: {
+            p1: { mother: ['?', '?'] as never, father: ['?', '?'] as never },
+            p2: { mother: ['?', '?'] as never, father: ['?', '?'] as never },
+          },
+        }),
+        players: [
+          { id: 'p1', occupationHand: ['?'], minorHand: ['?'] },
+          { id: 'p2', occupationHand: ['?'], minorHand: ['?'] },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'zh',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByText('等待你的私有父母卡候选。')).toBeInTheDocument()
+  })
+
   test('renders parent choices from portrait assets instead of full card images', () => {
     render(createElement(ParentSelectionOverlay, {
       state: {
@@ -153,6 +324,35 @@ describe('ParentSelectionOverlay', () => {
     expect(screen.getByRole('heading', { name: 'Already drafted' })).toBeInTheDocument()
     expect(screen.getByText('Kept occupations (2)')).toBeInTheDocument()
     expect(screen.getByText('Kept minor improvements (1)')).toBeInTheDocument()
+  })
+
+  test('localizes the selected card history in Chinese', () => {
+    render(createElement(ParentSelectionOverlay, {
+      state: {
+        phase: 'parent-selection',
+        gameSeed: 1,
+        parentSelection: mkParentSelection(),
+        players: [
+          {
+            id: 'p1',
+            occupationHand: ['A102_Grocer', 'A105_BarrowPusher'],
+            minorHand: ['B034_SpecialFood'],
+          },
+          {
+            id: 'p2',
+            occupationHand: ['?'],
+            minorHand: ['?'],
+          },
+        ],
+      } as GameState,
+      meId: 'p1',
+      locale: 'zh',
+      onSubmit: () => {},
+    }))
+
+    expect(screen.getByRole('heading', { name: '已选卡牌' })).toBeInTheDocument()
+    expect(screen.getByText('已选职业（2）')).toBeInTheDocument()
+    expect(screen.getByText('已选小改进（1）')).toBeInTheDocument()
   })
 })
 

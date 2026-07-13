@@ -4,37 +4,32 @@ import type {
   ParentCardId,
 } from '../../../shared/parents'
 import { getParentCardDefinition } from '../../../shared/parents'
+import { t, type Locale } from '../../../shared/i18n'
 import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 
 type FatherCompletedTier = 1 | 2 | 3
 
-const resourceLabel: Record<string, string> = {
-  wood: 'Wood',
-  clay: 'Clay',
-  reed: 'Reed',
-  stone: 'Stone',
-  food: 'Food',
-  grain: 'Grain',
-  vegetable: 'Vegetable',
-  sheep: 'Sheep',
-  boar: 'Boar',
-  cattle: 'Cattle',
-}
+const parentCardTitle = (card: ParentCardDefinition, locale: Locale): string =>
+  `${t(locale, `ui.parentCard.${card.kind}`)} ${card.id}`
 
-const parentCardTitle = (card: ParentCardDefinition): string =>
-  `${card.kind === 'mother' ? 'Mother' : 'Father'} ${card.id}`
-
-const motherGainLabel = (card: MotherCardDefinition) => {
+const motherGainLabel = (card: MotherCardDefinition, locale: Locale) => {
   const gain = card.gain
-  if (gain.type === 'resource') return `Gain ${gain.amount} ${resourceLabel[gain.resource] ?? gain.resource}`
-  if (gain.type === 'field') return `Plow ${gain.amount} field`
-  return `Build ${gain.amount} stable`
+  if (gain.type === 'resource') {
+    return t(locale, 'ui.parentCard.gainResource', {
+      amount: gain.amount,
+      resource: t(locale, `resources.${gain.resource}`),
+    })
+  }
+  if (gain.type === 'field') return t(locale, 'ui.parentCard.plowField', { amount: gain.amount })
+  return t(locale, 'ui.parentCard.buildStable', { amount: gain.amount })
 }
 
-const motherMeta = (card: MotherCardDefinition) => [
-  `Round ${card.round}`,
-  motherGainLabel(card),
-  `${card.score > 0 ? '+' : ''}${card.score} VP`,
+const motherMeta = (card: MotherCardDefinition, locale: Locale) => [
+  t(locale, 'ui.parentCard.round', { round: card.round }),
+  motherGainLabel(card, locale),
+  t(locale, 'ui.parentCard.score', {
+    score: `${card.score > 0 ? '+' : ''}${card.score}`,
+  }),
 ]
 
 const compactRewardText = (text: string): string =>
@@ -103,11 +98,13 @@ const SlashSummary = ({
 
 export function ParentCardFace({
   id,
+  locale = 'en',
   selected = false,
   infobox,
   completedTier,
 }: {
   id: ParentCardId
+  locale?: Locale
   selected?: boolean
   infobox?: string
   completedTier?: FatherCompletedTier
@@ -118,8 +115,8 @@ export function ParentCardFace({
   }
 
   const isMother = card.kind === 'mother'
-  const meta = isMother ? motherMeta(card) : []
-  const title = parentCardTitle(card)
+  const meta = isMother ? motherMeta(card, locale) : []
+  const title = parentCardTitle(card, locale)
   const { portraitUrl } = resolveParentCardAssetUrls(card.assets)
 
   return (
@@ -135,7 +132,9 @@ export function ParentCardFace({
       </div>
       <div className="parent-card-face__body">
         <div className="parent-card-face__topline">
-          <span className="parent-card-face__kind">{card.kind}</span>
+          <span className="parent-card-face__kind">
+            {t(locale, `ui.parentCard.${isMother ? 'kindMother' : 'kindFather'}`)}
+          </span>
           <span className="parent-card-face__id">{card.id}</span>
         </div>
         <h4 className="parent-card-face__title">{title}</h4>
@@ -151,14 +150,18 @@ export function ParentCardFace({
         ) : (
           <div className="parent-card-face__father-lines">
             <div className="parent-card-face__father-line" data-kind="condition">
-              <span className="parent-card-face__father-label">Req</span>
+              <span className="parent-card-face__father-label">
+                {t(locale, 'ui.parentCard.requirement')}
+              </span>
               <SlashSummary
                 values={card.rewards.map((reward) => reward.requirementText)}
                 completedTier={completedTier}
               />
             </div>
             <div className="parent-card-face__father-line" data-kind="reward">
-              <span className="parent-card-face__father-label">Reward</span>
+              <span className="parent-card-face__father-label">
+                {t(locale, 'ui.parentCard.reward')}
+              </span>
               <SlashSummary
                 values={card.rewards.map((reward) => compactRewardText(reward.rewardText))}
                 completedTier={completedTier}
