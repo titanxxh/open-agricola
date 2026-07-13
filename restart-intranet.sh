@@ -272,6 +272,38 @@ try {
 EOF
 }
 
+dev_rooms_without_direct_parent_cards() {
+  DB_PATH="$DB_PATH" node <<'EOF'
+const fs = require('node:fs')
+const Database = require('better-sqlite3')
+
+const dbPath = process.env.DB_PATH
+if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
+
+const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+try {
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
+  if (!table) process.exit(0)
+  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
+  const missing = rows.filter((row) => {
+    if (!row.state_json) return true
+    try {
+      const state = JSON.parse(row.state_json)
+      if (state.enableParentCards !== true) return true
+      return !Array.isArray(state.players) || !state.players.every((player) =>
+        player.parentCards && player.parentCards.mother && player.parentCards.father
+      )
+    } catch {
+      return true
+    }
+  })
+  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
+} finally {
+  db.close()
+}
+EOF
+}
+
 dev_rooms_without_through_the_seasons() {
   DB_PATH="$DB_PATH" node <<'EOF'
 const fs = require('node:fs')
@@ -433,8 +465,12 @@ if [ "$DRAFT_ENABLED" -eq 1 ]; then
 else
   RESET_REASONS=()
   if [ "$PARENTS_ENABLED" -eq 1 ]; then
-  MISSING_PARENT_ROOMS="$(dev_rooms_without_parent_cards)"
-  if [ -n "$MISSING_PARENT_ROOMS" ]; then
+    if [ "$DRAFT_ENABLED" -eq 1 ]; then
+      MISSING_PARENT_ROOMS="$(dev_rooms_without_parent_cards)"
+    else
+      MISSING_PARENT_ROOMS="$(dev_rooms_without_direct_parent_cards)"
+    fi
+    if [ -n "$MISSING_PARENT_ROOMS" ]; then
       RESET_REASONS+=("existing fixed dev room(s) are not Parent Cards games: $MISSING_PARENT_ROOMS.")
     fi
   fi
@@ -507,6 +543,7 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PUBLIC_API_BASE="$PUBLIC_API_BASE" \
   PUBLIC_APP_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
+  DEV_DRAFT_PARENTS="$([ "$PARENTS_ENABLED" -eq 1 ] && [ "$DRAFT_ENABLED" -eq 0 ] && echo false || echo true)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ENABLE_FARMERS_OF_THE_MOOR="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
@@ -553,6 +590,9 @@ echo "WS persistent dev rooms (each survives backend restart):"
 DEV_ROOM_QUERY_SUFFIX=""
 if [ "$PARENTS_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableParentCards=true"
+  if [ "$DRAFT_ENABLED" -eq 0 ]; then
+    DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftParents=false"
+  fi
 fi
 if [ "$SEASONS_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableThroughTheSeasons=true"

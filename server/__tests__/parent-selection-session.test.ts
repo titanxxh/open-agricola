@@ -3,6 +3,24 @@ import { GameSession } from '../game/authoritative-session'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 
 describe('Parent Card selection setup', () => {
+  it('deals one parent pair per player without parent selection when draftParents is false', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 9001,
+    } as never)
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.parentSelection).toBeNull()
+    for (const player of session.state.players) {
+      expect(player.parentCards.mother).not.toBeNull()
+      expect(player.parentCards.father).not.toBeNull()
+    }
+    expect(new Set(session.state.players.map((player) => player.parentCards.mother)).size).toBe(2)
+    expect(new Set(session.state.players.map((player) => player.parentCards.father)).size).toBe(2)
+  })
+
   it('starts a simultaneous parent-selection phase with private 2+2 candidates when enabled', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
