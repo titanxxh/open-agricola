@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import type { PlayerState } from '../../shared/contract/types.ts'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const fenceTradeModifiers: PlayerState['activeModifiers'] = [
   {
@@ -32,6 +33,7 @@ const edgesForTile = (row: number, col: number) => [
 describe('fence payment session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -100,6 +102,7 @@ describe('fence payment session', () => {
     // the stored farmPayment payload must retain palisadeEdges so the resumed
     // applyFarmChoice places palisades instead of silently dropping them.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 

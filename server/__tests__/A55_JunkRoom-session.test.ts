@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('A055_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     state.players = state.players.slice(0, 2)

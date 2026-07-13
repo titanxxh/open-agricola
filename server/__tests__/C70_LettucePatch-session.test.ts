@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -17,6 +18,7 @@ const setup = (options?: {
   round?: number
 }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -117,6 +119,7 @@ describe('C070_LettucePatch session', () => {
   describe('harvest grants 1 veg + optional conversion to 4 food', () => {
     it('onHarvestFieldPhase harvests 1 vegetable and offers conversion', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4
@@ -164,6 +167,7 @@ describe('C070_LettucePatch session', () => {
 
     it('onHarvestFieldPhase offers quantity choices for each vegetable reaped from the card', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4
@@ -254,6 +258,7 @@ describe('C070_LettucePatch session', () => {
   describe('crop cleared when remaining=0', () => {
     it('clears card crop when remaining reaches 0 after harvest', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4

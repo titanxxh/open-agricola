@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
@@ -13,6 +14,7 @@ describe('D118_Bonehead session', () => {
    */
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -28,7 +30,7 @@ describe('D118_Bonehead session', () => {
     }
 
     // Give another occupation in hand so we can test playing it
-    player.occupationHand.push('A102_Grocer')
+    player.occupationHand = ['A102_Grocer', 'A085_Homekeeper']
     player.resources.food = 5
 
     session.loadState(state)

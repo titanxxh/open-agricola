@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E095_Miller'
@@ -14,6 +15,7 @@ describe('E095_Miller session', () => {
    */
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1 // opponent's turn
 
@@ -148,6 +150,7 @@ describe('E095_Miller session', () => {
 
   it('onBuy offers optional improvement purchase', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -198,6 +201,7 @@ describe('E095_Miller session', () => {
 
   it('onBuy allows purchasing a baking improvement', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 

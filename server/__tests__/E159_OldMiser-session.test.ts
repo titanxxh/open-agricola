@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/domain/scoring'
 import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/contract/types'
@@ -48,6 +49,7 @@ describe('E159_OldMiser session', () => {
   describe('feeding reduction', () => {
     it('with card, 2 adults, feeding needs 2 food (not 4)', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4 // harvest round
@@ -96,6 +98,7 @@ describe('E159_OldMiser session', () => {
 
     it('without card, 2 adults, feeding needs 4 food', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4
@@ -145,6 +148,7 @@ describe('E159_OldMiser session', () => {
 
     it('with card and newborn, feeding is further reduced', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.round = 4

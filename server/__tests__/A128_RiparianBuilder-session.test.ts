@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { ActionChoiceOption, PlayerState } from '../../shared/contract/types.ts'
 
@@ -38,6 +39,7 @@ const chooseA128RoomPayment = (
 describe('A128_RiparianBuilder session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 1

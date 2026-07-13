@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D082_HuntingTrophy'
 
@@ -8,6 +9,7 @@ const CARD_ID = 'D082_HuntingTrophy'
 describe('D082_HuntingTrophy session', () => {
   const setupFarmRedevelopment = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

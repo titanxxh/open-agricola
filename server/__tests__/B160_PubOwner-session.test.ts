@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -12,6 +13,7 @@ const CARD_ID = 'B160_PubOwner'
 describe('B160_PubOwner session', () => {
   it('onBuy returns a gain-1-grain flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -28,6 +30,7 @@ describe('B160_PubOwner session', () => {
 
   it('onBeforeReturnHome gives 1 grain when forest, clay-pit, reed-bank all occupied', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -56,6 +59,7 @@ describe('B160_PubOwner session', () => {
 
   it('onBeforeReturnHome does not trigger when forest is not occupied', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -79,6 +83,7 @@ describe('B160_PubOwner session', () => {
 
   it('onBeforeReturnHome does not trigger when no spaces occupied', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -97,6 +102,7 @@ describe('B160_PubOwner session', () => {
 
   it('integration: end of work phase gives grain when all three spaces occupied', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

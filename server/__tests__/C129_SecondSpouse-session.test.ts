@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/domain/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'
@@ -32,6 +33,7 @@ const setup = (options?: {
 }) => {
   const playerCount = options?.playerCount ?? 3
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 5

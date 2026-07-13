@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { canRenovate } from '../../shared/actions/effects/renovation'
 import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import type { BonusModifier } from '../../shared/contract/types'
@@ -12,6 +13,7 @@ const CONSERVATOR_ID = 'A087_Conservator'
 
 const setupOwner = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
@@ -119,6 +121,7 @@ describe('C013_WoodSlideHammer — renovation -2 stone discount gated by conditi
 
   it('without C13 modifier: 5-room wood stays gated normally on stone-deficient renovate', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

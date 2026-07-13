@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
@@ -27,6 +28,7 @@ const setup = (options?: {
   const ownerFood = options?.ownerFood ?? 10
 
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = actorIdx
@@ -521,6 +523,7 @@ describe('D161_CabbageBuyer session', () => {
 
   it('T9: anytime renovation without worker placement still presents the D161 offer', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

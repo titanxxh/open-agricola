@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { workersAvailable } from '../../shared/domain/player'
 import { E003_TeaTime } from '../../shared/cards/E/E003_TeaTime'
@@ -10,6 +11,7 @@ const CARD_ID = 'E003_TeaTime'
 describe('E003_TeaTime session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -70,6 +72,7 @@ describe('E003_TeaTime session', () => {
   describe('prerequisite "Own Person on Grain Utilization"', () => {
     it('blocks when no own worker is on Grain Utilization', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
@@ -79,6 +82,7 @@ describe('E003_TeaTime session', () => {
 
     it('allows when own worker sits on Grain Utilization', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!

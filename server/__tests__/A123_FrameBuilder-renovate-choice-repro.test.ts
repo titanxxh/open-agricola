@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A123_FrameBuilder'
@@ -9,6 +10,7 @@ const CARD_ID = 'A123_FrameBuilder'
 describe('A123_FrameBuilder renovation choice repro', () => {
   it('should prompt payment choice when BOTH direct (2 clay + 1 reed) AND bonus (1 wood + 1 reed) are affordable', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -73,6 +75,7 @@ describe('A123_FrameBuilder renovation choice repro', () => {
 
   it('keeps the house wooden when payment choice resolution fails', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

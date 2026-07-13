@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D134_OysterEater'
 import type { SessionResponse } from '../../shared/session/session-core'
@@ -8,6 +9,7 @@ import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confi
 describe('D134_OysterEater session', () => {
   const setup = (currentPlayerIndex: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex

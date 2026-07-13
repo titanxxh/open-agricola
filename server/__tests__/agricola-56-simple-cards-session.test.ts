@@ -8,9 +8,11 @@ import { getAssignedAnimalsByType } from '../../shared/domain/animals'
 import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const setupLessonsSession = (cardId: string, food = 10) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -40,6 +42,7 @@ const chooseFirstNonSkipOption = (session: GameSession, playerIndex: number) => 
 
 const setupHarvestStartSession = (cardId: string) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -55,6 +58,7 @@ const setupHarvestStartSession = (cardId: string) => {
 
 const setupWorkPhaseHookSession = (cardId: string, playerCount = 5) => {
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 1
@@ -66,6 +70,7 @@ const setupWorkPhaseHookSession = (cardId: string, playerCount = 5) => {
 
 const setupRoundStartHookSession = (cardId: string, playerCount = 5) => {
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 2
@@ -78,6 +83,7 @@ const setupRoundStartHookSession = (cardId: string, playerCount = 5) => {
 
 const setupActionRewardSession = (cardId: string, playerCount = 6, food = 0) => {
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14
@@ -94,6 +100,7 @@ const setupActionRewardSession = (cardId: string, playerCount = 6, food = 0) => 
 
 const setupFarmEventSession = (cardId: string, currentPlayerIndex = 0, ownerFood = 0) => {
   const session = new GameSession(undefined, undefined, { playerCount: 6 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = currentPlayerIndex
   state.round = 14
@@ -111,6 +118,7 @@ const setupFarmEventSession = (cardId: string, currentPlayerIndex = 0, ownerFood
 
 const setupLivestockSustainerSession = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 6 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 14

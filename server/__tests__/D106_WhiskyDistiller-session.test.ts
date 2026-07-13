@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { AnytimeAction } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D106_WhiskyDistiller'
@@ -7,6 +8,7 @@ import '../../shared/cards/D/D106_WhiskyDistiller'
 describe('D106_WhiskyDistiller session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

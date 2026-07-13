@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener } from '../../shared/cards/card-listeners'
 import { A017_ReclamationPlow_impl } from '../../shared/cards/A/A017_ReclamationPlow'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
@@ -29,6 +30,7 @@ const setupDirectContext = (
   result?: ActionExecutionResult,
 ): CardListenerContext => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
@@ -55,6 +57,7 @@ const setupDirectContext = (
 describe('A017_ReclamationPlow session', () => {
   it('keeps the session collect path and prompts after animal reorg', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -117,6 +120,7 @@ describe('A017_ReclamationPlow session', () => {
 
   it('does not trigger from A137 feasibility on a non-animal Reed Bank action', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -8,6 +9,7 @@ import '../../shared/cards/B/B143_ClayWarden'
 describe('B143_ClayWarden session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex
@@ -85,6 +87,7 @@ describe('B143_ClayWarden session', () => {
 
   it('owner gains 2 clay when opponent uses 3P hollow space', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1
     state.round = 1

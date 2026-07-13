@@ -17,6 +17,7 @@ import { registerAdHocOccupation } from '../../shared/cards/registry-runtime'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -54,6 +55,7 @@ beforeEach(() => {
  */
 const makeSession = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
   requireActiveCardRegistry('choice-disabled-option').setEffect({
     id: TEST_CARD_ID,
     onBuy: () => buildTestOnBuyFlow(),

@@ -20,6 +20,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -78,6 +79,7 @@ const makeSession = () => {
     onBuy: () => buildTestOnBuyFlow(),
   }
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
   requireActiveCardRegistry('card-effect-resolve-choice').setEffect(effect)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

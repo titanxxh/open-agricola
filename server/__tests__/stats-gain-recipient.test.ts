@@ -5,6 +5,7 @@ import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('stats: gain with recipientPlayerId records resourcesFromCards on target', () => {
   const advancePastPlayerSwitches = (
@@ -19,6 +20,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
 
   it('Publican (gain with recipientPlayerId + sourceCard) credits opponent stats.resourcesFromCards', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 1

@@ -4,9 +4,11 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const setup2P = (cardId: string) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

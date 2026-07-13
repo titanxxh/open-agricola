@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/register-all'
 import { clearActionHooks, registerActionHook } from '../../shared/actions/hooks'
@@ -11,6 +12,7 @@ const CARD_ID = 'A165_PigBreeder'
 
 const setupPlayerWithCard = (round: number) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = round
@@ -89,6 +91,7 @@ describe('A165 PigBreeder session integration', () => {
 
   it('round 12 finalize: boar+1 + animalReorg pending', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 12
@@ -120,6 +123,7 @@ describe('A165 PigBreeder session integration', () => {
 
   it('round 12 finalize: triggers onBreed-style after listener with sourceCard A165', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     // GameSession constructor calls clearActionHooks(); register AFTER it so the
     // hook survives until performRoundEnd is invoked.
     const observed: Array<{ sourceCard: unknown; animalTypes: unknown }> = []

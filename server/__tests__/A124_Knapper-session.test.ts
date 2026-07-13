@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A124_Knapper'
 
@@ -8,6 +9,7 @@ const CARD_ID = 'A124_Knapper'
 describe('A124_Knapper session', () => {
   const setupForRound = (round: number, revealedSpaceId: string) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -73,6 +75,7 @@ describe('A124_Knapper session', () => {
 
   it('does not trigger when card is not played', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -10,6 +11,7 @@ const CARD_ID = 'E087_MasterRenovator'
 describe('E087_MasterRenovator session — chooseOne renovation discount', () => {
   const setup = (round: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

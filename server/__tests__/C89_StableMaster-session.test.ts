@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -10,6 +11,7 @@ import '../../shared/cards/C/C088_CarpentersApprentice'
 describe('C089_StableMaster session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -69,6 +71,7 @@ describe('C089_StableMaster session', () => {
 
   it('no effect without the card', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -86,6 +89,7 @@ describe('C089_StableMaster session', () => {
 
   it('onBuy returns optional stables flow with exact 1 wood cost', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -111,6 +115,7 @@ describe('C089_StableMaster session', () => {
 
   it('onBuy skipped if player has 4 stables built', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -129,6 +134,7 @@ describe('C089_StableMaster session', () => {
 
   it('onBuy skipped if consumed stable tokens exhaust reserve', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -145,6 +151,7 @@ describe('C089_StableMaster session', () => {
 
   it('onBuy returns stables flow even when wood is paid by a stables cost modifier', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -162,6 +169,7 @@ describe('C089_StableMaster session', () => {
 
   it('onBuy stable can be built with C88 discount and no wood', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

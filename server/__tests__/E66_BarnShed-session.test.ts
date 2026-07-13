@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -8,6 +9,7 @@ import '../../shared/cards/E/E066_BarnShed'
 describe('E066_BarnShed session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = currentPlayerIndex
     state.round = 1

@@ -4,6 +4,7 @@ import { buildEnvelope } from '../connection/envelope-builder'
 import { appendImmediateEvents } from '../../shared/events/append'
 
 import '../../shared/cards/E/E078_SleightofHand'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const maxEventSeq = (events: Array<{ seq: number }>): number =>
   events.reduce((max, event) => Math.max(max, event.seq), 0)
@@ -25,6 +26,7 @@ const cloneJson = <T>(value: T): T =>
 describe('provenance undo/replay reconstruction', () => {
   it('undoAction removes E78 public events, derived log, and private prompt from the current view', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -153,6 +155,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('undoStep cancels worker placement public events exactly', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     for (const player of state.players) {
@@ -203,6 +206,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('undoStep preserves prior canceled archive packets across continuous public event undos', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     for (const player of state.players) {
@@ -245,6 +249,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('keeps archive packetSeq monotonic when undo allows event id and seq reuse', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -312,6 +317,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('failed undo leaves public event archive unchanged', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const beforeArchive = cloneJson(session.getState().state.publicEventArchive)
 
     const failed = session.undoAction()
@@ -322,6 +328,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('undoStep does not append a canceled archive packet when no public event is removed', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -339,6 +346,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('undoStep still returns when canceled archive payload validation rejects a corrupted event', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -366,6 +374,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('does not land undoStep when public event archive cursor is stale', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -390,6 +399,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('does not land undoStep when live public event archive has duplicate packetSeq', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)
@@ -418,6 +428,7 @@ describe('provenance undo/replay reconstruction', () => {
 
   it('does not land undoStep when live public event archive has non-json packet fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     session.loadState(state)

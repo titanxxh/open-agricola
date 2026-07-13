@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C018_RollOverPlow'
 import type { AnytimeAction } from '../../shared/contract/types';
@@ -9,6 +10,7 @@ const CARD_ID = 'C018_RollOverPlow'
 describe('C018_RollOverPlow session', () => {
   const setup = (options?: { includeEmptyField?: boolean }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -143,6 +145,7 @@ describe('C018_RollOverPlow session', () => {
 
   it('NOT available with < 3 planted fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

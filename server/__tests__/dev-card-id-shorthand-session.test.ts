@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('dev card id shorthand', () => {
   it('draws the unique deck-number card id', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[0]!.minorHand = ['__test_placeholder__']
@@ -20,6 +22,7 @@ describe('dev card id shorthand', () => {
 
   it('plays the unique deck-number card id', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[0]!.minorPlayed = []
@@ -36,6 +39,7 @@ describe('dev card id shorthand', () => {
 
   it('matches exact card number instead of id prefix', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[0]!.minorHand = ['__test_placeholder__']

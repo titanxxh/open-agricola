@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -15,6 +16,7 @@ describe('A059_PotatoRidger session', () => {
     extraVegetable?: number
   }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -44,6 +46,7 @@ describe('A059_PotatoRidger session', () => {
 
   it('with 3 veg after harvest → optional exchange available (direct hook test)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -63,6 +66,7 @@ describe('A059_PotatoRidger session', () => {
 
   it('with 4 veg after harvest → mandatory exchange', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -81,6 +85,7 @@ describe('A059_PotatoRidger session', () => {
 
   it('with 2 veg after harvest → no trigger', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -97,6 +102,7 @@ describe('A059_PotatoRidger session', () => {
 
   it('no vegetable harvested → no trigger even with 5 veg in supply', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

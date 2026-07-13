@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -37,6 +38,7 @@ describe('D072_StableManure session', () => {
 
   const setupHarvest = (unfencedStableCount: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -145,6 +147,7 @@ describe('D072_StableManure session', () => {
 
   it('does not trigger when no cropped fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

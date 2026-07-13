@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A055_JunkRoom'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 /**
  * Regression: when a SEQ wraps multiple leaves (renovate-house + optional
@@ -14,6 +15,7 @@ import '../../shared/cards/A/A055_JunkRoom'
 describe('house-redevelopment leaf-flush logging', () => {
   it('continues into optional improvement choice after auto-resolved renovation', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -53,6 +55,7 @@ describe('house-redevelopment leaf-flush logging', () => {
 
   it('emits log.actionDetail for renovate-house before improvement choice prompt', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -90,6 +93,7 @@ describe('house-redevelopment leaf-flush logging', () => {
 
   it('does not duplicate renovation in the wrapper actionDetail when improvement is skipped', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

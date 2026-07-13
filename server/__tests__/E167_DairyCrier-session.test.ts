@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -9,6 +10,7 @@ const CARD_ID = 'E167_DairyCrier'
 
 const setup = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -17,7 +19,7 @@ const setup = () => {
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
   player.resources.food = 5
-  player.occupationHand.push(CARD_ID)
+  player.occupationHand = [CARD_ID, 'A085_Homekeeper']
 
   // Give p0 a fenced pasture so they can hold animals
   player.pastures = [{

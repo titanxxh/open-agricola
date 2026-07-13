@@ -10,6 +10,7 @@ import { runCardEffectHook } from '../card-effects'
 import { getCardDefinition } from '../catalog'
 import { implementedMinorImprovementCardsList, minorImprovementCardsList } from '../catalog.generated'
 import { confirmPlayerSwitch } from '../../../server/__tests__/_helpers/pending-confirms'
+import { stabilizeRandomHands } from '../../../server/__tests__/_helpers/stabilize-random-hands'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '../../..')
@@ -49,6 +50,7 @@ describe('Card Source representative migrations', () => {
     expect(impl?.effect?.onBuy).toEqual(expect.any(Function))
 
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -85,6 +87,7 @@ describe('Card Source representative migrations', () => {
     )
 
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1
     state.round = 1
@@ -125,6 +128,7 @@ describe('Card Source representative migrations', () => {
     expect(impl?.effect?.onBuy).toEqual(expect.any(Function))
 
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.round = 1
     const player = state.players[0]!

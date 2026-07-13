@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
@@ -14,6 +15,7 @@ describe('D156_RetailDealer session', () => {
    */
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

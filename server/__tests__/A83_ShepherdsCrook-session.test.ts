@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -31,6 +32,7 @@ describe('A083_ShepherdsCrook session flow', () => {
   it('uses fence delta in listener context to grant sheep', () => {
     expect(getRegisteredCardListeners().some((entry) => entry.id === 'A83-shepherds-crook-after-fencing')).toBe(true)
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -76,6 +78,7 @@ describe('A083_ShepherdsCrook session flow', () => {
     const listener = getRegisteredCardListeners().find((entry) => entry.id === 'A83-shepherds-crook-after-fencing')
     expect(listener).toBeDefined()
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

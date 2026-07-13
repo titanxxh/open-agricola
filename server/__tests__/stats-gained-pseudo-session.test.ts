@@ -4,6 +4,7 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A116_WoodCutter'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // Plow positive test driven via commitSelectionChoice on a pending farm choice
 // that carries a sourceCard. We assemble the pending state manually rather
@@ -12,6 +13,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 describe('gained.field pseudo-stat', () => {
   it('writes gained.field to sourceCard when commitSelectionChoice plows', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -43,6 +45,7 @@ describe('gained.field pseudo-stat', () => {
 describe('gained.stable pseudo-stat', () => {
   it('writes gained.stable to sourceCard when resolveChoice builds stables', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -73,6 +76,7 @@ describe('gained.occupation pseudo-stat', () => {
     // Standard player-driven `lessons` action -> playOccupation has no sourceCard,
     // so the played occupation should not accumulate gained.occupation on itself.
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

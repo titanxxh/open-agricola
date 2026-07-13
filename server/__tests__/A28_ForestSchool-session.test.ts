@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { A028_ForestSchool as A28Card } from '../../shared/cards/A/A028_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
@@ -10,6 +11,7 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
   const playerCount = options?.playerCount ?? 2
   const spaceId = options?.spaceId ?? 'lessons'
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, playerCount)
   state.currentPlayerIndex = 0
@@ -107,6 +109,7 @@ describe('A028_ForestSchool session', () => {
     // payment path is direct food — the pay leaf should auto-resolve and
     // never surface a selectPayment prompt.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

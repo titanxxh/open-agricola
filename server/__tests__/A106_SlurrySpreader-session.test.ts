@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -19,6 +20,7 @@ const expectGainFoodLeaf = (flow: ReturnType<typeof runCardEffectHook>, expected
 
 const setup = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
 
@@ -83,6 +85,7 @@ describe('A106_SlurrySpreader session', () => {
 
   it('integration: harvest chain grants food for an emptied grain field', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

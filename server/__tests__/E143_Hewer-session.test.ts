@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E143_Hewer'
@@ -10,6 +11,7 @@ const CARD_ID = 'E143_Hewer'
 describe('E143_Hewer session', () => {
   it('effect returns gain flow when clay-pit unoccupied and round >= 3', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -38,6 +40,7 @@ describe('E143_Hewer session', () => {
 
   it('does not trigger when round < 3', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -57,6 +60,7 @@ describe('E143_Hewer session', () => {
 
   it('does not trigger when clay-pit is occupied', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

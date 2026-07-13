@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A123_FrameBuilder'
@@ -9,6 +10,7 @@ const CARD_ID = 'A123_FrameBuilder'
 describe('A123_FrameBuilder renovation action log attribution', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -83,6 +85,7 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
 
   it('does NOT attribute renovate-house log when paying directly (no bonus used)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

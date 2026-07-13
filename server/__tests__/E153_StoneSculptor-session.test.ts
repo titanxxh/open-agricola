@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
@@ -11,6 +12,7 @@ const CARD_ID = 'E153_StoneSculptor'
 
 const setupHarvestRound = (round = 4) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = round
@@ -51,6 +53,7 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
 describe('E153_StoneSculptor exchange metadata', () => {
   it('declares a harvest-window exchange with bonusVp sideEffect', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
@@ -68,6 +71,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
 
   it('exposes nothing in the anytime window', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
@@ -78,6 +82,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
 
   it('computeBonusScore reads cardStates.bonusVpEarned', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
@@ -93,6 +98,7 @@ describe('E153_StoneSculptor exchange metadata', () => {
 
   it('computeBonusScore returns 0 when no usage recorded', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
@@ -193,6 +199,7 @@ describe('E153_StoneSculptor harvest integration', () => {
 
   it('player without E153: harvest exchange not exposed', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     // Do NOT push E153 into occupationPlayed.

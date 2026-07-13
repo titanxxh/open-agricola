@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -16,6 +17,7 @@ describe('A058_AsparagusKnife session', () => {
     grainFields?: { row: number; col: number; crop: 'grain'; remaining: number }[]
   }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -44,6 +46,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('triggers in round 8 with vegetable fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 8
@@ -62,6 +65,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('triggers in round 10', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 10
@@ -79,6 +83,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('triggers in round 12', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 12
@@ -94,6 +99,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('does NOT trigger in non-trigger rounds (e.g. round 7)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 7
@@ -109,6 +115,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('does NOT trigger in round 9', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 9
@@ -124,6 +131,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('does NOT trigger when no vegetable fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 8
@@ -140,6 +148,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('returns seq flow with selection for multiple vegetable fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 8
@@ -160,6 +169,7 @@ describe('A058_AsparagusKnife session', () => {
 
   it('does NOT trigger when vegetable field has remaining=0', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 8

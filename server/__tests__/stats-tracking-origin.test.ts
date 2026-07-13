@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('PlayerStats resource origin tracking', () => {
   it('card-effect gains route to resourcesFromCards via applyCardGain helper', async () => {
@@ -20,6 +21,7 @@ describe('PlayerStats resource origin tracking', () => {
 
   it('claims wood from Forest action space go to resourcesFromBoard', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     setWorkersAtHome(state, state.players[0]!, 2)

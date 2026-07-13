@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
@@ -11,6 +12,7 @@ describe('C087_Mason session', () => {
 
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; rooms?: number }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

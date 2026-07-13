@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import type { CostModifier } from '../../shared/contract/types'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('devDrawCard', () => {
   it('plays a virtual-occupation minor consistently before drawing it back', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[1]!.minorHand = ['D025_WitchesDanceFloor']
@@ -27,6 +29,7 @@ describe('devDrawCard', () => {
 
   it('removes card-derived active modifiers from the former minor owner', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const owner = state.players[1]!
@@ -58,6 +61,7 @@ describe('devDrawCard', () => {
 
   it('removes card-derived virtual occupations from the former minor owner', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const owner = state.players[1]!
@@ -74,6 +78,7 @@ describe('devDrawCard', () => {
 
   it('removes dynamic action spaces created by the former minor owner', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[1]!.minorHand = ['D051_Archway']
@@ -91,6 +96,7 @@ describe('devDrawCard', () => {
 
   it('pulls a played minor from any player back to the target hand and clears its state', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const target = state.players[0]!
@@ -113,6 +119,7 @@ describe('devDrawCard', () => {
 
   it('pulls a played occupation from any player back to the target hand and clears its state', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const target = state.players[0]!
@@ -135,6 +142,7 @@ describe('devDrawCard', () => {
 
   it('returns a played major to the public supply and clears its state', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const target = state.players[0]!

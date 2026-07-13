@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   isCardFlagged,
   readCardExtraData,
@@ -23,6 +24,7 @@ describe('C150_ParrotBreeder session', () => {
    */
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     expect(state.players.length).toBe(4)
     state.currentPlayerIndex = 0
