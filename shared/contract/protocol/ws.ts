@@ -57,6 +57,8 @@ type ClientCommandBody =
       enableCommunityDeck?: boolean
       /** When true, start the Parent Cards expansion selection phase before play. Default false. */
       enableParentCards?: boolean
+      /** When false, deal one Parent Card pair directly instead of opening parent selection. Default true. */
+      draftParents?: boolean
       /** When true, enable the Through the Seasons game variant. Default false. */
       enableThroughTheSeasons?: boolean
       /** When true, enable the Farmers of the Moor game variant. Default false. */
