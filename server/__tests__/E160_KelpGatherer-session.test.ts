@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -8,6 +9,7 @@ import '../../shared/cards/E/E160_KelpGatherer'
 describe('E160_KelpGatherer session', () => {
   const setup = (currentPlayerIndex = 0) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex

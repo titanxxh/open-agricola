@@ -5,9 +5,11 @@ import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('construct room payment session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -98,6 +100,7 @@ describe('construct room payment session', () => {
 
   it('undoStep can be used repeatedly to leave room selection and then undo the whole action', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     const player = state.players[0]!
@@ -146,6 +149,7 @@ describe('construct room payment session', () => {
 
   it('lets Carpenter\'s Hammer unlock a discounted two-room build', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -195,6 +199,7 @@ describe('construct room payment session', () => {
 
   it('returns to farm-expansion choice after building a room when stables remain possible', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 

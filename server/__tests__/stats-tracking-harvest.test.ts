@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('PlayerStats harvest tracking', () => {
   it('grain reaped from fields adds to harvestedGrain (1 per field)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     // give player 2 grain fields each with 2 grain on top
@@ -32,6 +34,7 @@ describe('PlayerStats harvest tracking', () => {
 
   it('vegetable reaped tracked separately', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [
@@ -52,6 +55,7 @@ describe('PlayerStats harvest tracking', () => {
 
   it('harvest reap summary keeps harvested crop details during field phase', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.fields = [

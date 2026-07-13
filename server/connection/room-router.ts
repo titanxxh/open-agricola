@@ -154,6 +154,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
   const enableParentCards = (msg as Record<string, unknown>).enableParentCards === true
+  const draftParents = (msg as Record<string, unknown>).draftParents === false ? false : undefined
   const enableThroughTheSeasons = (msg as Record<string, unknown>).enableThroughTheSeasons === true
   const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
   const allowIncompleteFarmersOfTheMoorMinorDeal =
@@ -168,6 +169,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
         playerCount: maxPlayers,
         enableCommunityDeck,
         enableParentCards,
+        ...(draftParents === false ? { draftParents } : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -193,6 +195,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     createdBy: ctx.currentUserId,
     customCardDbIds,
     enableParentCards,
+    draftParents,
     enableThroughTheSeasons,
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -357,6 +360,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       {
         playerCount: room.maxPlayers,
         enableParentCards,
+        ...(room.draftParents === false ? { draftParents: false } : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -370,6 +374,9 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  for (const player of room.players) {
+    room.session.updatePlayerName(player.playerIndex, player.name)
+  }
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
 }

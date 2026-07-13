@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -25,6 +26,7 @@ const moved = (
 describe('D146_Porter session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -41,6 +43,7 @@ describe('D146_Porter session', () => {
     transactionEvents: DraftGameEvent<'resource.moved'>[],
   ): CardListenerContext => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

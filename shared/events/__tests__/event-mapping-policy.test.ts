@@ -265,6 +265,12 @@ const publicEventFixtureMatrix = {
       silent: { ...base, id: 'future-queued-no-summary', seq: 2, type: 'futureMeeple.queued', playerId: 'p1', cardId: 'B157_Salter', entries: [{ round: 3, resources: { food: 2 } }] },
     },
   },
+  'futureMeeple.resolved': {
+    log: {
+      mapped: { ...base, type: 'futureMeeple.resolved', playerId: 'p1', cardId: 'B157_Salter', round: 3, resources: { food: 2 }, roomType: 'clay' },
+      silent: { ...base, id: 'future-resolved-resource', seq: 2, type: 'futureMeeple.resolved', playerId: 'p1', cardId: 'PR11', round: 3, resources: { food: 1 } },
+    },
+  },
 } satisfies Partial<PublicEventFixtureMatrix>
 
 describe('event mapping policy', () => {

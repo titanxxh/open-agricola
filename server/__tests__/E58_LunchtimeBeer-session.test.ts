@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
@@ -10,6 +11,7 @@ const CARD_ID = 'E058_LunchtimeBeer'
 
 const setupHarvestRound = (round = 4) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = round
@@ -48,6 +50,7 @@ const drainHarvest = (session: GameSession) => {
 describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
   it('returns optional SEQ with [gain food:1, special-effect set-extra-data]', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -80,6 +83,7 @@ describe('E058_LunchtimeBeer onStartHarvest flow shape', () => {
 
   it('emits special-effect with state.round value (round 7 → value 7)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 7

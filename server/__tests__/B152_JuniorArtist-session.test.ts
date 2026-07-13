@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -16,6 +17,7 @@ const setup = (options?: {
   travelingPlayersFood?: number
 }) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 5
@@ -34,9 +36,7 @@ const setup = (options?: {
   if (options?.withCard ?? true) {
     player.occupationPlayed.push(CARD_ID)
   }
-  if (options?.occupationHand) {
-    player.occupationHand = [...options.occupationHand]
-  }
+  player.occupationHand = [...(options?.occupationHand ?? ['B130_FullPeasant'])]
 
   const tp = state.actionSpaces.find((s) => s.id === 'traveling-players')
   if (tp) tp.resources.food = options?.travelingPlayersFood ?? 2

@@ -386,8 +386,8 @@ _Avoid_: modifier、listener、effect、prerequisiteCheck、卡牌运行时局�
 Parent Cards 扩展的独立结构化数据定义，描述 mother / father parent card 的卡号、规则原文、逻辑头像引用、逻辑卡背引用、mother 小数分值、mother 轮次奖励、father 任务条件和三档奖励；father 条件与奖励同时保留原文和机器可读结构。mother 小数分直接按规则印刷的小数存储。它只描述可验证数据，不执行规则。它不属于 `shared/cards` 的 Card Source / Card Definition / Card Display / Card Impl 投影，也不进入普通手牌、已打出卡、cards-manifest 或常规卡牌注册表。
 _Avoid_: Card Definition、Card Source、MinorImprovement、Occupation、玩家手牌
 
-**Parent Cards**:
-Consul Dirigens 的父母牌小扩展；启用时所有入座玩家各保留 1 张 mother parent card 和 1 张 father parent card，并把保留的父母牌作为公开的玩家侧边牌参与游戏。它不是让子变体，也不是普通 A-E / community 卡牌来源。
+**Parent Cards（父母卡扩展）**:
+Consul Dirigens 的父母卡小扩展；启用时所有入座玩家各保留 1 张母亲卡和 1 张父亲卡，并把保留的父母卡作为公开的玩家侧边卡参与游戏。它不是让子变体，也不是普通 A-E / community 卡牌来源。
 _Avoid_: ordinary card deck、community deck、handicapping、让子
 
 **Parent Card Selection**:
@@ -473,6 +473,10 @@ _Avoid_: 业务代码直接写 log
 **Workshop**:
 自定义卡和 AI 卡牌设计区域，覆盖卡牌生成、LLM 服务、卡牌美术、工坊 PR 和自定义卡上传。
 _Avoid_: 原版规则主路径
+
+**Workshop Sandbox（工坊沙盒）**:
+Workshop 中组合自定义卡、配置测试局并启动浏览器内热座游戏的界面与流程。中文界面统一使用“沙盒”；重新选择卡牌和配置称“重新配置沙盒”；启动动作称“开始沙盒测试”。
+_Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
 
 **Custom Code Sandbox**:
 自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力。

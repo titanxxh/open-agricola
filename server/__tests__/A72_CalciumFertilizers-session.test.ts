@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A072_CalciumFertilizers'
 
@@ -12,6 +13,7 @@ describe('A072_CalciumFertilizers session', () => {
    */
   const setup = (round = 4) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -151,6 +153,7 @@ describe('A072_CalciumFertilizers session', () => {
 
   it('prerequisite: cannot buy if player has fields', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -209,6 +212,7 @@ describe('A072_CalciumFertilizers session', () => {
     // The "No Field Tiles" prerequisite is handled by the prerequisite system.
     // We verify the prerequisite string is correctly set on the card definition.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

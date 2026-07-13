@@ -762,13 +762,25 @@ const ParentCardTile = ({
       cardId={id}
       devMode={devMode}
       className="parent-card-tile"
-      previewCard={<ParentCardFace id={id} infobox={infobox} completedTier={completedTier} />}
+      previewCard={(
+        <ParentCardFace
+          id={id}
+          locale={locale}
+          infobox={infobox}
+          completedTier={completedTier}
+        />
+      )}
       previewWidth={PARENT_CARD_PREVIEW_WIDTH}
       previewHeight={PARENT_CARD_PREVIEW_HEIGHT}
       previewClassName="parent-card-hover-preview"
       data-card-id={id}
     >
-      <ParentCardFace id={id} infobox={infobox} completedTier={completedTier} />
+      <ParentCardFace
+        id={id}
+        locale={locale}
+        infobox={infobox}
+        completedTier={completedTier}
+      />
     </CardWithCopy>
   )
 }

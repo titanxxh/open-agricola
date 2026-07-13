@@ -23,6 +23,7 @@ export type Room = {
   createdBy?: string
   customCardDbIds?: string[]
   enableParentCards?: boolean
+  draftParents?: boolean
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
@@ -45,6 +46,7 @@ export type FixedDevRoomStartupOptions = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  draftParents?: boolean
   draftMode?: 'simultaneous'
   draftPoolSize?: number
 }
@@ -68,6 +70,9 @@ export const parseFixedDevRoomStartupOptions = (
   ) {
     options.allowIncompleteFarmersOfTheMoorMinorDeal = true
   }
+  if (env.DEV_DRAFT_PARENTS === 'false' || env.DEV_DRAFT_PARENTS === '0') {
+    options.draftParents = false
+  }
   if (env.DEV_DRAFT_MODE === 'simultaneous') {
     const rawPoolSize = Number(env.DEV_DRAFT_POOL_SIZE)
     options.draftMode = 'simultaneous'
@@ -87,6 +92,7 @@ export const buildFixedDevRoomInitialStateOptions = (
   ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
   ...(startupOptions.enableFarmersOfTheMoor ? { enableFarmersOfTheMoor: true } : {}),
   ...(startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal ? { allowIncompleteFarmersOfTheMoorMinorDeal: true } : {}),
+  ...(startupOptions.draftParents === false ? { draftParents: false } : {}),
   ...(startupOptions.draftMode === 'simultaneous'
     ? {
         draftMode: 'simultaneous' as const,
@@ -109,6 +115,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
+  draftParents: room.draftParents,
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -208,6 +215,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -223,6 +231,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -243,6 +252,7 @@ export const snapshotToRoom = (
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
   enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
+  draftParents: snapshot.meta.draftParents,
   enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
   enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,

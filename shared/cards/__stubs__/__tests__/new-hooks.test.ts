@@ -13,11 +13,13 @@ import { CARD_ID as HARVEST_FEEDING_ID } from '../Stub_HarvestFeedingPhase'
 import { CARD_ID as END_HARVEST_ID } from '../Stub_EndHarvest'
 import { clearActionHooks } from '../../../actions/hooks'
 import { markAllWorkersUsed } from '../../../domain/player'
+import { stabilizeRandomHands } from '../../../../server/__tests__/_helpers/stabilize-random-hands'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 function makeSession(round: number, stubCardIds: string[]) {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   registerStubCards()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)

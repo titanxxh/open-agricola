@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { GameEvent } from '../../shared/contract/events'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -13,6 +14,7 @@ type ResourcePaidEvent = Extract<GameEvent, { type: 'resource.paid' }>
 
 const setupBase = (playerCount = 4) => {
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 5

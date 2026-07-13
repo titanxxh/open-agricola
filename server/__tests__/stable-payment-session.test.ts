@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {
     type: 'trade',
@@ -25,6 +26,7 @@ const stableTradeModifiers: PlayerState['activeModifiers'] = [
 describe('stable payment session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -96,6 +98,7 @@ describe('stable payment session', () => {
 
   it('does not offer build stables when consumed stable tokens exhaust reserve', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     const player = state.players[0]!
@@ -181,6 +184,7 @@ describe('stable payment session', () => {
 
   it('undoStep returns to action-space selection when farm-expansion auto-enters stable selection', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.players[0]!.resources = {

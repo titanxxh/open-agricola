@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -12,6 +13,7 @@ const CARD_ID = 'B058_CrackWeeder'
 describe('B058_CrackWeeder session', () => {
   it('onBuy returns a gain-1-food flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -28,6 +30,7 @@ describe('B058_CrackWeeder session', () => {
 
   it('onAfterReap gives 1 food per vegetable field harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -49,6 +52,7 @@ describe('B058_CrackWeeder session', () => {
 
   it('onAfterReap does not trigger when no vegetable fields harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -69,6 +73,7 @@ describe('B058_CrackWeeder session', () => {
 
   it('integration: harvest with vegetable fields gives food bonus', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round

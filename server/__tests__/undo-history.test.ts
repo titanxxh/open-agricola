@@ -1,12 +1,14 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('undo history on player switch', () => {
   let session: GameSession
 
   beforeEach(() => {
     session = new GameSession()
+    stabilizeRandomHands(session.state.players)
   })
 
   it('should have undo history after taking an action', () => {

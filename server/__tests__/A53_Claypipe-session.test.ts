@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -8,6 +9,7 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 describe('A053_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     state.players = state.players.slice(0, 2)
@@ -48,6 +50,7 @@ describe('A053_Claypipe session flow', () => {
 
   it('triggers after taking Hollow and then playing Claypipe via Meeting Place in the same round', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     state.round = 7

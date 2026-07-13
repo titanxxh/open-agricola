@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { A027_OvenSite } from '../../shared/cards/A/A027_OvenSite'
 import { minorImprovements } from '../../shared/cards/_lookup'
@@ -63,6 +64,7 @@ describe('A027_OvenSite session', () => {
 
   it('gains 2 wood on play and offers Clay/Stone Oven at discount', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const resp = playA27(session)
     expect(resp.ok).toBe(true)
     // After playing A27: should have 2 wood from onBuy gain
@@ -73,6 +75,7 @@ describe('A027_OvenSite session', () => {
 
   it('lets player skip the optional oven purchase', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     let resp = playA27(session)
     // Walk pending choices until either oven purchase offer or done
     const maxSteps = 10
@@ -97,6 +100,7 @@ describe('A027_OvenSite session', () => {
 
   it('buys Clay Oven for 1 clay + 1 stone via the A27 discount', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     let resp = playA27(session)
 
     const clayBefore = resp.state.players[0]!.resources.clay
@@ -136,6 +140,7 @@ describe('A027_OvenSite session', () => {
 
   it('preserves sourceCard on the immediate bake prompt after buying Clay Oven', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const setupState = session.getState().state
     setupState.players = setupState.players.slice(0, 2)
     setupState.players[0]!.resources.grain = 1
@@ -172,6 +177,7 @@ describe('A027_OvenSite session', () => {
   describe('prerequisite "Both Fireplace and Cooking Hearth"', () => {
     it('blocks when player owns no Fireplace + Hearth pair', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = []
@@ -180,6 +186,7 @@ describe('A027_OvenSite session', () => {
 
     it('allows when player owns Fireplace1 and CookingHearth1', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']

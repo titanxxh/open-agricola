@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B094_StockProtector'
@@ -16,6 +17,7 @@ const edgesForTile = (row: number, col: number) => [
 describe('B094_StockProtector session', () => {
   it('preserves sourceCard on the granted post-fencing place-farmer choice', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -52,6 +54,7 @@ describe('B094_StockProtector session', () => {
 
   it('blocks after gaining 2 wood if fencing is still not doable', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

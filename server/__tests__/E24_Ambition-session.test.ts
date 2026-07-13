@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E024_Ambition'
@@ -9,6 +10,7 @@ const CARD_ID = 'E024_Ambition'
 
 const setup = (options?: { minorHand?: string[] }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C164_GermanHeathKeeper'
@@ -9,6 +10,7 @@ const CARD_ID = 'C164_GermanHeathKeeper'
 describe('C164_GermanHeathKeeper session', () => {
   const setup = (currentPlayerIndex: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     // GermanHeathKeeper is a 4+ player card, keep all 4 players
     state.currentPlayerIndex = currentPlayerIndex

@@ -252,7 +252,10 @@ export const publicEventMappingPolicy = {
     replay: 'replayable',
   },
   'futureMeeple.resolved': {
-    log: mapped(),
+    log: conditional(
+      'no positive resources, roomType present, or resources contain field/stable/forest/moor',
+      'pure resource resolution is represented by the receive resource movement',
+    ),
     notification: mapped(),
     highlight: silent('future meeple resolution has no current board target'),
     resourceAnimation: silent('future meeple resolution does not move resources now'),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
@@ -145,6 +146,7 @@ describe('D103_CanalBoatman listener', () => {
 describe('D103_CanalBoatman session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -212,6 +214,7 @@ describe('D103_CanalBoatman session', () => {
 
   it('D103 extra worker does not let D150_GodlySpouse miscount wish-children as second placement', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

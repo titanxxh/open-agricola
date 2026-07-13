@@ -33,7 +33,7 @@ import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeFarmyardSpaceStates } from '../domain/farmyard-space-states'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
-import { ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
+import { dealParentCardsIfNeeded, ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -945,7 +945,11 @@ export const createInitialState = (
   }
   applyRoundGrowth(initialState)
   applySeasonPreparationAdjustments(initialState)
-  startParentSelectionIfNeeded(initialState, parentSelectionSeed)
+  if (options.draftParents === false) {
+    dealParentCardsIfNeeded(initialState, parentSelectionSeed)
+  } else {
+    startParentSelectionIfNeeded(initialState, parentSelectionSeed)
+  }
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)
   return initialState
 }

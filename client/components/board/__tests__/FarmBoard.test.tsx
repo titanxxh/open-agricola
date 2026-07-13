@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
@@ -561,6 +561,18 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('/assets/parents/cards/PS01.png')
     expect(html).toContain('Completed')
     expect(html.match(/parent-card-face__slash-segment is-completed/g)).toHaveLength(2)
+  })
+
+  it('renders kept Parent Cards in the farm board locale', () => {
+    const player = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      parentCards: { mother: 'PR10', father: 'PS08' },
+    } as PlayerState
+
+    render(<FarmBoard {...createFarmBoardProps(player, { locale: 'zh' })} />)
+
+    expect(screen.getByRole('img', { name: '母亲 PR10' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '父亲 PS08' })).toBeInTheDocument()
   })
 
   it('shows an enlarged portrait-built Parent Card preview on hover', () => {

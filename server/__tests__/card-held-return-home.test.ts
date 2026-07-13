@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { holdWorkerOnCard, getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('GameSession return-home releases card-held workers', () => {
   it('clears every heldWorkerId on every player when return-home runs', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     // Hold a worker on a card for each player
@@ -23,6 +25,7 @@ describe('GameSession return-home releases card-held workers', () => {
 
   it('does not remove other extraData keys when releasing heldWorkerId', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     // Set a held worker AND another extraData key on player 0

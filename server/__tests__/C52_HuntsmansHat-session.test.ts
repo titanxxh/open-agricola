@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   executeCardListener,
   getRegisteredCardListeners,
@@ -31,6 +32,7 @@ const moved = (
 describe('C052_HuntsmansHat server session', () => {
   it('adds food and logs cardEffectGain when collecting boar from pig-market', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -70,6 +72,7 @@ describe('C052_HuntsmansHat server session', () => {
 
   it('keeps session listeners when the global active registry is mutated', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -118,6 +121,7 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
     result: ActionExecutionResult = { type: 'ok' },
   ) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -210,6 +214,7 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
   it('does not trigger on irrelevant action ids', () => {
     const listener = findListener(LISTENER_ID)!
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

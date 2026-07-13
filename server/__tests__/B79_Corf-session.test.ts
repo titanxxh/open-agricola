@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { B079_Corf_impl } from '../../shared/cards/B/B079_Corf'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -12,6 +13,7 @@ const LISTENER = B079_Corf_impl.listeners[0]!
 
 const setup = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -47,6 +49,7 @@ const directContext = (
   actionEvents = transactionEvents,
 ): CardListenerContext => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const owner = state.players[0]!

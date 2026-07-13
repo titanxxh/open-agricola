@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -12,6 +13,7 @@ const CARD_ID = 'B117_Informant'
 describe('B117_Informant session', () => {
   it('onBuy returns a gain-1-wood flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -28,6 +30,7 @@ describe('B117_Informant session', () => {
 
   it('onBeforeReturnHome gives 1 wood when stone > clay', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -50,6 +53,7 @@ describe('B117_Informant session', () => {
 
   it('onBeforeReturnHome does not trigger when stone <= clay', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -69,6 +73,7 @@ describe('B117_Informant session', () => {
 
   it('onBeforeReturnHome does not trigger when stone < clay', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -91,6 +96,7 @@ describe('B117_Informant session', () => {
     // Our onBeforeReturnHome runs runCardEffectHook(state, player, ...) per
     // owner of the played card, so opponent without the card is unaffected.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -121,6 +127,7 @@ describe('B117_Informant session', () => {
 
   it('integration: end of work phase gives wood when stone > clay', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

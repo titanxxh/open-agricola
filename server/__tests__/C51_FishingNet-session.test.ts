@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -9,6 +10,7 @@ import '../../shared/cards/C/C051_FishingNet'
 describe('C051_FishingNet session', () => {
   const setup = (currentPlayerIndex: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex
@@ -69,6 +71,7 @@ describe('C051_FishingNet session', () => {
 
   it('2 food placed on fishing space during return-home phase', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1
@@ -217,6 +220,7 @@ describe('C051_FishingNet session', () => {
 
   it('no extra food on fishing space when card is not flagged during return-home', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A139_HollowWarden'
@@ -9,6 +10,7 @@ const CARD_ID = 'A139_HollowWarden'
 describe('A139_HollowWarden session', () => {
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 4) // 4 players for hollow-4 space
     state.currentPlayerIndex = 0
@@ -58,6 +60,7 @@ describe('A139_HollowWarden session', () => {
     // 3p game uses 'hollow' space (non-4p variant). BGA listens via
     // isActionCardEvent($event, 'Hollow') which matches both spaces.
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 0
@@ -88,6 +91,7 @@ describe('A139_HollowWarden session', () => {
 
   it('gains 1 food when using 5/6 hollow space', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 5 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

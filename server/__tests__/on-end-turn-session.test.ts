@@ -6,6 +6,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 
@@ -26,6 +27,7 @@ describe('onEndTurn session', () => {
 
   it('fires before confirmNextPlayer on a normal worker placement turn', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -45,6 +47,7 @@ describe('onEndTurn session', () => {
 
   it('does not fire during an intermediate confirmPlayerSwitch', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
@@ -88,6 +91,7 @@ describe('onEndTurn session', () => {
 
   it('waits until action-scoped animal reorg resolves', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     registerCounterEffect()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

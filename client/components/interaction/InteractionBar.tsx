@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { AnimalKey } from '../../../shared/contract/animals'
@@ -477,6 +477,7 @@ export const InteractionBar = ({
   model,
   actions,
 }: Props) => {
+  const barRef = useRef<HTMLDivElement>(null)
   const { locale, isInteractive } = model
   const body = model.body
   const choiceModel = model.choice
@@ -508,8 +509,30 @@ export const InteractionBar = ({
     cancelAnimalDiscardPrompt,
   } = actions
 
+  useLayoutEffect(() => {
+    const bar = barRef.current
+    const app = bar?.closest<HTMLElement>('.app')
+    if (!bar || !app) return
+
+    const updateHeight = () => {
+      app.style.setProperty('--interaction-bar-height', `${bar.getBoundingClientRect().height}px`)
+    }
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => app.style.removeProperty('--interaction-bar-height')
+    }
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      app.style.removeProperty('--interaction-bar-height')
+    }
+  }, [])
+
   return (
-    <div className="interaction-bar">
+    <div ref={barRef} className="interaction-bar">
       <div className="interaction-bar__top">
         <div className="interaction-bar__controls">
           <button onClick={onUndo} disabled={!isInteractive || historyLength === 0 || !canUndoStep}>

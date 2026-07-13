@@ -3,6 +3,98 @@ import { GameSession } from '../game/authoritative-session'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
 
 describe('Parent Card selection setup', () => {
+  it('deals one parent pair per player without parent selection when draftParents is false', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 9001,
+    } as never)
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.parentSelection).toBeNull()
+    for (const player of session.state.players) {
+      expect(player.parentCards.mother).not.toBeNull()
+      expect(player.parentCards.father).not.toBeNull()
+    }
+    expect(new Set(session.state.players.map((player) => player.parentCards.mother)).size).toBe(2)
+    expect(new Set(session.state.players.map((player) => player.parentCards.father)).size).toBe(2)
+  })
+
+  it('resolves round-one mother rewards after dealing parent cards directly', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    expect(session.state.players[0].parentCards.mother).toBe('PR10')
+    expect(session.state.players[0].resources.wood).toBe(1)
+    expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
+  })
+
+  it('refreshes direct-deal logs by player identity when display names collide', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    const p1Mother = session.state.players[0]!.parentCards.mother
+    const p2Mother = session.state.players[1]!.parentCards.mother
+    const logsFor = (cardId: string | null) => session.state.log.filter((entry) =>
+      entry.params?.cardId === cardId ||
+      (cardId === p1Mother && entry.key === 'log.actionDetail'),
+    )
+
+    session.updatePlayerName(0, 'PlayerB')
+    session.updatePlayerName(1, 'Bob')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'PlayerB')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Bob')).toBe(true)
+
+    session.updatePlayerName(0, 'Shared')
+    session.updatePlayerName(1, 'Shared')
+    session.updatePlayerName(0, 'Carol')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Shared')).toBe(true)
+
+    session.loadState(JSON.parse(JSON.stringify(session.state)))
+    session.updatePlayerName(1, 'Dana')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Dana')).toBe(true)
+  })
+
+  it('resolves round-one direct-deal rewards after simultaneous draft finalizes', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    expect(session.state.phase).toBe('draft')
+    expect(session.state.players[0].parentCards.mother).toBe('PR10')
+    expect(session.state.players[0].resources.wood).toBe(0)
+
+    while (session.state.phase === 'draft') {
+      for (const player of session.state.players) {
+        const pool = session.state.draft!.pools[player.id]
+        expect(session.submitDraftPick(player.id, {
+          occCardId: pool.occ[0],
+          minorCardId: pool.minor[0],
+        }).ok).toBe(true)
+      }
+    }
+
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.players[0].resources.wood).toBe(1)
+    expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
+  })
+
   it('starts a simultaneous parent-selection phase with private 2+2 candidates when enabled', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,

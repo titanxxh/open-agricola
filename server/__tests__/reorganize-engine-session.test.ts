@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/M/M033_NightPasture'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const NIGHT_PASTURE = 'M033_NightPasture'
 
 describe('reorganizeAction engine sub-flow integration', () => {
   const setupWorkPhase = (opts: { boar?: number } = {}) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -5,9 +5,11 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/D/D060_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('harvest session flow', () => {
   it('uses start-player harvest order and logs reap/feed/breed details with begging', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -187,6 +189,7 @@ describe('harvest session flow', () => {
 
   it('emits a game-ended event when the last round completes', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 14
@@ -209,6 +212,7 @@ describe('harvest session flow', () => {
   // playerA's resources / cards before performRoundEnd.
   const setupSinglePlayerHarvest = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

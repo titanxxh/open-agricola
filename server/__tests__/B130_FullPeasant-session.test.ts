@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -14,6 +15,7 @@ const setup = (options?: {
   grainOccupied?: boolean
 }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

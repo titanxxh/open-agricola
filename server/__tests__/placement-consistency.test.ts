@@ -4,10 +4,12 @@ import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/plac
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', () => {
   it('urgent-wish-children appears in allowed set when C129 is active', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const st = session.getState().state
     st.currentPlayerIndex = 0
     st.round = 5
@@ -50,6 +52,7 @@ describe('placement consistency: takeAction vs computeAllowedPlacementSpaces', (
 
   it('urgent-wish-children is blocked without C129', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const st = session.getState().state
     st.currentPlayerIndex = 0
     st.round = 5

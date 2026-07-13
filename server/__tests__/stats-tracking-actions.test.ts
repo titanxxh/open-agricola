@@ -3,10 +3,12 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { setStartPlayer } from '../../shared/actions/effects/first-player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('PlayerStats action tracking', () => {
   it('incPlacedFarmers fires once per place', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1
@@ -33,6 +35,7 @@ describe('PlayerStats action tracking', () => {
 
   it('starting first player has firstPlayerCount=1, others 0', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     expect(state.players[0]!.stats.firstPlayerCount).toBe(1)
     expect(state.players[1]!.stats.firstPlayerCount).toBe(0)
@@ -40,6 +43,7 @@ describe('PlayerStats action tracking', () => {
 
   it('incFirstPlayer fires when first-player rotates each year', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     // simulate p2 having taken the "set first player" effect during round 1.
     // We move start-player marker over so when round 2 begins, p2 receives +1.
@@ -59,6 +63,7 @@ describe('PlayerStats action tracking', () => {
 
   it('incFirstPlayer is not double-counted on round 1 init', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
     // p1 was starting first player → starts at 1.
     // Calling continueBeforeStartOfTurn while round===1 must not bump it.
     const core = session as unknown as { continueBeforeStartOfTurn: () => void }
@@ -70,6 +75,7 @@ describe('PlayerStats action tracking', () => {
 
   it('totalRoomsBuilt increments when a room is constructed via farm-expansion', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
 
@@ -108,6 +114,7 @@ describe('PlayerStats action tracking', () => {
 
   it('totalOccupationBuilt increments when an occupation is played', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -115,6 +122,7 @@ describe('PlayerStats action tracking', () => {
     setWorkersAtHome(state, player, 2)
     setWorkersAtHome(state, state.players[1]!, 0)
     player.resources = { ...player.resources, food: 5 }
+    player.occupationHand = ['A116_WoodCutter', 'A114_SeasonalWorker']
     // pick first occupation in hand to play
     const occId = player.occupationHand[0]
     if (!occId) throw new Error('player needs at least one occupation in hand')
@@ -142,6 +150,7 @@ describe('PlayerStats action tracking', () => {
 
   it('totalMajorBuilt increments when a major improvement is played', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

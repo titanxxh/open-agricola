@@ -17,12 +17,14 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('state.pendingUndoBoundary consumed by pushHistory', () => {
   let session: GameSession
 
   beforeEach(() => {
     session = new GameSession()
+    stabilizeRandomHands(session.state.players)
   })
 
   it('flag is cleared and history entry gets undoBoundary:true', () => {

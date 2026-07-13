@@ -162,6 +162,7 @@ import {
   type AnytimePolicyInput,
 } from './anytime-policy'
 import {
+  ensureParentMotherScheduleLogs,
   startParentSelectionIfNeeded,
   submitParentSelection as commitParentSelection,
 } from '../parents/selection'
@@ -633,9 +634,16 @@ export class GameCore {
   applyDraftFinalize(): void {
     this.state = finalizeDraft(this.state)
     startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
+    ensureParentMotherScheduleLogs(this.state)
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+    if (
+      this.state.phase === 'playing' &&
+      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
+    ) {
+      this.continueCurrentFutureMeepleActions()
+    }
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
@@ -667,6 +675,7 @@ export class GameCore {
   constructor(options: GameCoreOptions = {}) {
     ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
+    const isFreshState = stateOrSeed === undefined || typeof stateOrSeed === 'number'
     this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
@@ -792,6 +801,14 @@ export class GameCore {
       })
     }
     this.syncDynamicActionSpaces()
+    if (
+      isFreshState &&
+      this.state.phase === 'playing' &&
+      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
+    ) {
+      this.continueCurrentFutureMeepleActions()
+    }
+    if (isFreshState) this.bindInitialLogPlayerIds()
   }
 
   /**
@@ -880,7 +897,26 @@ export class GameCore {
 
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
-    setupPhase.updatePlayerName(this.state.players[playerIndex], name)
+    const player = this.state.players[playerIndex]
+    const previousName = player?.name
+    setupPhase.updatePlayerName(player, name)
+    if (!previousName || !player || previousName === player.name) return
+    for (const entry of this.state.log) {
+      if (entry.playerId === player.id && entry.params) entry.params.player = player.name
+    }
+  }
+
+  private bindInitialLogPlayerIds(): void {
+    const playerIdsByName = new Map<string, string | null>()
+    for (const player of this.state.players) {
+      playerIdsByName.set(player.name, playerIdsByName.has(player.name) ? null : player.id)
+    }
+    for (const entry of this.state.log) {
+      const playerName = entry.params?.player
+      if (typeof playerName !== 'string') continue
+      const playerId = playerIdsByName.get(playerName)
+      if (playerId) entry.playerId = playerId
+    }
   }
 
   private engineDeps() {

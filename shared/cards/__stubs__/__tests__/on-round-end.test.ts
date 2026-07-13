@@ -5,6 +5,7 @@ import { CARD_ID as ON_ROUND_END_ID } from '../Stub_OnRoundEnd'
 import { CARD_ID as ON_ROUND_END_FLOW_ID } from '../Stub_OnRoundEndFlow'
 import { clearActionHooks } from '../../../actions/hooks'
 import { markAllWorkersUsed } from '../../../domain/player'
+import { stabilizeRandomHands } from '../../../../server/__tests__/_helpers/stabilize-random-hands'
 
 describe('Stub_OnRoundEnd mechanism', () => {
   beforeEach(() => {
@@ -14,6 +15,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
 
   it('onRoundEnd fires when round finalizes', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     registerStubCards()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -36,6 +38,7 @@ describe('Stub_OnRoundEnd mechanism', () => {
 
   it('runs onRoundEnd returned flow before advancing the round', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     registerStubCards()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

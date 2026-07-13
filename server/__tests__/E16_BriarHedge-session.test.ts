@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
@@ -10,6 +11,7 @@ import '../../shared/cards/B/B030_WoodPalisades'
 describe('E016_BriarHedge session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -78,6 +80,7 @@ describe('E016_BriarHedge session', () => {
 describe('E16 BriarHedge — border-fence discount', () => {
   const discountSetup = (opts: { withCard?: boolean; wood: number; withB30?: boolean }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

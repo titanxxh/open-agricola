@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { B051_DiggingSpade } from '../../shared/cards/B/B051_DiggingSpade'
@@ -10,6 +11,7 @@ const CARD_ID = 'B051_DiggingSpade'
 describe('B051_DiggingSpade session', () => {
   const setup = (pigsInPasture: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -73,6 +75,7 @@ describe('B051_DiggingSpade session', () => {
   describe('prerequisite "Play in Round 7 or Later"', () => {
     it('blocks when round < 7', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.round = 6
       const player = state.players[0]!
@@ -81,6 +84,7 @@ describe('B051_DiggingSpade session', () => {
 
     it('allows when round >= 7', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.round = 7
       const player = state.players[0]!

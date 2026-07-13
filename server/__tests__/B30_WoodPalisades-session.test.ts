@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeScores } from '../../shared/domain/scoring'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
@@ -15,6 +16,7 @@ const tile00Palisades = ['H-0-0', 'V-0-0']  // border edges
 
 const setup = (overrides: { withCard?: boolean; wood?: number } = {}) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

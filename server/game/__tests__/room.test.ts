@@ -159,12 +159,14 @@ describe('room-manager seat assignment', () => {
   it('builds parent-card fixed dev room options without draft unless requested', () => {
     const startup = parseFixedDevRoomStartupOptions({
       DEV_ENABLE_PARENT_CARDS: 'true',
+      DEV_DRAFT_PARENTS: 'false',
     })
 
-    expect(startup).toEqual({ enableParentCards: true })
+    expect(startup).toEqual({ enableParentCards: true, draftParents: false })
     expect(buildFixedDevRoomInitialStateOptions(2, startup)).toEqual({
       playerCount: 2,
       enableParentCards: true,
+      draftParents: false,
     })
   })
 

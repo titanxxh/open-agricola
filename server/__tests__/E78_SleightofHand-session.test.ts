@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { Resource } from '../../shared/contract/types'
 
@@ -9,6 +10,7 @@ const CARD_ID = 'E078_SleightofHand'
 
 const setupPlaySession = (resources?: Partial<Resource>) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -46,6 +48,7 @@ const playUntilBatchPrompt = (session: GameSession) => {
 describe('E078_SleightofHand session', () => {
   it('onBuy creates one batch exchange request leaf', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -71,6 +74,7 @@ describe('E078_SleightofHand session', () => {
 
   it('onBuy returns undefined when player has no building resources', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

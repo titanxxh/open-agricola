@@ -110,6 +110,55 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
 
+  it('preserves direct Parent Card dealing when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      name: 'Alice',
+      enableParentCards: true,
+      draftParents: false,
+    } as never)
+
+    expect(ctx.currentRoom!.draftParents).toBe(false)
+    expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+    expect(ctx.currentRoom!.session.state.parentSelection).toBeNull()
+    expect(ctx.currentRoom!.session.state.players.every((player) => player.parentCards.mother)).toBe(true)
+    expect(ctx.currentRoom!.session.state.players[0]!.name).toBe('Alice')
+    expect(ctx.currentRoom!.session.state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
+  })
+
+  it('uses room display names in direct Parent Card logs', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      name: 'PlayerB',
+      enableParentCards: true,
+      draftParents: false,
+    } as never)
+
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, {
+      type: 'joinRoom',
+      roomId: host.currentRoom!.id,
+      name: 'Bob',
+    })
+
+    const loggedPlayerNames = host.currentRoom!.session.state.log
+      .map((entry) => entry.params?.player)
+      .filter((player): player is string => typeof player === 'string')
+    expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
+  })
+
   it('checkpoints newGame state through the broadcast path', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

@@ -10,11 +10,13 @@ import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A082_WorkCertificate'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // ===== A54 Credit session tests =====
 describe('A054_Credit session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -39,6 +41,7 @@ describe('A054_Credit session', () => {
 describe('A096_TaskArtisan session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -65,6 +68,7 @@ describe('A096_TaskArtisan session', () => {
 describe('B016_MiningHammer session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -87,6 +91,7 @@ describe('B016_MiningHammer session', () => {
 
   it('gains 1 food when bought through the improvement action', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -193,6 +198,7 @@ describe('B016_MiningHammer session', () => {
 describe('A129_Swagman session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -348,6 +354,7 @@ describe('A129_Swagman session', () => {
 describe('A082_WorkCertificate session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

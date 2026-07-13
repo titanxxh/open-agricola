@@ -1,12 +1,14 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/session/state-bootstrap'
+import { stabilizeRandomHands } from '../server/__tests__/_helpers/stabilize-random-hands'
 
 describe('GameSession contract', () => {
   let session: GameSession
 
   beforeEach(() => {
     session = new GameSession()
+    stabilizeRandomHands(session.state.players)
   })
 
   describe('getState', () => {

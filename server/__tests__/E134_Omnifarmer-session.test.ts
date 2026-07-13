@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
@@ -53,6 +54,7 @@ const setStored = (player: PlayerState, stored: string[]): void => {
 
 const setupEffect = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const effect = getCardEffect(CARD_ID)
   expect(effect).toBeDefined()
   return { session, effect: effect! }

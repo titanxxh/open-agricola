@@ -9,6 +9,7 @@ import {
   writeCardExtraData,
 } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/A/A129_Swagman'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const driveAccepts = (
   session: GameSession,
@@ -61,6 +62,7 @@ const driveAccepts = (
 
 const setup2P = (...occupations: string[]) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

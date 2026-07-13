@@ -54,6 +54,25 @@ export const startParentSelectionIfNeeded = (state: GameState, seed?: number): v
   completeParentSelectionIfReady(state)
 }
 
+export const dealParentCardsIfNeeded = (state: GameState, seed?: number): void => {
+  if (!state.enableParentCards || state.parentSelection) return
+  const alreadySelected = state.players.every(
+    (player) => player.parentCards.mother && player.parentCards.father,
+  )
+  if (alreadySelected) return
+  const dealSeed = typeof seed === 'number' && Number.isFinite(seed) ? Math.floor(seed) : createSeed()
+  const mothers = dealParentIds(MOTHER_PARENT_CARD_IDS, dealSeed, 0x510001)
+  const fathers = dealParentIds(FATHER_PARENT_CARD_IDS, dealSeed, 0x520001)
+  state.players.forEach((player, index) => {
+    const mother = mothers[index]
+    const father = fathers[index]
+    if (!isMotherParentCardId(mother) || !isFatherParentCardId(father)) return
+    player.parentCards = { mother, father }
+  })
+  queueSelectedMotherRewards(state)
+  ensureParentMotherScheduleLogs(state)
+}
+
 const autoSubmitForcedParentSelections = (state: GameState): void => {
   const selection = state.parentSelection
   if (!selection) return

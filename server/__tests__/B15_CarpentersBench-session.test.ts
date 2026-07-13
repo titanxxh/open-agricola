@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { B015_CarpentersBench_impl } from '../../shared/cards/B/B015_CarpentersBench'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -28,6 +29,7 @@ const directContext = (
   actionEvents = transactionEvents,
 ): CardListenerContext => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
@@ -107,6 +109,7 @@ describe('B015_CarpentersBench session', () => {
 
   it('does not apply a second B15 wood discount when E16 also discounts border fences', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -152,6 +155,7 @@ describe('B015_CarpentersBench session', () => {
 
   it('rejects a B15 pasture whose non-border fence cost exceeds the taken wood budget', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

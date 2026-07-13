@@ -67,6 +67,14 @@ describe('Parent Cards mother rewards', () => {
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.players[0]!.resources.wood).toBe(1)
     expect(resp.state.players[1]!.resources.food).toBe(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.futureMeepleResolved')).toHaveLength(0)
+    expect(resp.state.log.filter((entry) => {
+      if (entry.key !== 'log.actionDetail' || entry.params?.action !== 'actions.receive.name') {
+        return false
+      }
+      const gains = (entry.params.detailParts as { gains?: { food?: number } } | undefined)?.gains
+      return gains?.food === 1
+    })).toHaveLength(1)
   })
 
   it('does not settle mother rewards when parent cards are disabled', () => {

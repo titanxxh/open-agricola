@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D106_WhiskyDistiller'
 import '../../shared/cards/C/C060_SmallPottersOven'
@@ -17,6 +18,7 @@ const setupBakeViaC60 = (
   } = {},
 ) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -48,6 +50,7 @@ const setupBakeViaC60 = (
 describe('C060_SmallPottersOven server session', () => {
   it('returns the only oven from onBuy and logs separate cardEffectGain on play', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -95,6 +98,7 @@ describe('C060_SmallPottersOven server session', () => {
 
   it('asks which oven to return from onBuy when both ovens are owned', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

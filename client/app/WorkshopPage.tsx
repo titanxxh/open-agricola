@@ -266,9 +266,7 @@ export async function readSandboxStartResponse(
   }
   return {
     ok: false,
-    error: response.ok
-      ? fallbackError
-      : `Sandbox start failed (${response.status} ${response.statusText || 'HTTP error'})`,
+    error: fallbackError,
   }
 }
 
@@ -1396,7 +1394,12 @@ export function WorkshopPage() {
           allowIncompleteFarmersOfTheMoorMinorDeal: sandboxSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
         }),
       })
-      const data = await readSandboxStartResponse(response, t('platform.sandboxUnknownError'))
+      const fallbackError = response.ok
+        ? t('platform.sandboxUnknownError')
+        : t('platform.sandboxFailed', {
+          error: `${response.status} ${response.statusText || 'HTTP error'}`,
+        })
+      const data = await readSandboxStartResponse(response, fallbackError)
       if (data.ok) {
         const warnings: string[] = data.cardWarnings ?? []
         setSandboxActive(true)
@@ -1604,7 +1607,7 @@ export function WorkshopPage() {
               key={sandboxKey}
               className="sandbox-embed-frame"
               src={`?page=game&player=p1&embedded=1&devMode=1`}
-              title="Sandbox"
+              title={t('platform.sandbox')}
             />
           )}
         </div>
@@ -1666,7 +1669,7 @@ export function WorkshopPage() {
               key={sandboxKey}
               className="sandbox-embed-frame"
               src={`?page=game&player=p1&embedded=1&devMode=1`}
-              title="Sandbox"
+              title={t('platform.sandbox')}
             />
           )}
         </div>

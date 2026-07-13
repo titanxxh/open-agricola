@@ -19,6 +19,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry'
@@ -31,6 +32,7 @@ const CARD_ID = 'D025_WitchesDanceFloor'
 
 const setup = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0

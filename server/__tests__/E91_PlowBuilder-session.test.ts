@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   readCardExtraData,
   writeCardExtraData,
@@ -23,6 +24,7 @@ describe('E091_PlowBuilder session', () => {
    */
   const setup = (round = 4, options?: { joineryUsed?: boolean }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -117,6 +119,7 @@ describe('E091_PlowBuilder session', () => {
 
   it('trade-applied listener sets usedJoinery on Major_Joinery sourceId', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -135,6 +138,7 @@ describe('E091_PlowBuilder session', () => {
 
   it('trade-applied listener ignores non-Joinery sourceIds (e.g. Fireplace)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -154,6 +158,7 @@ describe('E091_PlowBuilder session', () => {
     // Future-proofing: BGA prefix-matches Major_Joinery to catch potential
     // upgrade ids; we mirror with startsWith.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -171,6 +176,7 @@ describe('E091_PlowBuilder session', () => {
 
   it('onAfterHarvest clears both the per-use flag and usedJoinery', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -189,6 +195,7 @@ describe('E091_PlowBuilder session', () => {
     // run Joinery's onHarvest hook, and confirm E91's trade-applied
     // listener flipped the usedJoinery flag without any manual setup.
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

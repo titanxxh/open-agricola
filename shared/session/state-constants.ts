@@ -115,6 +115,7 @@ export type InitialStateOptions = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  draftParents?: boolean
   parentSelectionSeed?: number
   ordinaryCardDeckSeed?: number
 }

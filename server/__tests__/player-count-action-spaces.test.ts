@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { createInitialState, normalizeState } from '../../shared/session/state-bootstrap'
 import { createActionSpaces } from '../../shared/actions'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // ---- Helpers ----
 
@@ -182,6 +183,7 @@ describe('3P resource-market XOR choice', () => {
 
   it('grants reed + food when first option chosen', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     const p = state.players[0]!
@@ -201,6 +203,7 @@ describe('3P resource-market XOR choice', () => {
 
   it('grants stone + food when second option chosen', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     const p = state.players[0]!

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
@@ -18,6 +19,7 @@ const selectedSpacesFromChoice = (value: string) =>
 describe('E148_Lazybones session', () => {
   const setup = (reservedActionSpaces = TRIGGER_SPACES) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1
 
@@ -36,6 +38,7 @@ describe('E148_Lazybones session', () => {
 
   it('onBuy offers selectable action-space choices up to dynamic reserve', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const owner = state.players[0]!
     owner.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
@@ -74,6 +77,7 @@ describe('E148_Lazybones session', () => {
 
   it('onBuy returns nothing if dynamic reserve is empty', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
 
     const owner = state.players[0]!

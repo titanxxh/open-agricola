@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
@@ -11,6 +12,7 @@ const CARD_ID = 'E022_GuestRoom'
 describe('E022_GuestRoom session', () => {
   const setup = (food = 5) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -171,6 +171,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
           const enableParentCards = searchParams.get('enableParentCards') === 'true' || undefined
+          const draftParents = searchParams.get('draftParents') === 'false' ? false : undefined
           const enableThroughTheSeasons = enableThroughTheSeasonsFromQuery(window.location.search) || undefined
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
@@ -181,6 +182,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             customCardIds,
             enableCommunityDeck,
             enableParentCards,
+            draftParents,
             enableThroughTheSeasons,
             enableFarmersOfTheMoor,
             allowIncompleteFarmersOfTheMoorMinorDeal,
