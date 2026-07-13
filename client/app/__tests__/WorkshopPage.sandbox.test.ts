@@ -65,12 +65,28 @@ describe('WorkshopPage sandbox launch helpers', () => {
         statusText: 'Bad Gateway',
         headers: { 'Content-Type': 'text/html' },
       }),
-      'Unknown sandbox error',
+      'Sandbox start failed (502 Bad Gateway)',
     )
 
     expect(result).toEqual({
       ok: false,
       error: 'Sandbox start failed (502 Bad Gateway)',
+    })
+  })
+
+  it('preserves a localized non-JSON sandbox start failure', async () => {
+    const result = await readSandboxStartResponse(
+      new Response('<html>bad gateway</html>', {
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { 'Content-Type': 'text/html' },
+      }),
+      '启动沙盒游戏失败：502 Bad Gateway',
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: '启动沙盒游戏失败：502 Bad Gateway',
     })
   })
 })
