@@ -21,6 +21,19 @@ describe('Parent Card selection setup', () => {
     expect(new Set(session.state.players.map((player) => player.parentCards.father)).size).toBe(2)
   })
 
+  it('resolves round-one mother rewards after dealing parent cards directly', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    expect(session.state.players[0].parentCards.mother).toBe('PR10')
+    expect(session.state.players[0].resources.wood).toBe(1)
+    expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
+  })
+
   it('starts a simultaneous parent-selection phase with private 2+2 candidates when enabled', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,

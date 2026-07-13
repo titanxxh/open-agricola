@@ -48,7 +48,9 @@ const ensureFixedDevRooms = (
     if (registry.has(id)) continue
     const snap = persistence.load(id)
     if (snap) {
-      registry.set(snapshotToRoom(snap))
+      const room = snapshotToRoom(snap)
+      room.draftParents = startupOptions.draftParents
+      registry.set(room)
     } else {
       const session = new GameSession(
         undefined,
@@ -63,6 +65,7 @@ const ensureFixedDevRooms = (
         version: 0,
         status: 'playing',
         enableParentCards: session.state.enableParentCards,
+        draftParents: startupOptions.draftParents,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
         enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
