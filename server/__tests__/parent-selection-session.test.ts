@@ -34,7 +34,7 @@ describe('Parent Card selection setup', () => {
     expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
   })
 
-  it('refreshes direct-deal logs when player display names are applied', () => {
+  it('refreshes direct-deal logs by player identity when display names collide', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
@@ -42,13 +42,28 @@ describe('Parent Card selection setup', () => {
       parentSelectionSeed: 1,
     } as never)
 
-    session.updatePlayerName(0, 'Alice')
-    session.updatePlayerName(1, 'Bob')
+    const p1Mother = session.state.players[0]!.parentCards.mother
+    const p2Mother = session.state.players[1]!.parentCards.mother
+    const logsFor = (cardId: string | null) => session.state.log.filter((entry) =>
+      entry.params?.cardId === cardId ||
+      (cardId === p1Mother && entry.key === 'log.actionDetail'),
+    )
 
-    const loggedPlayerNames = session.state.log
-      .map((entry) => entry.params?.player)
-      .filter((player): player is string => typeof player === 'string')
-    expect(new Set(loggedPlayerNames)).toEqual(new Set(['Alice', 'Bob']))
+    session.updatePlayerName(0, 'PlayerB')
+    session.updatePlayerName(1, 'Bob')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'PlayerB')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Bob')).toBe(true)
+
+    session.updatePlayerName(0, 'Shared')
+    session.updatePlayerName(1, 'Shared')
+    session.updatePlayerName(0, 'Carol')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Shared')).toBe(true)
+
+    session.loadState(JSON.parse(JSON.stringify(session.state)))
+    session.updatePlayerName(1, 'Dana')
+    expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
+    expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Dana')).toBe(true)
   })
 
   it('resolves round-one direct-deal rewards after simultaneous draft finalizes', () => {

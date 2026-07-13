@@ -432,6 +432,7 @@ export type PlayerStats = {
 export type LogEntry = {
   key: string
   params?: Record<string, unknown>
+  playerId?: string
 }
 
 export type PlayerParentCards = {
