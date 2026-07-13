@@ -5,7 +5,7 @@ import type {
   ParentSelectionState,
   ParentSelectionSubmission,
 } from '../../../shared/contract/types'
-import type { Locale } from '../../../shared/i18n'
+import { t, type Locale } from '../../../shared/i18n'
 import type { FatherParentCardId, MotherParentCardId, ParentCardId } from '../../../shared/parents'
 import { ParentCardFace } from '../../components/common/ParentCardFace'
 import { DraftHistoryPanel } from '../draft/DraftHistoryPanel'
@@ -76,10 +76,12 @@ interface Props {
 
 function ParentChoiceCard({
   id,
+  locale,
   selected,
   onSelect,
 }: {
   id: ParentCardId
+  locale: Locale
   selected: boolean
   onSelect: (id: ParentCardId) => void
 }) {
@@ -90,7 +92,7 @@ function ParentChoiceCard({
       data-card-id={id}
       onClick={() => onSelect(id)}
     >
-      <ParentCardFace id={id} selected={selected} />
+      <ParentCardFace id={id} locale={locale} selected={selected} />
     </button>
   )
 }
@@ -122,26 +124,30 @@ function ActiveParentSelectionOverlay({
   }
 
   return (
-    <div className="parent-selection-overlay" role="dialog" aria-label="Parent Cards selection">
+    <div className="parent-selection-overlay" role="dialog" aria-label={t(locale, 'ui.parentSelection.dialog')}>
       <div className="parent-selection-panel">
         <header className="parent-selection-header">
-          <h2 className="parent-selection-title">Parent Cards</h2>
+          <h2 className="parent-selection-title">{t(locale, 'ui.parentSelection.title')}</h2>
           <div className="parent-selection-status" data-already-submitted={vm.alreadySubmitted ? '1' : '0'}>
             {vm.alreadySubmitted
-              ? `Waiting for other players (${vm.submittedCount}/${vm.seatCount})...`
-              : 'Choose 1 mother and 1 father.'}
+              ? t(locale, 'ui.parentSelection.waitingForOthers', {
+                submitted: vm.submittedCount,
+                seats: vm.seatCount,
+              })
+              : t(locale, 'ui.parentSelection.prompt')}
           </div>
         </header>
 
         {!vm.alreadySubmitted && vm.canSeeCandidates ? (
           <>
             <section className="parent-selection-section" data-section="mother">
-              <h3 className="parent-selection-section-title">Mother</h3>
+              <h3 className="parent-selection-section-title">{t(locale, 'ui.parentSelection.mother')}</h3>
               <div className="parent-selection-row">
                 {vm.myCandidates.mother.map((id) => (
                   <ParentChoiceCard
                     key={id}
                     id={id}
+                    locale={locale}
                     selected={selMother === id}
                     onSelect={(nextId) => setSelMother(nextId as MotherParentCardId)}
                   />
@@ -149,12 +155,13 @@ function ActiveParentSelectionOverlay({
               </div>
             </section>
             <section className="parent-selection-section" data-section="father">
-              <h3 className="parent-selection-section-title">Father</h3>
+              <h3 className="parent-selection-section-title">{t(locale, 'ui.parentSelection.father')}</h3>
               <div className="parent-selection-row">
                 {vm.myCandidates.father.map((id) => (
                   <ParentChoiceCard
                     key={id}
                     id={id}
+                    locale={locale}
                     selected={selFather === id}
                     onSelect={(nextId) => setSelFather(nextId as FatherParentCardId)}
                   />
@@ -168,18 +175,24 @@ function ActiveParentSelectionOverlay({
                 disabled={!canSubmit}
                 onClick={handleConfirm}
               >
-                Confirm parents
+                {t(locale, 'ui.parentSelection.confirm')}
               </button>
             </div>
           </>
+        ) : vm.alreadySubmitted ? (
+          <div className="parent-selection-waiting">
+            {t(locale, 'ui.parentSelection.submitted')}
+          </div>
         ) : (
           <div className="parent-selection-waiting">
-            Waiting for your private Parent Cards candidates.
+            {t(locale, 'ui.parentSelection.candidatesWaiting')}
           </div>
         )}
         {draftedCards.occ.length > 0 || draftedCards.minor.length > 0 ? (
           <section className="parent-selection-section parent-selection-drafted" data-section="drafted">
-            <h3 className="parent-selection-section-title">Already drafted</h3>
+            <h3 className="parent-selection-section-title">
+              {t(locale, 'ui.parentSelection.alreadyDrafted')}
+            </h3>
             <DraftHistoryPanel
               occIds={draftedCards.occ}
               minorIds={draftedCards.minor}

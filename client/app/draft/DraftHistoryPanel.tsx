@@ -1,4 +1,4 @@
-import type { Locale } from '../../../shared/i18n'
+import { t, type Locale } from '../../../shared/i18n'
 import { PlayerCard } from '../../components/common/PlayerCard'
 
 interface Props {
@@ -15,7 +15,9 @@ export function DraftHistoryPanel({ occIds, minorIds, locale }: Props) {
   return (
     <div className="draft-history">
       <div className="draft-history-section" data-section="occ">
-        <h4 className="draft-history-title">Kept occupations ({occIds.length})</h4>
+        <h4 className="draft-history-title">
+          {t(locale, 'ui.draftKeptOccupations', { count: occIds.length })}
+        </h4>
         <div className="draft-history-row">
           {occIds.length === 0 && <div className="draft-history-empty">—</div>}
           {occIds.map((id) => (
@@ -31,7 +33,9 @@ export function DraftHistoryPanel({ occIds, minorIds, locale }: Props) {
         </div>
       </div>
       <div className="draft-history-section" data-section="minor">
-        <h4 className="draft-history-title">Kept minor improvements ({minorIds.length})</h4>
+        <h4 className="draft-history-title">
+          {t(locale, 'ui.draftKeptMinorImprovements', { count: minorIds.length })}
+        </h4>
         <div className="draft-history-row">
           {minorIds.length === 0 && <div className="draft-history-empty">—</div>}
           {minorIds.map((id) => (
