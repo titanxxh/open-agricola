@@ -110,6 +110,26 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
 
+  it('preserves direct Parent Card dealing when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      enableParentCards: true,
+      draftParents: false,
+    } as never)
+
+    expect(ctx.currentRoom!.draftParents).toBe(false)
+    expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+    expect(ctx.currentRoom!.session.state.parentSelection).toBeNull()
+    expect(ctx.currentRoom!.session.state.players.every((player) => player.parentCards.mother)).toBe(true)
+  })
+
   it('checkpoints newGame state through the broadcast path', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
