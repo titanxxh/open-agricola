@@ -29,9 +29,7 @@ a:focus-visible,
   color: var(--color-text);
   background: transparent;
   padding: var(--app-edge-padding);
-  padding-bottom: calc(
-    var(--app-edge-padding) + var(--interaction-bar-height, 0px) + env(safe-area-inset-bottom)
-  );
+  padding-bottom: calc(var(--app-edge-padding) + var(--interaction-bar-height, 0px));
   box-sizing: border-box;
   overflow-x: hidden;
 }
