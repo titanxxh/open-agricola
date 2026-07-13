@@ -374,6 +374,9 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  for (const player of room.players) {
+    room.session.updatePlayerName(player.playerIndex, player.name)
+  }
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
 }

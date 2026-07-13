@@ -34,6 +34,23 @@ describe('Parent Card selection setup', () => {
     expect(session.state.futureMeeples).not.toContainEqual(expect.objectContaining({ cardId: 'PR10' }))
   })
 
+  it('refreshes direct-deal logs when player display names are applied', () => {
+    const session = new GameSession(308, undefined, {
+      playerCount: 2,
+      enableParentCards: true,
+      draftParents: false,
+      parentSelectionSeed: 1,
+    } as never)
+
+    session.updatePlayerName(0, 'Alice')
+    session.updatePlayerName(1, 'Bob')
+
+    const loggedPlayerNames = session.state.log
+      .map((entry) => entry.params?.player)
+      .filter((player): player is string => typeof player === 'string')
+    expect(new Set(loggedPlayerNames)).toEqual(new Set(['Alice', 'Bob']))
+  })
+
   it('resolves round-one direct-deal rewards after simultaneous draft finalizes', () => {
     const session = new GameSession(308, undefined, {
       playerCount: 2,
