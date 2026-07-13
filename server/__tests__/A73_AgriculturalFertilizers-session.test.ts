@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A073_AgriculturalFertilizers'
 
@@ -24,6 +25,7 @@ const edgesForOneTile = [
 describe('A073_AgriculturalFertilizers session', () => {
   const setupFencing = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -79,6 +81,7 @@ describe('A073_AgriculturalFertilizers session', () => {
 
   it('grants optional sow after building 2 stables via farm-expansion', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -121,6 +124,7 @@ describe('A073_AgriculturalFertilizers session', () => {
 
   it('cannot play A73 without at least 1 pasture (prerequisite)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

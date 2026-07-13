@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { B162_ForestClearer_impl } from '../../shared/cards/B/B162_ForestClearer'
@@ -25,6 +26,7 @@ const moved = (
 describe('B162_ForestClearer session', () => {
   const setup = (woodOnForest: number) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -49,6 +51,7 @@ describe('B162_ForestClearer session', () => {
     transactionEvents: DraftGameEvent<'resource.moved'>[],
   ): CardListenerContext => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

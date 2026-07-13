@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
@@ -13,6 +14,7 @@ const CARD_ID = 'B021_HayloftBarn'
 
 const setup = (options?: { foodCount?: number }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -39,6 +41,7 @@ const setup = (options?: { foodCount?: number }) => {
 describe('B021_HayloftBarn session', () => {
   it('onBuy sets foodCount to 4', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

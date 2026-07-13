@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { B023_FinalScenario } from '../../shared/cards/B/B023_FinalScenario'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -7,6 +8,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 describe('B023_FinalScenario prerequisite', () => {
   it('blocks when round == 14', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.round = 14
     const player = state.players[0]!
@@ -15,6 +17,7 @@ describe('B023_FinalScenario prerequisite', () => {
 
   it('allows when round <= 13', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.round = 13
     const player = state.players[0]!
@@ -23,6 +26,7 @@ describe('B023_FinalScenario prerequisite', () => {
 
   it('sets exclusiveUse on the round 14 action space and gates non-owner placement', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 13
@@ -73,6 +77,7 @@ describe('B023_FinalScenario prerequisite', () => {
 
   it('clears exclusiveUse at round 14 start and emits clear event', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 13

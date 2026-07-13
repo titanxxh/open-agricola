@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
@@ -13,6 +14,7 @@ const setupOccupiedSpaceSession = (options?: {
   rooms?: number
 }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -39,6 +41,7 @@ const setupOccupiedSpaceSession = (options?: {
 
 const setupPlaySession = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -80,6 +83,7 @@ describe('B151_LittlePeasant session', () => {
 
   it('does not offer occupied urgent-wish-children when the player has no inactive worker to grow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

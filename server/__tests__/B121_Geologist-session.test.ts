@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B121_Geologist'
@@ -9,6 +10,7 @@ const CARD_ID = 'B121_Geologist'
 describe('B121_Geologist session', () => {
   const setup = (playerCount: 2 | 3 | 4 = 2) => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, playerCount)
     state.currentPlayerIndex = 0

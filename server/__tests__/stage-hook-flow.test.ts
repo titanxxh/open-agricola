@@ -11,6 +11,7 @@ import '../../shared/cards/C/C120_AgriculturalLabourer'
 import '../../shared/cards/D/D099_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
 import '../../shared/cards/D/D167_PureBreeder'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const chooseFirstOption = (session: GameSession, playerIndex: number) => {
   const interaction = session.getState().interaction
@@ -25,6 +26,7 @@ const chooseFirstOption = (session: GameSession, playerIndex: number) => {
 describe('stage hook flows', () => {
   it('runs B070_NewPurchase through before-start-of-turn flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 3
@@ -62,6 +64,7 @@ describe('stage hook flows', () => {
 
   it('runs A166_Haydryer through before-harvest flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -107,6 +110,7 @@ describe('stage hook flows', () => {
 
   it('runs D099_EarthenwarePotter through after-harvest flow on round 14', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 14
@@ -142,6 +146,7 @@ describe('stage hook flows', () => {
 
   it('runs A064_BarleyMill through after-reap flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -180,6 +185,7 @@ describe('stage hook flows', () => {
 
   it('runs C120_AgriculturalLabourer through after-reap flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -220,6 +226,7 @@ describe('stage hook flows', () => {
 
   it('runs C071_Slurry through end-harvest sow flow after multi-animal breeding', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -293,6 +300,7 @@ describe('stage hook flows', () => {
 
   it('runs D115_FodderPlanter through multi-sow flow based on newborn count', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -374,6 +382,7 @@ describe('stage hook flows', () => {
 
   it('limits D115_FodderPlanter sow count to the number of newborn animals', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -436,6 +445,7 @@ describe('stage hook flows', () => {
 
   it('does not let D167 non-harvest breeding write D115 harvest breeding summary', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

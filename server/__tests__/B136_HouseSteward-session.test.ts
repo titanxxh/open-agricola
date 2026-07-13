@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 import { computeScores } from '../../shared/domain/scoring'
 
@@ -11,6 +12,7 @@ const CARD_ID = 'B136_HouseSteward'
 
 const setupSession = (round: number) => {
   const session = new GameSession(undefined, undefined, { playerCount: 3 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = round
@@ -90,6 +92,7 @@ describe('B136_HouseSteward session', () => {
 
   it('does not award the shared room-majority bonus when the card is not played', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players[0]!.rooms = 3
     state.players[1]!.rooms = 4

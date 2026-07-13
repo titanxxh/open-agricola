@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A116_WoodCutter'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // A116_WoodCutter has a simple `after place-farmer` listener that fires once
 // per wood-space visit. We use it as a representative card to assert that
@@ -12,6 +13,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 describe('per-card used stat', () => {
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

@@ -4,12 +4,14 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { C122_Bricklayer } from '../../shared/cards/C/C122_Bricklayer'
 import type { PlayerState } from '../../shared/contract/types'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const CARD_ID = 'C122_Bricklayer'
 
 describe('payment stats: bonus saved attribution (session)', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { C095_BasketWeaver } from '../../shared/cards/C/C095_BasketWeaver'
 import { occupations } from '../../shared/cards/_lookup'
@@ -25,6 +26,7 @@ if (!occupations.some((c) => c.id === CARD_ID)) {
 describe('C095_BasketWeaver session', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

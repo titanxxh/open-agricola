@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B035_HookKnife'
@@ -10,6 +11,7 @@ const CARD_ID = 'B035_HookKnife'
 describe('B035_HookKnife session', () => {
   const setup = (sheep = 0, playerCount = 2) => {
     const session = new GameSession(undefined, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, playerCount)
     state.currentPlayerIndex = 0

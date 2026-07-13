@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, collectComputeCostsForFarmChoice } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { PlayerState, GameState } from '../../shared/contract/types'
@@ -10,6 +11,7 @@ import '../../shared/cards/B/B030_WoodPalisades'
 
 const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   const p = state.players[0]!
   p.occupationPlayed.push('C088_CarpentersApprentice')
@@ -72,6 +74,7 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
 describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   it('低 fence 不打折:0 fence 造 2 fence + 2 palisade 全额付费', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -104,6 +107,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
 
   it('palisade 不打折:5 wood 不足 6 wood 的 2 fence + 2 palisade build', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -133,6 +137,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   describe('stables-cost listener cap (3rd & 4th stables only)', () => {
     const makePlayer = (stables: number, farmHand = false): PlayerState => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const p = state.players[0]!
       p.occupationPlayed.push('C088_CarpentersApprentice')
@@ -243,6 +248,7 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
   })
   it('12 fences,no legal commit → not doable', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -290,6 +296,7 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
 describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () => {
   it('before 12,造 3 个 → 聚合 wood -3(hook 路径生效)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = makeFencePlayer(12)
     state.players[0] = player
@@ -303,6 +310,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
   })
   it('before 0,造 2 个 → 聚合无 wood 折扣', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = makeFencePlayer(0)
     state.players[0] = player
@@ -319,6 +327,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
 describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
   it('0 fence 一次造 14 个 fence:第 13/14 个免费,wood 12→0', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
@@ -25,6 +26,7 @@ describe('E071_CowPatty session', () => {
     }[]
   }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -412,6 +414,7 @@ describe('E071_CowPatty session', () => {
   describe('prerequisite "1 Cattle"', () => {
     it('blocks when player has no cattle on board', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.pastures = []
@@ -423,6 +426,7 @@ describe('E071_CowPatty session', () => {
 
     it('allows when player has at least 1 cattle on board', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.pastures = [{

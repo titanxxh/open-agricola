@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -15,6 +16,7 @@ describe('D065_GrainSieve session', () => {
     vegetableFields?: { row: number; col: number; crop: 'vegetable'; remaining: number }[]
   }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -41,6 +43,7 @@ describe('D065_GrainSieve session', () => {
 
   it('onAfterReap grants 1 grain when 2+ grain harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -61,6 +64,7 @@ describe('D065_GrainSieve session', () => {
 
   it('onAfterReap does not trigger when only 1 grain harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -76,6 +80,7 @@ describe('D065_GrainSieve session', () => {
 
   it('onAfterReap does not trigger when no grain harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

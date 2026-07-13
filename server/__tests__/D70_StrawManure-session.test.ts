@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D070_StrawManure'
@@ -11,6 +12,7 @@ const CARD_ID = 'D070_StrawManure'
 describe('D070_StrawManure session', () => {
   const setupHarvest = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -86,6 +88,7 @@ describe('D070_StrawManure session', () => {
 
   it('does not trigger when player has no grain', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -112,6 +115,7 @@ describe('D070_StrawManure session', () => {
 
   it('does not trigger when no vegetable fields have crops', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

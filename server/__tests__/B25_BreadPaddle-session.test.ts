@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -13,6 +14,7 @@ const CARD_ID = 'B025_BreadPaddle'
 describe('B025_BreadPaddle session', () => {
   it('onBuy returns a gain-1-food flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -29,6 +31,7 @@ describe('B025_BreadPaddle session', () => {
 
   it('after playing occupation, triggers optional bake-bread', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -48,7 +51,7 @@ describe('B025_BreadPaddle session', () => {
 
     // Add an occupation to hand to play
     const occId = 'A114_SeasonalWorker'
-    player.occupationHand.push(occId)
+    player.occupationHand = [occId, 'A110_Roughcaster']
 
     // Give player a fireplace so they can bake bread
     player.improvements.push('Major_Fireplace1')
@@ -76,6 +79,7 @@ describe('B025_BreadPaddle session', () => {
 
   it('logs only the bake substep food when Bread Paddle triggers after a paid occupation', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -88,7 +92,7 @@ describe('B025_BreadPaddle session', () => {
     player.resources.grain = 1
     player.minorPlayed.push(CARD_ID)
     player.improvements.push('Major_Fireplace1')
-    player.occupationHand.push('A114_SeasonalWorker')
+    player.occupationHand = ['A114_SeasonalWorker', 'A110_Roughcaster']
     player.occupationPlayed.push('A085_Homekeeper')
 
     setActiveWorkerCount(state.players[1]!, 1)
@@ -126,6 +130,7 @@ describe('B025_BreadPaddle session', () => {
 
   it('does not trigger bake-bread if card is not played', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -141,7 +146,7 @@ describe('B025_BreadPaddle session', () => {
 
     // Card NOT in minorPlayed
     const occId = 'A114_SeasonalWorker'
-    player.occupationHand.push(occId)
+    player.occupationHand = [occId, 'A110_Roughcaster']
 
     session.loadState(state)
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { AnytimeAction, ActionFlow } from '../../shared/contract/types'
 
@@ -20,6 +21,7 @@ describe('D114_SeedTrader session', () => {
     options?: { food?: number; grainOnCard?: number; vegOnCard?: number; play?: boolean },
   ) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -41,6 +43,7 @@ describe('D114_SeedTrader session', () => {
 
   it('onBuy returns store-on-card leaf with grain:2 + vegetable:2', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     const effect = getCardEffect(CARD_ID)

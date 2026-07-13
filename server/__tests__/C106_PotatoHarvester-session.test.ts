@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -15,6 +16,7 @@ describe('C106_PotatoHarvester session', () => {
     grainFields?: { row: number; col: number; crop: 'grain'; remaining: number }[]
   }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -41,6 +43,7 @@ describe('C106_PotatoHarvester session', () => {
 
   it('onBuy grants 3 food', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -55,6 +58,7 @@ describe('C106_PotatoHarvester session', () => {
 
   it('onAfterReap grants 1 food per vegetable harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -75,6 +79,7 @@ describe('C106_PotatoHarvester session', () => {
 
   it('onAfterReap does not trigger when no vegetables harvested', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

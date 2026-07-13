@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const setWorkersAtHome = (state: any, player: any, count: number) => {
   player.workers = Array.from({ length: 5 }, (_, i) => ({
@@ -12,6 +13,7 @@ const setWorkersAtHome = (state: any, player: any, count: number) => {
 describe('improvement: pay fail idempotent', () => {
   it('cannot afford major-improvement -> pending stays choice; player.improvements untouched', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

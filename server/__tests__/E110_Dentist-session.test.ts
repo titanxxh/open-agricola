@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -14,6 +15,7 @@ const CARD_ID = 'E110_Dentist'
 describe('E110_Dentist session', () => {
   it('onStartHarvest returns optional flow to pay 1 wood when player has wood', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round
@@ -35,6 +37,7 @@ describe('E110_Dentist session', () => {
 
   it('onStartHarvest returns undefined when player has no wood', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -53,6 +56,7 @@ describe('E110_Dentist session', () => {
 
   it('onHarvestFeedingPhase grants 1 food per wood on card', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -78,6 +82,7 @@ describe('E110_Dentist session', () => {
 
   it('onHarvestFeedingPhase returns undefined when no wood on card', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
 
@@ -95,6 +100,7 @@ describe('E110_Dentist session', () => {
 
   it('full harvest flow: pay wood and get food during feeding', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round

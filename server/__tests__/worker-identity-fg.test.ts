@@ -5,10 +5,12 @@ import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/h
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A092_AdoptiveParents'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('worker-identity: family growth pushes newborn to FG space takenBy', () => {
   const setup = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

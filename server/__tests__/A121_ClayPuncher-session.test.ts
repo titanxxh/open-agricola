@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -11,6 +12,7 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 describe('A121_ClayPuncher session', () => {
   const setup = (playerCount: number = 2) => {
     const session = new GameSession(undefined, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, playerCount)
     state.currentPlayerIndex = 0
@@ -65,7 +67,7 @@ describe('A121_ClayPuncher session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     // Need an occupation in hand for lessons to be usable (must be in catalog)
-    player.occupationHand.push('A093_BedMaker')
+    player.occupationHand = ['A093_BedMaker', 'A110_Roughcaster']
     const clayBefore = player.resources.clay
     session.loadState(state)
 
@@ -94,7 +96,7 @@ describe('A121_ClayPuncher session', () => {
     const session = setup(3)
     const state = session.getState().state
     const player = state.players[0]!
-    player.occupationHand.push('A093_BedMaker')
+    player.occupationHand = ['A093_BedMaker', 'A110_Roughcaster']
     const clayBefore = player.resources.clay
     session.loadState(state)
 

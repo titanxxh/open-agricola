@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { PlayerState } from '../../shared/contract/types'
 import { reap, dispatchReapListener } from '../../shared/actions/effects/reap'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -49,6 +50,7 @@ const fillFarmMinus1 = (player: PlayerState): void => {
 
 const setupSession = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   return { session, state }

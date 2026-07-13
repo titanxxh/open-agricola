@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E074_AshTrees'
@@ -15,6 +16,7 @@ const edgesForTile = (row: number, col: number) => [
 describe('E074_AshTrees session flow', () => {
   it('lets fencing reach fence selection using stored free fences', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -75,6 +77,7 @@ describe('E074_AshTrees session flow', () => {
 
   it('freeFences only discount fences, palisades still cost full wood (with B30)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

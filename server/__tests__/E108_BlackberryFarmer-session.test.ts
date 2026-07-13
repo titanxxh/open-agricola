@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
@@ -23,6 +24,7 @@ const fenceBuilt = (
 describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
   it('queues future meeples for fence edges only, not palisades', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -63,6 +65,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
 
   it('ignores legacy newFenceEdges extraData when fence event has only palisades', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!

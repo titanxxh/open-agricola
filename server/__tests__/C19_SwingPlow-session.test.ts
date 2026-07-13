@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C019_SwingPlow'
@@ -8,6 +9,7 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 describe('C019_SwingPlow session', () => {
   const setup = (stackSize = 4) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

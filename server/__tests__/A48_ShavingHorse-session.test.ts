@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
@@ -20,6 +21,7 @@ type SetupOptions = {
 
 const setup = (options: SetupOptions = {}) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -70,6 +72,7 @@ const directContext = (
   transactionEvents: DraftGameEvent[],
 ): CardListenerContext => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   const player = state.players[0]!
@@ -204,6 +207,7 @@ describe('A048_ShavingHorse session', () => {
 
   it('triggers once after a batched future receive adds wood', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 1

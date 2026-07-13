@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { rehydrateState, serializeState } from '../../shared/session/serialization'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 /**
  * Tests for ActionFlow targetPlayerId metadata with lazy confirmation.
@@ -15,6 +16,7 @@ import { rehydrateState, serializeState } from '../../shared/session/serializati
 describe('ActionFlow targetPlayerId', () => {
   const setupSession = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -339,6 +341,7 @@ describe('ActionFlow targetPlayerId', () => {
 
   it('chained target player choices confirm each owner transition and return to the frame owner', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 0
@@ -400,6 +403,7 @@ describe('ActionFlow targetPlayerId', () => {
 
   it('dynamic target flow triggered by the switched player can switch to a third player and back', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 0

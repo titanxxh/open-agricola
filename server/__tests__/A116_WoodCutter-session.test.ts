@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -8,6 +9,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 describe('A116_WoodCutter session', () => {
   const setup = () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1
@@ -58,6 +60,7 @@ describe('A116_WoodCutter session', () => {
 
   it.each(['copse-56', 'grove-56'])('gains 1 extra wood when using %s', (spaceId) => {
     const session = new GameSession(undefined, undefined, { playerCount: 5 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1

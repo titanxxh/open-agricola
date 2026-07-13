@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
 import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 
@@ -8,6 +9,7 @@ import '../../shared/cards/B/B107_Manservant'
 describe('B107_Manservant session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; round?: number }) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

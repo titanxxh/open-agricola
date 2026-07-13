@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -26,6 +27,7 @@ const findAfterPayListener = () => {
 
 const setupBase = (playerCount = 2) => {
   const session = new GameSession(undefined, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 5

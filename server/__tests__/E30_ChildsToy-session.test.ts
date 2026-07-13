@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount } from '../../shared/domain/player'
 import { E030_ChildsToy } from '../../shared/cards/E/E030_ChildsToy'
@@ -11,6 +12,7 @@ const CARD_ID = 'E030_ChildsToy'
 describe('E030_ChildsToy session', () => {
   it('with card and 1 newborn, feeding requires full 2 food per person (no discount)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round
@@ -61,6 +63,7 @@ describe('E030_ChildsToy session', () => {
 
   it('without card and 1 newborn, feeding has newborn discount', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4 // harvest round
@@ -113,6 +116,7 @@ describe('E030_ChildsToy session', () => {
 
   it('with card and 1 newborn but insufficient food, player begs', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -162,6 +166,7 @@ describe('E030_ChildsToy session', () => {
 
   it('preserves newborn flag after feeding (non-destructive mutation)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -209,6 +214,7 @@ describe('E030_ChildsToy session', () => {
   describe('prerequisite "Exactly 2 Adults"', () => {
     it('blocks when player has only 1 adult', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       setActiveWorkerCount(player, 1)
@@ -218,6 +224,7 @@ describe('E030_ChildsToy session', () => {
 
     it('blocks when one active worker is a newborn (1 adult + 1 newborn)', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)
@@ -227,6 +234,7 @@ describe('E030_ChildsToy session', () => {
 
     it('allows when player has exactly 2 adults (no newborns)', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       setActiveWorkerCount(player, 2)

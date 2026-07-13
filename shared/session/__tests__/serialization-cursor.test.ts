@@ -3,10 +3,12 @@ import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
 import { rehydrateState, serializeState } from '../serialization'
 import { EngineStack } from '../../engine'
+import { stabilizeRandomHands } from '../../../server/__tests__/_helpers/stabilize-random-hands'
 
 describe('serialization cursor round-trip', () => {
   const restoredChoiceSession = (options: { value: string; labelKey: string }[], promptKey = 'ui.cursorTestChoice') => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -47,6 +49,7 @@ describe('serialization cursor round-trip', () => {
 
   it('restored one-option ActionNode pending envelope remains pending', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -102,6 +105,7 @@ describe('serialization cursor round-trip', () => {
 
   it('rejects invalid finite choice values before dispatch', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -206,6 +210,7 @@ describe('serialization cursor round-trip', () => {
 
   it('rejects invalid select-trigger values before dispatch', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -257,6 +262,7 @@ describe('serialization cursor round-trip', () => {
 
   it('restored disabled select-trigger option with pass remains pending', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -310,6 +316,7 @@ describe('serialization cursor round-trip', () => {
 
   it('rejects disabled select-trigger values before dispatch', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -365,6 +372,7 @@ describe('serialization cursor round-trip', () => {
   // sub-flow is reconstructed.
   const setupReorgPending = () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -447,6 +455,7 @@ describe('serialization cursor round-trip', () => {
   // check the engineStack frame is reconstructed and resolvable.
   it('plain choice sub-flow (plow) survives serialize/rehydrate', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -518,6 +527,7 @@ describe('serialization cursor round-trip', () => {
   // the restored session can resolve the prompt to advance the turn.
   it('confirm-next-player sub-flow survives serialize/rehydrate', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -567,6 +577,7 @@ describe('serialization cursor round-trip', () => {
   // '__interaction_only__' frame on top of the parent action frame.
   it('confirm-player-switch sub-flow survives serialize/rehydrate', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 3)
     state.currentPlayerIndex = 1
@@ -626,6 +637,7 @@ describe('serialization cursor round-trip', () => {
   // request.kind === 'feed'. Round-trip and resolve.
   it('feed sub-flow survives serialize/rehydrate', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

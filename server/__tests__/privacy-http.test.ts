@@ -18,6 +18,7 @@ import type { GameEvent } from '../../shared/contract/events.ts'
 
 import '../../shared/cards/E/E078_SleightofHand'
 import '../../shared/cards/D/D036_BreedRegistry'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const E078_CARD_ID = 'E078_SleightofHand'
 
@@ -64,6 +65,7 @@ const mockRes = (): MockRes => {
 
 const setupE78BatchPromptSession = () => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -220,6 +222,7 @@ describe('HTTP privacy + seat binding', () => {
 
     it('filters active player cardAvailability from other viewers', async () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       state.players = state.players.slice(0, 2)
       state.currentPlayerIndex = 0
@@ -242,6 +245,7 @@ describe('HTTP privacy + seat binding', () => {
 
     it('filters hidden hand-card public event cancellations from other viewers', async () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const originalGetState = session.getState.bind(session)
       const resp = originalGetState()
       const state = resp.state

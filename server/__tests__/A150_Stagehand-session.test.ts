@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A150_Stagehand'
@@ -9,6 +10,7 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 describe('A150_Stagehand session', () => {
   const setup = (playerCount = 4, spaceId = 'traveling-players') => {
     const session = new GameSession(undefined, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 1
 

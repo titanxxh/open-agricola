@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/domain/player'
 import { C105_BasketCarrier } from '../../shared/cards/C/C105_BasketCarrier'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
@@ -46,6 +47,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
 
   it('reverse trade applies bidirectionally via confirmHarvestFeed (food -2, wood/reed/grain +1)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4
@@ -114,6 +116,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
 
   it('reverse trade declined: empty selections leaves food untouched (or pays begging if short)', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 4

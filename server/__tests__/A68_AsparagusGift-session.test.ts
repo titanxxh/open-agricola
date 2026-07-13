@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { A068_AsparagusGift } from '../../shared/cards/A/A068_AsparagusGift'
 import '../../shared/cards/B/B030_WoodPalisades'
@@ -17,6 +18,7 @@ const tile00InternalFences = ['H-1-0', 'V-0-1']
 
 const setup = (opts: { withB30?: boolean; wood: number; round?: number }) => {
   const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -76,6 +78,7 @@ describe('A68 Asparagus Gift — session', () => {
   describe('prerequisite "1 Unplanted Field"', () => {
     it('blocks when player has no empty fields', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = []
@@ -84,6 +87,7 @@ describe('A68 Asparagus Gift — session', () => {
 
     it('allows when player has at least one empty field', () => {
       const session = new GameSession()
+      stabilizeRandomHands(session.state.players)
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [{ row: 0, col: 0, stacks: [] }]

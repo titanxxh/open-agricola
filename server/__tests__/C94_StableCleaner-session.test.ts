@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   executeCardListener,
   getRegisteredCardListeners,
@@ -30,6 +31,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     consumedStables = 0,
   ) => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -112,6 +114,7 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
 
   it('anytime stable can be built with C88 discount and no wood', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

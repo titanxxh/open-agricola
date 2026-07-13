@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getPlayedCardKeys } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 describe('devPlayCard major improvements', () => {
   it('plays a major into player improvements and removes it from the public supply', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -25,6 +27,7 @@ describe('devPlayCard major improvements', () => {
 
   it('moves a major from the former owner and clears stale old-owner state', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.players[1]!.improvements = ['Major_Fireplace1']

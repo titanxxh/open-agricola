@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const TEST_CARD = '__TEST_skipTurn__'
 
@@ -28,6 +29,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('skips a player whose card returns { skipTurn: true } and advances to next eligible player', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -59,6 +61,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('does not skip a player when handler returns void', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -80,6 +83,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('does not treat ActionFlow-shaped returns as stage flow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -108,6 +112,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
   it('caps consecutive skips at players.length to avoid infinite loop', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

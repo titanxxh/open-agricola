@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -12,6 +13,7 @@ const CARD_ID = 'D113_FoodMerchant'
 describe('D113_FoodMerchant session', () => {
   it('after harvesting grain with field depleted → cost is 2 food', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -38,6 +40,7 @@ describe('D113_FoodMerchant session', () => {
 
   it('after harvesting grain with remaining → cost is 3 food', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -65,6 +68,7 @@ describe('D113_FoodMerchant session', () => {
 
   it('without grain fields → no trigger', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -83,6 +87,7 @@ describe('D113_FoodMerchant session', () => {
 
   it('not enough food → no trigger', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -100,6 +105,7 @@ describe('D113_FoodMerchant session', () => {
 
   it('integration: harvest with depleted grain field offers 2-food exchange', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

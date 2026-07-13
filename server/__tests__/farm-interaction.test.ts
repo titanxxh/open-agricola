@@ -11,6 +11,7 @@ import {
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {
@@ -180,6 +181,7 @@ describe('farm interaction builders', () => {
 
   it('rebuilds stable interaction with exactCost from pending action context', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players[0] = createPlayer()
     session.loadState(state)
@@ -200,6 +202,7 @@ describe('farm interaction builders', () => {
 
   it('rebuilds plow interaction with exactCost from pending action context', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players[0] = createPlayer()
     session.loadState(state)
@@ -268,6 +271,7 @@ describe('farm interaction builders', () => {
 
   it('commitSelectionChoice commits farmland plow', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -288,6 +292,7 @@ describe('farm interaction builders', () => {
 
   it('plow farm-select rejects cancel and keeps pending fields unchanged', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
@@ -346,6 +351,7 @@ describe('farm interaction builders', () => {
 
   it('rejects direct resolveChoice farm payload on farm-select', () => {
     const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0

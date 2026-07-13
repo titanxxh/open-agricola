@@ -128,6 +128,10 @@
 - 农场版图状态
 - 是否需要预先设置 `cardStates`
 
+Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` 和
+`occupationHand`。与手牌无关时使用 `['__test_placeholder__']`；不要使用空数组，
+因为 `normalizeState` 会重新发牌。测试需要的目标卡应在固定背景手牌后单独加入。
+
 ### 4.4 同时机多卡反应
 
 如果卡牌属于 action reaction listener、harvest field stage card-effect、before-end card-effect 或 extra-turn provider，且同一时机可能与另一张卡同时触发，测试必须覆盖 `trigger-select`：
