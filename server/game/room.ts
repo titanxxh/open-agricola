@@ -115,6 +115,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
+  draftParents: room.draftParents,
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -214,6 +215,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -229,6 +231,7 @@ const createSessionFromSnapshot = (
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
+      ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
@@ -249,6 +252,7 @@ export const snapshotToRoom = (
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
   enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
+  draftParents: snapshot.meta.draftParents,
   enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
   enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,

@@ -349,6 +349,12 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE sandbox_settings ADD COLUMN allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0;
       `,
     },
+    {
+      version: 16,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN draft_parents INTEGER;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
