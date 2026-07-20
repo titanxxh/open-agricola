@@ -314,6 +314,7 @@ export const GameContainerApi = () => {
   const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
+  const [inviteCopyStatus, setInviteCopyStatus] = useState<'success' | 'error' | null>(null)
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
@@ -1159,17 +1160,33 @@ export const GameContainerApi = () => {
       )
     }
 
+    const isNetworkError = wsStatus.phase === 'error' &&
+      (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')
     const statusText = wsStatus.phase === 'waiting'
       ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
       : wsStatus.phase === 'error'
         ? wsStatus.message === 'roomDissolved'
           ? t(locale, 'platform.roomDissolved')
-          : `Error: ${wsStatus.message}`
+          : isNetworkError
+            ? t(locale, 'platform.roomNetworkError')
+            : `Error: ${wsStatus.message}`
         : ''
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
       : null
+
+    const handleCopyInvite = async () => {
+      if (!inviteUrl) return
+      setInviteCopyStatus(null)
+      try {
+        if (!navigator.clipboard) throw new Error('clipboard unavailable')
+        await navigator.clipboard.writeText(inviteUrl)
+        setInviteCopyStatus('success')
+      } catch {
+        setInviteCopyStatus('error')
+      }
+    }
 
     const handleDissolve = () => {
       if (!wsTransport) return
@@ -1187,7 +1204,9 @@ export const GameContainerApi = () => {
             className="brand-mark-centered ws-status-brand"
             titleClassName="ws-status-title"
           />
-          <div className="ws-status-text">{statusText}</div>
+          <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
+            {statusText}
+          </div>
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
@@ -1197,13 +1216,22 @@ export const GameContainerApi = () => {
                 <button
                   type="button"
                   className="btn-primary ws-btn-sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(inviteUrl).catch(() => {})
-                  }}
+                  onClick={() => { void handleCopyInvite() }}
                 >
                   {t(locale, 'platform.copy')}
                 </button>
               </div>
+              {inviteCopyStatus && (
+                <div
+                  className={`ws-invite-feedback is-${inviteCopyStatus}`}
+                  role={inviteCopyStatus === 'error' ? 'alert' : 'status'}
+                  aria-live={inviteCopyStatus === 'error' ? 'assertive' : 'polite'}
+                >
+                  {t(locale, inviteCopyStatus === 'success'
+                    ? 'platform.inviteCopySuccess'
+                    : 'platform.inviteCopyFailure')}
+                </div>
+              )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
               <div className="ws-invite-players">
                 {wsStatus.players.map(p => (
