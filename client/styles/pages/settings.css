@@ -96,4 +96,16 @@
   .settings-page {
     padding: 12px;
   }
+
+  .settings-link-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings-link-actions .btn-primary {
+    box-sizing: border-box;
+    flex: 1 1 200px;
+    min-width: 0;
+    text-align: center;
+  }
 }

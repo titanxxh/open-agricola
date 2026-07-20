@@ -1161,7 +1161,7 @@ function SandboxView({
 
 export function WorkshopPage() {
   const { user, apiFetch } = useAuth()
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   const [view, setView] = useState<View>('home')
   const [browseCards, setBrowseCards] = useState<WorkshopCard[]>([])
   const [featuredCards, setFeaturedCards] = useState<WorkshopCard[]>([])
@@ -1748,6 +1748,7 @@ export function WorkshopPage() {
           subtitle={t('platform.myCardsSubtitle')}
           mobileCollapsible
           defaultCollapsed
+          locale={locale}
           actions={(
             <button
               type="button"
@@ -1800,6 +1801,7 @@ export function WorkshopPage() {
         subtitle={t('platform.featuredSubtitle')}
         mobileCollapsible
         defaultCollapsed
+        locale={locale}
       >
         {featuredLoading ? (
           <div className="ws-loading">{t('platform.loadingMore')}</div>
@@ -1841,8 +1843,10 @@ export function WorkshopPage() {
         icon="🔍"
         title={t('platform.browse')}
         subtitle={t('platform.browseSubtitle')}
+        className="ws-section-browse"
         mobileCollapsible
         defaultCollapsed
+        locale={locale}
         actions={(
           <div className="ws-toolbar">
             <form onSubmit={event => { event.preventDefault(); setSearch(searchInput.trim()) }} className="ws-search">

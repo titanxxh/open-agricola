@@ -19,6 +19,7 @@ import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
+import { MobileActionsPanel } from '../components/board/MobileActionsPanel'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
@@ -89,9 +90,20 @@ import {
   buildInteractionBarActions,
   buildInteractionBarModel,
 } from './interaction-bar-presentation'
+import {
+  mobilePresentationRoute,
+  type GamePresentation,
+} from './game-presentation-routing'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
+
+const GAME_PRESENTATIONS: readonly GamePresentation[] = [
+  'action',
+  'farm',
+  'cards',
+  'information',
+]
 
 const httpTransportSingleton = new HttpGameTransport()
 
@@ -293,9 +305,9 @@ export const GameContainerApi = () => {
     const p = new URLSearchParams(window.location.search)
     const raw = p.get('player') ?? p.get('playerId')
     if (!raw) return null
-    if (/^p[1-4]$/.test(raw)) return raw
+    if (/^p[1-6]$/.test(raw)) return raw
     const index = Number(raw)
-    if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
+    if (Number.isFinite(index) && index >= 1 && index <= 6) return `p${index}`
     return null
   }, [])
   const { user } = useAuth()
@@ -314,11 +326,15 @@ export const GameContainerApi = () => {
   const [dismissedGameOverScoringKey, setDismissedGameOverScoringKey] = useState<string | null>(null)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
   const [selectedSpecialAction, setSelectedSpecialAction] = useState<SelectedSpecialAction>(null)
+  const [inviteCopyStatus, setInviteCopyStatus] = useState<'success' | 'error' | null>(null)
   const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
   const [devRound, setDevRound] = useState(1)
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
+  const [gamePresentation, setGamePresentation] = useState<GamePresentation>('action')
+  const [autoPresentationStatus, setAutoPresentationStatus] = useState<GamePresentation | null>(null)
+  const routedInteractionKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia('(max-width: 900px)')
@@ -330,6 +346,19 @@ export const GameContainerApi = () => {
     mq.addListener(handler)
     return () => mq.removeListener(handler)
   }, [])
+  useEffect(() => {
+    if (!isMobile) return
+    const route = mobilePresentationRoute(interaction, historyLength)
+    if (route === null) {
+      routedInteractionKeyRef.current = null
+      setAutoPresentationStatus(null)
+      return
+    }
+    if (routedInteractionKeyRef.current === route.key) return
+    routedInteractionKeyRef.current = route.key
+    setGamePresentation(route.presentation)
+    setAutoPresentationStatus(route.presentation)
+  }, [historyLength, interaction, isMobile])
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
@@ -554,6 +583,26 @@ export const GameContainerApi = () => {
       console.error('takeSpecialAction error', e)
     })
   }, [interaction, isInteractive, pendingMoorSpecialActionChoices, state, transport])
+
+  const selectTerrainSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
+    setSelectedSpecialAction((current) =>
+      current?.cardId === cardId && current.actionId === actionId
+        ? null
+        : { cardId, actionId },
+    )
+  }, [])
+
+  const takeSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
+    if (isMoorTerrainAction(actionId)) {
+      selectTerrainSpecialAction(cardId, actionId)
+      if (isMobile) {
+        setGamePresentation('farm')
+        setAutoPresentationStatus('farm')
+      }
+      return
+    }
+    takeImmediateSpecialAction(cardId, actionId)
+  }, [isMobile, selectTerrainSpecialAction, takeImmediateSpecialAction])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     setFarmDraftCommitError(farmType, error)
@@ -1159,17 +1208,33 @@ export const GameContainerApi = () => {
       )
     }
 
+    const isNetworkError = wsStatus.phase === 'error' &&
+      (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')
     const statusText = wsStatus.phase === 'waiting'
       ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
       : wsStatus.phase === 'error'
         ? wsStatus.message === 'roomDissolved'
           ? t(locale, 'platform.roomDissolved')
-          : `Error: ${wsStatus.message}`
+          : isNetworkError
+            ? t(locale, 'platform.roomNetworkError')
+            : `Error: ${wsStatus.message}`
         : ''
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
       : null
+
+    const handleCopyInvite = async () => {
+      if (!inviteUrl) return
+      setInviteCopyStatus(null)
+      try {
+        if (!navigator.clipboard) throw new Error('clipboard unavailable')
+        await navigator.clipboard.writeText(inviteUrl)
+        setInviteCopyStatus('success')
+      } catch {
+        setInviteCopyStatus('error')
+      }
+    }
 
     const handleDissolve = () => {
       if (!wsTransport) return
@@ -1187,7 +1252,9 @@ export const GameContainerApi = () => {
             className="brand-mark-centered ws-status-brand"
             titleClassName="ws-status-title"
           />
-          <div className="ws-status-text">{statusText}</div>
+          <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
+            {statusText}
+          </div>
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
@@ -1197,13 +1264,22 @@ export const GameContainerApi = () => {
                 <button
                   type="button"
                   className="btn-primary ws-btn-sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(inviteUrl).catch(() => {})
-                  }}
+                  onClick={() => { void handleCopyInvite() }}
                 >
                   {t(locale, 'platform.copy')}
                 </button>
               </div>
+              {inviteCopyStatus && (
+                <div
+                  className={`ws-invite-feedback is-${inviteCopyStatus}`}
+                  role={inviteCopyStatus === 'error' ? 'alert' : 'status'}
+                  aria-live={inviteCopyStatus === 'error' ? 'assertive' : 'polite'}
+                >
+                  {t(locale, inviteCopyStatus === 'success'
+                    ? 'platform.inviteCopySuccess'
+                    : 'platform.inviteCopyFailure')}
+                </div>
+              )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
               <div className="ws-invite-players">
                 {wsStatus.players.map(p => (
@@ -1471,6 +1547,53 @@ export const GameContainerApi = () => {
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
   })
+  const majorImprovementsPresentation = (
+    <MajorImprovements
+      locale={locale}
+      availableMajorImprovements={state.availableMajorImprovements}
+      majorImprovementSupply={state.majorImprovementSupply}
+      isSelectingMajor={isSelectingImprovementAny}
+      selectableMajorIds={selectableMajorIds}
+      cardAvailability={cardAvailability}
+      resolveChoice={resolveChoice}
+      futureCardResources={futureCardResources}
+      isInteractive={isInteractive}
+      devMode={devMode}
+    />
+  )
+  const actionBoardOverview = (
+    <section className="board-panel board-action">
+      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
+    </section>
+  )
+  const expansionActionBoards = (
+    <>
+      {state.enableThroughTheSeasons && state.throughTheSeasons ? (
+        <section className="board-panel board-seasons">
+          <SeasonsBoard
+            locale={locale}
+            throughTheSeasons={state.throughTheSeasons}
+            seasonActions={seasonActions}
+            players={state.players}
+            canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
+            takeAction={takeSeasonAction}
+          />
+        </section>
+      ) : null}
+      {state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? (
+        <section className="board-panel board-special-actions">
+          <SpecialActionsPanel
+            locale={locale}
+            cards={state.farmersOfTheMoor.specialActionCards}
+            currentPlayerId={currentPlayer.id}
+            canTakeSpecialAction={canTakeSpecialAction}
+            selected={selectedSpecialAction}
+            onTakeAction={takeSpecialAction}
+          />
+        </section>
+      ) : null}
+    </>
+  )
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
@@ -1542,50 +1665,90 @@ export const GameContainerApi = () => {
         />
       </div>
 
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} majorImprovementSupply={state.majorImprovementSupply} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+      {isMobile ? (
+        <nav
+          className="game-presentation-selector"
+          aria-label={t(locale, 'ui.gamePresentationNavigation')}
+          style={{ top: `${headerHeight}px` }}
+        >
+          {GAME_PRESENTATIONS.map((presentation) => (
+            <button
+              key={presentation}
+              type="button"
+              aria-pressed={gamePresentation === presentation}
+              onClick={() => {
+                setGamePresentation(presentation)
+                setAutoPresentationStatus(null)
+              }}
+            >
+              {t(locale, `ui.gamePresentation.${presentation}`)}
+            </button>
+          ))}
+          {autoPresentationStatus ? (
+            <span
+              className="game-presentation-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {t(locale, 'ui.gamePresentationChanged', {
+                presentation: t(locale, `ui.gamePresentation.${autoPresentationStatus}`),
+              })}
+            </span>
+          ) : null}
+        </nav>
+      ) : null}
 
       <div
-        className="game-layout"
-        style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
+        className="game-presentations"
+        data-presentation={isMobile ? gamePresentation : undefined}
       >
-        <div className="game-layout__left">
-          <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
-          </section>
-          {state.enableThroughTheSeasons && state.throughTheSeasons ? (
-            <section className="board-panel board-seasons">
-              <SeasonsBoard
-                locale={locale}
-                throughTheSeasons={state.throughTheSeasons}
-                seasonActions={seasonActions}
-                players={state.players}
-                canTakeAction={(space) => currentPlayer ? canTakeActionForBoard(space, currentPlayer) : false}
-                takeAction={takeSeasonAction}
-              />
-            </section>
-          ) : null}
-          {state.enableFarmersOfTheMoor && state.farmersOfTheMoor && currentPlayer ? (
-            <section className="board-panel board-special-actions">
-              <SpecialActionsPanel
-                locale={locale}
-                cards={state.farmersOfTheMoor.specialActionCards}
-                currentPlayerId={currentPlayer.id}
-                canTakeSpecialAction={canTakeSpecialAction}
-                selected={selectedSpecialAction}
-                onSelectTerrainAction={(cardId, actionId) => {
-                  setSelectedSpecialAction((current) =>
-                    current?.cardId === cardId && current.actionId === actionId
-                      ? null
-                      : { cardId, actionId },
-                  )
-                }}
-                onTakeImmediateAction={takeImmediateSpecialAction}
-              />
-            </section>
-          ) : null}
+        {!isMobile ? (
+          <div className="game-presentation-cards">
+            {majorImprovementsPresentation}
+          </div>
+        ) : null}
+
+        <div
+          className="game-layout"
+          style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
+        >
+        <div
+          className="game-layout__left"
+          hidden={isMobile && gamePresentation !== 'action'}
+        >
+          {isMobile ? (
+            <MobileActionsPanel
+              locale={locale}
+              baseActions={baseActions}
+              roundSlots={roundSlots}
+              currentRound={state.round}
+              devMode={devMode}
+              canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
+              takeAction={takeAction}
+              seasonActions={state.enableThroughTheSeasons ? seasonActions : undefined}
+              takeSeasonAction={takeSeasonAction}
+              specialActions={state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? {
+                cards: state.farmersOfTheMoor.specialActionCards,
+                canTake: canTakeSpecialAction,
+                selected: selectedSpecialAction,
+                onTake: takeSpecialAction,
+              } : undefined}
+              majorImprovements={majorImprovementsPresentation}
+              boardOverview={actionBoardOverview}
+            />
+          ) : (
+            <>
+              {actionBoardOverview}
+              {expansionActionBoards}
+            </>
+          )}
         </div>
-        <div className="game-layout__center">
-          <StageBar currentRound={state.round ?? 1} />
+        <div
+          className="game-layout__center"
+          hidden={isMobile && gamePresentation !== 'farm' && gamePresentation !== 'cards'}
+        >
+          <StageBar currentRound={state.round ?? 1} locale={locale} />
           <PlayerTabs
             players={state.players.map((p, i) => ({
               id: p.id,
@@ -1606,16 +1769,20 @@ export const GameContainerApi = () => {
               viewedPlayerId={displayPlayer.id}
               view={farmBoardView}
               actions={farmBoardActions}
+              presentation={isMobile ? gamePresentation === 'cards' ? 'cards' : 'farm' : undefined}
             />
           </section>
         </div>
-        <div className="game-layout__right">
+        <div
+          className="game-layout__right"
+          hidden={isMobile && gamePresentation !== 'information'}
+        >
           {isMobile ? (
             <>
-              <Section collapsible defaultCollapsed icon="📊" title="计分" variant="parchment">
-                <ScorePanel rows={scoreRows} />
+              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
+                <ScorePanel locale={locale} rows={scoreRows} />
               </Section>
-              <Section collapsible defaultCollapsed icon="📜" title="行动记录" variant="parchment">
+              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.actionLog')} variant="parchment">
                 <ActionLog
                   locale={locale}
                   log={state.log}
@@ -1635,7 +1802,7 @@ export const GameContainerApi = () => {
             </>
           ) : (
             <>
-              <ScorePanel rows={scoreRows} />
+              <ScorePanel locale={locale} rows={scoreRows} />
               <ActionLog
                 locale={locale}
                 log={state.log}
@@ -1654,6 +1821,7 @@ export const GameContainerApi = () => {
             </>
           )}
         </div>
+      </div>
       </div>
 
       <InteractionBar model={interactionBarModel} actions={interactionBarActions} />

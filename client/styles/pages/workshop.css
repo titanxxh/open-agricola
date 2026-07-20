@@ -380,7 +380,7 @@
   font-size: 13px;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .ws-like-btn.liked {
   background: #ffebeb;
@@ -795,7 +795,7 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .ai-provider-btn.active {
   background: var(--color-primary);
@@ -871,7 +871,7 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .ai-type-btn.active {
   background: var(--color-primary);
@@ -1313,9 +1313,6 @@
     flex-wrap: wrap;
   }
 
-  .ws-toolbar input[type="search"] {
-    min-width: 100%;
-  }
 }
 @media (max-width: 480px) {
   .ai-card-info-bar {
@@ -1390,6 +1387,16 @@
   word-break: break-all;
   color: #3a2a10;
 }
+.ws-invite-feedback {
+  font-size: 13px;
+  text-align: center;
+}
+.ws-invite-feedback.is-success {
+  color: var(--color-success);
+}
+.ws-invite-feedback.is-error {
+  color: var(--color-danger);
+}
 .ws-invite-roomid {
   font-size: 13px;
   color: var(--color-text-muted);
@@ -1447,6 +1454,28 @@
   .ws-section-actions {
       min-width: 0;
       width: 100%;
+    }
+
+  .ws-section-browse .section__header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+  .ws-section-browse .section__actions {
+      min-width: 0;
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+  .ws-section-browse .ws-toolbar,
+  .ws-section-browse .ws-search {
+      min-width: 0;
+      width: 100%;
+    }
+
+  .ws-section-browse .ws-search {
+      box-sizing: border-box;
     }
 
   .ws-toolbar {

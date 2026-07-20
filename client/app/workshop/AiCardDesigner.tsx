@@ -1328,6 +1328,7 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
         <Section
           collapsible
           defaultCollapsed={!!(abilityConfig && artConfig)}
+          locale={locale}
           icon="🤖"
           title={t('platform.aiConfig')}
           actions={

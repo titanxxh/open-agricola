@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="%BASE_URL%logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Open Agricola</title>
     <script>
       // Resolve seasonal background URL synchronously so the browser can start
@@ -24,7 +24,7 @@
         else if (override && /^(spring|summer|autumn|winter)-[1-3]$/.test(override)) variant = override;
         else variant = map[new Date().getMonth() + 1];
         if (variant) {
-          var href = base + "seasons/" + variant + ".webp";
+          var href = base + "assets/website-bg/" + variant + ".webp";
           document.documentElement.style.setProperty("--bg-monthly", 'url("' + href + '")');
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "image"; l.href = href;

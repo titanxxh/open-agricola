@@ -5,6 +5,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
+import { setPage } from './PageRouter'
 
 function safeReturnTo(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null
@@ -46,6 +47,7 @@ export function OnboardingPage() {
   const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [expired, setExpired] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -113,6 +115,10 @@ export function OnboardingPage() {
         window.dispatchEvent(new PopStateEvent('popstate'))
         return
       }
+      if (data.code === 'oauth_onboarding_expired') {
+        setExpired(true)
+        return
+      }
       setError(authErrorMessage(data.code, data.error, t))
     } catch {
       setError(t('platform.networkError'))
@@ -137,40 +143,62 @@ export function OnboardingPage() {
         />
         <p className="login-subtitle">{t('platform.onboardingSubtitle')}</p>
 
+        {expired ? (
+          <div className="login-form">
+            <h2 className="auth-method-title">{t('platform.onboardingExpiredTitle')}</h2>
+            <p role="alert">{authErrorMessage('oauth_onboarding_expired', undefined, t)}</p>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setPage('login', { authMode: 'register' })}
+            >
+              {t('platform.restartRegistration')}
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-field">
             <label htmlFor="onboarding-username">{t('platform.username')}</label>
-            <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
+            <span id="onboarding-username-hint" className="form-hint">{t('platform.usernamePlaceholder')}</span>
             <input
               id="onboarding-username"
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
               autoComplete="username"
+              aria-describedby="onboarding-username-hint"
+              aria-invalid={formError ? true : undefined}
+              aria-errormessage={formError ? 'onboarding-error' : undefined}
               required
             />
           </div>
 
           <div className="form-field">
             <label htmlFor="onboarding-display-name">{t('platform.displayName')}</label>
+            <span id="onboarding-display-name-hint" className="form-hint">{t('platform.displayNamePlaceholder')}</span>
             <input
               id="onboarding-display-name"
               type="text"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
-              placeholder={t('platform.displayNamePlaceholder')}
+              aria-describedby="onboarding-display-name-hint"
+              aria-invalid={formError ? true : undefined}
+              aria-errormessage={formError ? 'onboarding-error' : undefined}
             />
           </div>
 
           <div className="form-field">
             <label htmlFor="onboarding-password">{t('platform.password')}</label>
-            <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
+            <span id="onboarding-password-hint" className="form-hint">{t('platform.passwordPlaceholder')}</span>
             <input
               id="onboarding-password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoComplete="new-password"
+              aria-describedby="onboarding-password-hint"
+              aria-invalid={formError ? true : undefined}
+              aria-errormessage={formError ? 'onboarding-error' : undefined}
               required
             />
           </div>
@@ -183,16 +211,19 @@ export function OnboardingPage() {
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
+              aria-invalid={formError ? true : undefined}
+              aria-errormessage={formError ? 'onboarding-error' : undefined}
               required
             />
           </div>
 
-          {formError && <div className="form-error" role="alert">{formError}</div>}
+          {formError && <div id="onboarding-error" className="form-error" role="alert">{formError}</div>}
 
           <button type="submit" className="btn-primary" disabled={loading || policyLoadFailed} aria-busy={loading}>
             {loading ? t('platform.loading') : t('platform.onboardingTitle')}
           </button>
         </form>
+        )}
       </div>
     </div>
   )

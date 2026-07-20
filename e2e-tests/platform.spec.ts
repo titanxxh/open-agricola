@@ -159,13 +159,29 @@ test.describe('Platform: auth', () => {
     )
   })
 
-  test('register tab only offers OAuth registration providers', async ({ page }) => {
+  test('register tab offers password/email and OAuth registration paths', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/?page=login`)
     await page.getByRole('tab', { name: '注册' }).click()
-    await expect(page.getByRole('link', { name: '使用 GitHub 注册' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '使用 Google 注册' })).toBeVisible()
-    await expect(page.locator('#username')).toHaveCount(0)
-    await expect(page.locator('#password')).toHaveCount(0)
+    const localForm = page.getByRole('form', { name: '使用用户名和邮箱注册' })
+    const providerGroup = page.getByRole('group', { name: '其他注册方式' })
+    await expect(localForm.locator('#register-username')).toBeVisible()
+    await expect(localForm.locator('#register-email')).toBeVisible()
+    await expect(localForm.locator('#register-password')).toBeVisible()
+    await expect(providerGroup.getByText('使用 GitHub 注册', { exact: true })).toBeVisible()
+    await expect(providerGroup.getByText('使用 Google 注册', { exact: true })).toBeVisible()
+  })
+
+  test('expired onboarding replaces the form and returns to registration', async ({ page }) => {
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.fill('#onboarding-username', `expired_${RUN_ID}`)
+    await page.fill('#onboarding-password', PASSWORD)
+    await page.fill('#onboarding-confirm-password', PASSWORD)
+    await page.getByRole('button', { name: '完成注册' }).click()
+
+    await expect(page.getByRole('alert')).toContainText('注册会话已过期')
+    await expect(page.locator('#onboarding-username')).toHaveCount(0)
+    await page.getByRole('button', { name: '重新注册' }).click()
+    await expect(page.getByRole('tab', { name: '注册' })).toHaveAttribute('aria-selected', 'true')
   })
 
   test('wrong password is rejected with localized message', async ({ page, request }) => {
@@ -281,6 +297,19 @@ test.describe('Platform: lobby page', () => {
     await loginThroughPage(page, username, 'lobby123')
     await expect(page.locator('text=单人模式')).toBeVisible()
     await expect(page.locator('text=进入卡牌工坊')).toBeVisible()
+  })
+
+  test('creates a room and announces the invitation-copy result', async ({ page, request }) => {
+    const username = `e2e_waiting_${RUN_ID}`
+    await createUserViaOAuth(request, username, { password: 'waiting123' })
+    await loginThroughPage(page, username, 'waiting123')
+
+    await page.getByRole('button', { name: '创建多人游戏' }).click()
+    await page.getByRole('button', { name: '创建游戏' }).click()
+    await page.getByRole('button', { name: '复制' }).click()
+
+    const feedback = page.getByRole('status').or(page.getByRole('alert'))
+    await expect(feedback).toHaveText(/邀请链接已复制。|无法复制邀请链接，请手动复制后重试。/)
   })
 })
 
