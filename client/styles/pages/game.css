@@ -5536,6 +5536,10 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-size: var(--fs-small);
   color: var(--color-text-secondary);
 }
+.score-chip .res-icon {
+  margin-right: 3px;
+  font-size: 14px;
+}
 
 /* ══════════ ActionLog ══════════ */
 .action-log {
@@ -5613,7 +5617,21 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   opacity: 1;
 }
 .action-log__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+}
+.action-log__icon .res-icon {
+  font-size: 16px;
+}
+.action-log__icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 .action-log__player {
   display: inline-flex;
@@ -5699,7 +5717,11 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 .stage-bar__cell.is-harvest {
   background: var(--color-accent-bg);
   border: 1px solid var(--color-accent-strong);
+  border-radius: var(--radius-pill);
   color: #5a3a10;
+}
+.stage-bar__cell .res-icon {
+  font-size: 20px;
 }
 .stage-bar__cell.is-current {
   background: var(--color-accent-strong);
