@@ -319,6 +319,7 @@
  * >640px the toggle is hidden and the body is always shown. The body stays in
  * the DOM in this mode so resizing back to desktop reveals it instantly. */
 @media (max-width: 640px) {
+  .section__header { flex-wrap: wrap; }
   .section--mobile-collapsible.is-collapsed .section__body { display: none; }
   .section--mobile-collapsible.is-collapsed .section__header { margin-bottom: 0; }
 }

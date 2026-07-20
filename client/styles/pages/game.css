@@ -300,6 +300,8 @@
   margin-top: 6px;
 }
 .interaction-actions button {
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid rgba(255, 247, 230, 0.3);
   border-radius: 999px;
   padding: 6px 14px;
@@ -5652,7 +5654,7 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-size: var(--fs-body);
   flex: 1;
   min-width: 100px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 .player-tabs__tab.is-active {
   background: var(--color-accent-bg);
