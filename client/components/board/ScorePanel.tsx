@@ -30,19 +30,19 @@ export function ScorePanel({ rows }: Props) {
             <span className="score-panel__total">{row.total}</span>
             <div className="score-panel__breakdown">
               <span className="score-chip" title="fields">
-                🌾 fields {row.breakdown.fields}
+                <span className="res-icon res-icon-field" aria-hidden /> fields {row.breakdown.fields}
               </span>
               <span className="score-chip" title="animals">
-                🐑 animals {row.breakdown.animals}
+                <span className="res-icon res-icon-sheep" aria-hidden /> animals {row.breakdown.animals}
               </span>
               <span className="score-chip" title="card bonus VP">
-                ⭐ card bonus VP {row.breakdown.cardBonusVp}
+                <span className="res-icon res-icon-score" aria-hidden /> card bonus VP {row.breakdown.cardBonusVp}
               </span>
               <span className="score-chip" title="family">
-                👶 family {row.breakdown.family}
+                <span className="res-icon res-icon-child" aria-hidden /> family {row.breakdown.family}
               </span>
               <span className="score-chip" title="cards">
-                🃏 cards {row.breakdown.cards}
+                <span className="res-icon res-icon-minor" aria-hidden /> cards {row.breakdown.cards}
               </span>
             </div>
           </li>

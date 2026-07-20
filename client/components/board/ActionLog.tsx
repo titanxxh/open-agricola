@@ -3,7 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState } from '../../../shared/contract/types'
 import { LogParts, prepareLogEntry } from './log-rendering'
-import { pickLogIcon } from './action-log-icons'
+import { pickLogIcon, type LogIconKey } from './action-log-icons'
 import type { ActionLogTimelineBucket, ActionLogTimelineRow } from '../../app/action-log-timeline'
 import type {
   ReplayTimelineEntry,
@@ -96,6 +96,28 @@ const rowClassName = (row: ActionLogTimelineRow, selectedReplayKey?: string | nu
   row.kind === 'event' && row.status === 'missing' ? 'action-log__entry--missing' : '',
   selectedReplayKey === row.key ? 'is-current' : '',
 ].filter(Boolean).join(' ')
+
+const LOG_ICON_CLASS: Partial<Record<LogIconKey, string>> = {
+  harvest: 'grain',
+  sheep: 'sheep',
+  boar: 'boar',
+  cattle: 'cattle',
+  home: 'room-wood',
+  family: 'child',
+  resource: 'wood',
+  card: 'minor',
+}
+
+function LogIcon({ icon }: { icon: LogIconKey }) {
+  const resourceClass = LOG_ICON_CLASS[icon]
+  if (resourceClass) return <span className={`res-icon res-icon-${resourceClass}`} />
+  return (
+    <svg viewBox="0 0 24 24" focusable="false">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
+    </svg>
+  )
+}
 
 export function ActionLog({
   locale,
@@ -226,7 +248,7 @@ export function ActionLog({
                     }}
                   >
                     <span className="action-log__icon" aria-hidden>
-                      {pickLogIcon(plainText)}
+                      <LogIcon icon={pickLogIcon(plainText)} />
                     </span>
                     {playerName ? (
                       <span className="action-log__player">{playerName.slice(0, 1)}</span>

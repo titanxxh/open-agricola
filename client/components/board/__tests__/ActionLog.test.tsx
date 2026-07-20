@@ -81,6 +81,23 @@ const buckets: ActionLogTimelineBucket[] = [
 ]
 
 describe('ActionLog', () => {
+  it('keeps rule-critical log icons visible without emoji glyphs', () => {
+    const { container } = render(
+      <ActionLog
+        locale="en"
+        currentRound={1}
+        log={[
+          { key: 'log.harvest', params: { round: 1 } },
+          { key: 'log.startGame' },
+        ]}
+      />,
+    )
+
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+    expect(container.querySelectorAll('.action-log__icon .res-icon, .action-log__icon svg'))
+      .toHaveLength(2)
+  })
+
   it('renders translated entries with icons', () => {
     render(
       <ActionLog
