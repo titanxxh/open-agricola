@@ -1613,7 +1613,7 @@ export const GameContainerApi = () => {
           ) : null}
         </div>
         <div className="game-layout__center">
-          <StageBar currentRound={state.round ?? 1} />
+          <StageBar currentRound={state.round ?? 1} locale={locale} />
           <PlayerTabs
             players={state.players.map((p, i) => ({
               id: p.id,

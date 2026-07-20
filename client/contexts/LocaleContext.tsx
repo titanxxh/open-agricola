@@ -30,6 +30,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    document.documentElement.lang = locale
     try { window.localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* ignore */ }
   }, [locale])
 

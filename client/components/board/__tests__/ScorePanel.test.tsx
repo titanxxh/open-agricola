@@ -20,6 +20,17 @@ const ROWS: PlayerScoreRow[] = [
 ]
 
 describe('ScorePanel', () => {
+  it('keeps score categories visible without emoji glyphs', () => {
+    const { container } = render(<ScorePanel rows={ROWS} />)
+    const firstRow = container.querySelector('.score-panel__row')
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+    expect(firstRow?.querySelector('[title="fields"] .res-icon-field')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="animals"] .res-icon-sheep')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="card bonus VP"] .res-icon-score')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="family"] .res-icon-child')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="cards"] .res-icon-minor')).toBeInTheDocument()
+  })
+
   it('renders one row per player', () => {
     render(<ScorePanel rows={ROWS} />)
     expect(screen.getByText('You')).toBeInTheDocument()

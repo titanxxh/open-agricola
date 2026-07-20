@@ -132,6 +132,7 @@ export const en = {
     actionLogArchiveGap: 'Archive gap',
     noLogEntries: 'No entries',
     roundHeader: 'Round {round}',
+    nextHarvestHint: '{remaining} rounds until the next harvest (Round {round})',
     cardStatsPaid: 'Paid',
     cardStatsGained: 'Gained',
     cardStats: {
@@ -1330,6 +1331,7 @@ export const en = {
     tabLobby: 'Lobby',
     tabWorkshop: 'Workshop',
     tabSettings: 'Settings',
+    mainNavigation: 'Main navigation',
 
     settingsTitle: 'Account Settings',
     backToLobby: '← Back to Lobby',

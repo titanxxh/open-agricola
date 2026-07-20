@@ -132,6 +132,7 @@ export const zh = {
     actionLogArchiveGap: 'archive 缺口',
     noLogEntries: '暂无',
     roundHeader: '第 {round} 轮',
+    nextHarvestHint: '还有 {remaining} 轮到下次收获（第 {round} 轮）',
     cardStatsPaid: '支付',
     cardStatsGained: '获得',
     cardStats: {
@@ -1310,6 +1311,7 @@ export const zh = {
     tabLobby: '大厅',
     tabWorkshop: '工坊',
     tabSettings: '设置',
+    mainNavigation: '主导航',
 
     settingsTitle: '账户设置',
     backToLobby: '← 返回大厅',
