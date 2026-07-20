@@ -333,4 +333,48 @@ describe('GameContainerApi mobile presentation navigation', () => {
     expect(container.querySelectorAll('.action-board')).toHaveLength(1)
     expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
   })
+
+  it('routes a selected Moor terrain special action to the mobile farm presentation', async () => {
+    const moorPayload: GameSyncPayload = {
+      ...payload,
+      state: serializeState(createInitialState(42, {
+        playerCount: 2,
+        enableFarmersOfTheMoor: true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      }), { engineStack: new EngineStack() }),
+    }
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(max-width: 900px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(moorPayload))))
+
+    const { container } = render(
+      <LocaleProvider>
+        <AuthProvider>
+          <GameContainerApi />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cut Peat' }))
+
+    expect(container.querySelector('.game-presentations')).toHaveAttribute(
+      'data-presentation',
+      'farm',
+    )
+    expect(screen.getByRole('heading', { name: 'Player Farm' })).toBeInTheDocument()
+  })
 })
