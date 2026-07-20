@@ -1313,9 +1313,6 @@
     flex-wrap: wrap;
   }
 
-  .ws-toolbar input[type="search"] {
-    min-width: 100%;
-  }
 }
 @media (max-width: 480px) {
   .ai-card-info-bar {
@@ -1447,6 +1444,28 @@
   .ws-section-actions {
       min-width: 0;
       width: 100%;
+    }
+
+  .ws-section-browse .section__header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+  .ws-section-browse .section__actions {
+      min-width: 0;
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+  .ws-section-browse .ws-toolbar,
+  .ws-section-browse .ws-search {
+      min-width: 0;
+      width: 100%;
+    }
+
+  .ws-section-browse .ws-search {
+      box-sizing: border-box;
     }
 
   .ws-toolbar {
