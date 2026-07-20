@@ -1387,6 +1387,16 @@
   word-break: break-all;
   color: #3a2a10;
 }
+.ws-invite-feedback {
+  font-size: 13px;
+  text-align: center;
+}
+.ws-invite-feedback.is-success {
+  color: var(--color-success);
+}
+.ws-invite-feedback.is-error {
+  color: var(--color-danger);
+}
 .ws-invite-roomid {
   font-size: 13px;
   color: var(--color-text-muted);

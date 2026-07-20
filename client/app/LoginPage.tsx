@@ -46,7 +46,7 @@ function OAuthLink({
     return (
       <button
         type="button"
-        className="btn-primary oauth-provider-link is-disabled"
+        className="btn-secondary oauth-provider-link is-disabled"
         aria-disabled="true"
         onClick={() => { onDisabledClick?.() }}
       >
@@ -57,7 +57,7 @@ function OAuthLink({
   }
 
   return (
-    <a className="btn-primary oauth-provider-link" href={href}>
+    <a className="btn-secondary oauth-provider-link" href={href}>
       <OAuthProviderIcon provider={provider} />
       <span>{children}</span>
     </a>
@@ -67,7 +67,9 @@ function OAuthLink({
 export function LoginPage() {
   const { login, oauthStartUrl, registerWithPassword, resendVerification } = useAuth()
   const { t } = useLocale()
-  const [mode, setMode] = useState<Mode>('login')
+  const [mode, setMode] = useState<Mode>(() =>
+    new URLSearchParams(window.location.search).get('authMode') === 'register' ? 'register' : 'login',
+  )
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -230,47 +232,54 @@ export function LoginPage() {
         </div>
 
         {mode === 'login' ? (
-          <form onSubmit={handleSubmit} className="login-form">
-            <OAuthLink provider="github" href={oauthStartUrl('github', 'login')}>{t('platform.oauthLoginGithub')}</OAuthLink>
-            <OAuthLink provider="google" href={oauthStartUrl('google', 'login')}>{t('platform.oauthLoginGoogle')}</OAuthLink>
+          <>
+          <form onSubmit={handleSubmit} className="login-form" aria-labelledby="local-login-heading">
+            <h2 id="local-login-heading" className="auth-method-title">{t('platform.localLoginTitle')}</h2>
             <div className="form-field">
               <label htmlFor="username">{t('platform.username')}</label>
-              <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
+              <span id="login-username-hint" className="form-hint">{t('platform.usernamePlaceholder')}</span>
               <input
                 id="username"
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 autoComplete="username"
+                aria-describedby="login-username-hint"
+                aria-invalid={error ? true : undefined}
+                aria-errormessage={error ? 'login-error' : undefined}
                 required
               />
             </div>
 
             <div className="form-field">
               <label htmlFor="password">{t('platform.password')}</label>
-              <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
+              <span id="login-password-hint" className="form-hint">{t('platform.passwordPlaceholder')}</span>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
+                aria-describedby="login-password-hint"
+                aria-invalid={error ? true : undefined}
+                aria-errormessage={error ? 'login-error' : undefined}
                 required
               />
             </div>
 
-            {error && <div className="form-error" role="alert">{error}</div>}
+            {error && <div id="login-error" className="form-error" role="alert">{error}</div>}
             {loginNeedsVerification && (
               <>
                 <div className="form-field">
                   <label htmlFor="login-verification-email">{t('platform.email')}</label>
-                  <span className="form-hint">{t('platform.emailPlaceholder')}</span>
+                  <span id="login-verification-email-hint" className="form-hint">{t('platform.emailPlaceholder')}</span>
                   <input
                     id="login-verification-email"
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     autoComplete="email"
+                    aria-describedby="login-verification-email-hint"
                   />
                 </div>
                 <button
@@ -288,13 +297,19 @@ export function LoginPage() {
               {loading ? t('platform.loading') : t('platform.loginBtn')}
             </button>
           </form>
+          <div className="oauth-provider-group" role="group" aria-labelledby="oauth-login-heading">
+            <h2 id="oauth-login-heading" className="auth-method-title">{t('platform.oauthLoginTitle')}</h2>
+            <OAuthLink provider="github" href={oauthStartUrl('github', 'login')}>{t('platform.oauthLoginGithub')}</OAuthLink>
+            <OAuthLink provider="google" href={oauthStartUrl('google', 'login')}>{t('platform.oauthLoginGoogle')}</OAuthLink>
+          </div>
+          </>
         ) : (
           <div className="login-form">
             <p>{t('platform.oauthRegisterIntro')}</p>
             {registrationPolicy === 'invite_only' && (
               <div className="form-field">
                 <label htmlFor="register-invite-code">{t('platform.inviteCode')}</label>
-                <span className="form-hint">{t('platform.inviteOnlyNote')}</span>
+                <span id="register-invite-hint" className="form-hint">{t('platform.inviteOnlyNote')}</span>
                 <input
                   id="register-invite-code"
                   type="text"
@@ -302,26 +317,13 @@ export function LoginPage() {
                   onChange={e => setInviteCode(e.target.value)}
                   placeholder={t('platform.inviteCodePlaceholder')}
                   autoComplete="off"
+                  aria-describedby="register-invite-hint"
+                  aria-invalid={error ? true : undefined}
+                  aria-errormessage={error ? 'register-error' : undefined}
                 />
               </div>
             )}
-            {error && <div className="form-error" role="alert">{error}</div>}
-            <OAuthLink
-              provider="github"
-              href={registerOAuthUrl('github')}
-              disabled={registerDisabled}
-              onDisabledClick={handleDisabledRegisterClick}
-            >
-              {t('platform.oauthRegisterGithub')}
-            </OAuthLink>
-            <OAuthLink
-              provider="google"
-              href={registerOAuthUrl('google')}
-              disabled={registerDisabled}
-              onDisabledClick={handleDisabledRegisterClick}
-            >
-              {t('platform.oauthRegisterGoogle')}
-            </OAuthLink>
+            {error && <div id="register-error" className="form-error" role="alert">{error}</div>}
             {registrationSent ? (
               <div className="login-form">
                 <h2>{t('platform.checkEmailTitle')}</h2>
@@ -335,54 +337,67 @@ export function LoginPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handlePasswordRegister} className="login-form">
+              <form onSubmit={handlePasswordRegister} className="login-form" aria-labelledby="local-register-heading">
+                <h2 id="local-register-heading" className="auth-method-title">{t('platform.localRegisterTitle')}</h2>
                 <div className="form-field">
                   <label htmlFor="register-username">{t('platform.username')}</label>
-                  <span className="form-hint">{t('platform.usernamePlaceholder')}</span>
+                  <span id="register-username-hint" className="form-hint">{t('platform.usernamePlaceholder')}</span>
                   <input
                     id="register-username"
                     type="text"
                     value={username}
                     onChange={e => setUsername(e.target.value)}
                     autoComplete="username"
+                    aria-describedby="register-username-hint"
+                    aria-invalid={error ? true : undefined}
+                    aria-errormessage={error ? 'register-error' : undefined}
                     required
                   />
                 </div>
 
                 <div className="form-field">
                   <label htmlFor="register-email">{t('platform.email')}</label>
-                  <span className="form-hint">{t('platform.emailPlaceholder')}</span>
+                  <span id="register-email-hint" className="form-hint">{t('platform.emailPlaceholder')}</span>
                   <input
                     id="register-email"
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     autoComplete="email"
+                    aria-describedby="register-email-hint"
+                    aria-invalid={error ? true : undefined}
+                    aria-errormessage={error ? 'register-error' : undefined}
                     required
                   />
                 </div>
 
                 <div className="form-field">
                   <label htmlFor="register-display-name">{t('platform.displayName')}</label>
-                  <span className="form-hint">{t('platform.displayNamePlaceholder')}</span>
+                  <span id="register-display-name-hint" className="form-hint">{t('platform.displayNamePlaceholder')}</span>
                   <input
                     id="register-display-name"
                     type="text"
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
                     autoComplete="nickname"
+                    aria-describedby="register-display-name-hint"
+                    aria-invalid={error ? true : undefined}
+                    aria-errormessage={error ? 'register-error' : undefined}
                   />
                 </div>
 
                 <div className="form-field">
                   <label htmlFor="register-password">{t('platform.password')}</label>
-                  <span className="form-hint">{t('platform.passwordPlaceholder')}</span>
+                  <span id="register-password-hint" className="form-hint">{t('platform.passwordPlaceholder')}</span>
                   <input
                     id="register-password"
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     autoComplete="new-password"
+                    aria-describedby="register-password-hint"
+                    aria-invalid={error ? true : undefined}
+                    aria-errormessage={error ? 'register-error' : undefined}
                     required
                   />
                 </div>
@@ -395,6 +410,8 @@ export function LoginPage() {
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                     autoComplete="new-password"
+                    aria-invalid={error ? true : undefined}
+                    aria-errormessage={error ? 'register-error' : undefined}
                     required
                   />
                 </div>
@@ -404,6 +421,25 @@ export function LoginPage() {
                 </button>
               </form>
             )}
+            <div className="oauth-provider-group" role="group" aria-labelledby="oauth-register-heading">
+              <h2 id="oauth-register-heading" className="auth-method-title">{t('platform.oauthRegisterTitle')}</h2>
+              <OAuthLink
+                provider="github"
+                href={registerOAuthUrl('github')}
+                disabled={registerDisabled}
+                onDisabledClick={handleDisabledRegisterClick}
+              >
+                {t('platform.oauthRegisterGithub')}
+              </OAuthLink>
+              <OAuthLink
+                provider="google"
+                href={registerOAuthUrl('google')}
+                disabled={registerDisabled}
+                onDisabledClick={handleDisabledRegisterClick}
+              >
+                {t('platform.oauthRegisterGoogle')}
+              </OAuthLink>
+            </div>
           </div>
         )}
       </div>
