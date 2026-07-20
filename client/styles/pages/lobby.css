@@ -251,7 +251,7 @@
 /* ── Tablet breakpoint ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .lobby-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 768px) {
@@ -315,7 +315,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 .player-select-btn:hover {
   border-color: var(--color-primary);
