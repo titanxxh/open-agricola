@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EngineStack } from '../../../shared/engine'
@@ -111,7 +111,8 @@ describe('GameContainerApi mobile presentation navigation', () => {
     const presentations = container.querySelector('.game-presentations')
 
     expect(presentations).toHaveAttribute('data-presentation', 'action')
-    expect(screen.getByRole('heading', { name: 'Action Spaces' })).toBeInTheDocument()
+    expect(container.querySelector('.mobile-actions-panel > h2')).toHaveTextContent('Action Spaces')
+    expect(screen.getByRole('heading', { name: /Major Improvements/ })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Player Farm' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Farm' }))
@@ -122,7 +123,7 @@ describe('GameContainerApi mobile presentation navigation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cards' }))
     expect(presentations).toHaveAttribute('data-presentation', 'cards')
-    expect(screen.getByRole('heading', { name: /Major Improvements/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Major Improvements/ })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Played Cards' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Hand Cards' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Player Farm' })).not.toBeInTheDocument()
@@ -256,5 +257,65 @@ describe('GameContainerApi mobile presentation navigation', () => {
     expect(cards).toHaveFocus()
     expect(navigation).toContainElement(screen.getByRole('status'))
     expect(screen.getByRole('status')).toHaveTextContent('Current request: Action')
+  })
+
+  it('submits a mobile task action through the existing transport and keeps the board as optional orientation', async () => {
+    const taskPayload: GameSyncPayload = {
+      ...payload,
+      actionAvailability: { 'meeting-place': true },
+    }
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(taskPayload)))
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(max-width: 900px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { container } = render(
+      <LocaleProvider>
+        <AuthProvider>
+          <GameContainerApi />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    const tasks = await waitFor(() => {
+      const node = container.querySelector<HTMLElement>('.mobile-actions-panel')
+      expect(node).not.toBeNull()
+      return node!
+    })
+    const primaryTasks = tasks.querySelector<HTMLElement>(':scope > .mobile-action-tasks')
+    expect(primaryTasks).not.toBeNull()
+    const meetingPlace = within(primaryTasks!).getByRole('button', { name: /Meeting Place/ })
+    expect(meetingPlace).toBeEnabled()
+
+    await userEvent.click(meetingPlace)
+
+    await waitFor(() => {
+      const actionCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).endsWith('/api/game/action'),
+      )
+      expect(actionCall?.[1]).toMatchObject({
+        method: 'POST',
+        body: JSON.stringify({ playerIndex: 0, spaceId: 'meeting-place' }),
+      })
+    })
+    const overview = container.querySelector('.mobile-board-overview')
+    expect(overview).not.toHaveAttribute('open')
+    expect(overview?.querySelector('.action-board')).not.toBeNull()
+    expect(container.querySelectorAll('.action-board')).toHaveLength(1)
+    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
   })
 })

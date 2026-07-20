@@ -8,6 +8,7 @@ export const zh = {
     statusRoundReady: '可结算回合',
     statusWaiting: '等待行动',
     actionArea: '行动区',
+    boardOverview: '棋盘总览',
     gamePresentationNavigation: '游戏视图',
     gamePresentationChanged: '当前操作：{presentation}',
     gamePresentation: {

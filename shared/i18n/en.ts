@@ -8,6 +8,7 @@ export const en = {
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
+    boardOverview: 'Board overview',
     gamePresentationNavigation: 'Game presentation',
     gamePresentationChanged: 'Current request: {presentation}',
     gamePresentation: {
