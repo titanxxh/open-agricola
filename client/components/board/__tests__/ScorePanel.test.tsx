@@ -21,39 +21,50 @@ const ROWS: PlayerScoreRow[] = [
 
 describe('ScorePanel', () => {
   it('keeps score categories visible without emoji glyphs', () => {
-    const { container } = render(<ScorePanel rows={ROWS} />)
+    const { container } = render(<ScorePanel locale="en" rows={ROWS} />)
     const firstRow = container.querySelector('.score-panel__row')
     expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
-    expect(firstRow?.querySelector('[title="fields"] .res-icon-field')).toBeInTheDocument()
-    expect(firstRow?.querySelector('[title="animals"] .res-icon-sheep')).toBeInTheDocument()
-    expect(firstRow?.querySelector('[title="card bonus VP"] .res-icon-score')).toBeInTheDocument()
-    expect(firstRow?.querySelector('[title="family"] .res-icon-child')).toBeInTheDocument()
-    expect(firstRow?.querySelector('[title="cards"] .res-icon-minor')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="Fields"] .res-icon-field')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="Animals"] .res-icon-sheep')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="Card bonus VP"] .res-icon-score')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="Family members"] .res-icon-child')).toBeInTheDocument()
+    expect(firstRow?.querySelector('[title="Cards"] .res-icon-minor')).toBeInTheDocument()
   })
 
   it('renders one row per player', () => {
-    render(<ScorePanel rows={ROWS} />)
+    render(<ScorePanel locale="en" rows={ROWS} />)
     expect(screen.getByText('You')).toBeInTheDocument()
     expect(screen.getByText('AI')).toBeInTheDocument()
   })
   it('shows total score', () => {
-    render(<ScorePanel rows={ROWS} />)
+    render(<ScorePanel locale="en" rows={ROWS} />)
     expect(screen.getByText('12')).toBeInTheDocument()
     expect(screen.getByText('9')).toBeInTheDocument()
   })
   it('highlights "you" row', () => {
-    const { container } = render(<ScorePanel rows={ROWS} />)
+    const { container } = render(<ScorePanel locale="en" rows={ROWS} />)
     expect(container.querySelector('.score-panel__row.is-you')).toBeInTheDocument()
   })
   it('shows breakdown chips', () => {
-    render(<ScorePanel rows={ROWS} />)
+    render(<ScorePanel locale="en" rows={ROWS} />)
     expect(screen.getAllByText(/fields/i).length).toBeGreaterThan(0)
   })
 
   it('labels card bonus VP separately from printed cards', () => {
-    render(<ScorePanel rows={ROWS} />)
+    render(<ScorePanel locale="en" rows={ROWS} />)
     expect(screen.getByText(/bonus VP 4/i)).toBeInTheDocument()
     expect(screen.getByText(/cards 2/i)).toBeInTheDocument()
     expect(screen.queryByText(/food 4/i)).toBeNull()
+  })
+
+  it('localizes the score title and breakdown labels', () => {
+    render(<ScorePanel locale="zh" rows={ROWS.slice(0, 1)} />)
+
+    expect(screen.getByRole('heading', { name: '计分板' })).toBeInTheDocument()
+    expect(screen.getByText(/田地 3/)).toBeInTheDocument()
+    expect(screen.getByText(/动物 5/)).toBeInTheDocument()
+    expect(screen.getByText(/卡牌加分 4/)).toBeInTheDocument()
+    expect(screen.getByText(/家庭成员 3/)).toBeInTheDocument()
+    expect(screen.getByText(/卡牌分 2/)).toBeInTheDocument()
   })
 })
