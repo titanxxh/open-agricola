@@ -305,9 +305,9 @@ export const GameContainerApi = () => {
     const p = new URLSearchParams(window.location.search)
     const raw = p.get('player') ?? p.get('playerId')
     if (!raw) return null
-    if (/^p[1-4]$/.test(raw)) return raw
+    if (/^p[1-6]$/.test(raw)) return raw
     const index = Number(raw)
-    if (Number.isFinite(index) && index >= 1 && index <= 4) return `p${index}`
+    if (Number.isFinite(index) && index >= 1 && index <= 6) return `p${index}`
     return null
   }, [])
   const { user } = useAuth()

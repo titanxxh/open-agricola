@@ -380,7 +380,7 @@
   font-size: 13px;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .ws-like-btn.liked {
   background: #ffebeb;
@@ -795,7 +795,7 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .ai-provider-btn.active {
   background: var(--color-primary);
@@ -871,7 +871,7 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .ai-type-btn.active {
   background: var(--color-primary);
