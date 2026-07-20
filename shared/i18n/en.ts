@@ -9,6 +9,7 @@ export const en = {
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
     gamePresentationNavigation: 'Game presentation',
+    gamePresentationChanged: 'Current request: {presentation}',
     gamePresentation: {
       action: 'Action',
       farm: 'Farm',

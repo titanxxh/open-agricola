@@ -89,10 +89,13 @@ import {
   buildInteractionBarActions,
   buildInteractionBarModel,
 } from './interaction-bar-presentation'
+import {
+  mobilePresentationRoute,
+  type GamePresentation,
+} from './game-presentation-routing'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
-type GamePresentation = 'action' | 'farm' | 'cards' | 'information'
 
 const GAME_PRESENTATIONS: readonly GamePresentation[] = [
   'action',
@@ -329,6 +332,8 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   const [gamePresentation, setGamePresentation] = useState<GamePresentation>('action')
+  const [autoPresentationStatus, setAutoPresentationStatus] = useState<GamePresentation | null>(null)
+  const routedInteractionKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia('(max-width: 900px)')
@@ -340,6 +345,19 @@ export const GameContainerApi = () => {
     mq.addListener(handler)
     return () => mq.removeListener(handler)
   }, [])
+  useEffect(() => {
+    if (!isMobile) return
+    const route = mobilePresentationRoute(interaction, historyLength)
+    if (route === null) {
+      routedInteractionKeyRef.current = null
+      setAutoPresentationStatus(null)
+      return
+    }
+    if (routedInteractionKeyRef.current === route.key) return
+    routedInteractionKeyRef.current = route.key
+    setGamePresentation(route.presentation)
+    setAutoPresentationStatus(route.presentation)
+  }, [historyLength, interaction, isMobile])
   const [devCardId, setDevCardId] = useState('')
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
@@ -1590,11 +1608,26 @@ export const GameContainerApi = () => {
               key={presentation}
               type="button"
               aria-pressed={gamePresentation === presentation}
-              onClick={() => setGamePresentation(presentation)}
+              onClick={() => {
+                setGamePresentation(presentation)
+                setAutoPresentationStatus(null)
+              }}
             >
               {t(locale, `ui.gamePresentation.${presentation}`)}
             </button>
           ))}
+          {autoPresentationStatus ? (
+            <span
+              className="game-presentation-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {t(locale, 'ui.gamePresentationChanged', {
+                presentation: t(locale, `ui.gamePresentation.${autoPresentationStatus}`),
+              })}
+            </span>
+          ) : null}
         </nav>
       ) : null}
 
