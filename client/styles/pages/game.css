@@ -907,6 +907,12 @@
   outline: 3px solid var(--color-accent-strong);
   outline-offset: 2px;
 }
+.game-presentation-status {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
 .game-presentations [hidden] {
   display: none !important;
 }
