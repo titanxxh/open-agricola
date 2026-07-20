@@ -19,7 +19,7 @@ import {
 import { isFarmyardBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
-import { formatCardStatsLines } from '../common/cardStatsFormat'
+import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsFormat'
 import { CardWithCopy } from '../common/CardWithCopy'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -209,7 +209,11 @@ const CompactResourceItem = ({
   value: number | string
   label: string
 }) => (
-  <span className="res-compact-item" title={label} aria-label={label}>
+  <span
+    className={`res-compact-item ${typeof value === 'number' && value === 0 ? 'is-zero' : 'is-nonzero'}`}
+    title={label}
+    aria-label={label}
+  >
     <span className={`res-icon ${iconClass}`} aria-hidden="true" />
     <span className="res-compact-num">{value}</span>
   </span>
@@ -525,6 +529,31 @@ type TooltipPosition = {
   left: number
 }
 
+const PlayedCardStatsContent = ({
+  locale,
+  statsLines,
+}: {
+  locale: Locale
+  statsLines: CardStatLine[]
+}) => (
+  <>
+    {statsLines.map((line) => (
+      <div key={line.key} className="played-card-stats-section">
+        <div className="played-card-stats-label">{t(locale, line.labelKey)}</div>
+        {line.resources ? (
+          <ResourceLine
+            locale={locale}
+            resources={{ ...emptyResources, ...line.resources }}
+            className="played-card-stats-line"
+          />
+        ) : line.value !== undefined ? (
+          <div className="played-card-stats-value">{line.value}</div>
+        ) : null}
+      </div>
+    ))}
+  </>
+)
+
 const PlayedCardStats = ({
   locale,
   rawId,
@@ -538,6 +567,7 @@ const PlayedCardStats = ({
   cardStacks,
   heldWorkerId,
   playerColor,
+  inlineStats,
 }: {
   locale: Locale
   rawId: string
@@ -556,6 +586,7 @@ const PlayedCardStats = ({
   cardStacks?: CropStack[] | null
   heldWorkerId?: string
   playerColor?: PlayerState['color']
+  inlineStats: boolean
 }) => {
   const [open, setOpen] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
@@ -569,6 +600,19 @@ const PlayedCardStats = ({
   const hasCounters = Object.keys(visibleCounters).length > 0 || bonusVp > 0 || stack.length > 0 || hasCardStacks
   const statsLines = formatCardStatsLines(resourceStats, rawId, locale)
   const hasResourceStats = statsLines.length > 0
+  const statsTitle =
+    t(locale, `occupations.${rawId}.name`).includes('.name') &&
+    t(locale, `minorImprovements.${rawId}.name`).includes('.name') &&
+    t(locale, `improvements.${rawId}.name`).includes('.name')
+      ? rawId
+      : t(
+          locale,
+          cardType === 'occupation'
+            ? `occupations.${rawId}.name`
+            : cardType === 'minor'
+              ? `minorImprovements.${rawId}.name`
+              : `improvements.${rawId}.name`,
+        )
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -622,6 +666,14 @@ const PlayedCardStats = ({
         infobox={cardInfobox}
         devMode={devMode}
       />
+      {inlineStats && hasResourceStats ? (
+        <div className="played-card-stats-inline">
+          <PlayedCardStatsContent
+            locale={locale}
+            statsLines={statsLines}
+          />
+        </div>
+      ) : null}
       {futureEntries.length > 0 || hasCounters ? (
         <div className="card-future">
           {bonusVp > 0 ? (
@@ -710,34 +762,11 @@ const PlayedCardStats = ({
             left: tooltipPosition?.left ?? -9999,
           }}
         >
-          <div className="played-card-stats-title">
-            {t(locale, `occupations.${rawId}.name`).includes('.name') &&
-            t(locale, `minorImprovements.${rawId}.name`).includes('.name') &&
-            t(locale, `improvements.${rawId}.name`).includes('.name')
-              ? rawId
-              : t(
-                  locale,
-                  cardType === 'occupation'
-                    ? `occupations.${rawId}.name`
-                    : cardType === 'minor'
-                      ? `minorImprovements.${rawId}.name`
-                      : `improvements.${rawId}.name`,
-                )}
-          </div>
-          {statsLines.map((line) => (
-            <div key={line.key} className="played-card-stats-section">
-              <div className="played-card-stats-label">{t(locale, line.labelKey)}</div>
-              {line.resources ? (
-                <ResourceLine
-                  locale={locale}
-                  resources={{ ...emptyResources, ...line.resources }}
-                  className="played-card-stats-line"
-                />
-              ) : line.value !== undefined ? (
-                <div className="played-card-stats-value">{line.value}</div>
-              ) : null}
-            </div>
-          ))}
+          <div className="played-card-stats-title">{statsTitle}</div>
+          <PlayedCardStatsContent
+            locale={locale}
+            statsLines={statsLines}
+          />
         </div>
       ) : null}
     </div>
@@ -995,9 +1024,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
             <CompactResourceItem iconClass="res-icon-sheep" value={displayPlayer.resources.sheep} label={`${t(locale, 'resources.sheep')}: ${displayPlayer.resources.sheep}`} />
             <CompactResourceItem iconClass="res-icon-boar" value={displayPlayer.resources.boar} label={`${t(locale, 'resources.boar')}: ${displayPlayer.resources.boar}`} />
             <CompactResourceItem iconClass="res-icon-cattle" value={displayPlayer.resources.cattle} label={`${t(locale, 'resources.cattle')}: ${displayPlayer.resources.cattle}`} />
-            {displayPlayer.resources.begging > 0 && (<>
-              <CompactResourceItem iconClass="res-icon-begging" value={displayPlayer.resources.begging} label={`${t(locale, 'resources.begging')}: ${displayPlayer.resources.begging}`} />
-            </>)}
+            <CompactResourceItem iconClass="res-icon-begging" value={displayPlayer.resources.begging} label={`${t(locale, 'resources.begging')}: ${displayPlayer.resources.begging}`} />
           </span>
           {displayPlayer.resources.fuel !== undefined || displayPlayer.resources.horse !== undefined ? (<>
             <span className="res-compact-divider" />
@@ -1654,6 +1681,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
                 cardStacks={card.cardStacks}
                 heldWorkerId={card.heldWorkerId}
                 playerColor={displayPlayer.color}
+                inlineStats={presentation === 'cards'}
               />
               {card.m084LyingHorses > 0 ? (
                 <div

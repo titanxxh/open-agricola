@@ -133,6 +133,21 @@ describe('GameContainerApi mobile presentation navigation', () => {
     expect(screen.getByRole('heading', { name: 'Action Log' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /Major Improvements/ })).not.toBeInTheDocument()
     expect(container.querySelector('.interaction-bar')).not.toHaveAttribute('hidden')
+    expect(container.querySelectorAll('.interaction-bar')).toHaveLength(1)
+    expect(container.querySelector('[class*="hand-dock"]')).not.toBeInTheDocument()
+    expect(container.querySelector('.hand-cards')?.closest('.game-layout__center')).not.toBeNull()
+
+    const disclosureButtons = screen.getAllByRole('button', { name: 'expand' })
+    expect(disclosureButtons).toHaveLength(2)
+    await user.click(disclosureButtons[0]!)
+    await user.click(disclosureButtons[1]!)
+
+    expect(container.querySelector('.score-panel')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'All' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Latest' })).toBeVisible()
   })
 
   it('leaves the desktop three-column presentation intact', async () => {
