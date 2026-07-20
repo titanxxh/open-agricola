@@ -118,6 +118,30 @@
   gap: 20px;
 }
 
+.auth-method-title {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-body);
+  text-align: center;
+}
+
+.oauth-provider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.oauth-provider-group .oauth-provider-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
 /* Cream input fields with an inset "groove" — matches the parchment metaphor. */
 .login-form .form-field input {
   background: #fdf6e3;

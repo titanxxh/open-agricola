@@ -42,6 +42,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'customCards',
   'embedded',
   'devMode',
+  'authMode',
 ]
 
 function getPage(): Page {
