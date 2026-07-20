@@ -595,10 +595,14 @@ export const GameContainerApi = () => {
   const takeSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
     if (isMoorTerrainAction(actionId)) {
       selectTerrainSpecialAction(cardId, actionId)
+      if (isMobile) {
+        setGamePresentation('farm')
+        setAutoPresentationStatus('farm')
+      }
       return
     }
     takeImmediateSpecialAction(cardId, actionId)
-  }, [selectTerrainSpecialAction, takeImmediateSpecialAction])
+  }, [isMobile, selectTerrainSpecialAction, takeImmediateSpecialAction])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     setFarmDraftCommitError(farmType, error)
