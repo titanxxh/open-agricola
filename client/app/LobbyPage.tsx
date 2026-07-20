@@ -404,31 +404,6 @@ export function LobbyPage() {
         )}
       </Section>
 
-      <div className="lobby-horizon" aria-hidden>
-        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" focusable="false">
-          <path
-            className="lobby-horizon__hill lobby-horizon__hill--back"
-            d="M0,90 C150,60 300,80 450,70 C600,60 750,90 900,80 C1050,72 1150,62 1200,68 L1200,120 L0,120 Z"
-          />
-          <path
-            className="lobby-horizon__hill lobby-horizon__hill--front"
-            d="M0,100 C120,82 260,98 400,92 C540,86 680,104 830,96 C980,90 1100,84 1200,90 L1200,120 L0,120 Z"
-          />
-          <g className="lobby-horizon__grass">
-            <path d="M40,108 l3,-10 l3,10 z M48,110 l2,-7 l2,7 z M56,108 l3,-10 l3,10 z" />
-            <path d="M310,108 l3,-10 l3,10 z M318,110 l2,-7 l2,7 z M326,108 l3,-10 l3,10 z" />
-            <path d="M870,108 l3,-10 l3,10 z M878,110 l2,-7 l2,7 z M886,108 l3,-10 l3,10 z" />
-          </g>
-          <g className="lobby-horizon__fence">
-            <rect x="1048" y="86" width="2" height="22" />
-            <rect x="1064" y="84" width="2" height="24" />
-            <rect x="1080" y="86" width="2" height="22" />
-            <rect x="1096" y="84" width="2" height="24" />
-            <rect x="1042" y="92" width="60" height="2" />
-            <rect x="1042" y="100" width="60" height="2" />
-          </g>
-        </svg>
-      </div>
     </div>
   )
 }
