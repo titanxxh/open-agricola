@@ -1841,6 +1841,7 @@ export function WorkshopPage() {
         icon="🔍"
         title={t('platform.browse')}
         subtitle={t('platform.browseSubtitle')}
+        className="ws-section-browse"
         mobileCollapsible
         defaultCollapsed
         actions={(

@@ -347,25 +347,3 @@
   gap: 10px;
   align-items: center;
 }
-
-/* Lobby horizon band — closes the page with a green field + fence motif so the
- * empty parchment below the rooms list doesn't read as unfinished. */
-.lobby-horizon {
-  margin: 32px -24px 0;
-  padding: 0;
-  pointer-events: none;
-  user-select: none;
-}
-.lobby-horizon svg {
-  display: block;
-  width: 100%;
-  height: 96px;
-}
-.lobby-horizon__hill--back { fill: #9bbf7c; opacity: 0.55; }
-.lobby-horizon__hill--front { fill: #6fa256; }
-.lobby-horizon__grass { fill: #4f7a3a; opacity: 0.7; }
-.lobby-horizon__fence { fill: #6b4a2a; }
-@media (max-width: 640px) {
-  .lobby-horizon { margin-left: -16px; margin-right: -16px; }
-  .lobby-horizon svg { height: 72px; }
-}

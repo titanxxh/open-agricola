@@ -291,7 +291,7 @@ export function SettingsPage() {
             Google
             <span className="settings-readonly-chip">{googleIdentity?.providerEmail ?? googleIdentity?.providerLogin ?? t('platform.notLinked')}</span>
           </p>
-          <div className="settings-actions">
+          <div className="settings-actions settings-link-actions">
             <a className="btn-primary" href={oauthStartUrl('github', 'link')}>{t('platform.linkGithub')}</a>
             <a className="btn-primary" href={oauthStartUrl('google', 'link')}>{t('platform.linkGoogle')}</a>
           </div>
