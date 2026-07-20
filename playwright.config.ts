@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e-tests',
   timeout: 120_000,
   retries: 0,
+  workers: 1,
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{platform}{ext}',
   use: {
     headless: true,
