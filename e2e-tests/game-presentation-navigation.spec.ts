@@ -21,7 +21,8 @@ const expectPresentationSelector = async (navigation: Locator) => {
 for (const width of [375, 768, 900]) {
   test(`real room exposes all gameplay presentations at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1024 })
-    await openEnglishPage(page, '/?player=p1&transport=ws&room=dev2&devMode=1')
+    await openEnglishPage(page, '/?player=p1&transport=ws&room=dev5&devMode=1')
+    expect(new URL(page.url()).searchParams.get('room')).toBe('dev5')
 
     const navigation = page.getByRole('navigation', { name: 'Game presentation' })
     await expectPresentationSelector(navigation)
