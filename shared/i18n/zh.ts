@@ -9,6 +9,7 @@ export const zh = {
     statusWaiting: '等待行动',
     actionArea: '行动区',
     gamePresentationNavigation: '游戏视图',
+    gamePresentationChanged: '当前操作：{presentation}',
     gamePresentation: {
       action: '行动',
       farm: '农场',

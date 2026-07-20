@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EngineStack } from '../../../shared/engine'
@@ -171,5 +171,90 @@ describe('GameContainerApi mobile presentation navigation', () => {
     expect(container.querySelector('.game-layout__right')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.farm-grid')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.played-cards')).not.toHaveAttribute('hidden')
+  })
+
+  it('routes only new mobile interactions without stealing focus', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1&embedded=1')
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(max-width: 900px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+
+    const farmInteraction = {
+      stateId: 'wait',
+      playerIndex: 0,
+      request: {
+        kind: 'farm-select',
+        farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 0 }] },
+      },
+      allowedCommands: ['commitSelection'],
+      anytimeActions: [],
+    } satisfies GameSyncPayload['interaction']
+    const synchronizedFarmInteraction = {
+      ...farmInteraction,
+      sourceCard: 'ignored-card-id',
+      request: {
+        ...farmInteraction.request,
+        farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 1 }] },
+      },
+    } satisfies GameSyncPayload['interaction']
+    const actionInteraction = {
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'choice', options: [] },
+      allowedCommands: ['resolveChoice'],
+      anytimeActions: [],
+    } satisfies GameSyncPayload['interaction']
+    const responses = [
+      { ...payload, interaction: farmInteraction, historyLength: 3 },
+      { ...payload, interaction: synchronizedFarmInteraction, historyLength: 3 },
+      { ...payload, interaction: actionInteraction, historyLength: 4 },
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify(responses.shift() ?? responses.at(-1))),
+    ))
+
+    const { container } = render(
+      <LocaleProvider>
+        <AuthProvider>
+          <GameContainerApi />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    const navigation = await screen.findByRole('navigation', { name: 'Game presentation' })
+    const action = screen.getByRole('button', { name: 'Action' })
+    const farm = screen.getByRole('button', { name: 'Farm' })
+    const cards = screen.getByRole('button', { name: 'Cards' })
+
+    await waitFor(() => expect(farm).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.getByRole('status')).toHaveTextContent('Current request: Farm')
+
+    await user.click(cards)
+    expect(cards).toHaveFocus()
+    expect(container.querySelector('.game-presentations')).toHaveAttribute('data-presentation', 'cards')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Resource' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    expect(cards).toHaveAttribute('aria-pressed', 'true')
+    expect(cards).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Resource' }))
+    await waitFor(() => expect(action).toHaveAttribute('aria-pressed', 'true'))
+    expect(cards).toHaveFocus()
+    expect(navigation).toContainElement(screen.getByRole('status'))
+    expect(screen.getByRole('status')).toHaveTextContent('Current request: Action')
   })
 })
