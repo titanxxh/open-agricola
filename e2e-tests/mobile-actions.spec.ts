@@ -130,6 +130,13 @@ test('workshop variants expose and submit every mobile action family', async ({ 
   const cutPeat = specialActions.getByRole('button', { name: 'Cut Peat' })
   await expect(cutPeat).toBeEnabled()
   await cutPeat.click()
+  await expect(moorSandbox.locator('.game-presentations')).toHaveAttribute(
+    'data-presentation',
+    'farm',
+  )
+  await moorSandbox.getByRole('navigation', { name: 'Game presentation' })
+    .getByRole('button', { name: 'Action' })
+    .click()
   await expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
 
   const hiringFair = specialActions.getByRole('button', { name: 'Hiring Fair' })
