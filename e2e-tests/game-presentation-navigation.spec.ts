@@ -37,7 +37,7 @@ for (const width of [375, 768, 900]) {
     await expect(page.locator('.played-cards')).toBeHidden()
 
     await navigation.getByRole('button', { name: 'Cards' }).click()
-    await expect(page.locator('.game-presentation-cards')).toBeVisible()
+    await expect(page.locator('.played-cards')).toBeVisible()
     await expect(page.locator('.hand-cards')).toBeVisible()
     await expect(page.locator('.farm-grid')).toBeHidden()
 
