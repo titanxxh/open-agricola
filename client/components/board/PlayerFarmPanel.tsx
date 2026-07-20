@@ -14,6 +14,7 @@ export interface PlayerFarmPanelProps {
     'players' | 'currentPlayer' | 'displayPlayer' | 'infirmaryWorkerCount' | 'playerPanelSummary'
   >
   actions: FarmBoardActions
+  presentation?: 'farm' | 'cards'
 }
 
 export function PlayerFarmPanel({
@@ -21,6 +22,7 @@ export function PlayerFarmPanel({
   viewedPlayerId,
   view,
   actions,
+  presentation,
 }: PlayerFarmPanelProps) {
   const currentPlayer: PlayerState | undefined = state.players[state.currentPlayerIndex]
   const displayPlayer: PlayerState | undefined =
@@ -45,6 +47,7 @@ export function PlayerFarmPanel({
           playerPanelSummary: getPlayerPanelSupplySummary(state, displayPlayer),
         }}
         actions={actions}
+        presentation={presentation}
       />
       {/* occupations CardCarousel — added in Task 6 */}
       {/* minor improvements CardCarousel — added in Task 6 */}

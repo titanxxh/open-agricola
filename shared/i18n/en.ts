@@ -8,6 +8,13 @@ export const en = {
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
+    gamePresentationNavigation: 'Game presentation',
+    gamePresentation: {
+      action: 'Action',
+      farm: 'Farm',
+      cards: 'Cards',
+      information: 'Information',
+    },
     seasons: {
       board: 'Seasons Board',
       winter: 'Winter',

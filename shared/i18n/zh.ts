@@ -8,6 +8,13 @@ export const zh = {
     statusRoundReady: '可结算回合',
     statusWaiting: '等待行动',
     actionArea: '行动区',
+    gamePresentationNavigation: '游戏视图',
+    gamePresentation: {
+      action: '行动',
+      farm: '农场',
+      cards: '卡牌',
+      information: '信息',
+    },
     seasons: {
       board: '四季版图',
       winter: '冬季',
