@@ -87,8 +87,7 @@ describe('MobileActionsPanel', () => {
   })
 
   it('shows Farmers of the Moor card art and routes each special action through its supplied command', () => {
-    const selectTerrainAction = vi.fn()
-    const takeImmediateAction = vi.fn()
+    const takeSpecialAction = vi.fn()
     const card: MoorSpecialActionCardState = {
       id: 'moor-special-mixed',
       players: [2, 3, 4, 5, 6],
@@ -110,8 +109,7 @@ describe('MobileActionsPanel', () => {
           cards: [card],
           canTake: (_card, actionId) => actionId === 'cut-peat' || actionId === 'hiring-fair',
           selected: null,
-          onSelectTerrainAction: selectTerrainAction,
-          onTakeImmediateAction: takeImmediateAction,
+          onTake: takeSpecialAction,
         }}
       />,
     )
@@ -124,8 +122,8 @@ describe('MobileActionsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cut Peat' }))
     fireEvent.click(screen.getByRole('button', { name: 'Hiring Fair' }))
 
-    expect(selectTerrainAction).toHaveBeenCalledWith(card.id, 'cut-peat')
-    expect(takeImmediateAction).toHaveBeenCalledWith(card.id, 'hiring-fair')
+    expect(takeSpecialAction).toHaveBeenNthCalledWith(1, card.id, 'cut-peat')
+    expect(takeSpecialAction).toHaveBeenNthCalledWith(2, card.id, 'hiring-fair')
   })
 
   it('keeps base, combined expansions, major improvements, and optional board orientation together', () => {
@@ -154,8 +152,7 @@ describe('MobileActionsPanel', () => {
           cards: [card],
           canTake: () => true,
           selected: null,
-          onSelectTerrainAction: () => {},
-          onTakeImmediateAction: () => {},
+          onTake: () => {},
         }}
         majorImprovements={<button type="button">Major Well</button>}
         boardOverview={<div>Physical action board</div>}

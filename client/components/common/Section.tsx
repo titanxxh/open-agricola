@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { t, type Locale } from '../../../shared/i18n'
 
 interface SectionProps {
   title?: string
@@ -18,6 +19,7 @@ interface SectionProps {
   /** When true, collapse only on small viewports — desktop always shows body. */
   mobileCollapsible?: boolean
   defaultCollapsed?: boolean
+  locale?: Locale
   className?: string
   children: ReactNode
 }
@@ -25,7 +27,7 @@ interface SectionProps {
 export function Section({
   title, subtitle, icon, actions,
   variant = 'default', collapsible = false, mobileCollapsible = false,
-  defaultCollapsed = false,
+  defaultCollapsed = false, locale = 'en',
   className, children,
 }: SectionProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
@@ -56,7 +58,7 @@ export function Section({
                 <button
                   type="button"
                   className="section__toggle"
-                  aria-label={collapsed ? 'expand' : 'collapse'}
+                  aria-label={t(locale, collapsed ? 'ui.expandSection' : 'ui.collapseSection')}
                   aria-expanded={!collapsed}
                   onClick={() => setCollapsed((v) => !v)}
                 >

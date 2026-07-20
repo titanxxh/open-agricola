@@ -37,8 +37,7 @@ describe('SpecialActionsPanel', () => {
         currentPlayerId="p1"
         canTakeSpecialAction={() => true}
         selected={null}
-        onSelectTerrainAction={() => {}}
-        onTakeImmediateAction={onTake}
+        onTakeAction={onTake}
       />,
     )
 
@@ -69,8 +68,7 @@ describe('SpecialActionsPanel', () => {
         currentPlayerId="p1"
         canTakeSpecialAction={() => true}
         selected={null}
-        onSelectTerrainAction={() => {}}
-        onTakeImmediateAction={() => {}}
+        onTakeAction={() => {}}
       />,
     )
 
@@ -91,8 +89,7 @@ describe('SpecialActionsPanel', () => {
         currentPlayerId="p1"
         canTakeSpecialAction={() => true}
         selected={null}
-        onSelectTerrainAction={() => {}}
-        onTakeImmediateAction={() => {}}
+        onTakeAction={() => {}}
       />,
     )
 
