@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ActionSpace } from '../../../shared/contract/types'
 import { t, type Locale } from '../../../shared/i18n'
-import { isMoorTerrainAction } from '../../../shared/moor/special-actions'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { formatResources } from '../../utils/format'
@@ -25,8 +24,7 @@ type MobileActionsPanelProps = {
     cards: MoorSpecialActionCardState[]
     canTake: (card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => boolean
     selected: { cardId: string; actionId: MoorSpecialActionId } | null
-    onSelectTerrainAction: (cardId: string, actionId: MoorSpecialActionId) => void
-    onTakeImmediateAction: (cardId: string, actionId: MoorSpecialActionId) => void
+    onTake: (cardId: string, actionId: MoorSpecialActionId) => void
   }
   majorImprovements?: ReactNode
   boardOverview?: ReactNode
@@ -133,13 +131,7 @@ export function MobileActionsPanel({
                           className="mobile-action-task"
                           disabled={!specialActions.canTake(card, actionId)}
                           aria-pressed={selected}
-                          onClick={() => {
-                            if (isMoorTerrainAction(actionId)) {
-                              specialActions.onSelectTerrainAction(card.id, actionId)
-                            } else {
-                              specialActions.onTakeImmediateAction(card.id, actionId)
-                            }
-                          }}
+                          onClick={() => specialActions.onTake(card.id, actionId)}
                         >
                           <strong>{t(locale, `moor.specialActions.${actionId}`)}</strong>
                         </button>

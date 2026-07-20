@@ -592,6 +592,14 @@ export const GameContainerApi = () => {
     )
   }, [])
 
+  const takeSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
+    if (isMoorTerrainAction(actionId)) {
+      selectTerrainSpecialAction(cardId, actionId)
+      return
+    }
+    takeImmediateSpecialAction(cardId, actionId)
+  }, [selectTerrainSpecialAction, takeImmediateSpecialAction])
+
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     setFarmDraftCommitError(farmType, error)
   }, [setFarmDraftCommitError])
@@ -1576,8 +1584,7 @@ export const GameContainerApi = () => {
             currentPlayerId={currentPlayer.id}
             canTakeSpecialAction={canTakeSpecialAction}
             selected={selectedSpecialAction}
-            onSelectTerrainAction={selectTerrainSpecialAction}
-            onTakeImmediateAction={takeImmediateSpecialAction}
+            onTakeAction={takeSpecialAction}
           />
         </section>
       ) : null}
@@ -1721,8 +1728,7 @@ export const GameContainerApi = () => {
                 cards: state.farmersOfTheMoor.specialActionCards,
                 canTake: canTakeSpecialAction,
                 selected: selectedSpecialAction,
-                onSelectTerrainAction: selectTerrainSpecialAction,
-                onTakeImmediateAction: takeImmediateSpecialAction,
+                onTake: takeSpecialAction,
               } : undefined}
               majorImprovements={majorImprovementsPresentation}
               boardOverview={actionBoardOverview}
@@ -1769,10 +1775,10 @@ export const GameContainerApi = () => {
         >
           {isMobile ? (
             <>
-              <Section collapsible defaultCollapsed title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
-                <ScorePanel rows={scoreRows} />
+              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
+                <ScorePanel locale={locale} rows={scoreRows} />
               </Section>
-              <Section collapsible defaultCollapsed title={t(locale, 'ui.actionLog')} variant="parchment">
+              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.actionLog')} variant="parchment">
                 <ActionLog
                   locale={locale}
                   log={state.log}
@@ -1792,7 +1798,7 @@ export const GameContainerApi = () => {
             </>
           ) : (
             <>
-              <ScorePanel rows={scoreRows} />
+              <ScorePanel locale={locale} rows={scoreRows} />
               <ActionLog
                 locale={locale}
                 log={state.log}

@@ -18,6 +18,8 @@ type LocaleScenario = {
   information: string
   score: string
   log: string
+  expand: string
+  scoreBreakdown: string[]
   plowPrompt: string
   plowConfirm: string
 }
@@ -35,6 +37,8 @@ const ENGLISH: LocaleScenario = {
   information: 'Information',
   score: 'Scoring Pad',
   log: 'Action Log',
+  expand: 'expand',
+  scoreBreakdown: ['Fields', 'Animals', 'Card bonus VP', 'Family members', 'Cards'],
   plowPrompt: 'Select a tile to plow',
   plowConfirm: 'Confirm plow',
 }
@@ -47,6 +51,8 @@ const CHINESE: LocaleScenario = {
   information: '信息',
   score: '计分板',
   log: '行动记录',
+  expand: '展开',
+  scoreBreakdown: ['田地', '动物', '卡牌加分', '家庭成员', '卡牌分'],
   plowPrompt: '选择要开垦的田地',
   plowConfirm: '确认开垦',
 }
@@ -269,9 +275,12 @@ const inspectMobileInformation = async (
   const logSection = information.locator('.section', {
     has: page.locator('.section__title', { hasText: locale.log }),
   })
-  await scoreSection.getByRole('button', { name: 'expand' }).click()
-  await logSection.getByRole('button', { name: 'expand' }).click()
+  await scoreSection.getByRole('button', { name: locale.expand }).click()
+  await logSection.getByRole('button', { name: locale.expand }).click()
   await expect(scoreSection.locator('.score-panel__row')).toHaveCount(playerCount)
+  for (const label of locale.scoreBreakdown) {
+    await expect(scoreSection).toContainText(label)
+  }
   await expect(logSection.locator('.action-log__entry').first()).toBeVisible()
 }
 
@@ -367,6 +376,7 @@ for (const locale of [CHINESE, ENGLISH]) {
     const actionButton = navigation.getByRole('button', { name: locale.action, exact: true })
     await expect(actionButton).toHaveText(locale.action)
     await completePlowInteraction(page, locale)
+    await inspectMobileInformation(page, locale, 2)
   })
 }
 

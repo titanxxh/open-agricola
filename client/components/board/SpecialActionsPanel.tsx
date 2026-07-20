@@ -1,9 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import {
-  isMoorSpecialActionCardUsableByPlayer,
-  isMoorTerrainAction,
-} from '../../../shared/moor/special-actions'
+import { isMoorSpecialActionCardUsableByPlayer } from '../../../shared/moor/special-actions'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 
@@ -18,8 +15,7 @@ type SpecialActionsPanelProps = {
   currentPlayerId: string
   canTakeSpecialAction: (card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => boolean
   selected: SelectedSpecialAction
-  onSelectTerrainAction: (cardId: string, actionId: MoorSpecialActionId) => void
-  onTakeImmediateAction: (cardId: string, actionId: MoorSpecialActionId) => void
+  onTakeAction: (cardId: string, actionId: MoorSpecialActionId) => void
 }
 
 const specialActionLabel = (locale: Locale, actionId: MoorSpecialActionId) =>
@@ -44,8 +40,7 @@ export function SpecialActionsPanel({
   currentPlayerId,
   canTakeSpecialAction,
   selected,
-  onSelectTerrainAction,
-  onTakeImmediateAction,
+  onTakeAction,
 }: SpecialActionsPanelProps) {
   if (cards.length === 0) return null
 
@@ -77,13 +72,7 @@ export function SpecialActionsPanel({
                         aria-label={label}
                         aria-pressed={isSelected}
                         title={label}
-                        onClick={() => {
-                          if (isMoorTerrainAction(actionId)) {
-                            onSelectTerrainAction(card.id, actionId)
-                            return
-                          }
-                          onTakeImmediateAction(card.id, actionId)
-                        }}
+                        onClick={() => onTakeAction(card.id, actionId)}
                       />
                     )
                   })}

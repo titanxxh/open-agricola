@@ -55,4 +55,16 @@ describe('Section', () => {
     )
     expect(screen.queryByText('Body')).not.toBeInTheDocument()
   })
+
+  it('localizes the disclosure control', () => {
+    render(
+      <Section title="T" collapsible defaultCollapsed locale="zh">
+        <p>Body</p>
+      </Section>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '展开' }))
+
+    expect(screen.getByRole('button', { name: '收起' })).toBeInTheDocument()
+  })
 })
