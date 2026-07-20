@@ -92,6 +92,14 @@ import {
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
+type GamePresentation = 'action' | 'farm' | 'cards' | 'information'
+
+const GAME_PRESENTATIONS: readonly GamePresentation[] = [
+  'action',
+  'farm',
+  'cards',
+  'information',
+]
 
 const httpTransportSingleton = new HttpGameTransport()
 
@@ -320,6 +328,7 @@ export const GameContainerApi = () => {
   const [devAmount, setDevAmount] = useState(1)
   const [devRound, setDevRound] = useState(1)
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
+  const [gamePresentation, setGamePresentation] = useState<GamePresentation>('action')
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia('(max-width: 900px)')
@@ -1570,13 +1579,44 @@ export const GameContainerApi = () => {
         />
       </div>
 
-      <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} majorImprovementSupply={state.majorImprovementSupply} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+      {isMobile ? (
+        <nav
+          className="game-presentation-selector"
+          aria-label={t(locale, 'ui.gamePresentationNavigation')}
+          style={{ top: `${headerHeight}px` }}
+        >
+          {GAME_PRESENTATIONS.map((presentation) => (
+            <button
+              key={presentation}
+              type="button"
+              aria-pressed={gamePresentation === presentation}
+              onClick={() => setGamePresentation(presentation)}
+            >
+              {t(locale, `ui.gamePresentation.${presentation}`)}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
       <div
-        className="game-layout"
-        style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
+        className="game-presentations"
+        data-presentation={isMobile ? gamePresentation : undefined}
       >
-        <div className="game-layout__left">
+        <div
+          className="game-presentation-cards"
+          hidden={isMobile && gamePresentation !== 'cards'}
+        >
+          <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} majorImprovementSupply={state.majorImprovementSupply} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
+        </div>
+
+        <div
+          className="game-layout"
+          style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
+        >
+        <div
+          className="game-layout__left"
+          hidden={isMobile && gamePresentation !== 'action'}
+        >
           <section className="board-panel board-action">
             <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
           </section>
@@ -1612,7 +1652,10 @@ export const GameContainerApi = () => {
             </section>
           ) : null}
         </div>
-        <div className="game-layout__center">
+        <div
+          className="game-layout__center"
+          hidden={isMobile && gamePresentation !== 'farm' && gamePresentation !== 'cards'}
+        >
           <StageBar currentRound={state.round ?? 1} locale={locale} />
           <PlayerTabs
             players={state.players.map((p, i) => ({
@@ -1634,16 +1677,20 @@ export const GameContainerApi = () => {
               viewedPlayerId={displayPlayer.id}
               view={farmBoardView}
               actions={farmBoardActions}
+              presentation={isMobile ? gamePresentation === 'cards' ? 'cards' : 'farm' : undefined}
             />
           </section>
         </div>
-        <div className="game-layout__right">
+        <div
+          className="game-layout__right"
+          hidden={isMobile && gamePresentation !== 'information'}
+        >
           {isMobile ? (
             <>
-              <Section collapsible defaultCollapsed icon="📊" title="计分" variant="parchment">
+              <Section collapsible defaultCollapsed title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
                 <ScorePanel rows={scoreRows} />
               </Section>
-              <Section collapsible defaultCollapsed icon="📜" title="行动记录" variant="parchment">
+              <Section collapsible defaultCollapsed title={t(locale, 'ui.actionLog')} variant="parchment">
                 <ActionLog
                   locale={locale}
                   log={state.log}
@@ -1682,6 +1729,7 @@ export const GameContainerApi = () => {
             </>
           )}
         </div>
+      </div>
       </div>
 
       <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
