@@ -191,6 +191,110 @@ const createFarmBoardProps = (
 }
 
 describe('FarmBoard', () => {
+  it('keeps zero-valued resource slots readable while emphasizing non-zero values', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+
+    render(<FarmBoard {...createFarmBoardProps(player)} />)
+
+    expect(screen.getByLabelText('Wood: 2')).toHaveClass('is-nonzero')
+    expect(screen.getByLabelText('Clay: 0')).toHaveClass('is-zero')
+    expect(screen.getByLabelText('Begging: 0')).toHaveClass('is-zero')
+  })
+
+  it('shows played-card statistics inline in the Cards presentation', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    player.minorPlayed = ['B034_SpecialFood']
+    player.cardStates = {
+      B034_SpecialFood: {
+        extraData: {
+          resourceStats: {
+            used: 1,
+            gained: {},
+            paid: {},
+            saved: { wood: 2 },
+            receivedPayment: {},
+            paidToOthers: {},
+          },
+        },
+      },
+    }
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player)}
+        presentation="cards"
+      />,
+    )
+
+    expect(screen.getByText('Used')).toBeVisible()
+    expect(screen.getByText('Saved')).toBeVisible()
+    expect(container.querySelector('.played-card-stats-inline [data-resource="wood"]'))
+      .toHaveAttribute('data-amount', '2')
+  })
+
+  it('keeps the active farm-selection draft visible and operable in the Farm presentation', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    const togglePositionSelection = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{
+            key: 'tile-0-0',
+            type: 'tile',
+            tileRow: 0,
+            tileCol: 0,
+            tileKey: '0-0',
+            isPositionSelectable: true,
+          }],
+          positionSelectableSet: new Set(['0-0']),
+          pendingPositionSelections: new Set(['0-0']),
+        }, {
+          togglePositionSelection,
+        })}
+        presentation="farm"
+      />,
+    )
+
+    const tile = container.querySelector('[data-farm-tile-key="0-0"]')
+    expect(tile).toBeVisible()
+    expect(tile).toHaveClass('position-selected')
+    expect(container.querySelector('.hand-cards')).not.toBeVisible()
+
+    fireEvent.click(tile!)
+
+    expect(togglePositionSelection).toHaveBeenCalledWith({ row: 0, col: 0 })
+  })
+
+  it('keeps interaction-relevant hand cards operable in the Cards presentation', () => {
+    const player = {
+      ...createPlayer('p1', 'Player 1', 'red'),
+      minorHand: ['B034_SpecialFood'],
+    }
+    const resolveChoice = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          activePlayerId: player.id,
+          isSelectingMinor: true,
+          selectableMinorIds: new Set(['B034_SpecialFood']),
+        }, {
+          resolveChoice,
+        })}
+        presentation="cards"
+      />,
+    )
+
+    expect(container.querySelector('.farm-grid')).not.toBeVisible()
+    const card = container.querySelector('[data-id="B034_SpecialFood"]')
+    expect(card).toBeVisible()
+
+    fireEvent.click(card!)
+
+    expect(resolveChoice).toHaveBeenCalledWith('B034_SpecialFood')
+  })
+
   it('renders extension spaces inside the farm grid and submits real coordinates', () => {
     const player = createPlayer('p1', 'Player 1', 'red')
     player.farmyardExtensions = [{
