@@ -19,6 +19,7 @@ import { SeasonsBoard } from '../components/board/SeasonsBoard'
 import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
 import { MajorImprovements } from '../components/board/MajorImprovements'
+import { MobileActionsPanel } from '../components/board/MobileActionsPanel'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
@@ -582,6 +583,14 @@ export const GameContainerApi = () => {
       console.error('takeSpecialAction error', e)
     })
   }, [interaction, isInteractive, pendingMoorSpecialActionChoices, state, transport])
+
+  const selectTerrainSpecialAction = useCallback((cardId: string, actionId: MoorSpecialActionId) => {
+    setSelectedSpecialAction((current) =>
+      current?.cardId === cardId && current.actionId === actionId
+        ? null
+        : { cardId, actionId },
+    )
+  }, [])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     setFarmDraftCommitError(farmType, error)
@@ -1526,6 +1535,54 @@ export const GameContainerApi = () => {
     confirmAnimalReorg,
     cancelAnimalDiscardPrompt,
   })
+  const majorImprovementsPresentation = (
+    <MajorImprovements
+      locale={locale}
+      availableMajorImprovements={state.availableMajorImprovements}
+      majorImprovementSupply={state.majorImprovementSupply}
+      isSelectingMajor={isSelectingImprovementAny}
+      selectableMajorIds={selectableMajorIds}
+      cardAvailability={cardAvailability}
+      resolveChoice={resolveChoice}
+      futureCardResources={futureCardResources}
+      isInteractive={isInteractive}
+      devMode={devMode}
+    />
+  )
+  const actionBoardOverview = (
+    <section className="board-panel board-action">
+      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
+    </section>
+  )
+  const expansionActionBoards = (
+    <>
+      {state.enableThroughTheSeasons && state.throughTheSeasons ? (
+        <section className="board-panel board-seasons">
+          <SeasonsBoard
+            locale={locale}
+            throughTheSeasons={state.throughTheSeasons}
+            seasonActions={seasonActions}
+            players={state.players}
+            canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
+            takeAction={takeSeasonAction}
+          />
+        </section>
+      ) : null}
+      {state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? (
+        <section className="board-panel board-special-actions">
+          <SpecialActionsPanel
+            locale={locale}
+            cards={state.farmersOfTheMoor.specialActionCards}
+            currentPlayerId={currentPlayer.id}
+            canTakeSpecialAction={canTakeSpecialAction}
+            selected={selectedSpecialAction}
+            onSelectTerrainAction={selectTerrainSpecialAction}
+            onTakeImmediateAction={takeImmediateSpecialAction}
+          />
+        </section>
+      ) : null}
+    </>
+  )
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
@@ -1635,12 +1692,11 @@ export const GameContainerApi = () => {
         className="game-presentations"
         data-presentation={isMobile ? gamePresentation : undefined}
       >
-        <div
-          className="game-presentation-cards"
-          hidden={isMobile && gamePresentation !== 'cards'}
-        >
-          <MajorImprovements locale={locale} availableMajorImprovements={state.availableMajorImprovements} majorImprovementSupply={state.majorImprovementSupply} isSelectingMajor={isSelectingImprovementAny} selectableMajorIds={selectableMajorIds} cardAvailability={cardAvailability} resolveChoice={resolveChoice} futureCardResources={futureCardResources} isInteractive={isInteractive} devMode={devMode} />
-        </div>
+        {!isMobile ? (
+          <div className="game-presentation-cards">
+            {majorImprovementsPresentation}
+          </div>
+        ) : null}
 
         <div
           className="game-layout"
@@ -1650,40 +1706,33 @@ export const GameContainerApi = () => {
           className="game-layout__left"
           hidden={isMobile && gamePresentation !== 'action'}
         >
-          <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} />
-          </section>
-          {state.enableThroughTheSeasons && state.throughTheSeasons ? (
-            <section className="board-panel board-seasons">
-              <SeasonsBoard
-                locale={locale}
-                throughTheSeasons={state.throughTheSeasons}
-                seasonActions={seasonActions}
-                players={state.players}
-                canTakeAction={(space) => currentPlayer ? canTakeActionForBoard(space, currentPlayer) : false}
-                takeAction={takeSeasonAction}
-              />
-            </section>
-          ) : null}
-          {state.enableFarmersOfTheMoor && state.farmersOfTheMoor && currentPlayer ? (
-            <section className="board-panel board-special-actions">
-              <SpecialActionsPanel
-                locale={locale}
-                cards={state.farmersOfTheMoor.specialActionCards}
-                currentPlayerId={currentPlayer.id}
-                canTakeSpecialAction={canTakeSpecialAction}
-                selected={selectedSpecialAction}
-                onSelectTerrainAction={(cardId, actionId) => {
-                  setSelectedSpecialAction((current) =>
-                    current?.cardId === cardId && current.actionId === actionId
-                      ? null
-                      : { cardId, actionId },
-                  )
-                }}
-                onTakeImmediateAction={takeImmediateSpecialAction}
-              />
-            </section>
-          ) : null}
+          {isMobile ? (
+            <MobileActionsPanel
+              locale={locale}
+              baseActions={baseActions}
+              roundSlots={roundSlots}
+              currentRound={state.round}
+              devMode={devMode}
+              canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
+              takeAction={takeAction}
+              seasonActions={state.enableThroughTheSeasons ? seasonActions : undefined}
+              takeSeasonAction={takeSeasonAction}
+              specialActions={state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? {
+                cards: state.farmersOfTheMoor.specialActionCards,
+                canTake: canTakeSpecialAction,
+                selected: selectedSpecialAction,
+                onSelectTerrainAction: selectTerrainSpecialAction,
+                onTakeImmediateAction: takeImmediateSpecialAction,
+              } : undefined}
+              majorImprovements={majorImprovementsPresentation}
+              boardOverview={actionBoardOverview}
+            />
+          ) : (
+            <>
+              {actionBoardOverview}
+              {expansionActionBoards}
+            </>
+          )}
         </div>
         <div
           className="game-layout__center"

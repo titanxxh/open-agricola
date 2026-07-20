@@ -19,7 +19,8 @@ const expectFarmRequestToRoute = async (surface: Page | FrameLocator) => {
     'true',
   )
 
-  const farmland = surface.locator('.action-card', { hasText: 'Farmland' })
+  const farmland = surface.locator('[data-mobile-action-id="farmland"]')
+  await expect(farmland).toBeVisible()
   await expect(farmland).toBeEnabled()
   await farmland.click()
 
