@@ -83,6 +83,8 @@ const parseBody = async <T = Record<string, unknown>>(req: IncomingMessage): Pro
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT_WINDOW = 60_000
 const RATE_LIMIT_MAX = 10
+const DAY_MS = 24 * 60 * 60 * 1000
+const MAX_INVITE_AGE_MS = 365 * DAY_MS
 
 function checkRateLimit(ip: string): boolean {
   if (process.env.DISABLE_RATE_LIMIT === '1') return true
@@ -240,7 +242,7 @@ const server = createServer(async (req, res) => {
     try {
       await sendVerificationEmail(result.userId, body.email)
     } catch {
-      cleanupPendingPasswordUser(result.userId)
+      cleanupPendingPasswordUser(result.userId, result.consumedInviteCodeHash)
       sendJson(res, 500, authError('email_delivery_failed', 'Failed to send verification email'))
       return
     }
@@ -433,13 +435,76 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/admin/invites') {
-      const body = await parseBody<{ expiresInDays?: number }>(req)
-      const rawDays = typeof body?.expiresInDays === 'number' && Number.isFinite(body.expiresInDays)
-        ? Math.floor(body.expiresInDays)
-        : 7
-      const expiresInDays = Math.min(365, Math.max(1, rawDays))
-      const invite = createInvite(adminUser.id, expiresInDays)
-      sendJson(res, 200, { ok: true, invite })
+      const body = await parseBody<{
+        code?: unknown
+        expiresAt?: unknown
+        expiresInDays?: unknown
+        maxUses?: unknown
+      }>(req)
+      const now = Date.now()
+      const rawCode = body?.code
+      if (rawCode !== undefined && typeof rawCode !== 'string') {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_code', error: 'Invalid invite code' })
+        return
+      }
+      const code = rawCode?.trim() || undefined
+      if (code && code.length > 128) {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_code', error: 'Invalid invite code' })
+        return
+      }
+
+      const rawExpiresAt = body?.expiresAt
+      const rawExpiresInDays = body?.expiresInDays
+      const hasExpiresAt = rawExpiresAt !== undefined
+      const hasExpiresInDays = rawExpiresInDays !== undefined
+      if (hasExpiresAt && hasExpiresInDays) {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_expiry', error: 'Invalid invite expiration' })
+        return
+      }
+
+      const expiresInDays = hasExpiresInDays ? rawExpiresInDays : 7
+      if (!hasExpiresAt && (
+        typeof expiresInDays !== 'number'
+        || !Number.isInteger(expiresInDays)
+        || expiresInDays < 1
+        || expiresInDays > 365
+      )) {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_expiry', error: 'Invalid invite expiration' })
+        return
+      }
+
+      const expiresAt = hasExpiresAt
+        ? rawExpiresAt
+        : now + (expiresInDays as number) * DAY_MS
+      if (typeof expiresAt !== 'number'
+        || !Number.isSafeInteger(expiresAt)
+        || expiresAt <= now
+        || expiresAt > now + MAX_INVITE_AGE_MS
+      ) {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_expiry', error: 'Invalid invite expiration' })
+        return
+      }
+
+      const maxUses = body?.maxUses ?? 1
+      if (typeof maxUses !== 'number' || !Number.isSafeInteger(maxUses) || maxUses < 1) {
+        sendJson(res, 400, { ok: false, code: 'invalid_invite_max_uses', error: 'Invalid invite maximum uses' })
+        return
+      }
+
+      try {
+        const invite = createInvite(adminUser.id, { code, expiresAt, maxUses })
+        sendJson(res, 200, { ok: true, invite })
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('account_invites.code_hash')) {
+          sendJson(res, 400, {
+            ok: false,
+            code: 'invite_code_taken',
+            error: 'Invite code already exists',
+          })
+          return
+        }
+        throw error
+      }
       return
     }
 

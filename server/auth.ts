@@ -1,7 +1,7 @@
 import { scrypt, randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto'
 import { getDb } from './db.ts'
 import { nanoid } from 'nanoid'
-import { consumeInviteCode, getRegistrationPolicy, isInviteCodeAvailable } from './invites.ts'
+import { consumeInviteCode, getRegistrationPolicy, hashInviteCode, isInviteCodeAvailable } from './invites.ts'
 import { sendEmail } from './email.ts'
 
 const SCRYPT_KEYLEN = 64
@@ -64,7 +64,7 @@ export type RegisterPasswordInput = {
 }
 
 export type RegisterPasswordResult =
-  | { ok: true; status: 'verification_required'; userId: string }
+  | { ok: true; status: 'verification_required'; userId: string; consumedInviteCodeHash: string | null }
   | { ok: false; code: AuthErrorCode; error: string }
 
 function hashPassword(password: string): Promise<string> {
@@ -162,6 +162,7 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
 
   const policy = getRegistrationPolicy()
   const inviteCode = input.inviteCode?.trim() ?? ''
+  const consumedInviteCodeHash = policy === 'invite_only' ? hashInviteCode(inviteCode) : null
   if (policy === 'disabled') {
     return { ok: false, code: 'registration_disabled', error: 'Registration is disabled' }
   }
@@ -196,7 +197,7 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
       if (policy === 'invite_only' && !consumeInviteCode(db, inviteCode, id, now)) {
         throw new Error('invalid_invite')
       }
-      return { ok: true as const, status: 'verification_required' as const, userId: id }
+      return { ok: true as const, status: 'verification_required' as const, userId: id, consumedInviteCodeHash }
     })()
     return result
   } catch (err) {
@@ -278,7 +279,7 @@ export async function sendVerificationEmail(userId: string, email: string): Prom
   storeEmailVerificationToken(userId, tokenHash, Date.now())
 }
 
-export function cleanupPendingPasswordUser(userId: string): boolean {
+export function cleanupPendingPasswordUser(userId: string, consumedInviteCodeHash: string | null): boolean {
   const db = getDb()
   return db.transaction(() => {
     const row = db.prepare(`
@@ -291,7 +292,15 @@ export function cleanupPendingPasswordUser(userId: string): boolean {
         AND NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id)
     `).get(userId)
     if (!row) return false
-    db.prepare('UPDATE account_invites SET used_by = NULL, used_at = NULL WHERE used_by = ?').run(userId)
+    if (consumedInviteCodeHash) {
+      db.prepare(`
+        UPDATE account_invites
+        SET use_count = use_count - 1,
+            used_by = CASE WHEN used_by = ? THEN NULL ELSE used_by END,
+            used_at = CASE WHEN used_by = ? THEN NULL ELSE used_at END
+        WHERE code_hash = ? AND use_count > 0
+      `).run(userId, userId, consumedInviteCodeHash)
+    }
     db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM users WHERE id = ?').run(userId)
     return true
