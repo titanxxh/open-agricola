@@ -21,7 +21,16 @@ type AdminInvite = {
   usedAt: number | null
   usedBy: string | null
   revokedAt: number | null
+  useCount: number
+  maxUses: number
   status: 'active' | 'used' | 'expired' | 'revoked'
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const toLocalDateTimeValue = (timestamp: number) => {
+  const date = new Date(timestamp)
+  return new Date(timestamp - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 
 export function SettingsPage() {
@@ -34,7 +43,18 @@ export function SettingsPage() {
   const [identities, setIdentities] = useState<LinkedIdentity[]>([])
   const [invites, setInvites] = useState<AdminInvite[]>([])
   const [generatedInvite, setGeneratedInvite] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [inviteDays, setInviteDays] = useState(7)
+  const [inviteDateRange] = useState(() => {
+    const now = Date.now()
+    return {
+      initial: toLocalDateTimeValue(now + 7 * DAY_MS),
+      min: toLocalDateTimeValue(now + 60_000),
+      max: toLocalDateTimeValue(now + 365 * DAY_MS),
+    }
+  })
+  const [inviteExpiresAt, setInviteExpiresAt] = useState(inviteDateRange.initial)
+  const [inviteMaxUses, setInviteMaxUses] = useState(1)
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
   const authError = new URLSearchParams(window.location.search).get('authError') ?? undefined
@@ -145,7 +165,11 @@ export function SettingsPage() {
       const resp = await apiFetch('/api/admin/invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expiresInDays: inviteDays }),
+        body: JSON.stringify({
+          code: inviteCode,
+          expiresAt: new Date(inviteExpiresAt).getTime(),
+          maxUses: inviteMaxUses,
+        }),
       })
       const data = await resp.json()
       if (data.ok) {
@@ -158,6 +182,20 @@ export function SettingsPage() {
       setInviteMsg({ ok: false, text: t('platform.networkError') })
     } finally {
       setInviteLoading(false)
+    }
+  }
+
+  const handleInviteDaysChange = (value: string) => {
+    const days = Math.min(365, Math.max(1, Number(value) || 1))
+    setInviteDays(days)
+    setInviteExpiresAt(toLocalDateTimeValue(Date.now() + days * DAY_MS))
+  }
+
+  const handleInviteExpirationChange = (value: string) => {
+    setInviteExpiresAt(value)
+    const timestamp = new Date(value).getTime()
+    if (Number.isFinite(timestamp)) {
+      setInviteDays(Math.max(1, Math.ceil((timestamp - Date.now()) / DAY_MS)))
     }
   }
 
@@ -302,6 +340,17 @@ export function SettingsPage() {
         <Section icon="🎟️" title={t('platform.adminInvites')} variant="parchment">
           <div className="settings-form">
             <div className="form-field">
+              <label htmlFor="invite-code">{t('platform.inviteCode')}</label>
+              <input
+                id="invite-code"
+                type="text"
+                maxLength={128}
+                value={inviteCode}
+                onChange={event => setInviteCode(event.target.value)}
+                placeholder={t('platform.inviteCodeHint')}
+              />
+            </div>
+            <div className="form-field">
               <label htmlFor="invite-days">{t('platform.inviteExpiresInDays')}</label>
               <input
                 id="invite-days"
@@ -309,7 +358,28 @@ export function SettingsPage() {
                 min={1}
                 max={365}
                 value={inviteDays}
-                onChange={e => setInviteDays(Number(e.target.value) || 1)}
+                onChange={event => handleInviteDaysChange(event.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="invite-expires-at">{t('platform.inviteExpiresAt')}</label>
+              <input
+                id="invite-expires-at"
+                type="datetime-local"
+                min={inviteDateRange.min}
+                max={inviteDateRange.max}
+                value={inviteExpiresAt}
+                onChange={event => handleInviteExpirationChange(event.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="invite-max-uses">{t('platform.inviteMaxUses')}</label>
+              <input
+                id="invite-max-uses"
+                type="number"
+                min={1}
+                value={inviteMaxUses}
+                onChange={event => setInviteMaxUses(Math.max(1, Number(event.target.value) || 1))}
               />
             </div>
             <div className="settings-actions">
@@ -320,7 +390,7 @@ export function SettingsPage() {
             {generatedInvite && (
               <div className="settings-success">
                 <strong>{t('platform.generatedInvite')}</strong>
-                <code>{generatedInvite}</code>
+                <code className="settings-generated-invite-code">{generatedInvite}</code>
                 <p className="settings-hint">{t('platform.inviteShownOnce')}</p>
               </div>
             )}
@@ -332,9 +402,11 @@ export function SettingsPage() {
             ) : (
               <div className="settings-form">
                 {invites.map(invite => (
-                  <p className="settings-readonly" key={invite.id}>
+                  <p className="settings-readonly settings-invite-row" key={invite.id}>
                     <span className="settings-readonly-chip">{t(`platform.inviteStatus.${invite.status}`)}</span>
                     <span>{new Date(invite.createdAt).toLocaleString()}</span>
+                    <span>{invite.expiresAt === null ? '—' : new Date(invite.expiresAt).toLocaleString()}</span>
+                    <span>{t('platform.inviteUsage', { used: invite.useCount, max: invite.maxUses })}</span>
                     {invite.status === 'active' && (
                       <button
                         type="button"

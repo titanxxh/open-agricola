@@ -71,6 +71,12 @@
   font-size: 13px;
 }
 
+.settings-generated-invite-code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .settings-danger {
   border: 2px solid var(--color-danger-border);
 }
@@ -107,5 +113,18 @@
     flex: 1 1 200px;
     min-width: 0;
     text-align: center;
+  }
+
+  .settings-invite-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settings-invite-row > span:not(.settings-readonly-chip) {
+    flex: 1 0 100%;
+  }
+
+  .settings-invite-row > .btn-secondary {
+    margin-left: auto;
   }
 }

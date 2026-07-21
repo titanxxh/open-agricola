@@ -6,11 +6,19 @@ import { getDb } from './db.ts'
 export type RegistrationPolicy = 'invite_only' | 'open' | 'disabled'
 export type InviteStatus = 'active' | 'used' | 'expired' | 'revoked'
 
+export type CreateInviteInput = {
+  code?: string
+  expiresAt: number
+  maxUses: number
+}
+
 export type CreatedInvite = {
   id: string
   code: string
   createdAt: number
-  expiresAt: number | null
+  expiresAt: number
+  maxUses: number
+  useCount: number
 }
 
 export type ListedInvite = {
@@ -20,6 +28,8 @@ export type ListedInvite = {
   usedAt: number | null
   usedBy: string | null
   revokedAt: number | null
+  maxUses: number
+  useCount: number
   status: InviteStatus
 }
 
@@ -30,6 +40,8 @@ type InviteRow = {
   used_at: number | null
   used_by: string | null
   revoked_at: number | null
+  max_uses: number
+  use_count: number
 }
 
 export function getRegistrationPolicy(raw: string | undefined = process.env.ACCOUNT_REGISTRATION_POLICY): RegistrationPolicy {
@@ -42,30 +54,35 @@ export function hashInviteCode(code: string): string {
 }
 
 function statusFor(row: InviteRow, now: number): InviteStatus {
-  if (row.used_at !== null) return 'used'
   if (row.revoked_at !== null) return 'revoked'
+  if (row.use_count >= row.max_uses) return 'used'
   if (row.expires_at !== null && row.expires_at <= now) return 'expired'
   return 'active'
 }
 
-export function createInvite(createdBy: string, expiresInDays?: number): CreatedInvite {
+export function createInvite(createdBy: string, input: CreateInviteInput): CreatedInvite {
   const db = getDb()
   const id = nanoid()
-  const code = `oa_${randomBytes(18).toString('base64url')}`
+  const code = input.code?.trim() || `oa_${randomBytes(18).toString('base64url')}`
   const createdAt = Date.now()
-  const expiresAt = expiresInDays && expiresInDays > 0
-    ? createdAt + Math.floor(expiresInDays * 24 * 60 * 60 * 1000)
-    : null
   db.prepare(`
-    INSERT INTO account_invites (id, code_hash, created_by, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, hashInviteCode(code), createdBy, createdAt, expiresAt)
-  return { id, code, createdAt, expiresAt }
+    INSERT INTO account_invites (
+      id, code_hash, created_by, created_at, expires_at, max_uses, use_count
+    ) VALUES (?, ?, ?, ?, ?, ?, 0)
+  `).run(id, hashInviteCode(code), createdBy, createdAt, input.expiresAt, input.maxUses)
+  return {
+    id,
+    code,
+    createdAt,
+    expiresAt: input.expiresAt,
+    maxUses: input.maxUses,
+    useCount: 0,
+  }
 }
 
 export function listInvites(now: number = Date.now()): ListedInvite[] {
   const rows = getDb().prepare(`
-    SELECT id, created_at, expires_at, used_at, used_by, revoked_at
+    SELECT id, created_at, expires_at, used_at, used_by, revoked_at, max_uses, use_count
     FROM account_invites
     ORDER BY created_at DESC
   `).all() as InviteRow[]
@@ -76,6 +93,8 @@ export function listInvites(now: number = Date.now()): ListedInvite[] {
     usedAt: row.used_at,
     usedBy: row.used_by,
     revokedAt: row.revoked_at,
+    maxUses: row.max_uses,
+    useCount: row.use_count,
     status: statusFor(row, now),
   }))
 }
@@ -85,7 +104,7 @@ function isInviteHashAvailable(codeHash: string, now: number): boolean {
     SELECT id
     FROM account_invites
     WHERE code_hash = ?
-      AND used_at IS NULL
+      AND use_count < max_uses
       AND revoked_at IS NULL
       AND (expires_at IS NULL OR expires_at > ?)
   `).get(codeHash, now)
@@ -102,8 +121,28 @@ export function revokeInvite(inviteId: string, now: number = Date.now()): boolea
   const result = getDb().prepare(`
     UPDATE account_invites
     SET revoked_at = ?
-    WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL
-  `).run(now, inviteId)
+    WHERE id = ?
+      AND use_count < max_uses
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > ?)
+  `).run(now, inviteId, now)
+  return result.changes === 1
+}
+
+function consumeInviteHash(
+  db: Database.Database,
+  codeHash: string,
+  userId: string,
+  now: number,
+): boolean {
+  const result = db.prepare(`
+    UPDATE account_invites
+    SET use_count = use_count + 1, used_by = ?, used_at = ?
+    WHERE code_hash = ?
+      AND use_count < max_uses
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > ?)
+  `).run(userId, now, codeHash, now)
   return result.changes === 1
 }
 
@@ -115,15 +154,7 @@ export function consumeInviteCode(
 ): boolean {
   const normalized = code.trim()
   if (!normalized) return false
-  const result = db.prepare(`
-    UPDATE account_invites
-    SET used_by = ?, used_at = ?
-    WHERE code_hash = ?
-      AND used_at IS NULL
-      AND revoked_at IS NULL
-      AND (expires_at IS NULL OR expires_at > ?)
-  `).run(userId, now, hashInviteCode(normalized), now)
-  return result.changes === 1
+  return consumeInviteHash(db, hashInviteCode(normalized), userId, now)
 }
 
 export function consumeInviteCodeHash(
@@ -134,13 +165,5 @@ export function consumeInviteCodeHash(
 ): boolean {
   const normalizedHash = codeHash.trim()
   if (!normalizedHash) return false
-  const result = db.prepare(`
-    UPDATE account_invites
-    SET used_by = ?, used_at = ?
-    WHERE code_hash = ?
-      AND used_at IS NULL
-      AND revoked_at IS NULL
-      AND (expires_at IS NULL OR expires_at > ?)
-  `).run(userId, now, normalizedHash, now)
-  return result.changes === 1
+  return consumeInviteHash(db, normalizedHash, userId, now)
 }

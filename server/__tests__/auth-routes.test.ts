@@ -116,6 +116,8 @@ vi.mock('../db.ts', () => {
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at INTEGER NOT NULL,
       expires_at INTEGER,
+      max_uses INTEGER NOT NULL DEFAULT 1,
+      use_count INTEGER NOT NULL DEFAULT 0,
       used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       used_at INTEGER,
       revoked_at INTEGER
@@ -568,7 +570,7 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.EMAIL_DELIVERY = 'log'
     const admin = await createLocalUserForTests('invite_password_admin', 'password123', 'Invite Admin')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
 
     const missing = await requestJson('POST', '/api/auth/register', {
       username: 'missinginvite',
@@ -601,7 +603,7 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     process.env.PUBLIC_API_BASE = 'https://api.example'
     const admin = await createLocalUserForTests('rollback_admin', 'password123', 'Rollback Admin')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
     const sendEmailSpy = vi.spyOn(emailModule, 'sendEmail')
       .mockRejectedValueOnce(new Error('resend down'))
       .mockResolvedValueOnce()
@@ -618,12 +620,14 @@ describe('auth routes', () => {
     expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('retryregister')).toBeUndefined()
     expect(getDb().prepare('SELECT id FROM users WHERE email = ?').get('retryregister@example.com')).toBeUndefined()
     expect((getDb().prepare('SELECT COUNT(*) AS count FROM email_verification_tokens').get() as { count: number }).count).toBe(0)
-    const releasedInvite = getDb().prepare('SELECT used_by, used_at FROM account_invites WHERE id = ?').get(invite.id) as {
+    const releasedInvite = getDb().prepare('SELECT used_by, used_at, use_count FROM account_invites WHERE id = ?').get(invite.id) as {
       used_by: string | null
       used_at: number | null
+      use_count: number
     }
     expect(releasedInvite.used_by).toBeNull()
     expect(releasedInvite.used_at).toBeNull()
+    expect(releasedInvite.use_count).toBe(0)
 
     const retried = await requestJson('POST', '/api/auth/register', {
       username: 'retryregister',
@@ -641,6 +645,56 @@ describe('auth routes', () => {
     }
     expect(usedInvite.used_by).toBe(user.id)
     expect(usedInvite.used_at).toBeGreaterThan(0)
+  })
+
+  it('rolls back the matching reusable invite use without clearing a later registration', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    process.env.PUBLIC_API_BASE = 'https://api.example'
+    const admin = await createLocalUserForTests('interleaved_admin', 'password123', 'Admin')
+    const invite = createInvite(admin.id, {
+      code: 'INTERLEAVED-TWO', expiresAt: Date.now() + 86_400_000, maxUses: 2,
+    })
+    let markFirstEmailStarted!: () => void
+    const firstEmailStarted = new Promise<void>(resolve => { markFirstEmailStarted = resolve })
+    let rejectFirstEmail!: (error: Error) => void
+    const pendingFirstEmail = new Promise<void>((_resolve, reject) => { rejectFirstEmail = reject })
+    vi.spyOn(emailModule, 'sendEmail')
+      .mockImplementationOnce(() => {
+        markFirstEmailStarted()
+        return pendingFirstEmail
+      })
+      .mockResolvedValueOnce()
+
+    const firstRegistration = requestJson('POST', '/api/auth/register', {
+      username: 'interleaveda',
+      email: 'interleaveda@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      inviteCode: invite.code,
+    })
+    await firstEmailStarted
+
+    const secondRegistration = await requestJson('POST', '/api/auth/register', {
+      username: 'interleavedb',
+      email: 'interleavedb@example.com',
+      password: 'password123',
+      confirmPassword: 'password123',
+      inviteCode: invite.code,
+    })
+    expect(secondRegistration.status).toBe(200)
+    const secondUser = getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb') as { id: string }
+
+    rejectFirstEmail(new Error('first delivery failed'))
+    const failedFirstRegistration = await firstRegistration
+    expect(failedFirstRegistration.status).toBe(500)
+    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleaveda')).toBeUndefined()
+    expect(getDb().prepare('SELECT id FROM users WHERE username = ?').get('interleavedb')).toEqual(secondUser)
+    const row = getDb().prepare(`
+      SELECT use_count, used_by, used_at FROM account_invites WHERE id = ?
+    `).get(invite.id) as { use_count: number; used_by: string | null; used_at: number | null }
+    expect(row.use_count).toBe(1)
+    expect(row.used_by).toBe(secondUser.id)
+    expect(row.used_at).toBeGreaterThan(0)
   })
 
   it('resends verification mail only for existing unverified accounts', async () => {
@@ -992,7 +1046,7 @@ describe('auth routes', () => {
   it('rejects inviteCode body during invite-only onboarding without a pre-authorized invite', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('admin_inviter', 'password123', 'Admin Inviter')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
     const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-invited', emailVerified: true })
 
     const res = await requestJson(
@@ -1017,7 +1071,7 @@ describe('auth routes', () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('reuse_admin', 'password123', 'Reuse Admin')
     const ticket = createOnboardingTicket({ provider: 'github', providerUserId: 'gh-second', emailVerified: true })
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
 
     const first = await requestJson(
       'POST',
@@ -1043,7 +1097,7 @@ describe('auth routes', () => {
   it('consumes the pre-authorized invite from onboarding ticket', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('preauth_admin', 'password123', 'Preauth Admin')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-preauth',
@@ -1079,6 +1133,52 @@ describe('auth routes', () => {
     }
     expect(row.used_by).toBe(userId)
     expect(row.used_at).toBeGreaterThan(0)
+  })
+
+  it('allows OAuth onboarding exactly up to a reusable invite limit', async () => {
+    process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+    const admin = await createLocalUserForTests('oauth_multi_admin', 'password123', 'Admin')
+    const invite = createInvite(admin.id, {
+      code: 'OAUTH-TWO', expiresAt: Date.now() + 86_400_000, maxUses: 2,
+    })
+
+    for (const suffix of ['one', 'two']) {
+      const start = await requestJson(
+        'GET',
+        `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
+      )
+      expect(start.headers.Location).not.toContain('authError=invalid_invite')
+      vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
+        provider: 'github',
+        providerUserId: `gh-multi-${suffix}`,
+        providerLogin: `multi-${suffix}`,
+        emailVerified: true,
+      })
+      const state = new URL(String(start.headers.Location)).searchParams.get('state') ?? ''
+      const callback = await requestJson(
+        'GET',
+        `/api/auth/oauth/github/callback?code=ok&state=${encodeURIComponent(state)}`,
+        undefined,
+        { Cookie: startOAuthCookie(start) },
+      )
+      const onboardingCookie = cookiePairFromSetCookie(callback.headers['Set-Cookie'], 'oa_onboarding')
+      const complete = await requestJson(
+        'POST',
+        '/api/auth/onboarding/complete',
+        { username: `oauth${suffix}`, password: 'password123', confirmPassword: 'password123' },
+        { Cookie: onboardingCookie },
+      )
+      expect(complete.status).toBe(200)
+    }
+
+    const rejected = await requestJson(
+      'GET',
+      `/api/auth/oauth/github/start?intent=register&inviteCode=${encodeURIComponent(invite.code)}`,
+    )
+    expect(rejected.status).toBe(302)
+    expect(rejected.headers.Location).toContain('authError=invalid_invite')
+    expect(getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id))
+      .toEqual({ use_count: 2 })
   })
 
   it('requires admin access to create invites', async () => {
@@ -1123,11 +1223,69 @@ describe('auth routes', () => {
     expect((listed.json.invites as Array<{ status: string }>)[0].status).toBe('active')
   })
 
+  it('lets admins create a custom reusable expiring invite', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+    const expiresAt = Date.now() + 2 * 24 * 60 * 60 * 1000
+
+    const created = await requestJson('POST', '/api/admin/invites', {
+      code: 'FAMILY-2026', expiresAt, maxUses: 4,
+    }, { Cookie: `oa_session=${token}` })
+
+    expect(created.status).toBe(200)
+    expect(created.json).toMatchObject({
+      ok: true,
+      invite: { code: 'FAMILY-2026', expiresAt, maxUses: 4, useCount: 0 },
+    })
+    const listed = await requestJson('GET', '/api/admin/invites', undefined, {
+      Cookie: `oa_session=${token}`,
+    })
+    expect(listed.json).toMatchObject({
+      ok: true,
+      invites: [expect.objectContaining({ expiresAt, maxUses: 4, useCount: 0, status: 'active' })],
+    })
+    expect(JSON.stringify(listed.json)).not.toContain('FAMILY-2026')
+  })
+
+  it('rejects a duplicate custom invite code', async () => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+    const headers = { Cookie: `oa_session=${token}` }
+    const body = { code: '  DUPLICATE  ', expiresInDays: 7, maxUses: 2 }
+    expect((await requestJson('POST', '/api/admin/invites', body, headers)).status).toBe(200)
+
+    const duplicate = await requestJson('POST', '/api/admin/invites', {
+      ...body, code: 'DUPLICATE',
+    }, headers)
+    expect(duplicate.status).toBe(400)
+    expect(duplicate.json).toMatchObject({ ok: false, code: 'invite_code_taken' })
+  })
+
+  it.each([
+    [{ code: 'x'.repeat(129), expiresInDays: 7, maxUses: 1 }, 'invalid_invite_code'],
+    [{ expiresAt: Date.now() - 1, maxUses: 1 }, 'invalid_invite_expiry'],
+    [{ expiresAt: Date.now() + 1000, expiresInDays: 7, maxUses: 1 }, 'invalid_invite_expiry'],
+    [{ expiresInDays: 366, maxUses: 1 }, 'invalid_invite_expiry'],
+    [{ expiresInDays: 7, maxUses: 0 }, 'invalid_invite_max_uses'],
+    [{ expiresInDays: 7, maxUses: 1.5 }, 'invalid_invite_max_uses'],
+  ])('rejects invalid invite creation input %#', async (body, code) => {
+    process.env.ADMIN_USERS = 'admin'
+    const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
+    const token = createSession(admin.id)
+    const response = await requestJson('POST', '/api/admin/invites', body, {
+      Cookie: `oa_session=${token}`,
+    })
+    expect(response.status).toBe(400)
+    expect(response.json).toMatchObject({ ok: false, code })
+  })
+
   it('lets admins revoke unused invites', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
     const token = createSession(admin.id)
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
 
     const revoked = await requestJson(
       'POST',
@@ -1192,7 +1350,7 @@ describe('auth routes', () => {
   it('rejects inviteCode body after intent=login onboarding for an unlinked identity', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('login_invite_admin', 'password123', 'Login Invite Admin')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-login-unlinked',
@@ -1386,7 +1544,7 @@ describe('auth routes', () => {
   it('carries invite hash from oauth start into onboarding ticket', async () => {
     process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
     const admin = await createLocalUserForTests('hash_admin', 'password123', 'Hash Admin')
-    const invite = createInvite(admin.id, 7)
+    const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
     vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({
       provider: 'github',
       providerUserId: 'gh-hashed-invite',
