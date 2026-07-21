@@ -355,6 +355,14 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE rooms ADD COLUMN draft_parents INTEGER;
       `,
     },
+    {
+      version: 17,
+      sql: `
+        ALTER TABLE account_invites ADD COLUMN max_uses INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE account_invites ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0;
+        UPDATE account_invites SET use_count = 1 WHERE used_at IS NOT NULL;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

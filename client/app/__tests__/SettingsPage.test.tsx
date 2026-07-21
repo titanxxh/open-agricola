@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from '../SettingsPage'
@@ -30,14 +30,19 @@ const labels: Record<string, string> = {
   'platform.linkGithub': '绑定 GitHub',
   'platform.linkGoogle': '绑定 Google',
   'platform.adminInvites': '邀请注册',
-  'platform.generateInvite': '生成邀请码',
+  'platform.inviteCode': '邀请码',
+  'platform.inviteCodeHint': '留空则自动生成',
+  'platform.generateInvite': '创建邀请码',
   'platform.inviteExpiresInDays': '有效天数',
+  'platform.inviteExpiresAt': '到期时间',
+  'platform.inviteMaxUses': '最大使用次数',
+  'platform.inviteUsage': '已使用 {used} / {max}',
   'platform.generatedInvite': '新邀请码',
   'platform.inviteShownOnce': '请立即复制，之后不会再次显示明文。',
   'platform.revokeInvite': '撤销',
   'platform.noInvites': '暂无邀请码',
   'platform.inviteStatus.active': '可用',
-  'platform.inviteStatus.used': '已使用',
+  'platform.inviteStatus.used': '已用完',
   'platform.inviteStatus.expired': '已过期',
   'platform.inviteStatus.revoked': '已撤销',
   'platform.dangerZone': '危险区域',
@@ -53,8 +58,16 @@ const labels: Record<string, string> = {
   'platform.authErrors.invalid_display_name': '显示名称需要 1-60 个字符',
   'platform.authErrors.invalid_password': '密码至少需要 8 个字符',
   'platform.authErrors.admin_required': '需要管理员权限',
+  'platform.authErrors.invalid_invite_code': '邀请码格式无效',
+  'platform.authErrors.invite_code_taken': '邀请码已存在',
+  'platform.authErrors.invalid_invite_expiry': '邀请码到期时间无效',
+  'platform.authErrors.invalid_invite_max_uses': '最大使用次数必须是正整数',
 }
-const translate = (key: string) => labels[key] ?? key
+const translate = (key: string, params: Record<string, string | number> = {}) =>
+  Object.entries(params).reduce(
+    (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
+    labels[key] ?? key,
+  )
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -174,18 +187,19 @@ describe('SettingsPage', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invite: { id: 'inv1', code: 'oa_secret', createdAt: 1000, expiresAt: 2000 },
+        invite: { id: 'inv1', code: 'oa_secret', createdAt: 1000, expiresAt: 2000, useCount: 0, maxUses: 1 },
       })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, useCount: 0, maxUses: 1, status: 'active' }],
       })))
 
     render(<SettingsPage />)
     await screen.findByText('邀请注册')
-    await user.click(screen.getByRole('button', { name: '生成邀请码' }))
+    await user.click(screen.getByRole('button', { name: '创建邀请码' }))
 
-    await waitFor(() => expect(screen.getByText('oa_secret')).toBeInTheDocument())
+    const generatedCode = await screen.findByText('oa_secret')
+    expect(generatedCode).toHaveClass('settings-generated-invite-code')
     expect(screen.getByText('请立即复制，之后不会再次显示明文。')).toBeInTheDocument()
     expect(apiFetchMock).toHaveBeenCalledWith('/api/admin/invites', expect.objectContaining({ method: 'POST' }))
   })
@@ -198,21 +212,21 @@ describe('SettingsPage', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invite: { id: 'inv1', code: 'oa_secret', createdAt: 1000, expiresAt: 2000 },
+        invite: { id: 'inv1', code: 'oa_secret', createdAt: 1000, expiresAt: 2000, useCount: 0, maxUses: 1 },
       })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, useCount: 0, maxUses: 1, status: 'active' }],
       })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, useCount: 0, maxUses: 1, status: 'active' }],
       })))
 
     const { unmount } = render(<SettingsPage />)
     await screen.findByText('邀请注册')
-    await user.click(screen.getByRole('button', { name: '生成邀请码' }))
+    await user.click(screen.getByRole('button', { name: '创建邀请码' }))
 
     await waitFor(() => expect(screen.getByText('oa_secret')).toBeInTheDocument())
     unmount()
@@ -230,12 +244,12 @@ describe('SettingsPage', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, status: 'active' }],
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: null, useCount: 0, maxUses: 1, status: 'active' }],
       })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: 1500, status: 'revoked' }],
+        invites: [{ id: 'inv1', createdAt: 1000, expiresAt: 2000, usedAt: null, usedBy: null, revokedAt: 1500, useCount: 0, maxUses: 1, status: 'revoked' }],
       })))
 
     render(<SettingsPage />)
@@ -246,5 +260,89 @@ describe('SettingsPage', () => {
       expect(apiFetchMock).toHaveBeenCalledWith('/api/admin/invites/inv1/revoke', expect.objectContaining({ method: 'POST' }))
     })
     await waitFor(() => expect(screen.getByText('已撤销')).toBeInTheDocument())
+  })
+
+  it('submits a custom reusable invite with the exact expiration', async () => {
+    const user = userEvent.setup()
+    mockUser = { id: 'admin1', username: 'admin', displayName: 'Admin', isAdmin: true }
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        invite: { id: 'inv1', code: 'FAMILY', createdAt: 1, expiresAt: 2, useCount: 0, maxUses: 4 },
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
+
+    render(<SettingsPage />)
+    await screen.findByText('邀请注册')
+    await user.type(screen.getByLabelText('邀请码'), 'FAMILY')
+    fireEvent.change(screen.getByLabelText('最大使用次数'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('到期时间'), { target: { value: '2026-07-25T12:30' } })
+    await user.click(screen.getByRole('button', { name: '创建邀请码' }))
+
+    const createCall = apiFetchMock.mock.calls.find(([url, init]) =>
+      url === '/api/admin/invites' && init?.method === 'POST')
+    const payload = JSON.parse(String(createCall?.[1]?.body))
+    expect(payload).toEqual({
+      code: 'FAMILY',
+      expiresAt: new Date('2026-07-25T12:30').getTime(),
+      maxUses: 4,
+    })
+  })
+
+  it('keeps valid days and expiration time synchronized', async () => {
+    const now = new Date('2026-07-21T00:00:00Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
+    mockUser = { id: 'admin1', username: 'admin', displayName: 'Admin', isAdmin: true }
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [] })))
+
+    try {
+      render(<SettingsPage />)
+      await screen.findByText('邀请注册')
+      const days = screen.getByLabelText('有效天数')
+      const expiration = screen.getByLabelText('到期时间') as HTMLInputElement
+
+      fireEvent.change(days, { target: { value: '2' } })
+      expect(new Date(expiration.value).getTime()).toBe(now + 2 * 86_400_000)
+
+      const target = now + 3.5 * 86_400_000
+      const targetDate = new Date(target)
+      const localValue = new Date(target - targetDate.getTimezoneOffset() * 60_000)
+        .toISOString().slice(0, 16)
+      fireEvent.change(expiration, { target: { value: localValue } })
+      expect(days).toHaveValue(4)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('shows invite usage and revokes a partially used active invite', async () => {
+    const user = userEvent.setup()
+    mockUser = { id: 'admin1', username: 'admin', displayName: 'Admin', isAdmin: true }
+    const active = {
+      id: 'inv1', createdAt: 1000, expiresAt: Date.now() + 86_400_000,
+      usedAt: 1500, usedBy: 'u2', revokedAt: null,
+      useCount: 2, maxUses: 4, status: 'active',
+    }
+    apiFetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, identities: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, invites: [active] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true, invites: [{ ...active, revokedAt: Date.now(), status: 'revoked' }],
+      })))
+
+    render(<SettingsPage />)
+    const usage = await screen.findByText('已使用 2 / 4')
+    expect(usage.closest('p')).toHaveClass('settings-invite-row')
+    await user.click(screen.getByRole('button', { name: '撤销' }))
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith(
+      '/api/admin/invites/inv1/revoke',
+      expect.objectContaining({ method: 'POST' }),
+    ))
+    await screen.findByText('已撤销')
   })
 })

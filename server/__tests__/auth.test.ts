@@ -69,6 +69,8 @@ vi.mock('../db.ts', () => {
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at INTEGER NOT NULL,
       expires_at INTEGER,
+      max_uses INTEGER NOT NULL DEFAULT 1,
+      use_count INTEGER NOT NULL DEFAULT 0,
       used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       used_at INTEGER,
       revoked_at INTEGER
@@ -327,7 +329,7 @@ describe('auth', () => {
     it('consumes an invite during invite-only password registration', async () => {
       process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
       const admin = await createLocalUserForTests('invite_admin', 'password123', 'Invite Admin')
-      const invite = createInvite(admin.id, 7)
+      const invite = createInvite(admin.id, { expiresAt: Date.now() + 7 * 86_400_000, maxUses: 1 })
 
       const result = await registerPasswordUser({
         username: 'inviteduser',
@@ -346,6 +348,36 @@ describe('auth', () => {
       }
       expect(inviteRow.used_by).toBe(result.userId)
       expect(inviteRow.used_at).toBeGreaterThan(0)
+    })
+
+    it('allows password registrations exactly up to a reusable invite limit', async () => {
+      process.env.ACCOUNT_REGISTRATION_POLICY = 'invite_only'
+      const admin = await createLocalUserForTests('multi_admin', 'password123', 'Admin')
+      const invite = createInvite(admin.id, {
+        code: 'PASSWORD-TWO', expiresAt: Date.now() + 86_400_000, maxUses: 2,
+      })
+
+      for (const suffix of ['one', 'two']) {
+        const result = await registerPasswordUser({
+          username: `invite${suffix}`,
+          email: `invite${suffix}@example.com`,
+          password: 'password123',
+          confirmPassword: 'password123',
+          inviteCode: invite.code,
+        })
+        expect(result.ok).toBe(true)
+      }
+
+      const rejected = await registerPasswordUser({
+        username: 'invitethree',
+        email: 'invitethree@example.com',
+        password: 'password123',
+        confirmPassword: 'password123',
+        inviteCode: invite.code,
+      })
+      expect(rejected).toMatchObject({ ok: false, code: 'invalid_invite' })
+      expect(getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id))
+        .toEqual({ use_count: 2 })
     })
 
     it('returns invalid_invite and rolls back the user when invite consumption fails', async () => {
